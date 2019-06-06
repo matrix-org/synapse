@@ -50,6 +50,11 @@ class EmailConfig(Config):
         else:
             self.email_app_name = "Matrix"
 
+        # TODO: Rename notif_from to something more generic, or have a separate
+        # from for password resets, message notifications, etc?
+        # Currently the email section is a bit bogged down with settings for
+        # multiple functions. Would be good to split it out into separate
+        # sections and only put the common ones under email:
         self.email_notif_from = email_config.get("notif_from", None)
         if self.email_notif_from is not None:
             # make sure it's valid
@@ -74,27 +79,27 @@ class EmailConfig(Config):
             "account_validity", {},
         ).get("renew_at")
 
-        self.email_enable_password_reset_from_is = email_config.get(
-            "enable_password_reset_from_is", False,
+        email_trust_identity_server_for_password_resets = email_config.get(
+            "trust_identity_server_for_password_resets", False,
         )
-        self.enable_password_resets = (
-            self.email_enable_password_reset_from_is
-            or (not self.email_enable_password_reset_from_is and email_config != {})
+        self.email_password_reset_behaviour = (
+            "remote" if email_trust_identity_server_for_password_resets else "local"
         )
-        if email_config == {} and not self.email_enable_password_reset_from_is:
+        if not email_trust_identity_server_for_password_resets and email_config == {}:
             logger.warn(
-                "User password resets have been disabled due to lack of email config."
+                "User password resets have been disabled due to lack of email config"
             )
+            self.email_password_reset_behaviour = "off"
 
-        self.email_validation_token_lifetime = email_config.get(
-            "validation_token_lifetime", 15 * 60,
+        # Get lifetime of a validation token in milliseconds
+        self.email_validation_token_lifetime = self.parse_duration(
+            email_config.get("validation_token_lifetime", "1h")
         )
 
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or (self.enable_password_resets
-                and self.email_enable_password_reset_from_is)
+            or self.email_password_reset_behaviour == "local"
         ):
             # make sure we can import the required deps
             import jinja2
@@ -103,7 +108,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.enable_password_resets and not self.email_enable_password_reset_from_is:
+        if self.email_password_reset_behaviour == "local":
             required = [
                 "smtp_host",
                 "smtp_port",
@@ -117,7 +122,7 @@ class EmailConfig(Config):
 
             if (len(missing) > 0):
                 raise RuntimeError(
-                    "email.enable_password_reset_from_is is False "
+                    "email.password_reset_behaviour is set to 'local' "
                     "but required keys are missing: %s" %
                     (", ".join(["email." + k for k in missing]),)
                 )
@@ -139,8 +144,9 @@ class EmailConfig(Config):
 
             if config.get("public_baseurl") is None:
                 raise RuntimeError(
-                    "email.enable_password_reset_from_is is False but no "
-                    "public_baseurl is set"
+                    "email.password_reset_behaviour is set to 'local' but no "
+                    "public_baseurl is set. This is necessary to generate password "
+                    "reset links"
                 )
 
         if self.email_enable_notifs:
@@ -200,17 +206,6 @@ class EmailConfig(Config):
                 if not os.path.isfile(p):
                     raise ConfigError("Unable to find email template file %s" % (p, ))
 
-    def _get_template_content(self, template_dir, path):
-        fullpath = os.path.join(template_dir, path)
-
-        try:
-            with open(fullpath) as f:
-                return f.read()
-        except Exception as e:
-            raise ConfigError(
-                "Unable to read content of template: %s - %s", fullpath, e,
-            )
-
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable sending emails for password resets, notification events or
@@ -220,6 +215,7 @@ class EmailConfig(Config):
         # smtp_pass variables should be used
         #
         #email:
+        #   enable_notifs: False
         #   smtp_host: "localhost"
         #   smtp_port: 25 # SSL: 465, STARTTLS: 587
         #   smtp_user: "exampleusername"
@@ -227,10 +223,6 @@ class EmailConfig(Config):
         #   require_transport_security: False
         #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
         #   app_name: Matrix
-        #
-        #   # Enable sending email notifications for new chat messages
-        #   #
-        #   enable_notifs: False
         #
         #   # Enable email notifications by default
         #   notif_for_new_users: True
@@ -240,7 +232,7 @@ class EmailConfig(Config):
         #   # the "app_name" setting is ignored
         #   riot_base_url: "http://localhost/riot"
         #
-        #   # Disable sending password reset emails via the configured, trusted
+        #   # Enable sending password reset emails via the configured, trusted
         #   # identity servers
         #   #
         #   # IMPORTANT! This will give a malicious or overtaken identity server
@@ -248,13 +240,15 @@ class EmailConfig(Config):
         #   # that you want to do this! It is strongly recommended that password
         #   # reset emails be sent by the homeserver instead
         #   #
-        #   #enable_password_reset_from_is: False
+        #   # If this option is set to false and SMTP options have not been
+        #   # configured, resetting user passwords via email will be disabled
+        #   #trust_identity_server_for_password_resets: false
         #
-        #   # Configure the time in seconds that a validation email or text
-        #   # message code will expire after sending
+        #   # Configure the time that a validation email or text message code
+        #   # will expire after sending
         #   #
         #   # This is currently used for password resets
-        #   #validation_token_lifetime: 900 # 15 minutes
+        #   #validation_token_lifetime: 1h
         #
         #   # Template directory. All template files should be stored within this
         #   # directory

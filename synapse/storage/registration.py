@@ -29,6 +29,8 @@ from synapse.storage._base import SQLBaseStore
 from synapse.types import UserID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
+THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
+
 
 class RegistrationWorkerStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
@@ -36,6 +38,11 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         self.config = hs.config
         self.clock = hs.get_clock()
+
+        # Create a background job for culling expired 3PID validity tokens
+        hs.get_clock().looping_call(
+            self.cull_expired_threepid_validation_tokens, THIRTY_MINUTES_IN_MS,
+        )
 
     @cached()
     def get_user_by_id(self, user_id):
@@ -1136,15 +1143,15 @@ class RegistrationStore(
         validated_at=None,
     ):
         """Upsert a threepid validation session
-
         Args:
             medium (str): The medium of the 3PID
             address (str): The address of the 3PID
             client_secret (str): A unique string provided by the client to
                 help identify this validation attempt
+            send_attempt (int): The latest send_attempt on this session
             session_id (str): The id of this validation session
-            validated_at (int): The unix timestamp in milliseconds of when
-                the session was marked as valid
+            validated_at (int|None): The unix timestamp in milliseconds of
+                when the session was marked as valid
         """
         insertion_values = {
             "medium": medium,
@@ -1163,12 +1170,70 @@ class RegistrationStore(
             desc="upsert_threepid_validation_session",
         )
 
+    def start_or_continue_validation_session(
+        self,
+        medium,
+        address,
+        session_id,
+        client_secret,
+        send_attempt,
+        next_link,
+        token,
+        token_expires,
+    ):
+        """Creates a new threepid validation session if it does not already
+        exist and associates a new validation token with it
+
+        Args:
+            medium (str): The medium of the 3PID
+            address (str): The address of the 3PID
+            session_id (str): The id of this validation session
+            client_secret (str): A unique string provided by the client to
+                help identify this validation attempt
+            send_attempt (int): The latest send_attempt on this session
+            next_link (str|None): The link to redirect the user to upon
+                successful validation
+            token (str): The validation token
+            token_expires (int): The timestamp for which after the token
+                will no longer be valid
+        """
+        def start_or_continue_validation_session_txn(txn):
+            # Create or update a validation session
+            self._simple_upsert_txn(
+                txn,
+                table="threepid_validation_session",
+                keyvalues={"session_id": session_id},
+                values={"last_send_attempt": send_attempt},
+                insertion_values={
+                    "medium": medium,
+                    "address": address,
+                    "client_secret": client_secret,
+                },
+            )
+
+            # Create a new validation token with this session ID
+            self._simple_insert_txn(
+                txn,
+                table="threepid_validation_token",
+                values={
+                    "session_id": session_id,
+                    "token": token,
+                    "next_link": next_link,
+                    "expires": token_expires,
+                },
+            )
+
+        return self.runInteraction(
+            "start_or_continue_validation_session",
+            start_or_continue_validation_session_txn,
+        )
+
     def insert_threepid_validation_token(
         self,
         session_id,
         token,
-        next_link,
         expires,
+        next_link=None,
     ):
         """Insert a new 3PID validation token and details
 
@@ -1178,6 +1243,8 @@ class RegistrationStore(
             token (str): The validation token
             expires (int): The timestamp for which after this token will no
                 longer be valid
+            next_link (str|None): The link to redirect the user to upon successful
+                validation
         """
         return self._simple_insert(
             table="threepid_validation_token",
