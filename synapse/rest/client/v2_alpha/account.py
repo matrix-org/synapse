@@ -176,6 +176,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
         token_expires = (self.hs.clock.time_msec() +
                          self.config.email_validation_token_lifetime)
+        logger.info("lifetime: %s", self.config.email_validation_token_lifetime)
 
         yield self.datastore.start_or_continue_validation_session(
             "email", email, session_id, client_secret, send_attempt,
@@ -259,10 +260,6 @@ class ThreepidSubmitTokenServlet(RestServlet):
                 token,
                 self.clock.time_msec(),
             )
-
-            # Delete associated session tokens from the db as we have no
-            # further use for them
-            yield self.datastore.delete_threepid_tokens(sid)
 
             # Perform a 302 redirect if next_link is set
             if next_link:

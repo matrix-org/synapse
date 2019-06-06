@@ -477,12 +477,15 @@ class AuthHandler(BaseHandler):
         identity_handler = self.hs.get_handlers().identity_handler
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
-        if password_servlet and not self.hs.config.email_enable_password_reset_from_is:
+        if password_servlet and self.hs.config.email_password_reset_behaviour == "local":
             row = yield self.store.get_threepid_validation_session(
                 medium,
                 threepid_creds["client_secret"],
                 sid=threepid_creds["sid"],
             )
+
+            logger.info("STUFF: %s", medium)
+            logger.info("ROW: %s", row)
 
             threepid = {
                 "medium": row["medium"],
@@ -490,11 +493,13 @@ class AuthHandler(BaseHandler):
                 "validated_at": row["validated_at"],
             } if row else None
 
-            # Valid threepid returned, delete from the db
-            yield self.store.delete_threepid_session(threepid_creds["sid"])
-        else:
-            logger.info("Using IS")
+            if row:
+                # Valid threepid returned, delete from the db
+                yield self.store.delete_threepid_session(threepid_creds["sid"])
+        elif self.hs.config.password_reset_behaviour == "remote":
             threepid = yield identity_handler.threepid_from_creds(threepid_creds)
+        else:
+            raise SynapseError(400, "Password resets are not enabled on this homeserver")
 
         if not threepid:
             raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
