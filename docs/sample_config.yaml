@@ -1019,7 +1019,7 @@ password_config:
 
 
 # Enable sending emails for password resets, notification events or
-# account expiry notices.
+# account expiry notices
 #
 # If your SMTP server requires authentication, the optional smtp_user &
 # smtp_pass variables should be used
@@ -1080,6 +1080,12 @@ password_config:
 #   #
 #   #password_reset_template_html: password_reset.html
 #   #password_reset_template_text: password_reset.txt
+#
+#   # Templates for password reset success and failure pages that a user
+#   # will see after attempting to reset their password
+#   #
+#   #password_reset_template_success_html: password_reset_success.html
+#   #password_reset_template_failure_html: password_reset_failure.html
 
 
 #password_providers:
