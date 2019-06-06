@@ -88,7 +88,7 @@ and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
 ``smtp_pass``, and ``require_transport_security``..
 
 If you are absolutely certain that you wish to continue using an identity
-server for email, set ``enable_password_reset_from_is`` to ``true``.
+server for password resets, set ``enable_password_reset_from_is`` to ``true``.
 
 See the `sample configuration file
 <https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_
