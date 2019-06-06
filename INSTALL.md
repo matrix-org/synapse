@@ -415,7 +415,8 @@ compromised, it would be theoretically possible to hijack an account through
 this means.
 
 If you are absolutely certain that you wish to continue using an identity
-server for email, set ``enable_password_reset_from_is`` to ``true``.
+server for email, set ``disable_local_password_reset`` to ``true``
+under the ``email:`` configuration section.
 
 ## Registering a user
 
