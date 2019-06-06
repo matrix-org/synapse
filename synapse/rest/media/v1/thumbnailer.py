@@ -128,5 +128,8 @@ class Thumbnailer(object):
 
     def _encode_image(self, output_image, output_type):
         output_bytes_io = BytesIO()
+        # jpeg does not support alpha
+        if output_type == 'JPEG' and output_image.mode == 'RGBA':
+            output_image.convert('RGB')
         output_image.save(output_bytes_io, self.FORMATS[output_type], quality=80)
         return output_bytes_io
