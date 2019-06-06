@@ -592,7 +592,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
     def get_max_topological_token(self, room_id, stream_key):
-        """Get the max topological token in a room that before given stream
+        """Get the max topological token in a room before the given stream
         ordering.
 
         Args:
