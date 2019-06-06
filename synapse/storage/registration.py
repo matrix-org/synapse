@@ -39,11 +39,6 @@ class RegistrationWorkerStore(SQLBaseStore):
         self.config = hs.config
         self.clock = hs.get_clock()
 
-        # Create a background job for culling expired 3PID validity tokens
-        hs.get_clock().looping_call(
-            self.cull_expired_threepid_validation_tokens, THIRTY_MINUTES_IN_MS,
-        )
-
     @cached()
     def get_user_by_id(self, user_id):
         return self._simple_select_one(
@@ -601,6 +596,11 @@ class RegistrationStore(
 
         self.register_background_update_handler(
             "user_threepids_grandfather", self._bg_user_threepids_grandfather,
+        )
+
+        # Create a background job for culling expired 3PID validity tokens
+        hs.get_clock().looping_call(
+            self.cull_expired_threepid_validation_tokens, THIRTY_MINUTES_IN_MS,
         )
 
     @defer.inlineCallbacks
