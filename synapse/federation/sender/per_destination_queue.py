@@ -349,9 +349,10 @@ class PerDestinationQueue(object):
     @defer.inlineCallbacks
     def _get_new_device_messages(self, limit):
         last_device_list = self._last_device_list_stream_id
-        # Will return at most 20 entries
+
+        # Retrieve list of new device updates to send to the destination
         now_stream_id, results = yield self._store.get_devices_by_remote(
-            self._destination, last_device_list
+            self._destination, last_device_list, limit=limit,
         )
         edus = [
             Edu(
