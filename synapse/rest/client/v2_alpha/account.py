@@ -46,10 +46,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if (
-            hs.config.enable_password_resets
-            and not hs.config.email_enable_password_reset_from_is
-        ):
+        if self.config.email_password_reset_behaviour == "local":
             from synapse.push.mailer import Mailer, load_jinja2_templates
             templates = load_jinja2_templates(
                 config=hs.config,
@@ -63,15 +60,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 template_text=templates[1],
             )
 
-        # Create a background job for culling expired 3PID validity tokens
-        # every minute
-        hs.get_clock().looping_call(
-            self.datastore.cull_expired_threepid_validation_tokens, 60 * 1000,
-        )
-
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if not self.config.enable_password_resets:
+        if self.config.email_password_reset_behaviour == "off":
             raise SynapseError(400, "Password resets have been disabled on this server")
 
         body = parse_json_object_from_request(request)
@@ -80,7 +71,13 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             'client_secret', 'email', 'send_attempt'
         ])
 
-        if not check_3pid_allowed(self.hs, "email", body['email']):
+        # Extract params from body
+        client_secret = body["client_secret"]
+        email = body["email"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
+
+        if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized on this server",
@@ -88,21 +85,25 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
-            'email', body['email']
+            'email', email,
         )
 
         if existingUid is None:
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
-        if self.config.email_enable_password_reset_from_is:
+        if self.config.email_password_reset_behaviour == "remote":
             if 'id_server' not in body:
                 raise SynapseError(400, "Missing 'id_server' param in body")
 
             # Have the identity server handle the password reset flow
-            ret = yield self.identity_handler.requestEmailToken(**body)
+            ret = yield self.identity_handler.requestEmailToken(
+                body["id_server"], email, client_secret, send_attempt, next_link,
+            )
         else:
             # Send password reset emails from Synapse
-            sid = yield self.send_password_reset(**body)
+            sid = yield self.send_password_reset(
+                email, client_secret, send_attempt, next_link,
+            )
 
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
@@ -110,7 +111,13 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
-    def send_password_reset(self, email, client_secret, send_attempt, **kwargs):
+    def send_password_reset(
+        self,
+        email,
+        client_secret,
+        send_attempt,
+        next_link=None,
+    ):
         """Send a password reset email
 
         Args:
@@ -126,17 +133,15 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         """
         # Check that this email/client_secret/send_attempt combo is new or
         # greater than what we've seen previously
-        ret = yield self.datastore.get_threepid_validation_session(
+        session = yield self.datastore.get_threepid_validation_session(
             "email", client_secret, address=email, validated=False,
         )
 
-        logger.info("Ret is %s", ret)
-
         # Check to see if a session already exists and that it is not yet
         # marked as validated
-        if ret and ret.get("validated_at") is None:
-            session_id = ret['session_id']
-            last_send_attempt = ret['last_send_attempt']
+        if session and session.get("validated_at") is None:
+            session_id = session['session_id']
+            last_send_attempt = session['last_send_attempt']
 
             # Check that the send_attempt is higher than previous attempts
             if send_attempt <= last_send_attempt:
@@ -165,15 +170,11 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             )
 
         token_expires = (self.hs.clock.time_msec() +
-                         self.config.email_validation_token_lifetime * 1000)
+                         self.config.email_validation_token_lifetime)
 
-        yield self.datastore.insert_threepid_validation_token(
-            session_id, token, kwargs.get("next_link"), token_expires,
-        )
-
-        # Save the session_id and send_attempt to the database
-        yield self.datastore.upsert_threepid_validation_session(
-            "email", email, client_secret, send_attempt, session_id,
+        yield self.datastore.start_or_continue_validation_session(
+            "email", email, session_id, client_secret, send_attempt,
+            next_link, token, token_expires,
         )
 
         defer.returnValue(session_id)
@@ -190,7 +191,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if not self.config.enable_password_resets:
+        if not self.config.email_password_reset_behaviour == "off":
             raise SynapseError(400, "Password resets have been disabled on this server")
 
         body = parse_json_object_from_request(request)

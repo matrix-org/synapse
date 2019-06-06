@@ -1025,6 +1025,7 @@ password_config:
 # smtp_pass variables should be used
 #
 #email:
+#   enable_notifs: False
 #   smtp_host: "localhost"
 #   smtp_port: 25 # SSL: 465, STARTTLS: 587
 #   smtp_user: "exampleusername"
@@ -1032,10 +1033,6 @@ password_config:
 #   require_transport_security: False
 #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
 #   app_name: Matrix
-#
-#   # Enable sending email notifications for new chat messages
-#   #
-#   enable_notifs: False
 #
 #   # Enable email notifications by default
 #   notif_for_new_users: True
@@ -1045,7 +1042,7 @@ password_config:
 #   # the "app_name" setting is ignored
 #   riot_base_url: "http://localhost/riot"
 #
-#   # Disable sending password reset emails via the configured, trusted
+#   # Enable sending password reset emails via the configured, trusted
 #   # identity servers
 #   #
 #   # IMPORTANT! This will give a malicious or overtaken identity server
@@ -1053,13 +1050,15 @@ password_config:
 #   # that you want to do this! It is strongly recommended that password
 #   # reset emails be sent by the homeserver instead
 #   #
-#   #enable_password_reset_from_is: False
+#   # If this option is set to false and SMTP options have not been
+#   # configured, resetting user passwords via email will be disabled
+#   #trust_identity_server_for_password_resets: false
 #
-#   # Configure the time in seconds that a validation email or text
-#   # message code will expire after sending
+#   # Configure the time that a validation email or text message code
+#   # will expire after sending
 #   #
 #   # This is currently used for password resets
-#   #validation_token_lifetime: 900 # 15 minutes
+#   #validation_token_lifetime: 1h
 #
 #   # Template directory. All template files should be stored within this
 #   # directory

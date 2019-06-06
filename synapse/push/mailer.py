@@ -117,7 +117,7 @@ class Mailer(object):
 
         link = (
             self.hs.config.public_baseurl +
-            "_matrix/identity/api/v1/validate/email/submitToken"
+            "_synapse/password_reset/email/submit_token"
             "?token=%s&client_secret=%s&sid=%s" %
             (token, client_secret, sid)
         )
