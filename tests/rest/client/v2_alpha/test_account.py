@@ -259,12 +259,12 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         tok = self.login("kermit", "test")
 
         request_data = json.dumps({
-            "auth":{
+            "auth": {
                 "type": "m.login.password",
                 "user": user_id,
                 "password": "test",
             },
-            "erase":False,
+            "erase": False,
         })
         request, channel = self.make_request(
             "POST",
