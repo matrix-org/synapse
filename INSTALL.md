@@ -406,19 +406,10 @@ this is required to support the 'password reset' feature.
 To configure an SMTP server for Synapse, modify the configuration section
 headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
 and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
-``smtp_pass``, and ``require_transport_security``..
+``smtp_pass``, and ``require_transport_security``.
 
 If Synapse is not configured with an SMTP server, password reset via email will
  be disabled by default.
-
-Alternatively it is possible delegate the sending of email to the server's
-identity server. Doing so is convenient but not recommended, since a malicious
-or compromised identity server could theoretically hijack a given user's
-account by redirecting mail.
-
-If you are absolutely certain that you wish to use the server's identity server
-for password resets, set ``trust_identity_server_for_password_resets`` to
-``true`` under the ``email:`` configuration section.
 
 ## Registering a user
 
