@@ -397,6 +397,27 @@ To configure Synapse to expose an HTTPS port, you will need to edit
 For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
 please take a look at [our guide](docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100).
 
+## Email
+Email
+It is desirable for Synapse to have the capability to send email, particularly
+in the case of password reset.
+
+To configure an SMTP server for Synapse, modify the configuration section
+headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
+and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
+``smtp_pass``, and ``require_transport_security``..
+
+If Synapse is not configured with an SMTP server, password reset via email will
+ be disabled.
+
+Previous versions of Synapse delegated the job of sending this email to an
+identity server. If the identity server was somehow malicious or became
+compromised, it would be theoretically possible to hijack an account through
+this means.
+
+If you are absolutely certain that you wish to continue using an identity
+server for email, set ``enable_password_reset_from_is`` to ``true``.
+
 ## Registering a user
 
 You will need at least one user on your server in order to use a Matrix
