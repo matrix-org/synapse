@@ -52,7 +52,10 @@ returned by the Client-Server API:
 Upgrading to v1.0
 =================
 
-Validation of TLS certificates Synapse v1.0 is the first release to enforce
+Validation of TLS certificates 
+------------------------------
+
+Synapse v1.0 is the first release to enforce
 validation of TLS certificates for the federation API. It is therefore
 essential that your certificates are correctly configured. See the `FAQ
 <docs/MSC1711_certificates_FAQ.md>`_ for more information.
