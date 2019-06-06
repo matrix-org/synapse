@@ -25,7 +25,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
 )
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class RoomUpgradeRestServlet(RestServlet):
     Args:
         hs (synapse.server.HomeServer):
     """
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         # /rooms/$roomid/upgrade
         "/rooms/(?P<room_id>[^/]*)/upgrade$",
     )

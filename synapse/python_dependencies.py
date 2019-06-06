@@ -77,7 +77,7 @@ REQUIREMENTS = [
 ]
 
 CONDITIONAL_REQUIREMENTS = {
-    "email.enable_notifs": ["Jinja2>=2.9", "bleach>=1.4.2"],
+    "email": ["Jinja2>=2.9", "bleach>=1.4.2"],
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
 
     # we use execute_batch, which arrived in psycopg 2.7.

@@ -16,6 +16,7 @@
 # limitations under the License.
 import itertools
 import logging
+import random
 import sys
 import threading
 import time
@@ -247,6 +248,8 @@ class SQLBaseStore(object):
                 self._check_safe_to_upsert,
             )
 
+        self.rand = random.SystemRandom()
+
         if self._account_validity.enabled:
             self._clock.call_later(
                 0.0,
@@ -308,21 +311,36 @@ class SQLBaseStore(object):
             res = self.cursor_to_dict(txn)
             if res:
                 for user in res:
-                    self.set_expiration_date_for_user_txn(txn, user["name"])
+                    self.set_expiration_date_for_user_txn(
+                        txn,
+                        user["name"],
+                        use_delta=True,
+                    )
 
         yield self.runInteraction(
             "get_users_with_no_expiration_date",
             select_users_with_no_expiration_date_txn,
         )
 
-    def set_expiration_date_for_user_txn(self, txn, user_id):
+    def set_expiration_date_for_user_txn(self, txn, user_id, use_delta=False):
         """Sets an expiration date to the account with the given user ID.
 
         Args:
              user_id (str): User ID to set an expiration date for.
+             use_delta (bool): If set to False, the expiration date for the user will be
+                now + validity period. If set to True, this expiration date will be a
+                random value in the [now + period - d ; now + period] range, d being a
+                delta equal to 10% of the validity period.
         """
         now_ms = self._clock.time_msec()
         expiration_ts = now_ms + self._account_validity.period
+
+        if use_delta:
+            expiration_ts = self.rand.randrange(
+                expiration_ts - self._account_validity.startup_job_max_delta,
+                expiration_ts,
+            )
+
         self._simple_insert_txn(
             txn,
             "account_validity",
@@ -1265,7 +1283,8 @@ class SQLBaseStore(object):
             " AND ".join("%s = ?" % (k,) for k in keyvalues),
         )
 
-        return txn.execute(sql, list(keyvalues.values()))
+        txn.execute(sql, list(keyvalues.values()))
+        return txn.rowcount
 
     def _simple_delete_many(self, table, column, iterable, keyvalues, desc):
         return self.runInteraction(
@@ -1284,9 +1303,12 @@ class SQLBaseStore(object):
             column : column name to test for inclusion against `iterable`
             iterable : list
             keyvalues : dict of column names and values to select the rows with
+
+        Returns:
+            int: Number rows deleted
         """
         if not iterable:
-            return
+            return 0
 
         sql = "DELETE FROM %s" % table
 
@@ -1301,7 +1323,9 @@ class SQLBaseStore(object):
 
         if clauses:
             sql = "%s WHERE %s" % (sql, " AND ".join(clauses))
-        return txn.execute(sql, values)
+        txn.execute(sql, values)
+
+        return txn.rowcount
 
     def _get_cache_dict(
         self, db_conn, table, entity_column, stream_column, max_value, limit=100000

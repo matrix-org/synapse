@@ -37,8 +37,7 @@ from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.tcp.client import ReplicationClientHandler
-from synapse.rest.client.v1.base import ClientV1RestServlet, client_path_patterns
-from synapse.rest.client.v2_alpha._base import client_v2_patterns
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
@@ -49,11 +48,11 @@ from synapse.util.versionstring import get_version_string
 logger = logging.getLogger("synapse.app.frontend_proxy")
 
 
-class PresenceStatusStubServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/presence/(?P<user_id>[^/]*)/status")
+class PresenceStatusStubServlet(RestServlet):
+    PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
 
     def __init__(self, hs):
-        super(PresenceStatusStubServlet, self).__init__(hs)
+        super(PresenceStatusStubServlet, self).__init__()
         self.http_client = hs.get_simple_http_client()
         self.auth = hs.get_auth()
         self.main_uri = hs.config.worker_main_http_uri
@@ -84,7 +83,7 @@ class PresenceStatusStubServlet(ClientV1RestServlet):
 
 
 class KeyUploadServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
+    PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
     def __init__(self, hs):
         """

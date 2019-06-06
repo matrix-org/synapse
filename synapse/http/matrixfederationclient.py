@@ -285,7 +285,24 @@ class MatrixFederationHttpClient(object):
             request (MatrixFederationRequest): details of request to be sent
 
             timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server). 60s by default.
+                (including connecting to the server), *for each attempt*.
+                60s by default.
+
+            long_retries (bool): whether to use the long retry algorithm.
+
+                The regular retry algorithm makes 4 attempts, with intervals
+                [0.5s, 1s, 2s].
+
+                The long retry algorithm makes 11 attempts, with intervals
+                [4s, 16s, 60s, 60s, ...]
+
+                Both algorithms add -20%/+40% jitter to the retry intervals.
+
+                Note that the above intervals are *in addition* to the time spent
+                waiting for the request to complete (up to `timeout` ms).
+
+                NB: the long retry algorithm takes over 20 minutes to complete, with
+                a default timeout of 60s!
 
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
@@ -566,10 +583,14 @@ class MatrixFederationHttpClient(object):
                 the request body. This will be encoded as JSON.
             json_data_callback (callable): A callable returning the dict to
                 use as the request body.
-            long_retries (bool): A boolean that indicates whether we should
-                retry for a short or long time.
-            timeout(int): How long to try (in ms) the destination for before
-                giving up. None indicates no timeout.
+
+            long_retries (bool): whether to use the long retry algorithm. See
+                docs on _send_request for details.
+
+            timeout (int|None): number of milliseconds to wait for the response headers
+                (including connecting to the server), *for each attempt*.
+                self._default_timeout (60s) by default.
+
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
             backoff_on_404 (bool): True if we should count a 404 response as
@@ -627,15 +648,22 @@ class MatrixFederationHttpClient(object):
         Args:
             destination (str): The remote server to send the HTTP request
                 to.
+
             path (str): The HTTP path.
+
             data (dict): A dict containing the data that will be used as
                 the request body. This will be encoded as JSON.
-            long_retries (bool): A boolean that indicates whether we should
-                retry for a short or long time.
-            timeout(int): How long to try (in ms) the destination for before
-                giving up. None indicates no timeout.
+
+            long_retries (bool): whether to use the long retry algorithm. See
+                docs on _send_request for details.
+
+            timeout (int|None): number of milliseconds to wait for the response headers
+                (including connecting to the server), *for each attempt*.
+                self._default_timeout (60s) by default.
+
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
+
             args (dict): query params
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
@@ -686,14 +714,19 @@ class MatrixFederationHttpClient(object):
         Args:
             destination (str): The remote server to send the HTTP request
                 to.
+
             path (str): The HTTP path.
+
             args (dict|None): A dictionary used to create query strings, defaults to
                 None.
-            timeout (int): How long to try (in ms) the destination for before
-                giving up. None indicates no timeout and that the request will
-                be retried.
+
+            timeout (int|None): number of milliseconds to wait for the response headers
+                (including connecting to the server), *for each attempt*.
+                self._default_timeout (60s) by default.
+
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
+
             try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end of
                 the request. Workaround for #3622 in Synapse <= v0.99.3.
@@ -711,10 +744,6 @@ class MatrixFederationHttpClient(object):
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
-        logger.debug("get_json args: %s", args)
-
-        logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
-
         request = MatrixFederationRequest(
             method="GET",
             destination=destination,
@@ -746,12 +775,18 @@ class MatrixFederationHttpClient(object):
             destination (str): The remote server to send the HTTP request
                 to.
             path (str): The HTTP path.
-            long_retries (bool): A boolean that indicates whether we should
-                retry for a short or long time.
-            timeout(int): How long to try (in ms) the destination for before
-                giving up. None indicates no timeout.
+
+            long_retries (bool): whether to use the long retry algorithm. See
+                docs on _send_request for details.
+
+            timeout (int|None): number of milliseconds to wait for the response headers
+                (including connecting to the server), *for each attempt*.
+                self._default_timeout (60s) by default.
+
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
+
+            args (dict): query params
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
