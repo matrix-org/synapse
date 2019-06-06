@@ -174,7 +174,7 @@ def default_config(name, parse=False):
         "use_frozen_dicts": False,
         # We need a sane default_room_version, otherwise attempts to create
         # rooms will fail.
-        "default_room_version": "1",
+        "default_room_version": "4",
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         "update_user_directory": False,
