@@ -398,7 +398,6 @@ For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
 please take a look at [our guide](docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100).
 
 ## Email
-Email
 It is desirable for Synapse to have the capability to send email, particularly
 in the case of password reset.
 
