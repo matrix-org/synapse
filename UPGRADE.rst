@@ -68,7 +68,7 @@ example, it might be essential to be able to federate with a given legacy
 server in a closed federation. This can be done in one of two ways:- *
 Configure the global switch ``federation_verify_certificates`` to ``false``. *
 Configure a whitelist of server domains to trust via
-``federation_certificate_verification_whitelist``.
+   ``federation_certificate_verification_whitelist``.
 
 See the `sample configuration file
 <https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_
