@@ -398,7 +398,6 @@ For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
 please take a look at [our guide](docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100).
 
 ## Email
-Email
 It is desirable for Synapse to have the capability to send email, particularly
 in the case of password reset.
 
@@ -416,7 +415,8 @@ compromised, it would be theoretically possible to hijack an account through
 this means.
 
 If you are absolutely certain that you wish to continue using an identity
-server for email, set ``enable_password_reset_from_is`` to ``true``.
+server for email, set ``disable_local_password_reset`` to ``true``
+under the ``email:`` configuration section.
 
 ## Registering a user
 
