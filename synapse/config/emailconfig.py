@@ -123,8 +123,8 @@ class EmailConfig(Config):
             if (len(missing) > 0):
                 raise RuntimeError(
                     "email.password_reset_behaviour is set to 'local' "
-                    "but required keys are missing: %s email config: %s" %
-                    (", ".join(["email." + k for k in missing]), email_config)
+                    "but required keys are missing: %s" %
+                    (", ".join(["email." + k for k in missing]),)
                 )
 
             # Templates for password reset emails
