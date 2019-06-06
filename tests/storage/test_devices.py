@@ -88,63 +88,57 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         # Check original device_ids are contained within these updates
         self._check_devices_in_updates(device_ids, device_updates)
 
+    @defer.inlineCallbacks
+    def test_get_devices_by_remote_limited(self):
         # Test breaking the update limit in 1, 101, and 1 device_id segments
-        # First test adding an update with 1 device
-        device_ids = ["device_id0"]
+
+        # first add one device
+        device_ids1 = ["device_id0"]
         yield self.store.add_device_change_to_streams(
-            "user_id", device_ids, ["someotherhost"],
+            "user_id", device_ids1, ["someotherhost"],
         )
 
-        # Get all device updates ever meant for this remote
+        # then add 101
+        device_ids2 = ["device_id" + str(i + 1) for i in range(101)]
+        yield self.store.add_device_change_to_streams(
+            "user_id", device_ids2, ["someotherhost"],
+        )
+
+        # then one more
+        device_ids3 = ["newdevice"]
+        yield self.store.add_device_change_to_streams(
+            "user_id", device_ids3, ["someotherhost"],
+        )
+
+        #
+        # now read them back.
+        #
+
+        # first we should get a single update
+        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+            "someotherhost", -1, limit=100,
+        )
+        self._check_devices_in_updates(device_ids1, device_updates)
+
+        # Then we should get an empty list back as the 101 devices broke the limit
         now_stream_id, device_updates = yield self.store.get_devices_by_remote(
             "someotherhost", now_stream_id, limit=100,
         )
-
-        # Check we got a single device update
-        self._check_devices_in_updates(device_ids, device_updates)
-
-        # Try adding 101 updates (we expect to get an empty list back as it
-        # broke the limit)
-        device_ids = ["device_id" + str(i + 1) for i in range(101)]
-
-        yield self.store.add_device_change_to_streams(
-            "user_id", device_ids, ["someotherhost"],
-        )
-
-        # Get all device updates meant for this remote.
-        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
-            "someotherhost", now_stream_id, limit=100,
-        )
-
-        # We should get an empty list back as this broke the limit
         self.assertEqual(len(device_updates), 0)
 
-        # Try to insert one more device update. The 101 devices should've been cleared,
-        # so we should now just get one device update: this new one
-        device_ids = ["newdevice"]
-        yield self.store.add_device_change_to_streams(
-            "user_id", device_ids, ["someotherhost"],
-        )
-
-        # Get all device updates meant for this remote.
+        # The 101 devices should've been cleared, so we should now just get one device
+        # update
         now_stream_id, device_updates = yield self.store.get_devices_by_remote(
             "someotherhost", now_stream_id, limit=100,
         )
+        self._check_devices_in_updates(device_ids3, device_updates)
 
-        # We should just get our one device update
-        self._check_devices_in_updates(device_ids, device_updates)
-
-    def _check_devices_in_updates(self, device_ids, device_updates):
+    def _check_devices_in_updates(self, expected_device_ids, device_updates):
         """Check that an specific device ids exist in a list of device update EDUs"""
-        self.assertEqual(len(device_updates), len(device_ids))
+        self.assertEqual(len(device_updates), len(expected_device_ids))
 
-        for update in device_updates:
-            d_id = update["device_id"]
-            if d_id in device_ids:
-                device_ids.remove(d_id)
-
-        # All device_ids should've been accounted for
-        self.assertEqual(len(device_ids), 0)
+        received_device_ids = {update["device_id"] for update in device_updates}
+        self.assertEqual(received_device_ids, set(expected_device_ids))
 
     @defer.inlineCallbacks
     def test_update_device(self):
