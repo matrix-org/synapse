@@ -134,13 +134,33 @@ class EmailConfig(Config):
             self.email_password_reset_template_text = email_config.get(
                 "password_reset_template_text", "password_reset.txt",
             )
+            self.email_password_reset_failure_template = email_config.get(
+                "password_reset_failure_template", "password_reset_failure.html",
+            )
+            # This template does not support any replaceable variables, so we will
+            # read it from the disk once during setup
+            email_password_reset_success_template = email_config.get(
+                "password_reset_success_template", "password_reset_success.html",
+            )
 
             # Check templates exist
             for f in [self.email_password_reset_template_html,
-                      self.email_password_reset_template_text]:
+                      self.email_password_reset_template_text,
+                      self.email_password_reset_failure_template,
+                      email_password_reset_success_template]:
                 p = os.path.join(self.email_template_dir, f)
                 if not os.path.isfile(p):
                     raise ConfigError("Unable to find template file %s" % (p, ))
+
+            # Retrieve content of web templates
+            filepath = os.path.join(
+                self.email_template_dir,
+                email_password_reset_success_template,
+            )
+            self.email_password_reset_success_html_content = self.read_file(
+                filepath,
+                "email.password_reset_template_success_html",
+            )
 
             if config.get("public_baseurl") is None:
                 raise RuntimeError(
@@ -188,10 +208,6 @@ class EmailConfig(Config):
             self.email_riot_base_url = email_config.get(
                 "riot_base_url", None
             )
-        else:
-            self.email_enable_notifs = False
-            # Not much point setting defaults for the rest: it would be an
-            # error for them to be used.
 
         if account_validity_renewal_enabled:
             self.email_expiry_template_html = email_config.get(
@@ -209,7 +225,7 @@ class EmailConfig(Config):
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable sending emails for password resets, notification events or
-        # account expiry notices.
+        # account expiry notices
         #
         # If your SMTP server requires authentication, the optional smtp_user &
         # smtp_pass variables should be used
@@ -269,4 +285,10 @@ class EmailConfig(Config):
         #   #
         #   #password_reset_template_html: password_reset.html
         #   #password_reset_template_text: password_reset.txt
+        #
+        #   # Templates for password reset success and failure pages that a user
+        #   # will see after attempting to reset their password
+        #   #
+        #   #password_reset_template_success_html: password_reset_success.html
+        #   #password_reset_template_failure_html: password_reset_failure.html
         """

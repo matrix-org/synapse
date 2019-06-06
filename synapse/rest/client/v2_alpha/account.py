@@ -15,17 +15,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 
 from six.moves import http_client
+
+import jinja2
 
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
+from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
+    parse_string,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import random_string
@@ -171,6 +176,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
         token_expires = (self.hs.clock.time_msec() +
                          self.config.email_validation_token_lifetime)
+        logger.info("lifetime: %s", self.config.email_validation_token_lifetime)
 
         yield self.datastore.start_or_continue_validation_session(
             "email", email, session_id, client_secret, send_attempt,
@@ -219,6 +225,118 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
         defer.returnValue((200, ret))
+
+
+class PasswordResetSubmitTokenServlet(RestServlet):
+    """Handles 3PID validation token submission"""
+    PATTERNS = [
+        re.compile("^/_synapse/password_reset/(?P<medium>[^/]*)/submit_token/*$"),
+    ]
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(PasswordResetSubmitTokenServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.config = hs.config
+        self.clock = hs.get_clock()
+        self.datastore = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, medium):
+        if medium != "email":
+            raise SynapseError(
+                400,
+                "This medium is currently not supported for password resets",
+            )
+
+        sid = parse_string(request, "sid")
+        client_secret = parse_string(request, "client_secret")
+        token = parse_string(request, "token")
+
+        # Attempt to validate a 3PID sesssion
+        try:
+            # Mark the session as valid
+            next_link = yield self.datastore.validate_threepid_session(
+                sid,
+                client_secret,
+                token,
+                self.clock.time_msec(),
+            )
+
+            # Perform a 302 redirect if next_link is set
+            if next_link:
+                if next_link.startswith("file:///"):
+                    logger.warn(
+                        "Not redirecting to next_link as it is a local file: address"
+                    )
+                else:
+                    request.setResponseCode(302)
+                    request.setHeader("Location", next_link)
+                    finish_request(request)
+                    defer.returnValue(None)
+
+            # Otherwise show the success template
+            html = self.config.email_password_reset_success_html_content
+            request.setResponseCode(200)
+        except ThreepidValidationError as e:
+            # Show a failure page with a reason
+            html = self.load_jinja2_template(
+                self.config.email_template_dir,
+                self.config.email_password_reset_failure_template,
+                template_vars={
+                    "failure_reason": e.msg,
+                }
+            )
+            request.setResponseCode(e.code)
+
+        request.write(html.encode('utf-8'))
+        finish_request(request)
+        defer.returnValue(None)
+
+    def load_jinja2_template(self, template_dir, template_filename, template_vars):
+        """Loads a jinja2 template with variables to insert
+
+        Args:
+            template_dir (str): The directory where templates are stored
+            template_filename (str): The name of the template in the template_dir
+            template_vars (Dict): Dictionary of keys in the template
+                alongside their values to insert
+
+        Returns:
+            str containing the contents of the rendered template
+        """
+        loader = jinja2.FileSystemLoader(template_dir)
+        env = jinja2.Environment(loader=loader)
+
+        template = env.get_template(template_filename)
+        return template.render(**template_vars)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, medium):
+        if medium != "email":
+            raise SynapseError(
+                400,
+                "This medium is currently not supported for password resets",
+            )
+
+        body = parse_json_object_from_request(request)
+        assert_params_in_dict(body, [
+            'sid', 'client_secret', 'token',
+        ])
+
+        valid, _ = yield self.datastore.validate_threepid_validation_token(
+            body['sid'],
+            body['client_secret'],
+            body['token'],
+            self.clock.time_msec(),
+        )
+        response_code = 200 if valid else 400
+
+        defer.returnValue((response_code, {"success": valid}))
 
 
 class PasswordRestServlet(RestServlet):
@@ -532,6 +650,7 @@ class WhoamiRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
     MsisdnPasswordRequestTokenRestServlet(hs).register(http_server)
+    PasswordResetSubmitTokenServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
