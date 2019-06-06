@@ -94,7 +94,6 @@ If you are absolutely certain that you wish to continue using an identity
 server for password resets, set ``enable_password_reset_from_is`` to ``true``.
 
 See the `sample configuration file <docs/sample_config.yaml>`_
-<https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_
 for more details on these settings.
 
 Upgrading to v0.99.0
