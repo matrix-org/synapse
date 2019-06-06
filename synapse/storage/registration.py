@@ -1268,3 +1268,49 @@ class RegistrationStore(
             "delete_threepid_session",
             delete_threepid_session_txn,
         )
+
+    @defer.inlineCallbacks
+    def set_user_deactivated_status(self, user_id, deactivated):
+        """Set the `deactivated` property for the provided user to the provided value.
+
+        Args:
+            user_id (str): The ID of the user to set the status for.
+            deactivated (bool): The value to set for `deactivated`.
+        """
+
+        def set_user_deactivated_status_txn(txn):
+            self._simple_update_one_txn(
+                txn=txn,
+                table="users",
+                keyvalues={"name": user_id},
+                updatevalues={"deactivated": 1 if deactivated else 0},
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_deactivated_status, (user_id,),
+            )
+
+        yield self.runInteraction(
+            "set_user_deactivated_status",
+            set_user_deactivated_status_txn,
+        )
+
+    @cachedInlineCallbacks()
+    def get_user_deactivated_status(self, user_id):
+        """Retrieve the value for the `deactivated` property for the provided user.
+
+        Args:
+            user_id (str): The ID of the user to retrieve the status for.
+
+        Returns:
+            defer.Deferred(bool): The requested value.
+        """
+
+        res = yield self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="deactivated",
+            desc="get_user_deactivated_status",
+        )
+
+        # Convert the integer into a boolean.
+        defer.returnValue(res == 1)
