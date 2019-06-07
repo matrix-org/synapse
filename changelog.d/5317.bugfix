@@ -1,0 +1,1 @@
+Fix handling of failures when processing incoming events where calling `/event_auth` on remote server fails.

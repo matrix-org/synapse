@@ -29,6 +29,7 @@ class VoipRestServlet(RestServlet):
     def __init__(self, hs):
         super(VoipRestServlet, self).__init__()
         self.hs = hs
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):

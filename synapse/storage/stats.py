@@ -328,6 +328,22 @@ class StatsStore(StateDeltasStore):
             room_id (str)
             fields (dict[str:Any])
         """
+
+        # For whatever reason some of the fields may contain null bytes, which
+        # postgres isn't a fan of, so we replace those fields with null.
+        for col in (
+            "join_rules",
+            "history_visibility",
+            "encryption",
+            "name",
+            "topic",
+            "avatar",
+            "canonical_alias"
+        ):
+            field = fields.get(col)
+            if field and "\0" in field:
+                fields[col] = None
+
         return self._simple_upsert(
             table="room_state",
             keyvalues={"room_id": room_id},
