@@ -108,7 +108,7 @@ class EmailPusherTests(HomeserverTestCase):
         )
         token_id = user_tuple["token_id"]
 
-        self.get_success(
+        self.pusher = self.get_success(
             self.hs.get_pusherpool().add_pusher(
                 user_id=self.user_id,
                 access_token=token_id,
@@ -135,6 +135,33 @@ class EmailPusherTests(HomeserverTestCase):
         self.helper.send(room, body="There!", tok=self.others[0].token)
 
         # We should get emailed about that message
+        self._check_for_mail()
+
+    def test_multiple_members_email(self):
+        # We want to test multiple notifications, so we pause processing of push
+        # while we send messages.
+        self.pusher._pause_processing()
+
+        # Create a simple room with multiple other users
+        room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+
+        for other in self.others:
+            self.helper.invite(
+                room=room, src=self.user_id, tok=self.access_token, targ=other.id,
+            )
+            self.helper.join(room=room, user=other.id, tok=other.token)
+
+        # The other users send some messages
+        self.helper.send(room, body="Hi!", tok=self.others[0].token)
+        self.helper.send(room, body="There!", tok=self.others[1].token)
+        self.helper.send(room, body="There!", tok=self.others[1].token)
+
+        # Nothing should have happened yet, as we're paused.
+        assert not self.email_attempts
+
+        self.pusher._resume_processing()
+
+        # We should get emailed about those messages
         self._check_for_mail()
 
     def _check_for_mail(self):
