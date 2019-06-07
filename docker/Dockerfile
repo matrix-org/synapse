@@ -64,6 +64,7 @@ RUN apk add --no-cache --virtual .runtime_deps \
         libxslt \
         libpq \
         zlib \
+        tzdata \
         su-exec
 
 COPY --from=builder /install /usr/local
