@@ -209,7 +209,7 @@ class BucketCollector(object):
         res.append(["+Inf", 0])
 
         metric = HistogramMetricFamily(
-            self.name, "", buckets=res, sum_value=sum(data.values())
+            self.name, "", buckets=res, sum_value=sum([x * y for x, y in data.items()])
         )
         yield metric
 

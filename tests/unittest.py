@@ -32,7 +32,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest
 from synapse.server import HomeServer
-from synapse.types import UserID, create_requester
+from synapse.types import Requester, UserID, create_requester
 from synapse.util.logcontext import LoggingContext
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
@@ -458,6 +458,8 @@ class HomeserverTestCase(TestCase):
             str: The new event's ID.
         """
         event_creator = self.hs.get_event_creation_handler()
+        secrets = self.hs.get_secrets()
+        requester = Requester(user, None, False, None, None)
 
         prev_events_and_hashes = None
         if prev_event_ids:
@@ -465,12 +467,12 @@ class HomeserverTestCase(TestCase):
 
         event, context = self.get_success(
             event_creator.create_event(
-                self.requester,
+                requester,
                 {
                     "type": EventTypes.Message,
                     "room_id": room_id,
                     "sender": user.to_string(),
-                    "content": {"body": "", "msgtype": "m.text"},
+                    "content": {"body": secrets.token_hex(), "msgtype": "m.text"},
                 },
                 prev_events_and_hashes=prev_events_and_hashes,
             )
@@ -480,7 +482,7 @@ class HomeserverTestCase(TestCase):
             event.internal_metadata.soft_failed = True
 
         self.get_success(
-            event_creator.send_nonmember_event(self.requester, event, context)
+            event_creator.send_nonmember_event(requester, event, context)
         )
 
         return event.event_id
@@ -497,4 +499,4 @@ class HomeserverTestCase(TestCase):
             )
         )
 
-        self.hs.get_datastore().get_latest_event_ids_in_room.invalidate((self.room_id,))
+        self.hs.get_datastore().get_latest_event_ids_in_room.invalidate((room_id,))

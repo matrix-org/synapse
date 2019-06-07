@@ -17,7 +17,7 @@
 
 import itertools
 import logging
-from collections import OrderedDict, defaultdict, deque, namedtuple
+from collections import Counter as c_counter, OrderedDict, deque, namedtuple
 from functools import wraps
 
 from six import iteritems, text_type
@@ -248,13 +248,7 @@ class EventsStore(
             return txn.fetchall()
 
         res = yield self.runInteraction("read_forward_extremities", fetch)
-
-        d = defaultdict(default=0)
-
-        for i in res:
-            d[res[1]] += 1
-
-        self._current_forward_extremities_amount = dict(d)
+        self._current_forward_extremities_amount = c_counter(list(x[1] for x in res))
 
     @defer.inlineCallbacks
     def persist_events(self, events_and_contexts, backfilled=False):

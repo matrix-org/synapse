@@ -26,12 +26,6 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
     Test the background update to clean forward extremities table.
     """
 
-    def make_homeserver(self, reactor, clock):
-        # Hack until we understand why test_forked_graph_cleanup fails with v4
-        config = self.default_config()
-        config['default_room_version'] = '1'
-        return self.setup_test_homeserver(config=config)
-
     def prepare(self, reactor, clock, homeserver):
         self.store = homeserver.get_datastore()
         self.room_creator = homeserver.get_room_creation_handler()
