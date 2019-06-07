@@ -1,1 +1,0 @@
-Fix "db txn 'update_presence' from sentinel context" log messages.

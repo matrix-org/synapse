@@ -1,1 +1,0 @@
-Fix worker registration bug caused by ClientReaderSlavedStore being unable to see get_profileinfo.

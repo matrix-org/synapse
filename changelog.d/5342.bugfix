@@ -1,1 +1,0 @@
-Fix failure when fetching batches of events during backfill, etc.
