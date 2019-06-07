@@ -101,7 +101,9 @@ class GroupAttestationSigning(object):
         if valid_until_ms < now:
             raise SynapseError(400, "Attestation expired")
 
-        yield self.keyring.verify_json_for_server(server_name, attestation, now)
+        yield self.keyring.verify_json_for_server(
+            server_name, attestation, now, "Group attestation"
+        )
 
     def create_attestation(self, group_id, user_id):
         """Create an attestation for the group_id and user_id with default

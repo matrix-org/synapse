@@ -49,6 +49,55 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
+Upgrading to v1.0
+=================
+
+Validation of TLS certificates
+------------------------------
+
+Synapse v1.0 is the first release to enforce
+validation of TLS certificates for the federation API. It is therefore
+essential that your certificates are correctly configured. See the `FAQ
+<docs/MSC1711_certificates_FAQ.md>`_ for more information.
+
+Note, v1.0 installations will also no longer be able to federate with servers
+that have not correctly configured their certificates.
+
+In rare cases, it may be desirable to disable certificate checking: for
+example, it might be essential to be able to federate with a given legacy
+server in a closed federation. This can be done in one of two ways:-
+
+* Configure the global switch ``federation_verify_certificates`` to ``false``.
+* Configure a whitelist of server domains to trust via ``federation_certificate_verification_whitelist``.
+
+See the `sample configuration file <docs/sample_config.yaml>`_
+for more details on these settings. 
+
+Email
+-----
+When a user requests a password reset, Synapse will send an email to the 
+user to confirm the request.
+
+Previous versions of Synapse delegated the job of sending this email to an
+identity server. If the identity server was somehow malicious or became
+compromised, it would be theoretically possible to hijack an account through
+this means.
+
+Therefore, by default, Synapse v1.0 will send the confirmation email itself. If
+Synapse is not configured with an SMTP server, password reset via email will be
+disabled.
+
+To configure an SMTP server for Synapse, modify the configuration section
+headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
+and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
+``smtp_pass``, and ``require_transport_security``.
+
+If you are absolutely certain that you wish to continue using an identity
+server for password resets, set ``trust_identity_server_for_password_resets`` to ``true``.
+
+See the `sample configuration file <docs/sample_config.yaml>`_
+for more details on these settings.
+
 Upgrading to v0.99.0
 ====================
 

@@ -271,6 +271,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
                 p.sender_domain,
                 p.redacted_pdu_json,
                 p.pdu.origin_server_ts if v.enforce_key_validity else 0,
+                p.pdu.event_id,
             )
             for p in pdus_to_check_sender
         ]
@@ -306,6 +307,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
                     get_domain_from_id(p.pdu.event_id),
                     p.redacted_pdu_json,
                     p.pdu.origin_server_ts if v.enforce_key_validity else 0,
+                    p.pdu.event_id,
                 )
                 for p in pdus_to_check_event_id
             ]

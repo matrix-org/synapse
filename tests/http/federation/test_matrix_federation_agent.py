@@ -27,6 +27,7 @@ from twisted.web.http import HTTPChannel
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IPolicyForHTTPS
 
+from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto.context_factory import ClientTLSOptionsFactory
 from synapse.http.federation.matrix_federation_agent import (
     MatrixFederationAgent,
@@ -52,11 +53,17 @@ class MatrixFederationAgentTests(TestCase):
 
         self.well_known_cache = TTLCache("test_cache", timer=self.reactor.seconds)
 
+        # for now, we disable cert verification for the test, since the cert we
+        # present will not be trusted. We should do better here, though.
+        config_dict = default_config("test", parse=False)
+        config_dict["federation_verify_certificates"] = False
+        config_dict["trusted_key_servers"] = []
+        config = HomeServerConfig()
+        config.parse_config_dict(config_dict)
+
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
-            tls_client_options_factory=ClientTLSOptionsFactory(
-                default_config("test", parse=True)
-            ),
+            tls_client_options_factory=ClientTLSOptionsFactory(config),
             _well_known_tls_policy=TrustingTLSPolicyForHTTPS(),
             _srv_resolver=self.mock_resolver,
             _well_known_cache=self.well_known_cache,

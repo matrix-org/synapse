@@ -82,12 +82,12 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=False,
     )
-    VDH_TEST_KEY_VALIDITY = RoomVersion(
-        "vdh-test-key-validity",
-        RoomDisposition.UNSTABLE,
+    V5 = RoomVersion(
+        "5",
+        RoomDisposition.STABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
-        enforce_key_validity=False,
+        enforce_key_validity=True,
     )
 
 
@@ -97,6 +97,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V2,
         RoomVersions.V3,
         RoomVersions.V4,
-        RoomVersions.VDH_TEST_KEY_VALIDITY,
+        RoomVersions.V5,
     )
 }   # type: dict[str, RoomVersion]

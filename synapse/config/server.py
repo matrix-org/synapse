@@ -36,7 +36,7 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ['::', '0.0.0.0']
 
-DEFAULT_ROOM_VERSION = "1"
+DEFAULT_ROOM_VERSION = "4"
 
 
 class ServerConfig(Config):
