@@ -206,7 +206,7 @@ class BucketCollector(object):
         for i in sorted(data.keys()):
             res.append([i, data[i]])
 
-        res.append(["+Inf", 0])
+        res.append(["+Inf", sum(data.values())])
 
         metric = HistogramMetricFamily(
             self.name, "", buckets=res, sum_value=sum([x * y for x, y in data.items()])
