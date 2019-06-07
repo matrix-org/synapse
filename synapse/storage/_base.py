@@ -299,12 +299,12 @@ class SQLBaseStore(object):
 
         def select_users_with_no_expiration_date_txn(txn):
             """Retrieves the list of registered users with no expiration date from the
-            database.
+            database, filtering out deactivated users.
             """
             sql = (
                 "SELECT users.name FROM users"
                 " LEFT JOIN account_validity ON (users.name = account_validity.user_id)"
-                " WHERE account_validity.user_id is NULL;"
+                " WHERE account_validity.user_id is NULL AND users.deactivated = 0;"
             )
             txn.execute(sql, [])
 
