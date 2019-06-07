@@ -247,7 +247,7 @@ class EventsStore(
             )
             return txn.fetchall()
 
-        res = self.runInteraction("read_forward_extremities", fetch)
+        res = yield self.runInteraction("read_forward_extremities", fetch)
 
         d = defaultdict(default=0)
 
