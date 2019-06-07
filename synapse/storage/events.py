@@ -17,7 +17,7 @@
 
 import itertools
 import logging
-from collections import OrderedDict, deque, namedtuple, defaultdict
+from collections import OrderedDict, defaultdict, deque, namedtuple
 from functools import wraps
 
 from six import iteritems, text_type
@@ -221,7 +221,6 @@ class EventsStore(
     EventsWorkerStore,
     BackgroundUpdateStore,
 ):
-
     def __init__(self, db_conn, hs):
         super(EventsStore, self).__init__(db_conn, hs)
 
@@ -233,7 +232,7 @@ class EventsStore(
 
         BucketCollector(
             "synapse_forward_extremities",
-            lambda: self._current_forward_extremities_amount
+            lambda: self._current_forward_extremities_amount,
         )
 
         # Read the extrems every 60 sec
@@ -241,10 +240,10 @@ class EventsStore(
 
     @defer.inlineCallbacks
     def _read_forward_extremities(self):
-
         def fetch(txn):
             txn.execute(
-                "select room_id, count(*) c from event_forward_extremities group by room_id"
+                "select room_id, count(*) c from event_forward_extremities "
+                "group by room_id"
             )
             return txn.fetchall()
 
@@ -255,7 +254,7 @@ class EventsStore(
         for i in res:
             d[res[1]] += 1
 
-        self._current_forward_extremities_amount = d
+        self._current_forward_extremities_amount = dict(d)
 
     @defer.inlineCallbacks
     def persist_events(self, events_and_contexts, backfilled=False):
@@ -598,17 +597,11 @@ class EventsStore(
             )
 
             txn.execute(sql, batch)
-            results.extend(
-                r[0]
-                for r in txn
-                if not json.loads(r[1]).get("soft_failed")
-            )
+            results.extend(r[0] for r in txn if not json.loads(r[1]).get("soft_failed"))
 
         for chunk in batch_iter(event_ids, 100):
             yield self.runInteraction(
-                "_get_events_which_are_prevs",
-                _get_events_which_are_prevs_txn,
-                chunk,
+                "_get_events_which_are_prevs", _get_events_which_are_prevs_txn, chunk
             )
 
         defer.returnValue(results)
@@ -670,9 +663,7 @@ class EventsStore(
 
         for chunk in batch_iter(event_ids, 100):
             yield self.runInteraction(
-                "_get_prevs_before_rejected",
-                _get_prevs_before_rejected_txn,
-                chunk,
+                "_get_prevs_before_rejected", _get_prevs_before_rejected_txn, chunk
             )
 
         defer.returnValue(existing_prevs)

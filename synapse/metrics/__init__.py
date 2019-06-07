@@ -40,7 +40,6 @@ HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
 
 class RegistryProxy(object):
-
     @staticmethod
     def collect():
         for metric in REGISTRY.collect():
@@ -63,10 +62,7 @@ class LaterGauge(object):
         try:
             calls = self.caller()
         except Exception:
-            logger.exception(
-                "Exception running callback for LaterGauge(%s)",
-                self.name,
-            )
+            logger.exception("Exception running callback for LaterGauge(%s)", self.name)
             yield g
             return
 
@@ -116,9 +112,7 @@ class InFlightGauge(object):
         # Create a class which have the sub_metrics values as attributes, which
         # default to 0 on initialization. Used to pass to registered callbacks.
         self._metrics_class = attr.make_class(
-            "_MetricsEntry",
-            attrs={x: attr.ib(0) for x in sub_metrics},
-            slots=True,
+            "_MetricsEntry", attrs={x: attr.ib(0) for x in sub_metrics}, slots=True
         )
 
         # Counts number of in flight blocks for a given set of label values
@@ -157,7 +151,9 @@ class InFlightGauge(object):
 
         Note: may be called by a separate thread.
         """
-        in_flight = GaugeMetricFamily(self.name + "_total", self.desc, labels=self.labels)
+        in_flight = GaugeMetricFamily(
+            self.name + "_total", self.desc, labels=self.labels
+        )
 
         metrics_by_key = {}
 
@@ -179,7 +175,9 @@ class InFlightGauge(object):
         yield in_flight
 
         for name in self.sub_metrics:
-            gauge = GaugeMetricFamily("_".join([self.name, name]), "", labels=self.labels)
+            gauge = GaugeMetricFamily(
+                "_".join([self.name, name]), "", labels=self.labels
+            )
             for key, metrics in six.iteritems(metrics_by_key):
                 gauge.add_metric(key, getattr(metrics, name))
             yield gauge
@@ -210,7 +208,9 @@ class BucketCollector(object):
 
         res.append(["+Inf", 0])
 
-        metric = HistogramMetricFamily(self.name, "", buckets=res, sum_value=sum(data.values()))
+        metric = HistogramMetricFamily(
+            self.name, "", buckets=res, sum_value=sum(data.values())
+        )
         yield metric
 
     def __attrs_post_init__(self):
@@ -226,8 +226,8 @@ class BucketCollector(object):
 # Detailed CPU metrics
 #
 
-class CPUMetrics(object):
 
+class CPUMetrics(object):
     def __init__(self):
         ticks_per_sec = 100
         try:
@@ -266,13 +266,28 @@ gc_time = Histogram(
     "python_gc_time",
     "Time taken to GC (sec)",
     ["gen"],
-    buckets=[0.0025, 0.005, 0.01, 0.025, 0.05, 0.10, 0.25, 0.50, 1.00, 2.50,
-             5.00, 7.50, 15.00, 30.00, 45.00, 60.00],
+    buckets=[
+        0.0025,
+        0.005,
+        0.01,
+        0.025,
+        0.05,
+        0.10,
+        0.25,
+        0.50,
+        1.00,
+        2.50,
+        5.00,
+        7.50,
+        15.00,
+        30.00,
+        45.00,
+        60.00,
+    ],
 )
 
 
 class GCCounts(object):
-
     def collect(self):
         cm = GaugeMetricFamily("python_gc_counts", "GC object counts", labels=["gen"])
         for n, m in enumerate(gc.get_count()):
@@ -308,9 +323,7 @@ sent_transactions_counter = Counter("synapse_federation_client_sent_transactions
 events_processed_counter = Counter("synapse_federation_client_events_processed", "")
 
 event_processing_loop_counter = Counter(
-    "synapse_event_processing_loop_count",
-    "Event processing loop iterations",
-    ["name"],
+    "synapse_event_processing_loop_count", "Event processing loop iterations", ["name"]
 )
 
 event_processing_loop_room_count = Counter(
@@ -340,7 +353,6 @@ last_ticked = time.time()
 
 
 class ReactorLastSeenMetric(object):
-
     def collect(self):
         cm = GaugeMetricFamily(
             "python_twisted_reactor_last_seen",
@@ -354,7 +366,6 @@ REGISTRY.register(ReactorLastSeenMetric())
 
 
 def runUntilCurrentTimer(func):
-
     @functools.wraps(func)
     def f(*args, **kwargs):
         now = reactor.seconds()
