@@ -86,6 +86,7 @@ Global settings:
 
 * ``UID``, the user id Synapse will run as [default 991]
 * ``GID``, the group id Synapse will run as [default 991]
+* ``TZ``, the [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) the container will run with [default UTC]
 * ``SYNAPSE_CONFIG_PATH``, path to a custom config file
 
 If ``SYNAPSE_CONFIG_PATH`` is set, you should generate a configuration file
