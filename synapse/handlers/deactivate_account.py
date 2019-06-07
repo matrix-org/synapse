@@ -42,6 +42,8 @@ class DeactivateAccountHandler(BaseHandler):
         # it left off (if it has work left to do).
         hs.get_reactor().callWhenRunning(self._start_user_parting)
 
+        self._account_validity_enabled = hs.config.account_validity.enabled
+
     @defer.inlineCallbacks
     def deactivate_account(self, user_id, erase_data, id_server=None):
         """Deactivate a user's account
@@ -113,6 +115,13 @@ class DeactivateAccountHandler(BaseHandler):
         # Now start the process that goes through that list and
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
+
+        # Remove all information on the user from the account_validity table.
+        if self._account_validity_enabled:
+            yield self.store.delete_account_validity_for_user(user_id)
+
+        # Mark the user as deactivated.
+        yield self.store.set_user_deactivated_status(user_id, True)
 
         defer.returnValue(identity_server_supports_unbinding)
 
