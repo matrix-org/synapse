@@ -258,7 +258,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         """
         yield self._simple_delete_one(
             table="account_validity",
-            keyvalues={"user_id", user_id},
+            keyvalues={"user_id": user_id},
             desc="delete_account_validity_for_user",
         )
 
