@@ -1,1 +1,0 @@
-Fix race when backfilling in rooms with worker mode.

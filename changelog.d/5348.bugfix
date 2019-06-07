@@ -1,1 +1,0 @@
-Add a new room version where the timestamps on events are checked against the validity periods on signing keys.

@@ -1,1 +1,0 @@
-New installs will now use the v54 full schema, rather than the full schema v14 and applying incremental updates to v54.
