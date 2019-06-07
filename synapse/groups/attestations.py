@@ -132,9 +132,10 @@ class GroupAttestionRenewer(object):
         self.is_mine_id = hs.is_mine_id
         self.attestations = hs.get_groups_attestation_signing()
 
-        self._renew_attestations_loop = self.clock.looping_call(
-            self._start_renew_attestations, 30 * 60 * 1000,
-        )
+        if not hs.config.worker_app:
+            self._renew_attestations_loop = self.clock.looping_call(
+                self._start_renew_attestations, 30 * 60 * 1000,
+            )
 
     @defer.inlineCallbacks
     def on_renew_attestation(self, group_id, user_id, content):
