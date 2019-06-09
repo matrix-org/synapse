@@ -15,10 +15,12 @@
 
 import logging
 
+from service_identity import VerificationError
+from service_identity.pyopenssl import verify_hostname
 from zope.interface import implementer
 
 from OpenSSL import SSL, crypto
-from twisted.internet._sslverify import ClientTLSOptions, _defaultCurveName
+from twisted.internet._sslverify import _defaultCurveName
 from twisted.internet.abstract import isIPAddress, isIPv6Address
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
 from twisted.internet.ssl import CertificateOptions, ContextFactory, platformTrust
@@ -70,65 +72,19 @@ def _idnaBytes(text):
         return idna.encode(text)
 
 
-def _tolerateErrors(wrapped):
-    """
-    Wrap up an info_callback for pyOpenSSL so that if something goes wrong
-    the error is immediately logged and the connection is dropped if possible.
-    This is a copy of twisted.internet._sslverify._tolerateErrors. For
-    documentation, see the twisted documentation.
-    """
-
-    def infoCallback(connection, where, ret):
-        try:
-            return wrapped(connection, where, ret)
-        except:  # noqa: E722, taken from the twisted implementation
-            f = Failure()
-            logger.exception("Error during info_callback")
-            connection.get_app_data().failVerification(f)
-
-    return infoCallback
-
-
-@implementer(IOpenSSLClientConnectionCreator)
-class ClientTLSOptionsNoVerify(object):
-    """
-    Client creator for TLS without certificate identity verification. This is a
-    copy of twisted.internet._sslverify.ClientTLSOptions with the identity
-    verification left out. For documentation, see the twisted documentation.
-    """
-
-    def __init__(self, hostname, ctx):
-        self._ctx = ctx
-
-        if isIPAddress(hostname) or isIPv6Address(hostname):
-            self._hostnameBytes = hostname.encode('ascii')
-            self._sendSNI = False
-        else:
-            self._hostnameBytes = _idnaBytes(hostname)
-            self._sendSNI = True
-
-        ctx.set_info_callback(_tolerateErrors(self._identityVerifyingInfoCallback))
-
-    def clientConnectionForTLS(self, tlsProtocol):
-        context = self._ctx
-        connection = SSL.Connection(context, None)
-        connection.set_app_data(tlsProtocol)
-        return connection
-
-    def _identityVerifyingInfoCallback(self, connection, where, ret):
-        # Literal IPv4 and IPv6 addresses are not permitted
-        # as host names according to the RFCs
-        if where & SSL.SSL_CB_HANDSHAKE_START and self._sendSNI:
-            connection.set_tlsext_host_name(self._hostnameBytes)
-
-
 class ClientTLSOptionsFactory(object):
-    """Factory for Twisted ClientTLSOptions that are used to make connections
-    to remote servers for federation."""
+    """Factory for Twisted SSLClientConnectionCreators that are used to make connections
+    to remote servers for federation.
+
+    Uses one of two OpenSSL context objects for all connections, depending on whether
+    we should do SSL certificate verification.
+
+    get_options decides whether we should do SSL certificate verification and
+    constructs an SSLClientConnectionCreator factory accordingly.
+    """
 
     def __init__(self, config):
         self._config = config
-        self._options_noverify = CertificateOptions()
 
         # Check if we're using a custom list of a CA certificates
         trust_root = config.federation_ca_trust_root
@@ -136,11 +92,13 @@ class ClientTLSOptionsFactory(object):
             # Use CA root certs provided by OpenSSL
             trust_root = platformTrust()
 
-        self._options_verify = CertificateOptions(trustRoot=trust_root)
+        self._verify_ssl_context = CertificateOptions(trustRoot=trust_root).getContext()
+        self._verify_ssl_context.set_info_callback(self._context_info_cb)
+
+        self._no_verify_ssl_context = CertificateOptions().getContext()
+        self._no_verify_ssl_context.set_info_callback(self._context_info_cb)
 
     def get_options(self, host):
-        # Use _makeContext so that we get a fresh OpenSSL CTX each time.
-
         # Check if certificate verification has been enabled
         should_verify = self._config.federation_verify_certificates
 
@@ -151,6 +109,77 @@ class ClientTLSOptionsFactory(object):
                     should_verify = False
                     break
 
-        if should_verify:
-            return ClientTLSOptions(host, self._options_verify._makeContext())
-        return ClientTLSOptionsNoVerify(host, self._options_noverify._makeContext())
+        ssl_context = (
+            self._verify_ssl_context if should_verify else self._no_verify_ssl_context
+        )
+
+        return SSLClientConnectionCreator(host, ssl_context, should_verify)
+
+    @staticmethod
+    def _context_info_cb(ssl_connection, where, ret):
+        """The 'information callback' for our openssl context object."""
+        # we assume that the app_data on the connection object has been set to
+        # a TLSMemoryBIOProtocol object. (This is done by SSLClientConnectionCreator)
+        tls_protocol = ssl_connection.get_app_data()
+        try:
+            # ... we further assume that SSLClientConnectionCreator has set the
+            # 'tls_verifier' attribute to a ConnectionVerifier object.
+            tls_protocol.tls_verifier.verify_context_info_cb(ssl_connection, where)
+        except:  # noqa: E722, taken from the twisted implementation
+            logger.exception("Error during info_callback")
+            f = Failure()
+            tls_protocol.failVerification(f)
+
+
+@implementer(IOpenSSLClientConnectionCreator)
+class SSLClientConnectionCreator(object):
+    """Creates openssl connection objects for client connections.
+
+    Replaces twisted.internet.ssl.ClientTLSOptions
+    """
+    def __init__(self, hostname, ctx, verify_certs):
+        self._ctx = ctx
+        self._verifier = ConnectionVerifier(hostname, verify_certs)
+
+    def clientConnectionForTLS(self, tls_protocol):
+        context = self._ctx
+        connection = SSL.Connection(context, None)
+
+        # as per twisted.internet.ssl.ClientTLSOptions, we set the application
+        # data to our TLSMemoryBIOProtocol...
+        connection.set_app_data(tls_protocol)
+
+        # ... and we also gut-wrench a 'tls_verifier' attribute into the
+        # tls_protocol so that the SSL context's info callback has something to
+        # call to do the cert verification.
+        setattr(tls_protocol, "tls_verifier", self._verifier)
+        return connection
+
+
+class ConnectionVerifier(object):
+    """Set the SNI, and do cert verification
+
+    This is a thing which is attached to the TLSMemoryBIOProtocol, and is called by
+    the ssl context's info callback.
+    """
+    def __init__(self, hostname, verify_certs):
+        self._verify_certs = verify_certs
+        if isIPAddress(hostname) or isIPv6Address(hostname):
+            self._hostnameBytes = hostname.encode('ascii')
+            self._sendSNI = False
+        else:
+            self._hostnameBytes = _idnaBytes(hostname)
+            self._sendSNI = True
+
+        self._hostnameASCII = self._hostnameBytes.decode("ascii")
+
+    def verify_context_info_cb(self, ssl_connection, where):
+        if where & SSL.SSL_CB_HANDSHAKE_START and self._sendSNI:
+            ssl_connection.set_tlsext_host_name(self._hostnameBytes)
+        if where & SSL.SSL_CB_HANDSHAKE_DONE and self._verify_certs:
+            try:
+                verify_hostname(ssl_connection, self._hostnameASCII)
+            except VerificationError:
+                f = Failure()
+                tls_protocol = ssl_connection.get_app_data()
+                tls_protocol.failVerification(f)
