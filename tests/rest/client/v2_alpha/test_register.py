@@ -19,9 +19,9 @@ import datetime
 import json
 import os
 
-import pkg_resources
-
 from mock import Mock
+
+import pkg_resources
 
 from twisted.internet import defer
 
