@@ -74,7 +74,7 @@ class RegistrationHandler(BaseHandler):
         )
         self._server_notices_mxid = hs.config.server_notices_mxid
 
-        self._show_in_user_directory = self.hs.show_users_in_user_directory
+        self._show_in_user_directory = self.hs.config.show_users_in_user_directory
 
         if hs.config.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
