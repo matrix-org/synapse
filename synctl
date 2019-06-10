@@ -69,7 +69,7 @@ def abort(message, colour=RED, stream=sys.stderr):
     sys.exit(1)
 
 
-def start(configfile, daemonize = True):
+def start(configfile, daemonize=True):
     write("Starting ...")
     args = SYNAPSE
 
