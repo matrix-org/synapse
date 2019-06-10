@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 55
+# FIXME: When we merge v1.0.0 into the dinsic branch, we need to remember to also
+#  regenerate the full schema so that it includes dinsic-specific tables and indexes.
+SCHEMA_VERSION = 54
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
