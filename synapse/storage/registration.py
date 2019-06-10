@@ -998,7 +998,7 @@ class RegistrationStore(
         client_secret,
         address=None,
         sid=None,
-        validated=None,
+        validated=True,
     ):
         """Gets a session_id and last_send_attempt (if available) for a
         client_secret/medium/(address|session_id) combo
