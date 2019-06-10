@@ -1,3 +1,14 @@
+Synapse 1.0.0rc2 (2019-06-10)
+=============================
+
+Bugfixes
+--------
+
+- Remove redundant warning about key server response validation. ([\#5392](https://github.com/matrix-org/synapse/issues/5392))
+- Fix bug where old keys stored in the database with a null valid until timestamp caused all verification requests for that key to fail. ([\#5415](https://github.com/matrix-org/synapse/issues/5415))
+- Fix excessive memory using with default `federation_verify_certificates: true` configuration. ([\#5417](https://github.com/matrix-org/synapse/issues/5417))
+
+
 Synapse 1.0.0rc1 (2019-06-07)
 =============================
 
