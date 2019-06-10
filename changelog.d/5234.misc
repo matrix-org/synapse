@@ -1,1 +1,0 @@
-Rewrite store_server_verify_key to store several keys at once.

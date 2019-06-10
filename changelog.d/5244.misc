@@ -1,1 +1,0 @@
-Refactor synapse.crypto.keyring to use a KeyFetcher interface.

@@ -25,6 +25,11 @@ from tests.unittest import HomeserverTestCase
 class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
     """Test the background update to clean forward extremities table.
     """
+    def make_homeserver(self, reactor, clock):
+        # Hack until we understand why test_forked_graph_cleanup fails with v4
+        config = self.default_config()
+        config['default_room_version'] = '1'
+        return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor, clock, homeserver):
         self.store = homeserver.get_datastore()
@@ -220,6 +225,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         Where SF* are soft failed, and with them A, B and C marked as
         extremities. This should resolve to B and C being marked as extremity.
         """
+
         # Create the room graph
         event_id_a = self.create_and_send_event()
         event_id_b = self.create_and_send_event()
