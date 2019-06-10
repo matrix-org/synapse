@@ -69,7 +69,7 @@ def abort(message, colour=RED, stream=sys.stderr):
     sys.exit(1)
 
 
-def start(configfile, daemonize=True):
+def start(configfile, daemonize = True):
     write("Starting ...")
     args = SYNAPSE
 
@@ -150,7 +150,8 @@ def main():
     parser.add_argument(
         "--no-daemonize",
         action="store_false",
-        help="Run synapse in the foreground (for debugging)"
+        help="Run synapse in the foreground for debugging. "
+        "Will work only if the daemonize option is not set in the config."
     )
 
     options = parser.parse_args()
