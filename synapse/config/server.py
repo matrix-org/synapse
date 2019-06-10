@@ -202,6 +202,12 @@ class ServerConfig(Config):
         # events with profile information that differ from the target's global profile.
         self.allow_per_room_profiles = config.get("allow_per_room_profiles", True)
 
+        # Whether to show the users on this homeserver in the user directory. Defaults to
+        # True.
+        self.show_users_in_user_directory = config.get(
+            "show_users_in_user_directory", True,
+        )
+
         self.listeners = []
         for listener in config.get("listeners", []):
             if not isinstance(listener.get("port", None), int):
@@ -631,6 +637,11 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #allow_per_room_profiles: false
+
+        # Whether to show the users on this homeserver in the user directory. Defaults to
+        # 'true'.
+        #
+        #show_users_in_user_directory: false
         """ % locals()
 
     def read_arguments(self, args):
