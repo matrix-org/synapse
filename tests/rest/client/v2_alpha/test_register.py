@@ -246,7 +246,7 @@ class RegisterHideProfileTestCase(unittest.HomeserverTestCase):
         args = post_json.call_args[0]
         # Make sure the last call was attempting to replicate profiles.
         split_uri = args[0].split("/")
-        self.assertEqual(split_uri[len(split_uri)-1], "replicate_profiles", args[0])
+        self.assertEqual(split_uri[len(split_uri) - 1], "replicate_profiles", args[0])
         # Make sure the last profile update was overriding the user's profile to None.
         self.assertEqual(args[1]["batch"][user_id], None, args[1])
 
