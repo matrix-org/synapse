@@ -110,8 +110,10 @@ class ClientTLSOptionsFactory(object):
         tls_protocol = ssl_connection.get_app_data()
         try:
             # ... we further assume that SSLClientConnectionCreator has set the
-            # 'tls_verifier' attribute to a ConnectionVerifier object.
-            tls_protocol.tls_verifier.verify_context_info_cb(ssl_connection, where)
+            # '_synapse_tls_verifier' attribute to a ConnectionVerifier object.
+            tls_protocol._synapse_tls_verifier.verify_context_info_cb(
+                ssl_connection, where
+            )
         except:  # noqa: E722, taken from the twisted implementation
             logger.exception("Error during info_callback")
             f = Failure()
@@ -124,6 +126,7 @@ class SSLClientConnectionCreator(object):
 
     Replaces twisted.internet.ssl.ClientTLSOptions
     """
+
     def __init__(self, hostname, ctx, verify_certs):
         self._ctx = ctx
         self._verifier = ConnectionVerifier(hostname, verify_certs)
@@ -136,10 +139,10 @@ class SSLClientConnectionCreator(object):
         # data to our TLSMemoryBIOProtocol...
         connection.set_app_data(tls_protocol)
 
-        # ... and we also gut-wrench a 'tls_verifier' attribute into the
+        # ... and we also gut-wrench a '_synapse_tls_verifier' attribute into the
         # tls_protocol so that the SSL context's info callback has something to
         # call to do the cert verification.
-        setattr(tls_protocol, "tls_verifier", self._verifier)
+        setattr(tls_protocol, "_synapse_tls_verifier", self._verifier)
         return connection
 
 
@@ -149,13 +152,14 @@ class ConnectionVerifier(object):
     This is a thing which is attached to the TLSMemoryBIOProtocol, and is called by
     the ssl context's info callback.
     """
+
     # This code is based on twisted.internet.ssl.ClientTLSOptions.
 
     def __init__(self, hostname, verify_certs):
         self._verify_certs = verify_certs
 
         if isIPAddress(hostname) or isIPv6Address(hostname):
-            self._hostnameBytes = hostname.encode('ascii')
+            self._hostnameBytes = hostname.encode("ascii")
             self._is_ip_address = True
         else:
             # twisted's ClientTLSOptions falls back to the stdlib impl here if
