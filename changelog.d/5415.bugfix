@@ -1,1 +1,0 @@
-Fix bug where old keys stored in the database with a null valid until timestamp caused all verification requests for that key to fail.

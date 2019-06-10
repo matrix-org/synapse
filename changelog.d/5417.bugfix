@@ -1,1 +1,0 @@
-Fix excessive memory using with default `federation_verify_certificates: true` configuration.
