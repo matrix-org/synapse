@@ -70,7 +70,7 @@ def create_test_cert_file(sanlist):
     cert_file_count += 1
 
     # first build a CSR
-    subprocess.run(
+    subprocess.check_call(
         [
             "openssl",
             "req",
@@ -81,8 +81,7 @@ def create_test_cert_file(sanlist):
             "/",
             "-out",
             csr_filename,
-        ],
-        check=True,
+        ]
     )
 
     # now a config file describing the right SAN entries
@@ -93,7 +92,7 @@ def create_test_cert_file(sanlist):
     # finally the cert
     ca_key_filename = os.path.join(os.path.dirname(__file__), "ca.key")
     ca_cert_filename = get_test_ca_cert_file()
-    subprocess.run(
+    subprocess.check_call(
         [
             "openssl",
             "x509",
@@ -110,8 +109,7 @@ def create_test_cert_file(sanlist):
             cnf_filename,
             "-out",
             cert_filename,
-        ],
-        check=True,
+        ]
     )
 
     return cert_filename
