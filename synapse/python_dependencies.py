@@ -44,7 +44,10 @@ REQUIREMENTS = [
     "canonicaljson>=1.1.3",
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
-    "service_identity>=16.0.0",
+    "idna>=2",
+
+    # validating SSL certs for IP addresses requires service_identity 18.1.
+    "service_identity>=18.1.0",
 
     # our logcontext handling relies on the ability to cancel inlineCallbacks
     # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
