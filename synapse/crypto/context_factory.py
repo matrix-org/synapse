@@ -17,7 +17,7 @@ import logging
 
 import idna
 from service_identity import VerificationError
-from service_identity.pyopenssl import verify_hostname
+from service_identity.pyopenssl import verify_hostname, verify_ip_address
 from zope.interface import implementer
 
 from OpenSSL import SSL, crypto
@@ -156,7 +156,7 @@ class ConnectionVerifier(object):
 
         if isIPAddress(hostname) or isIPv6Address(hostname):
             self._hostnameBytes = hostname.encode('ascii')
-            self._sendSNI = False
+            self._is_ip_address = True
         else:
             # twisted's ClientTLSOptions falls back to the stdlib impl here if
             # idna is not installed, but points out that lacks support for
@@ -164,17 +164,20 @@ class ConnectionVerifier(object):
             #
             # We can rely on having idna.
             self._hostnameBytes = idna.encode(hostname)
-            self._sendSNI = True
+            self._is_ip_address = False
 
         self._hostnameASCII = self._hostnameBytes.decode("ascii")
 
     def verify_context_info_cb(self, ssl_connection, where):
-        if where & SSL.SSL_CB_HANDSHAKE_START and self._sendSNI:
+        if where & SSL.SSL_CB_HANDSHAKE_START and not self._is_ip_address:
             ssl_connection.set_tlsext_host_name(self._hostnameBytes)
 
         if where & SSL.SSL_CB_HANDSHAKE_DONE and self._verify_certs:
             try:
-                verify_hostname(ssl_connection, self._hostnameASCII)
+                if self._is_ip_address:
+                    verify_ip_address(ssl_connection, self._hostnameASCII)
+                else:
+                    verify_hostname(ssl_connection, self._hostnameASCII)
             except VerificationError:
                 f = Failure()
                 tls_protocol = ssl_connection.get_app_data()
