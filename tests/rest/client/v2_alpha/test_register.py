@@ -21,6 +21,10 @@ import os
 
 import pkg_resources
 
+from mock import Mock
+
+from twisted.internet import defer
+
 import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
@@ -203,6 +207,53 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
+
+
+class RegisterHideProfileTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+
+        self.url = b"/_matrix/client/r0/register"
+
+        config = self.default_config()
+        config["enable_registration"] = True
+        config["show_users_in_user_directory"] = False
+        config["replicate_user_profiles_to"] = ["fakeserver"]
+
+        mock_http_client = Mock(spec=[
+            "get_json",
+            "post_json_get_json",
+        ])
+        mock_http_client.post_json_get_json.return_value = defer.succeed((200, "{}"))
+
+        self.hs = self.setup_test_homeserver(
+            config=config,
+            simple_http_client=mock_http_client,
+        )
+
+        return self.hs
+
+    def test_profile_hidden(self):
+        user_id = self.register_user("kermit", "monkey")
+
+        post_json = self.hs.get_simple_http_client().post_json_get_json
+
+        # We expect post_json_get_json to have been called twice: once with the original
+        # profile and once with the None profile resulting from the request to hide it
+        # from the user directory.
+        self.assertEqual(post_json.call_count, 2, post_json.call_args_list)
+
+        # Get the args (and not kwargs) passed to post_json.
+        args = post_json.call_args[0]
+        # Make sure the last call was attempting to replicate profiles.
+        split_uri = args[0].split("/")
+        self.assertEqual(split_uri[len(split_uri)-1], "replicate_profiles", args[0])
+        # Make sure the last profile update was overriding the user's profile to None.
+        self.assertEqual(args[1]["batch"][user_id], None, args[1])
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
