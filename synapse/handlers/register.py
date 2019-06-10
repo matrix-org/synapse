@@ -74,6 +74,8 @@ class RegistrationHandler(BaseHandler):
         )
         self._server_notices_mxid = hs.config.server_notices_mxid
 
+        self._show_in_user_directory = self.hs.show_users_in_user_directory
+
         if hs.config.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
             self._register_device_client = (
@@ -288,6 +290,14 @@ class RegistrationHandler(BaseHandler):
             yield self._register_email_threepid(
                 user_id, threepid_dict, None, False,
             )
+
+        # Prevent the new user from showing up in the user directory if the server
+        # mandates it.
+        if self._show_in_user_directory:
+            yield self.store.add_account_data_for_user(
+                user_id, "im.vector.hide_profile", {'hide_profile': True},
+            )
+            yield self.profile_handler.set_active(user, False, True)
 
         defer.returnValue((user_id, token))
 
