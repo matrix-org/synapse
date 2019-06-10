@@ -308,6 +308,11 @@ listeners:
 #
 #allow_per_room_profiles: false
 
+# Whether to show the users on this homeserver in the user directory. Defaults to
+# 'true'.
+#
+#show_users_in_user_directory: false
+
 
 ## TLS ##
 
