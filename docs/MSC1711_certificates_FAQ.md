@@ -2,10 +2,10 @@
 
 ## Historical Note
 This document was originally written to guide server admins through the upgrade
-path towards Synapse 1.0.0. Specifically,
+path towards Synapse 1.0. Specifically,
 [MSC1711](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md)
 required that all servers present valid TLS certificates on their federation
-API. Admins were encouraged to achieve compliance from version 0.99.0 (release
+API. Admins were encouraged to achieve compliance from version 0.99.0 (released
 in February 2019) ahead of version 1.0 (released June 2019) enforcing the
 certificate checks.
 
