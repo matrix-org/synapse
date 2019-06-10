@@ -750,13 +750,6 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 verify_signed_json(response, perspective_name, perspective_keys[key_id])
                 verified = True
 
-                if perspective_name == "matrix.org" and key_id == "ed25519:auto":
-                    logger.warning(
-                        "Trusting trusted_key_server responses signed by the "
-                        "compromised matrix.org signing key 'ed25519:auto'. "
-                        "This is a placebo."
-                    )
-
         if not verified:
             raise KeyLookupError(
                 "Response not signed with a known key: signed with: %r, known keys: %r"
