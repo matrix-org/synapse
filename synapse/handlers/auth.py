@@ -767,9 +767,6 @@ class AuthHandler(BaseHandler):
             if canonical_user_id:
                 defer.returnValue((canonical_user_id, None))
 
-        if login_type == LoginType.SSO:
-            known_login_type = True
-
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
 

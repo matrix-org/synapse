@@ -16,7 +16,6 @@
 import logging
 
 import saml2
-from saml2.client import Saml2Client
 
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
@@ -36,8 +35,7 @@ class SAML2ResponseResource(Resource):
 
     def __init__(self, hs):
         Resource.__init__(self)
-
-        self._saml_client = Saml2Client(hs.config.saml2_sp_config)
+        self._saml_client = hs.get_saml_client()
         self._sso_auth_handler = SSOAuthHandler(hs)
 
     def render_POST(self, request):

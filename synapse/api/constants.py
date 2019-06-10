@@ -57,7 +57,6 @@ class LoginType(object):
     EMAIL_IDENTITY = u"m.login.email.identity"
     MSISDN = u"m.login.msisdn"
     RECAPTCHA = u"m.login.recaptcha"
-    SSO = u"m.login.sso"
     TERMS = u"m.login.terms"
     DUMMY = u"m.login.dummy"
 

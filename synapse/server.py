@@ -189,6 +189,7 @@ class HomeServer(object):
         'registration_handler',
         'account_validity_handler',
         'event_client_serializer',
+        'saml_client',
     ]
 
     REQUIRED_ON_MASTER_STARTUP = [
@@ -521,6 +522,10 @@ class HomeServer(object):
 
     def build_event_client_serializer(self):
         return EventClientSerializer(self)
+
+    def build_saml_client(self):
+        from saml2.client import Saml2Client
+        return Saml2Client(self.config.saml2_sp_config)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

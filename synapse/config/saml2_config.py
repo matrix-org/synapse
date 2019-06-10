@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -24,6 +25,11 @@ class SAML2Config(Config):
 
         if not saml2_config or not saml2_config.get("enabled", True):
             return
+
+        try:
+            check_requirements('saml2')
+        except DependencyException as e:
+            raise ConfigError(e.message)
 
         self.saml2_enabled = True
 
@@ -75,7 +81,6 @@ class SAML2Config(Config):
         # override them.
         #
         #saml2_config:
-        #  enabled: true
         #  sp_config:
         #    # point this to the IdP's metadata. You can use either a local file or
         #    # (preferably) a URL.
