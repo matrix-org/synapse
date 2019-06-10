@@ -195,6 +195,11 @@ class Auth(object):
 
         Args:
             request - An HTTP request with an access_token query parameter.
+            allow_expired - Whether to allow the request through even if the account is
+                expired. If true, Synapse will still require the access token to be
+                provided but won't check if the account it belongs to has expired. This
+                works thanks to /login delivering access tokens regardless of accounts'
+                expiration.
         Returns:
             defer.Deferred: resolves to a ``synapse.types.Requester`` object
         Raises:
