@@ -14,9 +14,9 @@ up and will work provided you set the ``server_name`` to match your
 machine's public DNS hostname, and provide Synapse with a TLS certificate
 which is valid for your ``server_name``.
 
-Once you have completed the steps necessary to federate, you should be able to
-join a room via federation. (A good place to start is ``#synapse:matrix.org`` - a
-room for Synapse admins.)
+Once federation has been configured, you should be able to join a room over 
+federation. A good place to start is ``#synapse:matrix.org`` - a room for 
+Synapse admins.
 
 
 ## Delegation
