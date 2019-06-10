@@ -21,13 +21,13 @@ from synapse.api.errors import AuthError, SynapseError
 from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class AccountValidityRenewServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account_validity/renew$")
+    PATTERNS = client_patterns("/account_validity/renew$")
     SUCCESS_HTML = b"<html><body>Your account has been successfully renewed.</body><html>"
 
     def __init__(self, hs):
@@ -60,7 +60,7 @@ class AccountValidityRenewServlet(RestServlet):
 
 
 class AccountValiditySendMailServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account_validity/send_mail$")
+    PATTERNS = client_patterns("/account_validity/send_mail$")
 
     def __init__(self, hs):
         """
@@ -79,7 +79,7 @@ class AccountValiditySendMailServlet(RestServlet):
         if not self.account_validity.renew_by_email_enabled:
             raise AuthError(403, "Account renewal via email is disabled on this server.")
 
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_expired=True)
         user_id = requester.user.to_string()
         yield self.account_activity_handler.send_renewal_email_to_user(user_id)
 

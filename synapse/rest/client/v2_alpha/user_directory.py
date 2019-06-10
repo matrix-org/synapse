@@ -20,13 +20,13 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class UserDirectorySearchRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/user_directory/search$")
+    PATTERNS = client_patterns("/user_directory/search$")
 
     def __init__(self, hs):
         """

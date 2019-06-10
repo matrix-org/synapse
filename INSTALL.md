@@ -5,6 +5,7 @@
   * [Prebuilt packages](#prebuilt-packages)
 * [Setting up Synapse](#setting-up-synapse)
   * [TLS certificates](#tls-certificates)
+  * [Email](#email)
   * [Registering a user](#registering-a-user)
   * [Setting up a TURN server](#setting-up-a-turn-server)
   * [URL previews](#url-previews)
@@ -394,8 +395,21 @@ To configure Synapse to expose an HTTPS port, you will need to edit
   instance, if using certbot, use `fullchain.pem` as your certificate, not
   `cert.pem`).
 
-For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
+For those of you upgrading your TLS certificate for Synapse 1.0 compliance,
 please take a look at [our guide](docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100).
+
+## Email
+
+It is desirable for Synapse to have the capability to send email. For example,
+this is required to support the 'password reset' feature.
+
+To configure an SMTP server for Synapse, modify the configuration section
+headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
+and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
+``smtp_pass``, and ``require_transport_security``.
+
+If Synapse is not configured with an SMTP server, password reset via email will
+ be disabled by default.
 
 ## Registering a user
 

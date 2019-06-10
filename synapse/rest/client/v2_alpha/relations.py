@@ -34,7 +34,7 @@ from synapse.http.servlet import (
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.relations import AggregationPaginationToken, RelationPaginationToken
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -66,12 +66,12 @@ class RelationSendServlet(RestServlet):
     def register(self, http_server):
         http_server.register_paths(
             "POST",
-            client_v2_patterns(self.PATTERN + "$", releases=()),
+            client_patterns(self.PATTERN + "$", releases=()),
             self.on_PUT_or_POST,
         )
         http_server.register_paths(
             "PUT",
-            client_v2_patterns(self.PATTERN + "/(?P<txn_id>[^/]*)$", releases=()),
+            client_patterns(self.PATTERN + "/(?P<txn_id>[^/]*)$", releases=()),
             self.on_PUT,
         )
 
@@ -120,7 +120,7 @@ class RelationPaginationServlet(RestServlet):
     filtered by relation type and event type.
     """
 
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/relations/(?P<parent_id>[^/]*)"
         "(/(?P<relation_type>[^/]*)(/(?P<event_type>[^/]*))?)?$",
         releases=(),
@@ -197,7 +197,7 @@ class RelationAggregationPaginationServlet(RestServlet):
         }
     """
 
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/aggregations/(?P<parent_id>[^/]*)"
         "(/(?P<relation_type>[^/]*)(/(?P<event_type>[^/]*))?)?$",
         releases=(),
@@ -269,7 +269,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         }
     """
 
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/aggregations/(?P<parent_id>[^/]*)"
         "/(?P<relation_type>[^/]*)/(?P<event_type>[^/]*)/(?P<key>[^/]*)$",
         releases=(),

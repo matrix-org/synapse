@@ -36,7 +36,7 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ['::', '0.0.0.0']
 
-DEFAULT_ROOM_VERSION = "1"
+DEFAULT_ROOM_VERSION = "4"
 
 
 class ServerConfig(Config):
@@ -584,6 +584,22 @@ class ServerConfig(Config):
         #hs_disabled_limit_type: 'error code(str), to help clients decode reason'
 
         # Monthly Active User Blocking
+        #
+        # Used in cases where the admin or server owner wants to limit to the
+        # number of monthly active users.
+        #
+        # 'limit_usage_by_mau' disables/enables monthly active user blocking. When
+        # anabled and a limit is reached the server returns a 'ResourceLimitError'
+        # with error type Codes.RESOURCE_LIMIT_EXCEEDED
+        #
+        # 'max_mau_value' is the hard limit of monthly active users above which
+        # the server will start blocking user actions.
+        #
+        # 'mau_trial_days' is a means to add a grace period for active users. It
+        # means that users must be active for this number of days before they
+        # can be considered active and guards against the case where lots of users
+        # sign up in a short space of time never to return after their initial
+        # session.
         #
         #limit_usage_by_mau: False
         #max_mau_value: 50

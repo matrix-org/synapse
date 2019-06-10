@@ -36,8 +36,6 @@ steps:
           image: "python:3.6"
           propagate-environment: true
 
-  - wait
-
   - command:
       - "python -m pip install tox"
       - "tox -e check-sampleconfig"
@@ -45,6 +43,8 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
+
+  - wait
 
   - command:
       - "python -m pip install tox"
@@ -56,6 +56,12 @@ steps:
       - docker#v3.0.1:
           image: "python:2.7"
           propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - command:
       - "python -m pip install tox"
@@ -67,6 +73,12 @@ steps:
       - docker#v3.0.1:
           image: "python:3.5"
           propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - command:
       - "python -m pip install tox"
@@ -78,6 +90,12 @@ steps:
       - docker#v3.0.1:
           image: "python:3.6"
           propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - command:
       - "python -m pip install tox"
@@ -89,6 +107,12 @@ steps:
       - docker#v3.0.1:
           image: "python:3.7"
           propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - command:
       - "python -m pip install tox"
@@ -100,6 +124,12 @@ steps:
       - docker#v3.0.1:
           image: "python:2.7"
           propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: ":python: 2.7 / :postgres: 9.4"
     env:
@@ -111,6 +141,12 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py27.pg94.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: ":python: 2.7 / :postgres: 9.5"
     env:
@@ -122,6 +158,12 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py27.pg95.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: ":python: 3.5 / :postgres: 9.4"
     env:
@@ -133,6 +175,12 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py35.pg94.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: ":python: 3.5 / :postgres: 9.5"
     env:
@@ -144,6 +192,12 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py35.pg95.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: ":python: 3.7 / :postgres: 9.5"
     env:
@@ -155,6 +209,12 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg95.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: ":python: 3.7 / :postgres: 11"
     env:
@@ -166,3 +226,9 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg11.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
