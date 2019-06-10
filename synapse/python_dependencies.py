@@ -44,6 +44,7 @@ REQUIREMENTS = [
     "canonicaljson>=1.1.3",
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
+    "idna>=2",
     "service_identity>=16.0.0",
 
     # our logcontext handling relies on the ability to cancel inlineCallbacks

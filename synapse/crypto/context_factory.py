@@ -15,6 +15,7 @@
 
 import logging
 
+import idna
 from service_identity import VerificationError
 from service_identity.pyopenssl import verify_hostname
 from zope.interface import implementer
@@ -56,20 +57,6 @@ class ServerContextFactory(ContextFactory):
 
     def getContext(self):
         return self._context
-
-
-def _idnaBytes(text):
-    """
-    Convert some text typed by a human into some ASCII bytes. This is a
-    copy of twisted.internet._idna._idnaBytes. For documentation, see the
-    twisted documentation.
-    """
-    try:
-        import idna
-    except ImportError:
-        return text.encode("idna")
-    else:
-        return idna.encode(text)
 
 
 class ClientTLSOptionsFactory(object):
@@ -162,13 +149,21 @@ class ConnectionVerifier(object):
     This is a thing which is attached to the TLSMemoryBIOProtocol, and is called by
     the ssl context's info callback.
     """
+    # This code is based on twisted.internet.ssl.ClientTLSOptions.
+
     def __init__(self, hostname, verify_certs):
         self._verify_certs = verify_certs
+
         if isIPAddress(hostname) or isIPv6Address(hostname):
             self._hostnameBytes = hostname.encode('ascii')
             self._sendSNI = False
         else:
-            self._hostnameBytes = _idnaBytes(hostname)
+            # twisted's ClientTLSOptions falls back to the stdlib impl here if
+            # idna is not installed, but points out that lacks support for
+            # IDNA2008 (http://bugs.python.org/issue17305).
+            #
+            # We can rely on having idna.
+            self._hostnameBytes = idna.encode(hostname)
             self._sendSNI = True
 
         self._hostnameASCII = self._hostnameBytes.decode("ascii")
@@ -176,6 +171,7 @@ class ConnectionVerifier(object):
     def verify_context_info_cb(self, ssl_connection, where):
         if where & SSL.SSL_CB_HANDSHAKE_START and self._sendSNI:
             ssl_connection.set_tlsext_host_name(self._hostnameBytes)
+
         if where & SSL.SSL_CB_HANDSHAKE_DONE and self._verify_certs:
             try:
                 verify_hostname(ssl_connection, self._hostnameASCII)
