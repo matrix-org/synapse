@@ -1,3 +1,9 @@
+Synapse 1.0.0rc3 (2019-06-10)
+=============================
+
+Security: Fix authentication bug introduced in 1.0.0rc1. Please upgrade to rc3 immediately
+
+
 Synapse 1.0.0rc2 (2019-06-10)
 =============================
 
