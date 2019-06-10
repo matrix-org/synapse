@@ -50,7 +50,7 @@ CONFIG_TEMPLATE = b"""\
 [default]
 basicConstraints = CA:FALSE
 keyUsage=nonRepudiation, digitalSignature, keyEncipherment
-subjectAltName = %(sanentries)b
+subjectAltName = %(sanentries)s
 """
 
 
