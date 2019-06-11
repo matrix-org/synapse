@@ -106,7 +106,7 @@ If your homeserver listens on the default federation port (8448), and your
 
 For instance, if you registered `example.com` and pointed its DNS A record at a
 fresh server, you could install Synapse on that host,
-giving it a server_name of `example.com`, and it would automatically generate a
+giving it a `server_name` of `example.com`, and it would automatically generate a
 valid TLS certificate for you via Let's Encrypt and no SRV record or
 `.well-known` URI would be needed.
 
