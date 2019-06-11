@@ -19,13 +19,15 @@ class EventFormatVersions(object):
     """This is an internal enum for tracking the version of the event format,
     independently from the room version.
     """
-    V1 = 1   # $id:server format
-    V2 = 2   # MSC1659-style $hash format: introduced for room v3
+    V1 = 1   # $id:server event id format
+    V2 = 2   # MSC1659-style $hash event id format: introduced for room v3
+    V3 = 3   # MSC1884-style $hash format: introduced for room v4
 
 
 KNOWN_EVENT_FORMAT_VERSIONS = {
     EventFormatVersions.V1,
     EventFormatVersions.V2,
+    EventFormatVersions.V3,
 }
 
 
@@ -75,6 +77,12 @@ class RoomVersions(object):
         EventFormatVersions.V2,
         StateResolutionVersions.V2,
     )
+    V4 = RoomVersion(
+        "4",
+        RoomDisposition.STABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+    )
 
 
 # the version we will give rooms which are created on this server
@@ -87,5 +95,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V2,
         RoomVersions.V3,
         RoomVersions.STATE_V2_TEST,
+        RoomVersions.V4,
     )
 }   # type: dict[str, RoomVersion]

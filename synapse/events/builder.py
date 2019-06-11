@@ -18,6 +18,7 @@ import attr
 from twisted.internet import defer
 
 from synapse.api.constants import MAX_DEPTH
+from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import (
     KNOWN_EVENT_FORMAT_VERSIONS,
     KNOWN_ROOM_VERSIONS,
@@ -178,9 +179,8 @@ class EventBuilderFactory(object):
         """
         v = KNOWN_ROOM_VERSIONS.get(room_version)
         if not v:
-            raise Exception(
-                "No event format defined for version %r" % (room_version,)
-            )
+            # this can happen if support is withdrawn for a room version
+            raise UnsupportedRoomVersionError()
         return self.for_room_version(v, key_values)
 
     def for_room_version(self, room_version, key_values):

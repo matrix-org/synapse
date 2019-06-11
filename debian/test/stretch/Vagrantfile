@@ -1,0 +1,13 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+ver = `cd ../../..; dpkg-parsechangelog -S Version`.strip()
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "debian/stretch64"
+
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.synced_folder "../../../../debs", "/debs", type: "nfs"
+
+  config.vm.provision "shell", path: "../provision.sh"
+end
