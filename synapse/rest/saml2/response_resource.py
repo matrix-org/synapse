@@ -62,13 +62,13 @@ class SAML2ResponseResource(Resource):
         if saml2_auth.not_signed:
             raise CodeMessageException(400, "SAML2 response was not signed")
 
-        if "uid" not in saml2_auth.ava:
+        if "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn" not in saml2_auth.ava:
             logger.info("ava: %r", saml2_auth.ava)
-            raise CodeMessageException(400, "uid not in SAML2 response")
+            raise CodeMessageException(400, "upn not in SAML2 response")
 
-        username = saml2_auth.ava["uid"][0]
+        username = saml2_auth.ava["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn"][0]
 
-        displayName = saml2_auth.ava.get("displayName", [None])[0]
+        displayName = saml2_auth.ava.get("http://schemas.auth0.com/nickname", [None])[0]
         return self._sso_auth_handler.on_successful_auth(
             username, request, relay_state,
             user_display_name=displayName,
