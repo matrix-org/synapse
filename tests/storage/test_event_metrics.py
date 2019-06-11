@@ -30,7 +30,7 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         requester = Requester(user, None, False, None, None)
 
         # Real events, forward extremities
-        events = [(3, 2), (6, 2), (4, 5)]
+        events = [(3, 2), (6, 2), (4, 6)]
 
         for event_count, extrems in events:
             info = self.get_success(room_creator.create_room(requester, {}))
@@ -72,15 +72,15 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
             elif i[0].endswith("_sum"):
                 _sum = i[2]
 
-        # 3 buckets, 2 with 2 extrems, 1 with 5 extrems, and +Inf which is all
+        # 3 buckets, 2 with 2 extrems, 1 with 6 extrems (bucketed as 7), and +Inf which is all
         self.assertEqual(
             buckets,
             {
                 1.0: 0,
                 2.0: 2,
                 3.0: 0,
-                5.0: 1,
-                7.0: 0,
+                5.0: 0,
+                7.0: 1,
                 10.0: 0,
                 15.0: 0,
                 20.0: 0,
@@ -91,6 +91,6 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
                 "+Inf": 3,
             },
         )
-        # 3 rooms, with 9 total events
+        # 3 rooms, with 10 total events
         self.assertEqual(_count, 3)
-        self.assertEqual(_sum, 9)
+        self.assertEqual(_sum, 10)
