@@ -72,7 +72,8 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
             elif i[0].endswith("_sum"):
                 _sum = i[2]
 
-        # 3 buckets, 2 with 2 extrems, 1 with 6 extrems (bucketed as 7), and +Inf which is all
+        # 3 buckets, 2 with 2 extrems, 1 with 6 extrems (bucketed as 7), and
+        # +Inf which is all
         self.assertEqual(
             buckets,
             {
