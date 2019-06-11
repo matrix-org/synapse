@@ -128,19 +128,27 @@ class EmailConfig(Config):
                 )
 
             # Templates for password reset emails
-            self.email_password_reset_template_html = email_config.get(
-                "password_reset_template_html", "password_reset.html",
+            self.email_password_reset_template_html = os.path.join(
+                self.email_template_dir, email_config.get(
+                    "password_reset_template_html", "password_reset.html",
+                )
             )
-            self.email_password_reset_template_text = email_config.get(
-                "password_reset_template_text", "password_reset.txt",
+            self.email_password_reset_template_text = os.path.join(
+                self.email_template_dir, email_config.get(
+                    "password_reset_template_text", "password_reset.txt",
+                )
             )
-            self.email_password_reset_failure_template = email_config.get(
-                "password_reset_failure_template", "password_reset_failure.html",
+            self.email_password_reset_failure_template = os.path.join(
+                self.email_template_dir, email_config.get(
+                    "password_reset_failure_template", "password_reset_failure.html",
+                )
             )
             # This template does not support any replaceable variables, so we will
             # read it from the disk once during setup
-            email_password_reset_success_template = email_config.get(
-                "password_reset_success_template", "password_reset_success.html",
+            email_password_reset_success_template = os.path.join(
+                self.email_template_dir, email_config.get(
+                    "password_reset_success_template", "password_reset_success.html",
+                )
             )
 
             # Check templates exist
@@ -148,17 +156,12 @@ class EmailConfig(Config):
                       self.email_password_reset_template_text,
                       self.email_password_reset_failure_template,
                       email_password_reset_success_template]:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find template file %s" % (p, ))
+                if not os.path.isfile(f):
+                    raise ConfigError("Unable to find template file %s" % (f, ))
 
             # Retrieve content of web templates
-            filepath = os.path.join(
-                self.email_template_dir,
-                email_password_reset_success_template,
-            )
             self.email_password_reset_success_html_content = self.read_file(
-                filepath,
+                email_password_reset_success_template,
                 "email.password_reset_template_success_html",
             )
 
