@@ -155,7 +155,7 @@ Practically speaking, this is no longer necessary.
 
 If you are using a reverse proxy for all of your TLS traffic, then you can set
 `no_tls: True`. In that case, the only reason Synapse needs the certificate is
-to populate a legacy 'tls_fingerprints' field in the federation API. This is
+to populate a legacy `tls_fingerprints` field in the federation API. This is
 ignored by Synapse 0.99.0 and later, and the only time pre-0.99 Synapses will
 check it is when attempting to fetch the server keys - and generally this is
 delegated via `matrix.org`, which is on 0.99.0.
