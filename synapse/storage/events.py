@@ -243,13 +243,15 @@ class EventsStore(
     def _read_forward_extremities(self):
         def fetch(txn):
             txn.execute(
-                "select room_id, count(*) c from event_forward_extremities "
-                "group by room_id"
+                """
+                select count(*) c from event_forward_extremities
+                group by room_id
+                """
             )
             return txn.fetchall()
 
         res = yield self.runInteraction("read_forward_extremities", fetch)
-        self._current_forward_extremities_amount = c_counter(list(x[1] for x in res))
+        self._current_forward_extremities_amount = c_counter(list(x[0] for x in res))
 
     @defer.inlineCallbacks
     def persist_events(self, events_and_contexts, backfilled=False):
