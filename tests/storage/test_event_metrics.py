@@ -49,7 +49,9 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
 
         # Let it run for a while, then pull out the statistics from the
         # Prometheus client registry
+        self.reactor.advance(60 * 60 * 1000)
         self.pump(1)
+
         items = list(
             filter(
                 lambda x: x.name == "synapse_forward_extremities",
@@ -71,7 +73,24 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
                 _sum = i[2]
 
         # 3 buckets, 2 with 2 extrems, 1 with 5 extrems, and +Inf which is all
-        self.assertEqual(buckets, {2: 2, 5: 1, "+Inf": 3})
+        self.assertEqual(
+            buckets,
+            {
+                1.0: 0,
+                2.0: 2,
+                3.0: 0,
+                5.0: 1,
+                7.0: 0,
+                10.0: 0,
+                15.0: 0,
+                20.0: 0,
+                50.0: 0,
+                100.0: 0,
+                200.0: 0,
+                500.0: 0,
+                "+Inf": 3,
+            },
+        )
         # 3 rooms, with 9 total events
         self.assertEqual(_count, 3)
         self.assertEqual(_sum, 9)

@@ -233,10 +233,11 @@ class EventsStore(
         BucketCollector(
             "synapse_forward_extremities",
             lambda: self._current_forward_extremities_amount,
+            buckets=[1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"]
         )
 
-        # Read the extrems every 60 sec
-        hs.get_clock().looping_call(self._read_forward_extremities, 60000)
+        # Read the extrems every 60 minutes
+        hs.get_clock().looping_call(self._read_forward_extremities, 60 * 60 * 1000)
 
     @defer.inlineCallbacks
     def _read_forward_extremities(self):

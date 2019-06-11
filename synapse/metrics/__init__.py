@@ -196,15 +196,24 @@ class BucketCollector(object):
 
     name = attr.ib()
     data_collector = attr.ib()
+    buckets = attr.ib()
 
     def collect(self):
 
         # Fetch the data -- this must be synchronous!
         data = self.data_collector()
 
+        buckets = {}
+
         res = []
-        for i in sorted(data.keys()):
-            res.append([i, data[i]])
+        for x in data.keys():
+            for i, bound in enumerate(self.buckets[:-1]):
+                if x <= bound:
+                    buckets[bound] = buckets.get(bound, 0) + data[x]
+                    break
+
+        for i in self.buckets[:-1]:
+            res.append([i, buckets.get(i, 0)])
 
         res.append(["+Inf", sum(data.values())])
 
@@ -214,6 +223,12 @@ class BucketCollector(object):
         yield metric
 
     def __attrs_post_init__(self):
+        self.buckets = [float(x) for x in self.buckets]
+        if self.buckets != sorted(self.buckets):
+            raise ValueError("Buckets not sorted")
+
+        self.buckets = tuple(self.buckets)
+
         if self.name in all_gauges.keys():
             logger.warning("%s already registered, reregistering" % (self.name,))
             REGISTRY.unregister(all_gauges.pop(self.name))
