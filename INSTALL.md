@@ -1,14 +1,14 @@
-* [Installing Synapse](#installing-synapse)
-  * [Installing from source](#installing-from-source)
-    * [Platform-Specific Instructions](#platform-specific-instructions)
-    * [Troubleshooting Installation](#troubleshooting-installation)
-  * [Prebuilt packages](#prebuilt-packages)
-* [Setting up Synapse](#setting-up-synapse)
-  * [TLS certificates](#tls-certificates)
-  * [Email](#email)
-  * [Registering a user](#registering-a-user)
-  * [Setting up a TURN server](#setting-up-a-turn-server)
-  * [URL previews](#url-previews)
+- [Installing Synapse](#installing-synapse)
+  - [Installing from source](#installing-from-source)
+    - [Platform-Specific Instructions](#platform-specific-instructions)
+    - [Troubleshooting Installation](#troubleshooting-installation)
+  - [Prebuilt packages](#prebuilt-packages)
+- [Setting up Synapse](#setting-up-synapse)
+  - [TLS certificates](#tls-certificates)
+  - [Email](#email)
+  - [Registering a user](#registering-a-user)
+  - [Setting up a TURN server](#setting-up-a-turn-server)
+  - [URL previews](#url-previews)
 
 # Installing Synapse
 
@@ -395,8 +395,9 @@ To configure Synapse to expose an HTTPS port, you will need to edit
   instance, if using certbot, use `fullchain.pem` as your certificate, not
   `cert.pem`).
 
-For those of you upgrading your TLS certificate for Synapse 1.0 compliance,
-please take a look at [our guide](docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100).
+For a more detailed guide to configuring your server for federation, see
+[federate.md](docs/federate.md)
+
 
 ## Email
 
