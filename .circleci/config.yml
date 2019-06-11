@@ -72,6 +72,14 @@ workflows:
   version: 2
   build:
     jobs:
+      - sytestpy3:
+          filters:
+            branches:
+              only: /develop|master|release-.*/
+      - sytestpy3postgres:
+          filters:
+            branches:
+              only: /develop|master|release-.*/
       - sytestpy3merged:
           filters:
             branches:
