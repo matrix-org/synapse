@@ -14,9 +14,9 @@ up and will work provided you set the ``server_name`` to match your
 machine's public DNS hostname, and provide Synapse with a TLS certificate
 which is valid for your ``server_name``.
 
-Once you have completed the steps necessary to federate, you should be able to 
-join a room via federation. (A good place to start is ``#synapse:matrix.org`` - a 
-room for Synapse admins.)
+Once federation has been configured, you should be able to join a room over
+federation. A good place to start is ``#synapse:matrix.org`` - a room for
+Synapse admins.
 
 
 ## Delegation
@@ -97,6 +97,77 @@ _matrix._tcp.<server_name>``. In our example, we would expect this:
 
 Note that the target of a SRV record cannot be an alias (CNAME record): it has to point
 directly to the server hosting the synapse instance.
+
+### Delegation FAQ
+#### When do I need a SRV record or .well-known URI?
+
+If your homeserver listens on the default federation port (8448), and your
+`server_name` points to the host that your homeserver runs on, you do not need an SRV
+record or `.well-known/matrix/server` URI.
+
+For instance, if you registered `example.com` and pointed its DNS A record at a
+fresh server, you could install Synapse on that host,
+giving it a `server_name` of `example.com`, and once [ACME](acme.md) support is enabled,
+it would automatically generate a valid TLS certificate for you via Let's Encrypt
+and no SRV record or .well-known URI would be needed.
+
+This is the common case, although you can add an SRV record or
+`.well-known/matrix/server` URI for completeness if you wish.
+
+**However**, if your server does not listen on port 8448, or if your `server_name`
+does not point to the host that your homeserver runs on, you will need to let
+other servers know how to find it. The way to do this is via .well-known or an
+SRV record.
+
+#### I have created a .well-known URI. Do I still need an SRV record?
+
+As of Synapse 0.99, Synapse will first check for the existence of a .well-known
+URI and follow any delegation it suggests. It will only then check for the
+existence of an SRV record.
+
+That means that the SRV record will often be redundant. However, you should
+remember that there may still be older versions of Synapse in the federation
+which do not understand .well-known URIs, so if you removed your SRV record
+you would no longer be able to federate with them.
+
+It is therefore best to leave the SRV record in place for now. Synapse 0.34 and
+earlier will follow the SRV record (and not care about the invalid
+certificate). Synapse 0.99 and later will follow the .well-known URI, with the
+correct certificate chain.
+
+#### Can I manage my own certificates rather than having Synapse renew certificates itself?
+
+Yes, you are welcome to manage your certificates yourself. Synapse will only
+attempt to obtain certificates from Let's Encrypt if you configure it to do
+so.The only requirement is that there is a valid TLS cert present for
+federation end points.
+
+#### Do you still recommend against using a reverse proxy on the federation port?
+
+We no longer actively recommend against using a reverse proxy. Many admins will
+find it easier to direct federation traffic to a reverse proxy and manage their
+own TLS certificates, and this is a supported configuration.
+
+See [reverse_proxy.rst](reverse_proxy.rst) for information on setting up a
+reverse proxy.
+
+#### Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?
+
+Practically speaking, this is no longer necessary.
+
+If you are using a reverse proxy for all of your TLS traffic, then you can set
+`no_tls: True` in the Synapse config. In that case, the only reason Synapse
+needs the certificate is to populate a legacy `tls_fingerprints` field in the
+federation API. This is ignored by Synapse 0.99.0 and later, and the only time
+pre-0.99 Synapses will check it is when attempting to fetch the server keys -
+and generally this is delegated via `matrix.org`, which will be running a modern
+version of Synapse.
+
+#### Do I need the same certificate for the client and federation port?
+
+No. There is nothing stopping you from using different certificates,
+particularly if you are using a reverse proxy. However, Synapse will use the
+same certificate on any ports where TLS is configured.
 
 ## Troubleshooting
 

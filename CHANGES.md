@@ -1,3 +1,24 @@
+Synapse 1.0.0 (2019-06-11)
+==========================
+
+Bugfixes
+--------
+
+- Fix bug where attempting to send transactions with large number of EDUs can fail. ([\#5418](https://github.com/matrix-org/synapse/issues/5418))
+
+
+Improved Documentation
+----------------------
+
+- Expand the federation guide to include relevant content from the MSC1711 FAQ ([\#5419](https://github.com/matrix-org/synapse/issues/5419))
+
+
+Internal Changes
+----------------
+
+- Move password reset links to /_matrix/client/unstable namespace. ([\#5424](https://github.com/matrix-org/synapse/issues/5424))
+
+
 Synapse 1.0.0rc3 (2019-06-10)
 =============================
 
