@@ -25,7 +25,11 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.crypto import keyring
-from synapse.crypto.keyring import PerspectivesKeyFetcher, ServerKeyFetcher
+from synapse.crypto.keyring import (
+    PerspectivesKeyFetcher,
+    ServerKeyFetcher,
+    StoreKeyFetcher,
+)
 from synapse.storage.keys import FetchKeyResult
 from synapse.util import logcontext
 from synapse.util.logcontext import LoggingContext
@@ -217,6 +221,50 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # should suceed on a signed object
         d = _verify_json_for_server(kr, "server9", json1, 500, "test signed")
         # self.assertFalse(d.called)
+        self.get_success(d)
+
+    def test_verify_json_for_server_with_null_valid_until_ms(self):
+        """Tests that we correctly handle key requests for keys we've stored
+        with a null `ts_valid_until_ms`
+        """
+        mock_fetcher = keyring.KeyFetcher()
+        mock_fetcher.get_keys = Mock(return_value=defer.succeed({}))
+
+        kr = keyring.Keyring(
+            self.hs, key_fetchers=(StoreKeyFetcher(self.hs), mock_fetcher)
+        )
+
+        key1 = signedjson.key.generate_signing_key(1)
+        r = self.hs.datastore.store_server_verify_keys(
+            "server9",
+            time.time() * 1000,
+            [("server9", get_key_id(key1), FetchKeyResult(get_verify_key(key1), None))],
+        )
+        self.get_success(r)
+
+        json1 = {}
+        signedjson.sign.sign_json(json1, "server9", key1)
+
+        # should fail immediately on an unsigned object
+        d = _verify_json_for_server(kr, "server9", {}, 0, "test unsigned")
+        self.failureResultOf(d, SynapseError)
+
+        # should fail on a signed object with a non-zero minimum_valid_until_ms,
+        # as it tries to refetch the keys and fails.
+        d = _verify_json_for_server(
+            kr, "server9", json1, 500, "test signed non-zero min"
+        )
+        self.get_failure(d, SynapseError)
+
+        # We expect the keyring tried to refetch the key once.
+        mock_fetcher.get_keys.assert_called_once_with(
+            {"server9": {get_key_id(key1): 500}}
+        )
+
+        # should succeed on a signed object with a 0 minimum_valid_until_ms
+        d = _verify_json_for_server(
+            kr, "server9", json1, 0, "test signed with zero min"
+        )
         self.get_success(d)
 
     def test_verify_json_dedupes_key_requests(self):

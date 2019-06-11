@@ -41,6 +41,15 @@ validation or TLS certificate validation. This is likely to be very insecure. If
 you are *sure* you want to do this, set 'accept_keys_insecurely' on the
 keyserver configuration."""
 
+RELYING_ON_MATRIX_KEY_ERROR = """\
+Your server is configured to accept key server responses without TLS certificate
+validation, and which are only signed by the old (possibly compromised)
+matrix.org signing key 'ed25519:auto'. This likely isn't what you want to do,
+and you should enable 'federation_verify_certificates' in your configuration.
+
+If you are *sure* you want to do this, set 'accept_keys_insecurely' on the
+trusted_key_server configuration."""
+
 
 logger = logging.getLogger(__name__)
 
@@ -340,10 +349,20 @@ def _parse_key_servers(key_servers, federation_verify_certificates):
                 result.verify_keys[key_id] = verify_key
 
         if (
-            not verify_keys
-            and not server.get("accept_keys_insecurely")
-            and not federation_verify_certificates
+            not federation_verify_certificates and
+            not server.get("accept_keys_insecurely")
         ):
-            raise ConfigError(INSECURE_NOTARY_ERROR)
+            _assert_keyserver_has_verify_keys(result)
 
         yield result
+
+
+def _assert_keyserver_has_verify_keys(trusted_key_server):
+    if not trusted_key_server.verify_keys:
+        raise ConfigError(INSECURE_NOTARY_ERROR)
+
+    # also check that they are not blindly checking the old matrix.org key
+    if trusted_key_server.server_name == "matrix.org" and any(
+        key_id == "ed25519:auto" for key_id in trusted_key_server.verify_keys
+    ):
+        raise ConfigError(RELYING_ON_MATRIX_KEY_ERROR)

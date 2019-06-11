@@ -1,1 +1,0 @@
-Fix error when downloading thumbnail with missing width/height parameter.
