@@ -504,11 +504,14 @@ class SAMLRedirectServlet(BaseSsoRedirectServlet):
 
     def __init__(self, hs):
         self._saml_client = hs.get_saml_client()
+        self.samlreqs = hs.samlreqs
 
     def get_sso_url(self, client_redirect_url):
         reqid, info = self._saml_client.prepare_for_authenticate(
             relay_state=client_redirect_url,
         )
+        logger.info("prepared to auth - reqid: %r, info: %r, client redirect uri: %r", reqid, info, client_redirect_url)
+        self.samlreqs[reqid] = client_redirect_url
 
         for key, value in info['headers']:
             if key == 'Location':

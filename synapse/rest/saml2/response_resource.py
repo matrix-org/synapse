@@ -37,6 +37,7 @@ class SAML2ResponseResource(Resource):
         Resource.__init__(self)
         self._saml_client = hs.get_saml_client()
         self._sso_auth_handler = SSOAuthHandler(hs)
+        self.samlreqs = hs.samlreqs
 
     def render_POST(self, request):
         self._async_render_POST(request)
@@ -50,6 +51,7 @@ class SAML2ResponseResource(Resource):
         try:
             saml2_auth = self._saml_client.parse_authn_request_response(
                 resp_bytes, saml2.BINDING_HTTP_POST,
+                outstanding=self.samlreqs,
             )
         except Exception as e:
             logger.warning("Exception parsing SAML2 response", exc_info=1)
@@ -60,12 +62,12 @@ class SAML2ResponseResource(Resource):
         if saml2_auth.not_signed:
             raise CodeMessageException(400, "SAML2 response was not signed")
 
-        if "uid" not in saml2_auth.ava:
-            raise CodeMessageException(400, "uid not in SAML2 response")
+        if "http://schemas.auth0.com/name" not in saml2_auth.ava:
+            raise CodeMessageException(400, "name not in SAML2 response")
 
-        username = saml2_auth.ava["uid"][0]
+        username = saml2_auth.ava["http://schemas.auth0.com/name"][0]
 
-        displayName = saml2_auth.ava.get("displayName", [None])[0]
+        displayName = saml2_auth.ava.get("http://schemas.auth0.com/nickname", [None])[0]
         return self._sso_auth_handler.on_successful_auth(
             username, request, relay_state,
             user_display_name=displayName,
