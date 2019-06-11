@@ -105,7 +105,7 @@ If your homeserver listens on the default federation port (8448), and your
 `server_name` points to the host that your homeserver runs on, you do not need an SRV record or `.well-known/matrix/server` URI.
 
 For instance, if you registered `example.com` and pointed its DNS A record at a
-fresh Upcloud VPS or similar, you could install Synapse on that host,
+fresh server, you could install Synapse on that host,
 giving it a server_name of `example.com`, and it would automatically generate a
 valid TLS certificate for you via Let's Encrypt and no SRV record or
 `.well-known` URI would be needed.
