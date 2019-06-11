@@ -14,8 +14,8 @@ up and will work provided you set the ``server_name`` to match your
 machine's public DNS hostname, and provide Synapse with a TLS certificate
 which is valid for your ``server_name``.
 
-Once federation has been configured, you should be able to join a room over 
-federation. A good place to start is ``#synapse:matrix.org`` - a room for 
+Once federation has been configured, you should be able to join a room over
+federation. A good place to start is ``#synapse:matrix.org`` - a room for
 Synapse admins.
 
 
@@ -102,13 +102,14 @@ directly to the server hosting the synapse instance.
 #### When do I need a SRV record or .well-known URI?
 
 If your homeserver listens on the default federation port (8448), and your
-`server_name` points to the host that your homeserver runs on, you do not need an SRV record or `.well-known/matrix/server` URI.
+`server_name` points to the host that your homeserver runs on, you do not need an SRV
+record or `.well-known/matrix/server` URI.
 
 For instance, if you registered `example.com` and pointed its DNS A record at a
 fresh server, you could install Synapse on that host,
-giving it a `server_name` of `example.com`, and it would automatically generate a
-valid TLS certificate for you via Let's Encrypt and no SRV record or
-`.well-known` URI would be needed.
+giving it a `server_name` of `example.com`, and once [ACME](acme.md) support is enabled,
+it would automatically generate a valid TLS certificate for you via Let's Encrypt
+and no SRV record or .well-known URI would be needed.
 
 This is the common case, although you can add an SRV record or
 `.well-known/matrix/server` URI for completeness if you wish.
@@ -120,13 +121,14 @@ SRV record.
 
 #### I have created a .well-known URI. Do I still need an SRV record?
 
-As of Synapse 0.99, Synapse will first check for the existence of a `.well-known`
+As of Synapse 0.99, Synapse will first check for the existence of a .well-known
 URI and follow any delegation it suggests. It will only then check for the
 existence of an SRV record.
 
 That means that the SRV record will often be redundant. However, you should
 remember that there may still be older versions of Synapse in the federation
-which do not understand `.well-known` URIs, so if you removed your SRV record you would no longer be able to federate with them.
+which do not understand .well-known URIs, so if you removed your SRV record
+you would no longer be able to federate with them.
 
 It is therefore best to leave the SRV record in place for now. Synapse 0.34 and
 earlier will follow the SRV record (and not care about the invalid
@@ -154,11 +156,12 @@ reverse proxy.
 Practically speaking, this is no longer necessary.
 
 If you are using a reverse proxy for all of your TLS traffic, then you can set
-`no_tls: True`. In that case, the only reason Synapse needs the certificate is
-to populate a legacy `tls_fingerprints` field in the federation API. This is
-ignored by Synapse 0.99.0 and later, and the only time pre-0.99 Synapses will
-check it is when attempting to fetch the server keys - and generally this is
-delegated via `matrix.org`, which is on 0.99.0.
+`no_tls: True` in the Synapse config. In that case, the only reason Synapse
+needs the certificate is to populate a legacy `tls_fingerprints` field in the
+federation API. This is ignored by Synapse 0.99.0 and later, and the only time
+pre-0.99 Synapses will check it is when attempting to fetch the server keys -
+and generally this is delegated via `matrix.org`, which will be running a modern
+version of Synapse.
 
 #### Do I need the same certificate for the client and federation port?
 
