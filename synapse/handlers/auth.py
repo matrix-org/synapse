@@ -479,6 +479,7 @@ class AuthHandler(BaseHandler):
                 medium,
                 threepid_creds["client_secret"],
                 sid=threepid_creds["sid"],
+                validated=True,
             )
 
             threepid = {
