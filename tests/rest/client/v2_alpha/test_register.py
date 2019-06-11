@@ -30,11 +30,6 @@ from synapse.rest.client.v2_alpha import account_validity, register, sync
 
 from tests import unittest
 
-try:
-    from synapse.push.mailer import load_jinja2_templates
-except ImportError:
-    load_jinja2_templates = None
-
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
@@ -307,7 +302,6 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
 class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
-    skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
         register.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
