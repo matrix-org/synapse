@@ -37,6 +37,9 @@ from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
+MAX_DISPLAYNAME_LEN = 100
+MAX_AVATAR_URL_LEN = 1000
+
 
 class BaseProfileHandler(BaseHandler):
     """Handles fetching and updating user profile information.
@@ -253,6 +256,11 @@ class BaseProfileHandler(BaseHandler):
             if profile.display_name:
                 raise SynapseError(400, "Changing displayname is disabled on this server")
 
+        if len(new_displayname) > MAX_DISPLAYNAME_LEN:
+            raise SynapseError(
+                400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN, ),
+            )
+
         if new_displayname == '':
             new_displayname = None
 
@@ -354,6 +362,11 @@ class BaseProfileHandler(BaseHandler):
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
         else:
             new_batchnum = None
+
+        if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
+            raise SynapseError(
+                400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN, ),
+            )
 
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url, new_batchnum,

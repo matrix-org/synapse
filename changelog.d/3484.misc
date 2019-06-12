@@ -1,1 +1,0 @@
-Make /sync attempt to return device updates for both joined and invited users. Note that this doesn't currently work correctly due to other bugs.

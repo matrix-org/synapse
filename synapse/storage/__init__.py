@@ -36,6 +36,7 @@ from .engines import PostgresEngine
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events import EventsStore
+from .events_bg_updates import EventsBackgroundUpdatesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
@@ -49,11 +50,13 @@ from .pusher import PusherStore
 from .receipts import ReceiptsStore
 from .registration import RegistrationStore
 from .rejections import RejectionsStore
+from .relations import RelationsStore
 from .room import RoomStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
 from .signatures import SignatureStore
 from .state import StateStore
+from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
 from .transactions import TransactionStore
@@ -64,6 +67,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataStore(
+    EventsBackgroundUpdatesStore,
     RoomMemberStore,
     RoomStore,
     RegistrationStore,
@@ -99,6 +103,8 @@ class DataStore(
     GroupServerStore,
     UserErasureStore,
     MonthlyActiveUsersStore,
+    StatsStore,
+    RelationsStore,
 ):
     def __init__(self, db_conn, hs):
         self.hs = hs

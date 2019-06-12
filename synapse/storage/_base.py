@@ -588,6 +588,10 @@ class SQLBaseStore(object):
         Args:
             table : string giving the table name
             values : dict of new column names and values for them
+            or_ignore : bool stating whether an exception should be raised
+                when a conflicting row already exists. If True, False will be
+                returned by the function instead
+            desc : string giving a description of the transaction
 
         Returns:
             bool: Whether the row was inserted or not. Only useful when
@@ -1228,8 +1232,8 @@ class SQLBaseStore(object):
         )
 
         txn.execute(select_sql, list(keyvalues.values()))
-
         row = txn.fetchone()
+
         if not row:
             if allow_none:
                 return None
@@ -1279,7 +1283,8 @@ class SQLBaseStore(object):
             " AND ".join("%s = ?" % (k,) for k in keyvalues),
         )
 
-        return txn.execute(sql, list(keyvalues.values()))
+        txn.execute(sql, list(keyvalues.values()))
+        return txn.rowcount
 
     def _simple_delete_many(self, table, column, iterable, keyvalues, desc):
         return self.runInteraction(
@@ -1298,9 +1303,12 @@ class SQLBaseStore(object):
             column : column name to test for inclusion against `iterable`
             iterable : list
             keyvalues : dict of column names and values to select the rows with
+
+        Returns:
+            int: Number rows deleted
         """
         if not iterable:
-            return
+            return 0
 
         sql = "DELETE FROM %s" % table
 
@@ -1315,7 +1323,9 @@ class SQLBaseStore(object):
 
         if clauses:
             sql = "%s WHERE %s" % (sql, " AND ".join(clauses))
-        return txn.execute(sql, values)
+        txn.execute(sql, values)
+
+        return txn.rowcount
 
     def _get_cache_dict(
         self, db_conn, table, entity_column, stream_column, max_value, limit=100000

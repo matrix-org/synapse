@@ -17,16 +17,19 @@ import logging
 from mock import Mock
 
 import treq
+from service_identity import VerificationError
 from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet._sslverify import ClientTLSOptions, OpenSSLCertificateOptions
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory
+from twisted.web._newclient import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IPolicyForHTTPS
 
+from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto.context_factory import ClientTLSOptionsFactory
 from synapse.http.federation.matrix_federation_agent import (
     MatrixFederationAgent,
@@ -36,12 +39,28 @@ from synapse.http.federation.srv_resolver import Server
 from synapse.util.caches.ttlcache import TTLCache
 from synapse.util.logcontext import LoggingContext
 
-from tests.http import ServerTLSContext
+from tests.http import TestServerTLSConnectionFactory, get_test_ca_cert_file
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
 from tests.unittest import TestCase
 from tests.utils import default_config
 
 logger = logging.getLogger(__name__)
+
+test_server_connection_factory = None
+
+
+def get_connection_factory():
+    # this needs to happen once, but not until we are ready to run the first test
+    global test_server_connection_factory
+    if test_server_connection_factory is None:
+        test_server_connection_factory = TestServerTLSConnectionFactory(sanlist=[
+            b'DNS:testserv',
+            b'DNS:target-server',
+            b'DNS:xn--bcher-kva.com',
+            b'IP:1.2.3.4',
+            b'IP:::1',
+        ])
+    return test_server_connection_factory
 
 
 class MatrixFederationAgentTests(TestCase):
@@ -52,11 +71,16 @@ class MatrixFederationAgentTests(TestCase):
 
         self.well_known_cache = TTLCache("test_cache", timer=self.reactor.seconds)
 
+        config_dict = default_config("test", parse=False)
+        config_dict["federation_custom_ca_list"] = [get_test_ca_cert_file()]
+        # config_dict["trusted_key_servers"] = []
+
+        self._config = config = HomeServerConfig()
+        config.parse_config_dict(config_dict)
+
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
-            tls_client_options_factory=ClientTLSOptionsFactory(
-                default_config("test", parse=True)
-            ),
+            tls_client_options_factory=ClientTLSOptionsFactory(config),
             _well_known_tls_policy=TrustingTLSPolicyForHTTPS(),
             _srv_resolver=self.mock_resolver,
             _well_known_cache=self.well_known_cache,
@@ -70,7 +94,7 @@ class MatrixFederationAgentTests(TestCase):
         """
 
         # build the test server
-        server_tls_protocol = _build_test_server()
+        server_tls_protocol = _build_test_server(get_connection_factory())
 
         # now, tell the client protocol factory to build the client protocol (it will be a
         # _WrappingProtocol, around a TLSMemoryBIOProtocol, around an
@@ -320,6 +344,88 @@ class MatrixFederationAgentTests(TestCase):
         request.finish()
         self.reactor.pump((0.1,))
         self.successResultOf(test_d)
+
+    def test_get_hostname_bad_cert(self):
+        """
+        Test the behaviour when the certificate on the server doesn't match the hostname
+        """
+        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.reactor.lookups["testserv1"] = "1.2.3.4"
+
+        test_d = self._make_get_request(b"matrix://testserv1/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # No SRV record lookup yet
+        self.mock_resolver.resolve_service.assert_not_called()
+
+        # there should be an attempt to connect on port 443 for the .well-known
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 443)
+
+        # fonx the connection
+        client_factory.clientConnectionFailed(None, Exception("nope"))
+
+        # attemptdelay on the hostnameendpoint is 0.3, so takes that long before the
+        # .well-known request fails.
+        self.reactor.pump((0.4,))
+
+        # now there should be a SRV lookup
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.testserv1"
+        )
+
+        # we should fall back to a direct connection
+        self.assertEqual(len(clients), 2)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[1]
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 8448)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(client_factory, expected_sni=b'testserv1')
+
+        # there should be no requests
+        self.assertEqual(len(http_server.requests), 0)
+
+        # ... and the request should have failed
+        e = self.failureResultOf(test_d, ResponseNeverReceived)
+        failure_reason = e.value.reasons[0]
+        self.assertIsInstance(failure_reason.value, VerificationError)
+
+    def test_get_ip_address_bad_cert(self):
+        """
+        Test the behaviour when the server name contains an explicit IP, but
+        the server cert doesn't cover it
+        """
+        # there will be a getaddrinfo on the IP
+        self.reactor.lookups["1.2.3.5"] = "1.2.3.5"
+
+        test_d = self._make_get_request(b"matrix://1.2.3.5/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # Make sure treq is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '1.2.3.5')
+        self.assertEqual(port, 8448)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(client_factory, expected_sni=None)
+
+        # there should be no requests
+        self.assertEqual(len(http_server.requests), 0)
+
+        # ... and the request should have failed
+        e = self.failureResultOf(test_d, ResponseNeverReceived)
+        failure_reason = e.value.reasons[0]
+        self.assertIsInstance(failure_reason.value, VerificationError)
 
     def test_get_no_srv_no_well_known(self):
         """
@@ -577,6 +683,49 @@ class MatrixFederationAgentTests(TestCase):
         request.finish()
         self.reactor.pump((0.1,))
         self.successResultOf(test_d)
+
+    def test_get_well_known_unsigned_cert(self):
+        """Test the behaviour when the .well-known server presents a cert
+        not signed by a CA
+        """
+
+        # we use the same test server as the other tests, but use an agent
+        # with _well_known_tls_policy left to the default, which will not
+        # trust it (since the presented cert is signed by a test CA)
+
+        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+
+        agent = MatrixFederationAgent(
+            reactor=self.reactor,
+            tls_client_options_factory=ClientTLSOptionsFactory(self._config),
+            _srv_resolver=self.mock_resolver,
+            _well_known_cache=self.well_known_cache,
+        )
+
+        test_d = agent.request(b"GET", b"matrix://testserv/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # there should be an attempt to connect on port 443 for the .well-known
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 443)
+
+        http_proto = self._make_connection(
+            client_factory, expected_sni=b"testserv",
+        )
+
+        # there should be no requests
+        self.assertEqual(len(http_proto.requests), 0)
+
+        # and there should be a SRV lookup instead
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.testserv"
+        )
 
     def test_get_hostname_srv(self):
         """
@@ -911,10 +1060,16 @@ def _check_logcontext(context):
         raise AssertionError("Expected logcontext %s but was %s" % (context, current))
 
 
-def _build_test_server():
+def _build_test_server(connection_creator):
     """Construct a test server
 
     This builds an HTTP channel, wrapped with a TLSMemoryBIOProtocol
+
+    Args:
+        connection_creator (IOpenSSLServerConnectionCreator): thing to build
+            SSL connections
+        sanlist (list[bytes]): list of the SAN entries for the cert returned
+            by the server
 
     Returns:
         TLSMemoryBIOProtocol
@@ -924,7 +1079,7 @@ def _build_test_server():
     server_factory.log = _log_request
 
     server_tls_factory = TLSMemoryBIOFactory(
-        ServerTLSContext(), isClient=False, wrappedFactory=server_factory
+        connection_creator, isClient=False, wrappedFactory=server_factory
     )
 
     return server_tls_factory.buildProtocol(None)
@@ -937,7 +1092,8 @@ def _log_request(request):
 
 @implementer(IPolicyForHTTPS)
 class TrustingTLSPolicyForHTTPS(object):
-    """An IPolicyForHTTPS which doesn't do any certificate verification"""
+    """An IPolicyForHTTPS which checks that the certificate belongs to the
+    right server, but doesn't check the certificate chain."""
 
     def creatorForNetloc(self, hostname, port):
         certificateOptions = OpenSSLCertificateOptions()

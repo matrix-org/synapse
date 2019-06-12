@@ -31,7 +31,11 @@ logger = logging.getLogger(__name__)
 def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     """Check whether the hash for this PDU matches the contents"""
     name, expected_hash = compute_content_hash(event.get_pdu_json(), hash_algorithm)
-    logger.debug("Expecting hash: %s", encode_base64(expected_hash))
+    logger.debug(
+        "Verifying content hash on %s (expecting: %s)",
+        event.event_id,
+        encode_base64(expected_hash),
+    )
 
     # some malformed events lack a 'hashes'. Protect against it being missing
     # or a weird type by basically treating it the same as an unhashed event.

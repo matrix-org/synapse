@@ -92,7 +92,14 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         self.assertEqual(len(self.recaptcha_attempts), 1)
         self.assertEqual(self.recaptcha_attempts[0][0]["response"], "a")
 
-        # Now we have fufilled the recaptcha fallback step, we can then send a
+        # also complete the dummy auth
+        request, channel = self.make_request(
+            "POST", "register", {"auth": {"session": session, "type": "m.login.dummy"}}
+        )
+        self.render(request)
+
+        # Now we should have fufilled a complete auth flow, including
+        # the recaptcha fallback step, we can then send a
         # request to the register API with the session in the authdict.
         request, channel = self.make_request(
             "POST", "register", {"auth": {"session": session}}
