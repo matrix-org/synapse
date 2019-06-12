@@ -22,7 +22,6 @@ from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
 
-
 logger = logging.getLogger(__name__)
 
 
