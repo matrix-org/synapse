@@ -441,3 +441,15 @@ class HomeserverTestCase(TestCase):
 
         access_token = channel.json_body["access_token"]
         return access_token
+
+    def attempt_wrong_password_login(self, username, password):
+        """Attempts to login as the user with the given password, asserting
+        that the attempt *fails*.
+        """
+        body = {"type": "m.login.password", "user": username, "password": password}
+
+        request, channel = self.make_request(
+            "POST", "/_matrix/client/r0/login", json.dumps(body).encode('utf8')
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 403, channel.result)
