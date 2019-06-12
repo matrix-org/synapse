@@ -15,9 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import re
-import json
 from email.parser import Parser
 
 import pkg_resources
