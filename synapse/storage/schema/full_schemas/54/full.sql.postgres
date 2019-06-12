@@ -667,10 +667,19 @@ CREATE TABLE presence_stream (
 
 
 
+CREATE TABLE profile_replication_status (
+    host text NOT NULL,
+    last_synced_batch bigint NOT NULL
+);
+
+
+
 CREATE TABLE profiles (
     user_id text NOT NULL,
     displayname text,
-    avatar_url text
+    avatar_url text,
+    batch bigint,
+    active smallint DEFAULT 1 NOT NULL
 );
 
 
@@ -1839,6 +1848,10 @@ CREATE INDEX presence_stream_id ON presence_stream USING btree (stream_id, user_
 
 
 CREATE INDEX presence_stream_user_id ON presence_stream USING btree (user_id);
+
+
+
+CREATE INDEX profiles_batch_idx ON profiles USING btree (batch);
 
 
 
