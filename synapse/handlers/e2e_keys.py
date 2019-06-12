@@ -201,6 +201,7 @@ class E2eKeysHandler(object):
         """
         master_keys = {}
         self_signing_keys = {}
+        user_signing_keys = {}
 
         @defer.inlineCallbacks
         def get_cross_signing_key(user_id):
@@ -222,12 +223,28 @@ class E2eKeysHandler(object):
             except Exception:
                 pass
 
+            # users can see other users' master and self-signing keys, but can
+            # only see their own user-signing keys
+            if from_user_id == user_id:
+                try:
+                    key = yield self.store.get_e2e_cross_signing_key(
+                        user_id, "user_signing", from_user_id
+                    )
+                    if key:
+                        user_signing_keys[user_id] = key
+                except Exception:
+                    pass
+
         yield make_deferred_yieldable(defer.gatherResults([
             run_in_background(get_cross_signing_key, user_id)
             for user_id in query.keys()
         ]))
 
-        defer.returnValue({"master": master_keys, "self_signing": self_signing_keys})
+        defer.returnValue({
+            "master": master_keys,
+            "self_signing": self_signing_keys,
+            "user_signing": user_signing_keys,
+        })
 
     @defer.inlineCallbacks
     def query_local_devices(self, query):
