@@ -48,6 +48,23 @@ steps:
 
   - command:
       - "python -m pip install tox"
+      - "tox -e py35-old,codecov"
+    label: ":python: 3.5 / SQLite / Old Deps"
+    env:
+      TRIAL_FLAGS: "-j 2"
+    plugins:
+      - docker#v3.0.1:
+          image: "python:3.5"
+          propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
+
+  - command:
+      - "python -m pip install tox"
       - "tox -e py35,codecov"
     label: ":python: 3.5 / SQLite"
     env:
