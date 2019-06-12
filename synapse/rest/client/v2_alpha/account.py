@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import re
 
 from six.moves import http_client
 
@@ -231,9 +230,11 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
 class PasswordResetSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
-    PATTERNS = [
-        re.compile("^/_synapse/password_reset/(?P<medium>[^/]*)/submit_token/*$"),
-    ]
+    PATTERNS = client_patterns(
+        "/password_reset/(?P<medium>[^/]*)/submit_token/*$",
+        releases=(),
+        unstable=True,
+    )
 
     def __init__(self, hs):
         """
