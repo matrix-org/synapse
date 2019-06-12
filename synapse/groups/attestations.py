@@ -97,10 +97,13 @@ class GroupAttestationSigning(object):
 
         # TODO: We also want to check that *new* attestations that people give
         # us to store are valid for at least a little while.
-        if valid_until_ms < self.clock.time_msec():
+        now = self.clock.time_msec()
+        if valid_until_ms < now:
             raise SynapseError(400, "Attestation expired")
 
-        yield self.keyring.verify_json_for_server(server_name, attestation)
+        yield self.keyring.verify_json_for_server(
+            server_name, attestation, now, "Group attestation"
+        )
 
     def create_attestation(self, group_id, user_id):
         """Create an attestation for the group_id and user_id with default

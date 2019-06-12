@@ -16,7 +16,12 @@
 
 import logging
 
-from pkg_resources import DistributionNotFound, VersionConflict, get_distribution
+from pkg_resources import (
+    DistributionNotFound,
+    Requirement,
+    VersionConflict,
+    get_provider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +44,10 @@ REQUIREMENTS = [
     "canonicaljson>=1.1.3",
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
-    "service_identity>=16.0.0",
+    "idna>=2",
+
+    # validating SSL certs for IP addresses requires service_identity 18.1.
+    "service_identity>=18.1.0",
 
     # our logcontext handling relies on the ability to cancel inlineCallbacks
     # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
@@ -53,7 +61,7 @@ REQUIREMENTS = [
     "pyasn1-modules>=0.0.7",
     "daemonize>=2.3.1",
     "bcrypt>=3.1.0",
-    "pillow>=3.1.2",
+    "pillow>=4.3.0",
     "sortedcontainers>=1.4.4",
     "psutil>=2.0.0",
     "pymacaroons>=0.13.0",
@@ -69,18 +77,10 @@ REQUIREMENTS = [
     "attrs>=17.4.0",
 
     "netaddr>=0.7.18",
-
-    # requests is a transitive dep of treq, and urlib3 is a transitive dep
-    # of requests, as well as of sentry-sdk.
-    #
-    # As of requests 2.21, requests does not yet support urllib3 1.25.
-    # (If we do not pin it here, pip will give us the latest urllib3
-    # due to the dep via sentry-sdk.)
-    "urllib3<1.25",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
-    "email.enable_notifs": ["Jinja2>=2.9", "bleach>=1.4.2"],
+    "email": ["Jinja2>=2.9", "bleach>=1.4.3"],
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
 
     # we use execute_batch, which arrived in psycopg 2.7.
@@ -91,7 +91,13 @@ CONDITIONAL_REQUIREMENTS = {
 
     # ACME support is required to provision TLS certificates from authorities
     # that use the protocol, such as Let's Encrypt.
-    "acme": ["txacme>=0.9.2"],
+    "acme": [
+        "txacme>=0.9.2",
+
+        # txacme depends on eliot. Eliot 1.8.0 is incompatible with
+        # python 3.5.2, as per https://github.com/itamarst/eliot/issues/418
+        'eliot<1.8.0;python_version<"3.5.3"',
+    ],
 
     "saml2": ["pysaml2>=4.5.0"],
     "systemd": ["systemd-python>=231"],
@@ -125,10 +131,10 @@ class DependencyException(Exception):
     @property
     def dependencies(self):
         for i in self.args[0]:
-            yield '"' + i + '"'
+            yield "'" + i + "'"
 
 
-def check_requirements(for_feature=None, _get_distribution=get_distribution):
+def check_requirements(for_feature=None):
     deps_needed = []
     errors = []
 
@@ -139,7 +145,7 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
 
     for dependency in reqs:
         try:
-            _get_distribution(dependency)
+            _check_requirement(dependency)
         except VersionConflict as e:
             deps_needed.append(dependency)
             errors.append(
@@ -157,7 +163,7 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
 
         for dependency in OPTS:
             try:
-                _get_distribution(dependency)
+                _check_requirement(dependency)
             except VersionConflict as e:
                 deps_needed.append(dependency)
                 errors.append(
@@ -173,6 +179,23 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
             logging.error(e)
 
         raise DependencyException(deps_needed)
+
+
+def _check_requirement(dependency_string):
+    """Parses a dependency string, and checks if the specified requirement is installed
+
+    Raises:
+        VersionConflict if the requirement is installed, but with the the wrong version
+        DistributionNotFound if nothing is found to provide the requirement
+    """
+    req = Requirement.parse(dependency_string)
+
+    # first check if the markers specify that this requirement needs installing
+    if req.marker is not None and not req.marker.evaluate():
+        # not required for this environment
+        return
+
+    get_provider(req)
 
 
 if __name__ == "__main__":

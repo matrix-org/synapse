@@ -19,7 +19,7 @@ import logging
 from twisted.internet import defer
 
 from synapse import types
-from synapse.api.constants import LoginType
+from synapse.api.constants import MAX_USERID_LENGTH, LoginType
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -123,6 +123,15 @@ class RegistrationHandler(BaseHandler):
                 )
 
         self.check_user_id_not_appservice_exclusive(user_id)
+
+        if len(user_id) > MAX_USERID_LENGTH:
+            raise SynapseError(
+                400,
+                "User ID may not be longer than %s characters" % (
+                    MAX_USERID_LENGTH,
+                ),
+                Codes.INVALID_USERNAME
+            )
 
         users = yield self.store.get_users_by_id_case_insensitive(user_id)
         if users:
@@ -620,6 +629,8 @@ class RegistrationHandler(BaseHandler):
             A tuple of (user_id, access_token).
         Raises:
             RegistrationError if there was a problem registering.
+
+        NB this is only used in tests. TODO: move it to the test package!
         """
         if localpart is None:
             raise SynapseError(400, "Request must include user id")

@@ -21,7 +21,7 @@ from synapse.api.errors import AuthError, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class AccountDataServlet(RestServlet):
     PUT /user/{user_id}/account_data/{account_dataType} HTTP/1.1
     GET /user/{user_id}/account_data/{account_dataType} HTTP/1.1
     """
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/user/(?P<user_id>[^/]*)/account_data/(?P<account_data_type>[^/]*)"
     )
 
@@ -86,7 +86,7 @@ class RoomAccountDataServlet(RestServlet):
     PUT /user/{user_id}/rooms/{room_id}/account_data/{account_dataType} HTTP/1.1
     GET /user/{user_id}/rooms/{room_id}/account_data/{account_dataType} HTTP/1.1
     """
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/user/(?P<user_id>[^/]*)"
         "/rooms/(?P<room_id>[^/]*)"
         "/account_data/(?P<account_data_type>[^/]*)"

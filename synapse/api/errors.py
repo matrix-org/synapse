@@ -336,9 +336,32 @@ class RoomKeysVersionError(SynapseError):
         self.current_version = current_version
 
 
-class IncompatibleRoomVersionError(SynapseError):
-    """A server is trying to join a room whose version it does not support."""
+class UnsupportedRoomVersionError(SynapseError):
+    """The client's request to create a room used a room version that the server does
+    not support."""
+    def __init__(self):
+        super(UnsupportedRoomVersionError, self).__init__(
+            code=400,
+            msg="Homeserver does not support this room version",
+            errcode=Codes.UNSUPPORTED_ROOM_VERSION,
+        )
 
+
+class ThreepidValidationError(SynapseError):
+    """An error raised when there was a problem authorising an event."""
+
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.FORBIDDEN
+        super(ThreepidValidationError, self).__init__(*args, **kwargs)
+
+
+class IncompatibleRoomVersionError(SynapseError):
+    """A server is trying to join a room whose version it does not support.
+
+    Unlike UnsupportedRoomVersionError, it is specific to the case of the make_join
+    failing.
+    """
     def __init__(self, room_version):
         super(IncompatibleRoomVersionError, self).__init__(
             code=400,
