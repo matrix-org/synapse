@@ -17,13 +17,13 @@ import logging
 
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class PasswordPolicyServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/password_policy$")
+    PATTERNS = client_patterns("/password_policy$")
 
     def __init__(self, hs):
         """
