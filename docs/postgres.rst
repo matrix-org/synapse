@@ -1,7 +1,7 @@
 Using Postgres
 --------------
 
-Postgres version 9.4 or later is known to work.
+Postgres version 9.5 or later is known to work.
 
 Install postgres client libraries
 =================================
@@ -16,7 +16,7 @@ a postgres database.
 * For other pre-built packages, please consult the documentation from the
   relevant package.
 
-* If you installed synapse `in a virtualenv 
+* If you installed synapse `in a virtualenv
   <../INSTALL.md#installing-from-source>`_, you can install the library with::
 
       ~/synapse/env/bin/pip install matrix-synapse[postgres]
