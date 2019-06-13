@@ -19,12 +19,13 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.storage.roommember import ProfileInfo
 
+from ._base import SQLBaseStore
 from . import background_updates
 
 BATCH_SIZE = 100
 
 
-class ProfileWorkerStore(background_updates.BackgroundUpdateStore):
+class ProfileWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_profileinfo(self, user_localpart):
         try:
@@ -165,7 +166,7 @@ class ProfileWorkerStore(background_updates.BackgroundUpdateStore):
         )
 
 
-class ProfileStore(ProfileWorkerStore):
+class ProfileStore(ProfileWorkerStore, background_updates.BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
 
         super(ProfileStore, self).__init__(db_conn, hs)
