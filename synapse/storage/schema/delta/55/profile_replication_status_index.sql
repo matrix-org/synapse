@@ -13,4 +13,5 @@
  * limitations under the License.
  */
 
-CREATE UNIQUE INDEX profile_replication_status_idx ON profile_replication_status(host);
+INSERT INTO background_updates (update_name, progress_json) VALUES
+  ('profile_replication_status_host_index', '{}');

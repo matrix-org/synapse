@@ -19,6 +19,7 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.storage.roommember import ProfileInfo
 
+from . import background_updates
 from ._base import SQLBaseStore
 
 BATCH_SIZE = 100
@@ -165,7 +166,18 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
 
-class ProfileStore(ProfileWorkerStore):
+class ProfileStore(ProfileWorkerStore, background_updates.BackgroundUpdateStore):
+    def __init__(self, db_conn, hs):
+
+        super(ProfileStore, self).__init__(db_conn, hs)
+
+        self.register_background_index_update(
+            "profile_replication_status_host_index",
+            index_name="profile_replication_status_idx",
+            table="profile_replication_status",
+            columns=["host"],
+        )
+
     def add_remote_profile_cache(self, user_id, displayname, avatar_url):
         """Ensure we are caching the remote user's profiles.
 
