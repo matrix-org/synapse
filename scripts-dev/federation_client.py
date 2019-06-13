@@ -21,7 +21,8 @@ import argparse
 import base64
 import json
 import sys
-from urlparse import urlparse, urlunparse
+
+from six.moves.urllib import parse as urlparse
 
 import nacl.signing
 import requests
@@ -145,7 +146,7 @@ def request_json(method, origin_name, origin_key, destination, path, content):
 
     for key, sig in signed_json["signatures"][origin_name].items():
         header = "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (origin_name, key, sig)
-        authorization_headers.append(bytes(header))
+        authorization_headers.append(header.encode("ascii"))
         print("Authorization: %s" % header, file=sys.stderr)
 
     dest = "matrix://%s%s" % (destination, path)
@@ -270,12 +271,12 @@ class MatrixConnectionAdapter(HTTPAdapter):
             return s, 8448
 
     def get_connection(self, url, proxies=None):
-        parsed = urlparse(url)
+        parsed = urlparse.urlparse(url)
 
         (host, port) = self.lookup(parsed.netloc)
         netloc = "%s:%d" % (host, port)
         print("Connecting to %s" % (netloc,), file=sys.stderr)
-        url = urlunparse(
+        url = urlparse.urlunparse(
             ("https", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
         )
         return super(MatrixConnectionAdapter, self).get_connection(url, proxies)
