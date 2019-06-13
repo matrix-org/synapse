@@ -598,10 +598,58 @@ class RegistrationStore(
             "user_threepids_grandfather", self._bg_user_threepids_grandfather,
         )
 
+        self.register_background_update_handler(
+            "users_set_deactivated_flag", self._set_deactivated_flag,
+        )
+
         # Create a background job for culling expired 3PID validity tokens
         hs.get_clock().looping_call(
             self.cull_expired_threepid_validation_tokens, THIRTY_MINUTES_IN_MS,
         )
+
+    @defer.inlineCallbacks
+    def _set_deactivated_flag(self, progress, batch_size):
+        last_user = progress.get("user_id", "")
+
+        def _set_deactivated_flag_txn(txn):
+            txn.execute(
+                """
+                SELECT
+                    users.name
+                FROM users
+                    LEFT JOIN access_tokens ON (access_tokens.user_id = users.name)
+                    LEFT JOIN user_threepids ON (user_threepids.user_id = users.name)
+                WHERE password_hash IS NULL OR password_hash = ''
+                AND users.name > ?
+                GROUP BY users.name
+                LIMIT ?
+                HAVING count(access_tokens.token) = 0
+                AND count(user_threepids.address) = 0;
+                """,
+                (last_user, batch_size),
+            )
+
+            rows = self.cursor_to_dict(txn)
+
+            for user in rows:
+                self.set_user_deactivated_status_txn(txn, user["user_id"], True)
+
+            self._background_update_progress_txn(
+                txn, "users_set_deactivated_flag", {"user_id": rows[-1]["user_id"]}
+            )
+
+            if len(rows) > batch_size:
+                return True
+            else:
+                return False
+
+        end = yield self.runInteraction(
+            "users_set_deactivated_flag",
+            _set_deactivated_flag_txn,
+        )
+
+        if end:
+            yield self._end_background_update("users_set_deactivated_flag")
 
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id=None):
@@ -1269,6 +1317,17 @@ class RegistrationStore(
             delete_threepid_session_txn,
         )
 
+    def set_user_deactivated_status_txn(self, txn, user_id, deactivated):
+        self._simple_update_one_txn(
+            txn=txn,
+            table="users",
+            keyvalues={"name": user_id},
+            updatevalues={"deactivated": 1 if deactivated else 0},
+        )
+        self._invalidate_cache_and_stream(
+            txn, self.get_user_deactivated_status, (user_id,),
+        )
+
     @defer.inlineCallbacks
     def set_user_deactivated_status(self, user_id, deactivated):
         """Set the `deactivated` property for the provided user to the provided value.
@@ -1278,20 +1337,10 @@ class RegistrationStore(
             deactivated (bool): The value to set for `deactivated`.
         """
 
-        def set_user_deactivated_status_txn(txn):
-            self._simple_update_one_txn(
-                txn=txn,
-                table="users",
-                keyvalues={"name": user_id},
-                updatevalues={"deactivated": 1 if deactivated else 0},
-            )
-            self._invalidate_cache_and_stream(
-                txn, self.get_user_deactivated_status, (user_id,),
-            )
-
         yield self.runInteraction(
             "set_user_deactivated_status",
-            set_user_deactivated_status_txn,
+            self.set_user_deactivated_status_txn,
+            user_id, deactivated,
         )
 
     @cachedInlineCallbacks()
