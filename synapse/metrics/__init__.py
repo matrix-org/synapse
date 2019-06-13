@@ -193,6 +193,20 @@ class InFlightGauge(object):
 
 @attr.s(hash=True)
 class BucketCollector(object):
+    """
+    Like a Histogram, but allows buckets to be point-in-time instead of
+    incrementally added to.
+
+    Args:
+        name (str): Base name of metric to be exported to Prometheus.
+        data_collector (callable -> dict): A synchronous callable that
+            returns a dict mapping bucket to number of items in the
+            bucket. If these buckets are not the same as the buckets
+            given to this class, they will be remapped into them.
+        buckets (list[float]): List of floats/ints of the buckets to
+            give to Prometheus. +Inf is ignored, if given.
+
+    """
 
     name = attr.ib()
     data_collector = attr.ib()
@@ -207,23 +221,26 @@ class BucketCollector(object):
 
         res = []
         for x in data.keys():
-            for i, bound in enumerate(self.buckets[:-1]):
+            for i, bound in enumerate(self.buckets):
                 if x <= bound:
                     buckets[bound] = buckets.get(bound, 0) + data[x]
                     break
 
-        for i in self.buckets[:-1]:
+        for i in self.buckets:
             res.append([i, buckets.get(i, 0)])
 
         res.append(["+Inf", sum(data.values())])
 
         metric = HistogramMetricFamily(
-            self.name, "", buckets=res, sum_value=sum([x * y for x, y in data.items()])
+            self.name,
+            "",
+            buckets=res + [float("+Inf")],
+            sum_value=sum([x * y for x, y in data.items()]),
         )
         yield metric
 
     def __attrs_post_init__(self):
-        self.buckets = [float(x) for x in self.buckets]
+        self.buckets = [float(x) for x in self.buckets if x != "+Inf"]
         if self.buckets != sorted(self.buckets):
             raise ValueError("Buckets not sorted")
 
