@@ -251,7 +251,7 @@ def read_args_from_config(args):
 
 class MatrixConnectionAdapter(HTTPAdapter):
     @staticmethod
-    def lookup(s):
+    def lookup(s, skip_well_known=False):
         if s[-1] == ']':
             # ipv6 literal (with no port)
             return s, 8448
@@ -264,11 +264,43 @@ class MatrixConnectionAdapter(HTTPAdapter):
                 raise ValueError("Invalid host:port '%s'" % s)
             return out[0], port
 
+        # try a .well-known lookup
+        if not skip_well_known:
+            well_known = MatrixConnectionAdapter.get_well_known(s)
+            if well_known:
+                return MatrixConnectionAdapter.lookup(
+                    well_known, skip_well_known=True
+                )
+
         try:
             srv = srvlookup.lookup("matrix", "tcp", s)[0]
             return srv.host, srv.port
         except Exception:
             return s, 8448
+
+    @staticmethod
+    def get_well_known(server_name):
+        uri = "https://%s/.well-known/matrix/server" % (server_name, )
+        print("fetching %s" % (uri, ), file=sys.stderr)
+
+        try:
+            resp = requests.get(uri)
+            if resp.status_code != 200:
+                print("%s gave %i" % (uri, resp.status_code), file=sys.stderr)
+                return None
+
+            parsed_well_known = resp.json()
+            if not isinstance(parsed_well_known, dict):
+                raise Exception("not a dict")
+            if "m.server" not in parsed_well_known:
+                raise Exception("Missing key 'm.server'")
+            new_name = parsed_well_known['m.server']
+            print("well-known lookup gave %s" % (new_name, ), file=sys.stderr)
+            return new_name
+
+        except Exception as e:
+            print("Invalid response from %s: %s" % (uri, e, ), file=sys.stderr)
+        return None
 
     def get_connection(self, url, proxies=None):
         parsed = urlparse.urlparse(url)
