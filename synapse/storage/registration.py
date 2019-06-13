@@ -620,16 +620,19 @@ class RegistrationStore(
                     LEFT JOIN access_tokens ON (access_tokens.user_id = users.name)
                     LEFT JOIN user_threepids ON (user_threepids.user_id = users.name)
                 WHERE password_hash IS NULL OR password_hash = ''
-                AND users.name > ''
+                AND users.name > ?
                 GROUP BY users.name
                 HAVING count(access_tokens.token) = 0
                 AND count(user_threepids.address) = 0
-                LIMIT 10;
+                LIMIT ?;
                 """,
                 (last_user, batch_size),
             )
 
             rows = self.cursor_to_dict(txn)
+
+            if not rows:
+                return True
 
             for user in rows:
                 self.set_user_deactivated_status_txn(txn, user["user_id"], True)
@@ -638,7 +641,7 @@ class RegistrationStore(
                 txn, "users_set_deactivated_flag", {"user_id": rows[-1]["user_id"]}
             )
 
-            if len(rows) > batch_size:
+            if batch_size > len(rows):
                 return True
             else:
                 return False
@@ -650,6 +653,8 @@ class RegistrationStore(
 
         if end:
             yield self._end_background_update("users_set_deactivated_flag")
+
+        defer.returnValue(batch_size)
 
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id=None):
