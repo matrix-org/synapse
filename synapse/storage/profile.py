@@ -19,8 +19,8 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.storage.roommember import ProfileInfo
 
-from ._base import SQLBaseStore
 from . import background_updates
+from ._base import SQLBaseStore
 
 BATCH_SIZE = 100
 
