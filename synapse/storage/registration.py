@@ -620,11 +620,11 @@ class RegistrationStore(
                     LEFT JOIN access_tokens ON (access_tokens.user_id = users.name)
                     LEFT JOIN user_threepids ON (user_threepids.user_id = users.name)
                 WHERE password_hash IS NULL OR password_hash = ''
-                AND users.name > ?
+                AND users.name > ''
                 GROUP BY users.name
-                LIMIT ?
                 HAVING count(access_tokens.token) = 0
-                AND count(user_threepids.address) = 0;
+                AND count(user_threepids.address) = 0
+                LIMIT 10;
                 """,
                 (last_user, batch_size),
             )
