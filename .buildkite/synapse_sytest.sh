@@ -82,7 +82,7 @@ else
     # deps.
     /venv/bin/pip install -q --upgrade --no-cache-dir -e $SYNAPSE_DIR
     /venv/bin/pip install -q --upgrade --no-cache-dir \
-        lxml psycopg2 coverage codecov
+        lxml psycopg2 coverage codecov tap.py
 
     # Make sure all Perl deps are installed -- this is done in the docker build
     # so will only install packages added since the last Docker build
@@ -137,7 +137,7 @@ then
 
     if [ $TEST_STATUS -ne 0 ]; then
         # Annotate, if failure
-        cat /logs/results.tap | tap-markdown --no-tidy | ./buildkite-agent annotate --style="error" --context="$BUILDKITE_LABEL"
+        /venv/bin/python $SYNAPSE_DIR/.buildkite/format_tap.py /logs/results.tap | ./buildkite-agent annotate --style="error" --context="$BUILDKITE_LABEL"
     fi
 fi
 
