@@ -176,6 +176,7 @@ class ProfileStore(ProfileWorkerStore, background_updates.BackgroundUpdateStore)
             index_name="profile_replication_status_idx",
             table="profile_replication_status",
             columns=["host"],
+            unique=True,
         )
 
     def add_remote_profile_cache(self, user_id, displayname, avatar_url):
