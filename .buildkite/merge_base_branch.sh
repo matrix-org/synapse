@@ -7,8 +7,7 @@ if [[ "$BUILDKITE_BRANCH" =~ ^(develop|master|dinsic|shhs|release-.*)$ ]]; then
     exit 0
 fi
 
-if [[ -z "$BUILDKITE_PULL_REQUEST_BASE_BRANCH"]]
-then
+if [[ -z "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ]]; then
     echo "Not a pull request, or hasn't had a PR opened yet..."
 
     # It probably hasn't had a PR opened yet. Since all PRs land on develop, we
