@@ -137,7 +137,7 @@ then
 
     if [ $TEST_STATUS -ne 0 ]; then
         # Annotate, if failure
-        /venv/bin/python $SYNAPSE_DIR/.buildkite/format_tap.py /logs/results.tap | ./buildkite-agent annotate --style="error" --context="$BUILDKITE_LABEL"
+        /venv/bin/python $SYNAPSE_DIR/.buildkite/format_tap.py /logs/results.tap "$BUILDKITE_LABEL" | ./buildkite-agent annotate --style="error" --context="$BUILDKITE_LABEL"
     fi
 fi
 

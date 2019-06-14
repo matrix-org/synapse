@@ -2,7 +2,7 @@ import sys
 from tap.parser import Parser
 from tap.line import Result, Unknown, Diagnostic
 
-out = []
+out = ["### TAP Output for " + sys.argv[2]]
 
 p = Parser()
 
@@ -11,6 +11,7 @@ in_error = False
 for line in p.parse_file(sys.argv[1]):
     if isinstance(line, Result):
         if in_error:
+            out.append("")
             out.append("</pre></code></details>")
             out.append("")
             out.append("----")
