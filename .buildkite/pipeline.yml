@@ -51,7 +51,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapsepy3"
-          entrypoint: "exec bash -c"
+          entrypoint: "bash -c"
           propagate-environment: true
     retry:
       automatic:
