@@ -48,11 +48,12 @@ steps:
 
   - label: "SyTest - :python: 3.6 / SQLite"
     command:
-      - "bash .circleci/merge_base_branch.sh"
+      - "bash .buildkite/merge_base_branch.sh"
       - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapsepy3"
+          propagate-environment: true
     retry:
       automatic:
         - exit_status: -1

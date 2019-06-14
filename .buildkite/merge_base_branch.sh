@@ -2,21 +2,16 @@
 
 set -e
 
-# CircleCI doesn't give CIRCLE_PR_NUMBER in the environment for non-forked PRs. Wonderful.
-# In this case, we just need to do some ~shell magic~ to strip it out of the PULL_REQUEST URL.
-echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> $BASH_ENV
-source $BASH_ENV
-
-if [[ -z "${CIRCLE_PR_NUMBER}" ]]
+if [[ -z "$BUILDKITE_PULL_REQUEST_BASE_BRANCH"]]
 then
-    echo "Can't figure out what the PR number is! Assuming merge target is develop."
+    echo "Not a pull request, or hasn't had a PR opened yet..."
 
     # It probably hasn't had a PR opened yet. Since all PRs land on develop, we
     # can probably assume it's based on it and will be merged into it.
     GITBASE="develop"
 else
     # Get the reference, using the GitHub API
-    GITBASE=`wget -O- https://api.github.com/repos/matrix-org/synapse/pulls/${CIRCLE_PR_NUMBER} | jq -r '.base.ref'`
+    GITBASE=$BUILDKITE_PULL_REQUEST_BASE_BRANCH
 fi
 
 # Show what we are before
