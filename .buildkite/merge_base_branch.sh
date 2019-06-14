@@ -2,6 +2,11 @@
 
 set -ex
 
+if [[ "$BUILDKITE_BRANCH" =~ ^(develop|master|dinsic|shhs|release-*)$ ]]; then
+    echo "Not merging forward, as this is a release branch"
+    exit 0
+fi
+
 if [[ -z "$BUILDKITE_PULL_REQUEST_BASE_BRANCH"]]
 then
     echo "Not a pull request, or hasn't had a PR opened yet..."

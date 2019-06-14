@@ -2,6 +2,22 @@ env:
   CODECOV_TOKEN: "2dd7eb9b-0eda-45fe-a47c-9b5ac040045f"
 
 steps:
+
+  - label: "SyTest - :python: 3.5 / SQLite"
+    command:
+      - "bash .buildkite/merge_base_branch.sh"
+      - "bash .buildkite/synapse_sytest.sh"
+    plugins:
+      - docker#v3.0.1:
+          image: "matrixdotorg/sytest-synapse:py35"
+          propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
+
   - command:
       - "python -m pip install tox"
       - "tox -e pep8"
@@ -43,21 +59,6 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
-
-  - label: "SyTest - :python: 3.6 / SQLite"
-    command:
-      - "bash .buildkite/merge_base_branch.sh"
-      - "bash .buildkite/synapse_sytest.sh"
-    plugins:
-      - docker#v3.0.1:
-          image: "matrixdotorg/sytest"
-          propagate-environment: true
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
 
   - wait
 
