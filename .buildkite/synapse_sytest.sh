@@ -132,7 +132,8 @@ then
     chmod +x ./buildkite-agent
 
     # Upload the files
-    ./buildkite-agent artifact upload "/logs/**/*.log*" "/logs/results.tap"
+    ./buildkite-agent artifact upload "/logs/**/*.log*"
+    ./buildkite-agent artifact upload "/logs/results.tap"
 
     if [ $TEST_STATUS -ne 0 ]; then
         # Annotate, if failure
