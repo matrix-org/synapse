@@ -224,7 +224,6 @@ class BucketCollector(object):
             for i, bound in enumerate(self.buckets):
                 if x <= bound:
                     buckets[bound] = buckets.get(bound, 0) + data[x]
-                    break
 
         for i in self.buckets:
             res.append([str(i), buckets.get(i, 0)])
