@@ -44,8 +44,6 @@ steps:
       - docker#v3.0.1:
           image: "python:3.6"
 
-  - wait
-
   - label: "SyTest - :python: 3.6 / SQLite"
     command:
       - "bash .buildkite/merge_base_branch.sh"
@@ -60,6 +58,9 @@ steps:
           limit: 2
         - exit_status: 2
           limit: 2
+
+  - wait
+
 
   - command:
       - "python -m pip install tox"

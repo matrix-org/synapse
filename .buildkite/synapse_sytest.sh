@@ -6,6 +6,7 @@
 set -ex
 
 echo `pwd`
+echo $BUILDKITE
 
 if [ -n "$BUILDKITE" ]
 then
