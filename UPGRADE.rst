@@ -53,7 +53,7 @@ Upgrading to v1.1
 =================
 
 Synapse 1.1 removes support for older Python and PostgreSQL versions, as
-outlined in `our deprecation notice <https://matrix.org/blog/2019/04/08/synapse-deprecating-postgres-9-4-and-python-2-x>`.
+outlined in `our deprecation notice <https://matrix.org/blog/2019/04/08/synapse-deprecating-postgres-9-4-and-python-2-x>`_.
 
 Minimum Python Version
 ----------------------
@@ -73,7 +73,7 @@ Minimum PostgreSQL Version
 
 If using PostgreSQL under Synapse, you will need to use PostgreSQL 9.5 or above.
 Please see the
-`PostgreSQL documentation <https://www.postgresql.org/docs/11/upgrading.html>`
+`PostgreSQL documentation <https://www.postgresql.org/docs/11/upgrading.html>`_
 for more details on upgrading your database.
 
 Upgrading to v1.0
