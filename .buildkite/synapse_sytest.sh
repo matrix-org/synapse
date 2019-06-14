@@ -137,7 +137,7 @@ then
 
     if [ $TEST_STATUS -ne 0 ]; then
         # Annotate, if failure
-        cat /logs/results.tap | tap-markdown | ./buildkite-agent annotate --style="error" --context="$BUILDKITE_LABEL"
+        cat /logs/results.tap | tap-markdown --no-tidy | ./buildkite-agent annotate --style="error" --context="$BUILDKITE_LABEL"
     fi
 fi
 
