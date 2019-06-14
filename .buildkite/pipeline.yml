@@ -4,6 +4,8 @@ env:
 steps:
 
   - label: "SyTest - :python: 3.5 / SQLite"
+    agents:
+      queue: "medium"
     command:
       - "bash .buildkite/merge_base_branch.sh"
       - "bash .buildkite/synapse_sytest.sh"
@@ -17,6 +19,8 @@ steps:
           limit: 2
         - exit_status: 2
           limit: 2
+
+  - wait
 
   - command:
       - "python -m pip install tox"

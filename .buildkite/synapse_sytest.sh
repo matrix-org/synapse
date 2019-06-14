@@ -118,11 +118,7 @@ fi
 # Copy out the logs
 mkdir -p /logs
 cp results.tap /logs/results.tap
-rsync --ignore-missing-args -av server-0 server-1 /logs --include "*/" --include="*.log.*" --include="*.log" --exclude="*"
-
-# Write out JUnit
-mkdir -p /logs/sytest
-perl ./tap-to-junit-xml.pl --puretap --input=/logs/results.tap --output=/logs/sytest/results.xml "SyTest"
+rsync --ignore-missing-args  --min-size=1B -av server-0 server-1 /logs --include "*/" --include="*.log.*" --include="*.log" --exclude="*"
 
 # Upload coverage to codecov and upload files, if running on Buildkite
 if [ -n "$BUILDKITE" ]
@@ -134,7 +130,14 @@ then
     wget -O buildkite.tar.gz https://github.com/buildkite/agent/releases/download/v3.13.0/buildkite-agent-linux-amd64-3.13.0.tar.gz
     tar xvf buildkite.tar.gz
     chmod +x ./buildkite-agent
-    ./buildkite-agent artifact upload "/logs/**/*"
+
+    # Upload the files
+    ./buildkite-agent artifact upload "/logs/**/*.log*" "/logs/results.tap"
+
+    if [ $TEST_STATUS -ne 0 ]; then
+        # Annotate, if failure
+        cat /logs/results.tap | tap-markdown | ./buildkite-agent annotate --style="error" --context="$BUILDKITE_LABEL"
+    fi
 fi
 
 
