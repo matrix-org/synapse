@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import re
 
 from six import iterkeys
@@ -30,6 +31,8 @@ from synapse.types import UserID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
+
+logger = logging.getLogger(__name__)
 
 
 class RegistrationWorkerStore(SQLBaseStore):
@@ -615,15 +618,16 @@ class RegistrationStore(
             txn.execute(
                 """
                 SELECT
-                    users.name
+                    users.name,
+                    COUNT(access_tokens.token) AS count_tokens,
+                    COUNT(user_threepids.address) AS count_threepids
                 FROM users
                     LEFT JOIN access_tokens ON (access_tokens.user_id = users.name)
                     LEFT JOIN user_threepids ON (user_threepids.user_id = users.name)
                 WHERE password_hash IS NULL OR password_hash = ''
                 AND users.name > ?
                 GROUP BY users.name
-                HAVING count(access_tokens.token) = 0
-                AND count(user_threepids.address) = 0
+                ORDER BY users.name ASC
                 LIMIT ?;
                 """,
                 (last_user, batch_size),
@@ -634,8 +638,14 @@ class RegistrationStore(
             if not rows:
                 return True
 
+            rows_processed_nb = 0
+
             for user in rows:
-                self.set_user_deactivated_status_txn(txn, user["user_id"], True)
+                if not user["count_tokens"] and not user["count_threepids"]:
+                    self.set_user_deactivated_status_txn(txn, user["user_id"], True)
+                    rows_processed_nb += 1
+
+            logger.info("Marked %d rows as deactivated", rows_processed_nb)
 
             self._background_update_progress_txn(
                 txn, "users_set_deactivated_flag", {"user_id": rows[-1]["user_id"]}
