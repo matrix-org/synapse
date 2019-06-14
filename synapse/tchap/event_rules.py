@@ -18,6 +18,8 @@ from twisted.internet import defer
 
 class TchapEventRules(object):
 
+    ACESS_RULES_TYPE = "im.vector.room.access_rules"
+
     def __init__(self, config):
         # We don't have a config yet.
         pass
@@ -29,3 +31,12 @@ class TchapEventRules(object):
     @defer.inlineCallbacks
     def check_event_allowed(self, event, context):
         return True
+
+    def _apply_restricted(self):
+        pass
+
+    def _apply_unrestricted(self):
+        pass
+
+    def _apply_direct(self):
+        pass
