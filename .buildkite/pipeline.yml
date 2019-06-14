@@ -51,6 +51,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapsepy3"
+          entrypoint: "false"
           propagate-environment: true
     retry:
       automatic:
