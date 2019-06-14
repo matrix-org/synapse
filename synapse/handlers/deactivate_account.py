@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -117,6 +118,9 @@ class DeactivateAccountHandler(BaseHandler):
         # Now start the process that goes through that list and
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
+
+        # Mark the user as deactivated.
+        yield self.store.set_user_deactivated_status(user_id, True)
 
         defer.returnValue(identity_server_supports_unbinding)
 
