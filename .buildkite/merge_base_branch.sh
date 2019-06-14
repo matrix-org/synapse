@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -ex
 
 if [[ -z "$BUILDKITE_PULL_REQUEST_BASE_BRANCH"]]
 then

@@ -5,9 +5,15 @@
 
 set -ex
 
-if [-n "$BUILDKITE"]
+echo `pwd`
+
+if [ -n "$BUILDKITE" ]
 then
-    SYNAPSE_DIR=`pwd`
+    mkdir -p /src
+    /venv/bin/python setup.py sdist
+    cp dist/*.tar.gz /src
+    cd /src
+    tar xvf --strip-components=1 *.tar.gz
 else
     SYNAPSE_DIR="/src"
 fi
@@ -27,8 +33,13 @@ if [ -d "/sytest" ]; then
     ln -sf /sytest/keys /work
     SYTEST_LIB="/sytest/lib"
 else
-    # Otherwise, try and find out what the branch that the Synapse checkout is using. Fall back to develop if it's not a branch.
-    branch_name="$(git --git-dir=/src/.git symbolic-ref HEAD 2>/dev/null)" || branch_name="develop"
+    if [ -n "BUILDKITE_BRANCH" ]
+    then
+        branch_name=$BUILDKITE_BRANCH
+    else
+        # Otherwise, try and find out what the branch that the Synapse checkout is using. Fall back to develop if it's not a branch.
+        branch_name="$(git --git-dir=/src/.git symbolic-ref HEAD 2>/dev/null)" || branch_name="develop"
+    fi
 
     # Try and fetch the branch
     echo "Trying to get same-named sytest branch..."
