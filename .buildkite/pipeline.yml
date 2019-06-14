@@ -46,6 +46,22 @@ steps:
 
   - wait
 
+  - label: "SyTest - :python: 3.6 / SQLite"
+    env:
+      TRIAL_FLAGS: "-j 4"
+    command:
+      - "bash .circleci/merge_base_branch.sh"
+      - "bash -c '/synapse_sytest.sh'"
+    plugins:
+      - docker-compose#v2.1.0:
+          image: "matrixdotorg/sytest-synapsepy3"
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
+
   - command:
       - "python -m pip install tox"
       - "tox -e py35-old,codecov"
