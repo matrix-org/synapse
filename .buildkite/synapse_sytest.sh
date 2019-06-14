@@ -5,16 +5,9 @@
 
 set -ex
 
-echo `pwd`
-echo $BUILDKITE
-
 if [ -n "$BUILDKITE" ]
 then
-    mkdir -p /src
-    /venv/bin/python setup.py sdist
-    cp dist/*.tar.gz /src
-    cd /src
-    tar xvf --strip-components=1 *.tar.gz
+    SYNAPSE_DIR=`pwd`
 else
     SYNAPSE_DIR="/src"
 fi
