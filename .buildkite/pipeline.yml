@@ -50,8 +50,7 @@ steps:
       - "bash .buildkite/synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapsepy3"
-          entrypoint: "/bin/bash -c"
+          image: "matrixdotorg/sytest"
           propagate-environment: true
     retry:
       automatic:
