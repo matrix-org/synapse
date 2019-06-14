@@ -134,7 +134,7 @@ then
     wget -O buildkite.tar.gz https://github.com/buildkite/agent/releases/download/v3.13.0/buildkite-agent-linux-amd64-3.13.0.tar.gz
     tar xvf buildkite.tar.gz
     chmod +x ./buildkite-agent
-    ./buildkite-agent upload "/logs/**/*"
+    ./buildkite-agent artifact upload "/logs/**/*"
 fi
 
 
