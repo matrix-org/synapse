@@ -227,7 +227,7 @@ class BucketCollector(object):
                     break
 
         for i in self.buckets:
-            res.append([i, buckets.get(i, 0)])
+            res.append([str(i), buckets.get(i, 0)])
 
         res.append(["+Inf", sum(data.values())])
 

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from prometheus_client.exposition import generate_latest
+
 from synapse.metrics import REGISTRY
 from synapse.types import Requester, UserID
 
@@ -52,46 +54,29 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         self.reactor.advance(60 * 60 * 1000)
         self.pump(1)
 
-        items = list(
+        items = set(
             filter(
-                lambda x: x.name == "synapse_forward_extremities",
-                list(REGISTRY.collect()),
+                lambda x: b"synapse_forward_extremities_" in x,
+                generate_latest(REGISTRY).split(b"\n"),
             )
         )
 
-        # Check the values are what we want
-        buckets = {}
-        _count = 0
-        _sum = 0
+        expected = set([
+            b'synapse_forward_extremities_bucket{le="1.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="2.0"} 2.0',
+            b'synapse_forward_extremities_bucket{le="3.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="5.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="7.0"} 1.0',
+            b'synapse_forward_extremities_bucket{le="10.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="15.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="20.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="50.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="100.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="200.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="500.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="+Inf"} 3.0',
+            b'synapse_forward_extremities_count 3.0',
+            b'synapse_forward_extremities_sum 10.0',
+        ])
 
-        for i in items[0].samples:
-            if i[0].endswith("_bucket"):
-                buckets[i[1]['le']] = i[2]
-            elif i[0].endswith("_count"):
-                _count = i[2]
-            elif i[0].endswith("_sum"):
-                _sum = i[2]
-
-        # 3 buckets, 2 with 2 extrems, 1 with 6 extrems (bucketed as 7), and
-        # +Inf which is all
-        self.assertEqual(
-            buckets,
-            {
-                1.0: 0,
-                2.0: 2,
-                3.0: 0,
-                5.0: 0,
-                7.0: 1,
-                10.0: 0,
-                15.0: 0,
-                20.0: 0,
-                50.0: 0,
-                100.0: 0,
-                200.0: 0,
-                500.0: 0,
-                "+Inf": 3,
-            },
-        )
-        # 3 rooms, with 10 total events
-        self.assertEqual(_count, 3)
-        self.assertEqual(_sum, 10)
+        self.assertEqual(items, expected)

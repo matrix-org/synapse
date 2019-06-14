@@ -26,7 +26,7 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import account_validity, register, sync
+from synapse.rest.client.v2_alpha import account, account_validity, register, sync
 
 from tests import unittest
 
@@ -308,6 +308,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         sync.register_servlets,
         account_validity.register_servlets,
+        account.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -358,20 +359,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
     def test_renewal_email(self):
         self.email_attempts = []
 
-        user_id = self.register_user("kermit", "monkey")
-        tok = self.login("kermit", "monkey")
-        # We need to manually add an email address otherwise the handler will do
-        # nothing.
-        now = self.hs.clock.time_msec()
-        self.get_success(
-            self.store.user_add_threepid(
-                user_id=user_id,
-                medium="email",
-                address="kermit@example.com",
-                validated_at=now,
-                added_at=now,
-            )
-        )
+        (user_id, tok) = self.create_user()
 
         # Move 6 days forward. This should trigger a renewal email to be sent.
         self.reactor.advance(datetime.timedelta(days=6).total_seconds())
@@ -396,6 +384,44 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
     def test_manual_email_send(self):
         self.email_attempts = []
 
+        (user_id, tok) = self.create_user()
+        request, channel = self.make_request(
+            b"POST",
+            "/_matrix/client/unstable/account_validity/send_mail",
+            access_token=tok,
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.assertEqual(len(self.email_attempts), 1)
+
+    def test_deactivated_user(self):
+        self.email_attempts = []
+
+        (user_id, tok) = self.create_user()
+
+        request_data = json.dumps({
+            "auth": {
+                "type": "m.login.password",
+                "user": user_id,
+                "password": "monkey",
+            },
+            "erase": False,
+        })
+        request, channel = self.make_request(
+            "POST",
+            "account/deactivate",
+            request_data,
+            access_token=tok,
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
+
+        self.reactor.advance(datetime.timedelta(days=8).total_seconds())
+
+        self.assertEqual(len(self.email_attempts), 0)
+
+    def create_user(self):
         user_id = self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
         # We need to manually add an email address otherwise the handler will do
@@ -410,16 +436,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
                 added_at=now,
             )
         )
-
-        request, channel = self.make_request(
-            b"POST",
-            "/_matrix/client/unstable/account_validity/send_mail",
-            access_token=tok,
-        )
-        self.render(request)
-        self.assertEquals(channel.result["code"], b"200", channel.result)
-
-        self.assertEqual(len(self.email_attempts), 1)
+        return (user_id, tok)
 
     def test_manual_email_send_expired_account(self):
         user_id = self.register_user("kermit", "monkey")

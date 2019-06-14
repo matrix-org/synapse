@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,6 +42,8 @@ class DeactivateAccountHandler(BaseHandler):
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
         hs.get_reactor().callWhenRunning(self._start_user_parting)
+
+        self._account_validity_enabled = hs.config.account_validity.enabled
 
     @defer.inlineCallbacks
     def deactivate_account(self, user_id, erase_data, id_server=None):
@@ -113,6 +116,13 @@ class DeactivateAccountHandler(BaseHandler):
         # Now start the process that goes through that list and
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
+
+        # Remove all information on the user from the account_validity table.
+        if self._account_validity_enabled:
+            yield self.store.delete_account_validity_for_user(user_id)
+
+        # Mark the user as deactivated.
+        yield self.store.set_user_deactivated_status(user_id, True)
 
         defer.returnValue(identity_server_supports_unbinding)
 
