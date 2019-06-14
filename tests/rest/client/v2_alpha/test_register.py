@@ -360,6 +360,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         sync.register_servlets,
         account_validity.register_servlets,
+        account.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -466,7 +467,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             access_token=tok,
         )
         self.render(request)
-        self.assertEqual(request.code, 200)
+        self.assertEqual(request.code, 200, channel.result)
 
         self.reactor.advance(datetime.timedelta(days=8).total_seconds())
 
