@@ -642,7 +642,9 @@ class RegistrationStore(
                 FROM users
                     LEFT JOIN access_tokens ON (access_tokens.user_id = users.name)
                     LEFT JOIN user_threepids ON (user_threepids.user_id = users.name)
-                WHERE password_hash IS NULL OR password_hash = ''
+                WHERE (users.password_hash IS NULL OR users.password_hash = '')
+                AND (users.appservice_id IS NULL OR users.appservice_id = '')
+                AND users.is_guest = 0
                 AND users.name > ?
                 GROUP BY users.name
                 ORDER BY users.name ASC
@@ -666,7 +668,7 @@ class RegistrationStore(
             logger.info("Marked %d rows as deactivated", rows_processed_nb)
 
             self._background_update_progress_txn(
-                txn, "users_set_deactivated_flag", {"user_id": rows[-1]["user_id"]}
+                txn, "users_set_deactivated_flag", {"user_id": rows[-1]["name"]}
             )
 
             if batch_size > len(rows):
