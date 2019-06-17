@@ -69,6 +69,7 @@ class RoomMemberHandler(object):
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
+        self.third_party_event_rules = hs.get_third_party_event_rules()
         self._server_notices_mxid = self.config.server_notices_mxid
         self.rewrite_identity_server_urls = self.config.rewrite_identity_server_urls
         self._enable_lookup = hs.config.enable_3pid_lookup
@@ -773,6 +774,15 @@ class RoomMemberHandler(object):
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
         yield self.base_handler.ratelimit(requester)
+
+        can_invite = yield self.third_party_event_rules.check_threepid_can_be_invited(
+            medium, address, room_id,
+        )
+        if not can_invite:
+            raise SynapseError(
+                403, "This third-party identifier can not be invited in this room",
+                Codes.FORBIDDEN,
+            )
 
         invitee = yield self._lookup_3pid(
             id_server, medium, address
