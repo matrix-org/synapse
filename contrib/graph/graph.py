@@ -1,3 +1,4 @@
+from __future__ import print_function
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,7 +49,7 @@ def make_graph(pdus, room, filename_prefix):
             c = colors.pop()
             color_map[o] = c
         except:
-            print "Run out of colours!"
+            print("Run out of colours!")
             color_map[o] = "black"
 
     graph = pydot.Dot(graph_name="Test")
@@ -93,7 +94,7 @@ def make_graph(pdus, room, filename_prefix):
             end_name = make_name(i, o)
 
             if end_name not in node_map:
-                print "%s not in nodes" % end_name
+                print("%s not in nodes" % end_name)
                 continue
 
             edge = pydot.Edge(node_map[start_name], node_map[end_name])
