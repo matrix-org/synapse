@@ -17,11 +17,17 @@ import abc
 import logging
 import re
 
+from six import raise_from
 from six.moves import urllib
 
 from twisted.internet import defer
 
-from synapse.api.errors import CodeMessageException, HttpResponseException
+from synapse.api.errors import (
+    CodeMessageException,
+    HttpResponseException,
+    RequestSendFailed,
+    SynapseError,
+)
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
 
@@ -175,6 +181,8 @@ class ReplicationEndpoint(object):
                 # on the master process that we should send to the client. (And
                 # importantly, not stack traces everywhere)
                 raise e.to_synapse_error()
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to talk to master"), e)
 
             defer.returnValue(result)
 

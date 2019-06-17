@@ -17,77 +17,10 @@ jobs:
       - run: docker push matrixdotorg/synapse:latest
       - run: docker push matrixdotorg/synapse:latest-py3
 
-  sytestpy3:
-    docker:
-      - image: matrixdotorg/sytest-synapsepy3
-    working_directory: /src
-    steps:
-      - checkout
-      - run: /synapse_sytest.sh
-      - store_artifacts:
-          path: /logs
-          destination: logs
-      - store_test_results:
-          path: /logs
-  sytestpy3postgres:
-    docker:
-      - image: matrixdotorg/sytest-synapsepy3
-    working_directory: /src
-    steps:
-      - checkout
-      - run: POSTGRES=1 /synapse_sytest.sh
-      - store_artifacts:
-          path: /logs
-          destination: logs
-      - store_test_results:
-          path: /logs
-  sytestpy3merged:
-    docker:
-      - image: matrixdotorg/sytest-synapsepy3
-    working_directory: /src
-    steps:
-      - checkout
-      - run: bash .circleci/merge_base_branch.sh
-      - run: /synapse_sytest.sh
-      - store_artifacts:
-          path: /logs
-          destination: logs
-      - store_test_results:
-          path: /logs
-  sytestpy3postgresmerged:
-    docker:
-      - image: matrixdotorg/sytest-synapsepy3
-    working_directory: /src
-    steps:
-      - checkout
-      - run: bash .circleci/merge_base_branch.sh
-      - run: POSTGRES=1 /synapse_sytest.sh
-      - store_artifacts:
-          path: /logs
-          destination: logs
-      - store_test_results:
-          path: /logs
-
 workflows:
   version: 2
   build:
     jobs:
-      - sytestpy3:
-          filters:
-            branches:
-              only: /develop|master|release-.*/
-      - sytestpy3postgres:
-          filters:
-            branches:
-              only: /develop|master|release-.*/
-      - sytestpy3merged:
-          filters:
-            branches:
-              ignore: /develop|master|release-.*/
-      - sytestpy3postgresmerged:
-          filters:
-            branches:
-              ignore: /develop|master|release-.*/
       - dockerhubuploadrelease:
           filters:
             tags:

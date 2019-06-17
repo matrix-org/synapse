@@ -228,7 +228,8 @@ class EventsStore(
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
         # Collect metrics on the number of forward extremities that exist.
-        self._current_forward_extremities_amount = {}
+        # Counter of number of extremities to count
+        self._current_forward_extremities_amount = c_counter()
 
         BucketCollector(
             "synapse_forward_extremities",
