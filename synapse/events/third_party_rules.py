@@ -17,8 +17,8 @@ from twisted.internet import defer
 
 
 class ThirdPartyEventRules(object):
-    """Allows server admins to provide a Python module implementing an extra set of rules
-    to apply when processing events.
+    """Allows server admins to provide a Python module implementing an extra
+    set of rules to apply when processing events.
 
     This is designed to help admins of closed federations with enforcing custom
     behaviours.
@@ -46,7 +46,7 @@ class ThirdPartyEventRules(object):
             context (synapse.events.snapshot.EventContext): The context of the event.
 
         Returns:
-            defer.Deferred(bool), True if the event should be allowed, False if not.
+            defer.Deferred[bool]: True if the event should be allowed, False if not.
         """
         if self.third_party_rules is None:
             defer.returnValue(True)
@@ -60,3 +60,24 @@ class ThirdPartyEventRules(object):
 
         ret = yield self.third_party_rules.check_event_allowed(event, state_events)
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def on_create_room(self, requester, config, is_requester_admin):
+        """Intercept requests to create room to allow, deny or update the
+        request config.
+
+        Args:
+            requester (Requester)
+            config (dict): The creation config from the client.
+            is_requester_admin (bool): If the requester is an admin
+
+        Returns:
+            defer.Deferred
+        """
+
+        if self.third_party_rules is None:
+            return
+
+        yield self.third_party_rules.on_create_room(
+            requester, config, is_requester_admin
+        )
