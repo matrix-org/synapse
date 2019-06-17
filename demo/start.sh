@@ -21,7 +21,7 @@ for port in 8080 8081 8082; do
     pushd demo/$port
 
     #rm $DIR/etc/$port.config
-    python -m synapse.app.homeserver \
+    python3 -m synapse.app.homeserver \
         --generate-config \
         -H "localhost:$https_port" \
         --config-path "$DIR/etc/$port.config" \
@@ -55,7 +55,7 @@ for port in 8080 8081 8082; do
         echo "report_stats: false" >> $DIR/etc/$port.config
     fi
 
-    python -m synapse.app.homeserver \
+    python3 -m synapse.app.homeserver \
         --config-path "$DIR/etc/$port.config" \
         -D \
         -vv \
