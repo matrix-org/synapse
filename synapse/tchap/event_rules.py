@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import email.utils
+
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes
 from synapse.config._base import ConfigError
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 
@@ -26,7 +28,8 @@ ACCESS_RULE_DIRECT = "direct"
 
 
 class TchapEventRules(object):
-    def __init__(self, config):
+    def __init__(self, config, http_client):
+        self.http_client = http_client
         self.id_server = config["id_server"]
         self.domains_forbidden_when_restricted = config.get(
             "domains_forbidden_when_restricted", [],
@@ -66,13 +69,43 @@ class TchapEventRules(object):
             }
         })
 
+    @defer.inlineCallbacks
+    def check_threepid_can_be_invited(self, medium, address, state_events):
+        rule = self._get_rule_from_state(state_events)
+
+        if medium != "email":
+            defer.returnValue(False)
+
+        if rule != ACCESS_RULE_RESTRICTED:
+            # Only "restricted" requires filtering 3PID invites.
+            defer.returnValue(True)
+
+        parsed_address = email.utils.parseaddr(address)[1]
+        if parsed_address != address:
+            # Avoid reproducing the security issue described here:
+            # https://matrix.org/blog/2019/04/18/security-update-sydent-1-0-2
+            # It's probably not worth it but let's just be overly safe here.
+            defer.returnValue(False)
+
+        res = yield self.http_client.get_json(
+            "https://%s/_matrix/identity/api/v1/info" % (self.id_server,),
+            {
+                "medium": medium,
+                "address": address,
+            }
+        )
+
+        # Look for a domain that's not forbidden from being invited.
+        if not res.get("hs"):
+            defer.returnValue(False)
+        if res.get("hs") in self.domains_forbidden_when_restricted:
+            defer.returnValue(False)
+
+        defer.returnValue(True)
+
     def check_event_allowed(self, event, state_events):
         # TODO: add rules for sending the access rules event
-        access_rules = state_events.get((ACCESS_RULES_TYPE, ""))
-        if access_rules is None:
-            rule = ACCESS_RULE_RESTRICTED
-        else:
-            rule = access_rules.content.get("rule")
+        rule = self._get_rule_from_state(state_events)
 
         if rule == ACCESS_RULE_RESTRICTED:
             ret = self._apply_restricted(event)
@@ -155,6 +188,15 @@ class TchapEventRules(object):
             return False
 
         return True
+
+    @staticmethod
+    def _get_rule_from_state(state_events):
+        access_rules = state_events.get((ACCESS_RULES_TYPE, ""))
+        if access_rules is None:
+            rule = ACCESS_RULE_RESTRICTED
+        else:
+            rule = access_rules.content.get("rule")
+        return rule
 
     @staticmethod
     def _is_invite_from_threepid(invite, threepid_invite):
