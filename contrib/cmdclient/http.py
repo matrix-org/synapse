@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 from twisted.web.client import Agent, readBody
 from twisted.web.http_headers import Headers
 from twisted.internet import defer, reactor
@@ -141,15 +142,15 @@ class TwistedHttpClient(HttpClient):
         headers_dict["User-Agent"] = ["Synapse Cmd Client"]
 
         retries_left = 5
-        print "%s to %s with headers %s" % (method, url, headers_dict)
+        print("%s to %s with headers %s" % (method, url, headers_dict))
         if self.verbose and producer:
             if "password" in producer.data:
                 temp = producer.data["password"]
                 producer.data["password"] = "[REDACTED]"
-                print json.dumps(producer.data, indent=4)
+                print(json.dumps(producer.data, indent=4))
                 producer.data["password"] = temp
             else:
-                print json.dumps(producer.data, indent=4)
+                print(json.dumps(producer.data, indent=4))
 
         while True:
             try:
@@ -161,7 +162,7 @@ class TwistedHttpClient(HttpClient):
                 )
                 break
             except Exception as e:
-                print "uh oh: %s" % e
+                print("uh oh: %s" % e)
                 if retries_left:
                     yield self.sleep(2 ** (5 - retries_left))
                     retries_left -= 1
@@ -169,8 +170,8 @@ class TwistedHttpClient(HttpClient):
                     raise e
 
         if self.verbose:
-            print "Status %s %s" % (response.code, response.phrase)
-            print pformat(list(response.headers.getAllRawHeaders()))
+            print("Status %s %s" % (response.code, response.phrase))
+            print(pformat(list(response.headers.getAllRawHeaders())))
         defer.returnValue(response)
 
     def sleep(self, seconds):
