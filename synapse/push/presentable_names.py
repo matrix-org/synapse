@@ -162,6 +162,17 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
 
 
 def descriptor_from_member_events(member_events):
+    """Get a description of the room based on the member events.
+
+    Args:
+        member_events (Iterable[FrozenEvent])
+
+    Returns:
+        str
+    """
+
+    member_events = list(member_events)
+
     if len(member_events) == 0:
         return "nobody"
     elif len(member_events) == 1:
