@@ -30,21 +30,20 @@ use github's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
-We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Travis CI
-<https://travis-ci.org/matrix-org/synapse>`_ for continuous integration. All
-pull requests to synapse get automatically tested by Travis and CircleCI.
-If your change breaks the build, this will be shown in GitHub, so please
-keep an eye on the pull request for feedback.
+We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Buildkite
+<https://buildkite.com/matrix-dot-org/synapse>`_ for continuous integration.
+Buildkite builds need to be authorised by a maintainer. If your change breaks
+the build, this will be shown in GitHub, so please keep an eye on the pull
+request for feedback.
 
 To run unit tests in a local development environment, you can use:
 
-- ``tox -e py27`` (requires tox to be installed by ``pip install tox``) for
-  SQLite-backed Synapse on Python 2.7.
-- ``tox -e py35`` for SQLite-backed Synapse on Python 3.5.
+- ``tox -e py35`` (requires tox to be installed by ``pip install tox``)
+  for SQLite-backed Synapse on Python 3.5.
 - ``tox -e py36`` for SQLite-backed Synapse on Python 3.6.
-- ``tox -e py27-postgres`` for PostgreSQL-backed Synapse on Python 2.7
+- ``tox -e py36-postgres`` for PostgreSQL-backed Synapse on Python 3.6
   (requires a running local PostgreSQL with access to create databases).
-- ``./test_postgresql.sh`` for PostgreSQL-backed Synapse on Python 2.7
+- ``./test_postgresql.sh`` for PostgreSQL-backed Synapse on Python 3.5
   (requires Docker). Entirely self-contained, recommended if you don't want to
   set up PostgreSQL yourself.
 
