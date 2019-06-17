@@ -222,3 +222,44 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
             self.store.get_latest_event_ids_in_room(self.room_id)
         )
         self.assertEqual(set(latest_event_ids), set([event_id_b, event_id_c]))
+
+
+class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config["cleanup_extremities_with_dummy_events"] = True
+        return self.setup_test_homeserver(config=config)
+
+    def prepare(self, reactor, clock, homeserver):
+        self.store = homeserver.get_datastore()
+        self.room_creator = homeserver.get_room_creation_handler()
+
+        # Create a test user and room
+        self.user = UserID("alice", "test")
+        self.requester = Requester(self.user, None, False, None, None)
+        info = self.get_success(self.room_creator.create_room(self.requester, {}))
+        self.room_id = info["room_id"]
+
+    def test_send_dummy_event(self):
+        # Create a bushy graph with 50 extremities.
+
+        event_id_start = self.create_and_send_event(self.room_id, self.user)
+
+        for _ in range(50):
+            self.create_and_send_event(
+                self.room_id, self.user, prev_event_ids=[event_id_start]
+            )
+
+        latest_event_ids = self.get_success(
+            self.store.get_latest_event_ids_in_room(self.room_id)
+        )
+        self.assertEqual(len(latest_event_ids), 50)
+
+        # Bump the reacto repeatedly so that the background updates have a
+        # chance to run.
+        self.pump(10 * 60)
+
+        latest_event_ids = self.get_success(
+            self.store.get_latest_event_ids_in_room(self.room_id)
+        )
+        self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
