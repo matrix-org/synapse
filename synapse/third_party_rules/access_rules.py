@@ -27,7 +27,7 @@ ACCESS_RULE_UNRESTRICTED = "unrestricted"
 ACCESS_RULE_DIRECT = "direct"
 
 
-class TchapEventRules(object):
+class RoomAccessRules(object):
     def __init__(self, config, http_client):
         self.http_client = http_client
         self.id_server = config["id_server"]
