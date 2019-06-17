@@ -105,7 +105,10 @@ class TchapEventRules(object):
         defer.returnValue(True)
 
     def check_event_allowed(self, event, state_events):
-        # TODO: add rules for sending the access rules event
+        # Special-case the access rules event.
+        if event.type == ACCESS_RULES_TYPE:
+            return self._on_rules_change(event, state_events)
+
         rule = self._get_rule_from_state(state_events)
 
         if rule == ACCESS_RULE_RESTRICTED:
@@ -120,6 +123,42 @@ class TchapEventRules(object):
             ret = self._apply_restricted(event, state_events)
 
         return ret
+
+    def _on_rules_change(self, event, state_events):
+        new_rule = event.content.get("rule")
+
+        # Check for invalid values.
+        if (
+            new_rule != ACCESS_RULE_DIRECT
+            and new_rule != ACCESS_RULE_RESTRICTED
+            and new_rule != ACCESS_RULE_UNRESTRICTED
+        ):
+            return False
+
+        # Make sure we don't apply "direct" if the room has more than two members.
+        if new_rule == ACCESS_RULE_DIRECT:
+            member_events_count = 0
+            for key, event in state_events.items():
+                if key[0] == EventTypes.Member:
+                    member_events_count += 1
+
+            if member_events_count > 2:
+                return False
+
+        prev_rules_event = state_events.get((ACCESS_RULES_TYPE, ""))
+
+        # Now that we know the new rule doesn't break the "direct" case, we can allow any
+        # new rule in rooms that had none before.
+        if prev_rules_event is None:
+            return True
+
+        prev_rule = prev_rules_event.content.get("rule")
+
+        # Currently, we can only go from "restricted" to "unrestricted".
+        if prev_rule == ACCESS_RULE_RESTRICTED and new_rule == ACCESS_RULE_UNRESTRICTED:
+            return True
+
+        return False
 
     def _apply_restricted(self, event):
         # "restricted" currently means that users can only invite users if their server is
