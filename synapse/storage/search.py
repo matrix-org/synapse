@@ -40,6 +40,8 @@ class SearchStore(BackgroundUpdateStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
+    EVENT_SEARCH_USE_GIST_POSTGRES_NAME = "event_search_postgres_gist"
+    EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
 
     def __init__(self, db_conn, hs):
         super(SearchStore, self).__init__(db_conn, hs)
@@ -52,6 +54,17 @@ class SearchStore(BackgroundUpdateStore):
         )
         self.register_background_update_handler(
             self.EVENT_SEARCH_ORDER_UPDATE_NAME, self._background_reindex_search_order
+        )
+
+        # we used to have a background update to turn the GIN index into a
+        # GIST one; we no longer do that (obviously) because we actually want
+        # a GIN index. However, it's possible that some people might still have
+        # the background update queued, so we register a handler to clear the
+        # background update.
+        self.register_noop_background_update(self.EVENT_SEARCH_USE_GIST_POSTGRES_NAME)
+
+        self.register_background_update_handler(
+            self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME, self._background_reindex_gin_search
         )
 
     @defer.inlineCallbacks
@@ -154,6 +167,49 @@ class SearchStore(BackgroundUpdateStore):
             yield self._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
 
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _background_reindex_gin_search(self, progress, batch_size):
+        """This handles old synapses which used GIST indexes, if any;
+        converting them back to be GIN as per the actual schema.
+        """
+
+        def create_index(conn):
+            conn.rollback()
+
+            # we have to set autocommit, because postgres refuses to
+            # CREATE INDEX CONCURRENTLY without it.
+            conn.set_session(autocommit=True)
+
+            try:
+                c = conn.cursor()
+
+                # if we skipped the conversion to GIST, we may already/still
+                # have an event_search_fts_idx; unfortunately postgres 9.4
+                # doesn't support CREATE INDEX IF EXISTS so we just catch the
+                # exception and ignore it.
+                import psycopg2
+
+                try:
+                    c.execute(
+                        "CREATE INDEX CONCURRENTLY event_search_fts_idx"
+                        " ON event_search USING GIN (vector)"
+                    )
+                except psycopg2.ProgrammingError as e:
+                    logger.warn(
+                        "Ignoring error %r when trying to switch from GIST to GIN", e
+                    )
+
+                # we should now be able to delete the GIST index.
+                c.execute("DROP INDEX IF EXISTS event_search_fts_idx_gist")
+            finally:
+                conn.set_session(autocommit=False)
+
+        if isinstance(self.database_engine, PostgresEngine):
+            yield self.runWithConnection(create_index)
+
+        yield self._end_background_update(self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME)
+        defer.returnValue(1)
 
     @defer.inlineCallbacks
     def _background_reindex_search_order(self, progress, batch_size):
@@ -285,7 +341,29 @@ class SearchStore(BackgroundUpdateStore):
                 for entry in entries
             )
 
+            # inserts to a GIN index are normally batched up into a pending
+            # list, and then all committed together once the list gets to a
+            # certain size. The trouble with that is that postgres (pre-9.5)
+            # uses work_mem to determine the length of the list, and work_mem
+            # is typically very large.
+            #
+            # We therefore reduce work_mem while we do the insert.
+            #
+            # (postgres 9.5 uses the separate gin_pending_list_limit setting,
+            # so doesn't suffer the same problem, but changing work_mem will
+            # be harmless)
+            #
+            # Note that we don't need to worry about restoring it on
+            # exception, because exceptions will cause the transaction to be
+            # rolled back, including the effects of the SET command.
+            #
+            # Also: we use SET rather than SET LOCAL because there's lots of
+            # other stuff going on in this transaction, which want to have the
+            # normal work_mem setting.
+
+            txn.execute("SET work_mem='256kB'")
             txn.executemany(sql, args)
+            txn.execute("RESET work_mem")
 
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
