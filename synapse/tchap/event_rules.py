@@ -87,6 +87,7 @@ class TchapEventRules(object):
             # It's probably not worth it but let's just be overly safe here.
             defer.returnValue(False)
 
+        # Get the HS this address belongs to from the identity server.
         res = yield self.http_client.get_json(
             "https://%s/_matrix/identity/api/v1/info" % (self.id_server,),
             {
@@ -147,7 +148,11 @@ class TchapEventRules(object):
             if key[0] == EventTypes.ThirdPartyInvite:
                 threepid_invite_events.append(event)
 
-        # There should never be more than one 3PID invite in the room state:
+        # There should never be more than one 3PID invite in the room state: if the second
+        # original user came and left, and we're inviting them using their email address,
+        # given we know they have a Matrix account binded to the address (so they could
+        # join the first time), Synapse will successfully look it up before attempting to
+        # store an invite on the IS.
         if len(threepid_invite_events) == 1 and event.type == EventTypes.ThirdPartyInvite:
             # If we already have a 3PID invite in flight, don't accept another one.
             return False
@@ -175,8 +180,8 @@ class TchapEventRules(object):
             # We can only have m.room.member events here. In this case, we can only allow
             # the event if it's either a m.room.member from the joined user (we can assume
             # that the only m.room.member event is a join otherwise we wouldn't be able to
-            # send an event to the room) or an a m.room.member with the "invite"
-            # membership which target is the invited user.
+            # send an event to the room) or an an invite event which target is the invited
+            # user.
             target = event.state_key
             is_from_threepid_invite = self._is_invite_from_threepid(
                 event, threepid_invite_events[0],
