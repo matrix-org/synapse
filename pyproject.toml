@@ -40,12 +40,10 @@ exclude = '''
     | \.tox
     | \.venv
     | _build
-    | _trial_temp*.
+    | _trial_temp.*
     | build
     | dist
     | debian
   )/
-  | foo.py           # also separately exclude a file named foo.py in
-                     # the root of the project
 )
 '''
