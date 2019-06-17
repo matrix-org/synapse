@@ -16,7 +16,7 @@
 import argparse
 import sys
 
-from signedjson.key import write_signing_keys, generate_signing_key
+from signedjson.key import generate_signing_key, write_signing_keys
 
 from synapse.util.stringutils import random_string
 
