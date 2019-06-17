@@ -311,7 +311,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         prev_state=[],
         redacts=None,
         push_actions=[],
-        **content,
+        **content
     ):
 
         if depth is None:
