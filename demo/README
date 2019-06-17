@@ -1,9 +1,13 @@
+DO NOT USE THESE DEMO SERVERS IN PRODUCTION
+
 Requires you to have done:
     python setup.py develop
 
 
-The demo start.sh will start three synapse servers on ports 8080, 8081 and 8082, with host names localhost:$port. This can be easily changed to `hostname`:$port in start.sh if required. 
-It will also start a web server on port 8000 pointed at the webclient.
+The demo start.sh will start three synapse servers on ports 8080, 8081 and 8082, with host names localhost:$port. This can be easily changed to `hostname`:$port in start.sh if required.
+
+To enable the servers to communicate untrusted ssl certs are used. In order to do this the servers do not check the certs
+and are configured in a highly insecure way. Do not use these configuration files in production.
 
 stop.sh will stop the synapse servers and the webclient.
 
