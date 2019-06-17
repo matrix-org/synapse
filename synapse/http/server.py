@@ -140,7 +140,7 @@ def wrap_html_request_handler(h):
     """
     async def wrapped_request_handler(self, request):
         try:
-            return h(self, request)
+            return await h(self, request)
         except Exception:
             f = failure.Failure()
             return _return_html_error(f, request)
@@ -346,6 +346,23 @@ class JsonResource(HttpServer, resource.Resource):
             canonical_json=self.canonical_json,
         )
 
+
+class DirectServeResource(resource.Resource):
+
+    def render(self, request):
+        """
+        Render the request, using an asynchronous render handler if it exists.
+        """
+        render_callback_name = "_async_render_" + request.method.decode("ascii")
+
+        if hasattr(self, render_callback_name):
+            # Call the handler
+            callback = getattr(self, render_callback_name)
+            d = defer.ensureDeferred(callback(request))
+
+            return NOT_DONE_YET
+        else:
+            super().render(request)
 
 def _options_handler(request):
     """Request handler for OPTIONS requests

@@ -29,7 +29,7 @@ from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
-from synapse.http.server import finish_request, wrap_html_request_handler
+from synapse.http.server import finish_request, wrap_html_request_handler, DirectServeResource
 from synapse.http.servlet import parse_string
 from synapse.types import UserID
 
@@ -46,7 +46,7 @@ else:
         return a == b
 
 
-class ConsentResource(Resource):
+class ConsentResource(DirectServeResource):
     """A twisted Resource to display a privacy policy and gather consent to it
 
     When accessed via GET, returns the privacy policy via a template.
@@ -85,7 +85,7 @@ class ConsentResource(Resource):
         Args:
             hs (synapse.server.HomeServer): homeserver
         """
-        Resource.__init__(self)
+        super().__init__()
 
         self.hs = hs
         self.store = hs.get_datastore()
@@ -117,18 +117,12 @@ class ConsentResource(Resource):
 
         self._hmac_secret = hs.config.form_secret.encode("utf-8")
 
-    def render_GET(self, request):
-        self._async_render_GET(request)
-        return NOT_DONE_YET
-
     @wrap_html_request_handler
-    @defer.inlineCallbacks
-    def _async_render_GET(self, request):
+    async def _async_render_GET(self, request):
         """
         Args:
             request (twisted.web.http.Request):
         """
-
         version = parse_string(request, "v", default=self._default_consent_version)
         username = parse_string(request, "u", required=False, default="")
         userhmac = None
@@ -144,7 +138,7 @@ class ConsentResource(Resource):
             else:
                 qualified_user_id = UserID(username, self.hs.hostname).to_string()
 
-            u = yield self.store.get_user_by_id(qualified_user_id)
+            u = await self.store.get_user_by_id(qualified_user_id)
             if u is None:
                 raise NotFoundError("Unknown user")
 
@@ -163,13 +157,8 @@ class ConsentResource(Resource):
         except TemplateNotFound:
             raise NotFoundError("Unknown policy version")
 
-    def render_POST(self, request):
-        self._async_render_POST(request)
-        return NOT_DONE_YET
-
     @wrap_html_request_handler
-    @defer.inlineCallbacks
-    def _async_render_POST(self, request):
+    async def _async_render_POST(self, request):
         """
         Args:
             request (twisted.web.http.Request):
@@ -186,12 +175,12 @@ class ConsentResource(Resource):
             qualified_user_id = UserID(username, self.hs.hostname).to_string()
 
         try:
-            yield self.store.user_set_consent_version(qualified_user_id, version)
+            await self.store.user_set_consent_version(qualified_user_id, version)
         except StoreError as e:
             if e.code != 404:
                 raise
             raise NotFoundError("Unknown user")
-        yield self.registration_handler.post_consent_actions(qualified_user_id)
+        await self.registration_handler.post_consent_actions(qualified_user_id)
 
         try:
             self._render_template(request, "success.html")
