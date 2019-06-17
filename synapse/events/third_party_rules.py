@@ -35,7 +35,10 @@ class ThirdPartyEventRules(object):
             module, config = hs.config.third_party_event_rules
 
         if module is not None:
-            self.third_party_rules = module(config=config)
+            self.third_party_rules = module(
+                config=config,
+                http_client=hs.get_simple_http_client(),
+            )
 
     @defer.inlineCallbacks
     def check_event_allowed(self, event, context):
@@ -81,3 +84,30 @@ class ThirdPartyEventRules(object):
         yield self.third_party_rules.on_create_room(
             requester, config, is_requester_admin
         )
+
+    def check_threepid_can_be_invited(self, medium, address, room_id):
+        """Check if a provided 3PID can be invited in the given room.
+
+        Args:
+            medium (str): The 3PID's medium.
+            address (str): The 3PID's address.
+            room_id (str): The room we want to invite the threepid to.
+
+        Returns:
+            defer.Deferred[bool], True if the 3PID can be invited, False if not.
+        """
+
+        if self.third_party_rules is None:
+            defer.returnValue(True)
+
+        state_ids = yield self.store.get_filtered_current_state_ids(room_id)
+        room_state_events = yield self.store.get_events(state_ids.values())
+
+        state_events = {}
+        for key, event_id in state_ids.items():
+            state_events[key] = room_state_events[event_id]
+
+        ret = yield self.third_party_rules.check_threepid_can_be_invited(
+            medium, address, state_events,
+        )
+        defer.returnValue(ret)
