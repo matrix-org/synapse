@@ -17,8 +17,9 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.config._base import ConfigError
+from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 
-ACESS_RULES_TYPE = "im.vector.room.access_rules"
+ACCESS_RULES_TYPE = "im.vector.room.access_rules"
 ACCESS_RULE_RESTRICTED = "restricted"
 ACCESS_RULE_UNRESTRICTED = "unrestricted"
 ACCESS_RULE_DIRECT = "direct"
@@ -27,6 +28,9 @@ ACCESS_RULE_DIRECT = "direct"
 class TchapEventRules(object):
     def __init__(self, config):
         self.id_server = config["id_server"]
+        self.domains_forbidden_when_restricted = config.get(
+            "domains_forbidden_when_restricted", [],
+        )
 
     @staticmethod
     def parse_config(config):
@@ -35,18 +39,45 @@ class TchapEventRules(object):
         else:
             raise ConfigError("No IS for event rules TchapEventRules")
 
+    def on_create_room(self, requester, config, is_requester_admin):
+        for event in config.get("initial_state", []):
+            if event["type"] == ACCESS_RULES_TYPE:
+                # If there's already a rules event in the initial state, check if it
+                # breaks the rules for "direct", and if not don't do anything else.
+                if (
+                    not config.get("is_direct")
+                    or event["content"]["rule"] != ACCESS_RULE_DIRECT
+                ):
+                    return
+
+        # Append an access rules event to be sent once every other event in initial_state
+        # has been sent. If "is_direct" exists and is set to True, the rule needs to be
+        # "direct", and "restricted" otherwise.
+        if config.get("is_direct"):
+            default_rule = ACCESS_RULE_DIRECT
+        else:
+            default_rule = ACCESS_RULE_RESTRICTED
+
+        config["initial_state"].append({
+            "type": ACCESS_RULES_TYPE,
+            "state_key": "",
+            "content": {
+                "rule": default_rule,
+            }
+        })
+
     def check_event_allowed(self, event, state_events):
         # TODO: add rules for sending the access rules event
-        access_rules = state_events.get((ACESS_RULES_TYPE, ""))
+        access_rules = state_events.get((ACCESS_RULES_TYPE, ""))
         if access_rules is None:
             rule = ACCESS_RULE_RESTRICTED
         else:
             rule = access_rules.content.get("rule")
 
         if rule == ACCESS_RULE_RESTRICTED:
-            ret = self._apply_restricted(event, state_events)
+            ret = self._apply_restricted(event)
         elif rule == ACCESS_RULE_UNRESTRICTED:
-            ret = self._apply_unrestricted(event, state_events)
+            ret = self._apply_unrestricted()
         elif rule == ACCESS_RULE_DIRECT:
             ret = self._apply_direct(event, state_events)
         else:
@@ -56,11 +87,13 @@ class TchapEventRules(object):
 
         return ret
 
-    @defer.inlineCallbacks
-    def _apply_restricted(self, event, state_events):
-        return True
+    def _apply_restricted(self, event):
+        # "restricted" currently means that users can only invite users if their server is
+        # included in a limited list of domains.
+        invitee_domain = DomainRuleChecker._get_domain_from_id(event.state_key)
+        return invitee_domain not in self.domains_forbidden_when_restricted
 
-    def _apply_unrestricted(self, event, state_events):
+    def _apply_unrestricted(self):
         # "unrestricted" currently means that every event is allowed.
         return True
 
@@ -68,8 +101,6 @@ class TchapEventRules(object):
         # "direct" currently means that no member is allowed apart from the two initial
         # members the room was created for (i.e. the room's creator and their first
         # invitee).
-        # TODO: figure out how to know if the room was created with "is_direct".
-
         if event.type != EventTypes.Member and event.type != EventTypes.ThirdPartyInvite:
             return True
 
@@ -125,6 +156,7 @@ class TchapEventRules(object):
 
         return True
 
-    def _is_invite_from_threepid(self, invite, threepid_invite):
+    @staticmethod
+    def _is_invite_from_threepid(invite, threepid_invite):
         token = invite.content.get("third_party_signed", {}).get("token", "")
         return token == threepid_invite.state_key
