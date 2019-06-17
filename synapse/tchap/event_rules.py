@@ -120,7 +120,7 @@ class TchapEventRules(object):
         else:
             # We currently apply the default (restricted) if we don't know the rule, we
             # might want to change that in the future.
-            ret = self._apply_restricted(event, state_events)
+            ret = self._apply_restricted(event)
 
         return ret
 
