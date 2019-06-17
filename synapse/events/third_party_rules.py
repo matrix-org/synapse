@@ -85,6 +85,7 @@ class ThirdPartyEventRules(object):
             requester, config, is_requester_admin
         )
 
+    @defer.inlineCallbacks
     def check_threepid_can_be_invited(self, medium, address, room_id):
         """Check if a provided 3PID can be invited in the given room.
 
