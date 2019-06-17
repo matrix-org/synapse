@@ -24,6 +24,7 @@ def _wrap_in_base_path(func):
     """Takes a function that returns a relative path and turns it into an
     absolute path based on the location of the primary media store
     """
+
     @functools.wraps(func)
     def _wrapped(self, *args, **kwargs):
         path = func(self, *args, **kwargs)
@@ -43,125 +44,102 @@ class MediaFilePaths(object):
     def __init__(self, primary_base_path):
         self.base_path = primary_base_path
 
-    def default_thumbnail_rel(self, default_top_level, default_sub_type, width,
-                              height, content_type, method):
+    def default_thumbnail_rel(
+        self, default_top_level, default_sub_type, width, height, content_type, method
+    ):
         top_level_type, sub_type = content_type.split("/")
-        file_name = "%i-%i-%s-%s-%s" % (
-            width, height, top_level_type, sub_type, method
-        )
+        file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
         return os.path.join(
-            "default_thumbnails", default_top_level,
-            default_sub_type, file_name
+            "default_thumbnails", default_top_level, default_sub_type, file_name
         )
 
     default_thumbnail = _wrap_in_base_path(default_thumbnail_rel)
 
     def local_media_filepath_rel(self, media_id):
-        return os.path.join(
-            "local_content",
-            media_id[0:2], media_id[2:4], media_id[4:]
-        )
+        return os.path.join("local_content", media_id[0:2], media_id[2:4], media_id[4:])
 
     local_media_filepath = _wrap_in_base_path(local_media_filepath_rel)
 
-    def local_media_thumbnail_rel(self, media_id, width, height, content_type,
-                                  method):
+    def local_media_thumbnail_rel(self, media_id, width, height, content_type, method):
         top_level_type, sub_type = content_type.split("/")
-        file_name = "%i-%i-%s-%s-%s" % (
-            width, height, top_level_type, sub_type, method
-        )
+        file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
         return os.path.join(
-            "local_thumbnails",
-            media_id[0:2], media_id[2:4], media_id[4:],
-            file_name
+            "local_thumbnails", media_id[0:2], media_id[2:4], media_id[4:], file_name
         )
 
     local_media_thumbnail = _wrap_in_base_path(local_media_thumbnail_rel)
 
     def remote_media_filepath_rel(self, server_name, file_id):
         return os.path.join(
-            "remote_content", server_name,
-            file_id[0:2], file_id[2:4], file_id[4:]
+            "remote_content", server_name, file_id[0:2], file_id[2:4], file_id[4:]
         )
 
     remote_media_filepath = _wrap_in_base_path(remote_media_filepath_rel)
 
-    def remote_media_thumbnail_rel(self, server_name, file_id, width, height,
-                                   content_type, method):
+    def remote_media_thumbnail_rel(
+        self, server_name, file_id, width, height, content_type, method
+    ):
         top_level_type, sub_type = content_type.split("/")
         file_name = "%i-%i-%s-%s" % (width, height, top_level_type, sub_type)
         return os.path.join(
-            "remote_thumbnail", server_name,
-            file_id[0:2], file_id[2:4], file_id[4:],
-            file_name
+            "remote_thumbnail",
+            server_name,
+            file_id[0:2],
+            file_id[2:4],
+            file_id[4:],
+            file_name,
         )
 
     remote_media_thumbnail = _wrap_in_base_path(remote_media_thumbnail_rel)
 
     def remote_media_thumbnail_dir(self, server_name, file_id):
         return os.path.join(
-            self.base_path, "remote_thumbnail", server_name,
-            file_id[0:2], file_id[2:4], file_id[4:],
+            self.base_path,
+            "remote_thumbnail",
+            server_name,
+            file_id[0:2],
+            file_id[2:4],
+            file_id[4:],
         )
 
     def url_cache_filepath_rel(self, media_id):
         if NEW_FORMAT_ID_RE.match(media_id):
             # Media id is of the form <DATE><RANDOM_STRING>
             # E.g.: 2017-09-28-fsdRDt24DS234dsf
-            return os.path.join(
-                "url_cache",
-                media_id[:10], media_id[11:]
-            )
+            return os.path.join("url_cache", media_id[:10], media_id[11:])
         else:
-            return os.path.join(
-                "url_cache",
-                media_id[0:2], media_id[2:4], media_id[4:],
-            )
+            return os.path.join("url_cache", media_id[0:2], media_id[2:4], media_id[4:])
 
     url_cache_filepath = _wrap_in_base_path(url_cache_filepath_rel)
 
     def url_cache_filepath_dirs_to_delete(self, media_id):
         "The dirs to try and remove if we delete the media_id file"
         if NEW_FORMAT_ID_RE.match(media_id):
-            return [
-                os.path.join(
-                    self.base_path, "url_cache",
-                    media_id[:10],
-                ),
-            ]
+            return [os.path.join(self.base_path, "url_cache", media_id[:10])]
         else:
             return [
-                os.path.join(
-                    self.base_path, "url_cache",
-                    media_id[0:2], media_id[2:4],
-                ),
-                os.path.join(
-                    self.base_path, "url_cache",
-                    media_id[0:2],
-                ),
+                os.path.join(self.base_path, "url_cache", media_id[0:2], media_id[2:4]),
+                os.path.join(self.base_path, "url_cache", media_id[0:2]),
             ]
 
-    def url_cache_thumbnail_rel(self, media_id, width, height, content_type,
-                                method):
+    def url_cache_thumbnail_rel(self, media_id, width, height, content_type, method):
         # Media id is of the form <DATE><RANDOM_STRING>
         # E.g.: 2017-09-28-fsdRDt24DS234dsf
 
         top_level_type, sub_type = content_type.split("/")
-        file_name = "%i-%i-%s-%s-%s" % (
-            width, height, top_level_type, sub_type, method
-        )
+        file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
 
         if NEW_FORMAT_ID_RE.match(media_id):
             return os.path.join(
-                "url_cache_thumbnails",
-                media_id[:10], media_id[11:],
-                file_name
+                "url_cache_thumbnails", media_id[:10], media_id[11:], file_name
             )
         else:
             return os.path.join(
                 "url_cache_thumbnails",
-                media_id[0:2], media_id[2:4], media_id[4:],
-                file_name
+                media_id[0:2],
+                media_id[2:4],
+                media_id[4:],
+                file_name,
             )
 
     url_cache_thumbnail = _wrap_in_base_path(url_cache_thumbnail_rel)
@@ -172,13 +150,15 @@ class MediaFilePaths(object):
 
         if NEW_FORMAT_ID_RE.match(media_id):
             return os.path.join(
-                self.base_path, "url_cache_thumbnails",
-                media_id[:10], media_id[11:],
+                self.base_path, "url_cache_thumbnails", media_id[:10], media_id[11:]
             )
         else:
             return os.path.join(
-                self.base_path, "url_cache_thumbnails",
-                media_id[0:2], media_id[2:4], media_id[4:],
+                self.base_path,
+                "url_cache_thumbnails",
+                media_id[0:2],
+                media_id[2:4],
+                media_id[4:],
             )
 
     def url_cache_thumbnail_dirs_to_delete(self, media_id):
@@ -188,26 +168,21 @@ class MediaFilePaths(object):
         if NEW_FORMAT_ID_RE.match(media_id):
             return [
                 os.path.join(
-                    self.base_path, "url_cache_thumbnails",
-                    media_id[:10], media_id[11:],
+                    self.base_path, "url_cache_thumbnails", media_id[:10], media_id[11:]
                 ),
-                os.path.join(
-                    self.base_path, "url_cache_thumbnails",
-                    media_id[:10],
-                ),
+                os.path.join(self.base_path, "url_cache_thumbnails", media_id[:10]),
             ]
         else:
             return [
                 os.path.join(
-                    self.base_path, "url_cache_thumbnails",
-                    media_id[0:2], media_id[2:4], media_id[4:],
-                ),
-                os.path.join(
-                    self.base_path, "url_cache_thumbnails",
-                    media_id[0:2], media_id[2:4],
-                ),
-                os.path.join(
-                    self.base_path, "url_cache_thumbnails",
+                    self.base_path,
+                    "url_cache_thumbnails",
                     media_id[0:2],
+                    media_id[2:4],
+                    media_id[4:],
                 ),
+                os.path.join(
+                    self.base_path, "url_cache_thumbnails", media_id[0:2], media_id[2:4]
+                ),
+                os.path.join(self.base_path, "url_cache_thumbnails", media_id[0:2]),
             ]

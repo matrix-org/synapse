@@ -40,6 +40,7 @@ class Clock(object):
     Args:
         reactor: The Twisted reactor to use.
     """
+
     _reactor = attr.ib()
 
     @defer.inlineCallbacks
@@ -70,9 +71,7 @@ class Clock(object):
         call = task.LoopingCall(f)
         call.clock = self._reactor
         d = call.start(msec / 1000.0, now=False)
-        d.addErrback(
-            log_failure, "Looping call died", consumeErrors=False,
-        )
+        d.addErrback(log_failure, "Looping call died", consumeErrors=False)
         return call
 
     def call_later(self, delay, callback, *args, **kwargs):
@@ -84,6 +83,7 @@ class Clock(object):
             *args: Postional arguments to pass to function.
             **kwargs: Key arguments to pass to function.
         """
+
         def wrapped_callback(*args, **kwargs):
             with PreserveLoggingContext():
                 callback(*args, **kwargs)
@@ -129,12 +129,7 @@ def log_failure(failure, msg, consumeErrors=True):
     """
 
     logger.error(
-        msg,
-        exc_info=(
-            failure.type,
-            failure.value,
-            failure.getTracebackObject()
-        )
+        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())
     )
 
     if not consumeErrors:
@@ -152,12 +147,12 @@ def glob_to_regex(glob):
     Returns:
         re.RegexObject
     """
-    res = ''
+    res = ""
     for c in glob:
-        if c == '*':
-            res = res + '.*'
-        elif c == '?':
-            res = res + '.'
+        if c == "*":
+            res = res + ".*"
+        elif c == "?":
+            res = res + "."
         else:
             res = res + re.escape(c)
 

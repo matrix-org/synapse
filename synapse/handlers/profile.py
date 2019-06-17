@@ -73,18 +73,13 @@ class BaseProfileHandler(BaseHandler):
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
 
-            defer.returnValue({
-                "displayname": displayname,
-                "avatar_url": avatar_url,
-            })
+            defer.returnValue({"displayname": displayname, "avatar_url": avatar_url})
         else:
             try:
                 result = yield self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
-                    args={
-                        "user_id": user_id,
-                    },
+                    args={"user_id": user_id},
                     ignore_backoff=True,
                 )
                 defer.returnValue(result)
@@ -113,10 +108,7 @@ class BaseProfileHandler(BaseHandler):
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
 
-            defer.returnValue({
-                "displayname": displayname,
-                "avatar_url": avatar_url,
-            })
+            defer.returnValue({"displayname": displayname, "avatar_url": avatar_url})
         else:
             profile = yield self.store.get_from_remote_profile_cache(user_id)
             defer.returnValue(profile or {})
@@ -139,10 +131,7 @@ class BaseProfileHandler(BaseHandler):
                 result = yield self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
-                    args={
-                        "user_id": target_user.to_string(),
-                        "field": "displayname",
-                    },
+                    args={"user_id": target_user.to_string(), "field": "displayname"},
                     ignore_backoff=True,
                 )
             except RequestSendFailed as e:
@@ -170,15 +159,13 @@ class BaseProfileHandler(BaseHandler):
 
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
             raise SynapseError(
-                400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN, ),
+                400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
             )
 
-        if new_displayname == '':
+        if new_displayname == "":
             new_displayname = None
 
-        yield self.store.set_profile_displayname(
-            target_user.localpart, new_displayname
-        )
+        yield self.store.set_profile_displayname(target_user.localpart, new_displayname)
 
         if self.hs.config.user_directory_search_all_users:
             profile = yield self.store.get_profileinfo(target_user.localpart)
@@ -205,10 +192,7 @@ class BaseProfileHandler(BaseHandler):
                 result = yield self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
-                    args={
-                        "user_id": target_user.to_string(),
-                        "field": "avatar_url",
-                    },
+                    args={"user_id": target_user.to_string(), "field": "avatar_url"},
                     ignore_backoff=True,
                 )
             except RequestSendFailed as e:
@@ -230,12 +214,10 @@ class BaseProfileHandler(BaseHandler):
 
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(
-                400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN, ),
+                400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
-        yield self.store.set_profile_avatar_url(
-            target_user.localpart, new_avatar_url
-        )
+        yield self.store.set_profile_avatar_url(target_user.localpart, new_avatar_url)
 
         if self.hs.config.user_directory_search_all_users:
             profile = yield self.store.get_profileinfo(target_user.localpart)
@@ -278,9 +260,7 @@ class BaseProfileHandler(BaseHandler):
 
         yield self.ratelimit(requester)
 
-        room_ids = yield self.store.get_rooms_for_user(
-            target_user.to_string(),
-        )
+        room_ids = yield self.store.get_rooms_for_user(target_user.to_string())
 
         for room_id in room_ids:
             handler = self.hs.get_room_member_handler()
@@ -296,8 +276,7 @@ class BaseProfileHandler(BaseHandler):
                 )
             except Exception as e:
                 logger.warn(
-                    "Failed to update join event for room %s - %s",
-                    room_id, str(e)
+                    "Failed to update join event for room %s - %s", room_id, str(e)
                 )
 
     @defer.inlineCallbacks
@@ -325,11 +304,9 @@ class BaseProfileHandler(BaseHandler):
             return
 
         try:
-            requester_rooms = yield self.store.get_rooms_for_user(
-                requester.to_string()
-            )
+            requester_rooms = yield self.store.get_rooms_for_user(requester.to_string())
             target_user_rooms = yield self.store.get_rooms_for_user(
-                target_user.to_string(),
+                target_user.to_string()
             )
 
             # Check if the room lists have no elements in common.
@@ -353,12 +330,12 @@ class MasterProfileHandler(BaseProfileHandler):
         assert hs.config.worker_app is None
 
         self.clock.looping_call(
-            self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
+            self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS
         )
 
     def _start_update_remote_profile_cache(self):
         return run_as_background_process(
-            "Update remote profile", self._update_remote_profile_cache,
+            "Update remote profile", self._update_remote_profile_cache
         )
 
     @defer.inlineCallbacks
@@ -372,7 +349,7 @@ class MasterProfileHandler(BaseProfileHandler):
 
         for user_id, displayname, avatar_url in entries:
             is_subscribed = yield self.store.is_subscribed_remote_profile_for_user(
-                user_id,
+                user_id
             )
             if not is_subscribed:
                 yield self.store.maybe_delete_remote_profile_cache(user_id)
@@ -382,9 +359,7 @@ class MasterProfileHandler(BaseProfileHandler):
                 profile = yield self.federation.make_query(
                     destination=get_domain_from_id(user_id),
                     query_type="profile",
-                    args={
-                        "user_id": user_id,
-                    },
+                    args={"user_id": user_id},
                     ignore_backoff=True,
                 )
             except Exception:
@@ -399,6 +374,4 @@ class MasterProfileHandler(BaseProfileHandler):
             new_avatar = profile.get("avatar_url")
 
             # We always hit update to update the last_check timestamp
-            yield self.store.update_remote_profile_cache(
-                user_id, new_name, new_avatar
-            )
+            yield self.store.update_remote_profile_cache(user_id, new_name, new_avatar)

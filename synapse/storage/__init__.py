@@ -280,7 +280,7 @@ class DataStore(
         Counts the number of users who used this homeserver in the last 24 hours.
         """
         yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
-        return self.runInteraction("count_daily_users", self._count_users, yesterday,)
+        return self.runInteraction("count_daily_users", self._count_users, yesterday)
 
     def count_monthly_users(self):
         """
@@ -291,9 +291,7 @@ class DataStore(
         """
         thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
         return self.runInteraction(
-            "count_monthly_users",
-            self._count_users,
-            thirty_days_ago,
+            "count_monthly_users", self._count_users, thirty_days_ago
         )
 
     def _count_users(self, txn, time_from):
@@ -361,7 +359,7 @@ class DataStore(
             txn.execute(sql, (thirty_days_ago_in_secs, thirty_days_ago_in_secs))
 
             for row in txn:
-                if row[0] == 'unknown':
+                if row[0] == "unknown":
                     pass
                 results[row[0]] = row[1]
 
@@ -388,7 +386,7 @@ class DataStore(
             txn.execute(sql, (thirty_days_ago_in_secs, thirty_days_ago_in_secs))
 
             count, = txn.fetchone()
-            results['all'] = count
+            results["all"] = count
 
             return results
 

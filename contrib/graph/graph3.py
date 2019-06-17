@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -42,7 +43,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
     print("Sorted events")
 
     if limit:
-        events = events[-int(limit):]
+        events = events[-int(limit) :]
 
     node_map = {}
 
@@ -51,7 +52,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
     for event in events:
         t = datetime.datetime.fromtimestamp(
             float(event.origin_server_ts) / 1000
-        ).strftime('%Y-%m-%d %H:%M:%S,%f')
+        ).strftime("%Y-%m-%d %H:%M:%S,%f")
 
         content = json.dumps(unfreeze(event.get_dict()["content"]), indent=4)
         content = content.replace("\n", "<br/>\n")
@@ -67,9 +68,10 @@ def make_graph(file_name, room_id, file_prefix, limit):
                 value = json.dumps(value)
 
             content.append(
-                "<b>%s</b>: %s," % (
-                    cgi.escape(key, quote=True).encode("ascii", 'xmlcharrefreplace'),
-                    cgi.escape(value, quote=True).encode("ascii", 'xmlcharrefreplace'),
+                "<b>%s</b>: %s,"
+                % (
+                    cgi.escape(key, quote=True).encode("ascii", "xmlcharrefreplace"),
+                    cgi.escape(value, quote=True).encode("ascii", "xmlcharrefreplace"),
                 )
             )
 
@@ -95,10 +97,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
             "depth": event.depth,
         }
 
-        node = pydot.Node(
-            name=event.event_id,
-            label=label,
-        )
+        node = pydot.Node(name=event.event_id, label=label)
 
         node_map[event.event_id] = node
         graph.add_node(node)
@@ -110,10 +109,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
             try:
                 end_node = node_map[prev_id]
             except:
-                end_node = pydot.Node(
-                    name=prev_id,
-                    label="<<b>%s</b>>" % (prev_id,),
-                )
+                end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
 
                 node_map[prev_id] = end_node
                 graph.add_node(end_node)
@@ -123,31 +119,31 @@ def make_graph(file_name, room_id, file_prefix, limit):
 
     print("Created edges")
 
-    graph.write('%s.dot' % file_prefix, format='raw', prog='dot')
+    graph.write("%s.dot" % file_prefix, format="raw", prog="dot")
 
     print("Created Dot")
 
-    graph.write_svg("%s.svg" % file_prefix, prog='dot')
+    graph.write_svg("%s.svg" % file_prefix, prog="dot")
 
     print("Created svg")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate a PDU graph for a given room by reading "
-                    "from a file with line deliminated events. \n"
-                    "Requires pydot."
+        "from a file with line deliminated events. \n"
+        "Requires pydot."
     )
     parser.add_argument(
-        "-p", "--prefix", dest="prefix",
+        "-p",
+        "--prefix",
+        dest="prefix",
         help="String to prefix output files with",
-        default="graph_output"
+        default="graph_output",
     )
-    parser.add_argument(
-        "-l", "--limit",
-        help="Only retrieve the last N events.",
-    )
-    parser.add_argument('event_file')
-    parser.add_argument('room')
+    parser.add_argument("-l", "--limit", help="Only retrieve the last N events.")
+    parser.add_argument("event_file")
+    parser.add_argument("room")
 
     args = parser.parse_args()
 

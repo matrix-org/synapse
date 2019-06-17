@@ -109,12 +109,14 @@ class EventCreatorServer(HomeServer):
                     ProfileAvatarURLRestServlet(self).register(resource)
                     ProfileDisplaynameRestServlet(self).register(resource)
                     ProfileRestServlet(self).register(resource)
-                    resources.update({
-                        "/_matrix/client/r0": resource,
-                        "/_matrix/client/unstable": resource,
-                        "/_matrix/client/v2_alpha": resource,
-                        "/_matrix/client/api/v1": resource,
-                    })
+                    resources.update(
+                        {
+                            "/_matrix/client/r0": resource,
+                            "/_matrix/client/unstable": resource,
+                            "/_matrix/client/v2_alpha": resource,
+                            "/_matrix/client/api/v1": resource,
+                        }
+                    )
 
         root_resource = create_resource_tree(resources, NoResource())
 
@@ -127,7 +129,7 @@ class EventCreatorServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            )
+            ),
         )
 
         logger.info("Synapse event creator now listening on port %d", port)
@@ -141,18 +143,19 @@ class EventCreatorServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    )
+                        username="matrix", password="rabbithole", globals={"hs": self}
+                    ),
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(("Metrics listener configured, but "
-                                 "enable_metrics is not True!"))
+                    logger.warn(
+                        (
+                            "Metrics listener configured, but "
+                            "enable_metrics is not True!"
+                        )
+                    )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"],
-                                         listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -164,9 +167,7 @@ class EventCreatorServer(HomeServer):
 
 def start(config_options):
     try:
-        config = HomeServerConfig.load_config(
-            "Synapse event creator", config_options
-        )
+        config = HomeServerConfig.load_config("Synapse event creator", config_options)
     except ConfigError as e:
         sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
@@ -198,6 +199,6 @@ def start(config_options):
     _base.start_worker_reactor("synapse-event-creator", config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with LoggingContext("main"):
         start(sys.argv[1:])

@@ -29,9 +29,7 @@ class MediaConfigResource(Resource):
         config = hs.get_config()
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
-        self.limits_dict = {
-            "m.upload.size": config.max_upload_size,
-        }
+        self.limits_dict = {"m.upload.size": config.max_upload_size}
 
     def render_GET(self, request):
         self._async_render_GET(request)

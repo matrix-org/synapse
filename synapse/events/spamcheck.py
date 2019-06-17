@@ -60,7 +60,9 @@ class SpamChecker(object):
         if self.spam_checker is None:
             return True
 
-        return self.spam_checker.user_may_invite(inviter_userid, invitee_userid, room_id)
+        return self.spam_checker.user_may_invite(
+            inviter_userid, invitee_userid, room_id
+        )
 
     def user_may_create_room(self, userid):
         """Checks if a given user may create a room

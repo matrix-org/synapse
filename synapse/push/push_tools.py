@@ -23,9 +23,7 @@ def get_badge_count(store, user_id):
     invites = yield store.get_invited_rooms_for_user(user_id)
     joins = yield store.get_rooms_for_user(user_id)
 
-    my_receipts_by_room = yield store.get_receipts_for_user(
-        user_id, "m.read",
-    )
+    my_receipts_by_room = yield store.get_receipts_for_user(user_id, "m.read")
 
     badge = len(invites)
 
@@ -57,10 +55,10 @@ def get_context_for_event(store, state_handler, ev, user_id):
         store, room_state_ids, user_id, fallback_to_single_member=False
     )
     if name:
-        ctx['name'] = name
+        ctx["name"] = name
 
     sender_state_event_id = room_state_ids[("m.room.member", ev.sender)]
     sender_state_event = yield store.get_event(sender_state_event_id)
-    ctx['sender_display_name'] = name_from_member_event(sender_state_event)
+    ctx["sender_display_name"] = name_from_member_event(sender_state_event)
 
     defer.returnValue(ctx)

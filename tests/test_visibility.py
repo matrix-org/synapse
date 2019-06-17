@@ -265,7 +265,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         pr.disable()
         with open("filter_events_for_server.profile", "w+") as f:
-            ps = pstats.Stats(pr, stream=f).sort_stats('cumulative')
+            ps = pstats.Stats(pr, stream=f).sort_stats("cumulative")
             ps.print_stats()
 
         # the result should be 5 redacted events, and 5 unredacted events.

@@ -156,7 +156,7 @@ class StatsHandler(StateDeltasHandler):
                 prev_event_content = {}
                 if prev_event_id is not None:
                     prev_event = yield self.store.get_event(
-                        prev_event_id, allow_none=True,
+                        prev_event_id, allow_none=True
                     )
                     if prev_event:
                         prev_event_content = prev_event.content

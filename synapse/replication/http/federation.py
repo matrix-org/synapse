@@ -68,18 +68,17 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         for event, context in event_and_contexts:
             serialized_context = yield context.serialize(event, store)
 
-            event_payloads.append({
-                "event": event.get_pdu_json(),
-                "event_format_version": event.format_version,
-                "internal_metadata": event.internal_metadata.get_dict(),
-                "rejected_reason": event.rejected_reason,
-                "context": serialized_context,
-            })
+            event_payloads.append(
+                {
+                    "event": event.get_pdu_json(),
+                    "event_format_version": event.format_version,
+                    "internal_metadata": event.internal_metadata.get_dict(),
+                    "rejected_reason": event.rejected_reason,
+                    "context": serialized_context,
+                }
+            )
 
-        payload = {
-            "events": event_payloads,
-            "backfilled": backfilled,
-        }
+        payload = {"events": event_payloads, "backfilled": backfilled}
 
         defer.returnValue(payload)
 
@@ -103,18 +102,15 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                 event = EventType(event_dict, internal_metadata, rejected_reason)
 
                 context = yield EventContext.deserialize(
-                    self.store, event_payload["context"],
+                    self.store, event_payload["context"]
                 )
 
                 event_and_contexts.append((event, context))
 
-        logger.info(
-            "Got %d events from federation",
-            len(event_and_contexts),
-        )
+        logger.info("Got %d events from federation", len(event_and_contexts))
 
         yield self.federation_handler.persist_events_and_notify(
-            event_and_contexts, backfilled,
+            event_and_contexts, backfilled
         )
 
         defer.returnValue((200, {}))
@@ -146,10 +142,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
 
     @staticmethod
     def _serialize_payload(edu_type, origin, content):
-        return {
-            "origin": origin,
-            "content": content,
-        }
+        return {"origin": origin, "content": content}
 
     @defer.inlineCallbacks
     def _handle_request(self, request, edu_type):
@@ -159,10 +152,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
             origin = content["origin"]
             edu_content = content["content"]
 
-        logger.info(
-            "Got %r edu from %s",
-            edu_type, origin,
-        )
+        logger.info("Got %r edu from %s", edu_type, origin)
 
         result = yield self.registry.on_edu(edu_type, origin, edu_content)
 
@@ -201,9 +191,7 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
             query_type (str)
             args (dict): The arguments received for the given query type
         """
-        return {
-            "args": args,
-        }
+        return {"args": args}
 
     @defer.inlineCallbacks
     def _handle_request(self, request, query_type):
@@ -212,10 +200,7 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
 
             args = content["args"]
 
-        logger.info(
-            "Got %r query",
-            query_type,
-        )
+        logger.info("Got %r query", query_type)
 
         result = yield self.registry.on_query(query_type, args)
 

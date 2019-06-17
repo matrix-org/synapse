@@ -52,12 +52,14 @@ class WorkerConfig(Config):
         # argument.
         manhole = config.get("worker_manhole")
         if manhole:
-            self.worker_listeners.append({
-                "port": manhole,
-                "bind_addresses": ["127.0.0.1"],
-                "type": "manhole",
-                "tls": False,
-            })
+            self.worker_listeners.append(
+                {
+                    "port": manhole,
+                    "bind_addresses": ["127.0.0.1"],
+                    "type": "manhole",
+                    "tls": False,
+                }
+            )
 
         if self.worker_listeners:
             for listener in self.worker_listeners:
@@ -67,7 +69,7 @@ class WorkerConfig(Config):
                 if bind_address:
                     bind_addresses.append(bind_address)
                 elif not bind_addresses:
-                    bind_addresses.append('')
+                    bind_addresses.append("")
 
     def read_arguments(self, args):
         # We support a bunch of command line arguments that override options in

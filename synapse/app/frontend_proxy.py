@@ -62,14 +62,11 @@ class PresenceStatusStubServlet(RestServlet):
         # Pass through the auth headers, if any, in case the access token
         # is there.
         auth_headers = request.requestHeaders.getRawHeaders("Authorization", [])
-        headers = {
-            "Authorization": auth_headers,
-        }
+        headers = {"Authorization": auth_headers}
 
         try:
             result = yield self.http_client.get_json(
-                self.main_uri + request.uri.decode('ascii'),
-                headers=headers,
+                self.main_uri + request.uri.decode("ascii"), headers=headers
             )
         except HttpResponseException as e:
             raise e.to_synapse_error()
@@ -105,18 +102,19 @@ class KeyUploadServlet(RestServlet):
         if device_id is not None:
             # passing the device_id here is deprecated; however, we allow it
             # for now for compatibility with older clients.
-            if (requester.device_id is not None and
-                    device_id != requester.device_id):
-                logger.warning("Client uploading keys for a different device "
-                               "(logged in as %s, uploading for %s)",
-                               requester.device_id, device_id)
+            if requester.device_id is not None and device_id != requester.device_id:
+                logger.warning(
+                    "Client uploading keys for a different device "
+                    "(logged in as %s, uploading for %s)",
+                    requester.device_id,
+                    device_id,
+                )
         else:
             device_id = requester.device_id
 
         if device_id is None:
             raise SynapseError(
-                400,
-                "To upload keys, you must pass device_id when authenticating"
+                400, "To upload keys, you must pass device_id when authenticating"
             )
 
         if body:
@@ -124,13 +122,9 @@ class KeyUploadServlet(RestServlet):
             # Pass through the auth headers, if any, in case the access token
             # is there.
             auth_headers = request.requestHeaders.getRawHeaders(b"Authorization", [])
-            headers = {
-                "Authorization": auth_headers,
-            }
+            headers = {"Authorization": auth_headers}
             result = yield self.http_client.post_json_get_json(
-                self.main_uri + request.uri.decode('ascii'),
-                body,
-                headers=headers,
+                self.main_uri + request.uri.decode("ascii"), body, headers=headers
             )
 
             defer.returnValue((200, result))
@@ -171,12 +165,14 @@ class FrontendProxyServer(HomeServer):
                     if not self.config.use_presence:
                         PresenceStatusStubServlet(self).register(resource)
 
-                    resources.update({
-                        "/_matrix/client/r0": resource,
-                        "/_matrix/client/unstable": resource,
-                        "/_matrix/client/v2_alpha": resource,
-                        "/_matrix/client/api/v1": resource,
-                    })
+                    resources.update(
+                        {
+                            "/_matrix/client/r0": resource,
+                            "/_matrix/client/unstable": resource,
+                            "/_matrix/client/v2_alpha": resource,
+                            "/_matrix/client/api/v1": resource,
+                        }
+                    )
 
         root_resource = create_resource_tree(resources, NoResource())
 
@@ -190,7 +186,7 @@ class FrontendProxyServer(HomeServer):
                 root_resource,
                 self.version_string,
             ),
-            reactor=self.get_reactor()
+            reactor=self.get_reactor(),
         )
 
         logger.info("Synapse client reader now listening on port %d", port)
@@ -204,18 +200,19 @@ class FrontendProxyServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    )
+                        username="matrix", password="rabbithole", globals={"hs": self}
+                    ),
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(("Metrics listener configured, but "
-                                 "enable_metrics is not True!"))
+                    logger.warn(
+                        (
+                            "Metrics listener configured, but "
+                            "enable_metrics is not True!"
+                        )
+                    )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"],
-                                         listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -227,9 +224,7 @@ class FrontendProxyServer(HomeServer):
 
 def start(config_options):
     try:
-        config = HomeServerConfig.load_config(
-            "Synapse frontend proxy", config_options
-        )
+        config = HomeServerConfig.load_config("Synapse frontend proxy", config_options)
     except ConfigError as e:
         sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
@@ -258,6 +253,6 @@ def start(config_options):
     _base.start_worker_reactor("synapse-frontend-proxy", config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with LoggingContext("main"):
         start(sys.argv[1:])

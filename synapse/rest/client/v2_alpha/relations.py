@@ -32,7 +32,10 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.storage.relations import AggregationPaginationToken, RelationPaginationToken
+from synapse.storage.relations import (
+    AggregationPaginationToken,
+    RelationPaginationToken,
+)
 
 from ._base import client_patterns
 

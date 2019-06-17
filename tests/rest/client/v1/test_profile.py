@@ -183,7 +183,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     def test_set_displayname(self):
         request, channel = self.make_request(
             "PUT",
-            "/profile/%s/displayname" % (self.owner, ),
+            "/profile/%s/displayname" % (self.owner,),
             content=json.dumps({"displayname": "test"}),
             access_token=self.owner_tok,
         )
@@ -197,7 +197,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         """Attempts to set a stupid displayname should get a 400"""
         request, channel = self.make_request(
             "PUT",
-            "/profile/%s/displayname" % (self.owner, ),
+            "/profile/%s/displayname" % (self.owner,),
             content=json.dumps({"displayname": "test" * 100}),
             access_token=self.owner_tok,
         )
@@ -209,8 +209,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def get_displayname(self):
         request, channel = self.make_request(
-            "GET",
-            "/profile/%s/displayname" % (self.owner, ),
+            "GET", "/profile/%s/displayname" % (self.owner,)
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)

@@ -73,9 +73,7 @@ class TwistedHttpClient(HttpClient):
     @defer.inlineCallbacks
     def put_json(self, url, data):
         response = yield self._create_put_request(
-            url,
-            data,
-            headers_dict={"Content-Type": ["application/json"]}
+            url, data, headers_dict={"Content-Type": ["application/json"]}
         )
         body = yield readBody(response)
         defer.returnValue((response.code, body))
@@ -95,40 +93,34 @@ class TwistedHttpClient(HttpClient):
         """
 
         if "Content-Type" not in headers_dict:
-            raise defer.error(
-                RuntimeError("Must include Content-Type header for PUTs"))
+            raise defer.error(RuntimeError("Must include Content-Type header for PUTs"))
 
         return self._create_request(
-            "PUT",
-            url,
-            producer=_JsonProducer(json_data),
-            headers_dict=headers_dict
+            "PUT", url, producer=_JsonProducer(json_data), headers_dict=headers_dict
         )
 
     def _create_get_request(self, url, headers_dict={}):
         """ Wrapper of _create_request to issue a GET request
         """
-        return self._create_request(
-            "GET",
-            url,
-            headers_dict=headers_dict
-        )
+        return self._create_request("GET", url, headers_dict=headers_dict)
 
     @defer.inlineCallbacks
-    def do_request(self, method, url, data=None, qparams=None, jsonreq=True, headers={}):
+    def do_request(
+        self, method, url, data=None, qparams=None, jsonreq=True, headers={}
+    ):
         if qparams:
             url = "%s?%s" % (url, urllib.urlencode(qparams, True))
 
         if jsonreq:
             prod = _JsonProducer(data)
-            headers['Content-Type'] = ["application/json"];
+            headers["Content-Type"] = ["application/json"]
         else:
             prod = _RawProducer(data)
 
         if method in ["POST", "PUT"]:
-            response = yield self._create_request(method, url,
-                    producer=prod,
-                    headers_dict=headers)
+            response = yield self._create_request(
+                method, url, producer=prod, headers_dict=headers
+            )
         else:
             response = yield self._create_request(method, url)
 
@@ -155,10 +147,7 @@ class TwistedHttpClient(HttpClient):
         while True:
             try:
                 response = yield self.agent.request(
-                    method,
-                    url.encode("UTF8"),
-                    Headers(headers_dict),
-                    producer
+                    method, url.encode("UTF8"), Headers(headers_dict), producer
                 )
                 break
             except Exception as e:
@@ -179,6 +168,7 @@ class TwistedHttpClient(HttpClient):
         reactor.callLater(seconds, d.callback, seconds)
         return d
 
+
 class _RawProducer(object):
     def __init__(self, data):
         self.data = data
@@ -195,9 +185,11 @@ class _RawProducer(object):
     def stopProducing(self):
         pass
 
+
 class _JsonProducer(object):
     """ Used by the twisted http client to create the HTTP body from json
     """
+
     def __init__(self, jsn):
         self.data = jsn
         self.body = json.dumps(jsn).encode("utf8")

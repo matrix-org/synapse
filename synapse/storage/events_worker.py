@@ -27,6 +27,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError
 from synapse.api.room_versions import EventFormatVersions
 from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
+
 # these are only included to make the type annotations work
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
@@ -111,8 +112,7 @@ class EventsWorkerStore(SQLBaseStore):
             return ts
 
         return self.runInteraction(
-            "get_approximate_received_ts",
-            _get_approximate_received_ts_txn,
+            "get_approximate_received_ts", _get_approximate_received_ts_txn
         )
 
     @defer.inlineCallbacks
@@ -677,7 +677,8 @@ class EventsWorkerStore(SQLBaseStore):
         """
         return self.runInteraction(
             "get_total_state_event_counts",
-            self._get_total_state_event_counts_txn, room_id
+            self._get_total_state_event_counts_txn,
+            room_id,
         )
 
     def _get_current_state_event_counts_txn(self, txn, room_id):
@@ -701,7 +702,8 @@ class EventsWorkerStore(SQLBaseStore):
         """
         return self.runInteraction(
             "get_current_state_event_counts",
-            self._get_current_state_event_counts_txn, room_id
+            self._get_current_state_event_counts_txn,
+            room_id,
         )
 
     @defer.inlineCallbacks

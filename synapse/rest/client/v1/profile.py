@@ -63,8 +63,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
         except Exception:
             defer.returnValue((400, "Unable to parse name"))
 
-        yield self.profile_handler.set_displayname(
-            user, requester, new_name, is_admin)
+        yield self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
         defer.returnValue((200, {}))
 
@@ -113,8 +112,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
         except Exception:
             defer.returnValue((400, "Unable to parse name"))
 
-        yield self.profile_handler.set_avatar_url(
-            user, requester, new_name, is_admin)
+        yield self.profile_handler.set_avatar_url(user, requester, new_name, is_admin)
 
         defer.returnValue((200, {}))
 

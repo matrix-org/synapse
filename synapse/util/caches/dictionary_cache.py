@@ -35,6 +35,7 @@ class DictionaryEntry(namedtuple("DictionaryEntry", ("full", "known_absent", "va
             there.
         value (dict): The full or partial dict value
     """
+
     def __len__(self):
         return len(self.value)
 
@@ -84,13 +85,15 @@ class DictionaryCache(object):
             self.metrics.inc_hits()
 
             if dict_keys is None:
-                return DictionaryEntry(entry.full, entry.known_absent, dict(entry.value))
+                return DictionaryEntry(
+                    entry.full, entry.known_absent, dict(entry.value)
+                )
             else:
-                return DictionaryEntry(entry.full, entry.known_absent, {
-                    k: entry.value[k]
-                    for k in dict_keys
-                    if k in entry.value
-                })
+                return DictionaryEntry(
+                    entry.full,
+                    entry.known_absent,
+                    {k: entry.value[k] for k in dict_keys if k in entry.value},
+                )
 
         self.metrics.inc_misses()
         return DictionaryEntry(False, set(), {})

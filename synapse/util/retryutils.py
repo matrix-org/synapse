@@ -102,7 +102,7 @@ def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs)
             store,
             retry_interval,
             backoff_on_failure=backoff_on_failure,
-            **kwargs
+            **kwargs,
         )
     )
 

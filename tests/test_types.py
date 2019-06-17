@@ -102,7 +102,7 @@ class MapUsernameTestCase(unittest.TestCase):
 
     def testNonAscii(self):
         # this should work with either a unicode or a bytes
-        self.assertEqual(map_username_to_mxid_localpart(u'têst'), "t=c3=aast")
+        self.assertEqual(map_username_to_mxid_localpart("têst"), "t=c3=aast")
         self.assertEqual(
-            map_username_to_mxid_localpart(u'têst'.encode('utf-8')), "t=c3=aast"
+            map_username_to_mxid_localpart("têst".encode("utf-8")), "t=c3=aast"
         )

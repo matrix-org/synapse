@@ -33,9 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReportEventRestServlet(RestServlet):
-    PATTERNS = client_patterns(
-        "/rooms/(?P<room_id>[^/]*)/report/(?P<event_id>[^/]*)$"
-    )
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/report/(?P<event_id>[^/]*)$")
 
     def __init__(self, hs):
         super(ReportEventRestServlet, self).__init__()
