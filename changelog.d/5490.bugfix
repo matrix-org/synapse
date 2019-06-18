@@ -1,0 +1,1 @@
+Fix failure to start under docker with SAML support enabled.
