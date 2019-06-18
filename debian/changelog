@@ -1,3 +1,43 @@
+matrix-synapse-py3 (1.0.0) stable; urgency=medium
+
+  * New synapse release 1.0.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 11 Jun 2019 17:09:53 +0100
+
+matrix-synapse-py3 (0.99.5.2) stable; urgency=medium
+
+  * New synapse release 0.99.5.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 30 May 2019 16:28:07 +0100
+
+matrix-synapse-py3 (0.99.5.1) stable; urgency=medium
+
+  * New synapse release 0.99.5.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 22 May 2019 16:22:24 +0000
+
+matrix-synapse-py3 (0.99.4) stable; urgency=medium
+
+  [ Christoph Müller ]
+  * Configure the systemd units to have a log identifier of `matrix-synapse`
+
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.4.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 15 May 2019 13:58:08 +0100
+
+matrix-synapse-py3 (0.99.3.2) stable; urgency=medium
+
+  * New synapse release 0.99.3.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 18:56:20 +0100
+
+matrix-synapse-py3 (0.99.3.1) stable; urgency=medium
+
+  * New synapse release 0.99.3.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 16:02:43 +0100
+
 matrix-synapse-py3 (0.99.3) stable; urgency=medium
 
   [ Richard van der Hoff ]

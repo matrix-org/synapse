@@ -19,10 +19,9 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import RoomAlias
-
-from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -33,13 +32,14 @@ def register_servlets(hs, http_server):
     ClientAppserviceDirectoryListServer(hs).register(http_server)
 
 
-class ClientDirectoryServer(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/directory/room/(?P<room_alias>[^/]*)$")
+class ClientDirectoryServer(RestServlet):
+    PATTERNS = client_patterns("/directory/room/(?P<room_alias>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(ClientDirectoryServer, self).__init__(hs)
+        super(ClientDirectoryServer, self).__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_alias):
@@ -120,13 +120,14 @@ class ClientDirectoryServer(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class ClientDirectoryListServer(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/directory/list/room/(?P<room_id>[^/]*)$")
+class ClientDirectoryListServer(RestServlet):
+    PATTERNS = client_patterns("/directory/list/room/(?P<room_id>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(ClientDirectoryListServer, self).__init__(hs)
+        super(ClientDirectoryListServer, self).__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -162,15 +163,16 @@ class ClientDirectoryListServer(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class ClientAppserviceDirectoryListServer(ClientV1RestServlet):
-    PATTERNS = client_path_patterns(
-        "/directory/list/appservice/(?P<network_id>[^/]*)/(?P<room_id>[^/]*)$"
+class ClientAppserviceDirectoryListServer(RestServlet):
+    PATTERNS = client_patterns(
+        "/directory/list/appservice/(?P<network_id>[^/]*)/(?P<room_id>[^/]*)$", v1=True
     )
 
     def __init__(self, hs):
-        super(ClientAppserviceDirectoryListServer, self).__init__(hs)
+        super(ClientAppserviceDirectoryListServer, self).__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
+        self.auth = hs.get_auth()
 
     def on_PUT(self, request, network_id, room_id):
         content = parse_json_object_from_request(request)

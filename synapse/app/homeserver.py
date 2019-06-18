@@ -62,6 +62,7 @@ from synapse.python_dependencies import check_requirements
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
+from synapse.rest.admin import AdminRestResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.well_known import WellKnownResource
@@ -180,6 +181,7 @@ class SynapseHomeServer(HomeServer):
                 "/_matrix/client/v2_alpha": client_resource,
                 "/_matrix/client/versions": client_resource,
                 "/.well-known/matrix/client": WellKnownResource(self),
+                "/_synapse/admin": AdminRestResource(self),
             })
 
             if self.get_config().saml2_enabled:
@@ -538,6 +540,7 @@ def run(hs):
         stats["total_room_count"] = room_count
 
         stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
+        stats["monthly_active_users"] = yield hs.get_datastore().count_monthly_users()
         stats["daily_active_rooms"] = yield hs.get_datastore().count_daily_active_rooms()
         stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
 

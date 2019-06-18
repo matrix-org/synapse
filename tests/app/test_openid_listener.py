@@ -25,16 +25,18 @@ from tests.unittest import HomeserverTestCase
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserverToUse=FederationReaderServer,
+            http_client=None, homeserverToUse=FederationReaderServer
         )
         return hs
 
-    @parameterized.expand([
-        (["federation"], "auth_fail"),
-        ([], "no_resource"),
-        (["openid", "federation"], "auth_fail"),
-        (["openid"], "auth_fail"),
-    ])
+    @parameterized.expand(
+        [
+            (["federation"], "auth_fail"),
+            ([], "no_resource"),
+            (["openid", "federation"], "auth_fail"),
+            (["openid"], "auth_fail"),
+        ]
+    )
     def test_openid_listener(self, names, expectation):
         """
         Test different openid listener configurations.
@@ -53,17 +55,14 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]
         try:
-            self.resource = (
-                site.resource.children[b"_matrix"].children[b"federation"]
-            )
+            self.resource = site.resource.children[b"_matrix"].children[b"federation"]
         except KeyError:
             if expectation == "no_resource":
                 return
             raise
 
         request, channel = self.make_request(
-            "GET",
-            "/_matrix/federation/v1/openid/userinfo",
+            "GET", "/_matrix/federation/v1/openid/userinfo"
         )
         self.render(request)
 
@@ -74,16 +73,18 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
 class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserverToUse=SynapseHomeServer,
+            http_client=None, homeserverToUse=SynapseHomeServer
         )
         return hs
 
-    @parameterized.expand([
-        (["federation"], "auth_fail"),
-        ([], "no_resource"),
-        (["openid", "federation"], "auth_fail"),
-        (["openid"], "auth_fail"),
-    ])
+    @parameterized.expand(
+        [
+            (["federation"], "auth_fail"),
+            ([], "no_resource"),
+            (["openid", "federation"], "auth_fail"),
+            (["openid"], "auth_fail"),
+        ]
+    )
     def test_openid_listener(self, names, expectation):
         """
         Test different openid listener configurations.
@@ -102,17 +103,14 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]
         try:
-            self.resource = (
-                site.resource.children[b"_matrix"].children[b"federation"]
-            )
+            self.resource = site.resource.children[b"_matrix"].children[b"federation"]
         except KeyError:
             if expectation == "no_resource":
                 return
             raise
 
         request, channel = self.make_request(
-            "GET",
-            "/_matrix/federation/v1/openid/userinfo",
+            "GET", "/_matrix/federation/v1/openid/userinfo"
         )
         self.render(request)
 

@@ -10,19 +10,19 @@ class TestRatelimiter(unittest.TestCase):
             key="test_id", time_now_s=0, rate_hz=0.1, burst_count=1
         )
         self.assertTrue(allowed)
-        self.assertEquals(10., time_allowed)
+        self.assertEquals(10.0, time_allowed)
 
         allowed, time_allowed = limiter.can_do_action(
             key="test_id", time_now_s=5, rate_hz=0.1, burst_count=1
         )
         self.assertFalse(allowed)
-        self.assertEquals(10., time_allowed)
+        self.assertEquals(10.0, time_allowed)
 
         allowed, time_allowed = limiter.can_do_action(
             key="test_id", time_now_s=10, rate_hz=0.1, burst_count=1
         )
         self.assertTrue(allowed)
-        self.assertEquals(20., time_allowed)
+        self.assertEquals(20.0, time_allowed)
 
     def test_pruning(self):
         limiter = Ratelimiter()

@@ -302,7 +302,7 @@ class ApplicationServiceTransactionWorkerStore(
 
         event_ids = json.loads(entry["event_ids"])
 
-        events = yield self._get_events(event_ids)
+        events = yield self.get_events_as_list(event_ids)
 
         defer.returnValue(
             AppServiceTransaction(service=service, id=entry["txn_id"], events=events)
@@ -358,7 +358,7 @@ class ApplicationServiceTransactionWorkerStore(
             "get_new_events_for_appservice", get_new_events_for_appservice_txn
         )
 
-        events = yield self._get_events(event_ids)
+        events = yield self.get_events_as_list(event_ids)
 
         defer.returnValue((upper_bound, events))
 

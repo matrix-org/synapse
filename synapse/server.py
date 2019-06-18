@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +37,8 @@ from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
+from synapse.events.third_party_rules import ThirdPartyEventRules
+from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
@@ -47,6 +51,7 @@ from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler
 from synapse.handlers import Handlers
+from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
@@ -70,6 +75,7 @@ from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
@@ -137,6 +143,7 @@ class HomeServer(object):
         'acme_handler',
         'auth_handler',
         'device_handler',
+        'stats_handler',
         'e2e_keys_handler',
         'e2e_room_keys_handler',
         'event_handler',
@@ -174,6 +181,7 @@ class HomeServer(object):
         'groups_attestation_renewer',
         'secrets',
         'spam_checker',
+        'third_party_event_rules',
         'room_member_handler',
         'federation_registry',
         'server_notices_manager',
@@ -183,10 +191,13 @@ class HomeServer(object):
         'room_context_handler',
         'sendmail',
         'registration_handler',
+        'account_validity_handler',
+        'event_client_serializer',
     ]
 
     REQUIRED_ON_MASTER_STARTUP = [
         "user_directory_handler",
+        "stats_handler"
     ]
 
     # This is overridden in derived application classes
@@ -470,8 +481,14 @@ class HomeServer(object):
     def build_secrets(self):
         return Secrets()
 
+    def build_stats_handler(self):
+        return StatsHandler(self)
+
     def build_spam_checker(self):
         return SpamChecker(self)
+
+    def build_third_party_event_rules(self):
+        return ThirdPartyEventRules(self)
 
     def build_room_member_handler(self):
         if self.config.worker_app:
@@ -505,6 +522,12 @@ class HomeServer(object):
 
     def build_registration_handler(self):
         return RegistrationHandler(self)
+
+    def build_account_validity_handler(self):
+        return AccountValidityHandler(self)
+
+    def build_event_client_serializer(self):
+        return EventClientSerializer(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

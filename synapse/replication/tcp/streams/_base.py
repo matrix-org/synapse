@@ -32,6 +32,7 @@ BackfillStreamRow = namedtuple("BackfillStreamRow", (
     "type",  # str
     "state_key",  # str, optional
     "redacts",  # str, optional
+    "relates_to",  # str, optional
 ))
 PresenceStreamRow = namedtuple("PresenceStreamRow", (
     "user_id",  # str

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 - 2016 OpenMarket Ltd
-# Copyright 2017 - 2018 New Vector Ltd
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +23,7 @@ from canonicaljson import encode_canonical_json, json
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RelationTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -32,7 +33,6 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import ConsentURIBuilder
-from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.state import StateFilter
@@ -57,6 +57,7 @@ class MessageHandler(object):
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
         self.store = hs.get_datastore()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
@@ -164,9 +165,13 @@ class MessageHandler(object):
                 room_state = room_state[membership_event_id]
 
         now = self.clock.time_msec()
-        defer.returnValue(
-            [serialize_event(c, now) for c in room_state.values()]
+        events = yield self._event_serializer.serialize_events(
+            room_state.values(), now,
+            # We don't bother bundling aggregations in when asked for state
+            # events, as clients won't use them.
+            bundle_aggregations=False,
         )
+        defer.returnValue(events)
 
     @defer.inlineCallbacks
     def get_joined_members(self, requester, room_id):
@@ -228,6 +233,7 @@ class EventCreationHandler(object):
         self.ratelimiter = hs.get_ratelimiter()
         self.notifier = hs.get_notifier()
         self.config = hs.config
+        self.require_membership_for_aliases = hs.config.require_membership_for_aliases
 
         self.send_event_to_master = ReplicationSendEventRestServlet.make_client(hs)
 
@@ -243,6 +249,7 @@ class EventCreationHandler(object):
         self.action_generator = hs.get_action_generator()
 
         self.spam_checker = hs.get_spam_checker()
+        self.third_party_event_rules = hs.get_third_party_event_rules()
 
         self._block_events_without_consent_error = (
             self.config.block_events_without_consent_error
@@ -335,6 +342,35 @@ class EventCreationHandler(object):
             requester=requester,
             prev_events_and_hashes=prev_events_and_hashes,
         )
+
+        # In an ideal world we wouldn't need the second part of this condition. However,
+        # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
+        # behaviour. Another reason is that this code is also evaluated each time a new
+        # m.room.aliases event is created, which includes hitting a /directory route.
+        # Therefore not including this condition here would render the similar one in
+        # synapse.handlers.directory pointless.
+        if builder.type == EventTypes.Aliases and self.require_membership_for_aliases:
+            # Ideally we'd do the membership check in event_auth.check(), which
+            # describes a spec'd algorithm for authenticating events received over
+            # federation as well as those created locally. As of room v3, aliases events
+            # can be created by users that are not in the room, therefore we have to
+            # tolerate them in event_auth.check().
+            prev_state_ids = yield context.get_prev_state_ids(self.store)
+            prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
+            prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+            if not prev_event or prev_event.membership != Membership.JOIN:
+                logger.warning(
+                    ("Attempt to send `m.room.aliases` in room %s by user %s but"
+                     " membership is %s"),
+                    event.room_id,
+                    event.sender,
+                    prev_event.membership if prev_event else None,
+                )
+
+                raise AuthError(
+                    403,
+                    "You must be in the room to create an alias for it",
+                )
 
         self.validator.validate_new(event)
 
@@ -570,6 +606,20 @@ class EventCreationHandler(object):
 
         self.validator.validate_new(event)
 
+        # If this event is an annotation then we check that that the sender
+        # can't annotate the same way twice (e.g. stops users from liking an
+        # event multiple times).
+        relation = event.content.get("m.relates_to", {})
+        if relation.get("rel_type") == RelationTypes.ANNOTATION:
+            relates_to = relation["event_id"]
+            aggregation_key = relation["key"]
+
+            already_exists = yield self.store.has_user_annotated_event(
+                relates_to, event.type, aggregation_key, event.sender,
+            )
+            if already_exists:
+                raise SynapseError(400, "Can't send same reaction twice")
+
         logger.debug(
             "Created event %s",
             event.event_id,
@@ -609,6 +659,14 @@ class EventCreationHandler(object):
             )
         else:
             room_version = yield self.store.get_room_version(event.room_id)
+
+        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event, context,
+        )
+        if not event_allowed:
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN,
+            )
 
         try:
             yield self.auth.check_from_context(room_version, event, context)

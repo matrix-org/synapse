@@ -56,10 +56,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         fake_engine = Mock(wraps=engine)
         fake_engine.can_native_upsert = False
         hs = TestHomeServer(
-            "test",
-            db_pool=self.db_pool,
-            config=config,
-            database_engine=fake_engine,
+            "test", db_pool=self.db_pool, config=config, database_engine=fake_engine
         )
 
         self.datastore = SQLBaseStore(None, hs)

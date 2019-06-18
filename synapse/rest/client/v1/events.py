@@ -19,22 +19,22 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.events.utils import serialize_event
+from synapse.http.servlet import RestServlet
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.streams.config import PaginationConfig
-
-from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class EventStreamRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/events$")
+class EventStreamRestServlet(RestServlet):
+    PATTERNS = client_patterns("/events$", v1=True)
 
     DEFAULT_LONGPOLL_TIME_MS = 30000
 
     def __init__(self, hs):
-        super(EventStreamRestServlet, self).__init__(hs)
+        super(EventStreamRestServlet, self).__init__()
         self.event_stream_handler = hs.get_event_stream_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -77,13 +77,14 @@ class EventStreamRestServlet(ClientV1RestServlet):
 
 
 # TODO: Unit test gets, with and without auth, with different kinds of events.
-class EventRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/events/(?P<event_id>[^/]*)$")
+class EventRestServlet(RestServlet):
+    PATTERNS = client_patterns("/events/(?P<event_id>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(EventRestServlet, self).__init__(hs)
+        super(EventRestServlet, self).__init__()
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def on_GET(self, request, event_id):
@@ -92,7 +93,8 @@ class EventRestServlet(ClientV1RestServlet):
 
         time_now = self.clock.time_msec()
         if event:
-            defer.returnValue((200, serialize_event(event, time_now)))
+            event = yield self._event_serializer.serialize_event(event, time_now)
+            defer.returnValue((200, event))
         else:
             defer.returnValue((404, "Event not found."))
 

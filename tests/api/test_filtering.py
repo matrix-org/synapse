@@ -109,7 +109,6 @@ class FilteringTestCase(unittest.TestCase):
                 "event_format": "client",
                 "event_fields": ["type", "content", "sender"],
             },
-
             # a single backslash should be permitted (though it is debatable whether
             # it should be permitted before anything other than `.`, and what that
             # actually means)

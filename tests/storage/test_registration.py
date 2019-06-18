@@ -116,7 +116,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
             user_id=SUPPORT_USER,
             token="456",
             password_hash=None,
-            user_type=UserTypes.SUPPORT
+            user_type=UserTypes.SUPPORT,
         )
         res = yield self.store.is_support_user(SUPPORT_USER)
         self.assertTrue(res)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd.
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -153,6 +153,25 @@ def concurrently_execute(func, args, limit):
     return logcontext.make_deferred_yieldable(defer.gatherResults([
         run_in_background(_concurrently_execute_inner)
         for _ in range(limit)
+    ], consumeErrors=True)).addErrback(unwrapFirstError)
+
+
+def yieldable_gather_results(func, iter, *args, **kwargs):
+    """Executes the function with each argument concurrently.
+
+    Args:
+        func (func): Function to execute that returns a Deferred
+        iter (iter): An iterable that yields items that get passed as the first
+            argument to the function
+        *args: Arguments to be passed to each call to func
+
+    Returns
+        Deferred[list]: Resolved when all functions have been invoked, or errors if
+        one of the function calls fails.
+    """
+    return logcontext.make_deferred_yieldable(defer.gatherResults([
+        run_in_background(func, item, *args, **kwargs)
+        for item in iter
     ], consumeErrors=True)).addErrback(unwrapFirstError)
 
 

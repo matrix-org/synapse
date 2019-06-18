@@ -4,7 +4,7 @@ This API gets a list of known media in a room.
 
 The API is:
 ```
-GET /_matrix/client/r0/admin/room/<room_id>/media
+GET /_synapse/admin/v1/room/<room_id>/media
 ```
 including an `access_token` of a server admin.
 

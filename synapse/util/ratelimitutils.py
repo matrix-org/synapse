@@ -30,31 +30,14 @@ logger = logging.getLogger(__name__)
 
 
 class FederationRateLimiter(object):
-    def __init__(self, clock, window_size, sleep_limit, sleep_msec,
-                 reject_limit, concurrent_requests):
+    def __init__(self, clock, config):
         """
         Args:
             clock (Clock)
-            window_size (int): The window size in milliseconds.
-            sleep_limit (int): The number of requests received in the last
-                `window_size` milliseconds before we artificially start
-                delaying processing of requests.
-            sleep_msec (int): The number of milliseconds to delay processing
-                of incoming requests by.
-            reject_limit (int): The maximum number of requests that are can be
-                queued for processing before we start rejecting requests with
-                a 429 Too Many Requests response.
-            concurrent_requests (int): The number of concurrent requests to
-                process.
+            config (FederationRateLimitConfig)
         """
         self.clock = clock
-
-        self.window_size = window_size
-        self.sleep_limit = sleep_limit
-        self.sleep_msec = sleep_msec
-        self.reject_limit = reject_limit
-        self.concurrent_requests = concurrent_requests
-
+        self._config = config
         self.ratelimiters = {}
 
     def ratelimit(self, host):
@@ -76,25 +59,25 @@ class FederationRateLimiter(object):
             host,
             _PerHostRatelimiter(
                 clock=self.clock,
-                window_size=self.window_size,
-                sleep_limit=self.sleep_limit,
-                sleep_msec=self.sleep_msec,
-                reject_limit=self.reject_limit,
-                concurrent_requests=self.concurrent_requests,
+                config=self._config,
             )
         ).ratelimit()
 
 
 class _PerHostRatelimiter(object):
-    def __init__(self, clock, window_size, sleep_limit, sleep_msec,
-                 reject_limit, concurrent_requests):
+    def __init__(self, clock, config):
+        """
+        Args:
+            clock (Clock)
+            config (FederationRateLimitConfig)
+        """
         self.clock = clock
 
-        self.window_size = window_size
-        self.sleep_limit = sleep_limit
-        self.sleep_sec = sleep_msec / 1000.0
-        self.reject_limit = reject_limit
-        self.concurrent_requests = concurrent_requests
+        self.window_size = config.window_size
+        self.sleep_limit = config.sleep_limit
+        self.sleep_sec = config.sleep_delay / 1000.0
+        self.reject_limit = config.reject_limit
+        self.concurrent_requests = config.concurrent
 
         # request_id objects for requests which have been slept
         self.sleeping_requests = set()

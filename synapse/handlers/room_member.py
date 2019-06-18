@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +33,8 @@ from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +72,15 @@ class RoomMemberHandler(object):
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
+        self.third_party_event_rules = hs.get_third_party_event_rules()
         self._server_notices_mxid = self.config.server_notices_mxid
         self._enable_lookup = hs.config.enable_3pid_lookup
+        self.allow_per_room_profiles = self.config.allow_per_room_profiles
+
+        # This is only used to get at ratelimit function, and
+        # maybe_kick_guest_users. It's fine there are multiple of these as
+        # it doesn't store state.
+        self.base_handler = BaseHandler(hs)
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -349,6 +359,13 @@ class RoomMemberHandler(object):
             # We do a copy here as we potentially change some keys
             # later on.
             content = dict(content)
+
+        if not self.allow_per_room_profiles:
+            # Strip profile data, knowing that new profile data will be added to the
+            # event's content in event_creation_handler.create_event() using the target's
+            # global profile.
+            content.pop("displayname", None)
+            content.pop("avatar_url", None)
 
         effective_membership_state = action
         if action in ["kick", "unban"]:
@@ -703,6 +720,19 @@ class RoomMemberHandler(object):
                     Codes.FORBIDDEN,
                 )
 
+        # We need to rate limit *before* we send out any 3PID invites, so we
+        # can't just rely on the standard ratelimiting of events.
+        yield self.base_handler.ratelimit(requester)
+
+        can_invite = yield self.third_party_event_rules.check_threepid_can_be_invited(
+            medium, address, room_id,
+        )
+        if not can_invite:
+            raise SynapseError(
+                403, "This third-party identifier can not be invited in this room",
+                Codes.FORBIDDEN,
+            )
+
         invitee = yield self._lookup_3pid(
             id_server, medium, address
         )
@@ -924,7 +954,7 @@ class RoomMemberHandler(object):
         }
 
         if self.config.invite_3pid_guest:
-            guest_access_token, guest_user_id = yield self.get_or_register_3pid_guest(
+            guest_user_id, guest_access_token = yield self.get_or_register_3pid_guest(
                 requester=requester,
                 medium=medium,
                 address=address,

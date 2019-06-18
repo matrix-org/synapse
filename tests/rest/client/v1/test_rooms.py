@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,8 +23,9 @@ from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer
 
+import synapse.rest.admin
 from synapse.api.constants import Membership
-from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v1 import login, profile, room
 
 from tests import unittest
 
@@ -803,7 +805,7 @@ class RoomMessageListTestCase(RoomBase):
 
 class RoomSearchTestCase(unittest.HomeserverTestCase):
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
@@ -903,3 +905,102 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             context["profile_info"][self.other_user_id]["displayname"], "otheruser"
         )
+
+
+class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+
+        self.url = b"/_matrix/client/r0/publicRooms"
+
+        config = self.default_config()
+        config["restrict_public_rooms_to_local_users"] = True
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def test_restricted_no_auth(self):
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
+        self.assertEqual(channel.code, 401, channel.result)
+
+    def test_restricted_auth(self):
+        self.register_user("user", "pass")
+        tok = self.login("user", "pass")
+
+        request, channel = self.make_request("GET", self.url, access_token=tok)
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+
+class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+        profile.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config["allow_per_room_profiles"] = False
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def prepare(self, reactor, clock, homeserver):
+        self.user_id = self.register_user("test", "test")
+        self.tok = self.login("test", "test")
+
+        # Set a profile for the test user
+        self.displayname = "test user"
+        data = {
+            "displayname": self.displayname,
+        }
+        request_data = json.dumps(data)
+        request, channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/profile/%s/displayname" % (self.user_id,),
+            request_data,
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+
+    def test_per_room_profile_forbidden(self):
+        data = {
+            "membership": "join",
+            "displayname": "other test user"
+        }
+        request_data = json.dumps(data)
+        request, channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (
+                self.room_id, self.user_id,
+            ),
+            request_data,
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+        event_id = channel.json_body["event_id"]
+
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        res_displayname = channel.json_body["content"]["displayname"]
+        self.assertEqual(res_displayname, self.displayname, channel.result)

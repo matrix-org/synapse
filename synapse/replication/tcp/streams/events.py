@@ -80,11 +80,12 @@ class BaseEventsStreamRow(object):
 class EventsStreamEventRow(BaseEventsStreamRow):
     TypeId = "ev"
 
-    event_id = attr.ib()   # str
-    room_id = attr.ib()    # str
-    type = attr.ib()       # str
-    state_key = attr.ib()  # str, optional
-    redacts = attr.ib()    # str, optional
+    event_id = attr.ib()    # str
+    room_id = attr.ib()     # str
+    type = attr.ib()        # str
+    state_key = attr.ib()   # str, optional
+    redacts = attr.ib()     # str, optional
+    relates_to = attr.ib()  # str, optional
 
 
 @attr.s(slots=True, frozen=True)

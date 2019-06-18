@@ -12,7 +12,7 @@ is not enabled.
 
 To fetch the nonce, you need to request one from the API::
 
-  > GET /_matrix/client/r0/admin/register
+  > GET /_synapse/admin/v1/register
 
   < {"nonce": "thisisanonce"}
 
@@ -22,7 +22,7 @@ body containing the nonce, username, password, whether they are an admin
 
 As an example::
 
-  > POST /_matrix/client/r0/admin/register
+  > POST /_synapse/admin/v1/register
   > {
      "nonce": "thisisanonce",
      "username": "pepper_roni",

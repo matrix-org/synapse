@@ -261,6 +261,23 @@ BASE_APPEND_OVERRIDE_RULES = [
                 'value': True,
             }
         ]
+    },
+    {
+        'rule_id': 'global/override/.m.rule.tombstone',
+        'conditions': [
+            {
+                'kind': 'event_match',
+                'key': 'type',
+                'pattern': 'm.room.tombstone',
+                '_id': '_tombstone',
+            }
+        ],
+        'actions': [
+            'notify', {
+                'set_tweak': 'highlight',
+                'value': True,
+            }
+        ]
     }
 ]
 

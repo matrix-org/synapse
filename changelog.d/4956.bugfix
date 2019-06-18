@@ -1,1 +1,0 @@
-Fix sync bug which made accepting invites unreliable in worker-mode synapses.

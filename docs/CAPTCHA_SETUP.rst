@@ -7,6 +7,7 @@ Requires a public/private key pair from:
 
 https://developers.google.com/recaptcha/
 
+Must be a reCAPTCHA v2 key using the "I'm not a robot" Checkbox option
 
 Setting ReCaptcha Keys
 ----------------------

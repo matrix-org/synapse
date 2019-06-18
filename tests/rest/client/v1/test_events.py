@@ -17,7 +17,8 @@
 
 from mock import Mock, NonCallableMock
 
-from synapse.rest.client.v1 import admin, events, login, room
+import synapse.rest.admin
+from synapse.rest.client.v1 import events, login, room
 
 from tests import unittest
 
@@ -28,16 +29,16 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
     servlets = [
         events.register_servlets,
         room.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.enable_registration_captcha = False
-        config.enable_registration = True
-        config.auto_join_rooms = []
+        config["enable_registration_captcha"] = False
+        config["enable_registration"] = True
+        config["auto_join_rooms"] = []
 
         hs = self.setup_test_homeserver(
             config=config, ratelimiter=NonCallableMock(spec_set=["can_do_action"])

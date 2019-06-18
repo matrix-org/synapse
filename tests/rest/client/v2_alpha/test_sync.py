@@ -15,7 +15,8 @@
 
 from mock import Mock
 
-from synapse.rest.client.v1 import admin, login, room
+import synapse.rest.admin
+from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import sync
 
 from tests import unittest
@@ -72,7 +73,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
 class SyncTypingTests(unittest.HomeserverTestCase):
 
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
         sync.register_servlets,

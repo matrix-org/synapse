@@ -223,9 +223,6 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
            the signatures are valid, or fail (with a SynapseError) if not.
     """
 
-    # (currently this is written assuming the v1 room structure; we'll probably want a
-    # separate function for checking v2 rooms)
-
     # we want to check that the event is signed by:
     #
     # (a) the sender's server
@@ -257,6 +254,10 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
         for p in pdus
     ]
 
+    v = KNOWN_ROOM_VERSIONS.get(room_version)
+    if not v:
+        raise RuntimeError("Unrecognized room version %s" % (room_version,))
+
     # First we check that the sender event is signed by the sender's domain
     # (except if its a 3pid invite, in which case it may be sent by any server)
     pdus_to_check_sender = [
@@ -264,34 +265,66 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
         if not _is_invite_via_3pid(p.pdu)
     ]
 
-    more_deferreds = keyring.verify_json_objects_for_server([
-        (p.sender_domain, p.redacted_pdu_json)
-        for p in pdus_to_check_sender
-    ])
+    more_deferreds = keyring.verify_json_objects_for_server(
+        [
+            (
+                p.sender_domain,
+                p.redacted_pdu_json,
+                p.pdu.origin_server_ts if v.enforce_key_validity else 0,
+                p.pdu.event_id,
+            )
+            for p in pdus_to_check_sender
+        ]
+    )
+
+    def sender_err(e, pdu_to_check):
+        errmsg = "event id %s: unable to verify signature for sender %s: %s" % (
+            pdu_to_check.pdu.event_id,
+            pdu_to_check.sender_domain,
+            e.getErrorMessage(),
+        )
+        # XX not really sure if these are the right codes, but they are what
+        # we've done for ages
+        raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
 
     for p, d in zip(pdus_to_check_sender, more_deferreds):
+        d.addErrback(sender_err, p)
         p.deferreds.append(d)
 
     # now let's look for events where the sender's domain is different to the
     # event id's domain (normally only the case for joins/leaves), and add additional
     # checks. Only do this if the room version has a concept of event ID domain
     # (ie, the room version uses old-style non-hash event IDs).
-    v = KNOWN_ROOM_VERSIONS.get(room_version)
-    if not v:
-        raise RuntimeError("Unrecognized room version %s" % (room_version,))
-
     if v.event_format == EventFormatVersions.V1:
         pdus_to_check_event_id = [
             p for p in pdus_to_check
             if p.sender_domain != get_domain_from_id(p.pdu.event_id)
         ]
 
-        more_deferreds = keyring.verify_json_objects_for_server([
-            (get_domain_from_id(p.pdu.event_id), p.redacted_pdu_json)
-            for p in pdus_to_check_event_id
-        ])
+        more_deferreds = keyring.verify_json_objects_for_server(
+            [
+                (
+                    get_domain_from_id(p.pdu.event_id),
+                    p.redacted_pdu_json,
+                    p.pdu.origin_server_ts if v.enforce_key_validity else 0,
+                    p.pdu.event_id,
+                )
+                for p in pdus_to_check_event_id
+            ]
+        )
+
+        def event_err(e, pdu_to_check):
+            errmsg = (
+                "event id %s: unable to verify signature for event id domain: %s" % (
+                    pdu_to_check.pdu.event_id,
+                    e.getErrorMessage(),
+                )
+            )
+            # XX as above: not really sure if these are the right codes
+            raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
 
         for p, d in zip(pdus_to_check_event_id, more_deferreds):
+            d.addErrback(event_err, p)
             p.deferreds.append(d)
 
     # replace lists of deferreds with single Deferreds
