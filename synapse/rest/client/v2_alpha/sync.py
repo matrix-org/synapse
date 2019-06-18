@@ -32,7 +32,7 @@ from synapse.handlers.sync import SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.types import StreamToken
 
-from ._base import client_v2_patterns, set_timeline_upper_limit
+from ._base import client_patterns, set_timeline_upper_limit
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class SyncRestServlet(RestServlet):
         }
     """
 
-    PATTERNS = client_v2_patterns("/sync$")
+    PATTERNS = client_patterns("/sync$")
     ALLOWED_PRESENCE = set(["online", "offline", "unavailable"])
 
     def __init__(self, hs):
@@ -358,6 +358,9 @@ class SyncRestServlet(RestServlet):
         def serialize(events):
             return self._event_serializer.serialize_events(
                 events, time_now=time_now,
+                # We don't bundle "live" events, as otherwise clients
+                # will end up double counting annotations.
+                bundle_aggregations=False,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,

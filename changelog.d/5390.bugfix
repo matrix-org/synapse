@@ -1,0 +1,1 @@
+Fix handling of failures fetching remote content to not log failures as exceptions.

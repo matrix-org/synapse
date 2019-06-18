@@ -330,12 +330,13 @@ class EventClientSerializer(object):
         )
 
     @defer.inlineCallbacks
-    def serialize_event(self, event, time_now, **kwargs):
+    def serialize_event(self, event, time_now, bundle_aggregations=True, **kwargs):
         """Serializes a single event.
 
         Args:
             event (EventBase)
             time_now (int): The current time in milliseconds
+            bundle_aggregations (bool): Whether to bundle in related events
             **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
@@ -350,7 +351,7 @@ class EventClientSerializer(object):
 
         # If MSC1849 is enabled then we need to look if thre are any relations
         # we need to bundle in with the event
-        if self.experimental_msc1849_support_enabled:
+        if self.experimental_msc1849_support_enabled and bundle_aggregations:
             annotations = yield self.store.get_aggregation_groups_for_event(
                 event_id,
             )

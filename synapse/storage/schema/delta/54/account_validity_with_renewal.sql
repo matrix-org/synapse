@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 
+-- We previously changed the schema for this table without renaming the file, which means
+-- that some databases might still be using the old schema. This ensures Synapse uses the
+-- right schema for the table.
 DROP TABLE IF EXISTS account_validity;
 
 -- Track what users are in public rooms.

@@ -583,30 +583,42 @@ class SyncHandler(object):
         )
 
         # if the room has a name or canonical_alias set, we can skip
-        # calculating heroes.  we assume that if the event has contents, it'll
-        # be a valid name or canonical_alias - i.e. we're checking that they
-        # haven't been "deleted" by blatting {} over the top.
+        # calculating heroes. Empty strings are falsey, so we check
+        # for the "name" value and default to an empty string.
         if name_id:
             name = yield self.store.get_event(name_id, allow_none=True)
-            if name and name.content:
+            if name and name.content.get("name"):
                 defer.returnValue(summary)
 
         if canonical_alias_id:
             canonical_alias = yield self.store.get_event(
                 canonical_alias_id, allow_none=True,
             )
-            if canonical_alias and canonical_alias.content:
+            if canonical_alias and canonical_alias.content.get("alias"):
                 defer.returnValue(summary)
 
+        me = sync_config.user.to_string()
+
         joined_user_ids = [
-            r[0] for r in details.get(Membership.JOIN, empty_ms).members
+            r[0]
+            for r in details.get(Membership.JOIN, empty_ms).members
+            if r[0] != me
         ]
         invited_user_ids = [
-            r[0] for r in details.get(Membership.INVITE, empty_ms).members
+            r[0]
+            for r in details.get(Membership.INVITE, empty_ms).members
+            if r[0] != me
         ]
         gone_user_ids = (
-            [r[0] for r in details.get(Membership.LEAVE, empty_ms).members] +
-            [r[0] for r in details.get(Membership.BAN, empty_ms).members]
+            [
+                r[0]
+                for r in details.get(Membership.LEAVE, empty_ms).members
+                if r[0] != me
+            ] + [
+                r[0]
+                for r in details.get(Membership.BAN, empty_ms).members
+                if r[0] != me
+            ]
         )
 
         # FIXME: only build up a member_ids list for our heroes
@@ -621,22 +633,13 @@ class SyncHandler(object):
                 member_ids[user_id] = event_id
 
         # FIXME: order by stream ordering rather than as returned by SQL
-        me = sync_config.user.to_string()
         if (joined_user_ids or invited_user_ids):
             summary['m.heroes'] = sorted(
-                [
-                    user_id
-                    for user_id in (joined_user_ids + invited_user_ids)
-                    if user_id != me
-                ]
+                [user_id for user_id in (joined_user_ids + invited_user_ids)]
             )[0:5]
         else:
             summary['m.heroes'] = sorted(
-                [
-                    user_id
-                    for user_id in gone_user_ids
-                    if user_id != me
-                ]
+                [user_id for user_id in gone_user_ids]
             )[0:5]
 
         if not sync_config.filter_collection.lazy_load_members():

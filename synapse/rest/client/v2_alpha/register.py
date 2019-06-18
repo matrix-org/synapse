@@ -43,7 +43,7 @@ from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
 
-from ._base import client_v2_patterns, interactive_auth_handler
+from ._base import client_patterns, interactive_auth_handler
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
 # exist. It's a _really minor_ security flaw to use plain string comparison
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmailRegisterRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register/email/requestToken$")
+    PATTERNS = client_patterns("/register/email/requestToken$")
 
     def __init__(self, hs):
         """
@@ -98,7 +98,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register/msisdn/requestToken$")
+    PATTERNS = client_patterns("/register/msisdn/requestToken$")
 
     def __init__(self, hs):
         """
@@ -142,7 +142,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register/available")
+    PATTERNS = client_patterns("/register/available")
 
     def __init__(self, hs):
         """
@@ -182,7 +182,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
 
 class RegisterRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register$")
+    PATTERNS = client_patterns("/register$")
 
     def __init__(self, hs):
         """

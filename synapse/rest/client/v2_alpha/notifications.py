@@ -20,13 +20,13 @@ from twisted.internet import defer
 from synapse.events.utils import format_event_for_client_v2_without_room_id
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationsServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/notifications$")
+    PATTERNS = client_patterns("/notifications$")
 
     def __init__(self, hs):
         super(NotificationsServlet, self).__init__()

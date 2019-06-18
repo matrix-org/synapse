@@ -69,7 +69,7 @@ An empty body may be passed for backwards compatibility.
 Reset password
 ==============
 
-Changes the password of another user.
+Changes the password of another user. This will automatically log the user out of all their devices.
 
 The api is::
 

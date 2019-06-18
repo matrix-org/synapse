@@ -16,18 +16,19 @@
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 from twisted.internet import defer
 
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
 
-from .base import ClientV1RestServlet, client_path_patterns
 
-
-class ProfileDisplaynameRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/displayname")
+class ProfileDisplaynameRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
 
     def __init__(self, hs):
-        super(ProfileDisplaynameRestServlet, self).__init__(hs)
+        super(ProfileDisplaynameRestServlet, self).__init__()
+        self.hs = hs
         self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -71,12 +72,14 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         return (200, {})
 
 
-class ProfileAvatarURLRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/avatar_url")
+class ProfileAvatarURLRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/avatar_url", v1=True)
 
     def __init__(self, hs):
-        super(ProfileAvatarURLRestServlet, self).__init__(hs)
+        super(ProfileAvatarURLRestServlet, self).__init__()
+        self.hs = hs
         self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -119,12 +122,14 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         return (200, {})
 
 
-class ProfileRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)")
+class ProfileRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)", v1=True)
 
     def __init__(self, hs):
-        super(ProfileRestServlet, self).__init__(hs)
+        super(ProfileRestServlet, self).__init__()
+        self.hs = hs
         self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):

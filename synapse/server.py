@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +37,7 @@ from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
+from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
@@ -178,6 +181,7 @@ class HomeServer(object):
         'groups_attestation_renewer',
         'secrets',
         'spam_checker',
+        'third_party_event_rules',
         'room_member_handler',
         'federation_registry',
         'server_notices_manager',
@@ -482,6 +486,9 @@ class HomeServer(object):
 
     def build_spam_checker(self):
         return SpamChecker(self)
+
+    def build_third_party_event_rules(self):
+        return ThirdPartyEventRules(self)
 
     def build_room_member_handler(self):
         if self.config.worker_app:

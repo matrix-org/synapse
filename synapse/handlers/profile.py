@@ -15,12 +15,15 @@
 
 import logging
 
+from six import raise_from
+
 from twisted.internet import defer
 
 from synapse.api.errors import (
     AuthError,
-    CodeMessageException,
     Codes,
+    HttpResponseException,
+    RequestSendFailed,
     StoreError,
     SynapseError,
 )
@@ -30,6 +33,9 @@ from synapse.types import UserID, get_domain_from_id
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
+
+MAX_DISPLAYNAME_LEN = 100
+MAX_AVATAR_URL_LEN = 1000
 
 
 class BaseProfileHandler(BaseHandler):
@@ -82,10 +88,10 @@ class BaseProfileHandler(BaseHandler):
                     ignore_backoff=True,
                 )
                 defer.returnValue(result)
-            except CodeMessageException as e:
-                if e.code != 404:
-                    logger.exception("Failed to get displayname")
-                raise
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
 
     @defer.inlineCallbacks
     def get_profile_from_cache(self, user_id):
@@ -139,10 +145,10 @@ class BaseProfileHandler(BaseHandler):
                     },
                     ignore_backoff=True,
                 )
-            except CodeMessageException as e:
-                if e.code != 404:
-                    logger.exception("Failed to get displayname")
-                raise
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
 
             defer.returnValue(result["displayname"])
 
@@ -161,6 +167,11 @@ class BaseProfileHandler(BaseHandler):
 
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
+
+        if len(new_displayname) > MAX_DISPLAYNAME_LEN:
+            raise SynapseError(
+                400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN, ),
+            )
 
         if new_displayname == '':
             new_displayname = None
@@ -200,10 +211,10 @@ class BaseProfileHandler(BaseHandler):
                     },
                     ignore_backoff=True,
                 )
-            except CodeMessageException as e:
-                if e.code != 404:
-                    logger.exception("Failed to get avatar_url")
-                raise
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
 
             defer.returnValue(result["avatar_url"])
 
@@ -216,6 +227,11 @@ class BaseProfileHandler(BaseHandler):
 
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
+
+        if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
+            raise SynapseError(
+                400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN, ),
+            )
 
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url

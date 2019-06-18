@@ -14,7 +14,7 @@ This image is designed to run either with an automatically generated
 configuration file or with a custom configuration that requires manual editing.
 
 An easy way to make use of this image is via docker-compose. See the
-[contrib/docker](../contrib/docker) section of the synapse project for
+[contrib/docker](https://github.com/matrix-org/synapse/tree/master/contrib/docker) section of the synapse project for
 examples.
 
 ### Without Compose (harder)
@@ -161,7 +161,7 @@ specify values for `SYNAPSE_CONFIG_PATH`, `SYNAPSE_SERVER_NAME` and
 example:
 
 ```
-docker run -it --rm
+docker run -it --rm \
     --mount type=volume,src=synapse-data,dst=/data \
     -e SYNAPSE_CONFIG_PATH=/data/homeserver.yaml \
     -e SYNAPSE_SERVER_NAME=my.matrix.host \

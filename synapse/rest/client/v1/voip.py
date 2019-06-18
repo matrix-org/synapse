@@ -19,11 +19,17 @@ import hmac
 
 from twisted.internet import defer
 
-from .base import ClientV1RestServlet, client_path_patterns
+from synapse.http.servlet import RestServlet
+from synapse.rest.client.v2_alpha._base import client_patterns
 
 
-class VoipRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/voip/turnServer$")
+class VoipRestServlet(RestServlet):
+    PATTERNS = client_patterns("/voip/turnServer$", v1=True)
+
+    def __init__(self, hs):
+        super(VoipRestServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):

@@ -20,6 +20,7 @@ import os.path
 
 from netaddr import IPSet
 
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.python_dependencies import DependencyException, check_requirements
 
@@ -34,6 +35,8 @@ logger = logging.Logger(__name__)
 # We later check for errors when binding to 0.0.0.0 and ignore them if :: is also in
 # in the list.
 DEFAULT_BIND_ADDRESSES = ['::', '0.0.0.0']
+
+DEFAULT_ROOM_VERSION = "4"
 
 
 class ServerConfig(Config):
@@ -87,6 +90,22 @@ class ServerConfig(Config):
         self.restrict_public_rooms_to_local_users = config.get(
             "restrict_public_rooms_to_local_users", False,
         )
+
+        default_room_version = config.get(
+            "default_room_version", DEFAULT_ROOM_VERSION,
+        )
+
+        # Ensure room version is a str
+        default_room_version = str(default_room_version)
+
+        if default_room_version not in KNOWN_ROOM_VERSIONS:
+            raise ConfigError(
+                "Unknown default_room_version: %s, known room versions: %s" %
+                (default_room_version, list(KNOWN_ROOM_VERSIONS.keys()))
+            )
+
+        # Get the actual room version object rather than just the identifier
+        self.default_room_version = KNOWN_ROOM_VERSIONS[default_room_version]
 
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
@@ -316,6 +335,10 @@ class ServerConfig(Config):
             unsecure_port = 8008
 
         pid_file = os.path.join(data_dir_path, "homeserver.pid")
+
+        # Bring DEFAULT_ROOM_VERSION into the local-scope for use in the
+        # default config string
+        default_room_version = DEFAULT_ROOM_VERSION
         return """\
         ## Server ##
 
@@ -389,6 +412,16 @@ class ServerConfig(Config):
         # homeserver to fetch it via federation. Defaults to 'false'.
         #
         #restrict_public_rooms_to_local_users: true
+
+        # The default room version for newly created rooms.
+        #
+        # Known room versions are listed here:
+        # https://matrix.org/docs/spec/#complete-list-of-room-versions
+        #
+        # For example, for room version 1, default_room_version should be set
+        # to "1".
+        #
+        #default_room_version: "%(default_room_version)s"
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
@@ -557,6 +590,22 @@ class ServerConfig(Config):
         #hs_disabled_limit_type: 'error code(str), to help clients decode reason'
 
         # Monthly Active User Blocking
+        #
+        # Used in cases where the admin or server owner wants to limit to the
+        # number of monthly active users.
+        #
+        # 'limit_usage_by_mau' disables/enables monthly active user blocking. When
+        # anabled and a limit is reached the server returns a 'ResourceLimitError'
+        # with error type Codes.RESOURCE_LIMIT_EXCEEDED
+        #
+        # 'max_mau_value' is the hard limit of monthly active users above which
+        # the server will start blocking user actions.
+        #
+        # 'mau_trial_days' is a means to add a grace period for active users. It
+        # means that users must be active for this number of days before they
+        # can be considered active and guards against the case where lots of users
+        # sign up in a short space of time never to return after their initial
+        # session.
         #
         #limit_usage_by_mau: False
         #max_mau_value: 50

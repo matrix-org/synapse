@@ -17,7 +17,7 @@
 import logging
 from io import BytesIO
 
-from six import text_type
+from six import raise_from, text_type
 from six.moves import urllib
 
 import treq
@@ -542,10 +542,15 @@ class SimpleHttpClient(object):
             length = yield make_deferred_yieldable(
                 _readBodyToFile(response, output_stream, max_size)
             )
+        except SynapseError:
+            # This can happen e.g. because the body is too large.
+            raise
         except Exception as e:
-            logger.exception("Failed to download body")
-            raise SynapseError(
-                502, ("Failed to download remote body: %s" % e), Codes.UNKNOWN
+            raise_from(
+                SynapseError(
+                    502, ("Failed to download remote body: %s" % e),
+                ),
+                e
             )
 
         defer.returnValue(

@@ -122,6 +122,9 @@ class EventStreamHandler(BaseHandler):
 
             chunks = yield self._event_serializer.serialize_events(
                 events, time_now, as_client_event=as_client_event,
+                # We don't bundle "live" events, as otherwise clients
+                # will end up double counting annotations.
+                bundle_aggregations=False,
             )
 
             chunk = {

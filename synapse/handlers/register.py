@@ -531,6 +531,8 @@ class RegistrationHandler(BaseHandler):
             A tuple of (user_id, access_token).
         Raises:
             RegistrationError if there was a problem registering.
+
+        NB this is only used in tests. TODO: move it to the test package!
         """
         if localpart is None:
             raise SynapseError(400, "Request must include user id")
