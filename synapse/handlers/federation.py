@@ -513,7 +513,7 @@ class FederationHandler(BaseHandler):
             # the case of `get_missing_events` not returning the necessary
             # events anyway, it is safe to simply log the error and continue.
             logger.warn(
-                "[%s %s]: Failed to get prev_events for %s: %s",
+                "[%s %s]: Failed to get prev_events: %s",
                 room_id, event_id, e,
             )
             return
