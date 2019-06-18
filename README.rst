@@ -341,7 +341,7 @@ a few seconds to execute. Please let us know at #synapse:matrix.org if
 you see this failure mode so we can help debug it, however.
 
 Help!! Synapse is slow and eats all my RAM/CPU!
-===============================================
+-----------------------------------------------
 
 First, ensure you are running the latest version of Synapse, using Python 3
 with a PostgreSQL database.
