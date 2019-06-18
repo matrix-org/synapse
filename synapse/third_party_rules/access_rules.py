@@ -105,6 +105,9 @@ class RoomAccessRules(object):
         # If there's no rules event in the initial state, create one with the default
         # setting.
         if not rules_in_initial_state:
+            if not config.get("initial_state"):
+                config["initial_state"] = []
+
             config["initial_state"].append({
                 "type": ACCESS_RULES_TYPE,
                 "state_key": "",
@@ -246,6 +249,8 @@ class RoomAccessRules(object):
         """
         # "restricted" currently means that users can only invite users if their server is
         # included in a limited list of domains.
+        if event.type != EventTypes.Member and event.type != EventTypes.ThirdPartyInvite:
+            return True
         invitee_domain = DomainRuleChecker._get_domain_from_id(event.state_key)
         return invitee_domain not in self.domains_forbidden_when_restricted
 
