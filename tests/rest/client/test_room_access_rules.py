@@ -22,10 +22,10 @@ from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 from synapse.third_party_rules.access_rules import (
-    ACCESS_RULES_TYPE,
     ACCESS_RULE_DIRECT,
     ACCESS_RULE_RESTRICTED,
     ACCESS_RULE_UNRESTRICTED,
+    ACCESS_RULES_TYPE,
 )
 
 from tests import unittest
