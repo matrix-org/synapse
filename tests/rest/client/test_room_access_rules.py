@@ -16,6 +16,11 @@
 
 import json
 
+from mock import Mock
+
+from twisted.internet import defer
+
+from synapse.federation.federation_base import event_from_pdu_json
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.third_party_rules.access_rules import (
@@ -49,7 +54,18 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
             }
         }
 
-        self.hs = self.setup_test_homeserver(config=config)
+        def send_invite(destination, room_id, event_id, pdu):
+            return defer.succeed(pdu)
+
+        federation_client = Mock(spec=[
+            "send_invite",
+        ])
+        federation_client.send_invite.side_effect = send_invite
+
+        self.hs = self.setup_test_homeserver(
+            config=config,
+            federation_client=federation_client,
+        )
 
         return self.hs
 
@@ -60,6 +76,16 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
         self.restricted_room = self.create_room()
         self.unrestricted_room = self.create_room(rule=ACCESS_RULE_UNRESTRICTED)
         self.direct_room = self.create_room(direct=True)
+
+        self.invitee_id = self.register_user("invitee", "test")
+        self.invitee_tok = self.login("invitee", "test")
+
+        self.helper.invite(
+            room=self.direct_room,
+            src=self.user_id,
+            targ=self.invitee_id,
+            tok=self.tok,
+        )
 
     def test_create_room_no_rule(self):
         """Tests that creating a room with no rule will set the default value."""
@@ -92,7 +118,81 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
         """
         self.create_room(direct=True, rule=ACCESS_RULE_RESTRICTED, expected_code=400)
 
-    # def test_limited
+    def test_restricted(self):
+        """Tests that in restricted mode we're unable to invite users from blacklisted
+        servers but can invite other users.
+        """
+        self.helper.invite(
+            room=self.restricted_room,
+            src=self.user_id,
+            targ="@test:forbidden_domain",
+            tok=self.tok,
+            expect_code=403,
+        )
+
+        self.helper.invite(
+            room=self.restricted_room,
+            src=self.user_id,
+            targ="@test:not_forbidden_domain",
+            tok=self.tok,
+            expect_code=200,
+        )
+
+    def test_direct(self):
+        """Tests that, in direct mode, other users than the initial two can't be invited,
+        but the following scenario works:
+          * invited user joins the room
+          * invited user leaves the room
+          * room creator re-invites invited user
+        """
+        self.helper.invite(
+            room=self.direct_room,
+            src=self.user_id,
+            targ="@not_invited:test",
+            tok=self.tok,
+            expect_code=403,
+        )
+
+        self.helper.join(
+            room=self.direct_room,
+            user=self.invitee_id,
+            tok=self.invitee_tok,
+            expect_code=200,
+        )
+
+        self.helper.leave(
+            room=self.direct_room,
+            user=self.invitee_id,
+            tok=self.invitee_tok,
+            expect_code=200,
+        )
+
+        self.helper.invite(
+            room=self.direct_room,
+            src=self.user_id,
+            targ=self.invitee_id,
+            tok=self.tok,
+            expect_code=200,
+        )
+
+    def test_unrestricted(self):
+        """Tests that, in unrestricted mode, we can invite whoever we want.
+        """
+        self.helper.invite(
+            room=self.unrestricted_room,
+            src=self.user_id,
+            targ="@test:forbidden_domain",
+            tok=self.tok,
+            expect_code=200,
+        )
+
+        self.helper.invite(
+            room=self.unrestricted_room,
+            src=self.user_id,
+            targ="@test:not_forbidden_domain",
+            tok=self.tok,
+            expect_code=200,
+        )
 
     def create_room(self, direct=False, rule=None, expected_code=200):
         content = {
