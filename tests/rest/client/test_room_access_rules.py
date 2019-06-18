@@ -20,7 +20,6 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.federation.federation_base import event_from_pdu_json
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.third_party_rules.access_rules import (
