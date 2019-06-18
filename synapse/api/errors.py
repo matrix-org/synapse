@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd.
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,6 +60,7 @@ class Codes(object):
     UNSUPPORTED_ROOM_VERSION = "M_UNSUPPORTED_ROOM_VERSION"
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
     WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
+    EXPIRED_ACCOUNT = "ORG_MATRIX_EXPIRED_ACCOUNT"
 
 
 class CodeMessageException(RuntimeError):
@@ -327,9 +328,32 @@ class RoomKeysVersionError(SynapseError):
         self.current_version = current_version
 
 
-class IncompatibleRoomVersionError(SynapseError):
-    """A server is trying to join a room whose version it does not support."""
+class UnsupportedRoomVersionError(SynapseError):
+    """The client's request to create a room used a room version that the server does
+    not support."""
+    def __init__(self):
+        super(UnsupportedRoomVersionError, self).__init__(
+            code=400,
+            msg="Homeserver does not support this room version",
+            errcode=Codes.UNSUPPORTED_ROOM_VERSION,
+        )
 
+
+class ThreepidValidationError(SynapseError):
+    """An error raised when there was a problem authorising an event."""
+
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.FORBIDDEN
+        super(ThreepidValidationError, self).__init__(*args, **kwargs)
+
+
+class IncompatibleRoomVersionError(SynapseError):
+    """A server is trying to join a room whose version it does not support.
+
+    Unlike UnsupportedRoomVersionError, it is specific to the case of the make_join
+    failing.
+    """
     def __init__(self, room_version):
         super(IncompatibleRoomVersionError, self).__init__(
             code=400,

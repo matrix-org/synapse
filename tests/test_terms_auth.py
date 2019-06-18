@@ -59,7 +59,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
         for flow in channel.json_body["flows"]:
             self.assertIsInstance(flow["stages"], list)
             self.assertTrue(len(flow["stages"]) > 0)
-            self.assertEquals(flow["stages"][-1], "m.login.terms")
+            self.assertTrue("m.login.terms" in flow["stages"])
 
         expected_params = {
             "m.login.terms": {
@@ -69,10 +69,10 @@ class TermsTestCase(unittest.HomeserverTestCase):
                             "name": "My Cool Privacy Policy",
                             "url": "https://example.org/_matrix/consent?v=1.0",
                         },
-                        "version": "1.0"
-                    },
-                },
-            },
+                        "version": "1.0",
+                    }
+                }
+            }
         }
         self.assertIsInstance(channel.json_body["params"], dict)
         self.assertDictContainsSubset(channel.json_body["params"], expected_params)

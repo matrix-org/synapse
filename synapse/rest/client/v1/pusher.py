@@ -26,17 +26,18 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.push import PusherConfigException
-
-from .base import ClientV1RestServlet, client_path_patterns
+from synapse.rest.client.v2_alpha._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class PushersRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/pushers$")
+class PushersRestServlet(RestServlet):
+    PATTERNS = client_patterns("/pushers$", v1=True)
 
     def __init__(self, hs):
-        super(PushersRestServlet, self).__init__(hs)
+        super(PushersRestServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -69,11 +70,13 @@ class PushersRestServlet(ClientV1RestServlet):
         return 200, {}
 
 
-class PushersSetRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/pushers/set$")
+class PushersSetRestServlet(RestServlet):
+    PATTERNS = client_patterns("/pushers/set$", v1=True)
 
     def __init__(self, hs):
-        super(PushersSetRestServlet, self).__init__(hs)
+        super(PushersSetRestServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
         self.pusher_pool = self.hs.get_pusherpool()
 
@@ -141,7 +144,7 @@ class PushersRemoveRestServlet(RestServlet):
     """
     To allow pusher to be delete by clicking a link (ie. GET request)
     """
-    PATTERNS = client_path_patterns("/pushers/remove$")
+    PATTERNS = client_patterns("/pushers/remove$", v1=True)
     SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
 
     def __init__(self, hs):

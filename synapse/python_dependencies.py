@@ -16,7 +16,12 @@
 
 import logging
 
-from pkg_resources import DistributionNotFound, VersionConflict, get_distribution
+from pkg_resources import (
+    DistributionNotFound,
+    Requirement,
+    VersionConflict,
+    get_provider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +44,10 @@ REQUIREMENTS = [
     "canonicaljson>=1.1.3",
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
-    "service_identity>=16.0.0",
+    "idna>=2.5",
+
+    # validating SSL certs for IP addresses requires service_identity 18.1.
+    "service_identity>=18.1.0",
 
     # our logcontext handling relies on the ability to cancel inlineCallbacks
     # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
@@ -53,11 +61,11 @@ REQUIREMENTS = [
     "pyasn1-modules>=0.0.7",
     "daemonize>=2.3.1",
     "bcrypt>=3.1.0",
-    "pillow>=3.1.2",
+    "pillow>=4.3.0",
     "sortedcontainers>=1.4.4",
     "psutil>=2.0.0",
     "pymacaroons>=0.13.0",
-    "msgpack>=0.5.0",
+    "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
     "six>=1.10",
     # prometheus_client 0.4.0 changed the format of counter metrics
@@ -72,30 +80,42 @@ REQUIREMENTS = [
 ]
 
 CONDITIONAL_REQUIREMENTS = {
-    "email.enable_notifs": ["Jinja2>=2.9", "bleach>=1.4.2"],
+    "email": ["Jinja2>=2.9", "bleach>=1.4.3"],
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
-    "postgres": ["psycopg2>=2.6"],
+
+    # we use execute_batch, which arrived in psycopg 2.7.
+    "postgres": ["psycopg2>=2.7"],
 
     # ConsentResource uses select_autoescape, which arrived in jinja 2.9
     "resources.consent": ["Jinja2>=2.9"],
 
     # ACME support is required to provision TLS certificates from authorities
     # that use the protocol, such as Let's Encrypt.
-    "acme": ["txacme>=0.9.2"],
+    "acme": [
+        "txacme>=0.9.2",
+
+        # txacme depends on eliot. Eliot 1.8.0 is incompatible with
+        # python 3.5.2, as per https://github.com/itamarst/eliot/issues/418
+        'eliot<1.8.0;python_version<"3.5.3"',
+    ],
 
     "saml2": ["pysaml2>=4.5.0"],
+    "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0", "parameterized"],
     "sentry": ["sentry-sdk>=0.7.2"],
 }
 
+ALL_OPTIONAL_REQUIREMENTS = set()
+
+for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
+    # Exclude systemd as it's a system-based requirement.
+    if name not in ["systemd"]:
+        ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
+
 
 def list_requirements():
-    deps = set(REQUIREMENTS)
-    for opt in CONDITIONAL_REQUIREMENTS.values():
-        deps = set(opt) | deps
-
-    return list(deps)
+    return list(set(REQUIREMENTS) | ALL_OPTIONAL_REQUIREMENTS)
 
 
 class DependencyException(Exception):
@@ -111,10 +131,10 @@ class DependencyException(Exception):
     @property
     def dependencies(self):
         for i in self.args[0]:
-            yield '"' + i + '"'
+            yield "'" + i + "'"
 
 
-def check_requirements(for_feature=None, _get_distribution=get_distribution):
+def check_requirements(for_feature=None):
     deps_needed = []
     errors = []
 
@@ -125,7 +145,7 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
 
     for dependency in reqs:
         try:
-            _get_distribution(dependency)
+            _check_requirement(dependency)
         except VersionConflict as e:
             deps_needed.append(dependency)
             errors.append(
@@ -143,7 +163,7 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
 
         for dependency in OPTS:
             try:
-                _get_distribution(dependency)
+                _check_requirement(dependency)
             except VersionConflict as e:
                 deps_needed.append(dependency)
                 errors.append(
@@ -159,6 +179,23 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
             logging.error(e)
 
         raise DependencyException(deps_needed)
+
+
+def _check_requirement(dependency_string):
+    """Parses a dependency string, and checks if the specified requirement is installed
+
+    Raises:
+        VersionConflict if the requirement is installed, but with the the wrong version
+        DistributionNotFound if nothing is found to provide the requirement
+    """
+    req = Requirement.parse(dependency_string)
+
+    # first check if the markers specify that this requirement needs installing
+    if req.marker is not None and not req.marker.evaluate():
+        # not required for this environment
+        return
+
+    get_provider(req)
 
 
 if __name__ == "__main__":

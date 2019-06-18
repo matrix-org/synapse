@@ -24,14 +24,19 @@ _string_with_symbols = (
     string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
 )
 
+# random_string and random_string_with_symbols are used for a range of things,
+# some cryptographically important, some less so. We use SystemRandom to make sure
+# we get cryptographically-secure randoms.
+rand = random.SystemRandom()
+
 
 def random_string(length):
-    return ''.join(random.choice(string.ascii_letters) for _ in range(length))
+    return ''.join(rand.choice(string.ascii_letters) for _ in range(length))
 
 
 def random_string_with_symbols(length):
     return ''.join(
-        random.choice(_string_with_symbols) for _ in range(length)
+        rand.choice(_string_with_symbols) for _ in range(length)
     )
 
 

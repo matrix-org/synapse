@@ -8,7 +8,7 @@ being deleted.
 The API is:
 
 ```
-POST /_matrix/client/r0/admin/delete_group/<group_id>
+POST /_synapse/admin/v1/delete_group/<group_id>
 ```
 
 including an `access_token` of a server admin.

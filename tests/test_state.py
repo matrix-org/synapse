@@ -25,7 +25,7 @@ from synapse.state import StateHandler, StateResolutionHandler
 
 from tests import unittest
 
-from .utils import MockClock
+from .utils import MockClock, default_config
 
 _next_event_id = 1000
 
@@ -160,6 +160,7 @@ class StateTestCase(unittest.TestCase):
         self.store = StateGroupStore()
         hs = Mock(
             spec_set=[
+                "config",
                 "get_datastore",
                 "get_auth",
                 "get_state_handler",
@@ -167,6 +168,7 @@ class StateTestCase(unittest.TestCase):
                 "get_state_resolution_handler",
             ]
         )
+        hs.config = default_config("tesths", True)
         hs.get_datastore.return_value = self.store
         hs.get_state_handler.return_value = None
         hs.get_clock.return_value = MockClock()

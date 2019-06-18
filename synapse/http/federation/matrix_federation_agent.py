@@ -149,7 +149,7 @@ class MatrixFederationAgent(object):
             tls_options = None
         else:
             tls_options = self._tls_client_options_factory.get_options(
-                res.tls_server_name.decode("ascii")
+                res.tls_server_name.decode("ascii"),
             )
 
         # make sure that the Host header is set correctly

@@ -20,12 +20,14 @@ import logging
 import os
 import re
 
+from synapse.storage.engines.postgres import PostgresEngine
+
 logger = logging.getLogger(__name__)
 
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 54
+SCHEMA_VERSION = 55
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -115,8 +117,16 @@ def _setup_new_database(cur, database_engine):
 
     valid_dirs = []
     pattern = re.compile(r"^\d+(\.sql)?$")
+
+    if isinstance(database_engine, PostgresEngine):
+        specific = "postgres"
+    else:
+        specific = "sqlite"
+
+    specific_pattern = re.compile(r"^\d+(\.sql." + specific + r")?$")
+
     for filename in directory_entries:
-        match = pattern.match(filename)
+        match = pattern.match(filename) or specific_pattern.match(filename)
         abs_path = os.path.join(current_dir, filename)
         if match and os.path.isdir(abs_path):
             ver = int(match.group(0))
@@ -136,7 +146,9 @@ def _setup_new_database(cur, database_engine):
 
     directory_entries = os.listdir(sql_dir)
 
-    for filename in fnmatch.filter(directory_entries, "*.sql"):
+    for filename in sorted(fnmatch.filter(directory_entries, "*.sql") + fnmatch.filter(
+        directory_entries, "*.sql." + specific
+    )):
         sql_loc = os.path.join(sql_dir, filename)
         logger.debug("Applying schema %s", sql_loc)
         executescript(cur, sql_loc)

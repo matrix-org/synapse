@@ -108,6 +108,7 @@ class FileStorageProviderBackend(StorageProvider):
     """
 
     def __init__(self, hs, config):
+        self.hs = hs
         self.cache_directory = hs.config.media_store_path
         self.base_directory = config
 

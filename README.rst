@@ -173,7 +173,7 @@ Synapse offers two database engines:
  * `PostgreSQL <https://www.postgresql.org>`_
 
 By default Synapse uses SQLite in and doing so trades performance for convenience.
-SQLite is only recommended in Synapse for testing purposes or for servers with 
+SQLite is only recommended in Synapse for testing purposes or for servers with
 light workloads.
 
 Almost all installations should opt to use PostreSQL. Advantages include:
@@ -272,7 +272,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python3 env
     source env/bin/activate
-    python -m pip install -e .[all]
+    python -m pip install --no-pep-517 -e .[all]
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.

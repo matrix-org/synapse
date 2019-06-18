@@ -60,7 +60,7 @@ class RedactionTestCase(unittest.TestCase):
                 "state_key": user.to_string(),
                 "room_id": room.to_string(),
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -83,7 +83,7 @@ class RedactionTestCase(unittest.TestCase):
                 "state_key": user.to_string(),
                 "room_id": room.to_string(),
                 "content": {"body": body, "msgtype": u"message"},
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -105,7 +105,7 @@ class RedactionTestCase(unittest.TestCase):
                 "room_id": room.to_string(),
                 "content": {"reason": reason},
                 "redacts": event_id,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(

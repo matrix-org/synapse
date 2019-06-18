@@ -22,7 +22,7 @@ from synapse.api.errors import AuthError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.util.stringutils import random_string
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class IdTokenServlet(RestServlet):
         "expires_in": 3600,
     }
     """
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/user/(?P<user_id>[^/]*)/openid/request_token"
     )
 

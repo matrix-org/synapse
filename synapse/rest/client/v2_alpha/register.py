@@ -31,6 +31,7 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
     RestServlet,
@@ -42,7 +43,7 @@ from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
 
-from ._base import client_v2_patterns, interactive_auth_handler
+from ._base import client_patterns, interactive_auth_handler
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
 # exist. It's a _really minor_ security flaw to use plain string comparison
@@ -59,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmailRegisterRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register/email/requestToken$")
+    PATTERNS = client_patterns("/register/email/requestToken$")
 
     def __init__(self, hs):
         """
@@ -97,7 +98,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register/msisdn/requestToken$")
+    PATTERNS = client_patterns("/register/msisdn/requestToken$")
 
     def __init__(self, hs):
         """
@@ -141,7 +142,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register/available")
+    PATTERNS = client_patterns("/register/available")
 
     def __init__(self, hs):
         """
@@ -153,16 +154,18 @@ class UsernameAvailabilityRestServlet(RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
             hs.get_clock(),
-            # Time window of 2s
-            window_size=2000,
-            # Artificially delay requests if rate > sleep_limit/window_size
-            sleep_limit=1,
-            # Amount of artificial delay to apply
-            sleep_msec=1000,
-            # Error with 429 if more than reject_limit requests are queued
-            reject_limit=1,
-            # Allow 1 request at a time
-            concurrent_requests=1,
+            FederationRateLimitConfig(
+                # Time window of 2s
+                window_size=2000,
+                # Artificially delay requests if rate > sleep_limit/window_size
+                sleep_limit=1,
+                # Amount of artificial delay to apply
+                sleep_msec=1000,
+                # Error with 429 if more than reject_limit requests are queued
+                reject_limit=1,
+                # Allow 1 request at a time
+                concurrent_requests=1,
+            )
         )
 
     @defer.inlineCallbacks
@@ -179,7 +182,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
 
 class RegisterRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register$")
+    PATTERNS = client_patterns("/register$")
 
     def __init__(self, hs):
         """
@@ -345,18 +348,22 @@ class RegisterRestServlet(RestServlet):
         if self.hs.config.enable_registration_captcha:
             # only support 3PIDless registration if no 3PIDs are required
             if not require_email and not require_msisdn:
-                flows.extend([[LoginType.RECAPTCHA]])
+                # Also add a dummy flow here, otherwise if a client completes
+                # recaptcha first we'll assume they were going for this flow
+                # and complete the request, when they could have been trying to
+                # complete one of the flows with email/msisdn auth.
+                flows.extend([[LoginType.RECAPTCHA, LoginType.DUMMY]])
             # only support the email-only flow if we don't require MSISDN 3PIDs
             if not require_msisdn:
-                flows.extend([[LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA]])
+                flows.extend([[LoginType.RECAPTCHA, LoginType.EMAIL_IDENTITY]])
 
             if show_msisdn:
                 # only support the MSISDN-only flow if we don't require email 3PIDs
                 if not require_email:
-                    flows.extend([[LoginType.MSISDN, LoginType.RECAPTCHA]])
+                    flows.extend([[LoginType.RECAPTCHA, LoginType.MSISDN]])
                 # always let users provide both MSISDN & email
                 flows.extend([
-                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
+                    [LoginType.RECAPTCHA, LoginType.MSISDN, LoginType.EMAIL_IDENTITY],
                 ])
         else:
             # only support 3PIDless registration if no 3PIDs are required
@@ -379,7 +386,15 @@ class RegisterRestServlet(RestServlet):
         if self.hs.config.user_consent_at_registration:
             new_flows = []
             for flow in flows:
-                flow.append(LoginType.TERMS)
+                inserted = False
+                # m.login.terms should go near the end but before msisdn or email auth
+                for i, stage in enumerate(flow):
+                    if stage == LoginType.EMAIL_IDENTITY or stage == LoginType.MSISDN:
+                        flow.insert(i, LoginType.TERMS)
+                        inserted = True
+                        break
+                if not inserted:
+                    flow.append(LoginType.TERMS)
             flows.extend(new_flows)
 
         auth_result, params, session_id = yield self.auth_handler.check_auth(
@@ -427,6 +442,28 @@ class RegisterRestServlet(RestServlet):
             threepid = None
             if auth_result:
                 threepid = auth_result.get(LoginType.EMAIL_IDENTITY)
+
+                # Also check that we're not trying to register a 3pid that's already
+                # been registered.
+                #
+                # This has probably happened in /register/email/requestToken as well,
+                # but if a user hits this endpoint twice then clicks on each link from
+                # the two activation emails, they would register the same 3pid twice.
+                for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
+                    if login_type in auth_result:
+                        medium = auth_result[login_type]['medium']
+                        address = auth_result[login_type]['address']
+
+                        existingUid = yield self.store.get_user_id_by_threepid(
+                            medium, address,
+                        )
+
+                        if existingUid is not None:
+                            raise SynapseError(
+                                400,
+                                "%s is already in use" % medium,
+                                Codes.THREEPID_IN_USE,
+                            )
 
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,

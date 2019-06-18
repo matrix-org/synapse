@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2018 New Vector Ltd.
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,12 @@
 
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2**63 - 1
+
+# the maximum length for a room alias is 255 characters
+MAX_ALIAS_LENGTH = 255
+
+# the maximum length for a user id is 255 characters
+MAX_USERID_LENGTH = 255
 
 
 class Membership(object):
@@ -73,6 +79,7 @@ class EventTypes(object):
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
+    Encryption = "m.room.encryption"
     RoomAvatar = "m.room.avatar"
     RoomEncryption = "m.room.encryption"
     GuestAccess = "m.room.guest_access"
@@ -113,3 +120,11 @@ class UserTypes(object):
     """
     SUPPORT = "support"
     ALL_USER_TYPES = (SUPPORT,)
+
+
+class RelationTypes(object):
+    """The types of relations known to this server.
+    """
+    ANNOTATION = "m.annotation"
+    REPLACE = "m.replace"
+    REFERENCE = "m.reference"

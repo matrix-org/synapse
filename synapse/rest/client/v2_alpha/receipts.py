@@ -20,13 +20,13 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class ReceiptRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)"
         "/receipt/(?P<receipt_type>[^/]*)"
         "/(?P<event_id>[^/]*)$"

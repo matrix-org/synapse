@@ -15,12 +15,15 @@
 
 import logging
 
+from six import raise_from
+
 from twisted.internet import defer
 
 from synapse.api.errors import (
     AuthError,
-    CodeMessageException,
     Codes,
+    HttpResponseException,
+    RequestSendFailed,
     StoreError,
     SynapseError,
 )
@@ -30,6 +33,9 @@ from synapse.types import UserID, get_domain_from_id
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
+
+MAX_DISPLAYNAME_LEN = 100
+MAX_AVATAR_URL_LEN = 1000
 
 
 class BaseProfileHandler(BaseHandler):
@@ -53,6 +59,7 @@ class BaseProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_profile(self, user_id):
         target_user = UserID.from_string(user_id)
+
         if self.hs.is_mine(target_user):
             try:
                 displayname = yield self.store.get_profile_displayname(
@@ -81,10 +88,10 @@ class BaseProfileHandler(BaseHandler):
                     ignore_backoff=True,
                 )
                 defer.returnValue(result)
-            except CodeMessageException as e:
-                if e.code != 404:
-                    logger.exception("Failed to get displayname")
-                raise
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
 
     @defer.inlineCallbacks
     def get_profile_from_cache(self, user_id):
@@ -138,10 +145,10 @@ class BaseProfileHandler(BaseHandler):
                     },
                     ignore_backoff=True,
                 )
-            except CodeMessageException as e:
-                if e.code != 404:
-                    logger.exception("Failed to get displayname")
-                raise
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
 
             defer.returnValue(result["displayname"])
 
@@ -160,6 +167,11 @@ class BaseProfileHandler(BaseHandler):
 
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
+
+        if len(new_displayname) > MAX_DISPLAYNAME_LEN:
+            raise SynapseError(
+                400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN, ),
+            )
 
         if new_displayname == '':
             new_displayname = None
@@ -199,10 +211,10 @@ class BaseProfileHandler(BaseHandler):
                     },
                     ignore_backoff=True,
                 )
-            except CodeMessageException as e:
-                if e.code != 404:
-                    logger.exception("Failed to get avatar_url")
-                raise
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
 
             defer.returnValue(result["avatar_url"])
 
@@ -215,6 +227,11 @@ class BaseProfileHandler(BaseHandler):
 
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
+
+        if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
+            raise SynapseError(
+                400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN, ),
+            )
 
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url
@@ -282,6 +299,48 @@ class BaseProfileHandler(BaseHandler):
                     "Failed to update join event for room %s - %s",
                     room_id, str(e)
                 )
+
+    @defer.inlineCallbacks
+    def check_profile_query_allowed(self, target_user, requester=None):
+        """Checks whether a profile query is allowed. If the
+        'require_auth_for_profile_requests' config flag is set to True and a
+        'requester' is provided, the query is only allowed if the two users
+        share a room.
+
+        Args:
+            target_user (UserID): The owner of the queried profile.
+            requester (None|UserID): The user querying for the profile.
+
+        Raises:
+            SynapseError(403): The two users share no room, or ne user couldn't
+                be found to be in any room the server is in, and therefore the query
+                is denied.
+        """
+        # Implementation of MSC1301: don't allow looking up profiles if the
+        # requester isn't in the same room as the target. We expect requester to
+        # be None when this function is called outside of a profile query, e.g.
+        # when building a membership event. In this case, we must allow the
+        # lookup.
+        if not self.hs.config.require_auth_for_profile_requests or not requester:
+            return
+
+        try:
+            requester_rooms = yield self.store.get_rooms_for_user(
+                requester.to_string()
+            )
+            target_user_rooms = yield self.store.get_rooms_for_user(
+                target_user.to_string(),
+            )
+
+            # Check if the room lists have no elements in common.
+            if requester_rooms.isdisjoint(target_user_rooms):
+                raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
+        except StoreError as e:
+            if e.code == 404:
+                # This likely means that one of the users doesn't exist,
+                # so we act as if we couldn't find the profile.
+                raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
+            raise
 
 
 class MasterProfileHandler(BaseProfileHandler):

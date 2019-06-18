@@ -27,9 +27,11 @@ import treq
 from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
+from zope.interface import implementer
 
 from twisted.internet import defer, protocol
 from twisted.internet.error import DNSLookupError
+from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
 from twisted.web.http_headers import Headers
@@ -44,6 +46,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http import QuieterFileBodyProducer
+from synapse.http.client import BlacklistingAgentWrapper, IPBlacklistingResolver
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
@@ -172,19 +175,44 @@ class MatrixFederationHttpClient(object):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
-        reactor = hs.get_reactor()
+
+        real_reactor = hs.get_reactor()
+
+        # We need to use a DNS resolver which filters out blacklisted IP
+        # addresses, to prevent DNS rebinding.
+        nameResolver = IPBlacklistingResolver(
+            real_reactor, None, hs.config.federation_ip_range_blacklist,
+        )
+
+        @implementer(IReactorPluggableNameResolver)
+        class Reactor(object):
+            def __getattr__(_self, attr):
+                if attr == "nameResolver":
+                    return nameResolver
+                else:
+                    return getattr(real_reactor, attr)
+
+        self.reactor = Reactor()
 
         self.agent = MatrixFederationAgent(
-            hs.get_reactor(),
+            self.reactor,
             tls_client_options_factory,
         )
+
+        # Use a BlacklistingAgentWrapper to prevent circumventing the IP
+        # blacklist via IP literals in server names
+        self.agent = BlacklistingAgentWrapper(
+            self.agent, self.reactor,
+            ip_blacklist=hs.config.federation_ip_range_blacklist,
+        )
+
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
         self.version_string_bytes = hs.version_string.encode('ascii')
         self.default_timeout = 60
 
         def schedule(x):
-            reactor.callLater(_EPSILON, x)
+            self.reactor.callLater(_EPSILON, x)
 
         self._cooperator = Cooperator(scheduler=schedule)
 
@@ -257,7 +285,24 @@ class MatrixFederationHttpClient(object):
             request (MatrixFederationRequest): details of request to be sent
 
             timeout (int|None): number of milliseconds to wait for the response headers
-                (including connecting to the server). 60s by default.
+                (including connecting to the server), *for each attempt*.
+                60s by default.
+
+            long_retries (bool): whether to use the long retry algorithm.
+
+                The regular retry algorithm makes 4 attempts, with intervals
+                [0.5s, 1s, 2s].
+
+                The long retry algorithm makes 11 attempts, with intervals
+                [4s, 16s, 60s, 60s, ...]
+
+                Both algorithms add -20%/+40% jitter to the retry intervals.
+
+                Note that the above intervals are *in addition* to the time spent
+                waiting for the request to complete (up to `timeout` ms).
+
+                NB: the long retry algorithm takes over 20 minutes to complete, with
+                a default timeout of 60s!
 
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
@@ -370,7 +415,7 @@ class MatrixFederationHttpClient(object):
                             request_deferred = timeout_deferred(
                                 request_deferred,
                                 timeout=_sec_timeout,
-                                reactor=self.hs.get_reactor(),
+                                reactor=self.reactor,
                             )
 
                             response = yield request_deferred
@@ -397,7 +442,7 @@ class MatrixFederationHttpClient(object):
                         d = timeout_deferred(
                             d,
                             timeout=_sec_timeout,
-                            reactor=self.hs.get_reactor(),
+                            reactor=self.reactor,
                         )
 
                         try:
@@ -538,10 +583,14 @@ class MatrixFederationHttpClient(object):
                 the request body. This will be encoded as JSON.
             json_data_callback (callable): A callable returning the dict to
                 use as the request body.
-            long_retries (bool): A boolean that indicates whether we should
-                retry for a short or long time.
-            timeout(int): How long to try (in ms) the destination for before
-                giving up. None indicates no timeout.
+
+            long_retries (bool): whether to use the long retry algorithm. See
+                docs on _send_request for details.
+
+            timeout (int|None): number of milliseconds to wait for the response headers
+                (including connecting to the server), *for each attempt*.
+                self._default_timeout (60s) by default.
+
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
             backoff_on_404 (bool): True if we should count a 404 response as
@@ -586,7 +635,7 @@ class MatrixFederationHttpClient(object):
         )
 
         body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
+            self.reactor, self.default_timeout, request, response,
         )
 
         defer.returnValue(body)
@@ -599,15 +648,22 @@ class MatrixFederationHttpClient(object):
         Args:
             destination (str): The remote server to send the HTTP request
                 to.
+
             path (str): The HTTP path.
+
             data (dict): A dict containing the data that will be used as
                 the request body. This will be encoded as JSON.
-            long_retries (bool): A boolean that indicates whether we should
-                retry for a short or long time.
-            timeout(int): How long to try (in ms) the destination for before
-                giving up. None indicates no timeout.
+
+            long_retries (bool): whether to use the long retry algorithm. See
+                docs on _send_request for details.
+
+            timeout (int|None): number of milliseconds to wait for the response headers
+                (including connecting to the server), *for each attempt*.
+                self._default_timeout (60s) by default.
+
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
+
             args (dict): query params
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
@@ -645,7 +701,7 @@ class MatrixFederationHttpClient(object):
             _sec_timeout = self.default_timeout
 
         body = yield _handle_json_response(
-            self.hs.get_reactor(), _sec_timeout, request, response,
+            self.reactor, _sec_timeout, request, response,
         )
         defer.returnValue(body)
 
@@ -658,14 +714,19 @@ class MatrixFederationHttpClient(object):
         Args:
             destination (str): The remote server to send the HTTP request
                 to.
+
             path (str): The HTTP path.
+
             args (dict|None): A dictionary used to create query strings, defaults to
                 None.
-            timeout (int): How long to try (in ms) the destination for before
-                giving up. None indicates no timeout and that the request will
-                be retried.
+
+            timeout (int|None): number of milliseconds to wait for the response headers
+                (including connecting to the server), *for each attempt*.
+                self._default_timeout (60s) by default.
+
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
+
             try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end of
                 the request. Workaround for #3622 in Synapse <= v0.99.3.
@@ -683,10 +744,6 @@ class MatrixFederationHttpClient(object):
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
-        logger.debug("get_json args: %s", args)
-
-        logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
-
         request = MatrixFederationRequest(
             method="GET",
             destination=destination,
@@ -704,7 +761,7 @@ class MatrixFederationHttpClient(object):
         )
 
         body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
+            self.reactor, self.default_timeout, request, response,
         )
 
         defer.returnValue(body)
@@ -718,12 +775,18 @@ class MatrixFederationHttpClient(object):
             destination (str): The remote server to send the HTTP request
                 to.
             path (str): The HTTP path.
-            long_retries (bool): A boolean that indicates whether we should
-                retry for a short or long time.
-            timeout(int): How long to try (in ms) the destination for before
-                giving up. None indicates no timeout.
+
+            long_retries (bool): whether to use the long retry algorithm. See
+                docs on _send_request for details.
+
+            timeout (int|None): number of milliseconds to wait for the response headers
+                (including connecting to the server), *for each attempt*.
+                self._default_timeout (60s) by default.
+
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
+
+            args (dict): query params
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
@@ -753,7 +816,7 @@ class MatrixFederationHttpClient(object):
         )
 
         body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
+            self.reactor, self.default_timeout, request, response,
         )
         defer.returnValue(body)
 
@@ -801,7 +864,7 @@ class MatrixFederationHttpClient(object):
 
         try:
             d = _readBodyToFile(response, output_stream, max_size)
-            d.addTimeout(self.default_timeout, self.hs.get_reactor())
+            d.addTimeout(self.default_timeout, self.reactor)
             length = yield make_deferred_yieldable(d)
         except Exception as e:
             logger.warn(

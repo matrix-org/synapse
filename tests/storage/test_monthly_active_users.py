@@ -56,8 +56,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.register(user_id=user1, token="123", password_hash=None)
         self.store.register(user_id=user2, token="456", password_hash=None)
         self.store.register(
-            user_id=user3, token="789",
-            password_hash=None, user_type=UserTypes.SUPPORT
+            user_id=user3, token="789", password_hash=None, user_type=UserTypes.SUPPORT
         )
         self.pump()
 
@@ -173,9 +172,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def test_populate_monthly_users_should_update(self):
         self.store.upsert_monthly_active_user = Mock()
 
-        self.store.is_trial_user = Mock(
-            return_value=defer.succeed(False)
-        )
+        self.store.is_trial_user = Mock(return_value=defer.succeed(False))
 
         self.store.user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(None)
@@ -187,13 +184,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def test_populate_monthly_users_should_not_update(self):
         self.store.upsert_monthly_active_user = Mock()
 
-        self.store.is_trial_user = Mock(
-            return_value=defer.succeed(False)
-        )
+        self.store.is_trial_user = Mock(return_value=defer.succeed(False))
         self.store.user_last_seen_monthly_active = Mock(
-            return_value=defer.succeed(
-                self.hs.get_clock().time_msec()
-            )
+            return_value=defer.succeed(self.hs.get_clock().time_msec())
         )
         self.store.populate_monthly_active_users('user_id')
         self.pump()
@@ -243,7 +236,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
             user_id=support_user_id,
             token="123",
             password_hash=None,
-            user_type=UserTypes.SUPPORT
+            user_type=UserTypes.SUPPORT,
         )
 
         self.store.upsert_monthly_active_user(support_user_id)

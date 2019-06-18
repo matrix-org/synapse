@@ -29,11 +29,10 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
 from synapse.util.msisdn import phone_number_to_msisdn
-
-from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -81,15 +80,16 @@ def login_id_thirdparty_from_phone(identifier):
     }
 
 
-class LoginRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login$")
+class LoginRestServlet(RestServlet):
+    PATTERNS = client_patterns("/login$", v1=True)
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "m.login.jwt"
 
     def __init__(self, hs):
-        super(LoginRestServlet, self).__init__(hs)
+        super(LoginRestServlet, self).__init__()
+        self.hs = hs
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
         self.jwt_algorithm = hs.config.jwt_algorithm
@@ -371,7 +371,7 @@ class LoginRestServlet(ClientV1RestServlet):
 
 
 class CasRedirectServlet(RestServlet):
-    PATTERNS = client_path_patterns("/login/(cas|sso)/redirect")
+    PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
 
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__()
@@ -386,7 +386,7 @@ class CasRedirectServlet(RestServlet):
             b"redirectUrl": args[b"redirectUrl"][0]
         }).encode('ascii')
         hs_redirect_url = (self.cas_service_url +
-                           b"/_matrix/client/api/v1/login/cas/ticket")
+                           b"/_matrix/client/r0/login/cas/ticket")
         service_param = urllib.parse.urlencode({
             b"service": b"%s?%s" % (hs_redirect_url, client_redirect_url_param)
         }).encode('ascii')
@@ -394,27 +394,27 @@ class CasRedirectServlet(RestServlet):
         finish_request(request)
 
 
-class CasTicketServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login/cas/ticket", releases=())
+class CasTicketServlet(RestServlet):
+    PATTERNS = client_patterns("/login/cas/ticket", v1=True)
 
     def __init__(self, hs):
-        super(CasTicketServlet, self).__init__(hs)
+        super(CasTicketServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url
         self.cas_service_url = hs.config.cas_service_url
         self.cas_required_attributes = hs.config.cas_required_attributes
         self._sso_auth_handler = SSOAuthHandler(hs)
+        self._http_client = hs.get_simple_http_client()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
         client_redirect_url = parse_string(request, "redirectUrl", required=True)
-        http_client = self.hs.get_simple_http_client()
         uri = self.cas_server_url + "/proxyValidate"
         args = {
             "ticket": parse_string(request, "ticket", required=True),
             "service": self.cas_service_url
         }
         try:
-            body = yield http_client.get_raw(uri, args)
+            body = yield self._http_client.get_raw(uri, args)
         except PartialDownloadError as pde:
             # Twisted raises this error if the connection is closed,
             # even if that's being used old-http style to signal end-of-data

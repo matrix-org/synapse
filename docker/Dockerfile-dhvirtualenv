@@ -50,12 +50,15 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         debhelper \
         devscripts \
         dh-systemd \
+        libsystemd-dev \
         lsb-release \
+        pkg-config \
         python3-dev \
         python3-pip \
         python3-setuptools \
         python3-venv \
-        sqlite3
+        sqlite3 \
+        libpq-dev
 
 COPY --from=builder /dh-virtualenv_1.1-1_all.deb /
 

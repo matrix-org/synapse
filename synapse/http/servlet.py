@@ -55,7 +55,7 @@ def parse_integer_from_args(args, name, default=None, required=False):
             return int(args[name][0])
         except Exception:
             message = "Query parameter %r must be an integer" % (name,)
-            raise SynapseError(400, message)
+            raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
     else:
         if required:
             message = "Missing integer query parameter %r" % (name,)

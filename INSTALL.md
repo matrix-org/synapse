@@ -1,13 +1,14 @@
-* [Installing Synapse](#installing-synapse)
-  * [Installing from source](#installing-from-source)
-    * [Platform-Specific Instructions](#platform-specific-instructions)
-    * [Troubleshooting Installation](#troubleshooting-installation)
-  * [Prebuilt packages](#prebuilt-packages)
-* [Setting up Synapse](#setting-up-synapse)
-  * [TLS certificates](#tls-certificates)
-  * [Registering a user](#registering-a-user)
-  * [Setting up a TURN server](#setting-up-a-turn-server)
-  * [URL previews](#url-previews)
+- [Installing Synapse](#installing-synapse)
+  - [Installing from source](#installing-from-source)
+    - [Platform-Specific Instructions](#platform-specific-instructions)
+    - [Troubleshooting Installation](#troubleshooting-installation)
+  - [Prebuilt packages](#prebuilt-packages)
+- [Setting up Synapse](#setting-up-synapse)
+  - [TLS certificates](#tls-certificates)
+  - [Email](#email)
+  - [Registering a user](#registering-a-user)
+  - [Setting up a TURN server](#setting-up-a-turn-server)
+  - [URL previews](#url-previews)
 
 # Installing Synapse
 
@@ -35,7 +36,7 @@ virtualenv -p python3 ~/synapse/env
 source ~/synapse/env/bin/activate
 pip install --upgrade pip
 pip install --upgrade setuptools
-pip install matrix-synapse[all]
+pip install matrix-synapse
 ```
 
 This will download Synapse from [PyPI](https://pypi.org/project/matrix-synapse)
@@ -48,7 +49,7 @@ update flag:
 
 ```
 source ~/synapse/env/bin/activate
-pip install -U matrix-synapse[all]
+pip install -U matrix-synapse
 ```
 
 Before you can start Synapse, you will need to generate a configuration
@@ -257,17 +258,28 @@ https://github.com/spantaleev/matrix-docker-ansible-deploy
 #### Matrix.org packages
 
 Matrix.org provides Debian/Ubuntu packages of the latest stable version of
-Synapse via https://matrix.org/packages/debian/. To use them:
+Synapse via https://packages.matrix.org/debian/. They are available for Debian
+9 (Stretch), Ubuntu 16.04 (Xenial), and later. To use them:
 
 ```
-sudo apt install -y lsb-release curl apt-transport-https
-echo "deb https://matrix.org/packages/debian `lsb_release -cs` main" |
+sudo apt install -y lsb-release wget apt-transport-https
+sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main" |
     sudo tee /etc/apt/sources.list.d/matrix-org.list
-curl "https://matrix.org/packages/debian/repo-key.asc" |
-    sudo apt-key add -
 sudo apt update
 sudo apt install matrix-synapse-py3
 ```
+
+**Note**: if you followed a previous version of these instructions which
+recommended using `apt-key add` to add an old key from
+`https://matrix.org/packages/debian/`, you should note that this key has been
+revoked. You should remove the old key with `sudo apt-key remove
+C35EB17E1EAE708E6603A9B3AD0592FE47F0DF61`, and follow the above instructions to
+update your configuration.
+
+The fingerprint of the repository signing key (as shown by `gpg
+/usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
+`AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
 
 #### Downstream Debian/Ubuntu packages
 
@@ -383,8 +395,22 @@ To configure Synapse to expose an HTTPS port, you will need to edit
   instance, if using certbot, use `fullchain.pem` as your certificate, not
   `cert.pem`).
 
-For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
-please take a look at [our guide](docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100).
+For a more detailed guide to configuring your server for federation, see
+[federate.md](docs/federate.md)
+
+
+## Email
+
+It is desirable for Synapse to have the capability to send email. For example,
+this is required to support the 'password reset' feature.
+
+To configure an SMTP server for Synapse, modify the configuration section
+headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
+and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
+``smtp_pass``, and ``require_transport_security``.
+
+If Synapse is not configured with an SMTP server, password reset via email will
+ be disabled by default.
 
 ## Registering a user
 

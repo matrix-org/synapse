@@ -24,8 +24,10 @@ import six
 from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
+from twisted.internet._sslverify import Certificate, trustRootFromCertificates
 
 from synapse.config._base import Config, ConfigError
+from synapse.util import glob_to_regex
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +72,53 @@ class TlsConfig(Config):
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
 
+        # Whether to verify certificates on outbound federation traffic
+        self.federation_verify_certificates = config.get(
+            "federation_verify_certificates", True,
+        )
+
+        # Whitelist of domains to not verify certificates for
+        fed_whitelist_entries = config.get(
+            "federation_certificate_verification_whitelist", [],
+        )
+
+        # Support globs (*) in whitelist values
+        self.federation_certificate_verification_whitelist = []
+        for entry in fed_whitelist_entries:
+            # Convert globs to regex
+            entry_regex = glob_to_regex(entry)
+            self.federation_certificate_verification_whitelist.append(entry_regex)
+
+        # List of custom certificate authorities for federation traffic validation
+        custom_ca_list = config.get(
+            "federation_custom_ca_list", None,
+        )
+
+        # Read in and parse custom CA certificates
+        self.federation_ca_trust_root = None
+        if custom_ca_list is not None:
+            if len(custom_ca_list) == 0:
+                # A trustroot cannot be generated without any CA certificates.
+                # Raise an error if this option has been specified without any
+                # corresponding certificates.
+                raise ConfigError("federation_custom_ca_list specified without "
+                                  "any certificate files")
+
+            certs = []
+            for ca_file in custom_ca_list:
+                logger.debug("Reading custom CA certificate file: %s", ca_file)
+                content = self.read_file(ca_file, "federation_custom_ca_list")
+
+                # Parse the CA certificates
+                try:
+                    cert_base = Certificate.loadPEM(content)
+                    certs.append(cert_base)
+                except Exception as e:
+                    raise ConfigError("Error parsing custom CA certificate file %s: %s"
+                                      % (ca_file, e))
+
+            self.federation_ca_trust_root = trustRootFromCertificates(certs)
+
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
         # It should never be used in production, and is intended for
@@ -99,15 +148,15 @@ class TlsConfig(Config):
         try:
             with open(self.tls_certificate_file, 'rb') as f:
                 cert_pem = f.read()
-        except Exception:
-            logger.exception("Failed to read existing certificate off disk!")
-            raise
+        except Exception as e:
+            raise ConfigError("Failed to read existing certificate file %s: %s"
+                              % (self.tls_certificate_file, e))
 
         try:
             tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
-        except Exception:
-            logger.exception("Failed to parse existing certificate off disk!")
-            raise
+        except Exception as e:
+            raise ConfigError("Failed to parse existing certificate file %s: %s"
+                              % (self.tls_certificate_file, e))
 
         if not allow_self_signed:
             if tls_certificate.get_subject() == tls_certificate.get_issuer():
@@ -191,6 +240,40 @@ class TlsConfig(Config):
         # PEM-encoded private key for TLS
         #
         #tls_private_key_path: "%(tls_private_key_path)s"
+
+        # Whether to verify TLS server certificates for outbound federation requests.
+        #
+        # Defaults to `true`. To disable certificate verification, uncomment the
+        # following line.
+        #
+        #federation_verify_certificates: false
+
+        # Skip federation certificate verification on the following whitelist
+        # of domains.
+        #
+        # This setting should only be used in very specific cases, such as
+        # federation over Tor hidden services and similar. For private networks
+        # of homeservers, you likely want to use a private CA instead.
+        #
+        # Only effective if federation_verify_certicates is `true`.
+        #
+        #federation_certificate_verification_whitelist:
+        #  - lon.example.com
+        #  - *.domain.com
+        #  - *.onion
+
+        # List of custom certificate authorities for federation traffic.
+        #
+        # This setting should only normally be used within a private network of
+        # homeservers.
+        #
+        # Note that this list will replace those that are provided by your
+        # operating environment. Certificates must be in PEM format.
+        #
+        #federation_custom_ca_list:
+        #  - myCA1.pem
+        #  - myCA2.pem
+        #  - myCA3.pem
 
         # ACME support: This will configure Synapse to request a valid TLS certificate
         # for your configured `server_name` via Let's Encrypt.

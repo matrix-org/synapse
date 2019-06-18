@@ -23,7 +23,11 @@ from twisted.internet import defer
 import synapse
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
-from synapse.api.urls import FEDERATION_V1_PREFIX, FEDERATION_V2_PREFIX
+from synapse.api.urls import (
+    FEDERATION_UNSTABLE_PREFIX,
+    FEDERATION_V1_PREFIX,
+    FEDERATION_V2_PREFIX,
+)
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
@@ -63,11 +67,7 @@ class TransportLayerServer(JsonResource):
         self.authenticator = Authenticator(hs)
         self.ratelimiter = FederationRateLimiter(
             self.clock,
-            window_size=hs.config.federation_rc_window_size,
-            sleep_limit=hs.config.federation_rc_sleep_limit,
-            sleep_msec=hs.config.federation_rc_sleep_delay,
-            reject_limit=hs.config.federation_rc_reject_limit,
-            concurrent_requests=hs.config.federation_rc_concurrent,
+            config=hs.config.rc_federation,
         )
 
         self.register_servlets()
@@ -94,6 +94,7 @@ class NoAuthenticationError(AuthenticationError):
 
 class Authenticator(object):
     def __init__(self, hs):
+        self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
@@ -102,6 +103,7 @@ class Authenticator(object):
     # A method just so we can pass 'self' as the authenticator to the Servlets
     @defer.inlineCallbacks
     def authenticate_request(self, request, content):
+        now = self._clock.time_msec()
         json_request = {
             "method": request.method.decode('ascii'),
             "uri": request.uri.decode('ascii'),
@@ -138,7 +140,9 @@ class Authenticator(object):
                 401, "Missing Authorization headers", Codes.UNAUTHORIZED,
             )
 
-        yield self.keyring.verify_json_for_server(origin, json_request)
+        yield self.keyring.verify_json_for_server(
+            origin, json_request, now, "Incoming request"
+        )
 
         logger.info("Request from %s", origin)
         request.authenticated_entity = origin
@@ -716,8 +720,17 @@ class PublicRoomList(BaseFederationServlet):
 
     PATH = "/publicRooms"
 
+    def __init__(self, handler, authenticator, ratelimiter, server_name, deny_access):
+        super(PublicRoomList, self).__init__(
+            handler, authenticator, ratelimiter, server_name,
+        )
+        self.deny_access = deny_access
+
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query):
+        if self.deny_access:
+            raise FederationDeniedError(origin)
+
         limit = parse_integer_from_args(query, "limit", 0)
         since_token = parse_string_from_args(query, "since", None)
         include_all_networks = parse_boolean_from_args(
@@ -1299,6 +1312,30 @@ class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
         defer.returnValue((200, new_content))
 
 
+class RoomComplexityServlet(BaseFederationServlet):
+    """
+    Indicates to other servers how complex (and therefore likely
+    resource-intensive) a public room this server knows about is.
+    """
+    PATH = "/rooms/(?P<room_id>[^/]*)/complexity"
+    PREFIX = FEDERATION_UNSTABLE_PREFIX
+
+    @defer.inlineCallbacks
+    def on_GET(self, origin, content, query, room_id):
+
+        store = self.handler.hs.get_datastore()
+
+        is_public = yield store.is_room_world_readable_or_publicly_joinable(
+            room_id
+        )
+
+        if not is_public:
+            raise SynapseError(404, "Room not found", errcode=Codes.INVALID_PARAM)
+
+        complexity = yield store.get_room_complexity(room_id)
+        defer.returnValue((200, complexity))
+
+
 FEDERATION_SERVLET_CLASSES = (
     FederationSendServlet,
     FederationEventServlet,
@@ -1322,6 +1359,7 @@ FEDERATION_SERVLET_CLASSES = (
     FederationThirdPartyInviteExchangeServlet,
     On3pidBindServlet,
     FederationVersionServlet,
+    RoomComplexityServlet,
 )
 
 OPENID_SERVLET_CLASSES = (
@@ -1417,6 +1455,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
+                deny_access=hs.config.restrict_public_rooms_to_local_users,
             ).register(resource)
 
     if "group_server" in servlet_groups:

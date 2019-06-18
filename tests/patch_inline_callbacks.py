@@ -45,7 +45,9 @@ def do_patch():
             except Exception:
                 if LoggingContext.current_context() != start_context:
                     err = "%s changed context from %s to %s on exception" % (
-                        f, start_context, LoggingContext.current_context()
+                        f,
+                        start_context,
+                        LoggingContext.current_context(),
                     )
                     print(err, file=sys.stderr)
                     raise Exception(err)
@@ -54,7 +56,9 @@ def do_patch():
             if not isinstance(res, Deferred) or res.called:
                 if LoggingContext.current_context() != start_context:
                     err = "%s changed context from %s to %s" % (
-                        f, start_context, LoggingContext.current_context()
+                        f,
+                        start_context,
+                        LoggingContext.current_context(),
                     )
                     # print the error to stderr because otherwise all we
                     # see in travis-ci is the 500 error
@@ -66,9 +70,7 @@ def do_patch():
                 err = (
                     "%s returned incomplete deferred in non-sentinel context "
                     "%s (start was %s)"
-                ) % (
-                    f, LoggingContext.current_context(), start_context,
-                )
+                ) % (f, LoggingContext.current_context(), start_context)
                 print(err, file=sys.stderr)
                 raise Exception(err)
 
@@ -76,7 +78,9 @@ def do_patch():
                 if LoggingContext.current_context() != start_context:
                     err = "%s completion of %s changed context from %s to %s" % (
                         "Failure" if isinstance(r, Failure) else "Success",
-                        f, start_context, LoggingContext.current_context(),
+                        f,
+                        start_context,
+                        LoggingContext.current_context(),
                     )
                     print(err, file=sys.stderr)
                     raise Exception(err)

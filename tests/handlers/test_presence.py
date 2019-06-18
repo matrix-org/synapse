@@ -424,8 +424,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            "server", http_client=None,
-            federation_sender=Mock(),
+            "server", http_client=None, federation_sender=Mock()
         )
         return hs
 
@@ -457,7 +456,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         # Mark test2 as online, test will be offline with a last_active of 0
         self.presence_handler.set_state(
-            UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE},
+            UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
         )
         self.reactor.pump([0])  # Wait for presence updates to be handled
 
@@ -506,13 +505,13 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         # Mark test as online
         self.presence_handler.set_state(
-            UserID.from_string("@test:server"), {"presence": PresenceState.ONLINE},
+            UserID.from_string("@test:server"), {"presence": PresenceState.ONLINE}
         )
 
         # Mark test2 as online, test will be offline with a last_active of 0.
         # Note we don't join them to the room yet
         self.presence_handler.set_state(
-            UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE},
+            UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
         )
 
         # Add servers to the room
@@ -541,8 +540,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=set(("server2", "server3")),
-            states=[expected_state]
+            destinations=set(("server2", "server3")), states=[expected_state]
         )
 
     def _add_new_user(self, room_id, user_id):
@@ -565,7 +563,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             type=EventTypes.Member,
             sender=user_id,
             state_key=user_id,
-            content={"membership": Membership.JOIN}
+            content={"membership": Membership.JOIN},
         )
 
         prev_event_ids = self.get_success(

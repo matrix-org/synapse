@@ -74,21 +74,18 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
             self.assertEqual(
                 master_result,
                 expected_result,
-                "Expected master result to be %r but was %r" % (
-                    expected_result, master_result
-                ),
+                "Expected master result to be %r but was %r"
+                % (expected_result, master_result),
             )
             self.assertEqual(
                 slaved_result,
                 expected_result,
-                "Expected slave result to be %r but was %r" % (
-                    expected_result, slaved_result
-                ),
+                "Expected slave result to be %r but was %r"
+                % (expected_result, slaved_result),
             )
         self.assertEqual(
             master_result,
             slaved_result,
-            "Slave result %r does not match master result %r" % (
-                slaved_result, master_result
-            ),
+            "Slave result %r does not match master result %r"
+            % (slaved_result, master_result),
         )

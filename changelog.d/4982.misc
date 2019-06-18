@@ -1,1 +1,0 @@
-Track which identity server is used when binding a threepid and use that for unbinding, as per MSC1915.

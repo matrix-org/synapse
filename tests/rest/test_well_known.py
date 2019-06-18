@@ -31,27 +31,24 @@ class WellKnownTests(unittest.HomeserverTestCase):
         self.hs.config.default_identity_server = "https://testis"
 
         request, channel = self.make_request(
-            "GET",
-            "/.well-known/matrix/client",
-            shorthand=False,
+            "GET", "/.well-known/matrix/client", shorthand=False
         )
         self.render(request)
 
         self.assertEqual(request.code, 200)
         self.assertEqual(
-            channel.json_body, {
+            channel.json_body,
+            {
                 "m.homeserver": {"base_url": "https://tesths"},
                 "m.identity_server": {"base_url": "https://testis"},
-            }
+            },
         )
 
     def test_well_known_no_public_baseurl(self):
         self.hs.config.public_baseurl = None
 
         request, channel = self.make_request(
-            "GET",
-            "/.well-known/matrix/client",
-            shorthand=False,
+            "GET", "/.well-known/matrix/client", shorthand=False
         )
         self.render(request)
 

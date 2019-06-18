@@ -36,6 +36,7 @@ from .engines import PostgresEngine
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events import EventsStore
+from .events_bg_updates import EventsBackgroundUpdatesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
@@ -49,11 +50,13 @@ from .pusher import PusherStore
 from .receipts import ReceiptsStore
 from .registration import RegistrationStore
 from .rejections import RejectionsStore
+from .relations import RelationsStore
 from .room import RoomStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
 from .signatures import SignatureStore
 from .state import StateStore
+from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
 from .transactions import TransactionStore
@@ -64,6 +67,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataStore(
+    EventsBackgroundUpdatesStore,
     RoomMemberStore,
     RoomStore,
     RegistrationStore,
@@ -99,6 +103,8 @@ class DataStore(
     GroupServerStore,
     UserErasureStore,
     MonthlyActiveUsersStore,
+    StatsStore,
+    RelationsStore,
 ):
     def __init__(self, db_conn, hs):
         self.hs = hs
@@ -273,23 +279,37 @@ class DataStore(
         """
         Counts the number of users who used this homeserver in the last 24 hours.
         """
+        yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
+        return self.runInteraction("count_daily_users", self._count_users, yesterday,)
 
-        def _count_users(txn):
-            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
+    def count_monthly_users(self):
+        """
+        Counts the number of users who used this homeserver in the last 30 days.
+        Note this method is intended for phonehome metrics only and is different
+        from the mau figure in synapse.storage.monthly_active_users which,
+        amongst other things, includes a 3 day grace period before a user counts.
+        """
+        thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
+        return self.runInteraction(
+            "count_monthly_users",
+            self._count_users,
+            thirty_days_ago,
+        )
 
-            sql = """
-                SELECT COALESCE(count(*), 0) FROM (
-                    SELECT user_id FROM user_ips
-                    WHERE last_seen > ?
-                    GROUP BY user_id
-                ) u
-            """
-
-            txn.execute(sql, (yesterday,))
-            count, = txn.fetchone()
-            return count
-
-        return self.runInteraction("count_users", _count_users)
+    def _count_users(self, txn, time_from):
+        """
+        Returns number of users seen in the past time_from period
+        """
+        sql = """
+            SELECT COALESCE(count(*), 0) FROM (
+                SELECT user_id FROM user_ips
+                WHERE last_seen > ?
+                GROUP BY user_id
+            ) u
+        """
+        txn.execute(sql, (time_from,))
+        count, = txn.fetchone()
+        return count
 
     def count_r30_users(self):
         """
