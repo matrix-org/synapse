@@ -358,7 +358,6 @@ class RoomAccessRules(object):
 
         return existing_members, threepid_invite_tokens
 
-
     @staticmethod
     def _is_invite_from_threepid(invite, threepid_invite_token):
         """Checks whether the given invite follows the given 3PID invite.
