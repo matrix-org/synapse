@@ -16,11 +16,8 @@
 
 import json
 
-import synapse.rest.admin
-from synapse.config._base import ConfigError
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
-from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 from synapse.third_party_rules.access_rules import (
     ACCESS_RULE_DIRECT,
     ACCESS_RULE_RESTRICTED,
