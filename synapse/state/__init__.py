@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 # Metrics for number of state groups involved in a resolution.
 state_groups_histogram = Histogram(
     "synapse_state_number_state_groups", "",
-    buckets=(0, 1, 2, 3, 5, 7, 10, 20, 50, 100, "+Inf"),
+    buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
 
 
