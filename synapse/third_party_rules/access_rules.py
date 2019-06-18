@@ -242,7 +242,9 @@ class RoomAccessRules(object):
         """
         # "restricted" currently means that users can only invite users if their server is
         # included in a limited list of domains.
-        if event.type != EventTypes.Member and event.type != EventTypes.ThirdPartyInvite:
+        # We're not filtering on m.room.third_party_member events here because the
+        # filtering on threepids is done in check_threepid_can_be_invited.
+        if event.type != EventTypes.Member:
             return True
         invitee_domain = get_domain_from_id(event.state_key)
         return invitee_domain not in self.domains_forbidden_when_restricted
