@@ -15,6 +15,8 @@
 
 
 import json
+import random
+import string
 
 from mock import Mock
 
@@ -32,7 +34,7 @@ from synapse.third_party_rules.access_rules import (
 from tests import unittest
 
 
-class RoomAccessEventTestCase(unittest.HomeserverTestCase):
+class RoomAccessTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         admin.register_servlets,
@@ -52,18 +54,51 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
                 "id_server": "testis",
             }
         }
+        config["trusted_third_party_id_servers"] = [
+            "testis",
+        ]
 
         def send_invite(destination, room_id, event_id, pdu):
             return defer.succeed(pdu)
 
-        federation_client = Mock(spec=[
+        def get_json(uri, args={}, headers=None):
+            address_domain = args["address"].split("@")[1]
+            return defer.succeed({"hs": address_domain})
+
+        def post_urlencoded_get_json(uri, args={}, headers=None):
+            token = ''.join(random.choice(string.ascii_letters) for _ in range(10))
+            return defer.succeed({
+                "token": token,
+                "public_keys": [
+                    {
+                        "public_key": "serverpublickey",
+                        "key_validity_url": "https://testis/pubkey/isvalid",
+                    },
+                    {
+                        "public_key": "phemeralpublickey",
+                        "key_validity_url": "https://testis/pubkey/ephemeral/isvalid",
+                    },
+                ],
+                "display_name": "f...@b...",
+            })
+
+        mock_federation_client = Mock(spec=[
             "send_invite",
         ])
-        federation_client.send_invite.side_effect = send_invite
+        mock_federation_client.send_invite.side_effect = send_invite
 
+        mock_http_client = Mock(spec=[
+            "get_json",
+            "post_urlencoded_get_json"
+        ])
+        # Mocking the response for /info on the IS API.
+        mock_http_client.get_json.side_effect = get_json
+        # Mocking the response for /store-invite on the IS API.
+        mock_http_client.post_urlencoded_get_json.side_effect = post_urlencoded_get_json
         self.hs = self.setup_test_homeserver(
             config=config,
-            federation_client=federation_client,
+            federation_client=mock_federation_client,
+            simple_http_client=mock_http_client,
         )
 
         return self.hs
@@ -74,13 +109,17 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
 
         self.restricted_room = self.create_room()
         self.unrestricted_room = self.create_room(rule=ACCESS_RULE_UNRESTRICTED)
-        self.direct_room = self.create_room(direct=True)
+        self.direct_rooms = [
+            self.create_room(direct=True),
+            self.create_room(direct=True),
+            self.create_room(direct=True),
+        ]
 
         self.invitee_id = self.register_user("invitee", "test")
         self.invitee_tok = self.login("invitee", "test")
 
         self.helper.invite(
-            room=self.direct_room,
+            room=self.direct_rooms[0],
             src=self.user_id,
             targ=self.invitee_id,
             tok=self.tok,
@@ -121,6 +160,7 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
         """Tests that in restricted mode we're unable to invite users from blacklisted
         servers but can invite other users.
         """
+        # We can't invite a user from a forbidden HS.
         self.helper.invite(
             room=self.restricted_room,
             src=self.user_id,
@@ -129,12 +169,28 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
             expect_code=403,
         )
 
+        # We can invite a user which HS isn't forbidden.
         self.helper.invite(
             room=self.restricted_room,
             src=self.user_id,
-            targ="@test:not_forbidden_domain",
+            targ="@test:allowed_domain",
             tok=self.tok,
             expect_code=200,
+        )
+
+        # We can't send a 3PID invite to an address that is mapped to a forbidden HS.
+        self.send_threepid_invite(
+            address="test@forbidden_domain",
+            room_id=self.restricted_room,
+            expected_code=403,
+        )
+
+        # We can send a 3PID invite to an address that is mapped to an HS that's not
+        # forbidden.
+        self.send_threepid_invite(
+            address="test@allowed_domain",
+            room_id=self.restricted_room,
+            expected_code=200,
         )
 
     def test_direct(self):
@@ -143,40 +199,87 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
           * invited user joins the room
           * invited user leaves the room
           * room creator re-invites invited user
+        Also tests that a user from a HS that's in the list of forbidden domains (to use
+        in restricted mode) can be invited.
         """
+        not_invited_user = "@not_invited:forbidden_domain"
+
+        # We can't invite a new user to the room.
         self.helper.invite(
-            room=self.direct_room,
+            room=self.direct_rooms[0],
             src=self.user_id,
-            targ="@not_invited:test",
+            targ=not_invited_user,
             tok=self.tok,
             expect_code=403,
         )
 
+        # The invited user can join the room.
         self.helper.join(
-            room=self.direct_room,
+            room=self.direct_rooms[0],
             user=self.invitee_id,
             tok=self.invitee_tok,
             expect_code=200,
         )
 
+        # The invited user can leave the room.
         self.helper.leave(
-            room=self.direct_room,
+            room=self.direct_rooms[0],
             user=self.invitee_id,
             tok=self.invitee_tok,
             expect_code=200,
         )
 
+        # The invited user can be re-invited to the room.
         self.helper.invite(
-            room=self.direct_room,
+            room=self.direct_rooms[0],
             src=self.user_id,
             targ=self.invitee_id,
             tok=self.tok,
             expect_code=200,
         )
 
+        # If we're alone in the room and have always been the only member, we can invite
+        # someone.
+        self.helper.invite(
+            room=self.direct_rooms[1],
+            src=self.user_id,
+            targ=not_invited_user,
+            tok=self.tok,
+            expect_code=200,
+        )
+
+        # We can't send a 3PID invite to a room that already has two members.
+        self.send_threepid_invite(
+            address="test@allowed_domain",
+            room_id=self.direct_rooms[0],
+            expected_code=403,
+        )
+
+        # We can't send a 3PID invite to a room that already has a pending invite.
+        self.send_threepid_invite(
+            address="test@allowed_domain",
+            room_id=self.direct_rooms[1],
+            expected_code=403,
+        )
+
+        # We can send a 3PID invite to a room in which we've always been the only member.
+        self.send_threepid_invite(
+            address="test@forbidden_domain",
+            room_id=self.direct_rooms[2],
+            expected_code=200,
+        )
+
+        # We can send a 3PID invite to a room in which there's a 3PID invite.
+        self.send_threepid_invite(
+            address="test@forbidden_domain",
+            room_id=self.direct_rooms[2],
+            expected_code=403,
+        )
+
     def test_unrestricted(self):
         """Tests that, in unrestricted mode, we can invite whoever we want.
         """
+        # We can invite
         self.helper.invite(
             room=self.unrestricted_room,
             src=self.user_id,
@@ -191,6 +294,21 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
             targ="@test:not_forbidden_domain",
             tok=self.tok,
             expect_code=200,
+        )
+
+        # We can send a 3PID invite to an address that is mapped to a forbidden HS.
+        self.send_threepid_invite(
+            address="test@forbidden_domain",
+            room_id=self.unrestricted_room,
+            expected_code=200,
+        )
+
+        # We can send a 3PID invite to an address that is mapped to an HS that's not
+        # forbidden.
+        self.send_threepid_invite(
+            address="test@allowed_domain",
+            room_id=self.unrestricted_room,
+            expected_code=200,
         )
 
     def create_room(self, direct=False, rule=None, expected_code=200):
@@ -230,3 +348,19 @@ class RoomAccessEventTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["rule"]
+
+    def send_threepid_invite(self, address, room_id, expected_code=200):
+        params = {
+            "id_server": "testis",
+            "medium": "email",
+            "address": address,
+        }
+
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/%s/invite" % room_id,
+            json.dumps(params),
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
