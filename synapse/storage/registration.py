@@ -662,7 +662,7 @@ class RegistrationStore(
 
             for user in rows:
                 if not user["count_tokens"] and not user["count_threepids"]:
-                    self.set_user_deactivated_status_txn(txn, user["user_id"], True)
+                    self.set_user_deactivated_status_txn(txn, user["name"], True)
                     rows_processed_nb += 1
 
             logger.info("Marked %d rows as deactivated", rows_processed_nb)
