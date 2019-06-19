@@ -213,7 +213,6 @@ class SQLBaseStore(object):
         #   is running in mainline, and we have some nice monitoring frontends
         #   to watch it
         self._txn_perf_counters = PerformanceCounters()
-        self._get_event_counters = PerformanceCounters()
 
         self._get_event_cache = Cache(
             "*getEvent*", keylen=3, max_entries=hs.config.event_cache_size
@@ -369,15 +368,10 @@ class SQLBaseStore(object):
                 time_now - time_then, limit=3
             )
 
-            top_3_event_counters = self._get_event_counters.interval(
-                time_now - time_then, limit=3
-            )
-
             perf_logger.info(
-                "Total database time: %.3f%% {%s} {%s}",
+                "Total database time: %.3f%% {%s}",
                 ratio * 100,
                 top_three_counters,
-                top_3_event_counters,
             )
 
         self._clock.looping_call(loop, 10000)
