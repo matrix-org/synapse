@@ -498,15 +498,25 @@ class FederationHandler(BaseHandler):
         #
         # All that said: Let's try increasing the timout to 60s and see what happens.
 
-        missing_events = yield self.federation_client.get_missing_events(
-            origin,
-            room_id,
-            earliest_events_ids=list(latest),
-            latest_events=[pdu],
-            limit=10,
-            min_depth=min_depth,
-            timeout=60000,
-        )
+        try:
+            missing_events = yield self.federation_client.get_missing_events(
+                origin,
+                room_id,
+                earliest_events_ids=list(latest),
+                latest_events=[pdu],
+                limit=10,
+                min_depth=min_depth,
+                timeout=60000,
+            )
+        except RequestSendFailed as e:
+            # We failed to get the missing events, but since we need to handle
+            # the case of `get_missing_events` not returning the necessary
+            # events anyway, it is safe to simply log the error and continue.
+            logger.warn(
+                "[%s %s]: Failed to get prev_events: %s",
+                room_id, event_id, e,
+            )
+            return
 
         logger.info(
             "[%s %s]: Got %d prev_events: %s",
