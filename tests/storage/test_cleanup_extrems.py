@@ -255,7 +255,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         )
         self.assertEqual(len(latest_event_ids), 50)
 
-        # Bump the reacto repeatedly so that the background updates have a
+        # Pump the reactor repeatedly so that the background updates have a
         # chance to run.
         self.pump(10 * 60)
 

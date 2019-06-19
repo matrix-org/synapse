@@ -93,7 +93,7 @@ class _EventInternalMetadata(object):
         return getattr(self, "soft_failed", False)
 
     def should_proactively_send(self):
-        """Whether the eventm, if ours, should be sent to other clients and
+        """Whether the event, if ours, should be sent to other clients and
         servers.
 
         This is used for sending dummy events internally. Servers and clients
