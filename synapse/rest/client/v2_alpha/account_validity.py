@@ -79,7 +79,7 @@ class AccountValiditySendMailServlet(RestServlet):
         if not self.account_validity.renew_by_email_enabled:
             raise AuthError(403, "Account renewal via email is disabled on this server.")
 
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_expired=True)
         user_id = requester.user.to_string()
         yield self.account_activity_handler.send_renewal_email_to_user(user_id)
 

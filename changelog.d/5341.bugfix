@@ -1,1 +1,0 @@
-Fix a bug where account validity renewal emails could only be sent when email notifs were enabled.

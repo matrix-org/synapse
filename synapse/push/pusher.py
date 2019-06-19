@@ -70,8 +70,8 @@ class PusherFactory(object):
             mailer = Mailer(
                 hs=self.hs,
                 app_name=app_name,
-                notif_template_html=self.notif_template_html,
-                notif_template_text=self.notif_template_text,
+                template_html=self.notif_template_html,
+                template_text=self.notif_template_text,
             )
             self.mailers[app_name] = mailer
         return EmailPusher(self.hs, pusherdict, mailer)

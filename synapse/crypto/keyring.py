@@ -60,9 +60,9 @@ logger = logging.getLogger(__name__)
 
 
 @attr.s(slots=True, cmp=False)
-class VerifyKeyRequest(object):
+class VerifyJsonRequest(object):
     """
-    A request for a verify key to verify a JSON object.
+    A request to verify a JSON object.
 
     Attributes:
         server_name(str): The name of the server to verify against.
@@ -75,7 +75,7 @@ class VerifyKeyRequest(object):
         minimum_valid_until_ts (int): time at which we require the signing key to
             be valid. (0 implies we don't care)
 
-        deferred(Deferred[str, str, nacl.signing.VerifyKey]):
+        key_ready (Deferred[str, str, nacl.signing.VerifyKey]):
             A deferred (server_name, key_id, verify_key) tuple that resolves when
             a verify key has been fetched. The deferreds' callbacks are run with no
             logcontext.
@@ -85,10 +85,14 @@ class VerifyKeyRequest(object):
     """
 
     server_name = attr.ib()
-    key_ids = attr.ib()
     json_object = attr.ib()
     minimum_valid_until_ts = attr.ib()
-    deferred = attr.ib(default=attr.Factory(defer.Deferred))
+    request_name = attr.ib()
+    key_ids = attr.ib(init=False)
+    key_ready = attr.ib(default=attr.Factory(defer.Deferred))
+
+    def __attrs_post_init__(self):
+        self.key_ids = signature_ids(self.json_object, self.server_name)
 
 
 class KeyLookupError(ValueError):
@@ -114,7 +118,9 @@ class Keyring(object):
         # These are regular, logcontext-agnostic Deferreds.
         self.key_downloads = {}
 
-    def verify_json_for_server(self, server_name, json_object, validity_time):
+    def verify_json_for_server(
+        self, server_name, json_object, validity_time, request_name
+    ):
         """Verify that a JSON object has been signed by a given server
 
         Args:
@@ -125,24 +131,31 @@ class Keyring(object):
             validity_time (int): timestamp at which we require the signing key to
                 be valid. (0 implies we don't care)
 
+            request_name (str): an identifier for this json object (eg, an event id)
+                for logging.
+
         Returns:
             Deferred[None]: completes if the the object was correctly signed, otherwise
                 errbacks with an error
         """
-        req = server_name, json_object, validity_time
-
-        return logcontext.make_deferred_yieldable(
-            self.verify_json_objects_for_server((req,))[0]
-        )
+        req = VerifyJsonRequest(server_name, json_object, validity_time, request_name)
+        requests = (req,)
+        return logcontext.make_deferred_yieldable(self._verify_objects(requests)[0])
 
     def verify_json_objects_for_server(self, server_and_json):
         """Bulk verifies signatures of json objects, bulk fetching keys as
         necessary.
 
         Args:
-            server_and_json (iterable[Tuple[str, dict, int]):
-                Iterable of triplets of (server_name, json_object, validity_time)
-                validity_time is a timestamp at which the signing key must be valid.
+            server_and_json (iterable[Tuple[str, dict, int, str]):
+                Iterable of (server_name, json_object, validity_time, request_name)
+                tuples.
+
+                validity_time is a timestamp at which the signing key must be
+                valid.
+
+                request_name is an identifier for this json object (eg, an event id)
+                for logging.
 
         Returns:
             List<Deferred[None]>: for each input triplet, a deferred indicating success
@@ -150,38 +163,54 @@ class Keyring(object):
                 server_name. The deferreds run their callbacks in the sentinel
                 logcontext.
         """
-        # a list of VerifyKeyRequests
-        verify_requests = []
+        return self._verify_objects(
+            VerifyJsonRequest(server_name, json_object, validity_time, request_name)
+            for server_name, json_object, validity_time, request_name in server_and_json
+        )
+
+    def _verify_objects(self, verify_requests):
+        """Does the work of verify_json_[objects_]for_server
+
+
+        Args:
+            verify_requests (iterable[VerifyJsonRequest]):
+                Iterable of verification requests.
+
+        Returns:
+            List<Deferred[None]>: for each input item, a deferred indicating success
+                or failure to verify each json object's signature for the given
+                server_name. The deferreds run their callbacks in the sentinel
+                logcontext.
+        """
+        # a list of VerifyJsonRequests which are awaiting a key lookup
+        key_lookups = []
         handle = preserve_fn(_handle_key_deferred)
 
-        def process(server_name, json_object, validity_time):
+        def process(verify_request):
             """Process an entry in the request list
 
-            Given a (server_name, json_object, validity_time) triplet from the request
-            list, adds a key request to verify_requests, and returns a deferred which
+            Adds a key request to key_lookups, and returns a deferred which
             will complete or fail (in the sentinel context) when verification completes.
             """
-            key_ids = signature_ids(json_object, server_name)
-
-            if not key_ids:
+            if not verify_request.key_ids:
                 return defer.fail(
                     SynapseError(
-                        400, "Not signed by %s" % (server_name,), Codes.UNAUTHORIZED
+                        400,
+                        "Not signed by %s" % (verify_request.server_name,),
+                        Codes.UNAUTHORIZED,
                     )
                 )
 
             logger.debug(
-                "Verifying for %s with key_ids %s, min_validity %i",
-                server_name,
-                key_ids,
-                validity_time,
+                "Verifying %s for %s with key_ids %s, min_validity %i",
+                verify_request.request_name,
+                verify_request.server_name,
+                verify_request.key_ids,
+                verify_request.minimum_valid_until_ts,
             )
 
             # add the key request to the queue, but don't start it off yet.
-            verify_request = VerifyKeyRequest(
-                server_name, key_ids, json_object, validity_time
-            )
-            verify_requests.append(verify_request)
+            key_lookups.append(verify_request)
 
             # now run _handle_key_deferred, which will wait for the key request
             # to complete and then do the verification.
@@ -190,13 +219,10 @@ class Keyring(object):
             # wrap it with preserve_fn (aka run_in_background)
             return handle(verify_request)
 
-        results = [
-            process(server_name, json_object, validity_time)
-            for server_name, json_object, validity_time in server_and_json
-        ]
+        results = [process(r) for r in verify_requests]
 
-        if verify_requests:
-            run_in_background(self._start_key_lookups, verify_requests)
+        if key_lookups:
+            run_in_background(self._start_key_lookups, key_lookups)
 
         return results
 
@@ -204,10 +230,10 @@ class Keyring(object):
     def _start_key_lookups(self, verify_requests):
         """Sets off the key fetches for each verify request
 
-        Once each fetch completes, verify_request.deferred will be resolved.
+        Once each fetch completes, verify_request.key_ready will be resolved.
 
         Args:
-            verify_requests (List[VerifyKeyRequest]):
+            verify_requests (List[VerifyJsonRequest]):
         """
 
         try:
@@ -250,7 +276,7 @@ class Keyring(object):
                 return res
 
             for verify_request in verify_requests:
-                verify_request.deferred.addBoth(remove_deferreds, verify_request)
+                verify_request.key_ready.addBoth(remove_deferreds, verify_request)
         except Exception:
             logger.exception("Error starting key lookups")
 
@@ -303,16 +329,16 @@ class Keyring(object):
     def _get_server_verify_keys(self, verify_requests):
         """Tries to find at least one key for each verify request
 
-        For each verify_request, verify_request.deferred is called back with
+        For each verify_request, verify_request.key_ready is called back with
         params (server_name, key_id, VerifyKey) if a key is found, or errbacked
         with a SynapseError if none of the keys are found.
 
         Args:
-            verify_requests (list[VerifyKeyRequest]): list of verify requests
+            verify_requests (list[VerifyJsonRequest]): list of verify requests
         """
 
         remaining_requests = set(
-            (rq for rq in verify_requests if not rq.deferred.called)
+            (rq for rq in verify_requests if not rq.key_ready.called)
         )
 
         @defer.inlineCallbacks
@@ -326,7 +352,7 @@ class Keyring(object):
                 # look for any requests which weren't satisfied
                 with PreserveLoggingContext():
                     for verify_request in remaining_requests:
-                        verify_request.deferred.errback(
+                        verify_request.key_ready.errback(
                             SynapseError(
                                 401,
                                 "No key for %s with ids in %s (min_validity %i)"
@@ -346,8 +372,8 @@ class Keyring(object):
             logger.error("Unexpected error in _get_server_verify_keys: %s", err)
             with PreserveLoggingContext():
                 for verify_request in remaining_requests:
-                    if not verify_request.deferred.called:
-                        verify_request.deferred.errback(err)
+                    if not verify_request.key_ready.called:
+                        verify_request.key_ready.errback(err)
 
         run_in_background(do_iterations).addErrback(on_err)
 
@@ -357,7 +383,7 @@ class Keyring(object):
 
         Args:
             fetcher (KeyFetcher): fetcher to use to fetch the keys
-            remaining_requests (set[VerifyKeyRequest]): outstanding key requests.
+            remaining_requests (set[VerifyJsonRequest]): outstanding key requests.
                 Any successfully-completed requests will be removed from the list.
         """
         # dict[str, dict[str, int]]: keys to fetch.
@@ -366,7 +392,7 @@ class Keyring(object):
 
         for verify_request in remaining_requests:
             # any completed requests should already have been removed
-            assert not verify_request.deferred.called
+            assert not verify_request.key_ready.called
             keys_for_server = missing_keys[verify_request.server_name]
 
             for key_id in verify_request.key_ids:
@@ -376,7 +402,7 @@ class Keyring(object):
                 # the requests.
                 keys_for_server[key_id] = max(
                     keys_for_server.get(key_id, -1),
-                    verify_request.minimum_valid_until_ts
+                    verify_request.minimum_valid_until_ts,
                 )
 
         results = yield fetcher.get_keys(missing_keys)
@@ -386,7 +412,7 @@ class Keyring(object):
             server_name = verify_request.server_name
 
             # see if any of the keys we got this time are sufficient to
-            # complete this VerifyKeyRequest.
+            # complete this VerifyJsonRequest.
             result_keys = results.get(server_name, {})
             for key_id in verify_request.key_ids:
                 fetch_key_result = result_keys.get(key_id)
@@ -402,7 +428,7 @@ class Keyring(object):
                     continue
 
                 with PreserveLoggingContext():
-                    verify_request.deferred.callback(
+                    verify_request.key_ready.callback(
                         (server_name, key_id, fetch_key_result.verify_key)
                     )
                 completed.append(verify_request)
@@ -454,9 +480,7 @@ class BaseV2KeyFetcher(object):
         self.config = hs.get_config()
 
     @defer.inlineCallbacks
-    def process_v2_response(
-        self, from_server, response_json, time_added_ms
-    ):
+    def process_v2_response(self, from_server, response_json, time_added_ms):
         """Parse a 'Server Keys' structure from the result of a /key request
 
         This is used to parse either the entirety of the response from
@@ -561,25 +585,27 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         super(PerspectivesKeyFetcher, self).__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_http_client()
-        self.perspective_servers = self.config.perspectives
+        self.key_servers = self.config.key_servers
 
     @defer.inlineCallbacks
     def get_keys(self, keys_to_fetch):
         """see KeyFetcher.get_keys"""
 
         @defer.inlineCallbacks
-        def get_key(perspective_name, perspective_keys):
+        def get_key(key_server):
             try:
                 result = yield self.get_server_verify_key_v2_indirect(
-                    keys_to_fetch, perspective_name, perspective_keys
+                    keys_to_fetch, key_server
                 )
                 defer.returnValue(result)
             except KeyLookupError as e:
-                logger.warning("Key lookup failed from %r: %s", perspective_name, e)
+                logger.warning(
+                    "Key lookup failed from %r: %s", key_server.server_name, e
+                )
             except Exception as e:
                 logger.exception(
                     "Unable to get key from %r: %s %s",
-                    perspective_name,
+                    key_server.server_name,
                     type(e).__name__,
                     str(e),
                 )
@@ -589,8 +615,8 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         results = yield logcontext.make_deferred_yieldable(
             defer.gatherResults(
                 [
-                    run_in_background(get_key, p_name, p_keys)
-                    for p_name, p_keys in self.perspective_servers.items()
+                    run_in_background(get_key, server)
+                    for server in self.key_servers
                 ],
                 consumeErrors=True,
             ).addErrback(unwrapFirstError)
@@ -605,17 +631,15 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
     @defer.inlineCallbacks
     def get_server_verify_key_v2_indirect(
-        self, keys_to_fetch, perspective_name, perspective_keys
+        self, keys_to_fetch, key_server
     ):
         """
         Args:
             keys_to_fetch (dict[str, dict[str, int]]):
                 the keys to be fetched. server_name -> key_id -> min_valid_ts
 
-            perspective_name (str): name of the notary server to query for the keys
-
-            perspective_keys (dict[str, VerifyKey]): map of key_id->key for the
-                notary server
+            key_server (synapse.config.key.TrustedKeyServer): notary server to query for
+                the keys
 
         Returns:
             Deferred[dict[str, dict[str, synapse.storage.keys.FetchKeyResult]]]: map
@@ -625,6 +649,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             KeyLookupError if there was an error processing the entire response from
                 the server
         """
+        perspective_name = key_server.server_name
         logger.info(
             "Requesting keys %s from notary server %s",
             keys_to_fetch.items(),
@@ -665,11 +690,13 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 )
 
             try:
-                processed_response = yield self._process_perspectives_response(
-                    perspective_name,
-                    perspective_keys,
+                self._validate_perspectives_response(
+                    key_server,
                     response,
-                    time_added_ms=time_now_ms,
+                )
+
+                processed_response = yield self.process_v2_response(
+                    perspective_name, response, time_added_ms=time_now_ms
                 )
             except KeyLookupError as e:
                 logger.warning(
@@ -693,28 +720,24 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
         defer.returnValue(keys)
 
-    def _process_perspectives_response(
-        self, perspective_name, perspective_keys, response, time_added_ms
+    def _validate_perspectives_response(
+        self, key_server, response,
     ):
-        """Parse a 'Server Keys' structure from the result of a /key/query request
-
-        Checks that the entry is correctly signed by the perspectives server, and then
-        passes over to process_v2_response
+        """Optionally check the signature on the result of a /key/query request
 
         Args:
-            perspective_name (str): the name of the notary server that produced this
-                result
-
-            perspective_keys (dict[str, VerifyKey]): map of key_id->key for the
-                notary server
+            key_server (synapse.config.key.TrustedKeyServer): the notary server that
+                produced this result
 
             response (dict): the json-decoded Server Keys response object
-
-            time_added_ms (int): the timestamp to record in server_keys_json
-
-        Returns:
-            Deferred[dict[str, FetchKeyResult]]: map from key_id to result object
         """
+        perspective_name = key_server.server_name
+        perspective_keys = key_server.verify_keys
+
+        if perspective_keys is None:
+            # signature checking is disabled on this server
+            return
+
         if (
             u"signatures" not in response
             or perspective_name not in response[u"signatures"]
@@ -735,10 +758,6 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                     list(perspective_keys.keys()),
                 )
             )
-
-        return self.process_v2_response(
-            perspective_name, response, time_added_ms=time_added_ms
-        )
 
 
 class ServerKeyFetcher(BaseV2KeyFetcher):
@@ -852,7 +871,7 @@ def _handle_key_deferred(verify_request):
     """Waits for the key to become available, and then performs a verification
 
     Args:
-        verify_request (VerifyKeyRequest):
+        verify_request (VerifyJsonRequest):
 
     Returns:
         Deferred[None]
@@ -862,14 +881,10 @@ def _handle_key_deferred(verify_request):
     """
     server_name = verify_request.server_name
     with PreserveLoggingContext():
-        _, key_id, verify_key = yield verify_request.deferred
+        _, key_id, verify_key = yield verify_request.key_ready
 
     json_object = verify_request.json_object
 
-    logger.debug(
-        "Got key %s %s:%s for server %s, verifying"
-        % (key_id, verify_key.alg, verify_key.version, server_name)
-    )
     try:
         verify_signed_json(json_object, server_name, verify_key)
     except SignatureVerifyException as e:

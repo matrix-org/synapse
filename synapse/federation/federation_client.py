@@ -17,7 +17,6 @@
 import copy
 import itertools
 import logging
-import random
 
 from six.moves import range
 
@@ -233,7 +232,8 @@ class FederationClient(FederationBase):
                 moving to the next destination. None indicates no timeout.
 
         Returns:
-            Deferred: Results in the requested PDU.
+            Deferred: Results in the requested PDU, or None if we were unable to find
+               it.
         """
 
         # TODO: Rate limit the number of times we try and get the same event.
@@ -258,7 +258,12 @@ class FederationClient(FederationBase):
                     destination, event_id, timeout=timeout,
                 )
 
-                logger.debug("transaction_data %r", transaction_data)
+                logger.debug(
+                    "retrieved event id %s from %s: %r",
+                    event_id,
+                    destination,
+                    transaction_data,
+                )
 
                 pdu_list = [
                     event_from_pdu_json(p, format_ver, outlier=outlier)
@@ -280,6 +285,7 @@ class FederationClient(FederationBase):
                     "Failed to get PDU %s from %s because %s",
                     event_id, destination, e,
                 )
+                continue
             except NotRetryingDestination as e:
                 logger.info(str(e))
                 continue
@@ -326,12 +332,16 @@ class FederationClient(FederationBase):
             state_event_ids = result["pdu_ids"]
             auth_event_ids = result.get("auth_chain_ids", [])
 
-            fetched_events, failed_to_fetch = yield self.get_events(
-                [destination], room_id, set(state_event_ids + auth_event_ids)
+            fetched_events, failed_to_fetch = yield self.get_events_from_store_or_dest(
+                destination, room_id, set(state_event_ids + auth_event_ids)
             )
 
             if failed_to_fetch:
-                logger.warn("Failed to get %r", failed_to_fetch)
+                logger.warning(
+                    "Failed to fetch missing state/auth events for %s: %s",
+                    room_id,
+                    failed_to_fetch
+                )
 
             event_map = {
                 ev.event_id: ev for ev in fetched_events
@@ -397,27 +407,20 @@ class FederationClient(FederationBase):
         defer.returnValue((signed_pdus, signed_auth))
 
     @defer.inlineCallbacks
-    def get_events(self, destinations, room_id, event_ids, return_local=True):
-        """Fetch events from some remote destinations, checking if we already
-        have them.
+    def get_events_from_store_or_dest(self, destination, room_id, event_ids):
+        """Fetch events from a remote destination, checking if we already have them.
 
         Args:
-            destinations (list)
+            destination (str)
             room_id (str)
             event_ids (list)
-            return_local (bool): Whether to include events we already have in
-                the DB in the returned list of events
 
         Returns:
             Deferred: A deferred resolving to a 2-tuple where the first is a list of
             events and the second is a list of event ids that we failed to fetch.
         """
-        if return_local:
-            seen_events = yield self.store.get_events(event_ids, allow_rejected=True)
-            signed_events = list(seen_events.values())
-        else:
-            seen_events = yield self.store.have_seen_events(event_ids)
-            signed_events = []
+        seen_events = yield self.store.get_events(event_ids, allow_rejected=True)
+        signed_events = list(seen_events.values())
 
         failed_to_fetch = set()
 
@@ -428,10 +431,11 @@ class FederationClient(FederationBase):
         if not missing_events:
             defer.returnValue((signed_events, failed_to_fetch))
 
-        def random_server_list():
-            srvs = list(destinations)
-            random.shuffle(srvs)
-            return srvs
+        logger.debug(
+            "Fetching unknown state/auth events %s for room %s",
+            missing_events,
+            event_ids,
+        )
 
         room_version = yield self.store.get_room_version(room_id)
 
@@ -443,7 +447,7 @@ class FederationClient(FederationBase):
             deferreds = [
                 run_in_background(
                     self.get_pdu,
-                    destinations=random_server_list(),
+                    destinations=[destination],
                     event_id=e_id,
                     room_version=room_version,
                 )

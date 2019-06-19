@@ -42,7 +42,7 @@ from signedjson.sign import sign_json
 
 from twisted.internet import defer
 
-from synapse.api.errors import RequestSendFailed, SynapseError
+from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
 from synapse.util.logcontext import run_in_background
@@ -101,7 +101,9 @@ class GroupAttestationSigning(object):
         if valid_until_ms < now:
             raise SynapseError(400, "Attestation expired")
 
-        yield self.keyring.verify_json_for_server(server_name, attestation, now)
+        yield self.keyring.verify_json_for_server(
+            server_name, attestation, now, "Group attestation"
+        )
 
     def create_attestation(self, group_id, user_id):
         """Create an attestation for the group_id and user_id with default
@@ -130,9 +132,10 @@ class GroupAttestionRenewer(object):
         self.is_mine_id = hs.is_mine_id
         self.attestations = hs.get_groups_attestation_signing()
 
-        self._renew_attestations_loop = self.clock.looping_call(
-            self._start_renew_attestations, 30 * 60 * 1000,
-        )
+        if not hs.config.worker_app:
+            self._renew_attestations_loop = self.clock.looping_call(
+                self._start_renew_attestations, 30 * 60 * 1000,
+            )
 
     @defer.inlineCallbacks
     def on_renew_attestation(self, group_id, user_id, content):
@@ -192,7 +195,7 @@ class GroupAttestionRenewer(object):
                 yield self.store.update_attestation_renewal(
                     group_id, user_id, attestation
                 )
-            except RequestSendFailed as e:
+            except (RequestSendFailed, HttpResponseException) as e:
                 logger.warning(
                     "Failed to renew attestation of %r in %r: %s",
                     user_id, group_id, e,

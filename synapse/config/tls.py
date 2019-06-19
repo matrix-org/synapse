@@ -74,7 +74,7 @@ class TlsConfig(Config):
 
         # Whether to verify certificates on outbound federation traffic
         self.federation_verify_certificates = config.get(
-            "federation_verify_certificates", False,
+            "federation_verify_certificates", True,
         )
 
         # Whitelist of domains to not verify certificates for
@@ -107,7 +107,7 @@ class TlsConfig(Config):
             certs = []
             for ca_file in custom_ca_list:
                 logger.debug("Reading custom CA certificate file: %s", ca_file)
-                content = self.read_file(ca_file)
+                content = self.read_file(ca_file, "federation_custom_ca_list")
 
                 # Parse the CA certificates
                 try:
@@ -241,12 +241,12 @@ class TlsConfig(Config):
         #
         #tls_private_key_path: "%(tls_private_key_path)s"
 
-        # Whether to verify TLS certificates when sending federation traffic.
+        # Whether to verify TLS server certificates for outbound federation requests.
         #
-        # This currently defaults to `false`, however this will change in
-        # Synapse 1.0 when valid federation certificates will be required.
+        # Defaults to `true`. To disable certificate verification, uncomment the
+        # following line.
         #
-        #federation_verify_certificates: true
+        #federation_verify_certificates: false
 
         # Skip federation certificate verification on the following whitelist
         # of domains.

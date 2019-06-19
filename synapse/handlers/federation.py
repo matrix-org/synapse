@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,8 +34,10 @@ from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
+    Codes,
     FederationDeniedError,
     FederationError,
+    RequestSendFailed,
     StoreError,
     SynapseError,
 )
@@ -125,6 +128,8 @@ class FederationHandler(BaseHandler):
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
+
+        self.third_party_event_rules = hs.get_third_party_event_rules()
 
     @defer.inlineCallbacks
     def on_receive_pdu(
@@ -1257,6 +1262,15 @@ class FederationHandler(BaseHandler):
             logger.warn("Failed to create join %r because %s", event, e)
             raise e
 
+        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event, context,
+        )
+        if not event_allowed:
+            logger.info("Creation of join %s forbidden by third-party rules", event)
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN,
+            )
+
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
         yield self.auth.check_from_context(
@@ -1298,6 +1312,15 @@ class FederationHandler(BaseHandler):
         context = yield self._handle_new_event(
             origin, event
         )
+
+        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event, context,
+        )
+        if not event_allowed:
+            logger.info("Sending of join %s forbidden by third-party rules", event)
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN,
+            )
 
         logger.debug(
             "on_send_join_request: After _handle_new_event: %s, sigs: %s",
@@ -1457,6 +1480,15 @@ class FederationHandler(BaseHandler):
             builder=builder,
         )
 
+        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event, context,
+        )
+        if not event_allowed:
+            logger.warning("Creation of leave %s forbidden by third-party rules", event)
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN,
+            )
+
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
@@ -1483,9 +1515,18 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        yield self._handle_new_event(
+        context = yield self._handle_new_event(
             origin, event
         )
+
+        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event, context,
+        )
+        if not event_allowed:
+            logger.info("Sending of leave %s forbidden by third-party rules", event)
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN,
+            )
 
         logger.debug(
             "on_send_leave_request: After _handle_new_event: %s, sigs: %s",
@@ -2027,9 +2068,21 @@ class FederationHandler(BaseHandler):
         """
         room_version = yield self.store.get_room_version(event.room_id)
 
-        yield self._update_auth_events_and_context_for_auth(
-            origin, event, context, auth_events
-        )
+        try:
+            yield self._update_auth_events_and_context_for_auth(
+                origin, event, context, auth_events
+            )
+        except Exception:
+            # We don't really mind if the above fails, so lets not fail
+            # processing if it does. However, it really shouldn't fail so
+            # let's still log as an exception since we'll still want to fix
+            # any bugs.
+            logger.exception(
+                "Failed to double check auth events for %s with remote. "
+                "Ignoring failure and continuing processing of event.",
+                event.event_id,
+            )
+
         try:
             self.auth.check(room_version, event, auth_events=auth_events)
         except AuthError as e:
@@ -2041,6 +2094,15 @@ class FederationHandler(BaseHandler):
         self, origin, event, context, auth_events
     ):
         """Helper for do_auth. See there for docs.
+
+        Checks whether a given event has the expected auth events. If it
+        doesn't then we talk to the remote server to compare state to see if
+        we can come to a consensus (e.g. if one server missed some valid
+        state).
+
+        This attempts to resovle any potential divergence of state between
+        servers, but is not essential and so failures should not block further
+        processing of the event.
 
         Args:
             origin (str):
@@ -2088,9 +2150,15 @@ class FederationHandler(BaseHandler):
                 missing_auth,
             )
             try:
-                remote_auth_chain = yield self.federation_client.get_event_auth(
-                    origin, event.room_id, event.event_id
-                )
+                try:
+                    remote_auth_chain = yield self.federation_client.get_event_auth(
+                        origin, event.room_id, event.event_id
+                    )
+                except RequestSendFailed as e:
+                    # The other side isn't around or doesn't implement the
+                    # endpoint, so lets just bail out.
+                    logger.info("Failed to get event auth from remote: %s", e)
+                    return
 
                 seen_remotes = yield self.store.have_seen_events(
                     [e.event_id for e in remote_auth_chain]
@@ -2236,12 +2304,18 @@ class FederationHandler(BaseHandler):
 
         try:
             # 2. Get remote difference.
-            result = yield self.federation_client.query_auth(
-                origin,
-                event.room_id,
-                event.event_id,
-                local_auth_chain,
-            )
+            try:
+                result = yield self.federation_client.query_auth(
+                    origin,
+                    event.room_id,
+                    event.event_id,
+                    local_auth_chain,
+                )
+            except RequestSendFailed as e:
+                # The other side isn't around or doesn't implement the
+                # endpoint, so lets just bail out.
+                logger.info("Failed to query auth from remote: %s", e)
+                return
 
             seen_remotes = yield self.store.have_seen_events(
                 [e.event_id for e in result["auth_chain"]]
@@ -2516,6 +2590,18 @@ class FederationHandler(BaseHandler):
                 builder=builder
             )
 
+            event_allowed = yield self.third_party_event_rules.check_event_allowed(
+                event, context,
+            )
+            if not event_allowed:
+                logger.info(
+                    "Creation of threepid invite %s forbidden by third-party rules",
+                    event,
+                )
+                raise SynapseError(
+                    403, "This event is not allowed in this context", Codes.FORBIDDEN,
+                )
+
             event, context = yield self.add_display_name_to_third_party_invite(
                 room_version, event_dict, event, context
             )
@@ -2564,6 +2650,18 @@ class FederationHandler(BaseHandler):
             builder=builder,
         )
 
+        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event, context,
+        )
+        if not event_allowed:
+            logger.warning(
+                "Exchange of threepid invite %s forbidden by third-party rules",
+                event,
+            )
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN,
+            )
+
         event, context = yield self.add_display_name_to_third_party_invite(
             room_version, event_dict, event, context
         )
@@ -2578,12 +2676,6 @@ class FederationHandler(BaseHandler):
         # We need to tell the transaction queue to send this out, even
         # though the sender isn't a local user.
         event.internal_metadata.send_on_behalf_of = get_domain_from_id(event.sender)
-
-        # XXX we send the invite here, but send_membership_event also sends it,
-        # so we end up making two requests. I think this is redundant.
-        returned_invite = yield self.send_invite(origin, event)
-        # TODO: Make sure the signatures actually are correct.
-        event.signatures.update(returned_invite.signatures)
 
         member_handler = self.hs.get_room_member_handler()
         yield member_handler.send_membership_event(None, event, context)
@@ -2652,25 +2744,55 @@ class FederationHandler(BaseHandler):
         if not invite_event:
             raise AuthError(403, "Could not find invite")
 
+        logger.debug("Checking auth on event %r", event.content)
+
         last_exception = None
+        # for each public key in the 3pid invite event
         for public_key_object in self.hs.get_auth().get_public_keys(invite_event):
             try:
+                # for each sig on the third_party_invite block of the actual invite
                 for server, signature_block in signed["signatures"].items():
                     for key_name, encoded_signature in signature_block.items():
                         if not key_name.startswith("ed25519:"):
                             continue
 
-                        public_key = public_key_object["public_key"]
-                        verify_key = decode_verify_key_bytes(
-                            key_name,
-                            decode_base64(public_key)
+                        logger.debug(
+                            "Attempting to verify sig with key %s from %r "
+                            "against pubkey %r",
+                            key_name, server, public_key_object,
                         )
-                        verify_signed_json(signed, server, verify_key)
-                        if "key_validity_url" in public_key_object:
-                            yield self._check_key_revocation(
-                                public_key,
+
+                        try:
+                            public_key = public_key_object["public_key"]
+                            verify_key = decode_verify_key_bytes(
+                                key_name,
+                                decode_base64(public_key)
+                            )
+                            verify_signed_json(signed, server, verify_key)
+                            logger.debug(
+                                "Successfully verified sig with key %s from %r "
+                                "against pubkey %r",
+                                key_name, server, public_key_object,
+                            )
+                        except Exception:
+                            logger.info(
+                                "Failed to verify sig with key %s from %r "
+                                "against pubkey %r",
+                                key_name, server, public_key_object,
+                            )
+                            raise
+                        try:
+                            if "key_validity_url" in public_key_object:
+                                yield self._check_key_revocation(
+                                    public_key,
+                                    public_key_object["key_validity_url"]
+                                )
+                        except Exception:
+                            logger.info(
+                                "Failed to query key_validity_url %s",
                                 public_key_object["key_validity_url"]
                             )
+                            raise
                         return
             except Exception as e:
                 last_exception = e

@@ -1,1 +1,0 @@
-Remove urllib3 pin as requests 2.22.0 has been released supporting urllib3 1.25.2.

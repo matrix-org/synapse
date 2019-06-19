@@ -140,7 +140,9 @@ class Authenticator(object):
                 401, "Missing Authorization headers", Codes.UNAUTHORIZED,
             )
 
-        yield self.keyring.verify_json_for_server(origin, json_request, now)
+        yield self.keyring.verify_json_for_server(
+            origin, json_request, now, "Incoming request"
+        )
 
         logger.info("Request from %s", origin)
         request.authenticated_entity = origin

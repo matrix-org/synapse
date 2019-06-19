@@ -1,1 +1,0 @@
-Fix bug where we leaked extremities when we soft failed events, leading to performance degradation.

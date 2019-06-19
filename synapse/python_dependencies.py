@@ -44,7 +44,10 @@ REQUIREMENTS = [
     "canonicaljson>=1.1.3",
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
-    "service_identity>=16.0.0",
+    "idna>=2.5",
+
+    # validating SSL certs for IP addresses requires service_identity 18.1.
+    "service_identity>=18.1.0",
 
     # our logcontext handling relies on the ability to cancel inlineCallbacks
     # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
@@ -62,7 +65,7 @@ REQUIREMENTS = [
     "sortedcontainers>=1.4.4",
     "psutil>=2.0.0",
     "pymacaroons>=0.13.0",
-    "msgpack>=0.5.0",
+    "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
     "six>=1.10",
     # prometheus_client 0.4.0 changed the format of counter metrics
@@ -77,7 +80,7 @@ REQUIREMENTS = [
 ]
 
 CONDITIONAL_REQUIREMENTS = {
-    "email.enable_notifs": ["Jinja2>=2.9", "bleach>=1.4.2"],
+    "email": ["Jinja2>=2.9", "bleach>=1.4.3"],
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
 
     # we use execute_batch, which arrived in psycopg 2.7.

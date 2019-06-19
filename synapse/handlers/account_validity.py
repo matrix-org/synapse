@@ -110,6 +110,9 @@ class AccountValidityHandler(object):
         # Stop right here if the user doesn't have at least one email address.
         # In this case, they will have to ask their server admin to renew their
         # account manually.
+        # We don't need to do a specific check to make sure the account isn't
+        # deactivated, as a deactivated account isn't supposed to have any
+        # email address attached to it.
         if not addresses:
             return
 
