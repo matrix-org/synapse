@@ -498,15 +498,25 @@ class FederationHandler(BaseHandler):
         #
         # All that said: Let's try increasing the timout to 60s and see what happens.
 
-        missing_events = yield self.federation_client.get_missing_events(
-            origin,
-            room_id,
-            earliest_events_ids=list(latest),
-            latest_events=[pdu],
-            limit=10,
-            min_depth=min_depth,
-            timeout=60000,
-        )
+        try:
+            missing_events = yield self.federation_client.get_missing_events(
+                origin,
+                room_id,
+                earliest_events_ids=list(latest),
+                latest_events=[pdu],
+                limit=10,
+                min_depth=min_depth,
+                timeout=60000,
+            )
+        except RequestSendFailed as e:
+            # We failed to get the missing events, but since we need to handle
+            # the case of `get_missing_events` not returning the necessary
+            # events anyway, it is safe to simply log the error and continue.
+            logger.warn(
+                "[%s %s]: Failed to get prev_events: %s",
+                room_id, event_id, e,
+            )
+            return
 
         logger.info(
             "[%s %s]: Got %d prev_events: %s",
@@ -2744,25 +2754,55 @@ class FederationHandler(BaseHandler):
         if not invite_event:
             raise AuthError(403, "Could not find invite")
 
+        logger.debug("Checking auth on event %r", event.content)
+
         last_exception = None
+        # for each public key in the 3pid invite event
         for public_key_object in self.hs.get_auth().get_public_keys(invite_event):
             try:
+                # for each sig on the third_party_invite block of the actual invite
                 for server, signature_block in signed["signatures"].items():
                     for key_name, encoded_signature in signature_block.items():
                         if not key_name.startswith("ed25519:"):
                             continue
 
-                        public_key = public_key_object["public_key"]
-                        verify_key = decode_verify_key_bytes(
-                            key_name,
-                            decode_base64(public_key)
+                        logger.debug(
+                            "Attempting to verify sig with key %s from %r "
+                            "against pubkey %r",
+                            key_name, server, public_key_object,
                         )
-                        verify_signed_json(signed, server, verify_key)
-                        if "key_validity_url" in public_key_object:
-                            yield self._check_key_revocation(
-                                public_key,
+
+                        try:
+                            public_key = public_key_object["public_key"]
+                            verify_key = decode_verify_key_bytes(
+                                key_name,
+                                decode_base64(public_key)
+                            )
+                            verify_signed_json(signed, server, verify_key)
+                            logger.debug(
+                                "Successfully verified sig with key %s from %r "
+                                "against pubkey %r",
+                                key_name, server, public_key_object,
+                            )
+                        except Exception:
+                            logger.info(
+                                "Failed to verify sig with key %s from %r "
+                                "against pubkey %r",
+                                key_name, server, public_key_object,
+                            )
+                            raise
+                        try:
+                            if "key_validity_url" in public_key_object:
+                                yield self._check_key_revocation(
+                                    public_key,
+                                    public_key_object["key_validity_url"]
+                                )
+                        except Exception:
+                            logger.info(
+                                "Failed to query key_validity_url %s",
                                 public_key_object["key_validity_url"]
                             )
+                            raise
                         return
             except Exception as e:
                 last_exception = e

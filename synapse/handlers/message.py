@@ -34,9 +34,10 @@ from synapse.api.errors import (
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import ConsentURIBuilder
 from synapse.events.validator import EventValidator
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.state import StateFilter
-from synapse.types import RoomAlias, UserID
+from synapse.types import RoomAlias, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.logcontext import run_in_background
@@ -260,6 +261,18 @@ class EventCreationHandler(object):
         # going to need it.
         if self._block_events_without_consent_error:
             self._consent_uri_builder = ConsentURIBuilder(self.config)
+
+        if (
+            not self.config.worker_app
+            and self.config.cleanup_extremities_with_dummy_events
+        ):
+            self.clock.looping_call(
+                lambda: run_as_background_process(
+                    "send_dummy_events_to_fill_extremities",
+                    self._send_dummy_events_to_fill_extremities
+                ),
+                5 * 60 * 1000,
+            )
 
     @defer.inlineCallbacks
     def create_event(self, requester, event_dict, token_id=None, txn_id=None,
@@ -874,3 +887,63 @@ class EventCreationHandler(object):
             yield presence.bump_presence_active_time(user)
         except Exception:
             logger.exception("Error bumping presence active time")
+
+    @defer.inlineCallbacks
+    def _send_dummy_events_to_fill_extremities(self):
+        """Background task to send dummy events into rooms that have a large
+        number of extremities
+        """
+
+        room_ids = yield self.store.get_rooms_with_many_extremities(
+            min_count=10, limit=5,
+        )
+
+        for room_id in room_ids:
+            # For each room we need to find a joined member we can use to send
+            # the dummy event with.
+
+            prev_events_and_hashes = yield self.store.get_prev_events_for_room(
+                room_id,
+            )
+
+            latest_event_ids = (
+                event_id for (event_id, _, _) in prev_events_and_hashes
+            )
+
+            members = yield self.state.get_current_users_in_room(
+                room_id, latest_event_ids=latest_event_ids,
+            )
+
+            user_id = None
+            for member in members:
+                if self.hs.is_mine_id(member):
+                    user_id = member
+                    break
+
+            if not user_id:
+                # We don't have a joined user.
+                # TODO: We should do something here to stop the room from
+                # appearing next time.
+                continue
+
+            requester = create_requester(user_id)
+
+            event, context = yield self.create_event(
+                requester,
+                {
+                    "type": "org.matrix.dummy_event",
+                    "content": {},
+                    "room_id": room_id,
+                    "sender": user_id,
+                },
+                prev_events_and_hashes=prev_events_and_hashes,
+            )
+
+            event.internal_metadata.proactively_send = False
+
+            yield self.send_nonmember_event(
+                requester,
+                event,
+                context,
+                ratelimit=False,
+            )
