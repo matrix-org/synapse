@@ -81,8 +81,9 @@ class RoomCreationHandler(BaseHandler):
         # If a user tries to update the same room multiple times in quick
         # succession, only process the first attempt and return its result to
         # subsequent requests
-        self._upgrade_response_cache = ResponseCache(hs, "room_upgrade",
-                                                     timeout_ms=FIVE_MINUTES_IN_MS)
+        self._upgrade_response_cache = ResponseCache(
+            hs, "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
+        )
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
@@ -112,7 +113,7 @@ class RoomCreationHandler(BaseHandler):
                 # Note that this of course only gets caught if both users are
                 # on the same homeserver.
                 raise SynapseError(
-                    400, "An upgrade for this room is currently in progress",
+                    400, "An upgrade for this room is currently in progress"
                 )
 
         # Upgrade the room
@@ -123,7 +124,9 @@ class RoomCreationHandler(BaseHandler):
         ret = yield self._upgrade_response_cache.wrap(
             (old_room_id, user_id),
             self._upgrade_room,
-            requester, old_room_id, new_version,  # args for _upgrade_room
+            requester,
+            old_room_id,
+            new_version,  # args for _upgrade_room
         )
         defer.returnValue(ret)
 
@@ -136,7 +139,7 @@ class RoomCreationHandler(BaseHandler):
         if r is None:
             raise NotFoundError("Unknown room id %s" % (old_room_id,))
         new_room_id = yield self._generate_room_id(
-            creator_id=user_id, is_public=r["is_public"],
+            creator_id=user_id, is_public=r["is_public"]
         )
 
         logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
@@ -145,7 +148,8 @@ class RoomCreationHandler(BaseHandler):
         # room, to check our user has perms in the old room.
         tombstone_event, tombstone_context = (
             yield self.event_creation_handler.create_event(
-                requester, {
+                requester,
+                {
                     "type": EventTypes.Tombstone,
                     "state_key": "",
                     "room_id": old_room_id,
@@ -153,14 +157,14 @@ class RoomCreationHandler(BaseHandler):
                     "content": {
                         "body": "This room has been replaced",
                         "replacement_room": new_room_id,
-                    }
+                    },
                 },
                 token_id=requester.access_token_id,
             )
         )
         old_room_version = yield self.store.get_room_version(old_room_id)
         yield self.auth.check_from_context(
-            old_room_version, tombstone_event, tombstone_context,
+            old_room_version, tombstone_event, tombstone_context
         )
 
         yield self.clone_existing_room(
@@ -173,20 +177,20 @@ class RoomCreationHandler(BaseHandler):
 
         # now send the tombstone
         yield self.event_creation_handler.send_nonmember_event(
-            requester, tombstone_event, tombstone_context,
+            requester, tombstone_event, tombstone_context
         )
 
         old_room_state = yield tombstone_context.get_current_state_ids(self.store)
 
         # update any aliases
         yield self._move_aliases_to_new_room(
-            requester, old_room_id, new_room_id, old_room_state,
+            requester, old_room_id, new_room_id, old_room_state
         )
 
         # and finally, shut down the PLs in the old room, and update them in the new
         # room.
         yield self._update_upgraded_room_pls(
-            requester, old_room_id, new_room_id, old_room_state,
+            requester, old_room_id, new_room_id, old_room_state
         )
 
         defer.returnValue(new_room_id)
