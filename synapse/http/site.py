@@ -357,7 +357,7 @@ class SynapseSite(Site):
         resource,
         server_version_string,
         *args,
-        **kwargs
+        **kwargs,
     ):
         Site.__init__(self, resource, *args, **kwargs)
 

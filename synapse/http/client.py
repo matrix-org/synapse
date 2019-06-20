@@ -280,7 +280,7 @@ class SimpleHttpClient(object):
                 agent=self.agent,
                 data=body_producer,
                 headers=headers,
-                **self._extra_treq_args
+                **self._extra_treq_args,
             )
             request_deferred = timeout_deferred(
                 request_deferred,

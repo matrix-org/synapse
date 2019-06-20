@@ -490,7 +490,7 @@ class SQLBaseStore(object):
                 exception_callbacks,
                 func,
                 *args,
-                **kwargs
+                **kwargs,
             )
 
             for after_callback, after_args, after_kwargs in after_callbacks:

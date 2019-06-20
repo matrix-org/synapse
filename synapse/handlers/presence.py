@@ -999,7 +999,7 @@ class PresenceEventSource(object):
         room_ids=None,
         include_offline=True,
         explicit_room_id=None,
-        **kwargs
+        **kwargs,
     ):
         # The process for getting presence events are:
         #  1. Get the rooms the user is in.

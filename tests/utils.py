@@ -200,7 +200,7 @@ def setup_test_homeserver(
     config=None,
     reactor=None,
     homeserverToUse=TestHomeServer,
-    **kargs
+    **kargs,
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
@@ -281,7 +281,7 @@ def setup_test_homeserver(
             tls_server_context_factory=Mock(),
             tls_client_options_factory=Mock(),
             reactor=reactor,
-            **kargs
+            **kargs,
         )
 
         # Prepare the DB on SQLite -- PostgreSQL is a copy of an already up to
@@ -351,7 +351,7 @@ def setup_test_homeserver(
             tls_server_context_factory=Mock(),
             tls_client_options_factory=Mock(),
             reactor=reactor,
-            **kargs
+            **kargs,
         )
 
     # bcrypt is far too slow to be doing in unit tests
