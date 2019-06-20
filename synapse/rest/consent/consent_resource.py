@@ -29,7 +29,11 @@ from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
-from synapse.http.server import finish_request, wrap_html_request_handler, DirectServeResource
+from synapse.http.server import (
+    finish_request,
+    wrap_html_request_handler,
+    DirectServeResource,
+)
 from synapse.http.servlet import parse_string
 from synapse.types import UserID
 
@@ -42,6 +46,7 @@ logger = logging.getLogger(__name__)
 if hasattr(hmac, "compare_digest"):
     compare_digest = hmac.compare_digest
 else:
+
     def compare_digest(a, b):
         return a == b
 
@@ -80,6 +85,7 @@ class ConsentResource(DirectServeResource):
            For POST: required; gives the value to be recorded in the database
            against the user.
     """
+
     def __init__(self, hs):
         """
         Args:
@@ -98,21 +104,20 @@ class ConsentResource(DirectServeResource):
         if self._default_consent_version is None:
             raise ConfigError(
                 "Consent resource is enabled but user_consent section is "
-                "missing in config file.",
+                "missing in config file."
             )
 
         consent_template_directory = hs.config.user_consent_template_dir
 
         loader = jinja2.FileSystemLoader(consent_template_directory)
         self._jinja_env = jinja2.Environment(
-            loader=loader,
-            autoescape=jinja2.select_autoescape(['html', 'htm', 'xml']),
+            loader=loader, autoescape=jinja2.select_autoescape(["html", "htm", "xml"])
         )
 
         if hs.config.form_secret is None:
             raise ConfigError(
                 "Consent resource is enabled but form_secret is not set in "
-                "config file. It should be set to an arbitrary secret string.",
+                "config file. It should be set to an arbitrary secret string."
             )
 
         self._hmac_secret = hs.config.form_secret.encode("utf-8")
@@ -133,7 +138,7 @@ class ConsentResource(DirectServeResource):
 
             self._check_hash(username, userhmac_bytes)
 
-            if username.startswith('@'):
+            if username.startswith("@"):
                 qualified_user_id = username
             else:
                 qualified_user_id = UserID(username, self.hs.hostname).to_string()
@@ -147,7 +152,8 @@ class ConsentResource(DirectServeResource):
 
         try:
             self._render_template(
-                request, "%s.html" % (version,),
+                request,
+                "%s.html" % (version,),
                 user=username,
                 userhmac=userhmac,
                 version=version,
@@ -169,7 +175,7 @@ class ConsentResource(DirectServeResource):
 
         self._check_hash(username, userhmac)
 
-        if username.startswith('@'):
+        if username.startswith("@"):
             qualified_user_id = username
         else:
             qualified_user_id = UserID(username, self.hs.hostname).to_string()
@@ -210,11 +216,13 @@ class ConsentResource(DirectServeResource):
               SynapseError if the hash doesn't match
 
         """
-        want_mac = hmac.new(
-            key=self._hmac_secret,
-            msg=userid.encode('utf-8'),
-            digestmod=sha256,
-        ).hexdigest().encode('ascii')
+        want_mac = (
+            hmac.new(
+                key=self._hmac_secret, msg=userid.encode("utf-8"), digestmod=sha256
+            )
+            .hexdigest()
+            .encode("ascii")
+        )
 
         if not compare_digest(want_mac, userhmac):
             raise SynapseError(http_client.FORBIDDEN, "HMAC incorrect")

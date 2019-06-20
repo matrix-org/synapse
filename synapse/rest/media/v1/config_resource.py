@@ -16,7 +16,11 @@
 
 from twisted.internet import defer
 
-from synapse.http.server import respond_with_json, wrap_json_request_handler, DirectServeResource
+from synapse.http.server import (
+    respond_with_json,
+    wrap_json_request_handler,
+    DirectServeResource,
+)
 
 
 class MediaConfigResource(DirectServeResource):
@@ -27,9 +31,7 @@ class MediaConfigResource(DirectServeResource):
         config = hs.get_config()
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
-        self.limits_dict = {
-            "m.upload.size": config.max_upload_size,
-        }
+        self.limits_dict = {"m.upload.size": config.max_upload_size}
 
     @wrap_json_request_handler
     async def _async_render_GET(self, request):

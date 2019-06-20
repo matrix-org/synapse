@@ -19,7 +19,11 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 import synapse.http.servlet
-from synapse.http.server import set_cors_headers, wrap_json_request_handler, DirectServeResource
+from synapse.http.server import (
+    set_cors_headers,
+    wrap_json_request_handler,
+    DirectServeResource,
+)
 
 from ._base import parse_media_id, respond_404
 
@@ -48,18 +52,20 @@ class DownloadResource(DirectServeResource):
             b" plugin-types application/pdf;"
             b" style-src 'unsafe-inline';"
             b" media-src 'self';"
-            b" object-src 'self';"
+            b" object-src 'self';",
         )
         server_name, media_id, name = parse_media_id(request)
         if server_name == self.server_name:
             await self.media_repo.get_local_media(request, media_id, name)
         else:
             allow_remote = synapse.http.servlet.parse_boolean(
-                request, "allow_remote", default=True)
+                request, "allow_remote", default=True
+            )
             if not allow_remote:
                 logger.info(
                     "Rejecting request for remote media %s/%s due to allow_remote",
-                    server_name, media_id,
+                    server_name,
+                    media_id,
                 )
                 respond_404(request)
                 return

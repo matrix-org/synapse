@@ -215,8 +215,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             return [room_id for room_id, in txn]
 
         return self.runInteraction(
-            "get_rooms_with_many_extremities",
-            _get_rooms_with_many_extremities_txn,
+            "get_rooms_with_many_extremities", _get_rooms_with_many_extremities_txn
         )
 
     @cached(max_entries=5000, iterable=True)

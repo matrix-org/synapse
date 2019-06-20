@@ -48,9 +48,7 @@ class AppServiceTransaction(object):
             A Deferred which resolves to True if the transaction was sent.
         """
         return as_api.push_bulk(
-            service=self.service,
-            events=self.events,
-            txn_id=self.id
+            service=self.service, events=self.events, txn_id=self.id
         )
 
     def complete(self, store):
@@ -64,10 +62,7 @@ class AppServiceTransaction(object):
         Returns:
             A Deferred which resolves to True if the transaction was completed.
         """
-        return store.complete_appservice_txn(
-            service=self.service,
-            txn_id=self.id
-        )
+        return store.complete_appservice_txn(service=self.service, txn_id=self.id)
 
 
 class ApplicationService(object):
@@ -76,6 +71,7 @@ class ApplicationService(object):
 
     Provides methods to check if this service is "interested" in events.
     """
+
     NS_USERS = "users"
     NS_ALIASES = "aliases"
     NS_ROOMS = "rooms"
@@ -84,9 +80,19 @@ class ApplicationService(object):
     # values.
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
-    def __init__(self, token, hostname, url=None, namespaces=None, hs_token=None,
-                 sender=None, id=None, protocols=None, rate_limited=True,
-                 ip_range_whitelist=None):
+    def __init__(
+        self,
+        token,
+        hostname,
+        url=None,
+        namespaces=None,
+        hs_token=None,
+        sender=None,
+        id=None,
+        protocols=None,
+        rate_limited=True,
+        ip_range_whitelist=None,
+    ):
         self.token = token
         self.url = url
         self.hs_token = hs_token
@@ -128,9 +134,7 @@ class ApplicationService(object):
                 if not isinstance(regex_obj, dict):
                     raise ValueError("Expected dict regex for ns '%s'" % ns)
                 if not isinstance(regex_obj.get("exclusive"), bool):
-                    raise ValueError(
-                        "Expected bool for 'exclusive' in ns '%s'" % ns
-                    )
+                    raise ValueError("Expected bool for 'exclusive' in ns '%s'" % ns)
                 group_id = regex_obj.get("group_id")
                 if group_id:
                     if not isinstance(group_id, str):
@@ -153,9 +157,7 @@ class ApplicationService(object):
                 if isinstance(regex, string_types):
                     regex_obj["regex"] = re.compile(regex)  # Pre-compile regex
                 else:
-                    raise ValueError(
-                        "Expected string for 'regex' in ns '%s'" % ns
-                    )
+                    raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
         return namespaces
 
     def _matches_regex(self, test_string, namespace_key):
@@ -178,8 +180,9 @@ class ApplicationService(object):
         if self.is_interested_in_user(event.sender):
             defer.returnValue(True)
         # also check m.room.member state key
-        if (event.type == EventTypes.Member and
-                self.is_interested_in_user(event.state_key)):
+        if event.type == EventTypes.Member and self.is_interested_in_user(
+            event.state_key
+        ):
             defer.returnValue(True)
 
         if not store:

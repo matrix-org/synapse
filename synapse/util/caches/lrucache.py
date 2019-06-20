@@ -49,8 +49,15 @@ class LruCache(object):
     Can also set callbacks on objects when getting/setting which are fired
     when that key gets invalidated/evicted.
     """
-    def __init__(self, max_size, keylen=1, cache_type=dict, size_callback=None,
-                 evicted_callback=None):
+
+    def __init__(
+        self,
+        max_size,
+        keylen=1,
+        cache_type=dict,
+        size_callback=None,
+        evicted_callback=None,
+    ):
         """
         Args:
             max_size (int):
@@ -93,9 +100,12 @@ class LruCache(object):
 
         cached_cache_len = [0]
         if size_callback is not None:
+
             def cache_len():
                 return cached_cache_len[0]
+
         else:
+
             def cache_len():
                 return len(cache)
 

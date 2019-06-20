@@ -18,7 +18,7 @@
 """Contains constants from the specification."""
 
 # the "depth" field on events is limited to 2**63 - 1
-MAX_DEPTH = 2**63 - 1
+MAX_DEPTH = 2 ** 63 - 1
 
 # the maximum length for a room alias is 255 characters
 MAX_ALIAS_LENGTH = 255
@@ -30,6 +30,7 @@ MAX_USERID_LENGTH = 255
 class Membership(object):
 
     """Represents the membership states of a user in a room."""
+
     INVITE = u"invite"
     JOIN = u"join"
     KNOCK = u"knock"
@@ -40,6 +41,7 @@ class Membership(object):
 
 class PresenceState(object):
     """Represents the presence state of a user."""
+
     OFFLINE = u"offline"
     UNAVAILABLE = u"unavailable"
     ONLINE = u"online"
@@ -118,6 +120,7 @@ class UserTypes(object):
     """Allows for user type specific behaviour. With the benefit of hindsight
     'admin' and 'guest' users should also be UserTypes. Normal users are type None
     """
+
     SUPPORT = "support"
     ALL_USER_TYPES = (SUPPORT,)
 
@@ -125,6 +128,7 @@ class UserTypes(object):
 class RelationTypes(object):
     """The types of relations known to this server.
     """
+
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"
     REFERENCE = "m.reference"

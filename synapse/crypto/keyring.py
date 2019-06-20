@@ -614,10 +614,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
         results = yield logcontext.make_deferred_yieldable(
             defer.gatherResults(
-                [
-                    run_in_background(get_key, server)
-                    for server in self.key_servers
-                ],
+                [run_in_background(get_key, server) for server in self.key_servers],
                 consumeErrors=True,
             ).addErrback(unwrapFirstError)
         )
@@ -630,9 +627,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         defer.returnValue(union_of_keys)
 
     @defer.inlineCallbacks
-    def get_server_verify_key_v2_indirect(
-        self, keys_to_fetch, key_server
-    ):
+    def get_server_verify_key_v2_indirect(self, keys_to_fetch, key_server):
         """
         Args:
             keys_to_fetch (dict[str, dict[str, int]]):
@@ -690,10 +685,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 )
 
             try:
-                self._validate_perspectives_response(
-                    key_server,
-                    response,
-                )
+                self._validate_perspectives_response(key_server, response)
 
                 processed_response = yield self.process_v2_response(
                     perspective_name, response, time_added_ms=time_now_ms
@@ -720,9 +712,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
         defer.returnValue(keys)
 
-    def _validate_perspectives_response(
-        self, key_server, response,
-    ):
+    def _validate_perspectives_response(self, key_server, response):
         """Optionally check the signature on the result of a /key/query request
 
         Args:
@@ -826,7 +816,6 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                     path="/_matrix/key/v2/server/"
                     + urllib.parse.quote(requested_key_id),
                     ignore_backoff=True,
-
                     # we only give the remote server 10s to respond. It should be an
                     # easy request to handle, so if it doesn't reply within 10s, it's
                     # probably not going to.
