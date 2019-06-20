@@ -14,6 +14,8 @@
 # limitations under the License.
 
 """Tests REST events for /profile paths."""
+import json
+
 from mock import Mock
 
 from twisted.internet import defer
@@ -28,11 +30,14 @@ from tests import unittest
 from ....utils import MockHttpResource, setup_test_homeserver
 
 myid = "@1234ABCD:test"
-PATH_PREFIX = "/_matrix/client/api/v1"
+PATH_PREFIX = "/_matrix/client/r0"
 
 
-class ProfileTestCase(unittest.TestCase):
-    """ Tests profile management. """
+class MockHandlerProfileTestCase(unittest.TestCase):
+    """ Tests rest layer of profile management.
+
+    Todo: move these into ProfileTestCase
+    """
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -157,6 +162,58 @@ class ProfileTestCase(unittest.TestCase):
         self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
         self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
         self.assertEquals(mocked_set.call_args[0][2], "http://my.server/pic.gif")
+
+
+class ProfileTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        profile.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        self.hs = self.setup_test_homeserver()
+        return self.hs
+
+    def prepare(self, reactor, clock, hs):
+        self.owner = self.register_user("owner", "pass")
+        self.owner_tok = self.login("owner", "pass")
+
+    def test_set_displayname(self):
+        request, channel = self.make_request(
+            "PUT",
+            "/profile/%s/displayname" % (self.owner,),
+            content=json.dumps({"displayname": "test"}),
+            access_token=self.owner_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        res = self.get_displayname()
+        self.assertEqual(res, "test")
+
+    def test_set_displayname_too_long(self):
+        """Attempts to set a stupid displayname should get a 400"""
+        request, channel = self.make_request(
+            "PUT",
+            "/profile/%s/displayname" % (self.owner,),
+            content=json.dumps({"displayname": "test" * 100}),
+            access_token=self.owner_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 400, channel.result)
+
+        res = self.get_displayname()
+        self.assertEqual(res, "owner")
+
+    def get_displayname(self):
+        request, channel = self.make_request(
+            "GET", "/profile/%s/displayname" % (self.owner,)
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+        return channel.json_body["displayname"]
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):

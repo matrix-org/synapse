@@ -38,6 +38,7 @@ from .server import ServerConfig
 from .server_notices_config import ServerNoticesConfig
 from .spam_checker import SpamCheckerConfig
 from .stats import StatsConfig
+from .third_party_event_rules import ThirdPartyRulesConfig
 from .tls import TlsConfig
 from .user_directory import UserDirectoryConfig
 from .voip import VoipConfig
@@ -73,5 +74,6 @@ class HomeServerConfig(
     StatsConfig,
     ServerNoticesConfig,
     RoomDirectoryConfig,
+    ThirdPartyRulesConfig,
 ):
     pass

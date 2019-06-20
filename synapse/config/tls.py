@@ -42,11 +42,11 @@ class TlsConfig(Config):
         self.acme_enabled = acme_config.get("enabled", False)
 
         # hyperlink complains on py2 if this is not a Unicode
-        self.acme_url = six.text_type(acme_config.get(
-            "url", u"https://acme-v01.api.letsencrypt.org/directory"
-        ))
+        self.acme_url = six.text_type(
+            acme_config.get("url", "https://acme-v01.api.letsencrypt.org/directory")
+        )
         self.acme_port = acme_config.get("port", 80)
-        self.acme_bind_addresses = acme_config.get("bind_addresses", ['::', '0.0.0.0'])
+        self.acme_bind_addresses = acme_config.get("bind_addresses", ["::", "0.0.0.0"])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
         self.acme_domain = acme_config.get("domain", config.get("server_name"))
 
@@ -74,12 +74,12 @@ class TlsConfig(Config):
 
         # Whether to verify certificates on outbound federation traffic
         self.federation_verify_certificates = config.get(
-            "federation_verify_certificates", False,
+            "federation_verify_certificates", True
         )
 
         # Whitelist of domains to not verify certificates for
         fed_whitelist_entries = config.get(
-            "federation_certificate_verification_whitelist", [],
+            "federation_certificate_verification_whitelist", []
         )
 
         # Support globs (*) in whitelist values
@@ -90,9 +90,7 @@ class TlsConfig(Config):
             self.federation_certificate_verification_whitelist.append(entry_regex)
 
         # List of custom certificate authorities for federation traffic validation
-        custom_ca_list = config.get(
-            "federation_custom_ca_list", None,
-        )
+        custom_ca_list = config.get("federation_custom_ca_list", None)
 
         # Read in and parse custom CA certificates
         self.federation_ca_trust_root = None
@@ -101,21 +99,24 @@ class TlsConfig(Config):
                 # A trustroot cannot be generated without any CA certificates.
                 # Raise an error if this option has been specified without any
                 # corresponding certificates.
-                raise ConfigError("federation_custom_ca_list specified without "
-                                  "any certificate files")
+                raise ConfigError(
+                    "federation_custom_ca_list specified without "
+                    "any certificate files"
+                )
 
             certs = []
             for ca_file in custom_ca_list:
                 logger.debug("Reading custom CA certificate file: %s", ca_file)
-                content = self.read_file(ca_file)
+                content = self.read_file(ca_file, "federation_custom_ca_list")
 
                 # Parse the CA certificates
                 try:
                     cert_base = Certificate.loadPEM(content)
                     certs.append(cert_base)
                 except Exception as e:
-                    raise ConfigError("Error parsing custom CA certificate file %s: %s"
-                                      % (ca_file, e))
+                    raise ConfigError(
+                        "Error parsing custom CA certificate file %s: %s" % (ca_file, e)
+                    )
 
             self.federation_ca_trust_root = trustRootFromCertificates(certs)
 
@@ -146,17 +147,21 @@ class TlsConfig(Config):
             return None
 
         try:
-            with open(self.tls_certificate_file, 'rb') as f:
+            with open(self.tls_certificate_file, "rb") as f:
                 cert_pem = f.read()
         except Exception as e:
-            raise ConfigError("Failed to read existing certificate file %s: %s"
-                              % (self.tls_certificate_file, e))
+            raise ConfigError(
+                "Failed to read existing certificate file %s: %s"
+                % (self.tls_certificate_file, e)
+            )
 
         try:
             tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
         except Exception as e:
-            raise ConfigError("Failed to parse existing certificate file %s: %s"
-                              % (self.tls_certificate_file, e))
+            raise ConfigError(
+                "Failed to parse existing certificate file %s: %s"
+                % (self.tls_certificate_file, e)
+            )
 
         if not allow_self_signed:
             if tls_certificate.get_subject() == tls_certificate.get_issuer():
@@ -166,7 +171,7 @@ class TlsConfig(Config):
 
         # YYYYMMDDhhmmssZ -- in UTC
         expires_on = datetime.strptime(
-            tls_certificate.get_notAfter().decode('ascii'), "%Y%m%d%H%M%SZ"
+            tls_certificate.get_notAfter().decode("ascii"), "%Y%m%d%H%M%SZ"
         )
         now = datetime.utcnow()
         days_remaining = (expires_on - now).days
@@ -191,7 +196,8 @@ class TlsConfig(Config):
             except Exception as e:
                 logger.info(
                     "Unable to read TLS certificate (%s). Ignoring as no "
-                    "tls listeners enabled.", e,
+                    "tls listeners enabled.",
+                    e,
                 )
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
@@ -205,7 +211,7 @@ class TlsConfig(Config):
             sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
             sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
             if sha256_fingerprint not in sha256_fingerprints:
-                self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
+                self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
@@ -215,8 +221,8 @@ class TlsConfig(Config):
 
         # this is to avoid the max line length. Sorrynotsorry
         proxypassline = (
-            'ProxyPass /.well-known/acme-challenge '
-            'http://localhost:8009/.well-known/acme-challenge'
+            "ProxyPass /.well-known/acme-challenge "
+            "http://localhost:8009/.well-known/acme-challenge"
         )
 
         return (
@@ -241,12 +247,12 @@ class TlsConfig(Config):
         #
         #tls_private_key_path: "%(tls_private_key_path)s"
 
-        # Whether to verify TLS certificates when sending federation traffic.
+        # Whether to verify TLS server certificates for outbound federation requests.
         #
-        # This currently defaults to `false`, however this will change in
-        # Synapse 1.0 when valid federation certificates will be required.
+        # Defaults to `true`. To disable certificate verification, uncomment the
+        # following line.
         #
-        #federation_verify_certificates: true
+        #federation_verify_certificates: false
 
         # Skip federation certificate verification on the following whitelist
         # of domains.

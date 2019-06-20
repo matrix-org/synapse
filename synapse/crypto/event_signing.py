@@ -31,7 +31,11 @@ logger = logging.getLogger(__name__)
 def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     """Check whether the hash for this PDU matches the contents"""
     name, expected_hash = compute_content_hash(event.get_pdu_json(), hash_algorithm)
-    logger.debug("Expecting hash: %s", encode_base64(expected_hash))
+    logger.debug(
+        "Verifying content hash on %s (expecting: %s)",
+        event.event_id,
+        encode_base64(expected_hash),
+    )
 
     # some malformed events lack a 'hashes'. Protect against it being missing
     # or a weird type by basically treating it the same as an unhashed event.
@@ -42,9 +46,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     if name not in hashes:
         raise SynapseError(
             400,
-            "Algorithm %s not in hashes %s" % (
-                name, list(hashes),
-            ),
+            "Algorithm %s not in hashes %s" % (name, list(hashes)),
             Codes.UNAUTHORIZED,
         )
     message_hash_base64 = hashes[name]
@@ -52,9 +54,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
         message_hash_bytes = decode_base64(message_hash_base64)
     except Exception:
         raise SynapseError(
-            400,
-            "Invalid base64: %s" % (message_hash_base64,),
-            Codes.UNAUTHORIZED,
+            400, "Invalid base64: %s" % (message_hash_base64,), Codes.UNAUTHORIZED
         )
     return message_hash_bytes == expected_hash
 
@@ -131,8 +131,9 @@ def compute_event_signature(event_dict, signature_name, signing_key):
     return redact_json["signatures"]
 
 
-def add_hashes_and_signatures(event_dict, signature_name, signing_key,
-                              hash_algorithm=hashlib.sha256):
+def add_hashes_and_signatures(
+    event_dict, signature_name, signing_key, hash_algorithm=hashlib.sha256
+):
     """Add content hash and sign the event
 
     Args:
@@ -149,7 +150,5 @@ def add_hashes_and_signatures(event_dict, signature_name, signing_key,
     event_dict.setdefault("hashes", {})[name] = encode_base64(digest)
 
     event_dict["signatures"] = compute_event_signature(
-        event_dict,
-        signature_name=signature_name,
-        signing_key=signing_key,
+        event_dict, signature_name=signature_name, signing_key=signing_key
     )

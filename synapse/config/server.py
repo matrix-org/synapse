@@ -34,13 +34,12 @@ logger = logging.Logger(__name__)
 #
 # We later check for errors when binding to 0.0.0.0 and ignore them if :: is also in
 # in the list.
-DEFAULT_BIND_ADDRESSES = ['::', '0.0.0.0']
+DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
-DEFAULT_ROOM_VERSION = "1"
+DEFAULT_ROOM_VERSION = "4"
 
 
 class ServerConfig(Config):
-
     def read_config(self, config):
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
@@ -81,27 +80,25 @@ class ServerConfig(Config):
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API.
         self.require_auth_for_profile_requests = config.get(
-            "require_auth_for_profile_requests", False,
+            "require_auth_for_profile_requests", False
         )
 
         # If set to 'True', requires authentication to access the server's
         # public rooms directory through the client API, and forbids any other
         # homeserver to fetch it via federation.
         self.restrict_public_rooms_to_local_users = config.get(
-            "restrict_public_rooms_to_local_users", False,
+            "restrict_public_rooms_to_local_users", False
         )
 
-        default_room_version = config.get(
-            "default_room_version", DEFAULT_ROOM_VERSION,
-        )
+        default_room_version = config.get("default_room_version", DEFAULT_ROOM_VERSION)
 
         # Ensure room version is a str
         default_room_version = str(default_room_version)
 
         if default_room_version not in KNOWN_ROOM_VERSIONS:
             raise ConfigError(
-                "Unknown default_room_version: %s, known room versions: %s" %
-                (default_room_version, list(KNOWN_ROOM_VERSIONS.keys()))
+                "Unknown default_room_version: %s, known room versions: %s"
+                % (default_room_version, list(KNOWN_ROOM_VERSIONS.keys()))
             )
 
         # Get the actual room version object rather than just the identifier
@@ -116,31 +113,25 @@ class ServerConfig(Config):
 
         # Whether we should block invites sent to users on this server
         # (other than those sent by local server admins)
-        self.block_non_admin_invites = config.get(
-            "block_non_admin_invites", False,
-        )
+        self.block_non_admin_invites = config.get("block_non_admin_invites", False)
 
         # Whether to enable experimental MSC1849 (aka relations) support
         self.experimental_msc1849_support_enabled = config.get(
-            "experimental_msc1849_support_enabled", False,
+            "experimental_msc1849_support_enabled", False
         )
 
         # Options to control access by tracking MAU
         self.limit_usage_by_mau = config.get("limit_usage_by_mau", False)
         self.max_mau_value = 0
         if self.limit_usage_by_mau:
-            self.max_mau_value = config.get(
-                "max_mau_value", 0,
-            )
+            self.max_mau_value = config.get("max_mau_value", 0)
         self.mau_stats_only = config.get("mau_stats_only", False)
 
         self.mau_limits_reserved_threepids = config.get(
             "mau_limit_reserved_threepids", []
         )
 
-        self.mau_trial_days = config.get(
-            "mau_trial_days", 0,
-        )
+        self.mau_trial_days = config.get("mau_trial_days", 0)
 
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
@@ -153,9 +144,7 @@ class ServerConfig(Config):
 
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
-        federation_domain_whitelist = config.get(
-            "federation_domain_whitelist", None,
-        )
+        federation_domain_whitelist = config.get("federation_domain_whitelist", None)
 
         if federation_domain_whitelist is not None:
             # turn the whitelist into a hash for speed of lookup
@@ -165,7 +154,7 @@ class ServerConfig(Config):
                 self.federation_domain_whitelist[domain] = True
 
         self.federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", [],
+            "federation_ip_range_blacklist", []
         )
 
         # Attempt to create an IPSet from the given ranges
@@ -178,13 +167,12 @@ class ServerConfig(Config):
             self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
         except Exception as e:
             raise ConfigError(
-                "Invalid range(s) provided in "
-                "federation_ip_range_blacklist: %s" % e
+                "Invalid range(s) provided in " "federation_ip_range_blacklist: %s" % e
             )
 
         if self.public_baseurl is not None:
-            if self.public_baseurl[-1] != '/':
-                self.public_baseurl += '/'
+            if self.public_baseurl[-1] != "/":
+                self.public_baseurl += "/"
         self.start_pushers = config.get("start_pushers", True)
 
         # (undocumented) option for torturing the worker-mode replication a bit,
@@ -195,7 +183,7 @@ class ServerConfig(Config):
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to True.
         self.require_membership_for_aliases = config.get(
-            "require_membership_for_aliases", True,
+            "require_membership_for_aliases", True
         )
 
         # Whether to allow per-room membership profiles through the send of membership
@@ -227,9 +215,9 @@ class ServerConfig(Config):
 
             # if we still have an empty list of addresses, use the default list
             if not bind_addresses:
-                if listener['type'] == 'metrics':
+                if listener["type"] == "metrics":
                     # the metrics listener doesn't support IPv6
-                    bind_addresses.append('0.0.0.0')
+                    bind_addresses.append("0.0.0.0")
                 else:
                     bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
 
@@ -249,73 +237,73 @@ class ServerConfig(Config):
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
 
-            self.listeners.append({
-                "port": bind_port,
-                "bind_addresses": [bind_host],
-                "tls": True,
-                "type": "http",
-                "resources": [
-                    {
-                        "names": ["client"],
-                        "compress": gzip_responses,
-                    },
-                    {
-                        "names": ["federation"],
-                        "compress": False,
-                    }
-                ]
-            })
+            self.listeners.append(
+                {
+                    "port": bind_port,
+                    "bind_addresses": [bind_host],
+                    "tls": True,
+                    "type": "http",
+                    "resources": [
+                        {"names": ["client"], "compress": gzip_responses},
+                        {"names": ["federation"], "compress": False},
+                    ],
+                }
+            )
 
             unsecure_port = config.get("unsecure_port", bind_port - 400)
             if unsecure_port:
-                self.listeners.append({
-                    "port": unsecure_port,
-                    "bind_addresses": [bind_host],
-                    "tls": False,
-                    "type": "http",
-                    "resources": [
-                        {
-                            "names": ["client"],
-                            "compress": gzip_responses,
-                        },
-                        {
-                            "names": ["federation"],
-                            "compress": False,
-                        }
-                    ]
-                })
+                self.listeners.append(
+                    {
+                        "port": unsecure_port,
+                        "bind_addresses": [bind_host],
+                        "tls": False,
+                        "type": "http",
+                        "resources": [
+                            {"names": ["client"], "compress": gzip_responses},
+                            {"names": ["federation"], "compress": False},
+                        ],
+                    }
+                )
 
         manhole = config.get("manhole")
         if manhole:
-            self.listeners.append({
-                "port": manhole,
-                "bind_addresses": ["127.0.0.1"],
-                "type": "manhole",
-                "tls": False,
-            })
+            self.listeners.append(
+                {
+                    "port": manhole,
+                    "bind_addresses": ["127.0.0.1"],
+                    "type": "manhole",
+                    "tls": False,
+                }
+            )
 
         metrics_port = config.get("metrics_port")
         if metrics_port:
             logger.warn(
-                ("The metrics_port configuration option is deprecated in Synapse 0.31 "
-                 "in favour of a listener. Please see "
-                 "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.rst"
-                 " on how to configure the new listener."))
+                (
+                    "The metrics_port configuration option is deprecated in Synapse 0.31 "
+                    "in favour of a listener. Please see "
+                    "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.rst"
+                    " on how to configure the new listener."
+                )
+            )
 
-            self.listeners.append({
-                "port": metrics_port,
-                "bind_addresses": [config.get("metrics_bind_host", "127.0.0.1")],
-                "tls": False,
-                "type": "http",
-                "resources": [
-                    {
-                        "names": ["metrics"],
-                        "compress": False,
-                    },
-                ]
-            })
+            self.listeners.append(
+                {
+                    "port": metrics_port,
+                    "bind_addresses": [config.get("metrics_bind_host", "127.0.0.1")],
+                    "tls": False,
+                    "type": "http",
+                    "resources": [{"names": ["metrics"], "compress": False}],
+                }
+            )
 
         _check_resource_config(self.listeners)
+
+        # An experimental option to try and periodically clean up extremities
+        # by sending dummy events.
+        self.cleanup_extremities_with_dummy_events = config.get(
+            "cleanup_extremities_with_dummy_events", False
+        )
 
     def has_tls_listener(self):
         return any(l["tls"] for l in self.listeners)
@@ -333,7 +321,8 @@ class ServerConfig(Config):
         # Bring DEFAULT_ROOM_VERSION into the local-scope for use in the
         # default config string
         default_room_version = DEFAULT_ROOM_VERSION
-        return """\
+        return (
+            """\
         ## Server ##
 
         # The domain name of the server, with optional explicit port.
@@ -414,6 +403,7 @@ class ServerConfig(Config):
         #
         # For example, for room version 1, default_room_version should be set
         # to "1".
+        #
         #default_room_version: "%(default_room_version)s"
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
@@ -584,6 +574,22 @@ class ServerConfig(Config):
 
         # Monthly Active User Blocking
         #
+        # Used in cases where the admin or server owner wants to limit to the
+        # number of monthly active users.
+        #
+        # 'limit_usage_by_mau' disables/enables monthly active user blocking. When
+        # anabled and a limit is reached the server returns a 'ResourceLimitError'
+        # with error type Codes.RESOURCE_LIMIT_EXCEEDED
+        #
+        # 'max_mau_value' is the hard limit of monthly active users above which
+        # the server will start blocking user actions.
+        #
+        # 'mau_trial_days' is a means to add a grace period for active users. It
+        # means that users must be active for this number of days before they
+        # can be considered active and guards against the case where lots of users
+        # sign up in a short space of time never to return after their initial
+        # session.
+        #
         #limit_usage_by_mau: False
         #max_mau_value: 50
         #mau_trial_days: 2
@@ -614,7 +620,9 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #allow_per_room_profiles: false
-        """ % locals()
+        """
+            % locals()
+        )
 
     def read_arguments(self, args):
         if args.manhole is not None:
@@ -626,17 +634,26 @@ class ServerConfig(Config):
 
     def add_arguments(self, parser):
         server_group = parser.add_argument_group("server")
-        server_group.add_argument("-D", "--daemonize", action='store_true',
-                                  default=None,
-                                  help="Daemonize the home server")
-        server_group.add_argument("--print-pidfile", action='store_true',
-                                  default=None,
-                                  help="Print the path to the pidfile just"
-                                  " before daemonizing")
-        server_group.add_argument("--manhole", metavar="PORT", dest="manhole",
-                                  type=int,
-                                  help="Turn on the twisted telnet manhole"
-                                  " service on the given port.")
+        server_group.add_argument(
+            "-D",
+            "--daemonize",
+            action="store_true",
+            default=None,
+            help="Daemonize the home server",
+        )
+        server_group.add_argument(
+            "--print-pidfile",
+            action="store_true",
+            default=None,
+            help="Print the path to the pidfile just" " before daemonizing",
+        )
+        server_group.add_argument(
+            "--manhole",
+            metavar="PORT",
+            dest="manhole",
+            type=int,
+            help="Turn on the twisted telnet manhole" " service on the given port.",
+        )
 
 
 def is_threepid_reserved(reserved_threepids, threepid):
@@ -650,7 +667,7 @@ def is_threepid_reserved(reserved_threepids, threepid):
     """
 
     for tp in reserved_threepids:
-        if (threepid['medium'] == tp['medium'] and threepid['address'] == tp['address']):
+        if threepid["medium"] == tp["medium"] and threepid["address"] == tp["address"]:
             return True
     return False
 
@@ -663,9 +680,7 @@ def read_gc_thresholds(thresholds):
         return None
     try:
         assert len(thresholds) == 3
-        return (
-            int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
-        )
+        return (int(thresholds[0]), int(thresholds[1]), int(thresholds[2]))
     except Exception:
         raise ConfigError(
             "Value of `gc_threshold` must be a list of three integers if set"
@@ -683,22 +698,22 @@ def _warn_if_webclient_configured(listeners):
     for listener in listeners:
         for res in listener.get("resources", []):
             for name in res.get("names", []):
-                if name == 'webclient':
+                if name == "webclient":
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
 
 
 KNOWN_RESOURCES = (
-    'client',
-    'consent',
-    'federation',
-    'keys',
-    'media',
-    'metrics',
-    'openid',
-    'replication',
-    'static',
-    'webclient',
+    "client",
+    "consent",
+    "federation",
+    "keys",
+    "media",
+    "metrics",
+    "openid",
+    "replication",
+    "static",
+    "webclient",
 )
 
 
@@ -712,11 +727,9 @@ def _check_resource_config(listeners):
 
     for resource in resource_names:
         if resource not in KNOWN_RESOURCES:
-            raise ConfigError(
-                "Unknown listener resource '%s'" % (resource, )
-            )
+            raise ConfigError("Unknown listener resource '%s'" % (resource,))
         if resource == "consent":
             try:
-                check_requirements('resources.consent')
+                check_requirements("resources.consent")
             except DependencyException as e:
                 raise ConfigError(e.message)

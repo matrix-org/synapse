@@ -115,6 +115,7 @@ class StatsHandler(StateDeltasHandler):
             event_id = delta["event_id"]
             stream_id = delta["stream_id"]
             prev_event_id = delta["prev_event_id"]
+            stream_pos = delta["stream_id"]
 
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
@@ -136,10 +137,15 @@ class StatsHandler(StateDeltasHandler):
             event_content = {}
 
             if event_id is not None:
-                event_content = (yield self.store.get_event(event_id)).content or {}
+                event = yield self.store.get_event(event_id, allow_none=True)
+                if event:
+                    event_content = event.content or {}
+
+            # We use stream_pos here rather than fetch by event_id as event_id
+            # may be None
+            now = yield self.store.get_received_ts_by_stream_pos(stream_pos)
 
             # quantise time to the nearest bucket
-            now = yield self.store.get_received_ts(event_id)
             now = (now // 1000 // self.stats_bucket_size) * self.stats_bucket_size
 
             if typ == EventTypes.Member:
@@ -149,9 +155,11 @@ class StatsHandler(StateDeltasHandler):
                 # compare them.
                 prev_event_content = {}
                 if prev_event_id is not None:
-                    prev_event_content = (
-                        yield self.store.get_event(prev_event_id)
-                    ).content
+                    prev_event = yield self.store.get_event(
+                        prev_event_id, allow_none=True
+                    )
+                    if prev_event:
+                        prev_event_content = prev_event.content
 
                 membership = event_content.get("membership", Membership.LEAVE)
                 prev_membership = prev_event_content.get("membership", Membership.LEAVE)

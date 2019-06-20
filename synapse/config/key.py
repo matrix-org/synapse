@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +18,8 @@ import hashlib
 import logging
 import os
 
+import attr
+import jsonschema
 from signedjson.key import (
     NACL_ED25519,
     decode_signing_key_base64,
@@ -32,11 +35,36 @@ from synapse.util.stringutils import random_string, random_string_with_symbols
 
 from ._base import Config, ConfigError
 
+INSECURE_NOTARY_ERROR = """\
+Your server is configured to accept key server responses without signature
+validation or TLS certificate validation. This is likely to be very insecure. If
+you are *sure* you want to do this, set 'accept_keys_insecurely' on the
+keyserver configuration."""
+
+RELYING_ON_MATRIX_KEY_ERROR = """\
+Your server is configured to accept key server responses without TLS certificate
+validation, and which are only signed by the old (possibly compromised)
+matrix.org signing key 'ed25519:auto'. This likely isn't what you want to do,
+and you should enable 'federation_verify_certificates' in your configuration.
+
+If you are *sure* you want to do this, set 'accept_keys_insecurely' on the
+trusted_key_server configuration."""
+
+
 logger = logging.getLogger(__name__)
 
 
-class KeyConfig(Config):
+@attr.s
+class TrustedKeyServer(object):
+    # string: name of the server.
+    server_name = attr.ib()
 
+    # dict[str,VerifyKey]|None: map from key id to key object, or None to disable
+    # signature verification.
+    verify_keys = attr.ib(default=None)
+
+
+class KeyConfig(Config):
     def read_config(self, config):
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
@@ -49,16 +77,27 @@ class KeyConfig(Config):
             config.get("old_signing_keys", {})
         )
         self.key_refresh_interval = self.parse_duration(
-            config.get("key_refresh_interval", "1d"),
+            config.get("key_refresh_interval", "1d")
         )
-        self.perspectives = self.read_perspectives(
-            config.get("perspectives", {}).get("servers", {
-                "matrix.org": {"verify_keys": {
-                    "ed25519:auto": {
-                        "key": "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw",
-                    }
-                }}
-            })
+
+        # if neither trusted_key_servers nor perspectives are given, use the default.
+        if "perspectives" not in config and "trusted_key_servers" not in config:
+            key_servers = [{"server_name": "matrix.org"}]
+        else:
+            key_servers = config.get("trusted_key_servers", [])
+
+            if not isinstance(key_servers, list):
+                raise ConfigError(
+                    "trusted_key_servers, if given, must be a list, not a %s"
+                    % (type(key_servers).__name__,)
+                )
+
+            # merge the 'perspectives' config into the 'trusted_key_servers' config.
+            key_servers.extend(_perspectives_to_key_servers(config))
+
+        # list of TrustedKeyServer objects
+        self.key_servers = list(
+            _parse_key_servers(key_servers, self.federation_verify_certificates)
         )
 
         self.macaroon_secret_key = config.get(
@@ -78,8 +117,9 @@ class KeyConfig(Config):
         # falsification of values
         self.form_secret = config.get("form_secret", None)
 
-    def default_config(self, config_dir_path, server_name, generate_secrets=False,
-                       **kwargs):
+    def default_config(
+        self, config_dir_path, server_name, generate_secrets=False, **kwargs
+    ):
         base_key_name = os.path.join(config_dir_path, server_name)
 
         if generate_secrets:
@@ -91,7 +131,8 @@ class KeyConfig(Config):
             macaroon_secret_key = "# macaroon_secret_key: <PRIVATE STRING>"
             form_secret = "# form_secret: <PRIVATE STRING>"
 
-        return """\
+        return (
+            """\
         # a secret which is used to sign access tokens. If none is specified,
         # the registration_shared_secret is used, if one is given; otherwise,
         # a secret key is derived from the signing key.
@@ -133,33 +174,53 @@ class KeyConfig(Config):
 
         # The trusted servers to download signing keys from.
         #
-        #perspectives:
-        #  servers:
-        #    "matrix.org":
-        #      verify_keys:
-        #        "ed25519:auto":
-        #          key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
-        """ % locals()
-
-    def read_perspectives(self, perspectives_servers):
-        servers = {}
-        for server_name, server_config in perspectives_servers.items():
-            for key_id, key_data in server_config["verify_keys"].items():
-                if is_signing_algorithm_supported(key_id):
-                    key_base64 = key_data["key"]
-                    key_bytes = decode_base64(key_base64)
-                    verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                    servers.setdefault(server_name, {})[key_id] = verify_key
-        return servers
+        # When we need to fetch a signing key, each server is tried in parallel.
+        #
+        # Normally, the connection to the key server is validated via TLS certificates.
+        # Additional security can be provided by configuring a `verify key`, which
+        # will make synapse check that the response is signed by that key.
+        #
+        # This setting supercedes an older setting named `perspectives`. The old format
+        # is still supported for backwards-compatibility, but it is deprecated.
+        #
+        # Options for each entry in the list include:
+        #
+        #    server_name: the name of the server. required.
+        #
+        #    verify_keys: an optional map from key id to base64-encoded public key.
+        #       If specified, we will check that the response is signed by at least
+        #       one of the given keys.
+        #
+        #    accept_keys_insecurely: a boolean. Normally, if `verify_keys` is unset,
+        #       and federation_verify_certificates is not `true`, synapse will refuse
+        #       to start, because this would allow anyone who can spoof DNS responses
+        #       to masquerade as the trusted key server. If you know what you are doing
+        #       and are sure that your network environment provides a secure connection
+        #       to the key server, you can set this to `true` to override this
+        #       behaviour.
+        #
+        # An example configuration might look like:
+        #
+        #trusted_key_servers:
+        #  - server_name: "my_trusted_server.example.com"
+        #    verify_keys:
+        #      "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
+        #  - server_name: "my_other_trusted_server.example.com"
+        #
+        # The default configuration is:
+        #
+        #trusted_key_servers:
+        #  - server_name: "matrix.org"
+        """
+            % locals()
+        )
 
     def read_signing_key(self, signing_key_path):
         signing_keys = self.read_file(signing_key_path, "signing_key")
         try:
             return read_signing_keys(signing_keys.splitlines(True))
         except Exception as e:
-            raise ConfigError(
-                "Error reading signing_key: %s" % (str(e))
-            )
+            raise ConfigError("Error reading signing_key: %s" % (str(e)))
 
     def read_old_signing_keys(self, old_signing_keys):
         keys = {}
@@ -182,9 +243,7 @@ class KeyConfig(Config):
         if not self.path_exists(signing_key_path):
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
-                write_signing_keys(
-                    signing_key_file, (generate_signing_key(key_id),),
-                )
+                write_signing_keys(signing_key_file, (generate_signing_key(key_id),))
         else:
             signing_keys = self.read_file(signing_key_path, "signing_key")
             if len(signing_keys.split("\n")[0].split()) == 1:
@@ -194,6 +253,115 @@ class KeyConfig(Config):
                     NACL_ED25519, key_id, signing_keys.split("\n")[0]
                 )
                 with open(signing_key_path, "w") as signing_key_file:
-                    write_signing_keys(
-                        signing_key_file, (key,),
+                    write_signing_keys(signing_key_file, (key,))
+
+
+def _perspectives_to_key_servers(config):
+    """Convert old-style 'perspectives' configs into new-style 'trusted_key_servers'
+
+    Returns an iterable of entries to add to trusted_key_servers.
+    """
+
+    # 'perspectives' looks like:
+    #
+    # {
+    #     "servers": {
+    #         "matrix.org": {
+    #             "verify_keys": {
+    #                 "ed25519:auto": {
+    #                     "key": "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
+    #                 }
+    #             }
+    #         }
+    #     }
+    # }
+    #
+    # 'trusted_keys' looks like:
+    #
+    # [
+    #     {
+    #         "server_name": "matrix.org",
+    #         "verify_keys": {
+    #             "ed25519:auto": "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw",
+    #         }
+    #     }
+    # ]
+
+    perspectives_servers = config.get("perspectives", {}).get("servers", {})
+
+    for server_name, server_opts in perspectives_servers.items():
+        trusted_key_server_entry = {"server_name": server_name}
+        verify_keys = server_opts.get("verify_keys")
+        if verify_keys is not None:
+            trusted_key_server_entry["verify_keys"] = {
+                key_id: key_data["key"] for key_id, key_data in verify_keys.items()
+            }
+        yield trusted_key_server_entry
+
+
+TRUSTED_KEY_SERVERS_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "schema for the trusted_key_servers setting",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "server_name": {"type": "string"},
+            "verify_keys": {
+                "type": "object",
+                # each key must be a base64 string
+                "additionalProperties": {"type": "string"},
+            },
+        },
+        "required": ["server_name"],
+    },
+}
+
+
+def _parse_key_servers(key_servers, federation_verify_certificates):
+    try:
+        jsonschema.validate(key_servers, TRUSTED_KEY_SERVERS_SCHEMA)
+    except jsonschema.ValidationError as e:
+        raise ConfigError("Unable to parse 'trusted_key_servers': " + e.message)
+
+    for server in key_servers:
+        server_name = server["server_name"]
+        result = TrustedKeyServer(server_name=server_name)
+
+        verify_keys = server.get("verify_keys")
+        if verify_keys is not None:
+            result.verify_keys = {}
+            for key_id, key_base64 in verify_keys.items():
+                if not is_signing_algorithm_supported(key_id):
+                    raise ConfigError(
+                        "Unsupported signing algorithm on key %s for server %s in "
+                        "trusted_key_servers" % (key_id, server_name)
                     )
+                try:
+                    key_bytes = decode_base64(key_base64)
+                    verify_key = decode_verify_key_bytes(key_id, key_bytes)
+                except Exception as e:
+                    raise ConfigError(
+                        "Unable to parse key %s for server %s in "
+                        "trusted_key_servers: %s" % (key_id, server_name, e)
+                    )
+
+                result.verify_keys[key_id] = verify_key
+
+        if not federation_verify_certificates and not server.get(
+            "accept_keys_insecurely"
+        ):
+            _assert_keyserver_has_verify_keys(result)
+
+        yield result
+
+
+def _assert_keyserver_has_verify_keys(trusted_key_server):
+    if not trusted_key_server.verify_keys:
+        raise ConfigError(INSECURE_NOTARY_ERROR)
+
+    # also check that they are not blindly checking the old matrix.org key
+    if trusted_key_server.server_name == "matrix.org" and any(
+        key_id == "ed25519:auto" for key_id in trusted_key_server.verify_keys
+    ):
+        raise ConfigError(RELYING_ON_MATRIX_KEY_ERROR)

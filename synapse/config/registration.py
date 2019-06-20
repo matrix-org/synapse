@@ -23,7 +23,7 @@ from synapse.util.stringutils import random_string_with_symbols
 class AccountValidityConfig(Config):
     def __init__(self, config, synapse_config):
         self.enabled = config.get("enabled", False)
-        self.renew_by_email_enabled = ("renew_at" in config)
+        self.renew_by_email_enabled = "renew_at" in config
 
         if self.enabled:
             if "period" in config:
@@ -39,12 +39,13 @@ class AccountValidityConfig(Config):
             else:
                 self.renew_email_subject = "Renew your %(app)s account"
 
+            self.startup_job_max_delta = self.period * 10.0 / 100.0
+
         if self.renew_by_email_enabled and "public_baseurl" not in synapse_config:
             raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
 
 class RegistrationConfig(Config):
-
     def read_config(self, config):
         self.enable_registration = bool(
             strtobool(str(config.get("enable_registration", False)))
@@ -55,7 +56,7 @@ class RegistrationConfig(Config):
             )
 
         self.account_validity = AccountValidityConfig(
-            config.get("account_validity", {}), config,
+            config.get("account_validity", {}), config
         )
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
@@ -65,24 +66,23 @@ class RegistrationConfig(Config):
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config.get(
-            "trusted_third_party_id_servers",
-            ["matrix.org", "vector.im"],
+            "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
-        self.invite_3pid_guest = (
-            self.allow_guest_access and config.get("invite_3pid_guest", False)
+        self.invite_3pid_guest = self.allow_guest_access and config.get(
+            "invite_3pid_guest", False
         )
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
         for room_alias in self.auto_join_rooms:
             if not RoomAlias.is_valid(room_alias):
-                raise ConfigError('Invalid auto_join_rooms entry %s' % (room_alias,))
+                raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
-        self.disable_msisdn_registration = (
-            config.get("disable_msisdn_registration", False)
+        self.disable_msisdn_registration = config.get(
+            "disable_msisdn_registration", False
         )
 
     def default_config(self, generate_secrets=False, **kwargs):
@@ -91,9 +91,12 @@ class RegistrationConfig(Config):
                 random_string_with_symbols(50),
             )
         else:
-            registration_shared_secret = '# registration_shared_secret: <PRIVATE STRING>'
+            registration_shared_secret = (
+                "# registration_shared_secret: <PRIVATE STRING>"
+            )
 
-        return """\
+        return (
+            """\
         ## Registration ##
         #
         # Registration can be rate-limited using the parameters in the "Ratelimiting"
@@ -129,7 +132,9 @@ class RegistrationConfig(Config):
         # This means that, if a validity period is set, and Synapse is restarted (it will
         # then derive an expiration date from the current validity period), and some time
         # after that the validity period changes and Synapse is restarted, the users'
-        # expiration dates won't be updated unless their account is manually renewed.
+        # expiration dates won't be updated unless their account is manually renewed. This
+        # date will be randomly selected within a range [now + period - d ; now + period],
+        # where d is equal to 10%% of the validity period.
         #
         #account_validity:
         #  enabled: True
@@ -213,17 +218,19 @@ class RegistrationConfig(Config):
         # users cannot be auto-joined since they do not exist.
         #
         #autocreate_auto_join_rooms: true
-        """ % locals()
+        """
+            % locals()
+        )
 
     def add_arguments(self, parser):
         reg_group = parser.add_argument_group("registration")
         reg_group.add_argument(
-            "--enable-registration", action="store_true", default=None,
-            help="Enable registration for new users."
+            "--enable-registration",
+            action="store_true",
+            default=None,
+            help="Enable registration for new users.",
         )
 
     def read_arguments(self, args):
         if args.enable_registration is not None:
-            self.enable_registration = bool(
-                strtobool(str(args.enable_registration))
-            )
+            self.enable_registration = bool(strtobool(str(args.enable_registration)))

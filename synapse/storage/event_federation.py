@@ -190,6 +190,34 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             room_id,
         )
 
+    def get_rooms_with_many_extremities(self, min_count, limit):
+        """Get the top rooms with at least N extremities.
+
+        Args:
+            min_count (int): The minimum number of extremities
+            limit (int): The maximum number of rooms to return.
+
+        Returns:
+            Deferred[list]: At most `limit` room IDs that have at least
+            `min_count` extremities, sorted by extremity count.
+        """
+
+        def _get_rooms_with_many_extremities_txn(txn):
+            sql = """
+                SELECT room_id FROM event_forward_extremities
+                GROUP BY room_id
+                HAVING count(*) > ?
+                ORDER BY count(*) DESC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (min_count, limit))
+            return [room_id for room_id, in txn]
+
+        return self.runInteraction(
+            "get_rooms_with_many_extremities", _get_rooms_with_many_extremities_txn
+        )
+
     @cached(max_entries=5000, iterable=True)
     def get_latest_event_ids_in_room(self, room_id):
         return self._simple_select_onecol(

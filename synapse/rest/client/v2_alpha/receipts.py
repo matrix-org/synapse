@@ -20,13 +20,13 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class ReceiptRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)"
         "/receipt/(?P<receipt_type>[^/]*)"
         "/(?P<event_id>[^/]*)$"
@@ -49,10 +49,7 @@ class ReceiptRestServlet(RestServlet):
         yield self.presence_handler.bump_presence_active_time(requester.user)
 
         yield self.receipts_handler.received_client_receipt(
-            room_id,
-            receipt_type,
-            user_id=requester.user.to_string(),
-            event_id=event_id
+            room_id, receipt_type, user_id=requester.user.to_string(), event_id=event_id
         )
 
         defer.returnValue((200, {}))

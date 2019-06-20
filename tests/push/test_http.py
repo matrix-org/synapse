@@ -23,15 +23,9 @@ from synapse.util.logcontext import make_deferred_yieldable
 
 from tests.unittest import HomeserverTestCase
 
-try:
-    from synapse.push.mailer import load_jinja2_templates
-except Exception:
-    load_jinja2_templates = None
-
 
 class HTTPPusherTests(HomeserverTestCase):
 
-    skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,

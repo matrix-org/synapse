@@ -19,17 +19,22 @@ import hmac
 
 from twisted.internet import defer
 
-from .base import ClientV1RestServlet, client_path_patterns
+from synapse.http.servlet import RestServlet
+from synapse.rest.client.v2_alpha._base import client_patterns
 
 
-class VoipRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/voip/turnServer$")
+class VoipRestServlet(RestServlet):
+    PATTERNS = client_patterns("/voip/turnServer$", v1=True)
+
+    def __init__(self, hs):
+        super(VoipRestServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(
-            request,
-            self.hs.config.turn_allow_guests
+            request, self.hs.config.turn_allow_guests
         )
 
         turnUris = self.hs.config.turn_uris
@@ -43,9 +48,7 @@ class VoipRestServlet(ClientV1RestServlet):
             username = "%d:%s" % (expiry, requester.user.to_string())
 
             mac = hmac.new(
-                turnSecret.encode(),
-                msg=username.encode(),
-                digestmod=hashlib.sha1
+                turnSecret.encode(), msg=username.encode(), digestmod=hashlib.sha1
             )
             # We need to use standard padded base64 encoding here
             # encode_base64 because we need to add the standard padding to get the
@@ -59,12 +62,17 @@ class VoipRestServlet(ClientV1RestServlet):
         else:
             defer.returnValue((200, {}))
 
-        defer.returnValue((200, {
-            'username': username,
-            'password': password,
-            'ttl': userLifetime / 1000,
-            'uris': turnUris,
-        }))
+        defer.returnValue(
+            (
+                200,
+                {
+                    "username": username,
+                    "password": password,
+                    "ttl": userLifetime / 1000,
+                    "uris": turnUris,
+                },
+            )
+        )
 
     def on_OPTIONS(self, request):
         return (200, {})

@@ -19,7 +19,7 @@ from twisted.internet import defer
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class CapabilitiesRestServlet(RestServlet):
     """End point to expose the capabilities of the server."""
 
-    PATTERNS = client_v2_patterns("/capabilities$")
+    PATTERNS = client_patterns("/capabilities$")
 
     def __init__(self, hs):
         """

@@ -21,4 +21,4 @@ import tests.patch_inline_callbacks
 # attempt to do the patch before we load any synapse code
 tests.patch_inline_callbacks.do_patch()
 
-util.DEFAULT_TIMEOUT_DURATION = 10
+util.DEFAULT_TIMEOUT_DURATION = 20

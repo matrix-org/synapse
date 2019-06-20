@@ -31,6 +31,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import CodeMessageException, cs_error
 from synapse.api.room_versions import RoomVersions
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
@@ -131,7 +132,6 @@ def default_config(name, parse=False):
         "password_providers": [],
         "worker_replication_url": "",
         "worker_app": None,
-        "email_enable_notifs": False,
         "block_non_admin_invites": False,
         "federation_domain_whitelist": None,
         "filter_timeline_limit": 5000,
@@ -174,7 +174,7 @@ def default_config(name, parse=False):
         "use_frozen_dicts": False,
         # We need a sane default_room_version, otherwise attempts to create
         # rooms will fail.
-        "default_room_version": "1",
+        "default_room_version": DEFAULT_ROOM_VERSION,
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         "update_user_directory": False,
@@ -358,9 +358,9 @@ def setup_test_homeserver(
     # Need to let the HS build an auth handler and then mess with it
     # because AuthHandler's constructor requires the HS, so we can't make one
     # beforehand and pass it in to the HS's constructor (chicken / egg)
-    hs.get_auth_handler().hash = lambda p: hashlib.md5(p.encode('utf8')).hexdigest()
+    hs.get_auth_handler().hash = lambda p: hashlib.md5(p.encode("utf8")).hexdigest()
     hs.get_auth_handler().validate_hash = (
-        lambda p, h: hashlib.md5(p.encode('utf8')).hexdigest() == h
+        lambda p, h: hashlib.md5(p.encode("utf8")).hexdigest() == h
     )
 
     fed = kargs.get("resource_for_federation", None)
@@ -407,7 +407,7 @@ class MockHttpResource(HttpServer):
     def trigger_get(self, path):
         return self.trigger(b"GET", path, None)
 
-    @patch('twisted.web.http.Request')
+    @patch("twisted.web.http.Request")
     @defer.inlineCallbacks
     def trigger(
         self, http_method, path, content, mock_request, federation_auth_origin=None
@@ -431,12 +431,12 @@ class MockHttpResource(HttpServer):
         # annoyingly we return a twisted http request which has chained calls
         # to get at the http content, hence mock it here.
         mock_content = Mock()
-        config = {'read.return_value': content}
+        config = {"read.return_value": content}
         mock_content.configure_mock(**config)
         mock_request.content = mock_content
 
-        mock_request.method = http_method.encode('ascii')
-        mock_request.uri = path.encode('ascii')
+        mock_request.method = http_method.encode("ascii")
+        mock_request.uri = path.encode("ascii")
 
         mock_request.getClientIP.return_value = "-"
 
@@ -452,14 +452,14 @@ class MockHttpResource(HttpServer):
 
         # add in query params to the right place
         try:
-            mock_request.args = urlparse.parse_qs(path.split('?')[1])
-            mock_request.path = path.split('?')[0]
+            mock_request.args = urlparse.parse_qs(path.split("?")[1])
+            mock_request.path = path.split("?")[0]
             path = mock_request.path
         except Exception:
             pass
 
         if isinstance(path, bytes):
-            path = path.decode('utf8')
+            path = path.decode("utf8")
 
         for (method, pattern, func) in self.callbacks:
             if http_method != method:

@@ -23,21 +23,22 @@ from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError
 from synapse.handlers.presence import format_user_presence_state
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
-
-from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class PresenceStatusRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/presence/(?P<user_id>[^/]*)/status")
+class PresenceStatusRestServlet(RestServlet):
+    PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status", v1=True)
 
     def __init__(self, hs):
-        super(PresenceStatusRestServlet, self).__init__(hs)
+        super(PresenceStatusRestServlet, self).__init__()
+        self.hs = hs
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -46,7 +47,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
         if requester.user != user:
             allowed = yield self.presence_handler.is_visible(
-                observed_user=user, observer_user=requester.user,
+                observed_user=user, observer_user=requester.user
             )
 
             if not allowed:

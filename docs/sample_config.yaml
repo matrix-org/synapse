@@ -90,7 +90,8 @@ pid_file: DATADIR/homeserver.pid
 #
 # For example, for room version 1, default_room_version should be set
 # to "1".
-#default_room_version: "1"
+#
+#default_room_version: "4"
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -260,6 +261,22 @@ listeners:
 
 # Monthly Active User Blocking
 #
+# Used in cases where the admin or server owner wants to limit to the
+# number of monthly active users.
+#
+# 'limit_usage_by_mau' disables/enables monthly active user blocking. When
+# anabled and a limit is reached the server returns a 'ResourceLimitError'
+# with error type Codes.RESOURCE_LIMIT_EXCEEDED
+#
+# 'max_mau_value' is the hard limit of monthly active users above which
+# the server will start blocking user actions.
+#
+# 'mau_trial_days' is a means to add a grace period for active users. It
+# means that users must be active for this number of days before they
+# can be considered active and guards against the case where lots of users
+# sign up in a short space of time never to return after their initial
+# session.
+#
 #limit_usage_by_mau: False
 #max_mau_value: 50
 #mau_trial_days: 2
@@ -312,12 +329,12 @@ listeners:
 #
 #tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
 
-# Whether to verify TLS certificates when sending federation traffic.
+# Whether to verify TLS server certificates for outbound federation requests.
 #
-# This currently defaults to `false`, however this will change in
-# Synapse 1.0 when valid federation certificates will be required.
+# Defaults to `true`. To disable certificate verification, uncomment the
+# following line.
 #
-#federation_verify_certificates: true
+#federation_verify_certificates: false
 
 # Skip federation certificate verification on the following whitelist
 # of domains.
@@ -762,7 +779,9 @@ uploads_path: "DATADIR/uploads"
 # This means that, if a validity period is set, and Synapse is restarted (it will
 # then derive an expiration date from the current validity period), and some time
 # after that the validity period changes and Synapse is restarted, the users'
-# expiration dates won't be updated unless their account is manually renewed.
+# expiration dates won't be updated unless their account is manually renewed. This
+# date will be randomly selected within a range [now + period - d ; now + period],
+# where d is equal to 10% of the validity period.
 #
 #account_validity:
 #  enabled: True
@@ -933,12 +952,43 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 
 # The trusted servers to download signing keys from.
 #
-#perspectives:
-#  servers:
-#    "matrix.org":
-#      verify_keys:
-#        "ed25519:auto":
-#          key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
+# When we need to fetch a signing key, each server is tried in parallel.
+#
+# Normally, the connection to the key server is validated via TLS certificates.
+# Additional security can be provided by configuring a `verify key`, which
+# will make synapse check that the response is signed by that key.
+#
+# This setting supercedes an older setting named `perspectives`. The old format
+# is still supported for backwards-compatibility, but it is deprecated.
+#
+# Options for each entry in the list include:
+#
+#    server_name: the name of the server. required.
+#
+#    verify_keys: an optional map from key id to base64-encoded public key.
+#       If specified, we will check that the response is signed by at least
+#       one of the given keys.
+#
+#    accept_keys_insecurely: a boolean. Normally, if `verify_keys` is unset,
+#       and federation_verify_certificates is not `true`, synapse will refuse
+#       to start, because this would allow anyone who can spoof DNS responses
+#       to masquerade as the trusted key server. If you know what you are doing
+#       and are sure that your network environment provides a secure connection
+#       to the key server, you can set this to `true` to override this
+#       behaviour.
+#
+# An example configuration might look like:
+#
+#trusted_key_servers:
+#  - server_name: "my_trusted_server.example.com"
+#    verify_keys:
+#      "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
+#  - server_name: "my_other_trusted_server.example.com"
+#
+# The default configuration is:
+#
+#trusted_key_servers:
+#  - server_name: "matrix.org"
 
 
 # Enable SAML2 for registration and login. Uses pysaml2.
@@ -1015,10 +1065,8 @@ password_config:
 
 
 
-# Enable sending emails for notification events or expiry notices
-# Defining a custom URL for Riot is only needed if email notifications
-# should contain links to a self-hosted installation of Riot; when set
-# the "app_name" setting is ignored.
+# Enable sending emails for password resets, notification events or
+# account expiry notices
 #
 # If your SMTP server requires authentication, the optional smtp_user &
 # smtp_pass variables should be used
@@ -1026,22 +1074,64 @@ password_config:
 #email:
 #   enable_notifs: false
 #   smtp_host: "localhost"
-#   smtp_port: 25
+#   smtp_port: 25 # SSL: 465, STARTTLS: 587
 #   smtp_user: "exampleusername"
 #   smtp_pass: "examplepassword"
 #   require_transport_security: False
 #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
 #   app_name: Matrix
-#   # if template_dir is unset, uses the example templates that are part of
-#   # the Synapse distribution.
+#
+#   # Enable email notifications by default
+#   notif_for_new_users: True
+#
+#   # Defining a custom URL for Riot is only needed if email notifications
+#   # should contain links to a self-hosted installation of Riot; when set
+#   # the "app_name" setting is ignored
+#   riot_base_url: "http://localhost/riot"
+#
+#   # Enable sending password reset emails via the configured, trusted
+#   # identity servers
+#   #
+#   # IMPORTANT! This will give a malicious or overtaken identity server
+#   # the ability to reset passwords for your users! Make absolutely sure
+#   # that you want to do this! It is strongly recommended that password
+#   # reset emails be sent by the homeserver instead
+#   #
+#   # If this option is set to false and SMTP options have not been
+#   # configured, resetting user passwords via email will be disabled
+#   #trust_identity_server_for_password_resets: false
+#
+#   # Configure the time that a validation email or text message code
+#   # will expire after sending
+#   #
+#   # This is currently used for password resets
+#   #validation_token_lifetime: 1h
+#
+#   # Template directory. All template files should be stored within this
+#   # directory
+#   #
 #   #template_dir: res/templates
+#
+#   # Templates for email notifications
+#   #
 #   notif_template_html: notif_mail.html
 #   notif_template_text: notif_mail.txt
-#   # Templates for account expiry notices.
+#
+#   # Templates for account expiry notices
+#   #
 #   expiry_template_html: notice_expiry.html
 #   expiry_template_text: notice_expiry.txt
-#   notif_for_new_users: True
-#   riot_base_url: "http://localhost/riot"
+#
+#   # Templates for password reset emails sent by the homeserver
+#   #
+#   #password_reset_template_html: password_reset.html
+#   #password_reset_template_text: password_reset.txt
+#
+#   # Templates for password reset success and failure pages that a user
+#   # will see after attempting to reset their password
+#   #
+#   #password_reset_template_success_html: password_reset_success.html
+#   #password_reset_template_failure_html: password_reset_failure.html
 
 
 #password_providers:
@@ -1102,9 +1192,9 @@ password_config:
 #
 # 'search_all_users' defines whether to search all users visible to your HS
 # when searching the user directory, rather than limiting to users visible
-# in public rooms.  Defaults to false.  If you set it True, you'll have to run
-# UPDATE user_directory_stream_pos SET stream_id = NULL;
-# on your database to tell it to rebuild the user_directory search indexes.
+# in public rooms.  Defaults to false.  If you set it True, you'll have to
+# rebuild the user_directory search indexes, see
+# https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
 #
 #user_directory:
 #  enabled: true
@@ -1261,3 +1351,16 @@ password_config:
 #    alias: "*"
 #    room_id: "*"
 #    action: allow
+
+
+# Server admins can define a Python module that implements extra rules for
+# allowing or denying incoming events. In order to work, this module needs to
+# override the methods defined in synapse/events/third_party_rules.py.
+#
+# This feature is designed to be used in closed federations only, where each
+# participating server enforces the same rules.
+#
+#third_party_event_rules:
+#  module: "my_custom_project.SuperRulesSet"
+#  config:
+#    example_option: 'things'

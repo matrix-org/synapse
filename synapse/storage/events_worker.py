@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import division
+
 import itertools
 import logging
 from collections import namedtuple
@@ -25,7 +27,6 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError
 from synapse.api.room_versions import EventFormatVersions
 from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
-# these are only included to make the type annotations work
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -74,6 +75,42 @@ class EventsWorkerStore(SQLBaseStore):
             keyvalues={"event_id": event_id},
             retcol="received_ts",
             desc="get_received_ts",
+        )
+
+    def get_received_ts_by_stream_pos(self, stream_ordering):
+        """Given a stream ordering get an approximate timestamp of when it
+        happened.
+
+        This is done by simply taking the received ts of the first event that
+        has a stream ordering greater than or equal to the given stream pos.
+        If none exists returns the current time, on the assumption that it must
+        have happened recently.
+
+        Args:
+            stream_ordering (int)
+
+        Returns:
+            Deferred[int]
+        """
+
+        def _get_approximate_received_ts_txn(txn):
+            sql = """
+                SELECT received_ts FROM events
+                WHERE stream_ordering >= ?
+                LIMIT 1
+            """
+
+            txn.execute(sql, (stream_ordering,))
+            row = txn.fetchone()
+            if row and row[0]:
+                ts = row[0]
+            else:
+                ts = self.clock.time_msec()
+
+            return ts
+
+        return self.runInteraction(
+            "get_approximate_received_ts", _get_approximate_received_ts_txn
         )
 
     @defer.inlineCallbacks
@@ -614,9 +651,14 @@ class EventsWorkerStore(SQLBaseStore):
 
     def _get_total_state_event_counts_txn(self, txn, room_id):
         """
-        See get_state_event_counts.
+        See get_total_state_event_counts.
         """
-        sql = "SELECT COUNT(*) FROM state_events WHERE room_id=?"
+        # We join against the events table as that has an index on room_id
+        sql = """
+            SELECT COUNT(*) FROM state_events
+            INNER JOIN events USING (room_id, event_id)
+            WHERE room_id=?
+        """
         txn.execute(sql, (room_id,))
         row = txn.fetchone()
         return row[0] if row else 0
@@ -633,5 +675,53 @@ class EventsWorkerStore(SQLBaseStore):
         """
         return self.runInteraction(
             "get_total_state_event_counts",
-            self._get_total_state_event_counts_txn, room_id
+            self._get_total_state_event_counts_txn,
+            room_id,
         )
+
+    def _get_current_state_event_counts_txn(self, txn, room_id):
+        """
+        See get_current_state_event_counts.
+        """
+        sql = "SELECT COUNT(*) FROM current_state_events WHERE room_id=?"
+        txn.execute(sql, (room_id,))
+        row = txn.fetchone()
+        return row[0] if row else 0
+
+    def get_current_state_event_counts(self, room_id):
+        """
+        Gets the current number of state events in a room.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[int]
+        """
+        return self.runInteraction(
+            "get_current_state_event_counts",
+            self._get_current_state_event_counts_txn,
+            room_id,
+        )
+
+    @defer.inlineCallbacks
+    def get_room_complexity(self, room_id):
+        """
+        Get a rough approximation of the complexity of the room. This is used by
+        remote servers to decide whether they wish to join the room or not.
+        Higher complexity value indicates that being in the room will consume
+        more resources.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[dict[str:int]] of complexity version to complexity.
+        """
+        state_events = yield self.get_current_state_event_counts(room_id)
+
+        # Call this one "v1", so we can introduce new ones as we want to develop
+        # it.
+        complexity_v1 = round(state_events / 500, 2)
+
+        defer.returnValue({"v1": complexity_v1})

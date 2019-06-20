@@ -70,6 +70,7 @@ class CodeMessageException(RuntimeError):
         code (int): HTTP error code
         msg (str): string describing the error
     """
+
     def __init__(self, code, msg):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
@@ -83,6 +84,7 @@ class SynapseError(CodeMessageException):
     Attributes:
         errcode (str): Matrix error code e.g 'M_FORBIDDEN'
     """
+
     def __init__(self, code, msg, errcode=Codes.UNKNOWN):
         """Constructs a synapse error.
 
@@ -95,10 +97,7 @@ class SynapseError(CodeMessageException):
         self.errcode = errcode
 
     def error_dict(self):
-        return cs_error(
-            self.msg,
-            self.errcode,
-        )
+        return cs_error(self.msg, self.errcode)
 
 
 class ProxiedRequestError(SynapseError):
@@ -107,27 +106,23 @@ class ProxiedRequestError(SynapseError):
     Attributes:
         errcode (str): Matrix error code e.g 'M_FORBIDDEN'
     """
+
     def __init__(self, code, msg, errcode=Codes.UNKNOWN, additional_fields=None):
-        super(ProxiedRequestError, self).__init__(
-            code, msg, errcode
-        )
+        super(ProxiedRequestError, self).__init__(code, msg, errcode)
         if additional_fields is None:
             self._additional_fields = {}
         else:
             self._additional_fields = dict(additional_fields)
 
     def error_dict(self):
-        return cs_error(
-            self.msg,
-            self.errcode,
-            **self._additional_fields
-        )
+        return cs_error(self.msg, self.errcode, **self._additional_fields)
 
 
 class ConsentNotGivenError(SynapseError):
     """The error returned to the client when the user has not consented to the
     privacy policy.
     """
+
     def __init__(self, msg, consent_uri):
         """Constructs a ConsentNotGivenError
 
@@ -136,22 +131,17 @@ class ConsentNotGivenError(SynapseError):
             consent_url (str): The URL where the user can give their consent
         """
         super(ConsentNotGivenError, self).__init__(
-            code=http_client.FORBIDDEN,
-            msg=msg,
-            errcode=Codes.CONSENT_NOT_GIVEN
+            code=http_client.FORBIDDEN, msg=msg, errcode=Codes.CONSENT_NOT_GIVEN
         )
         self._consent_uri = consent_uri
 
     def error_dict(self):
-        return cs_error(
-            self.msg,
-            self.errcode,
-            consent_uri=self._consent_uri
-        )
+        return cs_error(self.msg, self.errcode, consent_uri=self._consent_uri)
 
 
 class RegistrationError(SynapseError):
     """An error raised when a registration event fails."""
+
     pass
 
 
@@ -190,15 +180,17 @@ class InteractiveAuthIncompleteError(Exception):
         result (dict): the server response to the request, which should be
             passed back to the client
     """
+
     def __init__(self, result):
         super(InteractiveAuthIncompleteError, self).__init__(
-            "Interactive auth not yet complete",
+            "Interactive auth not yet complete"
         )
         self.result = result
 
 
 class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
+
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.UNRECOGNIZED
@@ -207,21 +199,14 @@ class UnrecognizedRequestError(SynapseError):
             message = "Unrecognized request"
         else:
             message = args[0]
-        super(UnrecognizedRequestError, self).__init__(
-            400,
-            message,
-            **kwargs
-        )
+        super(UnrecognizedRequestError, self).__init__(400, message, **kwargs)
 
 
 class NotFoundError(SynapseError):
     """An error indicating we can't find the thing you asked for"""
+
     def __init__(self, msg="Not found", errcode=Codes.NOT_FOUND):
-        super(NotFoundError, self).__init__(
-            404,
-            msg,
-            errcode=errcode
-        )
+        super(NotFoundError, self).__init__(404, msg, errcode=errcode)
 
 
 class AuthError(SynapseError):
@@ -238,8 +223,11 @@ class ResourceLimitError(SynapseError):
     Any error raised when there is a problem with resource usage.
     For instance, the monthly active user limit for the server has been exceeded
     """
+
     def __init__(
-        self, code, msg,
+        self,
+        code,
+        msg,
         errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
         admin_contact=None,
         limit_type=None,
@@ -253,7 +241,7 @@ class ResourceLimitError(SynapseError):
             self.msg,
             self.errcode,
             admin_contact=self.admin_contact,
-            limit_type=self.limit_type
+            limit_type=self.limit_type,
         )
 
 
@@ -268,6 +256,7 @@ class EventSizeError(SynapseError):
 
 class EventStreamError(SynapseError):
     """An error raised when there a problem with the event stream."""
+
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.BAD_PAGINATION
@@ -276,47 +265,53 @@ class EventStreamError(SynapseError):
 
 class LoginError(SynapseError):
     """An error raised when there was a problem logging in."""
+
     pass
 
 
 class StoreError(SynapseError):
     """An error raised when there was a problem storing some data."""
+
     pass
 
 
 class InvalidCaptchaError(SynapseError):
-    def __init__(self, code=400, msg="Invalid captcha.", error_url=None,
-                 errcode=Codes.CAPTCHA_INVALID):
+    def __init__(
+        self,
+        code=400,
+        msg="Invalid captcha.",
+        error_url=None,
+        errcode=Codes.CAPTCHA_INVALID,
+    ):
         super(InvalidCaptchaError, self).__init__(code, msg, errcode)
         self.error_url = error_url
 
     def error_dict(self):
-        return cs_error(
-            self.msg,
-            self.errcode,
-            error_url=self.error_url,
-        )
+        return cs_error(self.msg, self.errcode, error_url=self.error_url)
 
 
 class LimitExceededError(SynapseError):
     """A client has sent too many requests and is being throttled.
     """
-    def __init__(self, code=429, msg="Too Many Requests", retry_after_ms=None,
-                 errcode=Codes.LIMIT_EXCEEDED):
+
+    def __init__(
+        self,
+        code=429,
+        msg="Too Many Requests",
+        retry_after_ms=None,
+        errcode=Codes.LIMIT_EXCEEDED,
+    ):
         super(LimitExceededError, self).__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
 
     def error_dict(self):
-        return cs_error(
-            self.msg,
-            self.errcode,
-            retry_after_ms=self.retry_after_ms,
-        )
+        return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
 
 
 class RoomKeysVersionError(SynapseError):
     """A client has tried to upload to a non-current version of the room_keys store
     """
+
     def __init__(self, current_version):
         """
         Args:
@@ -331,6 +326,7 @@ class RoomKeysVersionError(SynapseError):
 class UnsupportedRoomVersionError(SynapseError):
     """The client's request to create a room used a room version that the server does
     not support."""
+
     def __init__(self):
         super(UnsupportedRoomVersionError, self).__init__(
             code=400,
@@ -339,28 +335,34 @@ class UnsupportedRoomVersionError(SynapseError):
         )
 
 
+class ThreepidValidationError(SynapseError):
+    """An error raised when there was a problem authorising an event."""
+
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.FORBIDDEN
+        super(ThreepidValidationError, self).__init__(*args, **kwargs)
+
+
 class IncompatibleRoomVersionError(SynapseError):
     """A server is trying to join a room whose version it does not support.
 
     Unlike UnsupportedRoomVersionError, it is specific to the case of the make_join
     failing.
     """
+
     def __init__(self, room_version):
         super(IncompatibleRoomVersionError, self).__init__(
             code=400,
             msg="Your homeserver does not support the features required to "
-                "join this room",
+            "join this room",
             errcode=Codes.INCOMPATIBLE_ROOM_VERSION,
         )
 
         self._room_version = room_version
 
     def error_dict(self):
-        return cs_error(
-            self.msg,
-            self.errcode,
-            room_version=self._room_version,
-        )
+        return cs_error(self.msg, self.errcode, room_version=self._room_version)
 
 
 class RequestSendFailed(RuntimeError):
@@ -371,11 +373,11 @@ class RequestSendFailed(RuntimeError):
     networking (e.g. DNS failures, connection timeouts etc), versus unexpected
     errors (like programming errors).
     """
+
     def __init__(self, inner_exception, can_retry):
         super(RequestSendFailed, self).__init__(
-            "Failed to send request: %s: %s" % (
-                type(inner_exception).__name__, inner_exception,
-            )
+            "Failed to send request: %s: %s"
+            % (type(inner_exception).__name__, inner_exception)
         )
         self.inner_exception = inner_exception
         self.can_retry = can_retry
@@ -419,7 +421,7 @@ class FederationError(RuntimeError):
         self.affected = affected
         self.source = source
 
-        msg = "%s %s: %s" % (level, code, reason,)
+        msg = "%s %s: %s" % (level, code, reason)
         super(FederationError, self).__init__(msg)
 
     def get_dict(self):
@@ -439,6 +441,7 @@ class HttpResponseException(CodeMessageException):
     Attributes:
         response (bytes): body of response
     """
+
     def __init__(self, code, msg, response):
         """
 
@@ -477,7 +480,7 @@ class HttpResponseException(CodeMessageException):
         if not isinstance(j, dict):
             j = {}
 
-        errcode = j.pop('errcode', Codes.UNKNOWN)
-        errmsg = j.pop('error', self.msg)
+        errcode = j.pop("errcode", Codes.UNKNOWN)
+        errmsg = j.pop("error", self.msg)
 
         return ProxiedRequestError(self.code, errmsg, errcode, j)
