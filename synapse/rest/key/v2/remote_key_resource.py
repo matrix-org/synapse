@@ -97,7 +97,7 @@ class RemoteKey(DirectServeResource):
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
 
     @wrap_json_request_handler
-    async def async_render_GET(self, request):
+    async def _async_render_GET(self, request):
         if len(request.postpath) == 1:
             server, = request.postpath
             query = {server.decode("ascii"): {}}
@@ -114,7 +114,7 @@ class RemoteKey(DirectServeResource):
         await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
     @wrap_json_request_handler
-    async def async_render_POST(self, request):
+    async def _async_render_POST(self, request):
         content = parse_json_object_from_request(request)
 
         query = content["server_keys"]
