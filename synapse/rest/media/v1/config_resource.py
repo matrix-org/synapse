@@ -17,9 +17,9 @@
 from twisted.internet import defer
 
 from synapse.http.server import (
+    DirectServeResource,
     respond_with_json,
     wrap_json_request_handler,
-    DirectServeResource,
 )
 
 

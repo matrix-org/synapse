@@ -20,9 +20,9 @@ from twisted.web.server import NOT_DONE_YET
 
 import synapse.http.servlet
 from synapse.http.server import (
+    DirectServeResource,
     set_cors_headers,
     wrap_json_request_handler,
-    DirectServeResource,
 )
 
 from ._base import parse_media_id, respond_404

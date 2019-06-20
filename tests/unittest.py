@@ -14,19 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import gc
-import time
 import hashlib
 import hmac
 import logging
+import time
 
 from mock import Mock
 
 from canonicaljson import json
-from twisted.python.threadpool import ThreadPool
 
 import twisted
 import twisted.logger
 from twisted.internet.defer import Deferred, succeed
+from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
 
 from synapse.api.constants import EventTypes

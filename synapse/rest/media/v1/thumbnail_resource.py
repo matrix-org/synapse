@@ -21,9 +21,9 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.http.server import (
+    DirectServeResource,
     set_cors_headers,
     wrap_json_request_handler,
-    DirectServeResource,
 )
 from synapse.http.servlet import parse_integer, parse_string
 

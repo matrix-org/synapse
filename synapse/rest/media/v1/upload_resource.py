@@ -21,9 +21,9 @@ from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import SynapseError
 from synapse.http.server import (
+    DirectServeResource,
     respond_with_json,
     wrap_json_request_handler,
-    DirectServeResource,
 )
 from synapse.http.servlet import parse_string
 

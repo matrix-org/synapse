@@ -22,7 +22,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import CodeMessageException
-from synapse.http.server import wrap_html_request_handler, DirectServeResource
+from synapse.http.server import DirectServeResource, wrap_html_request_handler
 from synapse.http.servlet import parse_string
 from synapse.rest.client.v1.login import SSOAuthHandler
 

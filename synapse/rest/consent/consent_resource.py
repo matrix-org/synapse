@@ -30,9 +30,9 @@ from twisted.web.server import NOT_DONE_YET
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
 from synapse.http.server import (
+    DirectServeResource,
     finish_request,
     wrap_html_request_handler,
-    DirectServeResource,
 )
 from synapse.http.servlet import parse_string
 from synapse.types import UserID

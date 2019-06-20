@@ -38,10 +38,10 @@ from twisted.web.server import NOT_DONE_YET
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
+    DirectServeResource,
     respond_with_json,
     respond_with_json_bytes,
     wrap_json_request_handler,
-    DirectServeResource,
 )
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.metrics.background_process_metrics import run_as_background_process
