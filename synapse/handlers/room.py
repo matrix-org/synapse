@@ -121,7 +121,7 @@ class RoomCreationHandler(BaseHandler):
         # and one of them is not complete yet, cache the response and
         # return it to all subsequent requests
         ret = yield self._upgrade_response_cache.wrap(
-            (old_room_id, user_id, new_version),
+            (old_room_id, user_id),
             self._upgrade_room,
             requester, old_room_id, new_version,  # args for _upgrade_room
         )
