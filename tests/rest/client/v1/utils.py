@@ -44,7 +44,7 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            self.hs.get_reactor(), "POST", path, json.dumps(content).encode('utf8')
+            self.hs.get_reactor(), "POST", path, json.dumps(content).encode("utf8")
         )
         render(request, self.resource, self.hs.get_reactor())
 
@@ -93,7 +93,7 @@ class RestHelper(object):
         data = {"membership": membership}
 
         request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(data).encode('utf8')
+            self.hs.get_reactor(), "PUT", path, json.dumps(data).encode("utf8")
         )
 
         render(request, self.resource, self.hs.get_reactor())
@@ -117,7 +117,7 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(content).encode('utf8')
+            self.hs.get_reactor(), "PUT", path, json.dumps(content).encode("utf8")
         )
         render(request, self.resource, self.hs.get_reactor())
 
@@ -134,7 +134,7 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(body).encode('utf8')
+            self.hs.get_reactor(), "PUT", path, json.dumps(body).encode("utf8")
         )
         render(request, self.resource, self.hs.get_reactor())
 
