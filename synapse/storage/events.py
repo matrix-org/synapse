@@ -78,7 +78,7 @@ state_delta_reuse_delta_counter = Counter(
 forward_extremities_counter = Histogram(
     "synapse_storage_events_forward_extremities_persisted",
     "Number of forward extremities for each new event",
-    buckets=(1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf")
+    buckets=(1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
 
 # The number of stale forward extremities for each new event. Stale extremities
@@ -86,7 +86,7 @@ forward_extremities_counter = Histogram(
 stale_forward_extremities_counter = Histogram(
     "synapse_storage_events_stale_forward_extremities_persisted",
     "Number of unchanged forward extremities for each new event",
-    buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf")
+    buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
 
 
