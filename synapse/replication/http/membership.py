@@ -40,7 +40,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
     """
 
     NAME = "remote_join"
-    PATH_ARGS = ("room_id", "user_id",)
+    PATH_ARGS = ("room_id", "user_id")
 
     def __init__(self, hs):
         super(ReplicationRemoteJoinRestServlet, self).__init__(hs)
@@ -50,8 +50,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         self.clock = hs.get_clock()
 
     @staticmethod
-    def _serialize_payload(requester, room_id, user_id, remote_room_hosts,
-                           content):
+    def _serialize_payload(requester, room_id, user_id, remote_room_hosts, content):
         """
         Args:
             requester(Requester)
@@ -78,16 +77,10 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
 
-        logger.info(
-            "remote_join: %s into room: %s",
-            user_id, room_id,
-        )
+        logger.info("remote_join: %s into room: %s", user_id, room_id)
 
         yield self.federation_handler.do_invite_join(
-            remote_room_hosts,
-            room_id,
-            user_id,
-            event_content,
+            remote_room_hosts, room_id, user_id, event_content
         )
 
         defer.returnValue((200, {}))
@@ -107,7 +100,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
     """
 
     NAME = "remote_reject_invite"
-    PATH_ARGS = ("room_id", "user_id",)
+    PATH_ARGS = ("room_id", "user_id")
 
     def __init__(self, hs):
         super(ReplicationRemoteRejectInviteRestServlet, self).__init__(hs)
@@ -141,16 +134,11 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
 
-        logger.info(
-            "remote_reject_invite: %s out of room: %s",
-            user_id, room_id,
-        )
+        logger.info("remote_reject_invite: %s out of room: %s", user_id, room_id)
 
         try:
             event = yield self.federation_handler.do_remotely_reject_invite(
-                remote_room_hosts,
-                room_id,
-                user_id,
+                remote_room_hosts, room_id, user_id
             )
             ret = event.get_pdu_json()
         except Exception as e:
@@ -162,9 +150,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
             #
             logger.warn("Failed to reject invite: %s", e)
 
-            yield self.store.locally_reject_invite(
-                user_id, room_id
-            )
+            yield self.store.locally_reject_invite(user_id, room_id)
             ret = {}
 
         defer.returnValue((200, ret))
@@ -228,7 +214,7 @@ class ReplicationRegister3PIDGuestRestServlet(ReplicationEndpoint):
         logger.info("get_or_register_3pid_guest: %r", content)
 
         ret = yield self.registeration_handler.get_or_register_3pid_guest(
-            medium, address, inviter_user_id,
+            medium, address, inviter_user_id
         )
 
         defer.returnValue((200, ret))
@@ -264,7 +250,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
             user_id (str)
             change (str): Either "joined" or "left"
         """
-        assert change in ("joined", "left",)
+        assert change in ("joined", "left")
 
         return {}
 

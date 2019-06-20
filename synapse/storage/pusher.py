@@ -37,24 +37,24 @@ else:
 class PusherWorkerStore(SQLBaseStore):
     def _decode_pushers_rows(self, rows):
         for r in rows:
-            dataJson = r['data']
-            r['data'] = None
+            dataJson = r["data"]
+            r["data"] = None
             try:
                 if isinstance(dataJson, db_binary_type):
                     dataJson = str(dataJson).decode("UTF8")
 
-                r['data'] = json.loads(dataJson)
+                r["data"] = json.loads(dataJson)
             except Exception as e:
                 logger.warn(
                     "Invalid JSON in data for pusher %d: %s, %s",
-                    r['id'],
+                    r["id"],
                     dataJson,
                     e.args[0],
                 )
                 pass
 
-            if isinstance(r['pushkey'], db_binary_type):
-                r['pushkey'] = str(r['pushkey']).decode("UTF8")
+            if isinstance(r["pushkey"], db_binary_type):
+                r["pushkey"] = str(r["pushkey"]).decode("UTF8")
 
         return rows
 
@@ -195,15 +195,15 @@ class PusherWorkerStore(SQLBaseStore):
     )
     def get_if_users_have_pushers(self, user_ids):
         rows = yield self._simple_select_many_batch(
-            table='pushers',
-            column='user_name',
+            table="pushers",
+            column="user_name",
             iterable=user_ids,
-            retcols=['user_name'],
-            desc='get_if_users_have_pushers',
+            retcols=["user_name"],
+            desc="get_if_users_have_pushers",
         )
 
         result = {user_id: False for user_id in user_ids}
-        result.update({r['user_name']: True for r in rows})
+        result.update({r["user_name"]: True for r in rows})
 
         defer.returnValue(result)
 
@@ -299,8 +299,8 @@ class PusherStore(PusherWorkerStore):
     ):
         yield self._simple_update_one(
             "pushers",
-            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_id},
-            {'last_stream_ordering': last_stream_ordering},
+            {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
+            {"last_stream_ordering": last_stream_ordering},
             desc="update_pusher_last_stream_ordering",
         )
 
@@ -310,10 +310,10 @@ class PusherStore(PusherWorkerStore):
     ):
         yield self._simple_update_one(
             "pushers",
-            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_id},
+            {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             {
-                'last_stream_ordering': last_stream_ordering,
-                'last_success': last_success,
+                "last_stream_ordering": last_stream_ordering,
+                "last_success": last_success,
             },
             desc="update_pusher_last_stream_ordering_and_success",
         )
@@ -322,8 +322,8 @@ class PusherStore(PusherWorkerStore):
     def update_pusher_failing_since(self, app_id, pushkey, user_id, failing_since):
         yield self._simple_update_one(
             "pushers",
-            {'app_id': app_id, 'pushkey': pushkey, 'user_name': user_id},
-            {'failing_since': failing_since},
+            {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
+            {"failing_since": failing_since},
             desc="update_pusher_failing_since",
         )
 

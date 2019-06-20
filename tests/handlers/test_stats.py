@@ -265,10 +265,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         while not self.get_success(self.store.has_completed_background_updates()):
             self.get_success(self.store.do_next_background_update(100), by=0.1)
 
-        events = {
-            "a1": None,
-            "a2": {"membership": Membership.JOIN},
-        }
+        events = {"a1": None, "a2": {"membership": Membership.JOIN}}
 
         def get_event(event_id, allow_none=True):
             if events.get(event_id):

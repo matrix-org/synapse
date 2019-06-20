@@ -56,7 +56,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         creates the right shape of event.
         """
 
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key=u"👍")
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
         self.assertEquals(200, channel.code, channel.json_body)
 
         event_id = channel.json_body["event_id"]
@@ -76,7 +76,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 "content": {
                     "m.relates_to": {
                         "event_id": self.parent_id,
-                        "key": u"👍",
+                        "key": "👍",
                         "rel_type": RelationTypes.ANNOTATION,
                     }
                 },
@@ -187,7 +187,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_tokens.append(token)
 
         idx = 0
-        sent_groups = {u"👍": 10, u"a": 7, u"b": 5, u"c": 3, u"d": 2, u"e": 1}
+        sent_groups = {"👍": 10, "a": 7, "b": 5, "c": 3, "d": 2, "e": 1}
         for key in itertools.chain.from_iterable(
             itertools.repeat(key, num) for key, num in sent_groups.items()
         ):
@@ -259,7 +259,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             channel = self._send_relation(
                 RelationTypes.ANNOTATION,
                 "m.reaction",
-                key=u"👍",
+                key="👍",
                 access_token=access_tokens[idx],
             )
             self.assertEquals(200, channel.code, channel.json_body)
@@ -273,7 +273,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         prev_token = None
         found_event_ids = []
-        encoded_key = six.moves.urllib.parse.quote_plus(u"👍".encode("utf-8"))
+        encoded_key = six.moves.urllib.parse.quote_plus("👍".encode("utf-8"))
         for _ in range(20):
             from_token = ""
             if prev_token:
