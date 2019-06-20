@@ -195,16 +195,20 @@ class HomeserverTestCase(TestCase):
             if self.hijack_auth:
 
                 def get_user_by_access_token(token=None, allow_guest=False):
-                    return succeed({
-                        "user": UserID.from_string(self.helper.auth_user_id),
-                        "token_id": 1,
-                        "is_guest": False,
-                    })
+                    return succeed(
+                        {
+                            "user": UserID.from_string(self.helper.auth_user_id),
+                            "token_id": 1,
+                            "is_guest": False,
+                        }
+                    )
 
                 def get_user_by_req(request, allow_guest=False, rights="access"):
-                    return succeed(create_requester(
-                        UserID.from_string(self.helper.auth_user_id), 1, False, None
-                    ))
+                    return succeed(
+                        create_requester(
+                            UserID.from_string(self.helper.auth_user_id), 1, False, None
+                        )
+                    )
 
                 self.hs.get_auth().get_user_by_req = get_user_by_req
                 self.hs.get_auth().get_user_by_access_token = get_user_by_access_token
