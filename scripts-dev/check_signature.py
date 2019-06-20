@@ -1,4 +1,3 @@
-
 import argparse
 import json
 import logging
@@ -40,7 +39,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("signature_name")
     parser.add_argument(
-        "input_json", nargs="?", type=argparse.FileType('r'), default=sys.stdin
+        "input_json", nargs="?", type=argparse.FileType("r"), default=sys.stdin
     )
 
     args = parser.parse_args()
@@ -69,5 +68,5 @@ def main():
             print("FAIL %s" % (key_id,))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

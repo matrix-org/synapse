@@ -5,8 +5,8 @@ steps:
 
   - command:
       - "python -m pip install tox"
-      - "tox -e pep8"
-    label: "\U0001F9F9 PEP-8"
+      - "tox -e check_codestyle"
+    label: "\U0001F9F9 Check Style"
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
@@ -109,23 +109,6 @@ steps:
       - docker#v3.0.1:
           image: "python:3.7"
           propagate-environment: true
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
-
-  - label: ":python: 3.5 / :postgres: 9.4"
-    env:
-      TRIAL_FLAGS: "-j 4"
-    command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
-    plugins:
-      - docker-compose#v2.1.0:
-          run: testenv
-          config:
-            - .buildkite/docker-compose.py35.pg94.yaml
     retry:
       automatic:
         - exit_status: -1

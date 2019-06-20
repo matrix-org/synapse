@@ -16,14 +16,13 @@ from ._base import Config
 
 
 class VoipConfig(Config):
-
     def read_config(self, config):
         self.turn_uris = config.get("turn_uris", [])
         self.turn_shared_secret = config.get("turn_shared_secret")
         self.turn_username = config.get("turn_username")
         self.turn_password = config.get("turn_password")
         self.turn_user_lifetime = self.parse_duration(
-            config.get("turn_user_lifetime", "1h"),
+            config.get("turn_user_lifetime", "1h")
         )
         self.turn_allow_guests = config.get("turn_allow_guests", True)
 

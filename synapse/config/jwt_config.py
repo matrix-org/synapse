@@ -15,13 +15,11 @@
 
 from ._base import Config, ConfigError
 
-MISSING_JWT = (
-    """Missing jwt library. This is required for jwt login.
+MISSING_JWT = """Missing jwt library. This is required for jwt login.
 
     Install by running:
         pip install pyjwt
     """
-)
 
 
 class JWTConfig(Config):
@@ -34,6 +32,7 @@ class JWTConfig(Config):
 
             try:
                 import jwt
+
                 jwt  # To stop unused lint.
             except ImportError:
                 raise ConfigError(MISSING_JWT)

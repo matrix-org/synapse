@@ -28,6 +28,7 @@ try:
     from twisted.internet import protocol
     from twisted.internet.protocol import Factory
     from twisted.names.dns import DNSDatagramProtocol
+
     protocol.Factory.noisy = False
     Factory.noisy = False
     DNSDatagramProtocol.noisy = False

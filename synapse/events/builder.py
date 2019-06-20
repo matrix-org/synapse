@@ -78,7 +78,9 @@ class EventBuilder(object):
     _redacts = attr.ib(default=None)
     _origin_server_ts = attr.ib(default=None)
 
-    internal_metadata = attr.ib(default=attr.Factory(lambda: _EventInternalMetadata({})))
+    internal_metadata = attr.ib(
+        default=attr.Factory(lambda: _EventInternalMetadata({}))
+    )
 
     @property
     def state_key(self):
@@ -102,11 +104,9 @@ class EventBuilder(object):
         """
 
         state_ids = yield self._state.get_current_state_ids(
-            self.room_id, prev_event_ids,
+            self.room_id, prev_event_ids
         )
-        auth_ids = yield self._auth.compute_auth_events(
-            self, state_ids,
-        )
+        auth_ids = yield self._auth.compute_auth_events(self, state_ids)
 
         if self.format_version == EventFormatVersions.V1:
             auth_events = yield self._store.add_event_hashes(auth_ids)
@@ -115,9 +115,7 @@ class EventBuilder(object):
             auth_events = auth_ids
             prev_events = prev_event_ids
 
-        old_depth = yield self._store.get_max_depth_of(
-            prev_event_ids,
-        )
+        old_depth = yield self._store.get_max_depth_of(prev_event_ids)
         depth = old_depth + 1
 
         # we cap depth of generated events, to ensure that they are not
@@ -217,9 +215,14 @@ class EventBuilderFactory(object):
         )
 
 
-def create_local_event_from_event_dict(clock, hostname, signing_key,
-                                       format_version, event_dict,
-                                       internal_metadata_dict=None):
+def create_local_event_from_event_dict(
+    clock,
+    hostname,
+    signing_key,
+    format_version,
+    event_dict,
+    internal_metadata_dict=None,
+):
     """Takes a fully formed event dict, ensuring that fields like `origin`
     and `origin_server_ts` have correct values for a locally produced event,
     then signs and hashes it.
@@ -237,9 +240,7 @@ def create_local_event_from_event_dict(clock, hostname, signing_key,
     """
 
     if format_version not in KNOWN_EVENT_FORMAT_VERSIONS:
-        raise Exception(
-            "No event format defined for version %r" % (format_version,)
-        )
+        raise Exception("No event format defined for version %r" % (format_version,))
 
     if internal_metadata_dict is None:
         internal_metadata_dict = {}
@@ -258,13 +259,9 @@ def create_local_event_from_event_dict(clock, hostname, signing_key,
 
     event_dict.setdefault("signatures", {})
 
-    add_hashes_and_signatures(
-        event_dict,
-        hostname,
-        signing_key,
-    )
+    add_hashes_and_signatures(event_dict, hostname, signing_key)
     return event_type_from_format_version(format_version)(
-        event_dict, internal_metadata_dict=internal_metadata_dict,
+        event_dict, internal_metadata_dict=internal_metadata_dict
     )
 
 
