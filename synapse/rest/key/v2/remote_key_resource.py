@@ -16,18 +16,20 @@ import logging
 from io import BytesIO
 
 from twisted.internet import defer
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyring import ServerKeyFetcher
-from synapse.http.server import respond_with_json_bytes, wrap_json_request_handler
+from synapse.http.server import (
+    DirectServeResource,
+    respond_with_json_bytes,
+    wrap_json_request_handler,
+)
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
 
 logger = logging.getLogger(__name__)
 
 
-class RemoteKey(Resource):
+class RemoteKey(DirectServeResource):
     """HTTP resource for retreiving the TLS certificate and NACL signature
     verification keys for a collection of servers. Checks that the reported
     X.509 TLS certificate matches the one used in the HTTPS connection. Checks
@@ -94,13 +96,8 @@ class RemoteKey(Resource):
         self.clock = hs.get_clock()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
 
-    def render_GET(self, request):
-        self.async_render_GET(request)
-        return NOT_DONE_YET
-
     @wrap_json_request_handler
-    @defer.inlineCallbacks
-    def async_render_GET(self, request):
+    async def async_render_GET(self, request):
         if len(request.postpath) == 1:
             server, = request.postpath
             query = {server.decode("ascii"): {}}
@@ -114,20 +111,15 @@ class RemoteKey(Resource):
         else:
             raise SynapseError(404, "Not found %r" % request.postpath, Codes.NOT_FOUND)
 
-        yield self.query_keys(request, query, query_remote_on_cache_miss=True)
-
-    def render_POST(self, request):
-        self.async_render_POST(request)
-        return NOT_DONE_YET
+        await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
     @wrap_json_request_handler
-    @defer.inlineCallbacks
-    def async_render_POST(self, request):
+    async def async_render_POST(self, request):
         content = parse_json_object_from_request(request)
 
         query = content["server_keys"]
 
-        yield self.query_keys(request, query, query_remote_on_cache_miss=True)
+        await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
     @defer.inlineCallbacks
     def query_keys(self, request, query, query_remote_on_cache_miss=False):
