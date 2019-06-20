@@ -17,8 +17,6 @@
 import logging
 
 from twisted.internet import defer
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
 
 from synapse.http.server import (
     DirectServeResource,

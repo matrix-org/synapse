@@ -22,7 +22,6 @@ from binascii import unhexlify
 from mock import Mock
 from six.moves.urllib import parse
 
-from twisted.internet import defer, reactor
 from twisted.internet.defer import Deferred
 
 from synapse.rest.media.v1._base import FileInfo

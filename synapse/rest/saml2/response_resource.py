@@ -18,9 +18,6 @@ import logging
 import saml2
 from saml2.client import Saml2Client
 
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
-
 from synapse.api.errors import CodeMessageException
 from synapse.http.server import DirectServeResource, wrap_html_request_handler
 from synapse.http.servlet import parse_string

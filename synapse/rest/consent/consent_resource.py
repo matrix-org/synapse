@@ -23,10 +23,6 @@ from six.moves import http_client
 import jinja2
 from jinja2 import TemplateNotFound
 
-from twisted.internet import defer
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
-
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
 from synapse.http.server import (

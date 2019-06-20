@@ -358,7 +358,7 @@ class DirectServeResource(resource.Resource):
         if hasattr(self, render_callback_name):
             # Call the handler
             callback = getattr(self, render_callback_name)
-            d = defer.ensureDeferred(callback(request))
+            defer.ensureDeferred(callback(request))
 
             return NOT_DONE_YET
         else:

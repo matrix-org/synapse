@@ -32,8 +32,6 @@ from canonicaljson import json
 
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
