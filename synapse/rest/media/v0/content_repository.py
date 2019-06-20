@@ -44,7 +44,6 @@ class ContentRepoResource(resource.Resource):
         - Content type base64d (so we can return it when clients GET it)
 
     """
-
     isLeaf = True
 
     def __init__(self, hs, directory):
@@ -57,7 +56,7 @@ class ContentRepoResource(resource.Resource):
         # servers.
 
         # TODO: A little crude here, we could do this better.
-        filename = request.path.decode("ascii").split("/")[-1]
+        filename = request.path.decode('ascii').split('/')[-1]
         # be paranoid
         filename = re.sub("[^0-9A-z.-_]", "", filename)
 
@@ -70,15 +69,17 @@ class ContentRepoResource(resource.Resource):
             base64_contentype = filename.split(".")[1]
             content_type = base64.urlsafe_b64decode(base64_contentype)
             logger.info("Sending file %s", file_path)
-            f = open(file_path, "rb")
-            request.setHeader("Content-Type", content_type)
+            f = open(file_path, 'rb')
+            request.setHeader('Content-Type', content_type)
 
             # cache for at least a day.
             # XXX: we might want to turn this off for data we don't want to
             # recommend caching as it's sensitive or private - or at least
             # select private. don't bother setting Expires as all our matrix
             # clients are smart enough to be happy with Cache-Control (right?)
-            request.setHeader(b"Cache-Control", b"public,max-age=86400,s-maxage=86400")
+            request.setHeader(
+                b"Cache-Control", b"public,max-age=86400,s-maxage=86400"
+            )
 
             d = FileSender().beginFileTransfer(f, request)
 
@@ -86,15 +87,13 @@ class ContentRepoResource(resource.Resource):
             def cbFinished(ignored):
                 f.close()
                 finish_request(request)
-
             d.addCallback(cbFinished)
         else:
             respond_with_json_bytes(
                 request,
                 404,
                 json.dumps(cs_error("Not found", code=Codes.NOT_FOUND)),
-                send_cors=True,
-            )
+                send_cors=True)
 
         return server.NOT_DONE_YET
 

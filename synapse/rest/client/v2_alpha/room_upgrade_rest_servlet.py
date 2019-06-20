@@ -47,10 +47,9 @@ class RoomUpgradeRestServlet(RestServlet):
     Args:
         hs (synapse.server.HomeServer):
     """
-
     PATTERNS = client_patterns(
         # /rooms/$roomid/upgrade
-        "/rooms/(?P<room_id>[^/]*)/upgrade$"
+        "/rooms/(?P<room_id>[^/]*)/upgrade$",
     )
 
     def __init__(self, hs):
@@ -64,7 +63,7 @@ class RoomUpgradeRestServlet(RestServlet):
         requester = yield self._auth.get_user_by_req(request)
 
         content = parse_json_object_from_request(request)
-        assert_params_in_dict(content, ("new_version",))
+        assert_params_in_dict(content, ("new_version", ))
         new_version = content["new_version"]
 
         if new_version not in KNOWN_ROOM_VERSIONS:
@@ -78,7 +77,9 @@ class RoomUpgradeRestServlet(RestServlet):
             requester, room_id, new_version
         )
 
-        ret = {"replacement_room": new_room_id}
+        ret = {
+            "replacement_room": new_room_id,
+        }
 
         defer.returnValue((200, ret))
 

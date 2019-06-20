@@ -74,7 +74,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             namespaces={},
         )
         # use the token as the filename
-        with open(as_token, "w") as outfile:
+        with open(as_token, 'w') as outfile:
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
@@ -135,7 +135,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             namespaces={},
         )
         # use the token as the filename
-        with open(as_token, "w") as outfile:
+        with open(as_token, 'w') as outfile:
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 

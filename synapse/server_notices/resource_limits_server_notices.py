@@ -33,7 +33,6 @@ class ResourceLimitsServerNotices(object):
     """ Keeps track of whether the server has reached it's resource limit and
     ensures that the client is kept up to date.
     """
-
     def __init__(self, hs):
         """
         Args:
@@ -105,28 +104,34 @@ class ResourceLimitsServerNotices(object):
             if currently_blocked and not is_auth_blocking:
                 # Room is notifying of a block, when it ought not to be.
                 # Remove block notification
-                content = {"pinned": ref_events}
+                content = {
+                    "pinned": ref_events
+                }
                 yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.Pinned, ""
+                    user_id, content, EventTypes.Pinned, '',
                 )
 
             elif not currently_blocked and is_auth_blocking:
                 # Room is not notifying of a block, when it ought to be.
                 # Add block notification
                 content = {
-                    "body": event_content,
-                    "msgtype": ServerNoticeMsgType,
-                    "server_notice_type": ServerNoticeLimitReached,
-                    "admin_contact": self._config.admin_contact,
-                    "limit_type": event_limit_type,
+                    'body': event_content,
+                    'msgtype': ServerNoticeMsgType,
+                    'server_notice_type': ServerNoticeLimitReached,
+                    'admin_contact': self._config.admin_contact,
+                    'limit_type': event_limit_type
                 }
                 event = yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.Message
+                    user_id, content, EventTypes.Message,
                 )
 
-                content = {"pinned": [event.event_id]}
+                content = {
+                    "pinned": [
+                        event.event_id,
+                    ]
+                }
                 yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.Pinned, ""
+                    user_id, content, EventTypes.Pinned, '',
                 )
 
         except SynapseError as e:
@@ -151,7 +156,9 @@ class ResourceLimitsServerNotices(object):
             max_id = yield self._store.add_tag_to_room(
                 user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
             )
-            self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
+            self._notifier.on_new_event(
+                "account_data_key", max_id, users=[user_id]
+            )
 
     @defer.inlineCallbacks
     def _is_room_currently_blocked(self, room_id):
@@ -181,7 +188,7 @@ class ResourceLimitsServerNotices(object):
 
         referenced_events = []
         if pinned_state_event is not None:
-            referenced_events = list(pinned_state_event.content.get("pinned", []))
+            referenced_events = list(pinned_state_event.content.get('pinned', []))
 
         events = yield self._store.get_events(referenced_events)
         for event_id, event in iteritems(events):

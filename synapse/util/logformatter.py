@@ -29,7 +29,6 @@ class LogFormatter(logging.Formatter):
     (Normally only stack frames between the point the exception was raised and
     where it was caught are logged).
     """
-
     def __init__(self, *args, **kwargs):
         super(LogFormatter, self).__init__(*args, **kwargs)
 
@@ -41,7 +40,7 @@ class LogFormatter(logging.Formatter):
         # check that we actually have an f_back attribute to work around
         # https://twistedmatrix.com/trac/ticket/9305
 
-        if tb and hasattr(tb.tb_frame, "f_back"):
+        if tb and hasattr(tb.tb_frame, 'f_back'):
             sio.write("Capture point (most recent call last):\n")
             traceback.print_stack(tb.tb_frame.f_back, None, sio)
 

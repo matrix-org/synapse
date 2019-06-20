@@ -468,5 +468,9 @@ class RelationsStore(RelationsWorkerStore):
         """
 
         self._simple_delete_txn(
-            txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
+            txn,
+            table="event_relations",
+            keyvalues={
+                "event_id": redacted_event_id,
+            }
         )

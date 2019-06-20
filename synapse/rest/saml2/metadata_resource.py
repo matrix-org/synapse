@@ -30,7 +30,7 @@ class SAML2MetadataResource(Resource):
 
     def render_GET(self, request):
         metadata_xml = saml2.metadata.create_metadata_string(
-            configfile=None, config=self.sp_config
+            configfile=None, config=self.sp_config,
         )
         request.setHeader(b"Content-Type", b"text/xml; charset=utf-8")
         return metadata_xml

@@ -65,18 +65,14 @@ def run_create(cur, database_engine, *args, **kwargs):
 
 def run_upgrade(cur, database_engine, *args, **kwargs):
     if isinstance(database_engine, PostgresEngine):
-        cur.execute(
-            """
+        cur.execute("""
             ALTER TABLE events ALTER COLUMN content DROP NOT NULL;
-        """
-        )
+        """)
         return
 
     # sqlite is an arse about this. ref: https://www.sqlite.org/lang_altertable.html
 
-    cur.execute(
-        "SELECT sql FROM sqlite_master WHERE tbl_name='events' AND type='table'"
-    )
+    cur.execute("SELECT sql FROM sqlite_master WHERE tbl_name='events' AND type='table'")
     (oldsql,) = cur.fetchone()
 
     sql = oldsql.replace("content TEXT NOT NULL", "content TEXT")
@@ -90,7 +86,7 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
     cur.execute("PRAGMA writable_schema=ON")
     cur.execute(
         "UPDATE sqlite_master SET sql=? WHERE tbl_name='events' AND type='table'",
-        (sql,),
+        (sql, ),
     )
     cur.execute("PRAGMA schema_version=%i" % (oldver + 1,))
     cur.execute("PRAGMA writable_schema=OFF")

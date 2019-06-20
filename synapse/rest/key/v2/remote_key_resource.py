@@ -103,16 +103,20 @@ class RemoteKey(Resource):
     def async_render_GET(self, request):
         if len(request.postpath) == 1:
             server, = request.postpath
-            query = {server.decode("ascii"): {}}
+            query = {server.decode('ascii'): {}}
         elif len(request.postpath) == 2:
             server, key_id = request.postpath
-            minimum_valid_until_ts = parse_integer(request, "minimum_valid_until_ts")
+            minimum_valid_until_ts = parse_integer(
+                request, "minimum_valid_until_ts"
+            )
             arguments = {}
             if minimum_valid_until_ts is not None:
                 arguments["minimum_valid_until_ts"] = minimum_valid_until_ts
-            query = {server.decode("ascii"): {key_id.decode("ascii"): arguments}}
+            query = {server.decode('ascii'): {key_id.decode('ascii'): arguments}}
         else:
-            raise SynapseError(404, "Not found %r" % request.postpath, Codes.NOT_FOUND)
+            raise SynapseError(
+                404, "Not found %r" % request.postpath, Codes.NOT_FOUND
+            )
 
         yield self.query_keys(request, query, query_remote_on_cache_miss=True)
 
@@ -136,8 +140,8 @@ class RemoteKey(Resource):
         store_queries = []
         for server_name, key_ids in query.items():
             if (
-                self.federation_domain_whitelist is not None
-                and server_name not in self.federation_domain_whitelist
+                self.federation_domain_whitelist is not None and
+                server_name not in self.federation_domain_whitelist
             ):
                 logger.debug("Federation denied with %s", server_name)
                 continue
@@ -155,7 +159,9 @@ class RemoteKey(Resource):
 
         cache_misses = dict()
         for (server_name, key_id, from_server), results in cached.items():
-            results = [(result["ts_added_ms"], result) for result in results]
+            results = [
+                (result["ts_added_ms"], result) for result in results
+            ]
 
             if not results and key_id is not None:
                 cache_misses.setdefault(server_name, set()).add(key_id)
@@ -172,30 +178,23 @@ class RemoteKey(Resource):
                         logger.debug(
                             "Cached response for %r/%r is older than requested"
                             ": valid_until (%r) < minimum_valid_until (%r)",
-                            server_name,
-                            key_id,
-                            ts_valid_until_ms,
-                            req_valid_until,
+                            server_name, key_id,
+                            ts_valid_until_ms, req_valid_until
                         )
                         miss = True
                     else:
                         logger.debug(
                             "Cached response for %r/%r is newer than requested"
                             ": valid_until (%r) >= minimum_valid_until (%r)",
-                            server_name,
-                            key_id,
-                            ts_valid_until_ms,
-                            req_valid_until,
+                            server_name, key_id,
+                            ts_valid_until_ms, req_valid_until
                         )
                 elif (ts_added_ms + ts_valid_until_ms) / 2 < time_now_ms:
                     logger.debug(
                         "Cached response for %r/%r is too old"
                         ": (added (%r) + valid_until (%r)) / 2 < now (%r)",
-                        server_name,
-                        key_id,
-                        ts_added_ms,
-                        ts_valid_until_ms,
-                        time_now_ms,
+                        server_name, key_id,
+                        ts_added_ms, ts_valid_until_ms, time_now_ms
                     )
                     # We more than half way through the lifetime of the
                     # response. We should fetch a fresh copy.
@@ -204,11 +203,8 @@ class RemoteKey(Resource):
                     logger.debug(
                         "Cached response for %r/%r is still valid"
                         ": (added (%r) + valid_until (%r)) / 2 < now (%r)",
-                        server_name,
-                        key_id,
-                        ts_added_ms,
-                        ts_valid_until_ms,
-                        time_now_ms,
+                        server_name, key_id,
+                        ts_added_ms, ts_valid_until_ms, time_now_ms
                     )
 
                 if miss:
@@ -220,10 +216,12 @@ class RemoteKey(Resource):
 
         if cache_misses and query_remote_on_cache_miss:
             yield self.fetcher.get_keys(cache_misses)
-            yield self.query_keys(request, query, query_remote_on_cache_miss=False)
+            yield self.query_keys(
+                request, query, query_remote_on_cache_miss=False
+            )
         else:
             result_io = BytesIO()
-            result_io.write(b'{"server_keys":')
+            result_io.write(b"{\"server_keys\":")
             sep = b"["
             for json_bytes in json_results:
                 result_io.write(sep)
@@ -233,4 +231,6 @@ class RemoteKey(Resource):
                 result_io.write(sep)
             result_io.write(b"]}")
 
-            respond_with_json_bytes(request, 200, result_io.getvalue())
+            respond_with_json_bytes(
+                request, 200, result_io.getvalue(),
+            )

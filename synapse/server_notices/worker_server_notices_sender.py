@@ -17,7 +17,6 @@ from twisted.internet import defer
 
 class WorkerServerNoticesSender(object):
     """Stub impl of ServerNoticesSender which does nothing"""
-
     def __init__(self, hs):
         """
         Args:

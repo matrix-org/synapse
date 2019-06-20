@@ -420,7 +420,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 table="room_memberships",
                 column="event_id",
                 iterable=missing_member_event_ids,
-                retcols=("user_id", "display_name", "avatar_url"),
+                retcols=('user_id', 'display_name', 'avatar_url'),
                 keyvalues={"membership": Membership.JOIN},
                 batch_size=500,
                 desc="_get_joined_users_from_context",
@@ -448,7 +448,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cachedInlineCallbacks(max_entries=10000)
     def is_host_joined(self, room_id, host):
-        if "%" in host or "_" in host:
+        if '%' in host or '_' in host:
             raise Exception("Invalid host name")
 
         sql = """
@@ -490,7 +490,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             Deferred: Resolves to True if the host is/was in the room, otherwise
             False.
         """
-        if "%" in host or "_" in host:
+        if '%' in host or '_' in host:
             raise Exception("Invalid host name")
 
         sql = """
@@ -723,7 +723,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
                 room_id = row["room_id"]
                 try:
                     event_json = json.loads(row["json"])
-                    content = event_json["content"]
+                    content = event_json['content']
                 except Exception:
                     continue
 

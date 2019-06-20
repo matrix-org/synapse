@@ -348,8 +348,9 @@ def _parse_key_servers(key_servers, federation_verify_certificates):
 
                 result.verify_keys[key_id] = verify_key
 
-        if not federation_verify_certificates and not server.get(
-            "accept_keys_insecurely"
+        if (
+            not federation_verify_certificates and
+            not server.get("accept_keys_insecurely")
         ):
             _assert_keyserver_has_verify_keys(result)
 

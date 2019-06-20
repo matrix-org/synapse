@@ -69,7 +69,9 @@ class WheelTimer(object):
 
         # Add empty entries between the end of the current list and when we want
         # to insert. This ensures there are no gaps.
-        self.entries.extend(_Entry(key) for key in range(last_key, then_key + 1))
+        self.entries.extend(
+            _Entry(key) for key in range(last_key, then_key + 1)
+        )
 
         self.entries[-1].queue.append(obj)
 

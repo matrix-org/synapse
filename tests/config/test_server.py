@@ -20,10 +20,10 @@ from tests import unittest
 
 class ServerConfigTestCase(unittest.TestCase):
     def test_is_threepid_reserved(self):
-        user1 = {"medium": "email", "address": "user1@example.com"}
-        user2 = {"medium": "email", "address": "user2@example.com"}
-        user3 = {"medium": "email", "address": "user3@example.com"}
-        user1_msisdn = {"medium": "msisdn", "address": "447700000000"}
+        user1 = {'medium': 'email', 'address': 'user1@example.com'}
+        user2 = {'medium': 'email', 'address': 'user2@example.com'}
+        user3 = {'medium': 'email', 'address': 'user3@example.com'}
+        user1_msisdn = {'medium': 'msisdn', 'address': '447700000000'}
         config = [user1, user2]
 
         self.assertTrue(is_threepid_reserved(config, user1))

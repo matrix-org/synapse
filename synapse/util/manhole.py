@@ -74,25 +74,27 @@ def manhole(username, password, globals):
         twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
     """
     if not isinstance(password, bytes):
-        password = password.encode("ascii")
+        password = password.encode('ascii')
 
-    checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(**{username: password})
+    checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(
+        **{username: password}
+    )
 
     rlm = manhole_ssh.TerminalRealm()
     rlm.chainedProtocolFactory = lambda: insults.ServerProtocol(
-        SynapseManhole, dict(globals, __name__="__console__")
+        SynapseManhole,
+        dict(globals, __name__="__console__")
     )
 
     factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
-    factory.publicKeys[b"ssh-rsa"] = Key.fromString(PUBLIC_KEY)
-    factory.privateKeys[b"ssh-rsa"] = Key.fromString(PRIVATE_KEY)
+    factory.publicKeys[b'ssh-rsa'] = Key.fromString(PUBLIC_KEY)
+    factory.privateKeys[b'ssh-rsa'] = Key.fromString(PRIVATE_KEY)
 
     return factory
 
 
 class SynapseManhole(ColoredManhole):
     """Overrides connectionMade to create our own ManholeInterpreter"""
-
     def connectionMade(self):
         super(SynapseManhole, self).connectionMade()
 
@@ -125,7 +127,7 @@ class SynapseManholeInterpreter(ManholeInterpreter):
                 value = SyntaxError(msg, (filename, lineno, offset, line))
                 sys.last_value = value
         lines = traceback.format_exception_only(type, value)
-        self.write("".join(lines))
+        self.write(''.join(lines))
 
     def showtraceback(self):
         """Display the exception that just occurred.
@@ -138,6 +140,6 @@ class SynapseManholeInterpreter(ManholeInterpreter):
         try:
             # We remove the first stack item because it is our own code.
             lines = traceback.format_exception(ei[0], ei[1], last_tb.tb_next)
-            self.write("".join(lines))
+            self.write(''.join(lines))
         finally:
             last_tb = ei = None

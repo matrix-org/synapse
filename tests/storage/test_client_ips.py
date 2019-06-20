@@ -94,11 +94,11 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             result,
             [
                 {
-                    "access_token": "access_token",
-                    "ip": "ip",
-                    "user_agent": "user_agent",
-                    "device_id": None,
-                    "last_seen": 12345678000,
+                    'access_token': 'access_token',
+                    'ip': 'ip',
+                    'user_agent': 'user_agent',
+                    'device_id': None,
+                    'last_seen': 12345678000,
                 }
             ],
         )
@@ -125,11 +125,11 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             result,
             [
                 {
-                    "access_token": "access_token",
-                    "ip": "ip",
-                    "user_agent": "user_agent",
-                    "device_id": None,
-                    "last_seen": 12345878000,
+                    'access_token': 'access_token',
+                    'ip': 'ip',
+                    'user_agent': 'user_agent',
+                    'device_id': None,
+                    'last_seen': 12345878000,
                 }
             ],
         )
@@ -248,7 +248,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
             "GET",
             "/_matrix/client/r0/admin/users/" + self.user_id,
             access_token=access_token,
-            **make_request_args,
+            **make_request_args
         )
         request.requestHeaders.addRawHeader(b"User-Agent", b"Mozzila pizza")
 

@@ -46,11 +46,10 @@ class SynapseRequest(Request):
     Attributes:
         logcontext(LoggingContext) : the log context for this request
     """
-
     def __init__(self, site, channel, *args, **kw):
         Request.__init__(self, channel, *args, **kw)
         self.site = site
-        self._channel = channel  # this is used by the tests
+        self._channel = channel     # this is used by the tests
         self.authenticated_entity = None
         self.start_time = 0
 
@@ -73,12 +72,12 @@ class SynapseRequest(Request):
 
     def __repr__(self):
         # We overwrite this so that we don't log ``access_token``
-        return "<%s at 0x%x method=%r uri=%r clientproto=%r site=%r>" % (
+        return '<%s at 0x%x method=%r uri=%r clientproto=%r site=%r>' % (
             self.__class__.__name__,
             id(self),
             self.get_method(),
             self.get_redacted_uri(),
-            self.clientproto.decode("ascii", errors="replace"),
+            self.clientproto.decode('ascii', errors='replace'),
             self.site.site_tag,
         )
 
@@ -88,7 +87,7 @@ class SynapseRequest(Request):
     def get_redacted_uri(self):
         uri = self.uri
         if isinstance(uri, bytes):
-            uri = self.uri.decode("ascii")
+            uri = self.uri.decode('ascii')
         return redact_uri(uri)
 
     def get_method(self):
@@ -103,7 +102,7 @@ class SynapseRequest(Request):
         """
         method = self.method
         if isinstance(method, bytes):
-            method = self.method.decode("ascii")
+            method = self.method.decode('ascii')
         return method
 
     def get_user_agent(self):
@@ -135,7 +134,8 @@ class SynapseRequest(Request):
             # dispatching to the handler, so that the handler
             # can update the servlet name in the request
             # metrics
-            requests_counter.labels(self.get_method(), self.request_metrics.name).inc()
+            requests_counter.labels(self.get_method(),
+                                    self.request_metrics.name).inc()
 
     @contextlib.contextmanager
     def processing(self):
@@ -200,7 +200,7 @@ class SynapseRequest(Request):
         # the client disconnects.
         with PreserveLoggingContext(self.logcontext):
             logger.warn(
-                "Error processing request %r: %s %s", self, reason.type, reason.value
+                "Error processing request %r: %s %s", self, reason.type, reason.value,
             )
 
             if not self._is_processing:
@@ -222,7 +222,7 @@ class SynapseRequest(Request):
         self.start_time = time.time()
         self.request_metrics = RequestMetrics()
         self.request_metrics.start(
-            self.start_time, name=servlet_name, method=self.get_method()
+            self.start_time, name=servlet_name, method=self.get_method(),
         )
 
         self.site.access_logger.info(
@@ -230,7 +230,7 @@ class SynapseRequest(Request):
             self.getClientIP(),
             self.site.site_tag,
             self.get_method(),
-            self.get_redacted_uri(),
+            self.get_redacted_uri()
         )
 
     def _finished_processing(self):
@@ -282,7 +282,7 @@ class SynapseRequest(Request):
         self.site.access_logger.info(
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
-            ' %sB %s "%s %s %s" "%s" [%d dbevts]',
+            " %sB %s \"%s %s %s\" \"%s\" [%d dbevts]",
             self.getClientIP(),
             self.site.site_tag,
             authenticated_entity,
@@ -297,7 +297,7 @@ class SynapseRequest(Request):
             code,
             self.get_method(),
             self.get_redacted_uri(),
-            self.clientproto.decode("ascii", errors="replace"),
+            self.clientproto.decode('ascii', errors='replace'),
             user_agent,
             usage.evt_db_fetch_count,
         )
@@ -316,19 +316,14 @@ class XForwardedForRequest(SynapseRequest):
     Add a layer on top of another request that only uses the value of an
     X-Forwarded-For header as the result of C{getClientIP}.
     """
-
     def getClientIP(self):
         """
         @return: The client address (the first address) in the value of the
             I{X-Forwarded-For header}.  If the header is not present, return
             C{b"-"}.
         """
-        return (
-            self.requestHeaders.getRawHeaders(b"x-forwarded-for", [b"-"])[0]
-            .split(b",")[0]
-            .strip()
-            .decode("ascii")
-        )
+        return self.requestHeaders.getRawHeaders(
+            b"x-forwarded-for", [b"-"])[0].split(b",")[0].strip().decode('ascii')
 
 
 class SynapseRequestFactory(object):
@@ -348,17 +343,8 @@ class SynapseSite(Site):
     Subclass of a twisted http Site that does access logging with python's
     standard logging
     """
-
-    def __init__(
-        self,
-        logger_name,
-        site_tag,
-        config,
-        resource,
-        server_version_string,
-        *args,
-        **kwargs,
-    ):
+    def __init__(self, logger_name, site_tag, config, resource,
+                 server_version_string, *args, **kwargs):
         Site.__init__(self, resource, *args, **kwargs)
 
         self.site_tag = site_tag
@@ -366,7 +352,7 @@ class SynapseSite(Site):
         proxied = config.get("x_forwarded", False)
         self.requestFactory = SynapseRequestFactory(self, proxied)
         self.access_logger = logging.getLogger(logger_name)
-        self.server_version_string = server_version_string.encode("ascii")
+        self.server_version_string = server_version_string.encode('ascii')
 
     def log(self, request):
         pass

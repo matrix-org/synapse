@@ -20,7 +20,9 @@ import six
 from six import PY2, PY3
 from six.moves import range
 
-_string_with_symbols = string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
+_string_with_symbols = (
+    string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
+)
 
 # random_string and random_string_with_symbols are used for a range of things,
 # some cryptographically important, some less so. We use SystemRandom to make sure
@@ -29,11 +31,13 @@ rand = random.SystemRandom()
 
 
 def random_string(length):
-    return "".join(rand.choice(string.ascii_letters) for _ in range(length))
+    return ''.join(rand.choice(string.ascii_letters) for _ in range(length))
 
 
 def random_string_with_symbols(length):
-    return "".join(rand.choice(_string_with_symbols) for _ in range(length))
+    return ''.join(
+        rand.choice(_string_with_symbols) for _ in range(length)
+    )
 
 
 def is_ascii(s):
@@ -41,7 +45,7 @@ def is_ascii(s):
     if PY3:
         if isinstance(s, bytes):
             try:
-                s.decode("ascii").encode("ascii")
+                s.decode('ascii').encode('ascii')
             except UnicodeDecodeError:
                 return False
             except UnicodeEncodeError:
@@ -100,12 +104,12 @@ def exception_to_unicode(e):
     # and instead look at what is in the args member.
 
     if len(e.args) == 0:
-        return ""
+        return u""
     elif len(e.args) > 1:
         return six.text_type(repr(e.args))
 
     msg = e.args[0]
     if isinstance(msg, bytes):
-        return msg.decode("utf-8", errors="replace")
+        return msg.decode('utf-8', errors='replace')
     else:
         return msg

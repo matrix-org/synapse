@@ -31,8 +31,8 @@ from .background_updates import BackgroundUpdateStore
 logger = logging.getLogger(__name__)
 
 SearchEntry = namedtuple(
-    "SearchEntry",
-    ["key", "value", "event_id", "room_id", "stream_ordering", "origin_server_ts"],
+    'SearchEntry',
+    ['key', 'value', 'event_id', 'room_id', 'stream_ordering', 'origin_server_ts'],
 )
 
 
@@ -216,7 +216,7 @@ class SearchStore(BackgroundUpdateStore):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
         rows_inserted = progress.get("rows_inserted", 0)
-        have_added_index = progress["have_added_indexes"]
+        have_added_index = progress['have_added_indexes']
 
         if not have_added_index:
 

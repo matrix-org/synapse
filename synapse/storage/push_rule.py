@@ -46,12 +46,12 @@ def _load_rules(rawrules, enabled_map):
     rules = list(list_with_base_rules(ruleslist))
 
     for i, rule in enumerate(rules):
-        rule_id = rule["rule_id"]
+        rule_id = rule['rule_id']
         if rule_id in enabled_map:
-            if rule.get("enabled", True) != bool(enabled_map[rule_id]):
+            if rule.get('enabled', True) != bool(enabled_map[rule_id]):
                 # Rules are cached across users.
                 rule = dict(rule)
-                rule["enabled"] = bool(enabled_map[rule_id])
+                rule['enabled'] = bool(enabled_map[rule_id])
                 rules[i] = rule
 
     return rules
@@ -126,12 +126,12 @@ class PushRulesWorkerStore(
     def get_push_rules_enabled_for_user(self, user_id):
         results = yield self._simple_select_list(
             table="push_rules_enable",
-            keyvalues={"user_name": user_id},
+            keyvalues={'user_name': user_id},
             retcols=("user_name", "rule_id", "enabled"),
             desc="get_push_rules_enabled_for_user",
         )
         defer.returnValue(
-            {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
+            {r['rule_id']: False if r['enabled'] == 0 else True for r in results}
         )
 
     def have_push_rules_changed_for_user(self, user_id, last_id):
@@ -175,7 +175,7 @@ class PushRulesWorkerStore(
         rows.sort(key=lambda row: (-int(row["priority_class"]), -int(row["priority"])))
 
         for row in rows:
-            results.setdefault(row["user_name"], []).append(row)
+            results.setdefault(row['user_name'], []).append(row)
 
         enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
 
@@ -194,7 +194,7 @@ class PushRulesWorkerStore(
             rule (Dict): A push rule.
         """
         # Create new rule id
-        rule_id_scope = "/".join(rule["rule_id"].split("/")[:-1])
+        rule_id_scope = '/'.join(rule["rule_id"].split('/')[:-1])
         new_rule_id = rule_id_scope + "/" + new_room_id
 
         # Change room id in each condition
@@ -334,8 +334,8 @@ class PushRulesWorkerStore(
             desc="bulk_get_push_rules_enabled",
         )
         for row in rows:
-            enabled = bool(row["enabled"])
-            results.setdefault(row["user_name"], {})[row["rule_id"]] = enabled
+            enabled = bool(row['enabled'])
+            results.setdefault(row['user_name'], {})[row['rule_id']] = enabled
         defer.returnValue(results)
 
 
@@ -568,7 +568,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
         def delete_push_rule_txn(txn, stream_id, event_stream_ordering):
             self._simple_delete_one_txn(
-                txn, "push_rules", {"user_name": user_id, "rule_id": rule_id}
+                txn, "push_rules", {'user_name': user_id, 'rule_id': rule_id}
             )
 
             self._insert_push_rules_update_txn(
@@ -605,9 +605,9 @@ class PushRuleStore(PushRulesWorkerStore):
         self._simple_upsert_txn(
             txn,
             "push_rules_enable",
-            {"user_name": user_id, "rule_id": rule_id},
-            {"enabled": 1 if enabled else 0},
-            {"id": new_id},
+            {'user_name': user_id, 'rule_id': rule_id},
+            {'enabled': 1 if enabled else 0},
+            {'id': new_id},
         )
 
         self._insert_push_rules_update_txn(
@@ -645,8 +645,8 @@ class PushRuleStore(PushRulesWorkerStore):
                 self._simple_update_one_txn(
                     txn,
                     "push_rules",
-                    {"user_name": user_id, "rule_id": rule_id},
-                    {"actions": actions_json},
+                    {'user_name': user_id, 'rule_id': rule_id},
+                    {'actions': actions_json},
                 )
 
             self._insert_push_rules_update_txn(

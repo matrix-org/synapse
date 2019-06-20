@@ -86,18 +86,19 @@ class FederationReaderServer(HomeServer):
                 if name == "metrics":
                     resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "federation":
-                    resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
+                    resources.update({
+                        FEDERATION_PREFIX: TransportLayerServer(self),
+                    })
                 if name == "openid" and "federation" not in res["names"]:
                     # Only load the openid resource separately if federation resource
                     # is not specified since federation resource includes openid
                     # resource.
-                    resources.update(
-                        {
-                            FEDERATION_PREFIX: TransportLayerServer(
-                                self, servlet_groups=["openid"]
-                            )
-                        }
-                    )
+                    resources.update({
+                        FEDERATION_PREFIX: TransportLayerServer(
+                            self,
+                            servlet_groups=["openid"],
+                        ),
+                    })
 
                 if name in ["keys", "federation"]:
                     resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
@@ -114,7 +115,7 @@ class FederationReaderServer(HomeServer):
                 root_resource,
                 self.version_string,
             ),
-            reactor=self.get_reactor(),
+            reactor=self.get_reactor()
         )
 
         logger.info("Synapse federation reader now listening on port %d", port)
@@ -128,19 +129,18 @@ class FederationReaderServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
+                        username="matrix",
+                        password="rabbithole",
+                        globals={"hs": self},
+                    )
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
-                    )
+                    logger.warn(("Metrics listener configured, but "
+                                 "enable_metrics is not True!"))
                 else:
-                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"],
+                                         listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -181,6 +181,6 @@ def start(config_options):
     _base.start_worker_reactor("synapse-federation-reader", config)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     with LoggingContext("main"):
         start(sys.argv[1:])

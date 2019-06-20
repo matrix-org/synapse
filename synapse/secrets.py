@@ -29,7 +29,6 @@ if sys.version_info[0:2] >= (3, 6):
     def Secrets():
         return secrets
 
-
 else:
     import os
     import binascii
@@ -39,4 +38,4 @@ else:
             return os.urandom(nbytes)
 
         def token_hex(self, nbytes=32):
-            return binascii.hexlify(self.token_bytes(nbytes)).decode("ascii")
+            return binascii.hexlify(self.token_bytes(nbytes)).decode('ascii')

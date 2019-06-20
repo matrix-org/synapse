@@ -135,7 +135,9 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         self.assertEquals(len(self.email_attempts), 1)
 
         # Attempt to reset password without clicking the link
-        self._reset_password(new_password, session_id, client_secret, expected_code=401)
+        self._reset_password(
+            new_password, session_id, client_secret, expected_code=401,
+        )
 
         # Assert we can log in with the old password
         self.login("kermit", old_password)
@@ -170,7 +172,9 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         session_id = "weasle"
 
         # Attempt to reset password without even requesting an email
-        self._reset_password(new_password, session_id, client_secret, expected_code=401)
+        self._reset_password(
+            new_password, session_id, client_secret, expected_code=401,
+        )
 
         # Assert we can log in with the old password
         self.login("kermit", old_password)
@@ -254,18 +258,19 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
-        request_data = json.dumps(
-            {
-                "auth": {
-                    "type": "m.login.password",
-                    "user": user_id,
-                    "password": "test",
-                },
-                "erase": False,
-            }
-        )
+        request_data = json.dumps({
+            "auth": {
+                "type": "m.login.password",
+                "user": user_id,
+                "password": "test",
+            },
+            "erase": False,
+        })
         request, channel = self.make_request(
-            "POST", "account/deactivate", request_data, access_token=tok
+            "POST",
+            "account/deactivate",
+            request_data,
+            access_token=tok,
         )
         self.render(request)
         self.assertEqual(request.code, 200)

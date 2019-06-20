@@ -93,20 +93,24 @@ class AcmeHandler(object):
         )
 
         well_known = Resource()
-        well_known.putChild(b"acme-challenge", responder.resource)
+        well_known.putChild(b'acme-challenge', responder.resource)
         responder_resource = Resource()
-        responder_resource.putChild(b".well-known", well_known)
-        responder_resource.putChild(b"check", static.Data(b"OK", b"text/plain"))
+        responder_resource.putChild(b'.well-known', well_known)
+        responder_resource.putChild(b'check', static.Data(b'OK', b'text/plain'))
 
         srv = server.Site(responder_resource)
 
         bind_addresses = self.hs.config.acme_bind_addresses
         for host in bind_addresses:
             logger.info(
-                "Listening for ACME requests on %s:%i", host, self.hs.config.acme_port
+                "Listening for ACME requests on %s:%i", host, self.hs.config.acme_port,
             )
             try:
-                self.reactor.listenTCP(self.hs.config.acme_port, srv, interface=host)
+                self.reactor.listenTCP(
+                    self.hs.config.acme_port,
+                    srv,
+                    interface=host,
+                )
             except twisted.internet.error.CannotListenError as e:
                 check_bind_error(e, host, bind_addresses)
 

@@ -9,7 +9,6 @@ class TreeCache(object):
     efficiently.
     Keys must be tuples.
     """
-
     def __init__(self):
         self.size = 0
         self.root = {}

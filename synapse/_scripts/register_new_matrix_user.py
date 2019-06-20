@@ -57,18 +57,18 @@ def request_registration(
 
     nonce = r.json()["nonce"]
 
-    mac = hmac.new(key=shared_secret.encode("utf8"), digestmod=hashlib.sha1)
+    mac = hmac.new(key=shared_secret.encode('utf8'), digestmod=hashlib.sha1)
 
-    mac.update(nonce.encode("utf8"))
+    mac.update(nonce.encode('utf8'))
     mac.update(b"\x00")
-    mac.update(user.encode("utf8"))
+    mac.update(user.encode('utf8'))
     mac.update(b"\x00")
-    mac.update(password.encode("utf8"))
+    mac.update(password.encode('utf8'))
     mac.update(b"\x00")
     mac.update(b"admin" if admin else b"notadmin")
     if user_type:
         mac.update(b"\x00")
-        mac.update(user_type.encode("utf8"))
+        mac.update(user_type.encode('utf8'))
 
     mac = mac.hexdigest()
 
@@ -134,9 +134,8 @@ def register_new_user(user, password, server_location, shared_secret, admin, use
         else:
             admin = False
 
-    request_registration(
-        user, password, server_location, shared_secret, bool(admin), user_type
-    )
+    request_registration(user, password, server_location, shared_secret,
+                         bool(admin), user_type)
 
 
 def main():
@@ -190,7 +189,7 @@ def main():
     group.add_argument(
         "-c",
         "--config",
-        type=argparse.FileType("r"),
+        type=argparse.FileType('r'),
         help="Path to server config file. Used to read in shared secret.",
     )
 
@@ -201,7 +200,7 @@ def main():
     parser.add_argument(
         "server_url",
         default="https://localhost:8448",
-        nargs="?",
+        nargs='?',
         help="URL to use to talk to the home server. Defaults to "
         " 'https://localhost:8448'.",
     )
@@ -221,9 +220,8 @@ def main():
     if args.admin or args.no_admin:
         admin = args.admin
 
-    register_new_user(
-        args.user, args.password, args.server_url, secret, admin, args.user_type
-    )
+    register_new_user(args.user, args.password, args.server_url, secret,
+                      admin, args.user_type)
 
 
 if __name__ == "__main__":

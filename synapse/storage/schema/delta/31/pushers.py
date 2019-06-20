@@ -24,13 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 def token_to_stream_ordering(token):
-    return int(token[1:].split("_")[0])
+    return int(token[1:].split('_')[0])
 
 
 def run_create(cur, database_engine, *args, **kwargs):
     logger.info("Porting pushers table, delta 31...")
-    cur.execute(
-        """
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS pushers2 (
           id BIGINT PRIMARY KEY,
           user_name TEXT NOT NULL,
@@ -49,33 +48,26 @@ def run_create(cur, database_engine, *args, **kwargs):
           failing_since BIGINT,
           UNIQUE (app_id, pushkey, user_name)
         )
-    """
-    )
-    cur.execute(
-        """SELECT
+    """)
+    cur.execute("""SELECT
         id, user_name, access_token, profile_tag, kind,
         app_id, app_display_name, device_display_name,
         pushkey, ts, lang, data, last_token, last_success,
         failing_since
         FROM pushers
-    """
-    )
+    """)
     count = 0
     for row in cur.fetchall():
         row = list(row)
         row[12] = token_to_stream_ordering(row[12])
-        cur.execute(
-            database_engine.convert_param_style(
-                """
+        cur.execute(database_engine.convert_param_style("""
             INSERT into pushers2 (
             id, user_name, access_token, profile_tag, kind,
             app_id, app_display_name, device_display_name,
             pushkey, ts, lang, data, last_stream_ordering, last_success,
             failing_since
-            ) values (%s)"""
-                % (",".join(["?" for _ in range(len(row))]))
-            ),
-            row,
+            ) values (%s)""" % (','.join(['?' for _ in range(len(row))]))),
+            row
         )
         count += 1
     cur.execute("DROP TABLE pushers")

@@ -85,7 +85,7 @@ class Sqlite3Engine(object):
 
 def _parse_match_info(buf):
     bufsize = len(buf)
-    return [struct.unpack("@I", buf[i : i + 4])[0] for i in range(0, bufsize, 4)]
+    return [struct.unpack('@I', buf[i : i + 4])[0] for i in range(0, bufsize, 4)]
 
 
 def _rank(raw_match_info):

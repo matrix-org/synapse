@@ -64,7 +64,8 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         )
 
         self.register_background_update_handler(
-            self.DELETE_SOFT_FAILED_EXTREMITIES, self._cleanup_extremities_bg_update
+            self.DELETE_SOFT_FAILED_EXTREMITIES,
+            self._cleanup_extremities_bg_update,
         )
 
     @defer.inlineCallbacks
@@ -268,8 +269,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 LEFT JOIN events USING (event_id)
                 LEFT JOIN event_json USING (event_id)
                 LEFT JOIN rejections USING (event_id)
-                """,
-                (batch_size,),
+                """, (batch_size,)
             )
 
             for prev_event_id, event_id, metadata, rejected, outlier in txn:
@@ -364,12 +364,13 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     column="event_id",
                     iterable=to_delete,
                     keyvalues={},
-                    retcols=("room_id",),
+                    retcols=("room_id",)
                 )
                 room_ids = set(row["room_id"] for row in rows)
                 for room_id in room_ids:
                     txn.call_after(
-                        self.get_latest_event_ids_in_room.invalidate, (room_id,)
+                        self.get_latest_event_ids_in_room.invalidate,
+                        (room_id,)
                     )
 
             self._simple_delete_many_txn(
@@ -383,7 +384,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             return len(original_set)
 
         num_handled = yield self.runInteraction(
-            "_cleanup_extremities_bg_update", _cleanup_extremities_bg_update_txn
+            "_cleanup_extremities_bg_update", _cleanup_extremities_bg_update_txn,
         )
 
         if not num_handled:
@@ -393,7 +394,8 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 txn.execute("DROP TABLE _extremities_to_check")
 
             yield self.runInteraction(
-                "_cleanup_extremities_bg_update_drop_table", _drop_table_txn
+                "_cleanup_extremities_bg_update_drop_table",
+                _drop_table_txn,
             )
 
         defer.returnValue(num_handled)

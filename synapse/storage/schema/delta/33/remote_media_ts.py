@@ -26,5 +26,5 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
         database_engine.convert_param_style(
             "UPDATE remote_media_cache SET last_access_ts = ?"
         ),
-        (int(time.time() * 1000),),
+        (int(time.time() * 1000),)
     )

@@ -47,7 +47,7 @@ def _expect_edu_transaction(edu_type, content, origin="test"):
 
 
 def _make_edu_transaction_json(edu_type, content):
-    return json.dumps(_expect_edu_transaction(edu_type, content)).encode("utf8")
+    return json.dumps(_expect_edu_transaction(edu_type, content)).encode('utf8')
 
 
 class TypingNotificationsTestCase(unittest.HomeserverTestCase):
@@ -151,7 +151,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call('typing_key', 1, rooms=[ROOM_ID])])
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
@@ -209,12 +209,12 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                     "typing": True,
                 },
             ),
-            federation_auth_origin=b"farm",
+            federation_auth_origin=b'farm',
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
 
-        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call('typing_key', 1, rooms=[ROOM_ID])])
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
@@ -247,7 +247,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call('typing_key', 1, rooms=[ROOM_ID])])
 
         put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(
@@ -285,7 +285,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call('typing_key', 1, rooms=[ROOM_ID])])
         self.on_new_event.reset_mock()
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -303,7 +303,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.reactor.pump([16])
 
-        self.on_new_event.assert_has_calls([call("typing_key", 2, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call('typing_key', 2, rooms=[ROOM_ID])])
 
         self.assertEquals(self.event_source.get_current_key(), 2)
         events = self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=1)
@@ -320,7 +320,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call("typing_key", 3, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call('typing_key', 3, rooms=[ROOM_ID])])
         self.on_new_event.reset_mock()
 
         self.assertEquals(self.event_source.get_current_key(), 3)

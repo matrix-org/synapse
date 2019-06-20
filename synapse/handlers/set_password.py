@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 class SetPasswordHandler(BaseHandler):
     """Handler which deals with changing user account passwords"""
-
     def __init__(self, hs):
         super(SetPasswordHandler, self).__init__(hs)
         self._auth_handler = hs.get_auth_handler()
@@ -48,11 +47,11 @@ class SetPasswordHandler(BaseHandler):
         # we want to log out all of the user's other sessions. First delete
         # all his other devices.
         yield self._device_handler.delete_all_devices_for_user(
-            user_id, except_device_id=except_device_id
+            user_id, except_device_id=except_device_id,
         )
 
         # and now delete any access tokens which weren't associated with
         # devices (or were associated with this device).
         yield self._auth_handler.delete_access_tokens_for_user(
-            user_id, except_token_id=except_access_token_id
+            user_id, except_token_id=except_access_token_id,
         )

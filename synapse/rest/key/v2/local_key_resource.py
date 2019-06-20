@@ -80,27 +80,33 @@ class LocalKey(Resource):
         for key in self.config.signing_key:
             verify_key_bytes = key.verify_key.encode()
             key_id = "%s:%s" % (key.alg, key.version)
-            verify_keys[key_id] = {"key": encode_base64(verify_key_bytes)}
+            verify_keys[key_id] = {
+                u"key": encode_base64(verify_key_bytes)
+            }
 
         old_verify_keys = {}
         for key_id, key in self.config.old_signing_keys.items():
             verify_key_bytes = key.encode()
             old_verify_keys[key_id] = {
-                "key": encode_base64(verify_key_bytes),
-                "expired_ts": key.expired_ts,
+                u"key": encode_base64(verify_key_bytes),
+                u"expired_ts": key.expired_ts,
             }
 
         tls_fingerprints = self.config.tls_fingerprints
 
         json_object = {
-            "valid_until_ts": self.valid_until_ts,
-            "server_name": self.config.server_name,
-            "verify_keys": verify_keys,
-            "old_verify_keys": old_verify_keys,
-            "tls_fingerprints": tls_fingerprints,
+            u"valid_until_ts": self.valid_until_ts,
+            u"server_name": self.config.server_name,
+            u"verify_keys": verify_keys,
+            u"old_verify_keys": old_verify_keys,
+            u"tls_fingerprints": tls_fingerprints,
         }
         for key in self.config.signing_key:
-            json_object = sign_json(json_object, self.config.server_name, key)
+            json_object = sign_json(
+                json_object,
+                self.config.server_name,
+                key,
+            )
         return json_object
 
     def render_GET(self, request):
@@ -108,4 +114,6 @@ class LocalKey(Resource):
         # Update the expiry time if less than half the interval remains.
         if time_now + self.config.key_refresh_interval / 2 > self.valid_until_ts:
             self.update_response_body(time_now)
-        return respond_with_json_bytes(request, 200, self.response_body)
+        return respond_with_json_bytes(
+            request, 200, self.response_body,
+        )

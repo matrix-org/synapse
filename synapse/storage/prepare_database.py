@@ -146,10 +146,9 @@ def _setup_new_database(cur, database_engine):
 
     directory_entries = os.listdir(sql_dir)
 
-    for filename in sorted(
-        fnmatch.filter(directory_entries, "*.sql")
-        + fnmatch.filter(directory_entries, "*.sql." + specific)
-    ):
+    for filename in sorted(fnmatch.filter(directory_entries, "*.sql") + fnmatch.filter(
+        directory_entries, "*.sql." + specific
+    )):
         sql_loc = os.path.join(sql_dir, filename)
         logger.debug("Applying schema %s", sql_loc)
         executescript(cur, sql_loc)
@@ -314,7 +313,7 @@ def _apply_module_schemas(txn, database_engine, config):
             application config
     """
     for (mod, _config) in config.password_providers:
-        if not hasattr(mod, "get_db_schema_files"):
+        if not hasattr(mod, 'get_db_schema_files'):
             continue
         modname = ".".join((mod.__module__, mod.__name__))
         _apply_module_schema_files(
@@ -344,7 +343,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
             continue
 
         root_name, ext = os.path.splitext(name)
-        if ext != ".sql":
+        if ext != '.sql':
             raise PrepareDatabaseException(
                 "only .sql files are currently supported for module schemas"
             )
@@ -408,7 +407,7 @@ def get_statements(f):
 
 
 def executescript(txn, schema_path):
-    with open(schema_path, "r") as f:
+    with open(schema_path, 'r') as f:
         for statement in get_statements(f):
             txn.execute(statement)
 

@@ -51,7 +51,8 @@ class ServerNoticesManager(object):
 
     @defer.inlineCallbacks
     def send_notice(
-        self, user_id, event_content, type=EventTypes.Message, state_key=None
+        self, user_id, event_content,
+        type=EventTypes.Message, state_key=None
     ):
         """Send a notice to the given user
 
@@ -81,10 +82,10 @@ class ServerNoticesManager(object):
         }
 
         if state_key is not None:
-            event_dict["state_key"] = state_key
+            event_dict['state_key'] = state_key
 
         res = yield self._event_creation_handler.create_and_send_nonmember_event(
-            requester, event_dict, ratelimit=False
+            requester, event_dict, ratelimit=False,
         )
         defer.returnValue(res)
 
@@ -103,10 +104,11 @@ class ServerNoticesManager(object):
         if not self.is_enabled():
             raise Exception("Server notices not enabled")
 
-        assert self._is_mine_id(user_id), "Cannot send server notices to remote users"
+        assert self._is_mine_id(user_id), \
+            "Cannot send server notices to remote users"
 
         rooms = yield self._store.get_rooms_for_user_where_membership_is(
-            user_id, [Membership.INVITE, Membership.JOIN]
+            user_id, [Membership.INVITE, Membership.JOIN],
         )
         system_mxid = self._config.server_notices_mxid
         for room in rooms:
@@ -130,8 +132,8 @@ class ServerNoticesManager(object):
         # avatar, we have to use both.
         join_profile = None
         if (
-            self._config.server_notices_mxid_display_name is not None
-            or self._config.server_notices_mxid_avatar_url is not None
+            self._config.server_notices_mxid_display_name is not None or
+            self._config.server_notices_mxid_avatar_url is not None
         ):
             join_profile = {
                 "displayname": self._config.server_notices_mxid_display_name,
@@ -144,18 +146,22 @@ class ServerNoticesManager(object):
             config={
                 "preset": RoomCreationPreset.PRIVATE_CHAT,
                 "name": self._config.server_notices_room_name,
-                "power_level_content_override": {"users_default": -10},
-                "invite": (user_id,),
+                "power_level_content_override": {
+                    "users_default": -10,
+                },
+                "invite": (user_id,)
             },
             ratelimit=False,
             creator_join_profile=join_profile,
         )
-        room_id = info["room_id"]
+        room_id = info['room_id']
 
         max_id = yield self._store.add_tag_to_room(
-            user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
+            user_id, room_id, SERVER_NOTICE_ROOM_TAG, {},
         )
-        self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
+        self._notifier.on_new_event(
+            "account_data_key", max_id, users=[user_id]
+        )
 
         logger.info("Created server notices room %s for %s", room_id, user_id)
         defer.returnValue(room_id)

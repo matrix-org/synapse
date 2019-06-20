@@ -27,11 +27,11 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_prev_events_for_room(self):
-        room_id = "@ROOM:local"
+        room_id = '@ROOM:local'
 
         # add a bunch of events and hashes to act as forward extremities
         def insert_event(txn, i):
-            event_id = "$event_%i:local" % i
+            event_id = '$event_%i:local' % i
 
             txn.execute(
                 (
@@ -45,19 +45,19 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
 
             txn.execute(
                 (
-                    "INSERT INTO event_forward_extremities (room_id, event_id) "
-                    "VALUES (?, ?)"
+                    'INSERT INTO event_forward_extremities (room_id, event_id) '
+                    'VALUES (?, ?)'
                 ),
                 (room_id, event_id),
             )
 
             txn.execute(
                 (
-                    "INSERT INTO event_reference_hashes "
-                    "(event_id, algorithm, hash) "
+                    'INSERT INTO event_reference_hashes '
+                    '(event_id, algorithm, hash) '
                     "VALUES (?, 'sha256', ?)"
                 ),
-                (event_id, b"ffff"),
+                (event_id, b'ffff'),
             )
 
         for i in range(0, 11):

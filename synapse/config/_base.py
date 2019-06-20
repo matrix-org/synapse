@@ -284,8 +284,8 @@ class Config(object):
             if not config_files:
                 config_parser.error(
                     "Must supply a config file.\nA config file can be automatically"
-                    ' generated using "--generate-config -H SERVER_NAME'
-                    ' -c CONFIG-FILE"'
+                    " generated using \"--generate-config -H SERVER_NAME"
+                    " -c CONFIG-FILE\""
                 )
             (config_path,) = config_files
             if not cls.path_exists(config_path):
@@ -313,7 +313,9 @@ class Config(object):
                 if not cls.path_exists(config_dir_path):
                     os.makedirs(config_dir_path)
                 with open(config_path, "w") as config_file:
-                    config_file.write("# vim:ft=yaml\n\n")
+                    config_file.write(
+                        "# vim:ft=yaml\n\n"
+                    )
                     config_file.write(config_str)
 
                 config = yaml.safe_load(config_str)
@@ -350,8 +352,8 @@ class Config(object):
         if not config_files:
             config_parser.error(
                 "Must supply a config file.\nA config file can be automatically"
-                ' generated using "--generate-config -H SERVER_NAME'
-                ' -c CONFIG-FILE"'
+                " generated using \"--generate-config -H SERVER_NAME"
+                " -c CONFIG-FILE\""
             )
 
         obj.read_config_files(

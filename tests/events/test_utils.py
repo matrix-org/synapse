@@ -37,88 +37,88 @@ class PruneEventTestCase(unittest.TestCase):
 
     def test_minimal(self):
         self.run_test(
-            {"type": "A", "event_id": "$test:domain"},
+            {'type': 'A', 'event_id': '$test:domain'},
             {
-                "type": "A",
-                "event_id": "$test:domain",
-                "content": {},
-                "signatures": {},
-                "unsigned": {},
+                'type': 'A',
+                'event_id': '$test:domain',
+                'content': {},
+                'signatures': {},
+                'unsigned': {},
             },
         )
 
     def test_basic_keys(self):
         self.run_test(
             {
-                "type": "A",
-                "room_id": "!1:domain",
-                "sender": "@2:domain",
-                "event_id": "$3:domain",
-                "origin": "domain",
+                'type': 'A',
+                'room_id': '!1:domain',
+                'sender': '@2:domain',
+                'event_id': '$3:domain',
+                'origin': 'domain',
             },
             {
-                "type": "A",
-                "room_id": "!1:domain",
-                "sender": "@2:domain",
-                "event_id": "$3:domain",
-                "origin": "domain",
-                "content": {},
-                "signatures": {},
-                "unsigned": {},
+                'type': 'A',
+                'room_id': '!1:domain',
+                'sender': '@2:domain',
+                'event_id': '$3:domain',
+                'origin': 'domain',
+                'content': {},
+                'signatures': {},
+                'unsigned': {},
             },
         )
 
     def test_unsigned_age_ts(self):
         self.run_test(
-            {"type": "B", "event_id": "$test:domain", "unsigned": {"age_ts": 20}},
+            {'type': 'B', 'event_id': '$test:domain', 'unsigned': {'age_ts': 20}},
             {
-                "type": "B",
-                "event_id": "$test:domain",
-                "content": {},
-                "signatures": {},
-                "unsigned": {"age_ts": 20},
+                'type': 'B',
+                'event_id': '$test:domain',
+                'content': {},
+                'signatures': {},
+                'unsigned': {'age_ts': 20},
             },
         )
 
         self.run_test(
             {
-                "type": "B",
-                "event_id": "$test:domain",
-                "unsigned": {"other_key": "here"},
+                'type': 'B',
+                'event_id': '$test:domain',
+                'unsigned': {'other_key': 'here'},
             },
             {
-                "type": "B",
-                "event_id": "$test:domain",
-                "content": {},
-                "signatures": {},
-                "unsigned": {},
+                'type': 'B',
+                'event_id': '$test:domain',
+                'content': {},
+                'signatures': {},
+                'unsigned': {},
             },
         )
 
     def test_content(self):
         self.run_test(
-            {"type": "C", "event_id": "$test:domain", "content": {"things": "here"}},
+            {'type': 'C', 'event_id': '$test:domain', 'content': {'things': 'here'}},
             {
-                "type": "C",
-                "event_id": "$test:domain",
-                "content": {},
-                "signatures": {},
-                "unsigned": {},
+                'type': 'C',
+                'event_id': '$test:domain',
+                'content': {},
+                'signatures': {},
+                'unsigned': {},
             },
         )
 
         self.run_test(
             {
-                "type": "m.room.create",
-                "event_id": "$test:domain",
-                "content": {"creator": "@2:domain", "other_field": "here"},
+                'type': 'm.room.create',
+                'event_id': '$test:domain',
+                'content': {'creator': '@2:domain', 'other_field': 'here'},
             },
             {
-                "type": "m.room.create",
-                "event_id": "$test:domain",
-                "content": {"creator": "@2:domain"},
-                "signatures": {},
-                "unsigned": {},
+                'type': 'm.room.create',
+                'event_id': '$test:domain',
+                'content': {'creator': '@2:domain'},
+                'signatures': {},
+                'unsigned': {},
             },
         )
 

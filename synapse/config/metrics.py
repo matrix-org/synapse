@@ -15,9 +15,11 @@
 
 from ._base import Config, ConfigError
 
-MISSING_SENTRY = """Missing sentry-sdk library. This is required to enable sentry
+MISSING_SENTRY = (
+    """Missing sentry-sdk library. This is required to enable sentry
     integration.
     """
+)
 
 
 class MetricsConfig(Config):
@@ -37,7 +39,7 @@ class MetricsConfig(Config):
             self.sentry_dsn = config["sentry"].get("dsn")
             if not self.sentry_dsn:
                 raise ConfigError(
-                    "sentry.dsn field is required when sentry integration is enabled"
+                    "sentry.dsn field is required when sentry integration is enabled",
                 )
 
     def default_config(self, report_stats=None, **kwargs):
@@ -64,6 +66,6 @@ class MetricsConfig(Config):
         if report_stats is None:
             res += "# report_stats: true|false\n"
         else:
-            res += "report_stats: %s\n" % ("true" if report_stats else "false")
+            res += "report_stats: %s\n" % ('true' if report_stats else 'false')
 
         return res

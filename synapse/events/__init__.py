@@ -115,25 +115,25 @@ def _event_dict_property(key):
         except KeyError:
             raise AttributeError(key)
 
-    return property(getter, setter, delete)
+    return property(
+        getter,
+        setter,
+        delete,
+    )
 
 
 class EventBase(object):
-    def __init__(
-        self,
-        event_dict,
-        signatures={},
-        unsigned={},
-        internal_metadata_dict={},
-        rejected_reason=None,
-    ):
+    def __init__(self, event_dict, signatures={}, unsigned={},
+                 internal_metadata_dict={}, rejected_reason=None):
         self.signatures = signatures
         self.unsigned = unsigned
         self.rejected_reason = rejected_reason
 
         self._event_dict = event_dict
 
-        self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
+        self.internal_metadata = _EventInternalMetadata(
+            internal_metadata_dict
+        )
 
     auth_events = _event_dict_property("auth_events")
     depth = _event_dict_property("depth")
@@ -156,7 +156,10 @@ class EventBase(object):
 
     def get_dict(self):
         d = dict(self._event_dict)
-        d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
+        d.update({
+            "signatures": self.signatures,
+            "unsigned": dict(self.unsigned),
+        })
 
         return d
 
@@ -343,7 +346,6 @@ class FrozenEventV2(EventBase):
 
 class FrozenEventV3(FrozenEventV2):
     """FrozenEventV3, which differs from FrozenEventV2 only in the event_id format"""
-
     format_version = EventFormatVersions.V3  # All events of this type are V3
 
     @property
@@ -400,4 +402,6 @@ def event_type_from_format_version(format_version):
     elif format_version == EventFormatVersions.V3:
         return FrozenEventV3
     else:
-        raise Exception("No event format %r" % (format_version,))
+        raise Exception(
+            "No event format %r" % (format_version,)
+        )

@@ -104,8 +104,8 @@ def register_cache(cache_type, cache_name, cache):
 
 
 KNOWN_KEYS = {
-    key: key
-    for key in (
+    key: key for key in
+    (
         "auth_events",
         "content",
         "depth",
@@ -150,7 +150,7 @@ def intern_dict(dictionary):
 
 
 def _intern_known_values(key, value):
-    intern_keys = ("event_id", "room_id", "sender", "user_id", "type", "state_key")
+    intern_keys = ("event_id", "room_id", "sender", "user_id", "type", "state_key",)
 
     if key in intern_keys:
         return intern_string(value)

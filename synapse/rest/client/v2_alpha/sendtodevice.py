@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class SendToDeviceRestServlet(servlet.RestServlet):
     PATTERNS = client_patterns(
-        "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$"
+        "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$",
     )
 
     def __init__(self, hs):

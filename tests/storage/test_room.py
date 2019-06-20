@@ -78,7 +78,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def STALE_test_room_name(self):
-        name = "A-Room-Name"
+        name = u"A-Room-Name"
 
         yield self.inject_room_event(
             etype=EventTypes.Name, name=name, content={"name": name}, depth=1
@@ -94,7 +94,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def STALE_test_room_topic(self):
-        topic = "A place for things"
+        topic = u"A place for things"
 
         yield self.inject_room_event(
             etype=EventTypes.Topic, topic=topic, content={"topic": topic}, depth=1

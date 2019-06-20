@@ -71,14 +71,18 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         """Implements RoomMemberHandler._user_joined_room
         """
         return self._notify_change_client(
-            user_id=target.to_string(), room_id=room_id, change="joined"
+            user_id=target.to_string(),
+            room_id=room_id,
+            change="joined",
         )
 
     def _user_left_room(self, target, room_id):
         """Implements RoomMemberHandler._user_left_room
         """
         return self._notify_change_client(
-            user_id=target.to_string(), room_id=room_id, change="left"
+            user_id=target.to_string(),
+            room_id=room_id,
+            change="left",
         )
 
     def get_or_register_3pid_guest(self, requester, medium, address, inviter_user_id):

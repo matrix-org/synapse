@@ -82,7 +82,7 @@ class RedactionTestCase(unittest.TestCase):
                 "sender": user.to_string(),
                 "state_key": user.to_string(),
                 "room_id": room.to_string(),
-                "content": {"body": body, "msgtype": "message"},
+                "content": {"body": body, "msgtype": u"message"},
             },
         )
 
@@ -118,7 +118,7 @@ class RedactionTestCase(unittest.TestCase):
     def test_redact(self):
         yield self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
 
-        msg_event = yield self.inject_message(self.room1, self.u_alice, "t")
+        msg_event = yield self.inject_message(self.room1, self.u_alice, u"t")
 
         # Check event has not been redacted:
         event = yield self.store.get_event(msg_event.event_id)

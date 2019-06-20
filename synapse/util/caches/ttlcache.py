@@ -155,7 +155,6 @@ class TTLCache(object):
 @attr.s(frozen=True, slots=True)
 class _CacheEntry(object):
     """TTLCache entry"""
-
     # expiry_time is the first attribute, so that entries are sorted by expiry.
     expiry_time = attr.ib()
     key = attr.ib()

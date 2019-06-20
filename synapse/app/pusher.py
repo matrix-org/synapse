@@ -46,27 +46,36 @@ logger = logging.getLogger("synapse.app.pusher")
 
 
 class PusherSlaveStore(
-    SlavedEventStore, SlavedPusherStore, SlavedReceiptsStore, SlavedAccountDataStore
+    SlavedEventStore, SlavedPusherStore, SlavedReceiptsStore,
+    SlavedAccountDataStore
 ):
-    update_pusher_last_stream_ordering_and_success = __func__(
-        DataStore.update_pusher_last_stream_ordering_and_success
+    update_pusher_last_stream_ordering_and_success = (
+        __func__(DataStore.update_pusher_last_stream_ordering_and_success)
     )
 
-    update_pusher_failing_since = __func__(DataStore.update_pusher_failing_since)
-
-    update_pusher_last_stream_ordering = __func__(
-        DataStore.update_pusher_last_stream_ordering
+    update_pusher_failing_since = (
+        __func__(DataStore.update_pusher_failing_since)
     )
 
-    get_throttle_params_by_room = __func__(DataStore.get_throttle_params_by_room)
-
-    set_throttle_params = __func__(DataStore.set_throttle_params)
-
-    get_time_of_last_push_action_before = __func__(
-        DataStore.get_time_of_last_push_action_before
+    update_pusher_last_stream_ordering = (
+        __func__(DataStore.update_pusher_last_stream_ordering)
     )
 
-    get_profile_displayname = __func__(DataStore.get_profile_displayname)
+    get_throttle_params_by_room = (
+        __func__(DataStore.get_throttle_params_by_room)
+    )
+
+    set_throttle_params = (
+        __func__(DataStore.set_throttle_params)
+    )
+
+    get_time_of_last_push_action_before = (
+        __func__(DataStore.get_time_of_last_push_action_before)
+    )
+
+    get_profile_displayname = (
+        __func__(DataStore.get_profile_displayname)
+    )
 
 
 class PusherServer(HomeServer):
@@ -96,7 +105,7 @@ class PusherServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            ),
+            )
         )
 
         logger.info("Synapse pusher now listening on port %d", port)
@@ -110,19 +119,18 @@ class PusherServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
+                        username="matrix",
+                        password="rabbithole",
+                        globals={"hs": self},
+                    )
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
-                    )
+                    logger.warn(("Metrics listener configured, but "
+                                 "enable_metrics is not True!"))
                 else:
-                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"],
+                                         listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -153,7 +161,9 @@ class PusherReplicationHandler(ReplicationClientHandler):
                     else:
                         yield self.start_pusher(row.user_id, row.app_id, row.pushkey)
             elif stream_name == "events":
-                yield self.pusher_pool.on_new_notifications(token, token)
+                yield self.pusher_pool.on_new_notifications(
+                    token, token,
+                )
             elif stream_name == "receipts":
                 yield self.pusher_pool.on_new_receipts(
                     token, token, set(row.room_id for row in rows)
@@ -178,7 +188,9 @@ class PusherReplicationHandler(ReplicationClientHandler):
 
 def start(config_options):
     try:
-        config = HomeServerConfig.load_config("Synapse pusher", config_options)
+        config = HomeServerConfig.load_config(
+            "Synapse pusher", config_options
+        )
     except ConfigError as e:
         sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
@@ -222,6 +234,6 @@ def start(config_options):
     _base.start_worker_reactor("synapse-pusher", config)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     with LoggingContext("main"):
         ps = start(sys.argv[1:])

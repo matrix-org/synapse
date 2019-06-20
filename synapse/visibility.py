@@ -29,7 +29,12 @@ from synapse.types import get_domain_from_id
 logger = logging.getLogger(__name__)
 
 
-VISIBILITY_PRIORITY = ("world_readable", "shared", "invited", "joined")
+VISIBILITY_PRIORITY = (
+    "world_readable",
+    "shared",
+    "invited",
+    "joined",
+)
 
 
 MEMBERSHIP_PRIORITY = (
@@ -42,9 +47,8 @@ MEMBERSHIP_PRIORITY = (
 
 
 @defer.inlineCallbacks
-def filter_events_for_client(
-    store, user_id, events, is_peeking=False, always_include_ids=frozenset()
-):
+def filter_events_for_client(store, user_id, events, is_peeking=False,
+                             always_include_ids=frozenset()):
     """
     Check which events a user is allowed to see
 
@@ -67,21 +71,23 @@ def filter_events_for_client(
     # to clients.
     events = list(e for e in events if not e.internal_metadata.is_soft_failed())
 
-    types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
+    types = (
+        (EventTypes.RoomHistoryVisibility, ""),
+        (EventTypes.Member, user_id),
+    )
     event_id_to_state = yield store.get_state_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(types),
     )
 
     ignore_dict_content = yield store.get_global_account_data_by_type_for_user(
-        "m.ignored_user_list", user_id
+        "m.ignored_user_list", user_id,
     )
 
     # FIXME: This will explode if people upload something incorrect.
     ignore_list = frozenset(
         ignore_dict_content.get("ignored_users", {}).keys()
-        if ignore_dict_content
-        else []
+        if ignore_dict_content else []
     )
 
     erased_senders = yield store.are_users_erased((e.sender for e in events))
@@ -179,7 +185,9 @@ def filter_events_for_client(
         elif visibility == "invited":
             # user can also see the event if they were *invited* at the time
             # of the event.
-            return event if membership == Membership.INVITE else None
+            return (
+                event if membership == Membership.INVITE else None
+            )
 
         elif visibility == "shared" and is_peeking:
             # if the visibility is shared, users cannot see the event unless
@@ -212,9 +220,8 @@ def filter_events_for_client(
 
 
 @defer.inlineCallbacks
-def filter_events_for_server(
-    store, server_name, events, redact=True, check_history_visibility_only=False
-):
+def filter_events_for_server(store, server_name, events, redact=True,
+                             check_history_visibility_only=False):
     """Filter a list of events based on whether given server is allowed to
     see them.
 
@@ -235,12 +242,15 @@ def filter_events_for_server(
 
     def is_sender_erased(event, erased_senders):
         if erased_senders and erased_senders[event.sender]:
-            logger.info("Sender of %s has been erased, redacting", event.event_id)
+            logger.info(
+                "Sender of %s has been erased, redacting",
+                event.event_id,
+            )
             return True
         return False
 
     def check_event_is_visible(event, state):
-        history = state.get((EventTypes.RoomHistoryVisibility, ""), None)
+        history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
         if history:
             visibility = history.content.get("history_visibility", "shared")
             if visibility in ["invited", "joined"]:
@@ -277,8 +287,8 @@ def filter_events_for_server(
     event_to_state_ids = yield store.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(
-            types=((EventTypes.RoomHistoryVisibility, ""),)
-        ),
+            types=((EventTypes.RoomHistoryVisibility, ""),),
+        )
     )
 
     visibility_ids = set()
@@ -299,7 +309,9 @@ def filter_events_for_server(
         )
 
     if not check_history_visibility_only:
-        erased_senders = yield store.are_users_erased((e.sender for e in events))
+        erased_senders = yield store.are_users_erased(
+            (e.sender for e in events),
+        )
     else:
         # We don't want to check whether users are erased, which is equivalent
         # to no users having been erased.
@@ -331,8 +343,11 @@ def filter_events_for_server(
     event_to_state_ids = yield store.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(
-            types=((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, None))
-        ),
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+                (EventTypes.Member, None),
+            ),
+        )
     )
 
     # We only want to pull out member events that correspond to the
@@ -356,15 +371,13 @@ def filter_events_for_server(
         idx = state_key.find(":")
         if idx == -1:
             return False
-        return state_key[idx + 1 :] == server_name
+        return state_key[idx + 1:] == server_name
 
-    event_map = yield store.get_events(
-        [
-            e_id
-            for e_id, key in iteritems(event_id_to_state_key)
-            if include(key[0], key[1])
-        ]
-    )
+    event_map = yield store.get_events([
+        e_id
+        for e_id, key in iteritems(event_id_to_state_key)
+        if include(key[0], key[1])
+    ])
 
     event_to_state = {
         e_id: {

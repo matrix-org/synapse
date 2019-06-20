@@ -1,5 +1,4 @@
 from __future__ import print_function
-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -59,9 +58,9 @@ def make_graph(pdus, room, filename_prefix):
         name = make_name(pdu.get("pdu_id"), pdu.get("origin"))
         pdu_map[name] = pdu
 
-        t = datetime.datetime.fromtimestamp(float(pdu["ts"]) / 1000).strftime(
-            "%Y-%m-%d %H:%M:%S,%f"
-        )
+        t = datetime.datetime.fromtimestamp(
+            float(pdu["ts"]) / 1000
+        ).strftime('%Y-%m-%d %H:%M:%S,%f')
 
         label = (
             "<"
@@ -81,7 +80,11 @@ def make_graph(pdus, room, filename_prefix):
             "depth": pdu.get("depth"),
         }
 
-        node = pydot.Node(name=name, label=label, color=color_map[pdu.get("origin")])
+        node = pydot.Node(
+            name=name,
+            label=label,
+            color=color_map[pdu.get("origin")]
+        )
         node_map[name] = node
         graph.add_node(node)
 
@@ -105,13 +108,14 @@ def make_graph(pdus, room, filename_prefix):
 
             if prev_state_name in node_map:
                 state_edge = pydot.Edge(
-                    node_map[start_name], node_map[prev_state_name], style="dotted"
+                    node_map[start_name], node_map[prev_state_name],
+                    style='dotted'
                 )
                 graph.add_edge(state_edge)
 
-    graph.write("%s.dot" % filename_prefix, format="raw", prog="dot")
-    #    graph.write_png("%s.png" % filename_prefix, prog='dot')
-    graph.write_svg("%s.svg" % filename_prefix, prog="dot")
+    graph.write('%s.dot' % filename_prefix, format='raw', prog='dot')
+#    graph.write_png("%s.png" % filename_prefix, prog='dot')
+    graph.write_svg("%s.svg" % filename_prefix, prog='dot')
 
 
 def get_pdus(host, room):
@@ -127,14 +131,15 @@ def get_pdus(host, room):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate a PDU graph for a given room by talking "
-        "to the given homeserver to get the list of PDUs. \n"
-        "Requires pydot."
+                    "to the given homeserver to get the list of PDUs. \n"
+                    "Requires pydot."
     )
     parser.add_argument(
-        "-p", "--prefix", dest="prefix", help="String to prefix output files with"
+        "-p", "--prefix", dest="prefix",
+        help="String to prefix output files with"
     )
-    parser.add_argument("host")
-    parser.add_argument("room")
+    parser.add_argument('host')
+    parser.add_argument('room')
 
     args = parser.parse_args()
 

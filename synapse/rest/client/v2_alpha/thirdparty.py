@@ -57,7 +57,7 @@ class ThirdPartyProtocolServlet(RestServlet):
         yield self.auth.get_user_by_req(request, allow_guest=True)
 
         protocols = yield self.appservice_handler.get_3pe_protocols(
-            only_protocol=protocol
+            only_protocol=protocol,
         )
         if protocol in protocols:
             defer.returnValue((200, protocols[protocol]))

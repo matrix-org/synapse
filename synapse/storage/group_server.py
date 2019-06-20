@@ -1179,7 +1179,11 @@ class GroupServerStore(SQLBaseStore):
 
             for table in tables:
                 self._simple_delete_txn(
-                    txn, table=table, keyvalues={"group_id": group_id}
+                    txn,
+                    table=table,
+                    keyvalues={"group_id": group_id},
                 )
 
-        return self.runInteraction("delete_group", _delete_group_txn)
+        return self.runInteraction(
+            "delete_group", _delete_group_txn
+        )

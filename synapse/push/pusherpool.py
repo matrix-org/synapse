@@ -40,7 +40,6 @@ class PusherPool:
     notifications are sent; accordingly Pusher.on_started, Pusher.on_new_notifications and
     Pusher.on_new_receipts are not expected to return deferreds.
     """
-
     def __init__(self, _hs):
         self.hs = _hs
         self.pusher_factory = PusherFactory(_hs)
@@ -58,19 +57,9 @@ class PusherPool:
         run_as_background_process("start_pushers", self._start_pushers)
 
     @defer.inlineCallbacks
-    def add_pusher(
-        self,
-        user_id,
-        access_token,
-        kind,
-        app_id,
-        app_display_name,
-        device_display_name,
-        pushkey,
-        lang,
-        data,
-        profile_tag="",
-    ):
+    def add_pusher(self, user_id, access_token, kind, app_id,
+                   app_display_name, device_display_name, pushkey, lang, data,
+                   profile_tag=""):
         """Creates a new pusher and adds it to the pool
 
         Returns:
@@ -82,23 +71,21 @@ class PusherPool:
         # will then get pulled out of the database,
         # recreated, added and started: this means we have only one
         # code path adding pushers.
-        self.pusher_factory.create_pusher(
-            {
-                "id": None,
-                "user_name": user_id,
-                "kind": kind,
-                "app_id": app_id,
-                "app_display_name": app_display_name,
-                "device_display_name": device_display_name,
-                "pushkey": pushkey,
-                "ts": time_now_msec,
-                "lang": lang,
-                "data": data,
-                "last_stream_ordering": None,
-                "last_success": None,
-                "failing_since": None,
-            }
-        )
+        self.pusher_factory.create_pusher({
+            "id": None,
+            "user_name": user_id,
+            "kind": kind,
+            "app_id": app_id,
+            "app_display_name": app_display_name,
+            "device_display_name": device_display_name,
+            "pushkey": pushkey,
+            "ts": time_now_msec,
+            "lang": lang,
+            "data": data,
+            "last_stream_ordering": None,
+            "last_success": None,
+            "failing_since": None
+        })
 
         # create the pusher setting last_stream_ordering to the current maximum
         # stream ordering in event_push_actions, so it will process
@@ -126,19 +113,18 @@ class PusherPool:
         defer.returnValue(pusher)
 
     @defer.inlineCallbacks
-    def remove_pushers_by_app_id_and_pushkey_not_user(
-        self, app_id, pushkey, not_user_id
-    ):
-        to_remove = yield self.store.get_pushers_by_app_id_and_pushkey(app_id, pushkey)
+    def remove_pushers_by_app_id_and_pushkey_not_user(self, app_id, pushkey,
+                                                      not_user_id):
+        to_remove = yield self.store.get_pushers_by_app_id_and_pushkey(
+            app_id, pushkey
+        )
         for p in to_remove:
-            if p["user_name"] != not_user_id:
+            if p['user_name'] != not_user_id:
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
-                    app_id,
-                    pushkey,
-                    p["user_name"],
+                    app_id, pushkey, p['user_name']
                 )
-                yield self.remove_pusher(p["app_id"], p["pushkey"], p["user_name"])
+                yield self.remove_pusher(p['app_id'], p['pushkey'], p['user_name'])
 
     @defer.inlineCallbacks
     def remove_pushers_by_access_token(self, user_id, access_tokens):
@@ -152,14 +138,14 @@ class PusherPool:
         """
         tokens = set(access_tokens)
         for p in (yield self.store.get_pushers_by_user_id(user_id)):
-            if p["access_token"] in tokens:
+            if p['access_token'] in tokens:
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
-                    p["app_id"],
-                    p["pushkey"],
-                    p["user_name"],
+                    p['app_id'], p['pushkey'], p['user_name']
                 )
-                yield self.remove_pusher(p["app_id"], p["pushkey"], p["user_name"])
+                yield self.remove_pusher(
+                    p['app_id'], p['pushkey'], p['user_name'],
+                )
 
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_id, max_stream_id):
@@ -213,11 +199,13 @@ class PusherPool:
         if not self._should_start_pushers:
             return
 
-        resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(app_id, pushkey)
+        resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(
+            app_id, pushkey
+        )
 
         pusher_dict = None
         for r in resultlist:
-            if r["user_name"] == user_id:
+            if r['user_name'] == user_id:
                 pusher_dict = r
 
         pusher = None
@@ -257,9 +245,9 @@ class PusherPool:
         except PusherConfigException as e:
             logger.warning(
                 "Pusher incorrectly configured user=%s, appid=%s, pushkey=%s: %s",
-                pusherdict.get("user_name"),
-                pusherdict.get("app_id"),
-                pusherdict.get("pushkey"),
+                pusherdict.get('user_name'),
+                pusherdict.get('app_id'),
+                pusherdict.get('pushkey'),
                 e,
             )
             return
@@ -270,8 +258,11 @@ class PusherPool:
         if not p:
             return
 
-        appid_pushkey = "%s:%s" % (pusherdict["app_id"], pusherdict["pushkey"])
-        byuser = self.pushers.setdefault(pusherdict["user_name"], {})
+        appid_pushkey = "%s:%s" % (
+            pusherdict['app_id'],
+            pusherdict['pushkey'],
+        )
+        byuser = self.pushers.setdefault(pusherdict['user_name'], {})
 
         if appid_pushkey in byuser:
             byuser[appid_pushkey].on_stop()
@@ -284,7 +275,7 @@ class PusherPool:
         last_stream_ordering = pusherdict["last_stream_ordering"]
         if last_stream_ordering:
             have_notifs = yield self.store.get_if_maybe_push_in_range_for_user(
-                user_id, last_stream_ordering
+                user_id, last_stream_ordering,
             )
         else:
             # We always want to default to starting up the pusher rather than

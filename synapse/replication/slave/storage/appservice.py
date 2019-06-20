@@ -20,7 +20,6 @@ from synapse.storage.appservice import (
 )
 
 
-class SlavedApplicationServiceStore(
-    ApplicationServiceTransactionWorkerStore, ApplicationServiceWorkerStore
-):
+class SlavedApplicationServiceStore(ApplicationServiceTransactionWorkerStore,
+                                    ApplicationServiceWorkerStore):
     pass

@@ -60,10 +60,8 @@ _background_process_db_txn_count = Counter(
 
 _background_process_db_txn_duration = Counter(
     "synapse_background_process_db_txn_duration_seconds",
-    (
-        "Seconds spent by background processes waiting for database "
-        "transactions, excluding scheduling time"
-    ),
+    ("Seconds spent by background processes waiting for database "
+     "transactions, excluding scheduling time"),
     ["name"],
     registry=None,
 )
@@ -96,7 +94,6 @@ class _Collector(object):
     Ensures that all of the metrics are up-to-date with any in-flight processes
     before they are returned.
     """
-
     def collect(self):
         background_process_in_flight_count = GaugeMetricFamily(
             "synapse_background_process_in_flight_count",
@@ -108,11 +105,14 @@ class _Collector(object):
         # We also copy the process lists as that can also change
         with _bg_metrics_lock:
             _background_processes_copy = {
-                k: list(v) for k, v in six.iteritems(_background_processes)
+                k: list(v)
+                for k, v in six.iteritems(_background_processes)
             }
 
         for desc, processes in six.iteritems(_background_processes_copy):
-            background_process_in_flight_count.add_metric((desc,), len(processes))
+            background_process_in_flight_count.add_metric(
+                (desc,), len(processes),
+            )
             for process in processes:
                 process.update_metrics()
 
@@ -121,11 +121,11 @@ class _Collector(object):
         # now we need to run collect() over each of the static Counters, and
         # yield each metric they return.
         for m in (
-            _background_process_ru_utime,
-            _background_process_ru_stime,
-            _background_process_db_txn_count,
-            _background_process_db_txn_duration,
-            _background_process_db_sched_duration,
+                _background_process_ru_utime,
+                _background_process_ru_stime,
+                _background_process_db_txn_count,
+                _background_process_db_txn_duration,
+                _background_process_db_sched_duration,
         ):
             for r in m.collect():
                 yield r
@@ -151,12 +151,14 @@ class _BackgroundProcess(object):
 
         _background_process_ru_utime.labels(self.desc).inc(diff.ru_utime)
         _background_process_ru_stime.labels(self.desc).inc(diff.ru_stime)
-        _background_process_db_txn_count.labels(self.desc).inc(diff.db_txn_count)
+        _background_process_db_txn_count.labels(self.desc).inc(
+            diff.db_txn_count,
+        )
         _background_process_db_txn_duration.labels(self.desc).inc(
-            diff.db_txn_duration_sec
+            diff.db_txn_duration_sec,
         )
         _background_process_db_sched_duration.labels(self.desc).inc(
-            diff.db_sched_duration_sec
+            diff.db_sched_duration_sec,
         )
 
 
@@ -180,7 +182,6 @@ def run_as_background_process(desc, func, *args, **kwargs):
     Returns: Deferred which returns the result of func, but note that it does not
         follow the synapse logcontext rules.
     """
-
     @defer.inlineCallbacks
     def run():
         with _bg_metrics_lock:

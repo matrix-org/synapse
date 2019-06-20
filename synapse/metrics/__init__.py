@@ -231,7 +231,10 @@ class BucketCollector(object):
         res.append(["+Inf", sum(data.values())])
 
         metric = HistogramMetricFamily(
-            self.name, "", buckets=res, sum_value=sum([x * y for x, y in data.items()])
+            self.name,
+            "",
+            buckets=res,
+            sum_value=sum([x * y for x, y in data.items()]),
         )
         yield metric
 
@@ -260,7 +263,7 @@ class CPUMetrics(object):
         ticks_per_sec = 100
         try:
             # Try and get the system config
-            ticks_per_sec = os.sysconf("SC_CLK_TCK")
+            ticks_per_sec = os.sysconf('SC_CLK_TCK')
         except (ValueError, TypeError, AttributeError):
             pass
 

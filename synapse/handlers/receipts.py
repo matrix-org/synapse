@@ -88,16 +88,19 @@ class ReceiptsHandler(BaseHandler):
 
         affected_room_ids = list(set([r.room_id for r in receipts]))
 
-        self.notifier.on_new_event("receipt_key", max_batch_id, rooms=affected_room_ids)
+        self.notifier.on_new_event(
+            "receipt_key", max_batch_id, rooms=affected_room_ids
+        )
         # Note that the min here shouldn't be relied upon to be accurate.
         yield self.hs.get_pusherpool().on_new_receipts(
-            min_batch_id, max_batch_id, affected_room_ids
+            min_batch_id, max_batch_id, affected_room_ids,
         )
 
         defer.returnValue(True)
 
     @defer.inlineCallbacks
-    def received_client_receipt(self, room_id, receipt_type, user_id, event_id):
+    def received_client_receipt(self, room_id, receipt_type, user_id,
+                                event_id):
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
         """
@@ -106,7 +109,9 @@ class ReceiptsHandler(BaseHandler):
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
-            data={"ts": int(self.clock.time_msec())},
+            data={
+                "ts": int(self.clock.time_msec()),
+            },
         )
 
         is_new = yield self._handle_new_receipts([receipt])
@@ -120,7 +125,8 @@ class ReceiptsHandler(BaseHandler):
         """Gets all receipts for a room, upto the given key.
         """
         result = yield self.store.get_linearized_receipts_for_room(
-            room_id, to_key=to_key
+            room_id,
+            to_key=to_key,
         )
 
         if not result:
@@ -142,12 +148,14 @@ class ReceiptEventSource(object):
             defer.returnValue(([], to_key))
 
         events = yield self.store.get_linearized_receipts_for_rooms(
-            room_ids, from_key=from_key, to_key=to_key
+            room_ids,
+            from_key=from_key,
+            to_key=to_key,
         )
 
         defer.returnValue((events, to_key))
 
-    def get_current_key(self, direction="f"):
+    def get_current_key(self, direction='f'):
         return self.store.get_max_receipt_stream_id()
 
     @defer.inlineCallbacks
@@ -161,7 +169,9 @@ class ReceiptEventSource(object):
 
         room_ids = yield self.store.get_rooms_for_user(user.to_string())
         events = yield self.store.get_linearized_receipts_for_rooms(
-            room_ids, from_key=from_key, to_key=to_key
+            room_ids,
+            from_key=from_key,
+            to_key=to_key,
         )
 
         defer.returnValue((events, to_key))

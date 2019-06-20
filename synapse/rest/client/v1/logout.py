@@ -46,8 +46,7 @@ class LogoutRestServlet(RestServlet):
             yield self._auth_handler.delete_access_token(access_token)
         else:
             yield self._device_handler.delete_device(
-                requester.user.to_string(), requester.device_id
-            )
+                requester.user.to_string(), requester.device_id)
 
         defer.returnValue((200, {}))
 

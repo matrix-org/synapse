@@ -31,7 +31,7 @@ def parse_server_name(server_name):
         ValueError if the server name could not be parsed.
     """
     try:
-        if server_name[-1] == "]":
+        if server_name[-1] == ']':
             # ipv6 literal, hopefully
             return server_name, None
 
@@ -43,7 +43,9 @@ def parse_server_name(server_name):
         raise ValueError("Invalid server name '%s'" % server_name)
 
 
-VALID_HOST_REGEX = re.compile("\\A[0-9a-zA-Z.-]+\\Z")
+VALID_HOST_REGEX = re.compile(
+    "\\A[0-9a-zA-Z.-]+\\Z",
+)
 
 
 def parse_and_validate_server_name(server_name):
@@ -65,15 +67,17 @@ def parse_and_validate_server_name(server_name):
     # that nobody is sneaking IP literals in that look like hostnames, etc.
 
     # look for ipv6 literals
-    if host[0] == "[":
-        if host[-1] != "]":
-            raise ValueError("Mismatched [...] in server name '%s'" % (server_name,))
+    if host[0] == '[':
+        if host[-1] != ']':
+            raise ValueError("Mismatched [...] in server name '%s'" % (
+                server_name,
+            ))
         return host, port
 
     # otherwise it should only be alphanumerics.
     if not VALID_HOST_REGEX.match(host):
-        raise ValueError(
-            "Server name '%s' contains invalid characters" % (server_name,)
-        )
+        raise ValueError("Server name '%s' contains invalid characters" % (
+            server_name,
+        ))
 
     return host, port

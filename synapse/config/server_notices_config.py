@@ -58,7 +58,6 @@ class ServerNoticesConfig(Config):
             The name to use for the server notices room.
             None if server notices are not enabled.
     """
-
     def __init__(self):
         super(ServerNoticesConfig, self).__init__()
         self.server_notices_mxid = None
@@ -71,12 +70,18 @@ class ServerNoticesConfig(Config):
         if c is None:
             return
 
-        mxid_localpart = c["system_mxid_localpart"]
-        self.server_notices_mxid = UserID(mxid_localpart, self.server_name).to_string()
-        self.server_notices_mxid_display_name = c.get("system_mxid_display_name", None)
-        self.server_notices_mxid_avatar_url = c.get("system_mxid_avatar_url", None)
+        mxid_localpart = c['system_mxid_localpart']
+        self.server_notices_mxid = UserID(
+            mxid_localpart, self.server_name,
+        ).to_string()
+        self.server_notices_mxid_display_name = c.get(
+            'system_mxid_display_name', None,
+        )
+        self.server_notices_mxid_avatar_url = c.get(
+            'system_mxid_avatar_url', None,
+        )
         # todo: i18n
-        self.server_notices_room_name = c.get("room_name", "Server Notices")
+        self.server_notices_room_name = c.get('room_name', "Server Notices")
 
     def default_config(self, **kwargs):
         return DEFAULT_CONFIG

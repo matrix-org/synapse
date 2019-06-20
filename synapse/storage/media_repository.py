@@ -22,11 +22,11 @@ class MediaRepositoryStore(BackgroundUpdateStore):
         super(MediaRepositoryStore, self).__init__(db_conn, hs)
 
         self.register_background_index_update(
-            update_name="local_media_repository_url_idx",
-            index_name="local_media_repository_url_idx",
-            table="local_media_repository",
-            columns=["created_ts"],
-            where_clause="url_cache IS NOT NULL",
+            update_name='local_media_repository_url_idx',
+            index_name='local_media_repository_url_idx',
+            table='local_media_repository',
+            columns=['created_ts'],
+            where_clause='url_cache IS NOT NULL',
         )
 
     def get_local_media(self, media_id):
@@ -108,12 +108,12 @@ class MediaRepositoryStore(BackgroundUpdateStore):
             return dict(
                 zip(
                     (
-                        "response_code",
-                        "etag",
-                        "expires_ts",
-                        "og",
-                        "media_id",
-                        "download_ts",
+                        'response_code',
+                        'etag',
+                        'expires_ts',
+                        'og',
+                        'media_id',
+                        'download_ts',
                     ),
                     row,
                 )

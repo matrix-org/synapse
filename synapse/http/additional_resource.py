@@ -28,7 +28,6 @@ class AdditionalResource(Resource):
     This class is also where we wrap the request handler with logging, metrics,
     and exception handling.
     """
-
     def __init__(self, hs, handler):
         """Initialise AdditionalResource
 

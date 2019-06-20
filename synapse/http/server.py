@@ -81,7 +81,9 @@ def wrap_json_request_handler(h):
             yield h(self, request)
         except SynapseError as e:
             code = e.code
-            logger.info("%s SynapseError: %s - %s", request, code, e.msg)
+            logger.info(
+                "%s SynapseError: %s - %s", request, code, e.msg
+            )
 
             # Only respond with an error response if we haven't already started
             # writing, otherwise lets just kill the connection
@@ -94,10 +96,7 @@ def wrap_json_request_handler(h):
                         pass
             else:
                 respond_with_json(
-                    request,
-                    code,
-                    e.error_dict(),
-                    send_cors=True,
+                    request, code, e.error_dict(), send_cors=True,
                     pretty_print=_request_user_agent_is_curl(request),
                 )
 
@@ -125,7 +124,10 @@ def wrap_json_request_handler(h):
                 respond_with_json(
                     request,
                     500,
-                    {"error": "Internal server error", "errcode": Codes.UNKNOWN},
+                    {
+                        "error": "Internal server error",
+                        "errcode": Codes.UNKNOWN,
+                    },
                     send_cors=True,
                     pretty_print=_request_user_agent_is_curl(request),
                 )
@@ -141,7 +143,6 @@ def wrap_html_request_handler(h):
     The handler method must have a signature of "handle_foo(self, request)",
     where "request" must be a SynapseRequest.
     """
-
     def wrapped_request_handler(self, request):
         d = defer.maybeDeferred(h, self, request)
         d.addErrback(_return_html_error, request)
@@ -163,7 +164,9 @@ def _return_html_error(f, request):
         msg = cme.msg
 
         if isinstance(cme, SynapseError):
-            logger.info("%s SynapseError: %s - %s", request, code, msg)
+            logger.info(
+                "%s SynapseError: %s - %s", request, code, msg
+            )
         else:
             logger.error(
                 "Failed handle request %r",
@@ -180,7 +183,9 @@ def _return_html_error(f, request):
             exc_info=(f.type, f.value, f.getTracebackObject()),
         )
 
-    body = HTML_ERROR_TEMPLATE.format(code=code, msg=cgi.escape(msg)).encode("utf-8")
+    body = HTML_ERROR_TEMPLATE.format(
+        code=code, msg=cgi.escape(msg),
+    ).encode("utf-8")
     request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
     request.setHeader(b"Content-Length", b"%i" % (len(body),))
@@ -200,7 +205,6 @@ def wrap_async_request_handler(h):
     The handler may return a deferred, in which case the completion of the request isn't
     logged until the deferred completes.
     """
-
     @defer.inlineCallbacks
     def wrapped_async_request_handler(self, request):
         with request.processing():
@@ -302,14 +306,12 @@ class JsonResource(HttpServer, resource.Resource):
                 # URL again (as it was decoded by _get_handler_for request), as
                 # ASCII because it's a URL, and then decode it to get the UTF-8
                 # characters that were quoted.
-                return urllib.parse.unquote(s.encode("ascii")).decode("utf8")
+                return urllib.parse.unquote(s.encode('ascii')).decode('utf8')
 
-        kwargs = intern_dict(
-            {
-                name: _unquote(value) if value else value
-                for name, value in group_dict.items()
-            }
-        )
+        kwargs = intern_dict({
+            name: _unquote(value) if value else value
+            for name, value in group_dict.items()
+        })
 
         callback_return = yield callback(request, **kwargs)
         if callback_return is not None:
@@ -337,7 +339,7 @@ class JsonResource(HttpServer, resource.Resource):
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request.path.decode("ascii"))
+            m = path_entry.pattern.match(request.path.decode('ascii'))
             if m:
                 # We found a match!
                 return path_entry.callback, m.groupdict()
@@ -345,14 +347,11 @@ class JsonResource(HttpServer, resource.Resource):
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
         return _unrecognised_request_handler, {}
 
-    def _send_response(
-        self, request, code, response_json_object, response_code_message=None
-    ):
+    def _send_response(self, request, code, response_json_object,
+                       response_code_message=None):
         # TODO: Only enable CORS for the requests that need it.
         respond_with_json(
-            request,
-            code,
-            response_json_object,
+            request, code, response_json_object,
             send_cors=True,
             response_code_message=response_code_message,
             pretty_print=_request_user_agent_is_curl(request),
@@ -396,7 +395,7 @@ class RootRedirect(resource.Resource):
         self.url = path
 
     def render_GET(self, request):
-        return redirectTo(self.url.encode("ascii"), request)
+        return redirectTo(self.url.encode('ascii'), request)
 
     def getChild(self, name, request):
         if len(name) == 0:
@@ -404,22 +403,16 @@ class RootRedirect(resource.Resource):
         return resource.Resource.getChild(self, name, request)
 
 
-def respond_with_json(
-    request,
-    code,
-    json_object,
-    send_cors=False,
-    response_code_message=None,
-    pretty_print=False,
-    canonical_json=True,
-):
+def respond_with_json(request, code, json_object, send_cors=False,
+                      response_code_message=None, pretty_print=False,
+                      canonical_json=True):
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
     if request._disconnected:
         logger.warn(
-            "Not sending response to request %s, already disconnected.", request
-        )
+            "Not sending response to request %s, already disconnected.",
+            request)
         return
 
     if pretty_print:
@@ -432,17 +425,14 @@ def respond_with_json(
             json_bytes = json.dumps(json_object).encode("utf-8")
 
     return respond_with_json_bytes(
-        request,
-        code,
-        json_bytes,
+        request, code, json_bytes,
         send_cors=send_cors,
         response_code_message=response_code_message,
     )
 
 
-def respond_with_json_bytes(
-    request, code, json_bytes, send_cors=False, response_code_message=None
-):
+def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
+                            response_code_message=None):
     """Sends encoded JSON in response to the given request.
 
     Args:
@@ -484,7 +474,7 @@ def set_cors_headers(request):
     )
     request.setHeader(
         b"Access-Control-Allow-Headers",
-        b"Origin, X-Requested-With, Content-Type, Accept, Authorization",
+        b"Origin, X-Requested-With, Content-Type, Accept, Authorization"
     )
 
 
@@ -508,7 +498,9 @@ def finish_request(request):
 
 
 def _request_user_agent_is_curl(request):
-    user_agents = request.requestHeaders.getRawHeaders(b"User-Agent", default=[])
+    user_agents = request.requestHeaders.getRawHeaders(
+        b"User-Agent", default=[]
+    )
     for user_agent in user_agents:
         if b"curl" in user_agent:
             return True

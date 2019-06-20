@@ -43,7 +43,7 @@ class ReadMarkerHandler(BaseHandler):
 
         with (yield self.read_marker_linearizer.queue((room_id, user_id))):
             existing_read_marker = yield self.store.get_account_data_for_room_and_type(
-                user_id, room_id, "m.fully_read"
+                user_id, room_id, "m.fully_read",
             )
 
             should_update = True
@@ -51,11 +51,14 @@ class ReadMarkerHandler(BaseHandler):
             if existing_read_marker:
                 # Only update if the new marker is ahead in the stream
                 should_update = yield self.store.is_event_after(
-                    event_id, existing_read_marker["event_id"]
+                    event_id,
+                    existing_read_marker['event_id']
                 )
 
             if should_update:
-                content = {"event_id": event_id}
+                content = {
+                    "event_id": event_id
+                }
                 max_id = yield self.store.add_account_data_to_room(
                     user_id, room_id, "m.fully_read", content
                 )

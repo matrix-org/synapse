@@ -94,15 +94,14 @@ class BaseHandler(object):
             burst_count = self.hs.config.rc_message.burst_count
 
         allowed, time_allowed = self.ratelimiter.can_do_action(
-            user_id,
-            time_now,
+            user_id, time_now,
             rate_hz=messages_per_second,
             burst_count=burst_count,
             update=update,
         )
         if not allowed:
             raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now))
+                retry_after_ms=int(1000 * (time_allowed - time_now)),
             )
 
     @defer.inlineCallbacks
@@ -140,7 +139,7 @@ class BaseHandler(object):
 
                 if member_event.content["membership"] not in {
                     Membership.JOIN,
-                    Membership.INVITE,
+                    Membership.INVITE
                 }:
                     continue
 
@@ -157,7 +156,8 @@ class BaseHandler(object):
                 # and having homeservers have their own users leave keeps more
                 # of that decision-making and control local to the guest-having
                 # homeserver.
-                requester = synapse.types.create_requester(target_user, is_guest=True)
+                requester = synapse.types.create_requester(
+                    target_user, is_guest=True)
                 handler = self.hs.get_room_member_handler()
                 yield handler.update_membership(
                     requester,

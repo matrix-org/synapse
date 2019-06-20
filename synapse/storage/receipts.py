@@ -58,7 +58,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cachedInlineCallbacks()
     def get_users_with_read_receipts_in_room(self, room_id):
         receipts = yield self.get_receipts_for_room(room_id, "m.read")
-        defer.returnValue(set(r["user_id"] for r in receipts))
+        defer.returnValue(set(r['user_id'] for r in receipts))
 
     @cached(num_args=2)
     def get_receipts_for_room(self, room_id, receipt_type):

@@ -47,15 +47,15 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request("GET", self.url, access_token=access_token)
         self.render(request)
-        capabilities = channel.json_body["capabilities"]
+        capabilities = channel.json_body['capabilities']
 
         self.assertEqual(channel.code, 200)
-        for room_version in capabilities["m.room_versions"]["available"].keys():
+        for room_version in capabilities['m.room_versions']['available'].keys():
             self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, "" + room_version)
 
         self.assertEqual(
             self.config.default_room_version.identifier,
-            capabilities["m.room_versions"]["default"],
+            capabilities['m.room_versions']['default'],
         )
 
     def test_get_change_password_capabilities(self):
@@ -66,16 +66,16 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request("GET", self.url, access_token=access_token)
         self.render(request)
-        capabilities = channel.json_body["capabilities"]
+        capabilities = channel.json_body['capabilities']
 
         self.assertEqual(channel.code, 200)
 
         # Test case where password is handled outside of Synapse
-        self.assertTrue(capabilities["m.change_password"]["enabled"])
+        self.assertTrue(capabilities['m.change_password']['enabled'])
         self.get_success(self.store.user_set_password_hash(user, None))
         request, channel = self.make_request("GET", self.url, access_token=access_token)
         self.render(request)
-        capabilities = channel.json_body["capabilities"]
+        capabilities = channel.json_body['capabilities']
 
         self.assertEqual(channel.code, 200)
-        self.assertFalse(capabilities["m.change_password"]["enabled"])
+        self.assertFalse(capabilities['m.change_password']['enabled'])

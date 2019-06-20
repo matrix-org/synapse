@@ -52,7 +52,6 @@ data part are:
 @attr.s(slots=True, frozen=True)
 class EventsStreamRow(object):
     """A parsed row from the events replication stream"""
-
     type = attr.ib()  # str: the TypeId of one of the *EventsStreamRows
     data = attr.ib()  # BaseEventsStreamRow
 
@@ -81,11 +80,11 @@ class BaseEventsStreamRow(object):
 class EventsStreamEventRow(BaseEventsStreamRow):
     TypeId = "ev"
 
-    event_id = attr.ib()  # str
-    room_id = attr.ib()  # str
-    type = attr.ib()  # str
-    state_key = attr.ib()  # str, optional
-    redacts = attr.ib()  # str, optional
+    event_id = attr.ib()    # str
+    room_id = attr.ib()     # str
+    type = attr.ib()        # str
+    state_key = attr.ib()   # str, optional
+    redacts = attr.ib()     # str, optional
     relates_to = attr.ib()  # str, optional
 
 
@@ -93,21 +92,24 @@ class EventsStreamEventRow(BaseEventsStreamRow):
 class EventsStreamCurrentStateRow(BaseEventsStreamRow):
     TypeId = "state"
 
-    room_id = attr.ib()  # str
-    type = attr.ib()  # str
+    room_id = attr.ib()    # str
+    type = attr.ib()       # str
     state_key = attr.ib()  # str
-    event_id = attr.ib()  # str, optional
+    event_id = attr.ib()   # str, optional
 
 
 TypeToRow = {
-    Row.TypeId: Row for Row in (EventsStreamEventRow, EventsStreamCurrentStateRow)
+    Row.TypeId: Row
+    for Row in (
+        EventsStreamEventRow,
+        EventsStreamCurrentStateRow,
+    )
 }
 
 
 class EventsStream(Stream):
     """We received a new event, or an event went from being an outlier to not
     """
-
     NAME = "events"
 
     def __init__(self, hs):
@@ -119,17 +121,19 @@ class EventsStream(Stream):
     @defer.inlineCallbacks
     def update_function(self, from_token, current_token, limit=None):
         event_rows = yield self._store.get_all_new_forward_event_rows(
-            from_token, current_token, limit
+            from_token, current_token, limit,
         )
         event_updates = (
-            (row[0], EventsStreamEventRow.TypeId, row[1:]) for row in event_rows
+            (row[0], EventsStreamEventRow.TypeId, row[1:])
+            for row in event_rows
         )
 
         state_rows = yield self._store.get_all_updated_current_state_deltas(
             from_token, current_token, limit
         )
         state_updates = (
-            (row[0], EventsStreamCurrentStateRow.TypeId, row[1:]) for row in state_rows
+            (row[0], EventsStreamCurrentStateRow.TypeId, row[1:])
+            for row in state_rows
         )
 
         all_updates = heapq.merge(event_updates, state_updates)

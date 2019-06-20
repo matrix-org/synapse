@@ -20,11 +20,27 @@ from synapse.util.module_loader import load_module
 from ._base import Config, ConfigError
 
 DEFAULT_THUMBNAIL_SIZES = [
-    {"width": 32, "height": 32, "method": "crop"},
-    {"width": 96, "height": 96, "method": "crop"},
-    {"width": 320, "height": 240, "method": "scale"},
-    {"width": 640, "height": 480, "method": "scale"},
-    {"width": 800, "height": 600, "method": "scale"},
+    {
+        "width": 32,
+        "height": 32,
+        "method": "crop",
+    }, {
+        "width": 96,
+        "height": 96,
+        "method": "crop",
+    }, {
+        "width": 320,
+        "height": 240,
+        "method": "scale",
+    }, {
+        "width": 640,
+        "height": 480,
+        "method": "scale",
+    }, {
+        "width": 800,
+        "height": 600,
+        "method": "scale"
+    },
 ]
 
 THUMBNAIL_SIZE_YAML = """\
@@ -33,15 +49,19 @@ THUMBNAIL_SIZE_YAML = """\
         #    method: %(method)s
 """
 
-MISSING_NETADDR = "Missing netaddr library. This is required for URL preview API."
+MISSING_NETADDR = (
+    "Missing netaddr library. This is required for URL preview API."
+)
 
-MISSING_LXML = """Missing lxml library. This is required for URL preview API.
+MISSING_LXML = (
+    """Missing lxml library. This is required for URL preview API.
 
     Install by running:
         pip install lxml
 
     Requires libxslt1-dev system package.
     """
+)
 
 
 ThumbnailRequirement = namedtuple(
@@ -49,8 +69,7 @@ ThumbnailRequirement = namedtuple(
 )
 
 MediaStorageProviderConfig = namedtuple(
-    "MediaStorageProviderConfig",
-    (
+    "MediaStorageProviderConfig", (
         "store_local",  # Whether to store newly uploaded local files
         "store_remote",  # Whether to store newly downloaded remote files
         "store_synchronous",  # Whether to wait for successful storage for local uploads
@@ -81,7 +100,8 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         requirements.setdefault("image/gif", []).append(png_thumbnail)
         requirements.setdefault("image/png", []).append(png_thumbnail)
     return {
-        media_type: tuple(thumbnails) for media_type, thumbnails in requirements.items()
+        media_type: tuple(thumbnails)
+        for media_type, thumbnails in requirements.items()
     }
 
 
@@ -107,15 +127,15 @@ class ContentRepositoryConfig(Config):
                     "Cannot use both 'backup_media_store_path' and 'storage_providers'"
                 )
 
-            storage_providers = [
-                {
-                    "module": "file_system",
-                    "store_local": True,
-                    "store_synchronous": synchronous_backup_media_store,
-                    "store_remote": True,
-                    "config": {"directory": backup_media_store_path},
+            storage_providers = [{
+                "module": "file_system",
+                "store_local": True,
+                "store_synchronous": synchronous_backup_media_store,
+                "store_remote": True,
+                "config": {
+                    "directory": backup_media_store_path,
                 }
-            ]
+            }]
 
         # This is a list of config that can be used to create the storage
         # providers. The entries are tuples of (Class, class_config,
@@ -145,19 +165,18 @@ class ContentRepositoryConfig(Config):
             )
 
             self.media_storage_providers.append(
-                (provider_class, parsed_config, wrapper_config)
+                (provider_class, parsed_config, wrapper_config,)
             )
 
         self.uploads_path = self.ensure_directory(config["uploads_path"])
         self.dynamic_thumbnails = config.get("dynamic_thumbnails", False)
         self.thumbnail_requirements = parse_thumbnail_requirements(
-            config.get("thumbnail_sizes", DEFAULT_THUMBNAIL_SIZES)
+            config.get("thumbnail_sizes", DEFAULT_THUMBNAIL_SIZES),
         )
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
             try:
                 import lxml
-
                 lxml  # To stop unused lint.
             except ImportError:
                 raise ConfigError(MISSING_LXML)
@@ -180,13 +199,15 @@ class ContentRepositoryConfig(Config):
 
             # we always blacklist '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.
-            self.url_preview_ip_range_blacklist.update(["0.0.0.0", "::"])
+            self.url_preview_ip_range_blacklist.update(['0.0.0.0', '::'])
 
             self.url_preview_ip_range_whitelist = IPSet(
                 config.get("url_preview_ip_range_whitelist", ())
             )
 
-            self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
+            self.url_preview_url_blacklist = config.get(
+                "url_preview_url_blacklist", ()
+            )
 
     def default_config(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
@@ -198,8 +219,7 @@ class ContentRepositoryConfig(Config):
         # strip final NL
         formatted_thumbnail_sizes = formatted_thumbnail_sizes[:-1]
 
-        return (
-            r"""
+        return r"""
         # Directory where uploaded images and attachments are stored.
         #
         media_store_path: "%(media_store)s"
@@ -322,6 +342,4 @@ class ContentRepositoryConfig(Config):
         # The largest allowed URL preview spidering size in bytes
         #
         #max_spider_size: 10M
-        """
-            % locals()
-        )
+        """ % locals()

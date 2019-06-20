@@ -395,37 +395,37 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         yield self.handler.upload_room_keys(self.local_user, version, room_keys)
 
         new_room_keys = copy.deepcopy(room_keys)
-        new_room_key = new_room_keys["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]
+        new_room_key = new_room_keys['rooms']['!abc:matrix.org']['sessions']['c0ff33']
 
         # test that increasing the message_index doesn't replace the existing session
-        new_room_key["first_message_index"] = 2
-        new_room_key["session_data"] = "new"
+        new_room_key['first_message_index'] = 2
+        new_room_key['session_data'] = 'new'
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
 
         res = yield self.handler.get_room_keys(self.local_user, version)
         self.assertEqual(
-            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
+            res['rooms']['!abc:matrix.org']['sessions']['c0ff33']['session_data'],
             "SSBBTSBBIEZJU0gK",
         )
 
         # test that marking the session as verified however /does/ replace it
-        new_room_key["is_verified"] = True
+        new_room_key['is_verified'] = True
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
 
         res = yield self.handler.get_room_keys(self.local_user, version)
         self.assertEqual(
-            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
+            res['rooms']['!abc:matrix.org']['sessions']['c0ff33']['session_data'], "new"
         )
 
         # test that a session with a higher forwarded_count doesn't replace one
         # with a lower forwarding count
-        new_room_key["forwarded_count"] = 2
-        new_room_key["session_data"] = "other"
+        new_room_key['forwarded_count'] = 2
+        new_room_key['session_data'] = 'other'
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
 
         res = yield self.handler.get_room_keys(self.local_user, version)
         self.assertEqual(
-            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
+            res['rooms']['!abc:matrix.org']['sessions']['c0ff33']['session_data'], "new"
         )
 
         # TODO: check edge cases as well as the common variations here

@@ -37,16 +37,8 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
 
     @staticmethod
     def _serialize_payload(
-        user_id,
-        token,
-        password_hash,
-        was_guest,
-        make_guest,
-        appservice_id,
-        create_profile_with_displayname,
-        admin,
-        user_type,
-        address,
+        user_id, token, password_hash, was_guest, make_guest, appservice_id,
+        create_profile_with_displayname, admin, user_type, address,
     ):
         """
         Args:
@@ -93,7 +85,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             create_profile_with_displayname=content["create_profile_with_displayname"],
             admin=content["admin"],
             user_type=content["user_type"],
-            address=content["address"],
+            address=content["address"]
         )
 
         defer.returnValue((200, {}))
@@ -112,7 +104,8 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    def _serialize_payload(user_id, auth_result, access_token, bind_email, bind_msisdn):
+    def _serialize_payload(user_id, auth_result, access_token, bind_email,
+                           bind_msisdn):
         """
         Args:
             user_id (str): The user ID that consented

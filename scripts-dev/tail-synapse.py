@@ -63,5 +63,5 @@ def main():
             streams[update.name] = update.position
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

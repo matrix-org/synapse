@@ -25,7 +25,9 @@ class SlavedClientIpStore(BaseSlavedStore):
         super(SlavedClientIpStore, self).__init__(db_conn, hs)
 
         self.client_ip_last_seen = Cache(
-            name="client_ip_last_seen", keylen=4, max_entries=50000 * CACHE_SIZE_FACTOR
+            name="client_ip_last_seen",
+            keylen=4,
+            max_entries=50000 * CACHE_SIZE_FACTOR,
         )
 
     def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id):

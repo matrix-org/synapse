@@ -80,10 +80,10 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         yield self.store.store_device("user2", "device1", None)
         yield self.store.store_device("user2", "device2", None)
 
-        yield self.store.set_e2e_device_keys("user1", "device1", now, "json11")
-        yield self.store.set_e2e_device_keys("user1", "device2", now, "json12")
-        yield self.store.set_e2e_device_keys("user2", "device1", now, "json21")
-        yield self.store.set_e2e_device_keys("user2", "device2", now, "json22")
+        yield self.store.set_e2e_device_keys("user1", "device1", now, 'json11')
+        yield self.store.set_e2e_device_keys("user1", "device2", now, 'json12')
+        yield self.store.set_e2e_device_keys("user2", "device1", now, 'json21')
+        yield self.store.set_e2e_device_keys("user2", "device2", now, 'json22')
 
         res = yield self.store.get_e2e_device_keys(
             (("user1", "device1"), ("user2", "device2"))

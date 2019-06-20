@@ -38,22 +38,16 @@ def run_create(cur, database_engine, *args, **kwargs):
     rowid = "ctid" if isinstance(database_engine, PostgresEngine) else "rowid"
 
     # remove duplicates from group_users & group_invites tables
-    cur.execute(
-        """
+    cur.execute("""
         DELETE FROM group_users WHERE %s NOT IN (
            SELECT min(%s) FROM group_users GROUP BY group_id, user_id
         );
-    """
-        % (rowid, rowid)
-    )
-    cur.execute(
-        """
+    """ % (rowid, rowid))
+    cur.execute("""
         DELETE FROM group_invites WHERE %s NOT IN (
            SELECT min(%s) FROM group_invites GROUP BY group_id, user_id
         );
-    """
-        % (rowid, rowid)
-    )
+    """ % (rowid, rowid))
 
     for statement in get_statements(FIX_INDEXES.splitlines()):
         cur.execute(statement)

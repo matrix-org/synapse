@@ -128,4 +128,4 @@ class TokenGenerator:
 
     def generate(self, user_id):
         self._last_issued_token += 1
-        return "%s-%d" % (user_id, self._last_issued_token)
+        return u"%s-%d" % (user_id, self._last_issued_token)

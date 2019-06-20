@@ -51,16 +51,16 @@ class FederationSenderTestCases(HomeserverTestCase):
         json_cb = mock_send_transaction.call_args[0][1]
         data = json_cb()
         self.assertEqual(
-            data["edus"],
+            data['edus'],
             [
                 {
-                    "edu_type": "m.receipt",
-                    "content": {
-                        "room_id": {
-                            "m.read": {
-                                "user_id": {
-                                    "event_ids": ["event_id"],
-                                    "data": {"ts": 1234},
+                    'edu_type': 'm.receipt',
+                    'content': {
+                        'room_id': {
+                            'm.read': {
+                                'user_id': {
+                                    'event_ids': ['event_id'],
+                                    'data': {'ts': 1234},
                                 }
                             }
                         }
@@ -93,16 +93,16 @@ class FederationSenderTestCases(HomeserverTestCase):
         json_cb = mock_send_transaction.call_args[0][1]
         data = json_cb()
         self.assertEqual(
-            data["edus"],
+            data['edus'],
             [
                 {
-                    "edu_type": "m.receipt",
-                    "content": {
-                        "room_id": {
-                            "m.read": {
-                                "user_id": {
-                                    "event_ids": ["event_id"],
-                                    "data": {"ts": 1234},
+                    'edu_type': 'm.receipt',
+                    'content': {
+                        'room_id': {
+                            'm.read': {
+                                'user_id': {
+                                    'event_ids': ['event_id'],
+                                    'data': {'ts': 1234},
                                 }
                             }
                         }
@@ -128,16 +128,16 @@ class FederationSenderTestCases(HomeserverTestCase):
         json_cb = mock_send_transaction.call_args[0][1]
         data = json_cb()
         self.assertEqual(
-            data["edus"],
+            data['edus'],
             [
                 {
-                    "edu_type": "m.receipt",
-                    "content": {
-                        "room_id": {
-                            "m.read": {
-                                "user_id": {
-                                    "event_ids": ["other_id"],
-                                    "data": {"ts": 1234},
+                    'edu_type': 'm.receipt',
+                    'content': {
+                        'room_id': {
+                            'm.read': {
+                                'user_id': {
+                                    'event_ids': ['other_id'],
+                                    'data': {'ts': 1234},
                                 }
                             }
                         }

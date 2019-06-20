@@ -66,7 +66,6 @@ class ClientRestResource(JsonResource):
        * /_matrix/client/unstable
        * etc
     """
-
     def __init__(self, hs):
         JsonResource.__init__(self, hs, canonical_json=False)
         self.register_servlets(self, hs)

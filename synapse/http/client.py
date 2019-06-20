@@ -103,8 +103,8 @@ class IPBlacklistingResolver(object):
                     ip_address, self._ip_whitelist, self._ip_blacklist
                 ):
                     logger.info(
-                        "Dropped %s from DNS resolution to %s due to blacklist"
-                        % (ip_address, hostname)
+                        "Dropped %s from DNS resolution to %s due to blacklist" %
+                        (ip_address, hostname)
                     )
                     has_bad_ip = True
 
@@ -156,7 +156,7 @@ class BlacklistingAgentWrapper(Agent):
         self._ip_blacklist = ip_blacklist
 
     def request(self, method, uri, headers=None, bodyProducer=None):
-        h = urllib.parse.urlparse(uri.decode("ascii"))
+        h = urllib.parse.urlparse(uri.decode('ascii'))
 
         try:
             ip_address = IPAddress(h.hostname)
@@ -164,7 +164,10 @@ class BlacklistingAgentWrapper(Agent):
             if check_against_blacklist(
                 ip_address, self._ip_whitelist, self._ip_blacklist
             ):
-                logger.info("Blocking access to %s due to blacklist" % (ip_address,))
+                logger.info(
+                    "Blocking access to %s due to blacklist" %
+                    (ip_address,)
+                )
                 e = SynapseError(403, "IP address blocked by IP blacklist entry")
                 return defer.fail(Failure(e))
         except Exception:
@@ -203,7 +206,7 @@ class SimpleHttpClient(object):
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
 
-        self.user_agent = self.user_agent.encode("ascii")
+        self.user_agent = self.user_agent.encode('ascii')
 
         if self._ip_blacklist:
             real_reactor = hs.get_reactor()
@@ -280,7 +283,7 @@ class SimpleHttpClient(object):
                 agent=self.agent,
                 data=body_producer,
                 headers=headers,
-                **self._extra_treq_args,
+                **self._extra_treq_args
             )
             request_deferred = timeout_deferred(
                 request_deferred,
@@ -517,8 +520,8 @@ class SimpleHttpClient(object):
         resp_headers = dict(response.headers.getAllRawHeaders())
 
         if (
-            b"Content-Length" in resp_headers
-            and int(resp_headers[b"Content-Length"][0]) > max_size
+            b'Content-Length' in resp_headers
+            and int(resp_headers[b'Content-Length'][0]) > max_size
         ):
             logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
             raise SynapseError(
@@ -543,13 +546,18 @@ class SimpleHttpClient(object):
             # This can happen e.g. because the body is too large.
             raise
         except Exception as e:
-            raise_from(SynapseError(502, ("Failed to download remote body: %s" % e)), e)
+            raise_from(
+                SynapseError(
+                    502, ("Failed to download remote body: %s" % e),
+                ),
+                e
+            )
 
         defer.returnValue(
             (
                 length,
                 resp_headers,
-                response.request.absoluteURI.decode("ascii"),
+                response.request.absoluteURI.decode('ascii'),
                 response.code,
             )
         )
@@ -639,7 +647,7 @@ def encode_urlencode_args(args):
 
 def encode_urlencode_arg(arg):
     if isinstance(arg, text_type):
-        return arg.encode("utf-8")
+        return arg.encode('utf-8')
     elif isinstance(arg, list):
         return [encode_urlencode_arg(i) for i in arg]
     else:

@@ -36,7 +36,10 @@ def make_graph(db_name, room_id, file_prefix, limit):
     args = [room_id]
 
     if limit:
-        sql += " ORDER BY topological_ordering DESC, stream_ordering DESC " "LIMIT ?"
+        sql += (
+            " ORDER BY topological_ordering DESC, stream_ordering DESC "
+            "LIMIT ?"
+        )
 
         args.append(limit)
 
@@ -53,8 +56,9 @@ def make_graph(db_name, room_id, file_prefix, limit):
 
     for event in events:
         c = conn.execute(
-            "SELECT state_group FROM event_to_state_groups " "WHERE event_id = ?",
-            (event.event_id,),
+            "SELECT state_group FROM event_to_state_groups "
+            "WHERE event_id = ?",
+            (event.event_id,)
         )
 
         res = c.fetchone()
@@ -65,7 +69,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
 
         t = datetime.datetime.fromtimestamp(
             float(event.origin_server_ts) / 1000
-        ).strftime("%Y-%m-%d %H:%M:%S,%f")
+        ).strftime('%Y-%m-%d %H:%M:%S,%f')
 
         content = json.dumps(unfreeze(event.get_dict()["content"]))
 
@@ -89,7 +93,10 @@ def make_graph(db_name, room_id, file_prefix, limit):
             "state_group": state_group,
         }
 
-        node = pydot.Node(name=event.event_id, label=label)
+        node = pydot.Node(
+            name=event.event_id,
+            label=label,
+        )
 
         node_map[event.event_id] = node
         graph.add_node(node)
@@ -99,7 +106,10 @@ def make_graph(db_name, room_id, file_prefix, limit):
             try:
                 end_node = node_map[prev_id]
             except:
-                end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
+                end_node = pydot.Node(
+                    name=prev_id,
+                    label="<<b>%s</b>>" % (prev_id,),
+                )
 
                 node_map[prev_id] = end_node
                 graph.add_node(end_node)
@@ -111,33 +121,36 @@ def make_graph(db_name, room_id, file_prefix, limit):
         if len(event_ids) <= 1:
             continue
 
-        cluster = pydot.Cluster(str(group), label="<State Group: %s>" % (str(group),))
+        cluster = pydot.Cluster(
+            str(group),
+            label="<State Group: %s>" % (str(group),)
+        )
 
         for event_id in event_ids:
             cluster.add_node(node_map[event_id])
 
         graph.add_subgraph(cluster)
 
-    graph.write("%s.dot" % file_prefix, format="raw", prog="dot")
-    graph.write_svg("%s.svg" % file_prefix, prog="dot")
-
+    graph.write('%s.dot' % file_prefix, format='raw', prog='dot')
+    graph.write_svg("%s.svg" % file_prefix, prog='dot')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate a PDU graph for a given room by talking "
-        "to the given homeserver to get the list of PDUs. \n"
-        "Requires pydot."
+                    "to the given homeserver to get the list of PDUs. \n"
+                    "Requires pydot."
     )
     parser.add_argument(
-        "-p",
-        "--prefix",
-        dest="prefix",
+        "-p", "--prefix", dest="prefix",
         help="String to prefix output files with",
-        default="graph_output",
+        default="graph_output"
     )
-    parser.add_argument("-l", "--limit", help="Only retrieve the last N events.")
-    parser.add_argument("db")
-    parser.add_argument("room")
+    parser.add_argument(
+        "-l", "--limit",
+        help="Only retrieve the last N events.",
+    )
+    parser.add_argument('db')
+    parser.add_argument('room')
 
     args = parser.parse_args()
 

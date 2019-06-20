@@ -32,7 +32,7 @@ class TLSConfigTests(TestCase):
         """
         config_dir = self.mktemp()
         os.mkdir(config_dir)
-        with open(os.path.join(config_dir, "cert.pem"), "w") as f:
+        with open(os.path.join(config_dir, "cert.pem"), 'w') as f:
             f.write(
                 """-----BEGIN CERTIFICATE-----
 MIID6DCCAtACAws9CjANBgkqhkiG9w0BAQUFADCBtzELMAkGA1UEBhMCVFIxDzAN

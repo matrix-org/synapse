@@ -110,7 +110,8 @@ class EventsWorkerStore(SQLBaseStore):
             return ts
 
         return self.runInteraction(
-            "get_approximate_received_ts", _get_approximate_received_ts_txn
+            "get_approximate_received_ts",
+            _get_approximate_received_ts_txn,
         )
 
     @defer.inlineCallbacks
@@ -675,8 +676,7 @@ class EventsWorkerStore(SQLBaseStore):
         """
         return self.runInteraction(
             "get_total_state_event_counts",
-            self._get_total_state_event_counts_txn,
-            room_id,
+            self._get_total_state_event_counts_txn, room_id
         )
 
     def _get_current_state_event_counts_txn(self, txn, room_id):
@@ -700,8 +700,7 @@ class EventsWorkerStore(SQLBaseStore):
         """
         return self.runInteraction(
             "get_current_state_event_counts",
-            self._get_current_state_event_counts_txn,
-            room_id,
+            self._get_current_state_event_counts_txn, room_id
         )
 
     @defer.inlineCallbacks

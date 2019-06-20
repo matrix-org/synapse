@@ -152,14 +152,14 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
 
-            if version_info["version"] != version:
+            if version_info['version'] != version:
                 # Check that the version we're trying to upload actually exists
                 try:
                     version_info = yield self.store.get_e2e_room_keys_version_info(
-                        user_id, version
+                        user_id, version,
                     )
                     # if we get this far, the version must exist
-                    raise RoomKeysVersionError(current_version=version_info["version"])
+                    raise RoomKeysVersionError(current_version=version_info['version'])
                 except StoreError as e:
                     if e.code == 404:
                         raise NotFoundError("Version '%s' not found" % (version,))
@@ -168,8 +168,8 @@ class E2eRoomKeysHandler(object):
 
             # go through the room_keys.
             # XXX: this should/could be done concurrently, given we're in a lock.
-            for room_id, room in iteritems(room_keys["rooms"]):
-                for session_id, session in iteritems(room["sessions"]):
+            for room_id, room in iteritems(room_keys['rooms']):
+                for session_id, session in iteritems(room['sessions']):
                     yield self._upload_room_key(
                         user_id, version, room_id, session_id, session
                     )
@@ -223,14 +223,14 @@ class E2eRoomKeysHandler(object):
             # spelt out with if/elifs rather than nested boolean expressions
             # purely for legibility.
 
-            if room_key["is_verified"] and not current_room_key["is_verified"]:
+            if room_key['is_verified'] and not current_room_key['is_verified']:
                 return True
             elif (
-                room_key["first_message_index"]
-                < current_room_key["first_message_index"]
+                room_key['first_message_index'] <
+                current_room_key['first_message_index']
             ):
                 return True
-            elif room_key["forwarded_count"] < current_room_key["forwarded_count"]:
+            elif room_key['forwarded_count'] < current_room_key['forwarded_count']:
                 return True
             else:
                 return False
@@ -328,10 +328,16 @@ class E2eRoomKeysHandler(object):
             A deferred of an empty dict.
         """
         if "version" not in version_info:
-            raise SynapseError(400, "Missing version in body", Codes.MISSING_PARAM)
+            raise SynapseError(
+                400,
+                "Missing version in body",
+                Codes.MISSING_PARAM
+            )
         if version_info["version"] != version:
             raise SynapseError(
-                400, "Version in body does not match", Codes.INVALID_PARAM
+                400,
+                "Version in body does not match",
+                Codes.INVALID_PARAM
             )
         with (yield self._upload_linearizer.queue(user_id)):
             try:
@@ -344,10 +350,12 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
             if old_info["algorithm"] != version_info["algorithm"]:
-                raise SynapseError(400, "Algorithm does not match", Codes.INVALID_PARAM)
+                raise SynapseError(
+                    400,
+                    "Algorithm does not match",
+                    Codes.INVALID_PARAM
+                )
 
-            yield self.store.update_e2e_room_keys_version(
-                user_id, version, version_info
-            )
+            yield self.store.update_e2e_room_keys_version(user_id, version, version_info)
 
             defer.returnValue({})

@@ -72,15 +72,13 @@ class MediaRepositoryServer(HomeServer):
                     resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "media":
                     media_repo = self.get_media_repository_resource()
-                    resources.update(
-                        {
-                            MEDIA_PREFIX: media_repo,
-                            LEGACY_MEDIA_PREFIX: media_repo,
-                            CONTENT_REPO_PREFIX: ContentRepoResource(
-                                self, self.config.uploads_path
-                            ),
-                        }
-                    )
+                    resources.update({
+                        MEDIA_PREFIX: media_repo,
+                        LEGACY_MEDIA_PREFIX: media_repo,
+                        CONTENT_REPO_PREFIX: ContentRepoResource(
+                            self, self.config.uploads_path
+                        ),
+                    })
 
         root_resource = create_resource_tree(resources, NoResource())
 
@@ -93,7 +91,7 @@ class MediaRepositoryServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            ),
+            )
         )
 
         logger.info("Synapse media repository now listening on port %d", port)
@@ -107,19 +105,18 @@ class MediaRepositoryServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
+                        username="matrix",
+                        password="rabbithole",
+                        globals={"hs": self},
+                    )
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
-                    )
+                    logger.warn(("Metrics listener configured, but "
+                                 "enable_metrics is not True!"))
                 else:
-                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"],
+                                         listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -167,6 +164,6 @@ def start(config_options):
     _base.start_worker_reactor("synapse-media-repository", config)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     with LoggingContext("main"):
         start(sys.argv[1:])

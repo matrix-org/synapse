@@ -39,7 +39,6 @@ class ReplicationClientFactory(ReconnectingClientFactory):
     Accepts a handler that will be called when new data is available or data
     is required.
     """
-
     maxDelay = 30  # Try at least once every N seconds
 
     def __init__(self, hs, client_name, handler):
@@ -65,7 +64,9 @@ class ReplicationClientFactory(ReconnectingClientFactory):
 
     def clientConnectionFailed(self, connector, reason):
         logger.error("Failed to connect to replication: %r", reason)
-        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
+        ReconnectingClientFactory.clientConnectionFailed(
+            self, connector, reason
+        )
 
 
 class ReplicationClientHandler(object):
@@ -73,7 +74,6 @@ class ReplicationClientHandler(object):
 
     By default proxies incoming replication data to the SlaveStore.
     """
-
     def __init__(self, store):
         self.store = store
 

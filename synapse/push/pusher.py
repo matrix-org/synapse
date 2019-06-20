@@ -36,7 +36,9 @@ class PusherFactory(object):
     def __init__(self, hs):
         self.hs = hs
 
-        self.pusher_types = {"http": HttpPusher}
+        self.pusher_types = {
+            "http": HttpPusher,
+        }
 
         logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
         if hs.config.email_enable_notifs:
@@ -54,7 +56,7 @@ class PusherFactory(object):
             logger.info("defined email pusher type")
 
     def create_pusher(self, pusherdict):
-        kind = pusherdict["kind"]
+        kind = pusherdict['kind']
         f = self.pusher_types.get(kind, None)
         if not f:
             return None
@@ -75,8 +77,8 @@ class PusherFactory(object):
         return EmailPusher(self.hs, pusherdict, mailer)
 
     def _app_name_from_pusherdict(self, pusherdict):
-        if "data" in pusherdict and "brand" in pusherdict["data"]:
-            app_name = pusherdict["data"]["brand"]
+        if 'data' in pusherdict and 'brand' in pusherdict['data']:
+            app_name = pusherdict['data']['brand']
         else:
             app_name = self.hs.config.email_app_name
 

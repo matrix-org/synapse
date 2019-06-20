@@ -24,15 +24,15 @@ class SlavedDeviceInboxStore(DeviceInboxWorkerStore, BaseSlavedStore):
     def __init__(self, db_conn, hs):
         super(SlavedDeviceInboxStore, self).__init__(db_conn, hs)
         self._device_inbox_id_gen = SlavedIdTracker(
-            db_conn, "device_max_stream_id", "stream_id"
+            db_conn, "device_max_stream_id", "stream_id",
         )
         self._device_inbox_stream_cache = StreamChangeCache(
             "DeviceInboxStreamChangeCache",
-            self._device_inbox_id_gen.get_current_token(),
+            self._device_inbox_id_gen.get_current_token()
         )
         self._device_federation_outbox_stream_cache = StreamChangeCache(
             "DeviceFederationOutboxStreamChangeCache",
-            self._device_inbox_id_gen.get_current_token(),
+            self._device_inbox_id_gen.get_current_token()
         )
 
         self._last_device_delete_cache = ExpiringCache(

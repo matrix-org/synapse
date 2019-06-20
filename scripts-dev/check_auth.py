@@ -39,11 +39,11 @@ def check_auth(auth, auth_chain, events):
         print("Success:", e.event_id, e.type, e.state_key)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "json", nargs="?", type=argparse.FileType("r"), default=sys.stdin
+        'json', nargs='?', type=argparse.FileType('r'), default=sys.stdin
     )
 
     args = parser.parse_args()

@@ -40,4 +40,6 @@ class ActionGenerator(object):
     @defer.inlineCallbacks
     def handle_push_actions_for_event(self, event, context):
         with Measure(self.clock, "action_for_event_by_user"):
-            yield self.bulk_evaluator.action_for_event_by_user(event, context)
+            yield self.bulk_evaluator.action_for_event_by_user(
+                event, context
+            )

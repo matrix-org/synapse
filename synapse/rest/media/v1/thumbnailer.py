@@ -28,13 +28,16 @@ EXIF_TRANSPOSE_MAPPINGS = {
     5: Image.TRANSPOSE,
     6: Image.ROTATE_270,
     7: Image.TRANSVERSE,
-    8: Image.ROTATE_90,
+    8: Image.ROTATE_90
 }
 
 
 class Thumbnailer(object):
 
-    FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
+    FORMATS = {
+        "image/jpeg": "JPEG",
+        "image/png": "PNG",
+    }
 
     def __init__(self, input_path):
         self.image = Image.open(input_path)
@@ -107,13 +110,17 @@ class Thumbnailer(object):
         """
         if width * self.height > height * self.width:
             scaled_height = (width * self.height) // self.width
-            scaled_image = self.image.resize((width, scaled_height), Image.ANTIALIAS)
+            scaled_image = self.image.resize(
+                (width, scaled_height), Image.ANTIALIAS
+            )
             crop_top = (scaled_height - height) // 2
             crop_bottom = height + crop_top
             cropped = scaled_image.crop((0, crop_top, width, crop_bottom))
         else:
             scaled_width = (height * self.width) // self.height
-            scaled_image = self.image.resize((scaled_width, height), Image.ANTIALIAS)
+            scaled_image = self.image.resize(
+                (scaled_width, height), Image.ANTIALIAS
+            )
             crop_left = (scaled_width - width) // 2
             crop_right = width + crop_left
             cropped = scaled_image.crop((crop_left, 0, crop_right, height))

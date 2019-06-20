@@ -181,7 +181,7 @@ class StateTestCase(unittest.TestCase):
                 id="PB",
                 sender=BOB,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 50}},
             ),
         ]
@@ -229,14 +229,14 @@ class StateTestCase(unittest.TestCase):
                 id="PB",
                 sender=BOB,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 50, CHARLIE: 50}},
             ),
             FakeEvent(
                 id="PC",
                 sender=CHARLIE,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 50, CHARLIE: 0}},
             ),
         ]
@@ -256,7 +256,7 @@ class StateTestCase(unittest.TestCase):
                 id="PA1",
                 sender=ALICE,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 50}},
             ),
             FakeEvent(
@@ -266,14 +266,14 @@ class StateTestCase(unittest.TestCase):
                 id="PA2",
                 sender=ALICE,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 0}},
             ),
             FakeEvent(
                 id="PB",
                 sender=BOB,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 50}},
             ),
             FakeEvent(
@@ -296,7 +296,7 @@ class StateTestCase(unittest.TestCase):
                 id="PA",
                 sender=ALICE,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 50}},
             ),
             FakeEvent(
@@ -326,7 +326,7 @@ class StateTestCase(unittest.TestCase):
                 id="PA1",
                 sender=ALICE,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 50}},
             ),
             FakeEvent(
@@ -336,14 +336,14 @@ class StateTestCase(unittest.TestCase):
                 id="PA2",
                 sender=ALICE,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 0}},
             ),
             FakeEvent(
                 id="PB",
                 sender=BOB,
                 type=EventTypes.PowerLevels,
-                state_key="",
+                state_key='',
                 content={"users": {ALICE: 100, BOB: 50}},
             ),
             FakeEvent(

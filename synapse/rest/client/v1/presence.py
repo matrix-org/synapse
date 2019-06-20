@@ -47,7 +47,7 @@ class PresenceStatusRestServlet(RestServlet):
 
         if requester.user != user:
             allowed = yield self.presence_handler.is_visible(
-                observed_user=user, observer_user=requester.user
+                observed_user=user, observer_user=requester.user,
             )
 
             if not allowed:

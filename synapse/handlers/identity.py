@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class IdentityHandler(BaseHandler):
+
     def __init__(self, hs):
         super(IdentityHandler, self).__init__(hs)
 
@@ -63,38 +64,40 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def threepid_from_creds(self, creds):
-        if "id_server" in creds:
-            id_server = creds["id_server"]
-        elif "idServer" in creds:
-            id_server = creds["idServer"]
+        if 'id_server' in creds:
+            id_server = creds['id_server']
+        elif 'idServer' in creds:
+            id_server = creds['idServer']
         else:
             raise SynapseError(400, "No id_server in creds")
 
-        if "client_secret" in creds:
-            client_secret = creds["client_secret"]
-        elif "clientSecret" in creds:
-            client_secret = creds["clientSecret"]
+        if 'client_secret' in creds:
+            client_secret = creds['client_secret']
+        elif 'clientSecret' in creds:
+            client_secret = creds['clientSecret']
         else:
             raise SynapseError(400, "No client_secret in creds")
 
         if not self._should_trust_id_server(id_server):
             logger.warn(
-                "%s is not a trusted ID server: rejecting 3pid " + "credentials",
-                id_server,
+                '%s is not a trusted ID server: rejecting 3pid ' +
+                'credentials', id_server
             )
             defer.returnValue(None)
 
         try:
             data = yield self.http_client.get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/3pid/getValidated3pid"),
-                {"sid": creds["sid"], "client_secret": client_secret},
+                "https://%s%s" % (
+                    id_server,
+                    "/_matrix/identity/api/v1/3pid/getValidated3pid"
+                ),
+                {'sid': creds['sid'], 'client_secret': client_secret}
             )
         except HttpResponseException as e:
             logger.info("getValidated3pid failed with Matrix error: %r", e)
             raise e.to_synapse_error()
 
-        if "medium" in data:
+        if 'medium' in data:
             defer.returnValue(data)
         defer.returnValue(None)
 
@@ -103,24 +106,30 @@ class IdentityHandler(BaseHandler):
         logger.debug("binding threepid %r to %s", creds, mxid)
         data = None
 
-        if "id_server" in creds:
-            id_server = creds["id_server"]
-        elif "idServer" in creds:
-            id_server = creds["idServer"]
+        if 'id_server' in creds:
+            id_server = creds['id_server']
+        elif 'idServer' in creds:
+            id_server = creds['idServer']
         else:
             raise SynapseError(400, "No id_server in creds")
 
-        if "client_secret" in creds:
-            client_secret = creds["client_secret"]
-        elif "clientSecret" in creds:
-            client_secret = creds["clientSecret"]
+        if 'client_secret' in creds:
+            client_secret = creds['client_secret']
+        elif 'clientSecret' in creds:
+            client_secret = creds['clientSecret']
         else:
             raise SynapseError(400, "No client_secret in creds")
 
         try:
             data = yield self.http_client.post_urlencoded_get_json(
-                "https://%s%s" % (id_server, "/_matrix/identity/api/v1/3pid/bind"),
-                {"sid": creds["sid"], "client_secret": client_secret, "mxid": mxid},
+                "https://%s%s" % (
+                    id_server, "/_matrix/identity/api/v1/3pid/bind"
+                ),
+                {
+                    'sid': creds['sid'],
+                    'client_secret': client_secret,
+                    'mxid': mxid,
+                }
             )
             logger.debug("bound threepid %r to %s", creds, mxid)
 
@@ -156,7 +165,9 @@ class IdentityHandler(BaseHandler):
             id_servers = [threepid["id_server"]]
         else:
             id_servers = yield self.store.get_id_servers_user_bound(
-                user_id=mxid, medium=threepid["medium"], address=threepid["address"]
+                user_id=mxid,
+                medium=threepid["medium"],
+                address=threepid["address"],
             )
 
         # We don't know where to unbind, so we don't have a choice but to return
@@ -166,7 +177,7 @@ class IdentityHandler(BaseHandler):
         changed = True
         for id_server in id_servers:
             changed &= yield self.try_unbind_threepid_with_id_server(
-                mxid, threepid, id_server
+                mxid, threepid, id_server,
             )
 
         defer.returnValue(changed)
@@ -190,7 +201,10 @@ class IdentityHandler(BaseHandler):
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
         content = {
             "mxid": mxid,
-            "threepid": {"medium": threepid["medium"], "address": threepid["address"]},
+            "threepid": {
+                "medium": threepid["medium"],
+                "address": threepid["address"],
+            },
         }
 
         # we abuse the federation http client to sign the request, but we have to send it
@@ -198,19 +212,25 @@ class IdentityHandler(BaseHandler):
         # 'browser-like' HTTPS.
         auth_headers = self.federation_http_client.build_auth_headers(
             destination=None,
-            method="POST",
-            url_bytes="/_matrix/identity/api/v1/3pid/unbind".encode("ascii"),
+            method='POST',
+            url_bytes='/_matrix/identity/api/v1/3pid/unbind'.encode('ascii'),
             content=content,
             destination_is=id_server,
         )
-        headers = {b"Authorization": auth_headers}
+        headers = {
+            b"Authorization": auth_headers,
+        }
 
         try:
-            yield self.http_client.post_json_get_json(url, content, headers)
+            yield self.http_client.post_json_get_json(
+                url,
+                content,
+                headers,
+            )
             changed = True
         except HttpResponseException as e:
             changed = False
-            if e.code in (400, 404, 501):
+            if e.code in (400, 404, 501,):
                 # The remote server probably doesn't support unbinding (yet)
                 logger.warn("Received %d response while unbinding threepid", e.code)
             else:
@@ -228,27 +248,35 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def requestEmailToken(
-        self, id_server, email, client_secret, send_attempt, next_link=None
+        self,
+        id_server,
+        email,
+        client_secret,
+        send_attempt,
+        next_link=None,
     ):
         if not self._should_trust_id_server(id_server):
             raise SynapseError(
-                400, "Untrusted ID server '%s'" % id_server, Codes.SERVER_NOT_TRUSTED
+                400, "Untrusted ID server '%s'" % id_server,
+                Codes.SERVER_NOT_TRUSTED
             )
 
         params = {
-            "email": email,
-            "client_secret": client_secret,
-            "send_attempt": send_attempt,
+            'email': email,
+            'client_secret': client_secret,
+            'send_attempt': send_attempt,
         }
 
         if next_link:
-            params.update({"next_link": next_link})
+            params.update({'next_link': next_link})
 
         try:
             data = yield self.http_client.post_json_get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/validate/email/requestToken"),
-                params,
+                "https://%s%s" % (
+                    id_server,
+                    "/_matrix/identity/api/v1/validate/email/requestToken"
+                ),
+                params
             )
             defer.returnValue(data)
         except HttpResponseException as e:
@@ -257,26 +285,30 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
-        self, id_server, country, phone_number, client_secret, send_attempt, **kwargs
+            self, id_server, country, phone_number,
+            client_secret, send_attempt, **kwargs
     ):
         if not self._should_trust_id_server(id_server):
             raise SynapseError(
-                400, "Untrusted ID server '%s'" % id_server, Codes.SERVER_NOT_TRUSTED
+                400, "Untrusted ID server '%s'" % id_server,
+                Codes.SERVER_NOT_TRUSTED
             )
 
         params = {
-            "country": country,
-            "phone_number": phone_number,
-            "client_secret": client_secret,
-            "send_attempt": send_attempt,
+            'country': country,
+            'phone_number': phone_number,
+            'client_secret': client_secret,
+            'send_attempt': send_attempt,
         }
         params.update(kwargs)
 
         try:
             data = yield self.http_client.post_json_get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/validate/msisdn/requestToken"),
-                params,
+                "https://%s%s" % (
+                    id_server,
+                    "/_matrix/identity/api/v1/validate/msisdn/requestToken"
+                ),
+                params
             )
             defer.returnValue(data)
         except HttpResponseException as e:

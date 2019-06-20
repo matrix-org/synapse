@@ -70,8 +70,7 @@ class JsonEncodedObject(object):
             dict
         """
         d = {
-            k: _encode(v)
-            for (k, v) in self.__dict__.items()
+            k: _encode(v) for (k, v) in self.__dict__.items()
             if k in self.valid_keys and k not in self.internal_keys
         }
         d.update(self.unrecognized_keys)
@@ -79,8 +78,7 @@ class JsonEncodedObject(object):
 
     def get_internal_dict(self):
         d = {
-            k: _encode(v, internal=True)
-            for (k, v) in self.__dict__.items()
+            k: _encode(v, internal=True) for (k, v) in self.__dict__.items()
             if k in self.valid_keys
         }
         d.update(self.unrecognized_keys)

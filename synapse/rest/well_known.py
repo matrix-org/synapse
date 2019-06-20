@@ -29,7 +29,6 @@ class WellKnownBuilder(object):
     Args:
         hs (synapse.server.HomeServer):
     """
-
     def __init__(self, hs):
         self._config = hs.config
 
@@ -38,11 +37,15 @@ class WellKnownBuilder(object):
         if self._config.public_baseurl is None:
             return None
 
-        result = {"m.homeserver": {"base_url": self._config.public_baseurl}}
+        result = {
+            "m.homeserver": {
+                "base_url": self._config.public_baseurl,
+            },
+        }
 
         if self._config.default_identity_server:
             result["m.identity_server"] = {
-                "base_url": self._config.default_identity_server
+                "base_url": self._config.default_identity_server,
             }
 
         return result
@@ -63,7 +66,7 @@ class WellKnownResource(Resource):
         if not r:
             request.setResponseCode(404)
             request.setHeader(b"Content-Type", b"text/plain")
-            return b".well-known not available"
+            return b'.well-known not available'
 
         logger.debug("returning: %s", r)
         request.setHeader(b"Content-Type", b"application/json")

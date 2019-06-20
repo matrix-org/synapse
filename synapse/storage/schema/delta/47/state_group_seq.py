@@ -27,7 +27,10 @@ def run_create(cur, database_engine, *args, **kwargs):
         else:
             start_val = row[0] + 1
 
-        cur.execute("CREATE SEQUENCE state_group_id_seq START WITH %s", (start_val,))
+        cur.execute(
+            "CREATE SEQUENCE state_group_id_seq START WITH %s",
+            (start_val, ),
+        )
 
 
 def run_upgrade(*args, **kwargs):

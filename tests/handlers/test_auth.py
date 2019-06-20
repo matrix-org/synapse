@@ -117,7 +117,7 @@ class AuthTestCase(unittest.TestCase):
     def test_mau_limits_disabled(self):
         self.hs.config.limit_usage_by_mau = False
         # Ensure does not throw exception
-        yield self.auth_handler.get_access_token_for_user_id("user_a")
+        yield self.auth_handler.get_access_token_for_user_id('user_a')
 
         yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
             self._get_macaroon().serialize()
@@ -131,7 +131,7 @@ class AuthTestCase(unittest.TestCase):
         )
 
         with self.assertRaises(ResourceLimitError):
-            yield self.auth_handler.get_access_token_for_user_id("user_a")
+            yield self.auth_handler.get_access_token_for_user_id('user_a')
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.large_number_of_users)
@@ -150,7 +150,7 @@ class AuthTestCase(unittest.TestCase):
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
         with self.assertRaises(ResourceLimitError):
-            yield self.auth_handler.get_access_token_for_user_id("user_a")
+            yield self.auth_handler.get_access_token_for_user_id('user_a')
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
@@ -166,7 +166,7 @@ class AuthTestCase(unittest.TestCase):
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        yield self.auth_handler.get_access_token_for_user_id("user_a")
+        yield self.auth_handler.get_access_token_for_user_id('user_a')
         self.hs.get_datastore().user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(self.hs.get_clock().time_msec())
         )
@@ -185,7 +185,7 @@ class AuthTestCase(unittest.TestCase):
             return_value=defer.succeed(self.small_number_of_users)
         )
         # Ensure does not raise exception
-        yield self.auth_handler.get_access_token_for_user_id("user_a")
+        yield self.auth_handler.get_access_token_for_user_id('user_a')
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.small_number_of_users)

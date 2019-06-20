@@ -21,10 +21,12 @@ from ._slaved_id_tracker import SlavedIdTracker
 
 
 class SlavedPusherStore(PusherWorkerStore, BaseSlavedStore):
+
     def __init__(self, db_conn, hs):
         super(SlavedPusherStore, self).__init__(db_conn, hs)
         self._pushers_id_gen = SlavedIdTracker(
-            db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
+            db_conn, "pushers", "id",
+            extra_tables=[("deleted_pushers", "stream_id")],
         )
 
     def stream_positions(self):

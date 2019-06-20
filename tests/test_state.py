@@ -37,7 +37,7 @@ def create_event(
     depth=2,
     event_id=None,
     prev_events=[],
-    **kwargs,
+    **kwargs
 ):
     global _next_event_id
 
@@ -366,11 +366,11 @@ class StateTestCase(unittest.TestCase):
     def _add_depths(self, nodes, edges):
         def _get_depth(ev):
             node = nodes[ev]
-            if "depth" not in node:
+            if 'depth' not in node:
                 prevs = edges[ev]
                 depth = max(_get_depth(prev) for prev in prevs) + 1
-                node["depth"] = depth
-            return node["depth"]
+                node['depth'] = depth
+            return node['depth']
 
         for n in nodes:
             _get_depth(n)

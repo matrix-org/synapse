@@ -60,15 +60,15 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
         profile = self.get_success(self.store.get_user_in_directory(support_user_id))
         self.assertTrue(profile is None)
-        display_name = "display_name"
+        display_name = 'display_name'
 
-        profile_info = ProfileInfo(avatar_url="avatar_url", display_name=display_name)
-        regular_user_id = "@regular:test"
+        profile_info = ProfileInfo(avatar_url='avatar_url', display_name=display_name)
+        regular_user_id = '@regular:test'
         self.get_success(
             self.handler.handle_local_profile_change(regular_user_id, profile_info)
         )
         profile = self.get_success(self.store.get_user_in_directory(regular_user_id))
-        self.assertTrue(profile["display_name"] == display_name)
+        self.assertTrue(profile['display_name'] == display_name)
 
     def test_handle_user_deactivated_support_user(self):
         s_user_id = "@support:test"
