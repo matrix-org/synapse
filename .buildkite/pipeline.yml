@@ -116,23 +116,6 @@ steps:
         - exit_status: 2
           limit: 2
 
-  - label: ":python: 3.5 / :postgres: 9.4"
-    env:
-      TRIAL_FLAGS: "-j 4"
-    command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
-    plugins:
-      - docker-compose#v2.1.0:
-          run: testenv
-          config:
-            - .buildkite/docker-compose.py35.pg94.yaml
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
-
   - label: ":python: 3.5 / :postgres: 9.5"
     env:
       TRIAL_FLAGS: "-j 4"

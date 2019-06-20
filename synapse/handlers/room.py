@@ -75,6 +75,10 @@ class RoomCreationHandler(BaseHandler):
         # linearizer to stop two upgrades happening at once
         self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
 
+        self._server_notices_mxid = hs.config.server_notices_mxid
+
+        self.third_party_event_rules = hs.get_third_party_event_rules()
+
     @defer.inlineCallbacks
     def upgrade_room(self, requester, old_room_id, new_version):
         """Replace a room with a new room with a different version
@@ -470,7 +474,26 @@ class RoomCreationHandler(BaseHandler):
 
         yield self.auth.check_auth_blocking(user_id)
 
-        if not self.spam_checker.user_may_create_room(user_id):
+        if (self._server_notices_mxid is not None and
+                requester.user.to_string() == self._server_notices_mxid):
+            # allow the server notices mxid to create rooms
+            is_requester_admin = True
+        else:
+            is_requester_admin = yield self.auth.is_server_admin(
+                requester.user,
+            )
+
+        # Check whether the third party rules allows/changes the room create
+        # request.
+        yield self.third_party_event_rules.on_create_room(
+            requester,
+            config,
+            is_requester_admin=is_requester_admin,
+        )
+
+        if not is_requester_admin and not self.spam_checker.user_may_create_room(
+            user_id,
+        ):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         if ratelimit:
