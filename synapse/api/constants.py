@@ -31,40 +31,40 @@ class Membership(object):
 
     """Represents the membership states of a user in a room."""
 
-    INVITE = u"invite"
-    JOIN = u"join"
-    KNOCK = u"knock"
-    LEAVE = u"leave"
-    BAN = u"ban"
+    INVITE = "invite"
+    JOIN = "join"
+    KNOCK = "knock"
+    LEAVE = "leave"
+    BAN = "ban"
     LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
 
 
 class PresenceState(object):
     """Represents the presence state of a user."""
 
-    OFFLINE = u"offline"
-    UNAVAILABLE = u"unavailable"
-    ONLINE = u"online"
+    OFFLINE = "offline"
+    UNAVAILABLE = "unavailable"
+    ONLINE = "online"
 
 
 class JoinRules(object):
-    PUBLIC = u"public"
-    KNOCK = u"knock"
-    INVITE = u"invite"
-    PRIVATE = u"private"
+    PUBLIC = "public"
+    KNOCK = "knock"
+    INVITE = "invite"
+    PRIVATE = "private"
 
 
 class LoginType(object):
-    PASSWORD = u"m.login.password"
-    EMAIL_IDENTITY = u"m.login.email.identity"
-    MSISDN = u"m.login.msisdn"
-    RECAPTCHA = u"m.login.recaptcha"
-    TERMS = u"m.login.terms"
-    DUMMY = u"m.login.dummy"
+    PASSWORD = "m.login.password"
+    EMAIL_IDENTITY = "m.login.email.identity"
+    MSISDN = "m.login.msisdn"
+    RECAPTCHA = "m.login.recaptcha"
+    TERMS = "m.login.terms"
+    DUMMY = "m.login.dummy"
 
     # Only for C/S API v1
-    APPLICATION_SERVICE = u"m.login.application_service"
-    SHARED_SECRET = u"org.matrix.login.shared_secret"
+    APPLICATION_SERVICE = "m.login.application_service"
+    SHARED_SECRET = "org.matrix.login.shared_secret"
 
 
 class EventTypes(object):

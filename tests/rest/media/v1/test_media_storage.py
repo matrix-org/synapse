@@ -149,7 +149,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
 
         self.media_repo = hs.get_media_repository_resource()
-        self.download_resource = self.media_repo.children[b'download']
+        self.download_resource = self.media_repo.children[b"download"]
 
         # smol png
         self.end_content = unhexlify(
@@ -177,7 +177,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         headers = {
             b"Content-Length": [b"%d" % (len(self.end_content))],
-            b"Content-Type": [b'image/png'],
+            b"Content-Type": [b"image/png"],
         }
         if content_disposition:
             headers[b"Content-Disposition"] = [content_disposition]
@@ -210,7 +210,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         correctly decode it as the UTF-8 string, and use filename* in the
         response.
         """
-        filename = parse.quote(u"\u2603".encode('utf8')).encode('ascii')
+        filename = parse.quote("\u2603".encode("utf8")).encode("ascii")
         channel = self._req(b"inline; filename*=utf-8''" + filename + b".png")
 
         headers = channel.headers

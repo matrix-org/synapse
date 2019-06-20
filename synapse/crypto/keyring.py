@@ -505,7 +505,7 @@ class BaseV2KeyFetcher(object):
         Returns:
             Deferred[dict[str, FetchKeyResult]]: map from key_id to result object
         """
-        ts_valid_until_ms = response_json[u"valid_until_ts"]
+        ts_valid_until_ms = response_json["valid_until_ts"]
 
         # start by extracting the keys from the response, since they may be required
         # to validate the signature on the response.
@@ -656,9 +656,9 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 destination=perspective_name,
                 path="/_matrix/key/v2/query",
                 data={
-                    u"server_keys": {
+                    "server_keys": {
                         server_name: {
-                            key_id: {u"minimum_valid_until_ts": min_valid_ts}
+                            key_id: {"minimum_valid_until_ts": min_valid_ts}
                             for key_id, min_valid_ts in server_keys.items()
                         }
                         for server_name, server_keys in keys_to_fetch.items()
@@ -729,13 +729,13 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             return
 
         if (
-            u"signatures" not in response
-            or perspective_name not in response[u"signatures"]
+            "signatures" not in response
+            or perspective_name not in response["signatures"]
         ):
             raise KeyLookupError("Response not signed by the notary server")
 
         verified = False
-        for key_id in response[u"signatures"][perspective_name]:
+        for key_id in response["signatures"][perspective_name]:
             if key_id in perspective_keys:
                 verify_signed_json(response, perspective_name, perspective_keys[key_id])
                 verified = True
@@ -744,7 +744,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             raise KeyLookupError(
                 "Response not signed with a known key: signed with: %r, known keys: %r"
                 % (
-                    list(response[u"signatures"][perspective_name].keys()),
+                    list(response["signatures"][perspective_name].keys()),
                     list(perspective_keys.keys()),
                 )
             )

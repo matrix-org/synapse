@@ -100,7 +100,7 @@ def exception_to_unicode(e):
     # and instead look at what is in the args member.
 
     if len(e.args) == 0:
-        return u""
+        return ""
     elif len(e.args) > 1:
         return six.text_type(repr(e.args))
 

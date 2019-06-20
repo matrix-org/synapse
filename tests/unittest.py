@@ -318,7 +318,7 @@ class HomeserverTestCase(TestCase):
             Tuple[synapse.http.site.SynapseRequest, channel]
         """
         if isinstance(content, dict):
-            content = json.dumps(content).encode('utf8')
+            content = json.dumps(content).encode("utf8")
 
         return make_request(
             self.reactor,
@@ -409,7 +409,7 @@ class HomeserverTestCase(TestCase):
         Returns:
             The MXID of the new user (unicode).
         """
-        self.hs.config.registration_shared_secret = u"shared"
+        self.hs.config.registration_shared_secret = "shared"
 
         # Create the user
         request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
@@ -417,13 +417,13 @@ class HomeserverTestCase(TestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        nonce_str = b"\x00".join([username.encode('utf8'), password.encode('utf8')])
+        nonce_str = b"\x00".join([username.encode("utf8"), password.encode("utf8")])
         if admin:
             nonce_str += b"\x00admin"
         else:
             nonce_str += b"\x00notadmin"
 
-        want_mac.update(nonce.encode('ascii') + b"\x00" + nonce_str)
+        want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -436,7 +436,7 @@ class HomeserverTestCase(TestCase):
             }
         )
         request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/admin/register", body.encode('utf8')
+            "POST", "/_matrix/client/r0/admin/register", body.encode("utf8")
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
@@ -455,7 +455,7 @@ class HomeserverTestCase(TestCase):
             body["device_id"] = device_id
 
         request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode('utf8')
+            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
@@ -501,9 +501,7 @@ class HomeserverTestCase(TestCase):
         if soft_failed:
             event.internal_metadata.soft_failed = True
 
-        self.get_success(
-            event_creator.send_nonmember_event(requester, event, context)
-        )
+        self.get_success(event_creator.send_nonmember_event(requester, event, context))
 
         return event.event_id
 
@@ -528,7 +526,7 @@ class HomeserverTestCase(TestCase):
         body = {"type": "m.login.password", "user": username, "password": password}
 
         request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode('utf8')
+            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
         self.render(request)
         self.assertEqual(channel.code, 403, channel.result)

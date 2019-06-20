@@ -43,7 +43,7 @@ class TlsConfig(Config):
 
         # hyperlink complains on py2 if this is not a Unicode
         self.acme_url = six.text_type(
-            acme_config.get("url", u"https://acme-v01.api.letsencrypt.org/directory")
+            acme_config.get("url", "https://acme-v01.api.letsencrypt.org/directory")
         )
         self.acme_port = acme_config.get("port", 80)
         self.acme_bind_addresses = acme_config.get("bind_addresses", ["::", "0.0.0.0"])
@@ -211,7 +211,7 @@ class TlsConfig(Config):
             sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
             sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
             if sha256_fingerprint not in sha256_fingerprints:
-                self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
+                self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
