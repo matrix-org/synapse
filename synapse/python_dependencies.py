@@ -72,10 +72,11 @@ REQUIREMENTS = [
     # Twisted 18.7.0 requires attrs>=17.4.0
     "attrs>=17.4.0",
     "netaddr>=0.7.18",
+    "Jinja2>=2.9",
+    "bleach>=1.4.3",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
-    "email": ["Jinja2>=2.9", "bleach>=1.4.3"],
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
     # we use execute_batch, which arrived in psycopg 2.7.
     "postgres": ["psycopg2>=2.7"],

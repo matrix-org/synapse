@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import sys
+import jinja2
 
 from six.moves import http_client
 
@@ -308,9 +308,6 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         Returns:
             str containing the contents of the rendered template
         """
-        if "jinja2" not in sys.modules:
-            import jinja2
-
         loader = jinja2.FileSystemLoader(template_dir)
         env = jinja2.Environment(loader=loader)
 
