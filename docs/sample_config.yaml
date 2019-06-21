@@ -209,7 +209,7 @@ listeners:
       - names: [client, federation]
         compress: false
 
-    # example additonal_resources:
+    # example additional_resources:
     #
     #additional_resources:
     #  "/_matrix/my/custom/endpoint":
