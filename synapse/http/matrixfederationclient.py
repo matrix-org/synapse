@@ -52,6 +52,9 @@ from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
 
+import opentracing
+from opentracing.propagation import Format
+
 logger = logging.getLogger(__name__)
 
 outgoing_requests_counter = Counter("synapse_http_matrixfederationclient_requests",
@@ -350,11 +353,26 @@ class MatrixFederationHttpClient(object):
         else:
             query_bytes = b""
 
-        headers_dict = {
-            b"User-Agent": [self.version_string_bytes],
-        }
-
-        with limiter:
+        # Retreive current span
+        scope = opentracing.tracer.start_active_span(
+            "outgoing-federation-request",
+            tags={
+                "span.kind": "client", # With respect to this request's role in an rpc
+                "peer.address": request.destination,
+                "http.method": request.method,
+                "http.url": request.path,
+            },
+            finish_on_close=True
+        )
+        
+        # Inject the span into the headers
+        headers_dict = {}
+        opentracing.tracer.inject(scope.span, Format.HTTP_HEADERS, headers_dict)
+        headers_dict = {k.encode(): [v.encode()] for k, v in headers_dict.items()}
+        
+        headers_dict[b"User-Agent"] = [self.version_string_bytes]
+        
+        with limiter, scope:
             # XXX: Would be much nicer to retry only at the transaction-layer
             # (once we have reliable transactions in place)
             if long_retries:
@@ -433,6 +451,9 @@ class MatrixFederationHttpClient(object):
                         response.phrase.decode('ascii', errors='replace'),
                     )
 
+                    logger.info("Setting response code on span {} *********".format(opentracing.tracer.active_span))
+                    scope.span.set_tag(
+                        "http.status_code", response.code)
                     if 200 <= response.code < 300:
                         pass
                     else:
@@ -516,9 +537,11 @@ class MatrixFederationHttpClient(object):
                         url_str,
                         _flatten_response_never_received(e),
                     )
+                    logger.info("Setting response code on span {} *********".format(opentracing.tracer.active_span))
+                    #scope.span.set_tag("error", True)
                     raise
 
-            defer.returnValue(response)
+        defer.returnValue(response)
 
     def build_auth_headers(
         self, destination, method, url_bytes, content=None, destination_is=None,
