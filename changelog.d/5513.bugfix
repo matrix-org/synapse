@@ -1,1 +1,0 @@
-Prevent python module `jinja2` from being required even though it is marked as an optional dependency.
