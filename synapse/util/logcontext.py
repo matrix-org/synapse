@@ -164,6 +164,7 @@ class LoggingContext(object):
         "usage_start",
         "main_thread", "alive",
         "request", "tag",
+        "active_scope"
     ]
 
     thread_local = threading.local()
@@ -215,6 +216,7 @@ class LoggingContext(object):
         self.request = None
         self.tag = ""
         self.alive = True
+        self.active_scope = None
 
         self.parent_context = parent_context
 
@@ -299,9 +301,11 @@ class LoggingContext(object):
         another LoggingContext
         """
 
-        # 'request' is the only field we currently use in the logger, so that's
-        # all we need to copy
+        # we track the current request
         record.request = self.request
+
+        # we also track the current active_scope:
+        record.active_scope = self.active_scope
 
     def start(self):
         if threading.current_thread() is not self.main_thread:
