@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -216,7 +218,7 @@ class Config(object):
             "--keys-directory",
             metavar="DIRECTORY",
             help="Where files such as certs and signing keys are stored when"
-            " their location is given explicitly in the config."
+            " their location is not given explicitly in the config."
             " Defaults to the directory containing the last config file",
         )
 
@@ -228,8 +230,18 @@ class Config(object):
 
         config_files = find_config_files(search_paths=config_args.config_path)
 
+        if not config_files:
+            config_parser.error("Must supply a config file.")
+
+        if config_args.keys_directory:
+            config_dir_path = config_args.keys_directory
+        else:
+            config_dir_path = os.path.dirname(config_files[-1])
+        config_dir_path = os.path.abspath(config_dir_path)
+        data_dir_path = os.getcwd()
+
         config_dict = obj.read_config_files(
-            config_files, keys_directory=config_args.keys_directory
+            config_files, config_dir_path=config_dir_path, data_dir_path=data_dir_path
         )
         obj.parse_config_dict(config_dict)
 
@@ -282,13 +294,27 @@ class Config(object):
             metavar="DIRECTORY",
             help=(
                 "Specify where additional config files such as signing keys and log"
-                " config should be stored. Defaults to the same directory as the main"
+                " config should be stored. Defaults to the same directory as the last"
                 " config file."
             ),
         )
         config_args, remaining_args = config_parser.parse_known_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
+
+        if not config_files:
+            config_parser.error(
+                "Must supply a config file.\nA config file can be automatically"
+                ' generated using "--generate-config -H SERVER_NAME'
+                ' -c CONFIG-FILE"'
+            )
+
+        if config_args.config_directory:
+            config_dir_path = config_args.config_directory
+        else:
+            config_dir_path = os.path.dirname(config_files[-1])
+        config_dir_path = os.path.abspath(config_dir_path)
+        data_dir_path = os.getcwd()
 
         generate_missing_configs = config_args.generate_missing_configs
 
@@ -300,20 +326,10 @@ class Config(object):
                     "Please specify either --report-stats=yes or --report-stats=no\n\n"
                     + MISSING_REPORT_STATS_SPIEL
                 )
-            if not config_files:
-                config_parser.error(
-                    "Must supply a config file.\nA config file can be automatically"
-                    ' generated using "--generate-config -H SERVER_NAME'
-                    ' -c CONFIG-FILE"'
-                )
+
             (config_path,) = config_files
             if not cls.path_exists(config_path):
                 print("Generating config file %s" % (config_path,))
-                if config_args.config_directory:
-                    config_dir_path = config_args.config_directory
-                else:
-                    config_dir_path = os.path.dirname(config_path)
-                config_dir_path = os.path.abspath(config_dir_path)
 
                 server_name = config_args.server_name
                 if not server_name:
@@ -324,7 +340,7 @@ class Config(object):
 
                 config_str = obj.generate_config(
                     config_dir_path=config_dir_path,
-                    data_dir_path=os.getcwd(),
+                    data_dir_path=data_dir_path,
                     server_name=server_name,
                     report_stats=(config_args.report_stats == "yes"),
                     generate_secrets=True,
@@ -367,15 +383,8 @@ class Config(object):
         obj.invoke_all("add_arguments", parser)
         args = parser.parse_args(remaining_args)
 
-        if not config_files:
-            config_parser.error(
-                "Must supply a config file.\nA config file can be automatically"
-                ' generated using "--generate-config -H SERVER_NAME'
-                ' -c CONFIG-FILE"'
-            )
-
         config_dict = obj.read_config_files(
-            config_files, keys_directory=config_args.config_directory
+            config_files, config_dir_path=config_dir_path, data_dir_path=data_dir_path
         )
 
         if generate_missing_configs:
@@ -387,15 +396,22 @@ class Config(object):
 
         return obj
 
-    def read_config_files(self, config_files, keys_directory=None):
+    def read_config_files(self, config_files, config_dir_path, data_dir_path):
         """Read the config files into a dict
+
+        Args:
+            config_files (iterable[str]): A list of the config files to read
+
+            config_dir_path (str): The path where the config files are kept. Used to
+                create filenames for things like the log config and the signing key.
+
+            data_dir_path (str): The path where the data files are kept. Used to create
+                filenames for things like the database and media store.
 
         Returns: dict
         """
-        if not keys_directory:
-            keys_directory = os.path.dirname(config_files[-1])
-
-        self.config_dir_path = os.path.abspath(keys_directory)
+        # FIXME: get rid of this
+        self.config_dir_path = config_dir_path
 
         # first we read the config files into a dict
         specified_config = {}
@@ -409,8 +425,8 @@ class Config(object):
             raise ConfigError(MISSING_SERVER_NAME)
         server_name = specified_config["server_name"]
         config_string = self.generate_config(
-            config_dir_path=self.config_dir_path,
-            data_dir_path=os.getcwd(),
+            config_dir_path=config_dir_path,
+            data_dir_path=data_dir_path,
             server_name=server_name,
             generate_secrets=False,
         )
