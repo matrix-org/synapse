@@ -368,7 +368,7 @@ class Config(object):
             )
 
         config_dict = obj.read_config_files(
-            config_files, keys_directory=args.config_directory
+            config_files, keys_directory=args.keys_directory
         )
 
         if generate_keys:
