@@ -1,1 +1,1 @@
-Make jinja2 and bleach required dependencies.
+Fix bug with `jinja2` preventing Synapse from starting. Users who had this problem should now simply need to run `pip install matrix-synapse`.
