@@ -1,4 +1,4 @@
-from .logcontext import LoggingContext
+from .logcontext import LoggingContext, nested_logging_context
 from opentracing import ScopeManager, Scope
 import logging
 
@@ -29,10 +29,10 @@ class LogContextScopeManager(ScopeManager):
             available.
         """
         ctx = LoggingContext.current_context()
-        if ctx is LoggingContext.sentinel or ctx.active_scope is None:
+        if ctx is LoggingContext.sentinel:
             return None
         else:
-            return ctx.active_scope
+            return ctx.scope
 
     def activate(self, span, finish_on_close):
         """
@@ -47,22 +47,19 @@ class LogContextScopeManager(ScopeManager):
             *span*. It is a programming error to neglect to call
             Scope.close() on the returned instance.
         """
-        logger.info("activating scope")
+
+        enter_logcontext = False
         ctx = LoggingContext.current_context()
         if ctx is LoggingContext.sentinel:
             # We don't want this scope to affect.
             logger.warning("Tried to activate scope outside of loggingcontext")
             return Scope(None, span)
-
-        scope = _LogContextScope(self, span, finish_on_close)
-        self._set_logcontext_scope(scope, ctx)
+        elif ctx.scope is not None:
+            ctx = nested_logging_context("scope")
+            enter_logcontext = True
+        scope = _LogContextScope(self, span, ctx, enter_logcontext, finish_on_close)
+        ctx.scope = scope
         return scope
-
-    def _set_logcontext_scope(self, scope, ctx=None):
-        if ctx is None:
-            ctx = LoggingContext.current_context()
-
-        ctx.active_scope = scope
 
     def request_from_whitelisted_homeserver(self, request):
         pass
@@ -71,17 +68,25 @@ class LogContextScopeManager(ScopeManager):
         pass
 
 class _LogContextScope(Scope):
-    def __init__(self, manager, span, finish_on_close):
+    def __init__(self, manager, span, logcontext, enter_logcontext, finish_on_close):
         super(_LogContextScope, self).__init__(manager, span)
+        self.logcontext = logcontext
         self._finish_on_close = finish_on_close
-        self._to_restore = manager.active
+        self._enter_logcontext = enter_logcontext
+
+    def __enter__(self):
+        if self._enter_logcontext:
+            self.logcontext.__enter__()
+
+    def __exit__(self, type, value, traceback):
+        super(_LogContextScope, self).__exit__(type, value, traceback)
+        if self._enter_logcontext:
+            self.logcontext.__exit__(type, value, traceback)
 
     def close(self):
         if self.manager.active is not self:
             logger.warning("Tried to close a none active scope!")
             return
-
-        self.manager._set_logcontext_scope(self._to_restore)
 
         if self._finish_on_close:
             self.span.finish()
