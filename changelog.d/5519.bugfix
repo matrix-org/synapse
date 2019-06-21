@@ -1,0 +1,1 @@
+Add `SYNAPSE_PUBLIC_BASEURL` as a environment variable for the docker container as a temporary fix to allow docker containers with `SYNAPSE_SMTP_*` to start. If `SYNAPSE_SMTP_*` is set, please ensure `SYNPASE_PUBLIC_BASEURL` is set as well.
