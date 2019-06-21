@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 class DeviceMessageHandler(object):
-
     def __init__(self, hs):
         """
         Args:
@@ -47,15 +46,15 @@ class DeviceMessageHandler(object):
         if origin != get_domain_from_id(sender_user_id):
             logger.warn(
                 "Dropping device message from %r with spoofed sender %r",
-                origin, sender_user_id
+                origin,
+                sender_user_id,
             )
         message_type = content["type"]
         message_id = content["message_id"]
         for user_id, by_device in content["messages"].items():
             # we use UserID.from_string to catch invalid user ids
             if not self.is_mine(UserID.from_string(user_id)):
-                logger.warning("Request for keys for non-local user %s",
-                               user_id)
+                logger.warning("Request for keys for non-local user %s", user_id)
                 raise SynapseError(400, "Not a user here")
 
             messages_by_device = {

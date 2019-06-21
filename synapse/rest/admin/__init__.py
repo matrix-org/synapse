@@ -61,7 +61,7 @@ def historical_admin_path_patterns(path_regex):
             "^/_synapse/admin/v1",
             "^/_matrix/client/api/v1/admin",
             "^/_matrix/client/unstable/admin",
-            "^/_matrix/client/r0/admin"
+            "^/_matrix/client/r0/admin",
         )
     )
 
@@ -88,12 +88,12 @@ class UsersRestServlet(RestServlet):
 
 
 class VersionServlet(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v1/server_version$"), )
+    PATTERNS = (re.compile("^/_synapse/admin/v1/server_version$"),)
 
     def __init__(self, hs):
         self.res = {
-            'server_version': get_version_string(synapse),
-            'python_version': platform.python_version(),
+            "server_version": get_version_string(synapse),
+            "python_version": platform.python_version(),
         }
 
     def on_GET(self, request):
@@ -107,6 +107,7 @@ class UserRegisterServlet(RestServlet):
          nonces (dict[str, int]): The nonces that we will accept. A dict of
              nonce to the time it was generated, in int seconds.
     """
+
     PATTERNS = historical_admin_path_patterns("/register")
     NONCE_TIMEOUT = 60
 
@@ -146,28 +147,24 @@ class UserRegisterServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         if "nonce" not in body:
-            raise SynapseError(
-                400, "nonce must be specified", errcode=Codes.BAD_JSON,
-            )
+            raise SynapseError(400, "nonce must be specified", errcode=Codes.BAD_JSON)
 
         nonce = body["nonce"]
 
         if nonce not in self.nonces:
-            raise SynapseError(
-                400, "unrecognised nonce",
-            )
+            raise SynapseError(400, "unrecognised nonce")
 
         # Delete the nonce, so it can't be reused, even if it's invalid
         del self.nonces[nonce]
 
         if "username" not in body:
             raise SynapseError(
-                400, "username must be specified", errcode=Codes.BAD_JSON,
+                400, "username must be specified", errcode=Codes.BAD_JSON
             )
         else:
             if (
-                not isinstance(body['username'], text_type)
-                or len(body['username']) > 512
+                not isinstance(body["username"], text_type)
+                or len(body["username"]) > 512
             ):
                 raise SynapseError(400, "Invalid username")
 
@@ -177,12 +174,12 @@ class UserRegisterServlet(RestServlet):
 
         if "password" not in body:
             raise SynapseError(
-                400, "password must be specified", errcode=Codes.BAD_JSON,
+                400, "password must be specified", errcode=Codes.BAD_JSON
             )
         else:
             if (
-                not isinstance(body['password'], text_type)
-                or len(body['password']) > 512
+                not isinstance(body["password"], text_type)
+                or len(body["password"]) > 512
             ):
                 raise SynapseError(400, "Invalid password")
 
@@ -202,7 +199,7 @@ class UserRegisterServlet(RestServlet):
             key=self.hs.config.registration_shared_secret.encode(),
             digestmod=hashlib.sha1,
         )
-        want_mac.update(nonce.encode('utf8'))
+        want_mac.update(nonce.encode("utf8"))
         want_mac.update(b"\x00")
         want_mac.update(username)
         want_mac.update(b"\x00")
@@ -211,13 +208,10 @@ class UserRegisterServlet(RestServlet):
         want_mac.update(b"admin" if admin else b"notadmin")
         if user_type:
             want_mac.update(b"\x00")
-            want_mac.update(user_type.encode('utf8'))
+            want_mac.update(user_type.encode("utf8"))
         want_mac = want_mac.hexdigest()
 
-        if not hmac.compare_digest(
-                want_mac.encode('ascii'),
-                got_mac.encode('ascii')
-        ):
+        if not hmac.compare_digest(want_mac.encode("ascii"), got_mac.encode("ascii")):
             raise SynapseError(403, "HMAC incorrect")
 
         # Reuse the parts of RegisterRestServlet to reduce code duplication
@@ -226,7 +220,7 @@ class UserRegisterServlet(RestServlet):
         register = RegisterRestServlet(self.hs)
 
         (user_id, _) = yield register.registration_handler.register(
-            localpart=body['username'].lower(),
+            localpart=body["username"].lower(),
             password=body["password"],
             admin=bool(admin),
             generate_token=False,
@@ -308,7 +302,7 @@ class PurgeHistoryRestServlet(RestServlet):
         # user can provide an event_id in the URL or the request body, or can
         # provide a timestamp in the request body.
         if event_id is None:
-            event_id = body.get('purge_up_to_event_id')
+            event_id = body.get("purge_up_to_event_id")
 
         if event_id is not None:
             event = yield self.store.get_event(event_id)
@@ -318,44 +312,39 @@ class PurgeHistoryRestServlet(RestServlet):
 
             token = yield self.store.get_topological_token_for_event(event_id)
 
-            logger.info(
-                "[purge] purging up to token %s (event_id %s)",
-                token, event_id,
-            )
-        elif 'purge_up_to_ts' in body:
-            ts = body['purge_up_to_ts']
+            logger.info("[purge] purging up to token %s (event_id %s)", token, event_id)
+        elif "purge_up_to_ts" in body:
+            ts = body["purge_up_to_ts"]
             if not isinstance(ts, int):
                 raise SynapseError(
-                    400, "purge_up_to_ts must be an int",
-                    errcode=Codes.BAD_JSON,
+                    400, "purge_up_to_ts must be an int", errcode=Codes.BAD_JSON
                 )
 
-            stream_ordering = (
-                yield self.store.find_first_stream_ordering_after_ts(ts)
-            )
+            stream_ordering = (yield self.store.find_first_stream_ordering_after_ts(ts))
 
             r = (
                 yield self.store.get_room_event_after_stream_ordering(
-                    room_id, stream_ordering,
+                    room_id, stream_ordering
                 )
             )
             if not r:
                 logger.warn(
                     "[purge] purging events not possible: No event found "
                     "(received_ts %i => stream_ordering %i)",
-                    ts, stream_ordering,
+                    ts,
+                    stream_ordering,
                 )
                 raise SynapseError(
-                    404,
-                    "there is no event to be purged",
-                    errcode=Codes.NOT_FOUND,
+                    404, "there is no event to be purged", errcode=Codes.NOT_FOUND
                 )
             (stream, topo, _event_id) = r
             token = "t%d-%d" % (topo, stream)
             logger.info(
                 "[purge] purging up to token %s (received_ts %i => "
                 "stream_ordering %i)",
-                token, ts, stream_ordering,
+                token,
+                ts,
+                stream_ordering,
             )
         else:
             raise SynapseError(
@@ -365,13 +354,10 @@ class PurgeHistoryRestServlet(RestServlet):
             )
 
         purge_id = yield self.pagination_handler.start_purge_history(
-            room_id, token,
-            delete_local_events=delete_local_events,
+            room_id, token, delete_local_events=delete_local_events
         )
 
-        defer.returnValue((200, {
-            "purge_id": purge_id,
-        }))
+        defer.returnValue((200, {"purge_id": purge_id}))
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
@@ -421,16 +407,14 @@ class DeactivateAccountRestServlet(RestServlet):
         UserID.from_string(target_user_id)
 
         result = yield self._deactivate_account_handler.deactivate_account(
-            target_user_id, erase,
+            target_user_id, erase
         )
         if result:
             id_server_unbind_result = "success"
         else:
             id_server_unbind_result = "no-support"
 
-        defer.returnValue((200, {
-            "id_server_unbind_result": id_server_unbind_result,
-        }))
+        defer.returnValue((200, {"id_server_unbind_result": id_server_unbind_result}))
 
 
 class ShutdownRoomRestServlet(RestServlet):
@@ -439,6 +423,7 @@ class ShutdownRoomRestServlet(RestServlet):
     to a new room created by `new_room_user_id` and kicked users will be auto
     joined to the new room.
     """
+
     PATTERNS = historical_admin_path_patterns("/shutdown_room/(?P<room_id>[^/]+)")
 
     DEFAULT_MESSAGE = (
@@ -474,9 +459,7 @@ class ShutdownRoomRestServlet(RestServlet):
             config={
                 "preset": "public_chat",
                 "name": room_name,
-                "power_level_content_override": {
-                    "users_default": -10,
-                },
+                "power_level_content_override": {"users_default": -10},
             },
             ratelimit=False,
         )
@@ -485,8 +468,7 @@ class ShutdownRoomRestServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         logger.info(
-            "Shutting down room %r, joining to new room: %r",
-            room_id, new_room_id,
+            "Shutting down room %r, joining to new room: %r", room_id, new_room_id
         )
 
         # This will work even if the room is already blocked, but that is
@@ -529,7 +511,7 @@ class ShutdownRoomRestServlet(RestServlet):
                 kicked_users.append(user_id)
             except Exception:
                 logger.exception(
-                    "Failed to leave old room and join new room for %r", user_id,
+                    "Failed to leave old room and join new room for %r", user_id
                 )
                 failed_to_kick_users.append(user_id)
 
@@ -550,18 +532,24 @@ class ShutdownRoomRestServlet(RestServlet):
             room_id, new_room_id, requester_user_id
         )
 
-        defer.returnValue((200, {
-            "kicked_users": kicked_users,
-            "failed_to_kick_users": failed_to_kick_users,
-            "local_aliases": aliases_for_room,
-            "new_room_id": new_room_id,
-        }))
+        defer.returnValue(
+            (
+                200,
+                {
+                    "kicked_users": kicked_users,
+                    "failed_to_kick_users": failed_to_kick_users,
+                    "local_aliases": aliases_for_room,
+                    "new_room_id": new_room_id,
+                },
+            )
+        )
 
 
 class QuarantineMediaInRoom(RestServlet):
     """Quarantines all media in a room so that no one can download it via
     this server.
     """
+
     PATTERNS = historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
 
     def __init__(self, hs):
@@ -574,7 +562,7 @@ class QuarantineMediaInRoom(RestServlet):
         yield assert_user_is_admin(self.auth, requester.user)
 
         num_quarantined = yield self.store.quarantine_media_ids_in_room(
-            room_id, requester.user.to_string(),
+            room_id, requester.user.to_string()
         )
 
         defer.returnValue((200, {"num_quarantined": num_quarantined}))
@@ -583,6 +571,7 @@ class QuarantineMediaInRoom(RestServlet):
 class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room.
     """
+
     PATTERNS = historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media")
 
     def __init__(self, hs):
@@ -613,7 +602,10 @@ class ResetPasswordRestServlet(RestServlet):
         Returns:
             200 OK with empty object if success otherwise an error.
         """
-    PATTERNS = historical_admin_path_patterns("/reset_password/(?P<target_user_id>[^/]*)")
+
+    PATTERNS = historical_admin_path_patterns(
+        "/reset_password/(?P<target_user_id>[^/]*)"
+    )
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -633,7 +625,7 @@ class ResetPasswordRestServlet(RestServlet):
 
         params = parse_json_object_from_request(request)
         assert_params_in_dict(params, ["new_password"])
-        new_password = params['new_password']
+        new_password = params["new_password"]
 
         yield self._set_password_handler.set_password(
             target_user_id, new_password, requester
@@ -650,7 +642,10 @@ class GetUsersPaginatedRestServlet(RestServlet):
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
         """
-    PATTERNS = historical_admin_path_patterns("/users_paginate/(?P<target_user_id>[^/]*)")
+
+    PATTERNS = historical_admin_path_patterns(
+        "/users_paginate/(?P<target_user_id>[^/]*)"
+    )
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -676,9 +671,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
 
         logger.info("limit: %s, start: %s", limit, start)
 
-        ret = yield self.handlers.admin_handler.get_users_paginate(
-            order, start, limit
-        )
+        ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
         defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
@@ -702,13 +695,11 @@ class GetUsersPaginatedRestServlet(RestServlet):
         order = "name"  # order by name in user table
         params = parse_json_object_from_request(request)
         assert_params_in_dict(params, ["limit", "start"])
-        limit = params['limit']
-        start = params['start']
+        limit = params["limit"]
+        start = params["start"]
         logger.info("limit: %s, start: %s", limit, start)
 
-        ret = yield self.handlers.admin_handler.get_users_paginate(
-            order, start, limit
-        )
+        ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
         defer.returnValue((200, ret))
 
 
@@ -722,6 +713,7 @@ class SearchUsersRestServlet(RestServlet):
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
     """
+
     PATTERNS = historical_admin_path_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
@@ -750,15 +742,14 @@ class SearchUsersRestServlet(RestServlet):
         term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
-        ret = yield self.handlers.admin_handler.search_users(
-            term
-        )
+        ret = yield self.handlers.admin_handler.search_users(term)
         defer.returnValue((200, ret))
 
 
 class DeleteGroupAdminRestServlet(RestServlet):
     """Allows deleting of local groups
     """
+
     PATTERNS = historical_admin_path_patterns("/delete_group/(?P<group_id>[^/]*)")
 
     def __init__(self, hs):
@@ -800,14 +791,14 @@ class AccountValidityRenewServlet(RestServlet):
             raise SynapseError(400, "Missing property 'user_id' in the request body")
 
         expiration_ts = yield self.account_activity_handler.renew_account_for_user(
-            body["user_id"], body.get("expiration_ts"),
+            body["user_id"],
+            body.get("expiration_ts"),
             not body.get("enable_renewal_emails", True),
         )
 
-        res = {
-            "expiration_ts": expiration_ts,
-        }
+        res = {"expiration_ts": expiration_ts}
         defer.returnValue((200, res))
+
 
 ########################################################################################
 #

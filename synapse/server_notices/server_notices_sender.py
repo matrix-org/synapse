@@ -24,6 +24,7 @@ class ServerNoticesSender(object):
     """A centralised place which sends server notices automatically when
     Certain Events take place
     """
+
     def __init__(self, hs):
         """
 
@@ -32,7 +33,7 @@ class ServerNoticesSender(object):
         """
         self._server_notices = (
             ConsentServerNotices(hs),
-            ResourceLimitsServerNotices(hs)
+            ResourceLimitsServerNotices(hs),
         )
 
     @defer.inlineCallbacks
@@ -43,9 +44,7 @@ class ServerNoticesSender(object):
             user_id (str): mxid of user who synced
         """
         for sn in self._server_notices:
-            yield sn.maybe_send_server_notice_to_user(
-                user_id,
-            )
+            yield sn.maybe_send_server_notice_to_user(user_id)
 
     @defer.inlineCallbacks
     def on_user_ip(self, user_id):
@@ -58,6 +57,4 @@ class ServerNoticesSender(object):
         # we check for notices to send to the user in on_user_ip as well as
         # in on_user_syncing
         for sn in self._server_notices:
-            yield sn.maybe_send_server_notice_to_user(
-                user_id,
-            )
+            yield sn.maybe_send_server_notice_to_user(user_id)
