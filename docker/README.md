@@ -118,7 +118,8 @@ when ``SYNAPSE_CONFIG_PATH`` is not set.
 * ``SYNAPSE_TURN_SECRET``, set this to the TURN shared secret if required.
 * ``SYNAPSE_MAX_UPLOAD_SIZE``, set this variable to change the max upload size
   [default `10M`].
-* ``SYNAPSE_ACME``: set this to enable the ACME certificate renewal support.
+* ``SYNAPSE_ACME``, set this to enable the ACME certificate renewal support.
+* ``SYNAPSE_PUBLIC_BASEURL``, set this to configure the base URL when sending out email notifications (must be set to allow local password resets).
 
 Shared secrets, that will be initialized to random values if not set:
 

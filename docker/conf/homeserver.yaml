@@ -22,6 +22,9 @@ pid_file: /homeserver.pid
 web_client: False
 soft_file_limit: 0
 log_config: "/compiled/log.config"
+{% if SYNAPSE_PUBLIC_BASEURL %}
+public_baseurl: "{{ SYNAPSE_PUBLIC_BASEURL }}"
+{% endif %}
 
 ## Ports ##
 
