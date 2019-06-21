@@ -52,6 +52,7 @@ from synapse.rest.client.v1.room import (
     PublicRoomListRestServlet,
     RoomEventContextServlet,
     RoomMemberListRestServlet,
+    RoomMessageListRestServlet,
     RoomStateRestServlet,
 )
 from synapse.rest.client.v1.voip import VoipRestServlet
@@ -109,6 +110,7 @@ class ClientReaderServer(HomeServer):
                     JoinedRoomMemberListRestServlet(self).register(resource)
                     RoomStateRestServlet(self).register(resource)
                     RoomEventContextServlet(self).register(resource)
+                    RoomMessageListRestServlet(self).register(resource)
                     RegisterRestServlet(self).register(resource)
                     LoginRestServlet(self).register(resource)
                     ThreepidRestServlet(self).register(resource)
