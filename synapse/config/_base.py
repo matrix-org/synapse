@@ -414,9 +414,6 @@ class Config(object):
 
         Returns: dict
         """
-        # FIXME: get rid of this
-        self.config_dir_path = config_dir_path
-
         # first we read the config files into a dict
         specified_config = {}
         for config_file in config_files:
