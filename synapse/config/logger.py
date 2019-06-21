@@ -133,7 +133,7 @@ class LoggingConfig(Config):
             help="Do not redirect stdout/stderr to the log",
         )
 
-    def generate_files(self, config):
+    def generate_files(self, config, config_dir_path):
         log_config = config.get("log_config")
         if log_config and not os.path.exists(log_config):
             log_file = self.abspath("homeserver.log")

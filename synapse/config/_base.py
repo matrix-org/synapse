@@ -354,8 +354,8 @@ class Config(object):
                     config_file.write("# vim:ft=yaml\n\n")
                     config_file.write(config_str)
 
-                config = yaml.safe_load(config_str)
-                obj.invoke_all("generate_files", config)
+                config_dict = yaml.safe_load(config_str)
+                obj.generate_missing_files(config_dict, config_dir_path)
 
                 print(
                     (
@@ -390,7 +390,7 @@ class Config(object):
         )
 
         if generate_missing_configs:
-            obj.generate_missing_files(config_dict)
+            obj.generate_missing_files(config_dict, config_dir_path)
             return None
 
         obj.parse_config_dict(
@@ -466,8 +466,8 @@ class Config(object):
             data_dir_path=data_dir_path,
         )
 
-    def generate_missing_files(self, config_dict):
-        self.invoke_all("generate_files", config_dict)
+    def generate_missing_files(self, config_dict, config_dir_path):
+        self.invoke_all("generate_files", config_dict, config_dir_path)
 
 
 def find_config_files(search_paths):
