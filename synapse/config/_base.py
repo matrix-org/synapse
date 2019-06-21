@@ -254,37 +254,43 @@ class Config(object):
             help="Specify config file. Can be given multiple times and"
             " may specify directories containing *.yaml files.",
         )
-        config_parser.add_argument(
+
+        generate_group = config_parser.add_argument_group("Config generation")
+        generate_group.add_argument(
             "--generate-config",
             action="store_true",
-            help="Generate a config file for the server name",
+            help="Generate a config file, then exit.",
         )
-        config_parser.add_argument(
-            "--report-stats",
-            action="store",
-            help="Whether the generated config reports anonymized usage statistics",
-            choices=["yes", "no"],
-        )
-        config_parser.add_argument(
+        generate_group.add_argument(
+            "--generate-missing-configs",
             "--generate-keys",
             action="store_true",
-            help="Generate any missing key files then exit",
+            help="Generate any missing additional config files, then exit.",
         )
-        config_parser.add_argument(
+        generate_group.add_argument(
+            "-H", "--server-name", help="The server name to generate a config file for."
+        )
+        generate_group.add_argument(
+            "--report-stats",
+            action="store",
+            help="Whether the generated config reports anonymized usage statistics.",
+            choices=["yes", "no"],
+        )
+        generate_group.add_argument(
+            "--config-directory",
             "--keys-directory",
             metavar="DIRECTORY",
-            help="Used with 'generate-*' options to specify where files such as"
-            " signing keys should be stored, unless explicitly"
-            " specified in the config.",
-        )
-        config_parser.add_argument(
-            "-H", "--server-name", help="The server name to generate a config file for"
+            help=(
+                "Specify where additional config files such as signing keys and log"
+                " config should be stored. Defaults to the same directory as the main"
+                " config file."
+            ),
         )
         config_args, remaining_args = config_parser.parse_known_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
 
-        generate_keys = config_args.generate_keys
+        generate_missing_configs = config_args.generate_missing_configs
 
         obj = cls()
 
@@ -303,8 +309,8 @@ class Config(object):
             (config_path,) = config_files
             if not cls.path_exists(config_path):
                 print("Generating config file %s" % (config_path,))
-                if config_args.keys_directory:
-                    config_dir_path = config_args.keys_directory
+                if config_args.config_directory:
+                    config_dir_path = config_args.config_directory
                 else:
                     config_dir_path = os.path.dirname(config_path)
                 config_dir_path = os.path.abspath(config_dir_path)
@@ -350,7 +356,7 @@ class Config(object):
                     )
                     % (config_path,)
                 )
-                generate_keys = True
+                generate_missing_configs = True
 
         parser = argparse.ArgumentParser(
             parents=[config_parser],
@@ -369,10 +375,10 @@ class Config(object):
             )
 
         config_dict = obj.read_config_files(
-            config_files, keys_directory=args.keys_directory
+            config_files, keys_directory=config_args.config_directory
         )
 
-        if generate_keys:
+        if generate_missing_configs:
             obj.generate_missing_files(config_dict)
             return None
 
