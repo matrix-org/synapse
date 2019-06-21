@@ -362,7 +362,7 @@ class Config(object):
 
         obj.read_config_files(
             config_files,
-            keys_directory=config_args.keys_directory,
+            keys_directory=config_args.config_directory,
             generate_keys=generate_missing_configs,
         )
 
