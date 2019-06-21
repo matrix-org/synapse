@@ -80,7 +80,7 @@ class LoggingConfig(Config):
         self.log_config = self.abspath(config.get("log_config"))
         self.log_file = self.abspath(config.get("log_file"))
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return (
             """\

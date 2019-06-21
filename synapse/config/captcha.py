@@ -28,7 +28,7 @@ class CaptchaConfig(Config):
             "https://www.recaptcha.net/recaptcha/api/siteverify",
         )
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         ## Captcha ##
         # See docs/CAPTCHA_SETUP for full details of configuring this.

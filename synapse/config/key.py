@@ -122,7 +122,7 @@ class KeyConfig(Config):
         # falsification of values
         self.form_secret = config.get("form_secret", None)
 
-    def default_config(
+    def generate_config_section(
         self, config_dir_path, server_name, generate_secrets=False, **kwargs
     ):
         base_key_name = os.path.join(config_dir_path, server_name)

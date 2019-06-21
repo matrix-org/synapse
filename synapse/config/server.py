@@ -307,7 +307,7 @@ class ServerConfig(Config):
     def has_tls_listener(self):
         return any(l["tls"] for l in self.listeners)
 
-    def default_config(self, server_name, data_dir_path, **kwargs):
+    def generate_config_section(self, server_name, data_dir_path, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
             unsecure_port = bind_port - 400

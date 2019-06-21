@@ -42,7 +42,7 @@ class StatsConfig(Config):
                 / 1000
             )
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
         # Local statistics collection. Used in populating the room directory.
         #

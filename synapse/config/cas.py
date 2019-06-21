@@ -35,7 +35,7 @@ class CasConfig(Config):
             self.cas_service_url = None
             self.cas_required_attributes = {}
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable CAS for registration and login.
         #

@@ -30,7 +30,7 @@ class ApiConfig(Config):
             ],
         )
 
-    def default_config(cls, **kwargs):
+    def generate_config_section(cls, **kwargs):
         return """\
         ## API Configuration ##
 

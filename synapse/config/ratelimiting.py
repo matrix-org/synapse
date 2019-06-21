@@ -80,7 +80,7 @@ class RatelimitConfig(Config):
             "federation_rr_transactions_per_room_per_second", 50
         )
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         ## Ratelimiting ##
 
