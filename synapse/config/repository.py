@@ -86,7 +86,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
 
 
 class ContentRepositoryConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))

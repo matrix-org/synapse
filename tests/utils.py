@@ -182,7 +182,7 @@ def default_config(name, parse=False):
 
     if parse:
         config = HomeServerConfig()
-        config.parse_config_dict(config_dict)
+        config.parse_config_dict(config_dict, "", "")
         return config
 
     return config_dict

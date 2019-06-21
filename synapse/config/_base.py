@@ -243,7 +243,9 @@ class Config(object):
         config_dict = obj.read_config_files(
             config_files, config_dir_path=config_dir_path, data_dir_path=data_dir_path
         )
-        obj.parse_config_dict(config_dict)
+        obj.parse_config_dict(
+            config_dict, config_dir_path=config_dir_path, data_dir_path=data_dir_path
+        )
 
         obj.invoke_all("read_arguments", config_args)
 
@@ -391,7 +393,9 @@ class Config(object):
             obj.generate_missing_files(config_dict)
             return None
 
-        obj.parse_config_dict(config_dict)
+        obj.parse_config_dict(
+            config_dict, config_dir_path=config_dir_path, data_dir_path=data_dir_path
+        )
         obj.invoke_all("read_arguments", args)
 
         return obj
@@ -446,8 +450,24 @@ class Config(object):
             )
         return config
 
-    def parse_config_dict(self, config_dict):
-        self.invoke_all("read_config", config_dict)
+    def parse_config_dict(self, config_dict, config_dir_path, data_dir_path):
+        """Read the information from the config dict into this Config object.
+
+        Args:
+            config_dict (dict): Configuration data, as read from the yaml
+
+            config_dir_path (str): The path where the config files are kept. Used to
+                create filenames for things like the log config and the signing key.
+
+            data_dir_path (str): The path where the data files are kept. Used to create
+                filenames for things like the database and media store.
+        """
+        self.invoke_all(
+            "read_config",
+            config_dict,
+            config_dir_path=config_dir_path,
+            data_dir_path=data_dir_path,
+        )
 
     def generate_missing_files(self, config_dict):
         self.invoke_all("generate_files", config_dict)

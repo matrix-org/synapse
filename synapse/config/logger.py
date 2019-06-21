@@ -74,7 +74,7 @@ root:
 
 
 class LoggingConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.verbosity = config.get("verbose", 0)
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
         self.log_config = self.abspath(config.get("log_config"))

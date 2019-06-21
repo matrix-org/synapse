@@ -78,7 +78,7 @@ class MatrixFederationAgentTests(TestCase):
         # config_dict["trusted_key_servers"] = []
 
         self._config = config = HomeServerConfig()
-        config.parse_config_dict(config_dict)
+        config.parse_config_dict(config_dict, "", "")
 
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,

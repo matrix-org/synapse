@@ -18,7 +18,7 @@ from ._base import Config
 
 
 class PushConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         push_config = config.get("push", {})
         self.push_include_content = push_config.get("include_content", True)
 
