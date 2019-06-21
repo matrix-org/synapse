@@ -290,6 +290,15 @@ class Config(object):
                 " config file."
             ),
         )
+        generate_group.add_argument(
+            "--data-directory",
+            metavar="DIRECTORY",
+            help=(
+                "Specify where data such as the media store and database file should be"
+                " stored. Defaults to the current working directory."
+            ),
+        )
+
         config_args, remaining_args = config_parser.parse_known_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
@@ -322,6 +331,12 @@ class Config(object):
             (config_path,) = config_files
             if not cls.path_exists(config_path):
                 print("Generating config file %s" % (config_path,))
+
+                if config_args.data_directory:
+                    data_dir_path = config_args.data_directory
+                else:
+                    data_dir_path = os.getcwd()
+                data_dir_path = os.path.abspath(data_dir_path)
 
                 server_name = config_args.server_name
                 if not server_name:
