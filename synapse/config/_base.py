@@ -196,6 +196,12 @@ class Config(object):
 
     @classmethod
     def load_config(cls, description, argv):
+        """Parse the commandline and config files
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Returns: Config object.
+        """
         config_parser = argparse.ArgumentParser(description=description)
         config_parser.add_argument(
             "-c",
@@ -222,9 +228,10 @@ class Config(object):
 
         config_files = find_config_files(search_paths=config_args.config_path)
 
-        obj.read_config_files(
-            config_files, keys_directory=config_args.keys_directory, generate_keys=False
+        config_dict = obj.read_config_files(
+            config_files, keys_directory=config_args.keys_directory
         )
+        obj.parse_config_dict(config_dict)
 
         obj.invoke_all("read_arguments", config_args)
 
@@ -232,6 +239,12 @@ class Config(object):
 
     @classmethod
     def load_or_generate_config(cls, description, argv):
+        """Parse the commandline and config files
+
+        Supports generation of config files, so is used for the main homeserver app.
+
+        Returns: Config object, or None if --generate-config or --generate-keys was set
+        """
         config_parser = argparse.ArgumentParser(add_help=False)
         config_parser.add_argument(
             "-c",
@@ -355,33 +368,39 @@ class Config(object):
                 ' -c CONFIG-FILE"'
             )
 
-        obj.read_config_files(
-            config_files,
-            keys_directory=config_args.keys_directory,
-            generate_keys=generate_keys,
+        config_dict = obj.read_config_files(
+            config_files, keys_directory=args.keys_directory
         )
 
         if generate_keys:
+            obj.generate_missing_files(config_dict)
             return None
 
+        obj.parse_config_dict(config_dict)
         obj.invoke_all("read_arguments", args)
 
         return obj
 
-    def read_config_files(self, config_files, keys_directory=None, generate_keys=False):
+    def read_config_files(self, config_files, keys_directory=None):
+        """Read the config files into a dict
+
+        Returns: dict
+        """
         if not keys_directory:
             keys_directory = os.path.dirname(config_files[-1])
 
         self.config_dir_path = os.path.abspath(keys_directory)
 
+        # first we read the config files into a dict
         specified_config = {}
         for config_file in config_files:
             yaml_config = self.read_config_file(config_file)
             specified_config.update(yaml_config)
 
+        # not all of the options have sensible defaults in code, so we now need to
+        # generate a default config file suitable for the specified server name...
         if "server_name" not in specified_config:
             raise ConfigError(MISSING_SERVER_NAME)
-
         server_name = specified_config["server_name"]
         config_string = self.generate_config(
             config_dir_path=self.config_dir_path,
@@ -389,7 +408,11 @@ class Config(object):
             server_name=server_name,
             generate_secrets=False,
         )
+
+        # ... and read it into a base config dict ...
         config = yaml.safe_load(config_string)
+
+        # ... and finally, overlay it with the actual configuration.
         config.pop("log_config")
         config.update(specified_config)
 
@@ -399,15 +422,13 @@ class Config(object):
                 + "\n"
                 + MISSING_REPORT_STATS_SPIEL
             )
-
-        if generate_keys:
-            self.invoke_all("generate_files", config)
-            return
-
-        self.parse_config_dict(config)
+        return config
 
     def parse_config_dict(self, config_dict):
         self.invoke_all("read_config", config_dict)
+
+    def generate_missing_files(self, config_dict):
+        self.invoke_all("generate_files", config_dict)
 
 
 def find_config_files(search_paths):
