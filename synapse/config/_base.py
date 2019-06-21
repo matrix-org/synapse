@@ -289,6 +289,7 @@ class Config(object):
                 )
             (config_path,) = config_files
             if not cls.path_exists(config_path):
+                print("Generating config file %s" % (config_path,))
                 if config_args.keys_directory:
                     config_dir_path = config_args.keys_directory
                 else:
@@ -331,7 +332,7 @@ class Config(object):
             else:
                 print(
                     (
-                        "Config file %r already exists. Generating any missing key"
+                        "Config file %r already exists. Generating any missing config"
                         " files."
                     )
                     % (config_path,)

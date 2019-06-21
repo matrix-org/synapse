@@ -137,6 +137,10 @@ class LoggingConfig(Config):
         log_config = config.get("log_config")
         if log_config and not os.path.exists(log_config):
             log_file = self.abspath("homeserver.log")
+            print(
+                "Generating log config file %s which will log to %s"
+                % (log_config, log_file)
+            )
             with open(log_config, "w") as log_config_file:
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
