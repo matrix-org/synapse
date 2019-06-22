@@ -57,7 +57,6 @@ class ServerConfig(Config):
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
-        self.cpu_affinity = config.get("cpu_affinity")
 
         # Whether to send federation traffic out in this process. This only
         # applies to some federation traffic, and so shouldn't be used to
@@ -335,29 +334,6 @@ class ServerConfig(Config):
         # When running as a daemon, the file to store the pid in
         #
         pid_file: %(pid_file)s
-
-        # CPU affinity mask. Setting this restricts the CPUs on which the
-        # process will be scheduled. It is represented as a bitmask, with the
-        # lowest order bit corresponding to the first logical CPU and the
-        # highest order bit corresponding to the last logical CPU. Not all CPUs
-        # may exist on a given system but a mask may specify more CPUs than are
-        # present.
-        #
-        # For example:
-        #    0x00000001  is processor #0,
-        #    0x00000003  is processors #0 and #1,
-        #    0xFFFFFFFF  is all processors (#0 through #31).
-        #
-        # Pinning a Python process to a single CPU is desirable, because Python
-        # is inherently single-threaded due to the GIL, and can suffer a
-        # 30-40%% slowdown due to cache blow-out and thread context switching
-        # if the scheduler happens to schedule the underlying threads across
-        # different cores. See
-        # https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
-        #
-        # This setting requires the affinity package to be installed!
-        #
-        #cpu_affinity: 0xFFFFFFFF
 
         # The path to the web client which will be served at /_matrix/client/
         # if 'webclient' is configured under the 'listeners' configuration.
