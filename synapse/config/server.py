@@ -327,7 +327,9 @@ class ServerConfig(Config):
     def has_tls_listener(self):
         return any(l["tls"] for l in self.listeners)
 
-    def generate_config_section(self, server_name, data_dir_path, **kwargs):
+    def generate_config_section(
+        self, server_name, data_dir_path, open_private_ports, **kwargs
+    ):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
             unsecure_port = bind_port - 400
@@ -340,6 +342,13 @@ class ServerConfig(Config):
         # Bring DEFAULT_ROOM_VERSION into the local-scope for use in the
         # default config string
         default_room_version = DEFAULT_ROOM_VERSION
+
+        unsecure_http_binding = "port: %i\n            tls: false" % (unsecure_port,)
+        if not open_private_ports:
+            unsecure_http_binding += (
+                "\n            bind_addresses: ['::1', '127.0.0.1']"
+            )
+
         return (
             """\
         ## Server ##
@@ -535,9 +544,7 @@ class ServerConfig(Config):
           # If you plan to use a reverse proxy, please see
           # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
           #
-          - port: %(unsecure_port)s
-            tls: false
-            bind_addresses: ['::1', '127.0.0.1']
+          - %(unsecure_http_binding)s
             type: http
             x_forwarded: true
 
@@ -545,7 +552,7 @@ class ServerConfig(Config):
               - names: [client, federation]
                 compress: false
 
-            # example additonal_resources:
+            # example additional_resources:
             #
             #additional_resources:
             #  "/_matrix/my/custom/endpoint":
