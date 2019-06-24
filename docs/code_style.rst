@@ -56,8 +56,6 @@ takes a while and is very resource intensive.
 
 ## General rules
 
-These rules are useful to keep in mind while programming, but be aware that the above tools will handle most of this for you
-
 - **Naming**:
 
   - Use camel case for class and type names
