@@ -1129,6 +1129,7 @@ password_config:
 #   #password_reset_template_success_html: password_reset_success.html
 #   #password_reset_template_failure_html: password_reset_failure.html
 
+
 #password_providers:
 #    - module: "ldap_auth_provider.LdapAuthProvider"
 #      config:
