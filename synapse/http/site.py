@@ -321,10 +321,6 @@ class SynapseRequest(Request):
 
         scope = opentracing.tracer.scope_manager.active
         if scope is not None:
-            # TODO: Remove this, it's just for debug and relies on implementation
-            # specific details of the jaeger_tracer
-            tags = {t.key: t.vStr for t in scope.span.tags}
-            assert(tags['request_id'] == self.get_request_id())
             # finish the span if it's there.
             scope.span.set_tag("peer.address", authenticated_entity)
             scope.__exit__(None, None, None)
