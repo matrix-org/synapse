@@ -21,7 +21,7 @@ MISSING_SENTRY = """Missing sentry-sdk library. This is required to enable sentr
 
 
 class MetricsConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.enable_metrics = config.get("enable_metrics", False)
         self.report_stats = config.get("report_stats", None)
         self.metrics_port = config.get("metrics_port")

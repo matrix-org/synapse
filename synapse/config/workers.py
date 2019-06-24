@@ -21,7 +21,7 @@ class WorkerConfig(Config):
     They have their own pid_file and listener configuration. They use the
     replication_url to talk to the main synapse process."""
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.worker_app = config.get("worker_app")
 
         # Canonicalise worker_app so that master always has None
@@ -46,7 +46,6 @@ class WorkerConfig(Config):
         self.worker_name = config.get("worker_name", self.worker_app)
 
         self.worker_main_http_uri = config.get("worker_main_http_uri", None)
-        self.worker_cpu_affinity = config.get("worker_cpu_affinity")
 
         # This option is really only here to support `--manhole` command line
         # argument.

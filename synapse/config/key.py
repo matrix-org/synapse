@@ -65,7 +65,7 @@ class TrustedKeyServer(object):
 
 
 class KeyConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
             self.signing_key = read_signing_keys([config["signing_key"]])
@@ -241,6 +241,7 @@ class KeyConfig(Config):
         signing_key_path = config["signing_key_path"]
 
         if not self.path_exists(signing_key_path):
+            print("Generating signing key file %s" % (signing_key_path,))
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
                 write_signing_keys(signing_key_file, (generate_signing_key(key_id),))

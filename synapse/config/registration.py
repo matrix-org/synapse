@@ -46,7 +46,7 @@ class AccountValidityConfig(Config):
 
 
 class RegistrationConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.enable_registration = bool(
             strtobool(str(config.get("enable_registration", False)))
         )

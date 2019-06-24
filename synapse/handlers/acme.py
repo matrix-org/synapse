@@ -15,41 +15,15 @@
 
 import logging
 
-import attr
-from zope.interface import implementer
-
 import twisted
 import twisted.internet.error
 from twisted.internet import defer
-from twisted.python.filepath import FilePath
-from twisted.python.url import URL
 from twisted.web import server, static
 from twisted.web.resource import Resource
 
 from synapse.app import check_bind_error
 
 logger = logging.getLogger(__name__)
-
-try:
-    from txacme.interfaces import ICertificateStore
-
-    @attr.s
-    @implementer(ICertificateStore)
-    class ErsatzStore(object):
-        """
-        A store that only stores in memory.
-        """
-
-        certs = attr.ib(default=attr.Factory(dict))
-
-        def store(self, server_name, pem_objects):
-            self.certs[server_name] = [o.as_bytes() for o in pem_objects]
-            return defer.succeed(None)
-
-
-except ImportError:
-    # txacme is missing
-    pass
 
 
 class AcmeHandler(object):
@@ -60,6 +34,7 @@ class AcmeHandler(object):
 
     @defer.inlineCallbacks
     def start_listening(self):
+        from synapse.handlers import acme_issuing_service
 
         # Configure logging for txacme, if you need to debug
         # from eliot import add_destinations
@@ -67,37 +42,18 @@ class AcmeHandler(object):
         #
         # add_destinations(TwistedDestination())
 
-        from txacme.challenges import HTTP01Responder
-        from txacme.service import AcmeIssuingService
-        from txacme.endpoint import load_or_create_client_key
-        from txacme.client import Client
-        from josepy.jwa import RS256
+        well_known = Resource()
 
-        self._store = ErsatzStore()
-        responder = HTTP01Responder()
-
-        self._issuer = AcmeIssuingService(
-            cert_store=self._store,
-            client_creator=(
-                lambda: Client.from_url(
-                    reactor=self.reactor,
-                    url=URL.from_text(self.hs.config.acme_url),
-                    key=load_or_create_client_key(
-                        FilePath(self.hs.config.config_dir_path)
-                    ),
-                    alg=RS256,
-                )
-            ),
-            clock=self.reactor,
-            responders=[responder],
+        self._issuer = acme_issuing_service.create_issuing_service(
+            self.reactor,
+            acme_url=self.hs.config.acme_url,
+            account_key_file=self.hs.config.acme_account_key_file,
+            well_known_resource=well_known,
         )
 
-        well_known = Resource()
-        well_known.putChild(b"acme-challenge", responder.resource)
         responder_resource = Resource()
         responder_resource.putChild(b".well-known", well_known)
         responder_resource.putChild(b"check", static.Data(b"OK", b"text/plain"))
-
         srv = server.Site(responder_resource)
 
         bind_addresses = self.hs.config.acme_bind_addresses
@@ -128,7 +84,7 @@ class AcmeHandler(object):
             logger.exception("Fail!")
             raise
         logger.warning("Reprovisioned %s, saving.", self._acme_domain)
-        cert_chain = self._store.certs[self._acme_domain]
+        cert_chain = self._issuer.cert_store.certs[self._acme_domain]
 
         try:
             with open(self.hs.config.tls_private_key_file, "wb") as private_key_file:
