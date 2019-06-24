@@ -1352,4 +1352,3 @@ password_config:
 #  module: "my_custom_project.SuperRulesSet"
 #  config:
 #    example_option: 'things'
-
