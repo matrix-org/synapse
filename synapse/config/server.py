@@ -81,12 +81,32 @@ class ServerConfig(Config):
             "require_auth_for_profile_requests", False,
         )
 
-        # If set to 'True', requires authentication to access the server's
-        # public rooms directory through the client API, and forbids any other
-        # homeserver to fetch it via federation.
-        self.restrict_public_rooms_to_local_users = config.get(
-            "restrict_public_rooms_to_local_users", False,
-        )
+        if "restrict_public_rooms_to_local_users" in config and (
+            "allow_public_rooms_without_auth" in config
+            or "allow_public_rooms_over_federation" in config
+        ):
+            raise ConfigError(
+                "Can't use 'restrict_public_rooms_to_local_users' if"
+                " 'allow_public_rooms_without_auth' and/or"
+                " 'allow_public_rooms_over_federation' is set."
+            )
+
+        # Check if the legacy "restrict_public_rooms_to_local_users" flag is set. This
+        # flag is now obsolete but we need to check it for backward-compatibility.
+        if config.get("restrict_public_rooms_to_local_users", False):
+            self.allow_public_rooms_without_auth = False
+            self.allow_public_rooms_over_federation = False
+        else:
+            # If set to 'False', requires authentication to access the server's public
+            # rooms directory through the client API. Defaults to 'True'.
+            self.allow_public_rooms_without_auth = config.get(
+                "allow_public_rooms_without_auth", True
+            )
+            # If set to 'False', forbids any other homeserver to fetch the server's public
+            # rooms directory via federation. Defaults to 'True'.
+            self.allow_public_rooms_over_federation = config.get(
+                "allow_public_rooms_over_federation", True
+            )
 
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
@@ -373,11 +393,15 @@ class ServerConfig(Config):
         #
         #require_auth_for_profile_requests: true
 
-        # If set to 'true', requires authentication to access the server's
-        # public rooms directory through the client API, and forbids any other
-        # homeserver to fetch it via federation. Defaults to 'false'.
+        # If set to 'false', requires authentication to access the server's public rooms
+        # directory through the client API. Defaults to 'true'.
         #
-        #restrict_public_rooms_to_local_users: true
+        #allow_public_rooms_without_auth: false
+
+        # If set to 'false', forbids any other homeserver to fetch the server's public
+        # rooms directory via federation. Defaults to 'true'.
+        #
+        #allow_public_rooms_over_federation: false
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #

@@ -920,7 +920,7 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
         self.url = b"/_matrix/client/r0/publicRooms"
 
         config = self.default_config()
-        config["restrict_public_rooms_to_local_users"] = True
+        config["allow_public_rooms_without_auth"] = False
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
