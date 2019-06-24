@@ -43,7 +43,7 @@ class TracerConfig(Config):
 
     def default_config(self, **kwargs):
         return """\
-        ## Tracert ##
+        ## Tracer ##
 
         tracer:
           # The list of users who's requests will be traced
