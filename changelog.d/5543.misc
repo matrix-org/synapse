@@ -1,1 +1,1 @@
-Make the config clearer in that email.template_dir was relative to the project's root directory, not the `synapse/` folder.
+Make the config clearer in that email.template_dir is relative to the Synapse's root directory, not the `synapse/` folder within it.
