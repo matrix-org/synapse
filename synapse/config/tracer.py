@@ -30,7 +30,7 @@ class TracerConfig(Config):
                 "tracer_enabled": False,
             }
         
-        if not self.tracer_config.get("tracer_enabled", False):
+        if self.tracer_config.get("tracer_enabled", False):
             # The tracer is enabled so sanitize the config
             # If no whitelists are given 
             self.tracer_config.setdefault("user_whitelist", ["*"])
