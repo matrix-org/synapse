@@ -44,9 +44,7 @@ class PushersRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user = requester.user
 
-        pushers = yield self.hs.get_datastore().get_pushers_by_user_id(
-            user.to_string()
-        )
+        pushers = yield self.hs.get_datastore().get_pushers_by_user_id(user.to_string())
 
         allowed_keys = [
             "app_display_name",
@@ -87,50 +85,61 @@ class PushersSetRestServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        if ('pushkey' in content and 'app_id' in content
-                and 'kind' in content and
-                content['kind'] is None):
+        if (
+            "pushkey" in content
+            and "app_id" in content
+            and "kind" in content
+            and content["kind"] is None
+        ):
             yield self.pusher_pool.remove_pusher(
-                content['app_id'], content['pushkey'], user_id=user.to_string()
+                content["app_id"], content["pushkey"], user_id=user.to_string()
             )
             defer.returnValue((200, {}))
 
         assert_params_in_dict(
             content,
-            ['kind', 'app_id', 'app_display_name',
-             'device_display_name', 'pushkey', 'lang', 'data']
+            [
+                "kind",
+                "app_id",
+                "app_display_name",
+                "device_display_name",
+                "pushkey",
+                "lang",
+                "data",
+            ],
         )
 
-        logger.debug("set pushkey %s to kind %s", content['pushkey'], content['kind'])
+        logger.debug("set pushkey %s to kind %s", content["pushkey"], content["kind"])
         logger.debug("Got pushers request with body: %r", content)
 
         append = False
-        if 'append' in content:
-            append = content['append']
+        if "append" in content:
+            append = content["append"]
 
         if not append:
             yield self.pusher_pool.remove_pushers_by_app_id_and_pushkey_not_user(
-                app_id=content['app_id'],
-                pushkey=content['pushkey'],
-                not_user_id=user.to_string()
+                app_id=content["app_id"],
+                pushkey=content["pushkey"],
+                not_user_id=user.to_string(),
             )
 
         try:
             yield self.pusher_pool.add_pusher(
                 user_id=user.to_string(),
                 access_token=requester.access_token_id,
-                kind=content['kind'],
-                app_id=content['app_id'],
-                app_display_name=content['app_display_name'],
-                device_display_name=content['device_display_name'],
-                pushkey=content['pushkey'],
-                lang=content['lang'],
-                data=content['data'],
-                profile_tag=content.get('profile_tag', ""),
+                kind=content["kind"],
+                app_id=content["app_id"],
+                app_display_name=content["app_display_name"],
+                device_display_name=content["device_display_name"],
+                pushkey=content["pushkey"],
+                lang=content["lang"],
+                data=content["data"],
+                profile_tag=content.get("profile_tag", ""),
             )
         except PusherConfigException as pce:
-            raise SynapseError(400, "Config Error: " + str(pce),
-                               errcode=Codes.MISSING_PARAM)
+            raise SynapseError(
+                400, "Config Error: " + str(pce), errcode=Codes.MISSING_PARAM
+            )
 
         self.notifier.on_new_replication_data()
 
@@ -144,6 +153,7 @@ class PushersRemoveRestServlet(RestServlet):
     """
     To allow pusher to be delete by clicking a link (ie. GET request)
     """
+
     PATTERNS = client_patterns("/pushers/remove$", v1=True)
     SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
 
@@ -164,9 +174,7 @@ class PushersRemoveRestServlet(RestServlet):
 
         try:
             yield self.pusher_pool.remove_pusher(
-                app_id=app_id,
-                pushkey=pushkey,
-                user_id=user.to_string(),
+                app_id=app_id, pushkey=pushkey, user_id=user.to_string()
             )
         except StoreError as se:
             if se.code != 404:
@@ -177,9 +185,9 @@ class PushersRemoveRestServlet(RestServlet):
 
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (
-            len(PushersRemoveRestServlet.SUCCESS_HTML),
-        ))
+        request.setHeader(
+            b"Content-Length", b"%d" % (len(PushersRemoveRestServlet.SUCCESS_HTML),)
+        )
         request.write(PushersRemoveRestServlet.SUCCESS_HTML)
         finish_request(request)
         defer.returnValue(None)

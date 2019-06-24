@@ -241,6 +241,7 @@ class KeyConfig(Config):
         signing_key_path = config["signing_key_path"]
 
         if not self.path_exists(signing_key_path):
+            print("Generating signing key file %s" % (signing_key_path,))
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
                 write_signing_keys(signing_key_file, (generate_signing_key(key_id),))
@@ -348,9 +349,8 @@ def _parse_key_servers(key_servers, federation_verify_certificates):
 
                 result.verify_keys[key_id] = verify_key
 
-        if (
-            not federation_verify_certificates and
-            not server.get("accept_keys_insecurely")
+        if not federation_verify_certificates and not server.get(
+            "accept_keys_insecurely"
         ):
             _assert_keyserver_has_verify_keys(result)
 

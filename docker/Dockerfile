@@ -57,6 +57,7 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 
 FROM docker.io/python:${PYTHON_VERSION}-alpine3.8
 
+# xmlsec is required for saml support
 RUN apk add --no-cache --virtual .runtime_deps \
         libffi \
         libjpeg-turbo \
@@ -64,7 +65,8 @@ RUN apk add --no-cache --virtual .runtime_deps \
         libxslt \
         libpq \
         zlib \
-        su-exec
+        su-exec \
+        xmlsec
 
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py

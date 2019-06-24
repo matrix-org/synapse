@@ -311,9 +311,7 @@ class SQLBaseStore(object):
             if res:
                 for user in res:
                     self.set_expiration_date_for_user_txn(
-                        txn,
-                        user["name"],
-                        use_delta=True,
+                        txn, user["name"], use_delta=True
                     )
 
         yield self.runInteraction(
@@ -1662,7 +1660,7 @@ def db_to_json(db_content):
     # Decode it to a Unicode string before feeding it to json.loads, so we
     # consistenty get a Unicode-containing object out.
     if isinstance(db_content, (bytes, bytearray)):
-        db_content = db_content.decode('utf8')
+        db_content = db_content.decode("utf8")
 
     try:
         return json.loads(db_content)
