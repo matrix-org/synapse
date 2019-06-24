@@ -66,6 +66,7 @@ class EmailConfig(Config):
         # work for the same reason.)
         if not template_dir:
             template_dir = pkg_resources.resource_filename("synapse", "res/templates")
+            raise ConfigError(template_dir)
 
         self.email_template_dir = os.path.abspath(template_dir)
 
@@ -233,11 +234,13 @@ class EmailConfig(Config):
         #   app_name: Matrix
         #
         #   # Enable email notifications by default
+        #   #
         #   notif_for_new_users: True
         #
         #   # Defining a custom URL for Riot is only needed if email notifications
         #   # should contain links to a self-hosted installation of Riot; when set
         #   # the "app_name" setting is ignored
+        #   #
         #   riot_base_url: "http://localhost/riot"
         #
         #   # Enable sending password reset emails via the configured, trusted
@@ -250,18 +253,24 @@ class EmailConfig(Config):
         #   #
         #   # If this option is set to false and SMTP options have not been
         #   # configured, resetting user passwords via email will be disabled
+        #   #
         #   #trust_identity_server_for_password_resets: false
         #
         #   # Configure the time that a validation email or text message code
         #   # will expire after sending
         #   #
         #   # This is currently used for password resets
+        #   #
         #   #validation_token_lifetime: 1h
         #
         #   # Template directory. All template files should be stored within this
         #   # directory
         #   #
-        #   #template_dir: synapse/res/templates
+        #   # If not set, the default location is `(location of Synapse's
+        #   # virtualenv)/res/templates`. Using an absolute path is recommended
+        #   # when changing this option from the default.
+        #   #
+        #   #template_dir: synapse-env/res/templates
         #
         #   # Templates for email notifications
         #   #
