@@ -59,21 +59,25 @@ class EventSources(object):
         defer.returnValue(token)
 
     @defer.inlineCallbacks
-    def get_current_token_for_room(self, room_id):
-        push_rules_key, _ = self.store.get_push_rules_stream_token()
-        to_device_key = self.store.get_to_device_stream_token()
-        device_list_key = self.store.get_device_stream_token()
-        groups_key = self.store.get_group_stream_token()
+    def get_current_token_for_pagination(self):
+        """Get the current token for a given room to be used to paginate
+        events.
 
+        The returned token does not have the current values for fields other
+        than `room`, since they are not used during pagination.
+
+        Retuns:
+            Deferred[StreamToken]
+        """
         token = StreamToken(
-            room_key=(yield self.sources["room"].get_current_key_for_room(room_id)),
-            presence_key=(yield self.sources["presence"].get_current_key()),
-            typing_key=(yield self.sources["typing"].get_current_key()),
-            receipt_key=(yield self.sources["receipt"].get_current_key()),
-            account_data_key=(yield self.sources["account_data"].get_current_key()),
-            push_rules_key=push_rules_key,
-            to_device_key=to_device_key,
-            device_list_key=device_list_key,
-            groups_key=groups_key,
+            room_key=(yield self.sources["room"].get_current_key()),
+            presence_key=0,
+            typing_key=0,
+            receipt_key=0,
+            account_data_key=0,
+            push_rules_key=0,
+            to_device_key=0,
+            device_list_key=0,
+            groups_key=0,
         )
         defer.returnValue(token)
