@@ -261,7 +261,7 @@ class EmailConfig(Config):
         #   # Template directory. All template files should be stored within this
         #   # directory
         #   #
-        #   #template_dir: res/templates
+        #   #template_dir: synapse/res/templates
         #
         #   # Templates for email notifications
         #   #
