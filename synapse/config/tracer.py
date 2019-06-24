@@ -74,7 +74,7 @@ def init_tracing(config):
                 },
                 'logging': True,
             },
-            service_name=config.server_name + "_new",
+            service_name=config.server_name,
             scope_manager=LogContextScopeManager(config),
         )
     else: # The tracer is not configured so we instantiate a noop tracer
@@ -84,7 +84,8 @@ def init_tracing(config):
                     'type': 'const',
                     'param': 0,
                 }
-            }
+            },
+            service_name=config.server_name
         )
 
     return jaeger_config.initialize_tracer()
