@@ -50,13 +50,17 @@ class LogContextScopeManager(ScopeManager):
 
         enter_logcontext = False
         ctx = LoggingContext.current_context()
+
         if ctx is LoggingContext.sentinel:
             # We don't want this scope to affect.
             logger.warning("Tried to activate scope outside of loggingcontext")
             return Scope(None, span)
         elif ctx.scope is not None:
-            ctx = nested_logging_context("scope")
+            # We want the logging scope to look exactly the same so we give it
+            # a blank suffix
+            ctx = nested_logging_context("")
             enter_logcontext = True
+
         scope = _LogContextScope(self, span, ctx, enter_logcontext, finish_on_close)
         ctx.scope = scope
         return scope
@@ -82,6 +86,8 @@ class _LogContextScope(Scope):
         super(_LogContextScope, self).__exit__(type, value, traceback)
         if self._enter_logcontext:
             self.logcontext.__exit__(type, value, traceback)
+        else: # the logcontext existed before the creation of the scope
+            self.logcontext.scope = None
 
     def close(self):
         if self.manager.active is not self:

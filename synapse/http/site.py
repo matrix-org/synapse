@@ -238,7 +238,7 @@ class SynapseRequest(Request):
 
         # Start a span
         span_context = extract_span_context(self.requestHeaders)
-        opentracing.tracer.start_active_span(
+        span = opentracing.tracer.start_active_span(
             "incoming-federation-request",
             tags={
                 "request_id": self.get_request_id(),
@@ -327,7 +327,7 @@ class SynapseRequest(Request):
             assert(tags['request_id'] == self.get_request_id())
             # finish the span if it's there.
             scope.span.set_tag("peer.address", authenticated_entity)
-            scope.close()
+            scope.__exit__(None, None, None)
 
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
