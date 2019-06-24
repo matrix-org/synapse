@@ -84,7 +84,7 @@ class ConsentConfig(Config):
         self.user_consent_at_registration = False
         self.user_consent_policy_name = "Privacy Policy"
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         consent_config = config.get("user_consent")
         if consent_config is None:
             return

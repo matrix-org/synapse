@@ -65,7 +65,7 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         }
 
         t = TestConfig()
-        t.read_config(config)
+        t.read_config(config, config_dir_path="", data_dir_path="")
         t.read_certificate_from_disk(require_cert_and_key=False)
 
         warnings = self.flushWarnings()

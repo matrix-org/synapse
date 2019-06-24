@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class TlsConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
 
         acme_config = config.get("acme", None)
         if acme_config is None:

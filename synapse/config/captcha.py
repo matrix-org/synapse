@@ -16,7 +16,7 @@ from ._base import Config
 
 
 class CaptchaConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.recaptcha_private_key = config.get("recaptcha_private_key")
         self.recaptcha_public_key = config.get("recaptcha_public_key")
         self.enable_registration_captcha = config.get(

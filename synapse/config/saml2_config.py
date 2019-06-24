@@ -17,7 +17,7 @@ from ._base import Config, ConfigError
 
 
 class SAML2Config(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.saml2_enabled = False
 
         saml2_config = config.get("saml2_config")

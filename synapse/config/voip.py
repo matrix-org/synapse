@@ -16,7 +16,7 @@ from ._base import Config
 
 
 class VoipConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.turn_uris = config.get("turn_uris", [])
         self.turn_shared_secret = config.get("turn_shared_secret")
         self.turn_username = config.get("turn_username")
