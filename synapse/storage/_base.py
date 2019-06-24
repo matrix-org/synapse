@@ -363,14 +363,10 @@ class SQLBaseStore(object):
             duration = time_now - time_then
             ratio = (curr - prev) / duration
 
-            top_three_counters = self._txn_perf_counters.interval(
-                duration, limit=3
-            )
+            top_three_counters = self._txn_perf_counters.interval(duration, limit=3)
 
             perf_logger.info(
-                "Total database time: %.3f%% {%s}",
-                ratio * 100,
-                top_three_counters,
+                "Total database time: %.3f%% {%s}", ratio * 100, top_three_counters
             )
 
         self._clock.looping_call(loop, 10000)
