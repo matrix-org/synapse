@@ -65,16 +65,26 @@ def init_tracing(config):
         name to the homeserver's.
     """
 
-    jaeger_config = JaegerConfig(
-        config={ 
-            'sampler': {
-                'type': 'const',
-                'param': 1,
+    if config.tracer_config.get("tracer_enabled", False):
+        jaeger_config = JaegerConfig(
+            config={ 
+                'sampler': {
+                    'type': 'const',
+                    'param': 1,
+                },
+                'logging': True,
             },
-            'logging': True,
-        },
-        service_name=config.server_name + "_new",
-        scope_manager=LogContextScopeManager(config),
-    )
+            service_name=config.server_name + "_new",
+            scope_manager=LogContextScopeManager(config),
+        )
+    else: # The tracer is not configured so we instantiate a noop tracer
+        jaeger_config = JaegerConfig(
+            config={
+                'sampler': {
+                    'type': 'const',
+                    'param': 0,
+                }
+            }
+        )
 
     return jaeger_config.initialize_tracer()
