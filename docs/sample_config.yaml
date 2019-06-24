@@ -77,11 +77,15 @@ pid_file: DATADIR/homeserver.pid
 #
 #require_auth_for_profile_requests: true
 
-# If set to 'true', requires authentication to access the server's
-# public rooms directory through the client API, and forbids any other
-# homeserver to fetch it via federation. Defaults to 'false'.
+# If set to 'false', requires authentication to access the server's public rooms
+# directory through the client API. Defaults to 'true'.
 #
-#restrict_public_rooms_to_local_users: true
+#allow_public_rooms_without_auth: false
+
+# If set to 'false', forbids any other homeserver to fetch the server's public
+# rooms directory via federation. Defaults to 'true'.
+#
+#allow_public_rooms_over_federation: false
 
 # The default room version for newly created rooms.
 #
