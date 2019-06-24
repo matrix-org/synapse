@@ -402,6 +402,13 @@ acme:
     #
     #domain: matrix.example.com
 
+    # file to use for the account key. This will be generated if it doesn't
+    # exist.
+    #
+    # If unspecified, we will use CONFDIR/client.key.
+    #
+    account_key_file: DATADIR/acme_account.key
+
 # List of allowed TLS fingerprints for this server to publish along
 # with the signing keys for this server. Other matrix servers that
 # make HTTPS requests to this server will check that the TLS

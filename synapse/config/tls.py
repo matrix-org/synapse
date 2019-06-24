@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class TlsConfig(Config):
-    def read_config(self, config, **kwargs):
+    def read_config(self, config, config_dir_path, **kwargs):
 
         acme_config = config.get("acme", None)
         if acme_config is None:
@@ -49,6 +49,10 @@ class TlsConfig(Config):
         self.acme_bind_addresses = acme_config.get("bind_addresses", ["::", "0.0.0.0"])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
         self.acme_domain = acme_config.get("domain", config.get("server_name"))
+
+        self.acme_account_key_file = self.abspath(
+            acme_config.get("account_key_file", config_dir_path + "/client.key")
+        )
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
@@ -213,11 +217,12 @@ class TlsConfig(Config):
             if sha256_fingerprint not in sha256_fingerprints:
                 self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def default_config(self, config_dir_path, server_name, data_dir_path, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
 
         tls_certificate_path = base_key_name + ".tls.crt"
         tls_private_key_path = base_key_name + ".tls.key"
+        default_acme_account_file = os.path.join(data_dir_path, "acme_account.key")
 
         # this is to avoid the max line length. Sorrynotsorry
         proxypassline = (
@@ -342,6 +347,13 @@ class TlsConfig(Config):
             # If not set, defaults to your 'server_name'.
             #
             #domain: matrix.example.com
+
+            # file to use for the account key. This will be generated if it doesn't
+            # exist.
+            #
+            # If unspecified, we will use CONFDIR/client.key.
+            #
+            account_key_file: %(default_acme_account_file)s
 
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that
