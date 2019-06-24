@@ -38,6 +38,14 @@ from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
 
+# import a function which will return a monotonic time, in seconds
+try:
+    # on python 3, use time.monotonic, since time.clock can go backwards
+    from time import monotonic as monotonic_time
+except ImportError:
+    # ... but python 2 doesn't have it
+    from time import clock as monotonic_time
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -350,14 +358,14 @@ class SQLBaseStore(object):
         )
 
     def start_profiling(self):
-        self._previous_loop_ts = self._clock.time_msec()
+        self._previous_loop_ts = monotonic_time()
 
         def loop():
             curr = self._current_txn_total_time
             prev = self._previous_txn_total_time
             self._previous_txn_total_time = curr
 
-            time_now = self._clock.time_msec()
+            time_now = monotonic_time()
             time_then = self._previous_loop_ts
             self._previous_loop_ts = time_now
 
@@ -383,7 +391,7 @@ class SQLBaseStore(object):
     def _new_transaction(
         self, conn, desc, after_callbacks, exception_callbacks, func, *args, **kwargs
     ):
-        start = time.time()
+        start = monotonic_time()
         txn_id = self._TXN_ID
 
         # We don't really need these to be unique, so lets stop it from
@@ -449,7 +457,7 @@ class SQLBaseStore(object):
             logger.debug("[TXN FAIL] {%s} %s", name, e)
             raise
         finally:
-            end = time.time()
+            end = monotonic_time()
             duration = end - start
 
             LoggingContext.current_context().add_database_transaction(duration)
@@ -523,11 +531,11 @@ class SQLBaseStore(object):
             )
             parent_context = None
 
-        start_time = time.time()
+        start_time = monotonic_time()
 
         def inner_func(conn, *args, **kwargs):
             with LoggingContext("runWithConnection", parent_context) as context:
-                sched_duration_sec = time.time() - start_time
+                sched_duration_sec = monotonic_time() - start_time
                 sql_scheduling_timer.observe(sched_duration_sec)
                 context.add_database_scheduled(sched_duration_sec)
 
