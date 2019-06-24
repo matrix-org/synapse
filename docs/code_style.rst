@@ -19,7 +19,7 @@ First install ``black`` with::
 Have ``black`` auto-format your code (it shouldn't change any
 functionality) with::
 
-  black --check . --exclude="\.tox|build|env"
+  black . --exclude="\.tox|build|env"
 
 - **flake8**
 
@@ -31,7 +31,7 @@ functionality) with::
 
   Check all application and test code with::
 
-    flake 8 synapse tests
+    flake8 synapse tests
 
 - **isort**
 
@@ -58,68 +58,12 @@ takes a while and is very resource intensive.
 
 These rules are useful to keep in mind while programming, but be aware that the above tools will handle most of this for you
 
-- **Indenting**:
-
-  - NEVER tabs. 4 spaces to indent.
-
-  - follow PEP8; either hanging indent or multiline-visual indent depending
-    on the size and shape of the arguments and what makes more sense to the
-    author. In other words, both this::
-
-      print("I am a fish %s" % "moo")
-
-    and this::
-
-      print("I am a fish %s" %
-            "moo")
-
-    and this::
-
-        print(
-            "I am a fish %s" %
-            "moo",
-        )
-
-    ...are valid, although given each one takes up 2x more vertical space than
-    the previous, it's up to the author's discretion as to which layout makes
-    most sense for their function invocation.  (e.g. if they want to add
-    comments per-argument, or put expressions in the arguments, or group
-    related arguments together, or want to deliberately extend or preserve
-    vertical/horizontal space)
-
-- **Line length**:
-
-  Max line length is 90 chars.
-
-  Use parentheses instead of ``\`` for line continuation where ever possible
-  (which is pretty much everywhere).
-
 - **Naming**:
 
   - Use camel case for class and type names
   - Use underscores for functions and variables.
 
 - Use double quotes ``"foo"`` rather than single quotes ``'foo'``.
-
-- **Blank lines**:
-
-  - There should be max a single new line between:
-
-    - statements
-    - functions in a class
-
-  - There should be two new lines between:
-
-    - definitions in a module (e.g., between different classes)
-
-- **Whitespace**:
-
-  There should be spaces where spaces should be and not where there shouldn't
-  be:
-
-  - a single space after a comma
-  - a single space before and after for '=' when used as assignment
-  - no spaces before and after for '=' for default values and keyword arguments.
 
 - **Comments**: should follow the `google code style
   <http://google.github.io/styleguide/pyguide.html?showone=Comments#Comments>`_.
