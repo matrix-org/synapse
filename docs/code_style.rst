@@ -1,5 +1,62 @@
-- Everything should comply with PEP8. Code should pass
-  ``pep8 --max-line-length=100`` without any warnings.
+# Code Style
+
+The Synapse codebase uses a number of code formatting tools in order to
+quickly and automatically check for formatting (and sometimes logical) errors
+in code.
+
+The necessary tools are detailed below.
+
+## Formatting tools
+
+The Synapse codebase uses [black](https://pypi.org/project/black/) as an
+opinionated code formatter, ensuring all comitted code is properly
+formatted.
+
+First install ``black`` with::
+
+  pip install --upgrade black
+
+Have ``black`` auto-format your code (it shouldn't change any
+functionality) with::
+
+  black --check . --exclude="\.tox|build|env"
+
+- **flake8**
+
+  ``flake8`` is a code checking tool. We require code to pass ``flake8`` before being merged into the codebase.
+
+  Install ``flake8`` with::
+
+    pip install --upgrade flake8
+
+  Check all application and test code with::
+
+    flake 8 synapse tests
+
+- **isort**
+
+  ``isort`` ensures imports are nicely formatted, and can suggest and
+  auto-fix issues such as double-importing.
+
+  Install ``isort`` with::
+
+    pip install --upgrade isort
+
+  Auto-fix imports with::
+
+    isort -rc synapse tests
+
+  ``-rc`` means to recursively search the given directories.
+
+It's worth noting that modern IDEs and text editors can run these tools
+automatically on save. It may be worth looking into whether this
+functionality is supported in your editor for a more convenient development
+workflow. It is not, however, recommended to run ``flake8`` on save as it
+takes a while and is very resource intensive.
+
+## General rules
+
+These rules are useful to keep in mind while programming, but be aware that the above tools will handle most of this for you
 
 - **Indenting**:
 
@@ -32,9 +89,7 @@
 
 - **Line length**:
 
-  Max line length is 79 chars (with flexibility to overflow by a "few chars" if
-  the overflowing content is not semantically significant and avoids an
-  explosion of vertical whitespace).
+  Max line length is 90 chars.
 
   Use parentheses instead of ``\`` for line continuation where ever possible
   (which is pretty much everywhere).
@@ -76,7 +131,7 @@
 
 - **Imports**:
 
-  - Prefer to import classes and functions than packages or modules.
+  - Prefer to import classes and functions rather than packages or modules.
 
     Example::
 
@@ -117,23 +172,3 @@
 
   - Avoid wildcard imports (``from synapse.types import *``) and relative
     imports (``from .types import UserID``).
-
-- **Running ``black`` on your code
-
-  The Synapse codebase uses [black](https://pypi.org/project/black/) as an
-  opinionated code formatter, ensuring all comitted code is properly
-  formatted.
-
-  First install ``black`` with::
-
-    pip install --upgrade black
-
-  Have ``black`` auto-format your code (it shouldn't change any
-  functionality) with::
-
-    black --check . --exclude="\.tox|build|env"
-
-  It's worth noting that modern IDEs and text editors can run ``black``
-  automatically on save. It may be worth looking into whether this
-  functionality is supported in your editor for a more convenient development
-  workflow.
