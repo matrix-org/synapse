@@ -374,20 +374,26 @@ class LoggingContext(object):
 
         # sanity check
         if utime_delta < 0:
-            raise ValueError("utime went backwards! %f < %f" % (
-                current.ru_utime, self.usage_start.ru_utime,
-            ))
+            logger.error(
+                "utime went backwards! %f < %f",
+                current.ru_utime,
+                self.usage_start.ru_utime,
+            )
+            utime_delta = 0
 
         if stime_delta < 0:
-            raise ValueError("stime went backwards! %f < %f" % (
-                current.ru_stime, self.usage_start.ru_stime,
-            ))
+            logger.error(
+                "stime went backwards! %f < %f",
+                current.ru_stime,
+                self.usage_start.ru_stime,
+            )
+            stime_delta = 0
 
         return utime_delta, stime_delta
 
     def add_database_transaction(self, duration_sec):
         if duration_sec < 0:
-            raise ValueError('DB txn time can only be non-negative')
+            raise ValueError("DB txn time can only be non-negative")
         self._resource_usage.db_txn_count += 1
         self._resource_usage.db_txn_duration_sec += duration_sec
 
@@ -399,7 +405,7 @@ class LoggingContext(object):
                 connection
         """
         if sched_sec < 0:
-            raise ValueError('DB scheduling time can only be non-negative')
+            raise ValueError("DB scheduling time can only be non-negative")
         self._resource_usage.db_sched_duration_sec += sched_sec
 
     def record_event_fetch(self, event_count):
