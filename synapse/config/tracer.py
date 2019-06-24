@@ -46,6 +46,8 @@ class TracerConfig(Config):
         ## Tracer ##
 
         tracer:
+          # Enable / disable tracer
+          tracer_enabled: false
           # The list of users who's requests will be traced
           # The list is a list of regex which is matched against the user_id
           user_whitelist:
