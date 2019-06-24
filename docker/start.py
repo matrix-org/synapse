@@ -33,12 +33,6 @@ def convert(src, dst, environ):
         outfile.write(rendered)
 
 
-def check_arguments(environ, args):
-    for argument in args:
-        if argument not in environ:
-            error("Environment variable %s is mandatory, exiting." % argument)
-
-
 def generate_config_from_template(environ, ownership):
     """Generate a homeserver.yaml from environment variables
 
@@ -108,17 +102,22 @@ def generate_config_from_template(environ, ownership):
     return config_path
 
 
-# Prepare the configuration
-mode = sys.argv[1] if len(sys.argv) > 1 else None
-ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
-args = ["python", "-m", "synapse.app.homeserver"]
+def run_generate_config(environ):
+    """Run synapse with a --generate-config param to generate a template config file
 
-# In generate mode, generate a configuration, missing keys, then exit
-if mode == "generate":
-    check_arguments(
-        environ, ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS", "SYNAPSE_CONFIG_PATH")
-    )
-    args += [
+    Args:
+        environ (dict): environment dictionary
+
+    Never returns.
+    """
+    for v in ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS", "SYNAPSE_CONFIG_PATH"):
+        if v not in environ:
+            error("Environment variable '%s' is mandatory in `generate` mode." % (v,))
+
+    args = [
+        "python",
+        "-m",
+        "synapse.app.homeserver",
         "--server-name",
         environ["SYNAPSE_SERVER_NAME"],
         "--report-stats",
@@ -129,6 +128,15 @@ if mode == "generate":
     ]
     os.execv("/usr/local/bin/python", args)
 
+
+# Prepare the configuration
+mode = sys.argv[1] if len(sys.argv) > 1 else None
+ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
+
+# In generate mode, generate a configuration, missing keys, then exit
+if mode == "generate":
+    run_generate_config(environ)
+
 # In normal mode, generate missing keys if any, then run synapse
 else:
     if "SYNAPSE_CONFIG_PATH" in environ:
@@ -136,7 +144,10 @@ else:
     else:
         config_path = generate_config_from_template(environ, ownership)
 
-    args += [
+    args = [
+        "python",
+        "-m",
+        "synapse.app.homeserver",
         "--config-path",
         config_path,
         # tell synapse to put any generated keys in /data rather than /compiled
