@@ -28,7 +28,7 @@ class PasswordConfig(Config):
         self.password_enabled = password_config.get("enabled", True)
         self.password_pepper = password_config.get("pepper", "")
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         password_config:
            # Uncomment to disable password login

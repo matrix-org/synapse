@@ -26,7 +26,7 @@ class VoipConfig(Config):
         )
         self.turn_allow_guests = config.get("turn_allow_guests", True)
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         ## TURN ##
 

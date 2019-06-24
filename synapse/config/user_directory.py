@@ -33,7 +33,7 @@ class UserDirectoryConfig(Config):
                 "search_all_users", False
             )
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
         # User Directory configuration
         #
