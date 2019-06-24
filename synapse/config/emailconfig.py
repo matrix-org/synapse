@@ -66,7 +66,6 @@ class EmailConfig(Config):
         # work for the same reason.)
         if not template_dir:
             template_dir = pkg_resources.resource_filename("synapse", "res/templates")
-            raise ConfigError(template_dir)
 
         self.email_template_dir = os.path.abspath(template_dir)
 
