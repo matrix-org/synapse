@@ -1070,11 +1070,13 @@ password_config:
 #   app_name: Matrix
 #
 #   # Enable email notifications by default
+#   #
 #   notif_for_new_users: True
 #
 #   # Defining a custom URL for Riot is only needed if email notifications
 #   # should contain links to a self-hosted installation of Riot; when set
 #   # the "app_name" setting is ignored
+#   #
 #   riot_base_url: "http://localhost/riot"
 #
 #   # Enable sending password reset emails via the configured, trusted
@@ -1087,18 +1089,24 @@ password_config:
 #   #
 #   # If this option is set to false and SMTP options have not been
 #   # configured, resetting user passwords via email will be disabled
+#   #
 #   #trust_identity_server_for_password_resets: false
 #
 #   # Configure the time that a validation email or text message code
 #   # will expire after sending
 #   #
 #   # This is currently used for password resets
+#   #
 #   #validation_token_lifetime: 1h
 #
 #   # Template directory. All template files should be stored within this
 #   # directory
 #   #
-#   #template_dir: synapse/res/templates
+#   # If not set, the default location is `(location of Synapse's
+#   # virtualenv)/res/templates`. Using an absolute path is recommended
+#   # when changing this option from the default.
+#   #
+#   #template_dir: synapse-env/res/templates
 #
 #   # Templates for email notifications
 #   #
@@ -1120,7 +1128,6 @@ password_config:
 #   #
 #   #password_reset_template_success_html: password_reset_success.html
 #   #password_reset_template_failure_html: password_reset_failure.html
-
 
 #password_providers:
 #    - module: "ldap_auth_provider.LdapAuthProvider"
