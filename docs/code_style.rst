@@ -117,3 +117,23 @@
 
   - Avoid wildcard imports (``from synapse.types import *``) and relative
     imports (``from .types import UserID``).
+
+- **Running ``black`` on your code
+
+  The Synapse codebase uses [black](https://pypi.org/project/black/) as an
+  opinionated code formatter, ensuring all comitted code is properly
+  formatted.
+
+  First install ``black`` with::
+
+    pip install --upgrade black
+
+  Have ``black`` auto-format your code (it shouldn't change any
+  functionality) with::
+
+    black --check . --exclude="\.tox|build|env"
+
+  It's worth noting that modern IDEs and text editors can run ``black``
+  automatically on save. It may be worth looking into whether this
+  functionality is supported in your editor for a more convenient development
+  workflow.
