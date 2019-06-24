@@ -721,15 +721,15 @@ class PublicRoomList(BaseFederationServlet):
 
     PATH = "/publicRooms"
 
-    def __init__(self, handler, authenticator, ratelimiter, server_name, deny_access):
+    def __init__(self, handler, authenticator, ratelimiter, server_name, allow_access):
         super(PublicRoomList, self).__init__(
             handler, authenticator, ratelimiter, server_name
         )
-        self.deny_access = deny_access
+        self.allow_access = allow_access
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query):
-        if self.deny_access:
+        if not self.allow_access:
             raise FederationDeniedError(origin)
 
         limit = parse_integer_from_args(query, "limit", 0)
@@ -1436,7 +1436,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
-                deny_access=hs.config.restrict_public_rooms_to_local_users,
+                allow_access=hs.config.allow_public_rooms_over_federation,
             ).register(resource)
 
     if "group_server" in servlet_groups:
