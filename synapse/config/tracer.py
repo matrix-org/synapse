@@ -54,7 +54,7 @@ class TracerConfig(Config):
           # The list is a list of regex which is matched against the user_id
           user_whitelist:
             - "*"
-          # The list of homeservers we wish to trace across 
+          # The list of homeservers we wish to trace across
           # The list is a list of regex which is matched against the homeserver name
           homeserver_whitelist:
             - "*"

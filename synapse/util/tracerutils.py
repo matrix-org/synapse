@@ -1,8 +1,6 @@
 import opentracing
 from opentracing.propagation import Format
 
-from .logcontext import LoggingContext
-
 
 def extract_span_context(headers):
     """
@@ -30,7 +28,7 @@ def inject_span_context(headers, span):
         The headers set by the tracer are custom to the tracer implementation which
         should be unique enough that they don't interfere with any headers set by
         synapse or twisted. If we're still using jaeger these headers would be those
-        here: 
+        here:
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
     carrier = {}

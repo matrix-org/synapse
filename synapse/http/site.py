@@ -239,7 +239,7 @@ class SynapseRequest(Request):
 
         # Start a span
         span_context = extract_span_context(self.requestHeaders)
-        span = opentracing.tracer.start_active_span(
+        opentracing.tracer.start_active_span(
             "incoming-federation-request",
             tags={
                 "request_id": self.get_request_id(),

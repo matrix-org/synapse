@@ -15,8 +15,8 @@ class LogContextScopeManager(ScopeManager):
     def __init__(self, config):
         # Set the whitelists
         logger.info(config.tracer_config)
-        _homeserver_whitelist = config.tracer_config["homeserver_whitelist"]
-        _user_whitelist = config.tracer_config["user_whitelist"]
+        self._homeserver_whitelist = config.tracer_config["homeserver_whitelist"]
+        self._user_whitelist = config.tracer_config["user_whitelist"]
 
     @property
     def active(self):
@@ -27,7 +27,7 @@ class LogContextScopeManager(ScopeManager):
         becomes an implicit parent of any newly-created Span at
         Tracer.start_active_span() time.
 
-        Return: 
+        Return:
             (Scope) : the Scope that is active, or None if not
             available.
         """
@@ -44,8 +44,8 @@ class LogContextScopeManager(ScopeManager):
             span (Span): the span that should become active.
             finish_on_close (Boolean): whether Span should be automatically
                 finished when Scope.close() is called.
-        
-        Return: 
+
+        Return:
             Scope to control the end of the active period for
             *span*. It is a programming error to neglect to call
             Scope.close() on the returned instance.
