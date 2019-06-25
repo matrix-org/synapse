@@ -116,6 +116,7 @@ def run_generate_config(environ, ownership):
         if v not in environ:
             error("Environment variable '%s' is mandatory in `generate` mode." % (v,))
 
+    config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
     data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
 
     # make sure that synapse has perms to write to the data dir.
@@ -131,6 +132,8 @@ def run_generate_config(environ, ownership):
         environ["SYNAPSE_REPORT_STATS"],
         "--config-path",
         environ["SYNAPSE_CONFIG_PATH"],
+        "--config-directory",
+        config_dir,
         "--data-directory",
         data_dir,
         "--generate-config",
