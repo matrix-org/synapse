@@ -101,6 +101,24 @@ def generate_config_from_template(environ, ownership):
     convert("/conf/homeserver.yaml", config_path, environ)
     convert("/conf/log.config", "/compiled/log.config", environ)
     subprocess.check_output(["chown", "-R", ownership, "/data"])
+
+    # Hopefully we already have a signing key, but generate one if not.
+    subprocess.check_output(
+        [
+            "su-exec",
+            ownership,
+            "python",
+            "-m",
+            "synapse.app.homeserver",
+            "--config-path",
+            config_path,
+            # tell synapse to put generated keys in /data rather than /compiled
+            "--keys-directory",
+            "/data",
+            "--generate-keys",
+        ]
+    )
+
     return config_path
 
 
@@ -146,19 +164,15 @@ def main(args, environ):
         config_path = generate_config_from_template(environ, ownership)
 
     args = [
+        "su-exec",
+        ownership,
         "python",
         "-m",
         "synapse.app.homeserver",
         "--config-path",
         config_path,
-        # tell synapse to put any generated keys in /data rather than /compiled
-        "--keys-directory",
-        "/data",
     ]
-
-    # Generate missing keys and start synapse
-    subprocess.check_output(args + ["--generate-keys"])
-    os.execv("/sbin/su-exec", ["su-exec", ownership] + args)
+    os.execv("/sbin/su-exec", args)
 
 
 if __name__ == "__main__":
