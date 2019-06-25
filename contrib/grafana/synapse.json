@@ -17,8 +17,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 4,
-  "iteration": 1554391266679,
+  "id": 1,
+  "iteration": 1561447718159,
   "links": [
     {
       "asDropdown": true,
@@ -72,6 +72,7 @@
       "linewidth": 1,
       "links": [],
       "nullPointMode": "null",
+      "options": {},
       "paceLength": 10,
       "percentage": false,
       "pointradius": 5,
@@ -171,6 +172,7 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "null",
+      "options": {},
       "paceLength": 10,
       "percentage": false,
       "pointradius": 5,
@@ -258,6 +260,7 @@
         "show": false
       },
       "links": [],
+      "options": {},
       "reverseYBuckets": false,
       "targets": [
         {
@@ -319,6 +322,7 @@
       "linewidth": 1,
       "links": [],
       "nullPointMode": "null",
+      "options": {},
       "paceLength": 10,
       "percentage": false,
       "pointradius": 5,
@@ -441,6 +445,7 @@
       "linewidth": 1,
       "links": [],
       "nullPointMode": "null",
+      "options": {},
       "paceLength": 10,
       "percentage": false,
       "pointradius": 5,
@@ -1750,7 +1755,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 67
+            "y": 31
           },
           "id": 4,
           "legend": {
@@ -1770,6 +1775,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1857,7 +1863,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 67
+            "y": 31
           },
           "id": 32,
           "legend": {
@@ -1873,6 +1879,7 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1946,7 +1953,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 75
+            "y": 39
           },
           "id": 23,
           "legend": {
@@ -1966,6 +1973,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2056,7 +2064,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 75
+            "y": 39
           },
           "id": 52,
           "legend": {
@@ -2076,6 +2084,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2163,7 +2172,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 83
+            "y": 47
           },
           "id": 7,
           "legend": {
@@ -2182,6 +2191,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2255,7 +2265,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 83
+            "y": 47
           },
           "id": 47,
           "legend": {
@@ -2275,6 +2285,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2345,7 +2356,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 91
+            "y": 55
           },
           "id": 103,
           "legend": {
@@ -2361,6 +2372,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2462,6 +2474,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -2549,6 +2562,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -3125,7 +3139,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 63
+            "y": 35
           },
           "id": 48,
           "legend": {
@@ -3141,6 +3155,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -3214,7 +3229,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 63
+            "y": 35
           },
           "id": 104,
           "legend": {
@@ -3231,6 +3246,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -3329,7 +3345,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 70
+            "y": 42
           },
           "id": 10,
           "legend": {
@@ -3347,6 +3363,7 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -3420,7 +3437,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 70
+            "y": 42
           },
           "id": 11,
           "legend": {
@@ -3438,6 +3455,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -3445,8 +3463,8 @@
           "renderer": "flot",
           "seriesOverrides": [],
           "spaceLength": 10,
-          "stack": true,
-          "steppedLine": true,
+          "stack": false,
+          "steppedLine": false,
           "targets": [
             {
               "expr": "rate(synapse_storage_transaction_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
@@ -5629,7 +5647,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 68
+            "y": 13
           },
           "id": 67,
           "legend": {
@@ -5645,6 +5663,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "connected",
+          "options": {},
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -5716,7 +5735,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 68
+            "y": 13
           },
           "id": 71,
           "legend": {
@@ -5732,6 +5751,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "connected",
+          "options": {},
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -5791,13 +5811,802 @@
             "align": false,
             "alignLevel": null
           }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 22
+          },
+          "id": 121,
+          "interval": "",
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "connected",
+          "options": {},
+          "paceLength": 10,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "deriv(synapse_event_processing_last_ts{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/1000 - 1",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{job}}-{{index}} {{name}}",
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Event processing catchup rate",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": null,
+              "format": "none",
+              "label": "fallbehind(-) / catchup(+):  s/sec",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         }
       ],
       "title": "Event processing loop positions",
       "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 126,
+      "panels": [
+        {
+          "cards": {
+            "cardPadding": 0,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#B877D9",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateInferno",
+            "exponent": 0.5,
+            "max": null,
+            "min": 0,
+            "mode": "opacity"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "$datasource",
+          "description": "Colour reflects the number of rooms with the given number of forward extremities, or fewer.\n\nThis is only updated once an hour.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 14
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 122,
+          "legend": {
+            "show": true
+          },
+          "links": [],
+          "options": {},
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "format": "heatmap",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Number of rooms, by number of forward extremities in room",
+          "tooltip": {
+            "show": true,
+            "showHistogram": true
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "short",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "auto",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "description": "Number of rooms with the given number of forward extremities or fewer.\n\nThis is only updated once an hour.",
+          "fill": 0,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 14
+          },
+          "id": 124,
+          "interval": "",
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {},
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} > 0",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Room counts, by number of extremities",
+          "tooltip": {
+            "shared": false,
+            "sort": 1,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": null,
+              "format": "none",
+              "label": "Number of rooms",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "cards": {
+            "cardPadding": 0,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#5794F2",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateInferno",
+            "exponent": 0.5,
+            "min": 0,
+            "mode": "opacity"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "$datasource",
+          "description": "Colour reflects the number of events persisted to rooms with the given number of forward extremities, or fewer.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 22
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 127,
+          "legend": {
+            "show": true
+          },
+          "links": [],
+          "options": {},
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "format": "heatmap",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Events persisted, by number of forward extremities in room (heatmap)",
+          "tooltip": {
+            "show": true,
+            "showHistogram": true
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "short",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "auto",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "description": "For a given percentage P, the number X where P% of events were persisted to rooms with X forward extremities or fewer.",
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 22
+          },
+          "id": 128,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {},
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50%",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "75%",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "C"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "refId": "D"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Events persisted, by number of forward extremities in room (quantiles)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": "Number of extremities in room",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "cards": {
+            "cardPadding": 0,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#FF9830",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateInferno",
+            "exponent": 0.5,
+            "min": 0,
+            "mode": "opacity"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "$datasource",
+          "description": "Colour reflects the number of events persisted to rooms with the given number of stale forward extremities, or fewer.\n\nStale forward extremities are those that were in the previous set of extremities as well as the new.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 30
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 129,
+          "legend": {
+            "show": true
+          },
+          "links": [],
+          "options": {},
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "format": "heatmap",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Events persisted, by number of stale forward extremities in room (heatmap)",
+          "tooltip": {
+            "show": true,
+            "showHistogram": true
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "short",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "auto",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "description": "For  given percentage P, the number X where P% of events were persisted to rooms with X stale forward extremities or fewer.\n\nStale forward extremities are those that were in the previous set of extremities as well as the new.",
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 30
+          },
+          "id": 130,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {},
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50%",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "75%",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "C"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "refId": "D"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Events persisted, by number of stale forward extremities in room (quantiles)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": "Number of stale forward extremities in room",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "cards": {
+            "cardPadding": 0,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#73BF69",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateInferno",
+            "exponent": 0.5,
+            "min": 0,
+            "mode": "opacity"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "$datasource",
+          "description": "Colour reflects the number of state resolution operations performed over the given number of state groups, or fewer.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 38
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 131,
+          "legend": {
+            "show": true
+          },
+          "links": [],
+          "options": {},
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "format": "heatmap",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Number of state resolution performed, by number of state groups involved (heatmap)",
+          "tooltip": {
+            "show": true,
+            "showHistogram": true
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "short",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "auto",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "description": "For a given percentage P, the number X where P% of state resolution operations took place over X state groups or fewer.",
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 38
+          },
+          "id": 132,
+          "interval": "",
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {},
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)) ",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50%",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.75, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "75%",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.90, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "C"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "refId": "D"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Number of state resolution performed, by number of state groups involved (quantiles)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": "Number of state groups",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        }
+      ],
+      "title": "Extremities",
+      "type": "row"
     }
   ],
-  "refresh": "1m",
+  "refresh": "5m",
   "schemaVersion": 18,
   "style": "dark",
   "tags": [
@@ -5807,7 +6616,7 @@
     "list": [
       {
         "current": {
-          "selected": true,
+          "tags": [],
           "text": "Prometheus",
           "value": "Prometheus"
         },
@@ -5910,9 +6719,9 @@
         "allFormat": "regex wildcard",
         "allValue": "",
         "current": {
-          "text": "synapse",
+          "text": "All",
           "value": [
-            "synapse"
+            "$__all"
           ]
         },
         "datasource": "$datasource",
@@ -6001,5 +6810,5 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 25
+  "version": 10
 }
