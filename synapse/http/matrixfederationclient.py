@@ -439,12 +439,8 @@ class MatrixFederationHttpClient(object):
                         response.phrase.decode("ascii", errors="replace"),
                     )
 
-                    logger.info(
-                        "Setting response code on span {} *********".format(
-                            opentracing.tracer.active_span
-                        )
-                    )
                     scope.span.set_tag(opentracing.tags.HTTP_STATUS_CODE, response.code)
+
                     if 200 <= response.code < 300:
                         pass
                     else:
