@@ -16,6 +16,7 @@ import logging
 import time
 
 import opentracing
+from opentracing import tags
 
 from twisted.web.server import Request, Site
 
@@ -243,10 +244,10 @@ class SynapseRequest(Request):
             "incoming-federation-request",
             tags={
                 "request_id": self.get_request_id(),
-                "span.kind": "server",
-                "http.method": self.get_method(),
-                "http.url": self.get_redacted_uri(),
-                "peer.ipv6": self.getClientIP(),
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
+                tags.HTTP_METHOD: self.get_method(),
+                tags.HTTP_URL: self.get_redacted_uri(),
+                tags.PEER_HOST_IPV6: self.getClientIP(),
             },
             child_of=span_context,
         )

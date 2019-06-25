@@ -24,6 +24,7 @@ from six.moves import urllib
 
 import attr
 import opentracing
+from opentracing import tags
 import treq
 from canonicaljson import encode_canonical_json
 from opentracing.propagation import Format
@@ -345,10 +346,10 @@ class MatrixFederationHttpClient(object):
         scope = opentracing.tracer.start_active_span(
             "outgoing-federation-request",
             tags={
-                "span.kind": "client",  # With respect to this request's role in an rpc
-                "peer.address": request.destination,
-                "http.method": request.method,
-                "http.url": request.path,
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT
+                tags.PEER_ADDRESS: request.destination,
+                tags.HTTP_METHOD: request.method,
+                tags.HTTP_URL: request.path,
             },
             finish_on_close=True,
         )
@@ -443,7 +444,7 @@ class MatrixFederationHttpClient(object):
                             opentracing.tracer.active_span
                         )
                     )
-                    scope.span.set_tag("http.status_code", response.code)
+                    scope.span.set_tag(opentracing.tags.HTTP_STATUS_CODE response.code)
                     if 200 <= response.code < 300:
                         pass
                     else:
