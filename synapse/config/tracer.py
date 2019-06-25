@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class TracerConfig(Config):
     def read_config(self, config, **kwargs):
-        self.tracer_config = config.get("tracer")
+        self.tracer_config = config.get("opentracing")
 
         if self.tracer_config is None:
             # If the tracer is not configured we assume it is disabled
@@ -45,9 +45,9 @@ class TracerConfig(Config):
 
     def generate_config_section(cls, **kwargs):
         return """\
-        ## Tracer ##
+        ## Opentracing ##
 
-        #tracer:
+        #opentracing:
         #  # Enable / disable tracer
         #  tracer_enabled: false
         #  # The list of users who's requests will be traced
