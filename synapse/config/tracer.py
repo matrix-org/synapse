@@ -38,7 +38,7 @@ class TracerConfig(Config):
             self.tracer_config.setdefault("homeserver_whitelist", [])
 
             if type(self.tracer_config.get("homeserver_whitelist")) != list:
-                raise RuntimeError("Tracer homesererver_whitelist config is malformed")
+                raise ConfigError("Tracer homesererver_whitelist config is malformed")
 
     def generate_config_section(cls, **kwargs):
         return """\
