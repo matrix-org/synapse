@@ -1,0 +1,1 @@
+Fixed m.login.jwt using unregistred user_id and added conditional dependencies for jwt.
