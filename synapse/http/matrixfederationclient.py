@@ -524,12 +524,6 @@ class MatrixFederationHttpClient(object):
                         url_str,
                         _flatten_response_never_received(e),
                     )
-                    logger.info(
-                        "Setting response code on span {} *********".format(
-                            opentracing.tracer.active_span
-                        )
-                    )
-                    # scope.span.set_tag("error", True)
                     raise
 
         defer.returnValue(response)
