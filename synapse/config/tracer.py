@@ -44,14 +44,20 @@ class TracerConfig(Config):
     def generate_config_section(cls, **kwargs):
         return """\
         ## Opentracing ##
+        # These settings enable opentracing which implements distributed tracing
+        # This allows you to observe the causal chain of events across servers 
+        # including requests, key lookups etc. across any server running
+        # synapse or any other other services which supports opentracing.
+        # (specifically those implemented with jaeger)
 
         #opentracing:
         #  # Enable / disable tracer
         #  tracer_enabled: false
-        #  # The list of homeservers we wish to trace across
-        #  # The list is a list of regex which is matched against the homeserver name
+        #  # The list of homeservers we wish to expose our current traces to.
+        #  # The list is a list of regexes which are matched against the
+        #  # servername of the homeserver
         #  homeserver_whitelist:
-        #    - "*"
+        #    - ".*"
         """
 
 
