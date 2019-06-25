@@ -35,7 +35,7 @@ class TracerConfig(Config):
         if self.tracer_config.get("tracer_enabled", False):
             # The tracer is enabled so sanitize the config
             # If no whitelists are given
-            self.tracer_config.setdefault("homeserver_whitelist", ["*"])
+            self.tracer_config.setdefault("homeserver_whitelist", [])
 
             if type(self.tracer_config.get("homeserver_whitelist")) != list:
                 raise RuntimeError("Tracer homesererver_whitelist config is malformed")
