@@ -23,9 +23,10 @@ from six import PY3, raise_from, string_types
 from six.moves import urllib
 
 import attr
+import opentracing
 import treq
 from canonicaljson import encode_canonical_json
-from opentracing.propagation import Format
+from opentracing import tags
 from prometheus_client import Counter
 from signedjson.sign import sign_json
 from zope.interface import implementer
@@ -36,10 +37,6 @@ from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
 from twisted.web.http_headers import Headers
-
-import opentracing
-from opentracing import tags
-from synapse.util.tracerutils import TracerUtil
 
 import synapse.metrics
 import synapse.util.retryutils
@@ -56,6 +53,7 @@ from synapse.http.federation.matrix_federation_agent import MatrixFederationAgen
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
+from synapse.util.tracerutils import TracerUtil
 
 logger = logging.getLogger(__name__)
 

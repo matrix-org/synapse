@@ -13,16 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-
 from jaeger_client import Config as JaegerConfig
 
 from synapse.util.scopecontextmanager import LogContextScopeManager
 from synapse.util.tracerutils import TracerUtil
 
 from ._base import Config, ConfigError
-
-logger = logging.getLogger(__name__)
 
 
 class TracerConfig(Config):
@@ -45,7 +41,7 @@ class TracerConfig(Config):
         return """\
         ## Opentracing ##
         # These settings enable opentracing which implements distributed tracing
-        # This allows you to observe the causal chain of events across servers 
+        # This allows you to observe the causal chain of events across servers
         # including requests, key lookups etc. across any server running
         # synapse or any other other services which supports opentracing.
         # (specifically those implemented with jaeger)

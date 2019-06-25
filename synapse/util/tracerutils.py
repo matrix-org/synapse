@@ -13,14 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.import opentracing
 
-import logging
-
-logger = logging.getLogger(__name__)
+import re
 
 import opentracing
 from opentracing.propagation import Format
-
-import re
 
 # block everything by default
 
@@ -40,7 +36,6 @@ class TracerUtil:
             TracerUtil._homeserver_whitelist = re.compile(
                 "({})".format(")|(".join(homeserver_whitelist))
             )
-            logger.info("Set whitelist to {}".format(TracerUtil._homeserver_whitelist))
 
     @staticmethod
     def whitelisted_homeserver(destination):
@@ -94,7 +89,7 @@ class TracerUtil:
     @staticmethod
     def inject_span_context_byte_dict(headers, span, destination):
         """
-        Injects a span context into a dict where the headers are encoded as byte 
+        Injects a span context into a dict where the headers are encoded as byte
         strings
 
         Args:
@@ -112,7 +107,6 @@ class TracerUtil:
             https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
         """
         if not TracerUtil.whitelisted_homeserver(destination):
-            logger.info("{}".format(TracerUtil._homeserver_whitelist))
             return
 
         carrier = {}

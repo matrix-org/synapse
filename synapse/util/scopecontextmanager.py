@@ -100,7 +100,7 @@ class _LogContextScope(Scope):
             manager (LogContextScopeManager):
                 the manager that is responsible for this scope.
             span (Span):
-                the opentracing span which this scope represents the local 
+                the opentracing span which this scope represents the local
                 lifetime for.
             logcontext (LogContext):
                 the logcontext to which this scope is attached.

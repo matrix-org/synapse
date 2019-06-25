@@ -1356,7 +1356,7 @@ password_config:
 
 ## Opentracing ##
 # These settings enable opentracing which implements distributed tracing
-# This allows you to observe the causal chain of events across servers 
+# This allows you to observe the causal chain of events across servers
 # including requests, key lookups etc. across any server running
 # synapse or any other other services which supports opentracing.
 # (specifically those implemented with jaeger)
