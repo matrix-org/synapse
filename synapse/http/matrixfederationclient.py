@@ -23,8 +23,10 @@ from six import PY3, raise_from, string_types
 from six.moves import urllib
 
 import attr
+import opentracing
 import treq
 from canonicaljson import encode_canonical_json
+from opentracing.propagation import Format
 from prometheus_client import Counter
 from signedjson.sign import sign_json
 from zope.interface import implementer
@@ -51,9 +53,6 @@ from synapse.http.federation.matrix_federation_agent import MatrixFederationAgen
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
-
-import opentracing
-from opentracing.propagation import Format
 
 logger = logging.getLogger(__name__)
 

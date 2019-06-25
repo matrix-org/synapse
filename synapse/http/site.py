@@ -14,6 +14,7 @@
 import contextlib
 import logging
 import time
+
 import opentracing
 
 from twisted.web.server import Request, Site
@@ -21,7 +22,7 @@ from twisted.web.server import Request, Site
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.util.tracerutils import extract_span_context 
+from synapse.util.tracerutils import extract_span_context
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +248,7 @@ class SynapseRequest(Request):
                 "http.url": self.get_redacted_uri(),
                 "peer.ipv6": self.getClientIP(),
             },
-            child_of=span_context
+            child_of=span_context,
         )
 
     def _finished_processing(self):

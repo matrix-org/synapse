@@ -1,8 +1,11 @@
-from .logcontext import LoggingContext, nested_logging_context
-from opentracing import ScopeManager, Scope
 import logging
 
+from opentracing import Scope, ScopeManager
+
+from .logcontext import LoggingContext, nested_logging_context
+
 logger = logging.getLogger(__name__)
+
 
 class LogContextScopeManager(ScopeManager):
 
@@ -71,6 +74,7 @@ class LogContextScopeManager(ScopeManager):
     def user_whitelisted(self, request):
         pass
 
+
 class _LogContextScope(Scope):
     def __init__(self, manager, span, logcontext, enter_logcontext, finish_on_close):
         super(_LogContextScope, self).__init__(manager, span)
@@ -86,7 +90,7 @@ class _LogContextScope(Scope):
         super(_LogContextScope, self).__exit__(type, value, traceback)
         if self._enter_logcontext:
             self.logcontext.__exit__(type, value, traceback)
-        else: # the logcontext existed before the creation of the scope
+        else:  # the logcontext existed before the creation of the scope
             self.logcontext.scope = None
 
     def close(self):

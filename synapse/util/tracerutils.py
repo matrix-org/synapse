@@ -1,7 +1,8 @@
-from opentracing.propagation import Format
 import opentracing
+from opentracing.propagation import Format
 
 from .logcontext import LoggingContext
+
 
 def extract_span_context(headers):
     """
@@ -13,10 +14,10 @@ def extract_span_context(headers):
     """
     # Twisted encodes the values as lists whereas opentracing doesn't.
     # So, we take the first item in the list.
-    # Also, twisted uses byte arrays while opentracing expects strings. 
+    # Also, twisted uses byte arrays while opentracing expects strings.
     header_dict = {k.decode(): v[0].decode() for k, v in headers.getAllRawHeaders()}
     return opentracing.tracer.extract(Format.HTTP_HEADERS, header_dict)
-    
+
 
 def inject_span_context(headers, span):
     """
@@ -34,13 +35,15 @@ def inject_span_context(headers, span):
     """
     carrier = {}
     carrier = opentracing.tracer.inject(span, Format.HTTP_HEADERS, {})
-    
+
     for key, value in carrier:
         headers.addRawHeaders(key, value)
+
 
 # TODO: Implement whitelisting
 def request_from_whitelisted_homeserver(request):
     pass
+
 
 # TODO: Implement whitelisting
 def user_whitelisted(request):

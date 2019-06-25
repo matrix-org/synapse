@@ -13,12 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+import logging
+
 from jaeger_client import Config as JaegerConfig
+
 from synapse.util.scopecontextmanager import LogContextScopeManager
 
-import logging
+from ._base import Config
+
 logger = logging.getLogger(__name__)
+
 
 class TracerConfig(Config):
     def read_config(self, config):
@@ -26,13 +30,11 @@ class TracerConfig(Config):
 
         if self.tracer_config is None:
             # If the tracer is not configured we assume it is disabled
-            self.tracer_config = {
-                "tracer_enabled": False,
-            }
-        
+            self.tracer_config = {"tracer_enabled": False}
+
         if self.tracer_config.get("tracer_enabled", False):
             # The tracer is enabled so sanitize the config
-            # If no whitelists are given 
+            # If no whitelists are given
             self.tracer_config.setdefault("user_whitelist", ["*"])
             self.tracer_config.setdefault("homeserver_whitelist", ["*"])
 
@@ -58,6 +60,7 @@ class TracerConfig(Config):
             - "*"
         """
 
+
 def init_tracing(config):
     """Initialise the JaegerClient tracer
 
@@ -69,25 +72,14 @@ def init_tracing(config):
 
     if config.tracer_config.get("tracer_enabled", False):
         jaeger_config = JaegerConfig(
-            config={ 
-                'sampler': {
-                    'type': 'const',
-                    'param': 1,
-                },
-                'logging': True,
-            },
+            config={"sampler": {"type": "const", "param": 1}, "logging": True},
             service_name=config.server_name,
             scope_manager=LogContextScopeManager(config),
         )
-    else: # The tracer is not configured so we instantiate a noop tracer
+    else:  # The tracer is not configured so we instantiate a noop tracer
         jaeger_config = JaegerConfig(
-            config={
-                'sampler': {
-                    'type': 'const',
-                    'param': 0,
-                }
-            },
-            service_name=config.server_name
+            config={"sampler": {"type": "const", "param": 0}},
+            service_name=config.server_name,
         )
 
     return jaeger_config.initialize_tracer()
