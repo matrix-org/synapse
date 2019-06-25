@@ -35,11 +35,8 @@ class TracerConfig(Config):
         if self.tracer_config.get("tracer_enabled", False):
             # The tracer is enabled so sanitize the config
             # If no whitelists are given
-            self.tracer_config.setdefault("user_whitelist", ["*"])
             self.tracer_config.setdefault("homeserver_whitelist", ["*"])
 
-            if type(self.tracer_config.get("user_whitelist")) != list:
-                raise RuntimeError("Tracer user_whitelist config is malformed")
             if type(self.tracer_config.get("homeserver_whitelist")) != list:
                 raise RuntimeError("Tracer homesererver_whitelist config is malformed")
 
@@ -50,10 +47,6 @@ class TracerConfig(Config):
         #opentracing:
         #  # Enable / disable tracer
         #  tracer_enabled: false
-        #  # The list of users who's requests will be traced
-        #  # The list is a list of regex which is matched against the user_id
-        #  user_whitelist:
-        #    - "*"
         #  # The list of homeservers we wish to trace across
         #  # The list is a list of regex which is matched against the homeserver name
         #  homeserver_whitelist:

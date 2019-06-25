@@ -25,13 +25,11 @@ logger = logging.getLogger(__name__)
 class LogContextScopeManager(ScopeManager):
 
     _homeserver_whitelist = ["*"]
-    _user_whitelist = ["*"]
 
     def __init__(self, config):
         # Set the whitelists
         logger.info(config.tracer_config)
         self._homeserver_whitelist = config.tracer_config["homeserver_whitelist"]
-        self._user_whitelist = config.tracer_config["user_whitelist"]
 
     @property
     def active(self):
@@ -84,9 +82,6 @@ class LogContextScopeManager(ScopeManager):
         return scope
 
     def request_from_whitelisted_homeserver(self, request):
-        pass
-
-    def user_whitelisted(self, request):
         pass
 
 
