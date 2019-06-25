@@ -129,16 +129,15 @@ def run_generate_config(environ):
     os.execv("/usr/local/bin/python", args)
 
 
-# Prepare the configuration
-mode = sys.argv[1] if len(sys.argv) > 1 else None
-ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
+def main(args, environ):
+    mode = args[1] if len(args) > 1 else None
+    ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
 
-# In generate mode, generate a configuration, missing keys, then exit
-if mode == "generate":
-    run_generate_config(environ)
+    # In generate mode, generate a configuration, missing keys, then exit
+    if mode == "generate":
+        return run_generate_config(environ)
 
-# In normal mode, generate missing keys if any, then run synapse
-else:
+    # In normal mode, generate missing keys if any, then run synapse
     if "SYNAPSE_CONFIG_PATH" in environ:
         config_path = environ["SYNAPSE_CONFIG_PATH"]
     else:
@@ -158,3 +157,7 @@ else:
     # Generate missing keys and start synapse
     subprocess.check_output(args + ["--generate-keys"])
     os.execv("/sbin/su-exec", ["su-exec", ownership] + args)
+
+
+if __name__ == "__main__":
+    main(sys.argv, os.environ)
