@@ -19,7 +19,7 @@ from jaeger_client import Config as JaegerConfig
 
 from synapse.util.scopecontextmanager import LogContextScopeManager
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class TracerConfig(Config):
             # If no whitelists are given
             self.tracer_config.setdefault("homeserver_whitelist", [])
 
-            if isinstance(self.tracer_config.get("homeserver_whitelist"), list)
+            if isinstance(self.tracer_config.get("homeserver_whitelist"), list):
                 raise ConfigError("Tracer homesererver_whitelist config is malformed")
 
     def generate_config_section(cls, **kwargs):

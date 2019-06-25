@@ -346,7 +346,7 @@ class MatrixFederationHttpClient(object):
         scope = opentracing.tracer.start_active_span(
             "outgoing-federation-request",
             tags={
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
                 tags.PEER_ADDRESS: request.destination,
                 tags.HTTP_METHOD: request.method,
                 tags.HTTP_URL: request.path,
@@ -444,7 +444,7 @@ class MatrixFederationHttpClient(object):
                             opentracing.tracer.active_span
                         )
                     )
-                    scope.span.set_tag(opentracing.tags.HTTP_STATUS_CODE response.code)
+                    scope.span.set_tag(opentracing.tags.HTTP_STATUS_CODE, response.code)
                     if 200 <= response.code < 300:
                         pass
                     else:
