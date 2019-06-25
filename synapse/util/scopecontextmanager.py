@@ -23,8 +23,13 @@ logger = logging.getLogger(__name__)
 
 
 class LogContextScopeManager(ScopeManager):
-
-    _homeserver_whitelist = ["*"]
+    """
+    The LogContextScopeManager tracks the active scope in opentracing
+    by using the log contexts which are native to synapse. This is so
+    that the basic opentracing api can be used across twisted defereds.
+    (I would love to break logcontexts and this into an OS package. but
+    let's wait for twisted's contexts to be released.)
+    """
 
     def __init__(self, config):
         # Set the whitelists
@@ -58,7 +63,7 @@ class LogContextScopeManager(ScopeManager):
             finish_on_close (Boolean): whether Span should be automatically
                 finished when Scope.close() is called.
 
-        Return:
+        Returns:
             Scope to control the end of the active period for
             *span*. It is a programming error to neglect to call
             Scope.close() on the returned instance.
@@ -86,7 +91,28 @@ class LogContextScopeManager(ScopeManager):
 
 
 class _LogContextScope(Scope):
+    """
+    A custom opentracing scope. The only significant difference is that it will
+    close the log context it's related to if the logcontext was created specifically
+    for this scope.
+    """
+
     def __init__(self, manager, span, logcontext, enter_logcontext, finish_on_close):
+        """
+        Args:
+            manager (LogContextScopeManager):
+                the manager that is responsible for this scope.
+            span (Span):
+                the opentracing span which this scope represents the local 
+                lifetime for.
+            logcontext (LogContext):
+                the logcontext to which this scope is attached.
+            enter_logcontext (Boolean):
+                if True the logcontext will be entered and exited when the scope
+                is entered and exited respectively
+            finish_on_close (Boolean):
+                if True finish the span when the scope is closed
+        """
         super(_LogContextScope, self).__init__(manager, span)
         self.logcontext = logcontext
         self._finish_on_close = finish_on_close
