@@ -179,3 +179,10 @@ docker run -d --name synapse \
     -e SYNAPSE_CONFIG_PATH=/data/homeserver.yaml \
     matrixdotorg/synapse:latest
 ```
+
+The following environment variables are supported in this mode:
+
+* `SYNAPSE_SERVER_NAME` (mandatory): the server public hostname.
+* `SYNAPSE_REPORT_STATS` (mandatory, `yes` or `no`): whether to enable
+  anonymous statistics reporting.
+* `SYNAPSE_CONFIG_PATH` (mandatory): path to the file to be generated.
