@@ -23,8 +23,6 @@ from six import PY3, raise_from, string_types
 from six.moves import urllib
 
 import attr
-import opentracing
-from opentracing import tags
 import treq
 from canonicaljson import encode_canonical_json
 from opentracing.propagation import Format
@@ -38,6 +36,10 @@ from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
 from twisted.web.http_headers import Headers
+
+import opentracing
+from opentracing import tags
+from synapse.util.tracerutils import TracerUtil
 
 import synapse.metrics
 import synapse.util.retryutils
@@ -356,8 +358,9 @@ class MatrixFederationHttpClient(object):
 
         # Inject the span into the headers
         headers_dict = {}
-        opentracing.tracer.inject(scope.span, Format.HTTP_HEADERS, headers_dict)
-        headers_dict = {k.encode(): [v.encode()] for k, v in headers_dict.items()}
+        TracerUtil.inject_span_context_byte_dict(
+            headers_dict, scope.span, request.destination
+        )
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 

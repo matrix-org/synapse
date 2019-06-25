@@ -23,7 +23,7 @@ from twisted.web.server import Request, Site
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.util.tracerutils import extract_span_context
+from synapse.util.tracerutils import TracerUtil
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +239,7 @@ class SynapseRequest(Request):
         )
 
         # Start a span
-        span_context = extract_span_context(self.requestHeaders)
+        span_context = TracerUtil.extract_span_context(self.requestHeaders)
         opentracing.tracer.start_active_span(
             "incoming-federation-request",
             tags={

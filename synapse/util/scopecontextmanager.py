@@ -86,9 +86,6 @@ class LogContextScopeManager(ScopeManager):
         ctx.scope = scope
         return scope
 
-    def request_from_whitelisted_homeserver(self, request):
-        pass
-
 
 class _LogContextScope(Scope):
     """

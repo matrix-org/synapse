@@ -13,51 +13,110 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.import opentracing
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 import opentracing
 from opentracing.propagation import Format
 
+import re
 
-def extract_span_context(headers):
-    """
-    Extracts a span context from Twisted Headers.
-    args:
-        headers (twisted.web.http_headers.Headers)
-    returns:
-        span_context (opentracing.span.SpanContext)
-    """
-    # Twisted encodes the values as lists whereas opentracing doesn't.
-    # So, we take the first item in the list.
-    # Also, twisted uses byte arrays while opentracing expects strings.
-    header_dict = {k.decode(): v[0].decode() for k, v in headers.getAllRawHeaders()}
-    return opentracing.tracer.extract(Format.HTTP_HEADERS, header_dict)
+# block everything by default
 
 
-def inject_span_context(headers, span):
-    """
-    Injects a span context into twisted headers inplace
-    args:
-        headers (twisted.web.http_headers.Headers)
-        span (opentracing.Span)
+class TracerUtil:
+    _homeserver_whitelist = None
 
-    note:
-        The headers set by the tracer are custom to the tracer implementation which
-        should be unique enough that they don't interfere with any headers set by
-        synapse or twisted. If we're still using jaeger these headers would be those
-        here:
-        https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
-    """
-    carrier = {}
-    carrier = opentracing.tracer.inject(span, Format.HTTP_HEADERS, {})
+    @staticmethod
+    def set_homeserver_whitelist(homeserver_whitelist):
+        """Sets the whitelist
 
-    for key, value in carrier:
-        headers.addRawHeaders(key, value)
+        Args:
+            homeserver_whitelist (iterable of strings): regex of whitelisted homeservers
+        """
+        if homeserver_whitelist:
+            # Makes a single regex which accepts all passed in regexes in the list
+            TracerUtil._homeserver_whitelist = re.compile(
+                "({})".format(")|(".join(homeserver_whitelist))
+            )
+            logger.info("Set whitelist to {}".format(TracerUtil._homeserver_whitelist))
 
+    @staticmethod
+    def whitelisted_homeserver(destination):
+        if TracerUtil._homeserver_whitelist:
+            return TracerUtil._homeserver_whitelist.match(destination)
+        return False
 
-# TODO: Implement whitelisting
-def request_from_whitelisted_homeserver(request):
-    pass
+    @staticmethod
+    def extract_span_context(headers):
+        """
+        Extracts a span context from Twisted Headers.
+        args:
+            headers (twisted.web.http_headers.Headers)
+        returns:
+            span_context (opentracing.span.SpanContext)
+        """
+        # Twisted encodes the values as lists whereas opentracing doesn't.
+        # So, we take the first item in the list.
+        # Also, twisted uses byte arrays while opentracing expects strings.
+        header_dict = {k.decode(): v[0].decode() for k, v in headers.getAllRawHeaders()}
+        return opentracing.tracer.extract(Format.HTTP_HEADERS, header_dict)
 
+    @staticmethod
+    def inject_span_context(headers, span, destination):
+        """
+        Injects a span context into twisted headers inplace
 
-# TODO: Implement whitelisting
-def user_whitelisted(request):
-    pass
+        Args:
+            headers (twisted.web.http_headers.Headers)
+            span (opentracing.Span)
+
+        Returns:
+            Inplace modification of headers
+
+        Note:
+            The headers set by the tracer are custom to the tracer implementation which
+            should be unique enough that they don't interfere with any headers set by
+            synapse or twisted. If we're still using jaeger these headers would be those
+            here:
+            https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
+        """
+
+        if not TracerUtil.whitelisted_homeserver(destination):
+            return
+        carrier = {}
+        opentracing.tracer.inject(span, Format.HTTP_HEADERS, carrier)
+
+        for key, value in carrier.items():
+            headers.addRawHeaders(key, value)
+
+    @staticmethod
+    def inject_span_context_byte_dict(headers, span, destination):
+        """
+        Injects a span context into a dict where the headers are encoded as byte 
+        strings
+
+        Args:
+            headers (dict)
+            span (opentracing.Span)
+
+        Returns:
+            Inplace modification of headers
+
+        Note:
+            The headers set by the tracer are custom to the tracer implementation which
+            should be unique enough that they don't interfere with any headers set by
+            synapse or twisted. If we're still using jaeger these headers would be those
+            here:
+            https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
+        """
+        if not TracerUtil.whitelisted_homeserver(destination):
+            logger.info("{}".format(TracerUtil._homeserver_whitelist))
+            return
+
+        carrier = {}
+        opentracing.tracer.inject(span, Format.HTTP_HEADERS, carrier)
+
+        for key, value in carrier.items():
+            headers[key.encode()] = [value.encode()]
