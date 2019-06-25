@@ -102,14 +102,16 @@ class ClientTLSOptionsFactory(object):
         # let us do).
         minTLS = _TLS_VERSION_MAP[config.federation_minimum_tls_client_version]
 
-        self._verify_ssl_context = CertificateOptions(
+        self._verify_ssl = CertificateOptions(
             trustRoot=trust_root, insecurelyLowerMinimumTo=minTLS
-        ).getContext()
+        )
+        self._verify_ssl_context = self._verify_ssl.getContext()
         self._verify_ssl_context.set_info_callback(self._context_info_cb)
 
-        self._no_verify_ssl_context = CertificateOptions(
+        self._no_verify_ssl = CertificateOptions(
             insecurelyLowerMinimumTo=minTLS
-        ).getContext()
+        )
+        self._no_verify_ssl_context = self._no_verify_ssl.getContext()
         self._no_verify_ssl_context.set_info_callback(self._context_info_cb)
 
     def get_options(self, host):

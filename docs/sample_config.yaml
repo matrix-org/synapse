@@ -23,6 +23,29 @@ server_name: "SERVERNAME"
 #
 pid_file: DATADIR/homeserver.pid
 
+# CPU affinity mask. Setting this restricts the CPUs on which the
+# process will be scheduled. It is represented as a bitmask, with the
+# lowest order bit corresponding to the first logical CPU and the
+# highest order bit corresponding to the last logical CPU. Not all CPUs
+# may exist on a given system but a mask may specify more CPUs than are
+# present.
+#
+# For example:
+#    0x00000001  is processor #0,
+#    0x00000003  is processors #0 and #1,
+#    0xFFFFFFFF  is all processors (#0 through #31).
+#
+# Pinning a Python process to a single CPU is desirable, because Python
+# is inherently single-threaded due to the GIL, and can suffer a
+# 30-40% slowdown due to cache blow-out and thread context switching
+# if the scheduler happens to schedule the underlying threads across
+# different cores. See
+# https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
+#
+# This setting requires the affinity package to be installed!
+#
+#cpu_affinity: 0xFFFFFFFF
+
 # The path to the web client which will be served at /_matrix/client/
 # if 'webclient' is configured under the 'listeners' configuration.
 #
@@ -54,15 +77,11 @@ pid_file: DATADIR/homeserver.pid
 #
 #require_auth_for_profile_requests: true
 
-# If set to 'false', requires authentication to access the server's public rooms
-# directory through the client API. Defaults to 'true'.
+# If set to 'true', requires authentication to access the server's
+# public rooms directory through the client API, and forbids any other
+# homeserver to fetch it via federation. Defaults to 'false'.
 #
-#allow_public_rooms_without_auth: false
-
-# If set to 'false', forbids any other homeserver to fetch the server's public
-# rooms directory via federation. Defaults to 'true'.
-#
-#allow_public_rooms_over_federation: false
+#restrict_public_rooms_to_local_users: true
 
 # The default room version for newly created rooms.
 #
@@ -213,7 +232,7 @@ listeners:
       - names: [client, federation]
         compress: false
 
-    # example additional_resources:
+    # example additonal_resources:
     #
     #additional_resources:
     #  "/_matrix/my/custom/endpoint":
@@ -405,13 +424,6 @@ acme:
     # If not set, defaults to your 'server_name'.
     #
     #domain: matrix.example.com
-
-    # file to use for the account key. This will be generated if it doesn't
-    # exist.
-    #
-    # If unspecified, we will use CONFDIR/client.key.
-    #
-    account_key_file: DATADIR/acme_account.key
 
 # List of allowed TLS fingerprints for this server to publish along
 # with the signing keys for this server. Other matrix servers that
@@ -1339,16 +1351,3 @@ password_config:
 #    alias: "*"
 #    room_id: "*"
 #    action: allow
-
-
-# Server admins can define a Python module that implements extra rules for
-# allowing or denying incoming events. In order to work, this module needs to
-# override the methods defined in synapse/events/third_party_rules.py.
-#
-# This feature is designed to be used in closed federations only, where each
-# participating server enforces the same rules.
-#
-#third_party_event_rules:
-#  module: "my_custom_project.SuperRulesSet"
-#  config:
-#    example_option: 'things'

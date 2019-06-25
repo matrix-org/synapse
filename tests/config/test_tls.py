@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +19,7 @@ import os
 from OpenSSL import SSL
 
 from synapse.config.tls import ConfigError, TlsConfig
-from synapse.crypto.context_factory import ContextFactory
+from synapse.crypto.context_factory import ClientTLSOptionsFactory
 
 from tests.unittest import TestCase
 
@@ -132,7 +133,7 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         if hasattr(SSL, "OP_NO_TLSv1_3"):
             OP_NO_TLSv1_3 = SSL.OP_NO_TLSv1_3
             delattr(SSL, "OP_NO_TLSv1_3")
-            self.addCleanup(setattr, SSL, "SSL.OP_NO_TLSv1_3", SSL.OP_NO_TLSv1_3)
+            self.addCleanup(setattr, SSL, "SSL.OP_NO_TLSv1_3", OP_NO_TLSv1_3)
             assert not hasattr(SSL, "OP_NO_TLSv1_3")
 
         config = {"federation_minimum_tls_client_version": 1.3}
@@ -170,8 +171,8 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
 
-        cf = ContextFactory(t)
+        cf = ClientTLSOptionsFactory(t)
 
         # The context has had NO_TLSv1_1 set, but not NO_TLSv1_2
-        self.assertNotEqual(cf._verify_ssl_context._options & SSL.OP_NO_TLSv1_1, 0)
-        self.assertEqual(cf._verify_ssl_context._options & SSL.OP_NO_TLSv1_2, 0)
+        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
