@@ -53,13 +53,15 @@ def get_connection_factory():
     # this needs to happen once, but not until we are ready to run the first test
     global test_server_connection_factory
     if test_server_connection_factory is None:
-        test_server_connection_factory = TestServerTLSConnectionFactory(sanlist=[
-            b'DNS:testserv',
-            b'DNS:target-server',
-            b'DNS:xn--bcher-kva.com',
-            b'IP:1.2.3.4',
-            b'IP:::1',
-        ])
+        test_server_connection_factory = TestServerTLSConnectionFactory(
+            sanlist=[
+                b"DNS:testserv",
+                b"DNS:target-server",
+                b"DNS:xn--bcher-kva.com",
+                b"IP:1.2.3.4",
+                b"IP:::1",
+            ]
+        )
     return test_server_connection_factory
 
 
@@ -76,7 +78,7 @@ class MatrixFederationAgentTests(TestCase):
         # config_dict["trusted_key_servers"] = []
 
         self._config = config = HomeServerConfig()
-        config.parse_config_dict(config_dict)
+        config.parse_config_dict(config_dict, "", "")
 
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
@@ -133,7 +135,7 @@ class MatrixFederationAgentTests(TestCase):
         Sends a simple GET request via the agent, and checks its logcontext management
         """
         with LoggingContext("one") as context:
-            fetch_d = self.agent.request(b'GET', uri)
+            fetch_d = self.agent.request(b"GET", uri)
 
             # Nothing happened yet
             self.assertNoResult(fetch_d)
@@ -177,9 +179,9 @@ class MatrixFederationAgentTests(TestCase):
         """Check that an incoming request looks like a valid .well-known request, and
         send back the response.
         """
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/.well-known/matrix/server')
-        self.assertEqual(request.requestHeaders.getRawHeaders(b'host'), [b'testserv'])
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/.well-known/matrix/server")
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])
         # send back a response
         for k, v in headers.items():
             request.setHeader(k, v)
@@ -202,7 +204,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
@@ -210,20 +212,20 @@ class MatrixFederationAgentTests(TestCase):
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
         self.assertEqual(
-            request.requestHeaders.getRawHeaders(b'host'), [b'testserv:8448']
+            request.requestHeaders.getRawHeaders(b"host"), [b"testserv:8448"]
         )
         content = request.content.read()
-        self.assertEqual(content, b'')
+        self.assertEqual(content, b"")
 
         # Deferred is still without a result
         self.assertNoResult(test_d)
 
         # send the headers
-        request.responseHeaders.setRawHeaders(b'Content-Type', [b'application/json'])
-        request.write('')
+        request.responseHeaders.setRawHeaders(b"Content-Type", [b"application/json"])
+        request.write("")
 
         self.reactor.pump((0.1,))
 
@@ -233,7 +235,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(response.code, 200)
 
         # Send the body
-        request.write('{ "a": 1 }'.encode('ascii'))
+        request.write('{ "a": 1 }'.encode("ascii"))
         request.finish()
 
         self.reactor.pump((0.1,))
@@ -258,7 +260,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
@@ -266,9 +268,9 @@ class MatrixFederationAgentTests(TestCase):
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
-        self.assertEqual(request.requestHeaders.getRawHeaders(b'host'), [b'1.2.3.4'])
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"1.2.3.4"])
 
         # finish the request
         request.finish()
@@ -293,7 +295,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '::1')
+        self.assertEqual(host, "::1")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
@@ -301,9 +303,9 @@ class MatrixFederationAgentTests(TestCase):
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
-        self.assertEqual(request.requestHeaders.getRawHeaders(b'host'), [b'[::1]'])
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"[::1]"])
 
         # finish the request
         request.finish()
@@ -328,7 +330,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '::1')
+        self.assertEqual(host, "::1")
         self.assertEqual(port, 80)
 
         # make a test server, and wire up the client
@@ -336,9 +338,9 @@ class MatrixFederationAgentTests(TestCase):
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
-        self.assertEqual(request.requestHeaders.getRawHeaders(b'host'), [b'[::1]:80'])
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"[::1]:80"])
 
         # finish the request
         request.finish()
@@ -364,7 +366,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         # fonx the connection
@@ -382,11 +384,11 @@ class MatrixFederationAgentTests(TestCase):
         # we should fall back to a direct connection
         self.assertEqual(len(clients), 2)
         (host, port, client_factory, _timeout, _bindAddress) = clients[1]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
-        http_server = self._make_connection(client_factory, expected_sni=b'testserv1')
+        http_server = self._make_connection(client_factory, expected_sni=b"testserv1")
 
         # there should be no requests
         self.assertEqual(len(http_server.requests), 0)
@@ -413,7 +415,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.5')
+        self.assertEqual(host, "1.2.3.5")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
@@ -447,7 +449,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         # fonx the connection
@@ -465,17 +467,17 @@ class MatrixFederationAgentTests(TestCase):
         # we should fall back to a direct connection
         self.assertEqual(len(clients), 2)
         (host, port, client_factory, _timeout, _bindAddress) = clients[1]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
-        http_server = self._make_connection(client_factory, expected_sni=b'testserv')
+        http_server = self._make_connection(client_factory, expected_sni=b"testserv")
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
-        self.assertEqual(request.requestHeaders.getRawHeaders(b'host'), [b'testserv'])
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])
 
         # finish the request
         request.finish()
@@ -499,7 +501,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         self._handle_well_known_connection(
@@ -516,20 +518,20 @@ class MatrixFederationAgentTests(TestCase):
         # now we should get a connection to the target server
         self.assertEqual(len(clients), 2)
         (host, port, client_factory, _timeout, _bindAddress) = clients[1]
-        self.assertEqual(host, '1::f')
+        self.assertEqual(host, "1::f")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
         http_server = self._make_connection(
-            client_factory, expected_sni=b'target-server'
+            client_factory, expected_sni=b"target-server"
         )
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
         self.assertEqual(
-            request.requestHeaders.getRawHeaders(b'host'), [b'target-server']
+            request.requestHeaders.getRawHeaders(b"host"), [b"target-server"]
         )
 
         # finish the request
@@ -561,7 +563,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop()
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         redirect_server = self._make_connection(
@@ -571,7 +573,7 @@ class MatrixFederationAgentTests(TestCase):
         # send a 302 redirect
         self.assertEqual(len(redirect_server.requests), 1)
         request = redirect_server.requests[0]
-        request.redirect(b'https://testserv/even_better_known')
+        request.redirect(b"https://testserv/even_better_known")
         request.finish()
 
         self.reactor.pump((0.1,))
@@ -580,7 +582,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop()
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         well_known_server = self._make_connection(
@@ -589,8 +591,8 @@ class MatrixFederationAgentTests(TestCase):
 
         self.assertEqual(len(well_known_server.requests), 1, "No request after 302")
         request = well_known_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/even_better_known')
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/even_better_known")
         request.write(b'{ "m.server": "target-server" }')
         request.finish()
 
@@ -604,20 +606,20 @@ class MatrixFederationAgentTests(TestCase):
         # now we should get a connection to the target server
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1::f')
+        self.assertEqual(host, "1::f")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
         http_server = self._make_connection(
-            client_factory, expected_sni=b'target-server'
+            client_factory, expected_sni=b"target-server"
         )
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
         self.assertEqual(
-            request.requestHeaders.getRawHeaders(b'host'), [b'target-server']
+            request.requestHeaders.getRawHeaders(b"host"), [b"target-server"]
         )
 
         # finish the request
@@ -652,11 +654,11 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop()
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         self._handle_well_known_connection(
-            client_factory, expected_sni=b"testserv", content=b'NOT JSON'
+            client_factory, expected_sni=b"testserv", content=b"NOT JSON"
         )
 
         # now there should be a SRV lookup
@@ -667,17 +669,17 @@ class MatrixFederationAgentTests(TestCase):
         # we should fall back to a direct connection
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop()
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
-        http_server = self._make_connection(client_factory, expected_sni=b'testserv')
+        http_server = self._make_connection(client_factory, expected_sni=b"testserv")
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
-        self.assertEqual(request.requestHeaders.getRawHeaders(b'host'), [b'testserv'])
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])
 
         # finish the request
         request.finish()
@@ -712,12 +714,10 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
-        http_proto = self._make_connection(
-            client_factory, expected_sni=b"testserv",
-        )
+        http_proto = self._make_connection(client_factory, expected_sni=b"testserv")
 
         # there should be no requests
         self.assertEqual(len(http_proto.requests), 0)
@@ -750,17 +750,17 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8443)
 
         # make a test server, and wire up the client
-        http_server = self._make_connection(client_factory, expected_sni=b'testserv')
+        http_server = self._make_connection(client_factory, expected_sni=b"testserv")
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
-        self.assertEqual(request.requestHeaders.getRawHeaders(b'host'), [b'testserv'])
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])
 
         # finish the request
         request.finish()
@@ -783,7 +783,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         self.mock_resolver.resolve_service.side_effect = lambda _: [
@@ -804,20 +804,20 @@ class MatrixFederationAgentTests(TestCase):
         # now we should get a connection to the target of the SRV record
         self.assertEqual(len(clients), 2)
         (host, port, client_factory, _timeout, _bindAddress) = clients[1]
-        self.assertEqual(host, '5.6.7.8')
+        self.assertEqual(host, "5.6.7.8")
         self.assertEqual(port, 8443)
 
         # make a test server, and wire up the client
         http_server = self._make_connection(
-            client_factory, expected_sni=b'target-server'
+            client_factory, expected_sni=b"target-server"
         )
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
         self.assertEqual(
-            request.requestHeaders.getRawHeaders(b'host'), [b'target-server']
+            request.requestHeaders.getRawHeaders(b"host"), [b"target-server"]
         )
 
         # finish the request
@@ -846,7 +846,7 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         # fonx the connection
@@ -865,20 +865,20 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 2)
         (host, port, client_factory, _timeout, _bindAddress) = clients[1]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8448)
 
         # make a test server, and wire up the client
         http_server = self._make_connection(
-            client_factory, expected_sni=b'xn--bcher-kva.com'
+            client_factory, expected_sni=b"xn--bcher-kva.com"
         )
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
         self.assertEqual(
-            request.requestHeaders.getRawHeaders(b'host'), [b'xn--bcher-kva.com']
+            request.requestHeaders.getRawHeaders(b"host"), [b"xn--bcher-kva.com"]
         )
 
         # finish the request
@@ -907,20 +907,20 @@ class MatrixFederationAgentTests(TestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8443)
 
         # make a test server, and wire up the client
         http_server = self._make_connection(
-            client_factory, expected_sni=b'xn--bcher-kva.com'
+            client_factory, expected_sni=b"xn--bcher-kva.com"
         )
 
         self.assertEqual(len(http_server.requests), 1)
         request = http_server.requests[0]
-        self.assertEqual(request.method, b'GET')
-        self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
         self.assertEqual(
-            request.requestHeaders.getRawHeaders(b'host'), [b'xn--bcher-kva.com']
+            request.requestHeaders.getRawHeaders(b"host"), [b"xn--bcher-kva.com"]
         )
 
         # finish the request
@@ -941,42 +941,42 @@ class MatrixFederationAgentTests(TestCase):
     def test_well_known_cache(self):
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
-        fetch_d = self.do_get_well_known(b'testserv')
+        fetch_d = self.do_get_well_known(b"testserv")
 
         # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         well_known_server = self._handle_well_known_connection(
             client_factory,
             expected_sni=b"testserv",
-            response_headers={b'Cache-Control': b'max-age=10'},
+            response_headers={b"Cache-Control": b"max-age=10"},
             content=b'{ "m.server": "target-server" }',
         )
 
         r = self.successResultOf(fetch_d)
-        self.assertEqual(r, b'target-server')
+        self.assertEqual(r, b"target-server")
 
         # close the tcp connection
         well_known_server.loseConnection()
 
         # repeat the request: it should hit the cache
-        fetch_d = self.do_get_well_known(b'testserv')
+        fetch_d = self.do_get_well_known(b"testserv")
         r = self.successResultOf(fetch_d)
-        self.assertEqual(r, b'target-server')
+        self.assertEqual(r, b"target-server")
 
         # expire the cache
         self.reactor.pump((10.0,))
 
         # now it should connect again
-        fetch_d = self.do_get_well_known(b'testserv')
+        fetch_d = self.do_get_well_known(b"testserv")
 
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
         self._handle_well_known_connection(
@@ -986,7 +986,7 @@ class MatrixFederationAgentTests(TestCase):
         )
 
         r = self.successResultOf(fetch_d)
-        self.assertEqual(r, b'other-server')
+        self.assertEqual(r, b"other-server")
 
 
 class TestCachePeriodFromHeaders(TestCase):
@@ -994,27 +994,27 @@ class TestCachePeriodFromHeaders(TestCase):
         # uppercase
         self.assertEqual(
             _cache_period_from_headers(
-                Headers({b'Cache-Control': [b'foo, Max-Age = 100, bar']})
+                Headers({b"Cache-Control": [b"foo, Max-Age = 100, bar"]})
             ),
             100,
         )
 
         # missing value
         self.assertIsNone(
-            _cache_period_from_headers(Headers({b'Cache-Control': [b'max-age=, bar']}))
+            _cache_period_from_headers(Headers({b"Cache-Control": [b"max-age=, bar"]}))
         )
 
         # hackernews: bogus due to semicolon
         self.assertIsNone(
             _cache_period_from_headers(
-                Headers({b'Cache-Control': [b'private; max-age=0']})
+                Headers({b"Cache-Control": [b"private; max-age=0"]})
             )
         )
 
         # github
         self.assertEqual(
             _cache_period_from_headers(
-                Headers({b'Cache-Control': [b'max-age=0, private, must-revalidate']})
+                Headers({b"Cache-Control": [b"max-age=0, private, must-revalidate"]})
             ),
             0,
         )
@@ -1022,7 +1022,7 @@ class TestCachePeriodFromHeaders(TestCase):
         # google
         self.assertEqual(
             _cache_period_from_headers(
-                Headers({b'cache-control': [b'private, max-age=0']})
+                Headers({b"cache-control": [b"private, max-age=0"]})
             ),
             0,
         )
@@ -1030,7 +1030,7 @@ class TestCachePeriodFromHeaders(TestCase):
     def test_expires(self):
         self.assertEqual(
             _cache_period_from_headers(
-                Headers({b'Expires': [b'Wed, 30 Jan 2019 07:35:33 GMT']}),
+                Headers({b"Expires": [b"Wed, 30 Jan 2019 07:35:33 GMT"]}),
                 time_now=lambda: 1548833700,
             ),
             33,
@@ -1041,8 +1041,8 @@ class TestCachePeriodFromHeaders(TestCase):
             _cache_period_from_headers(
                 Headers(
                     {
-                        b'cache-control': [b'max-age=10'],
-                        b'Expires': [b'Wed, 30 Jan 2019 07:35:33 GMT'],
+                        b"cache-control": [b"max-age=10"],
+                        b"Expires": [b"Wed, 30 Jan 2019 07:35:33 GMT"],
                     }
                 ),
                 time_now=lambda: 1548833700,
@@ -1051,7 +1051,7 @@ class TestCachePeriodFromHeaders(TestCase):
         )
 
         # invalid expires means immediate expiry
-        self.assertEqual(_cache_period_from_headers(Headers({b'Expires': [b'0']})), 0)
+        self.assertEqual(_cache_period_from_headers(Headers({b"Expires": [b"0"]})), 0)
 
 
 def _check_logcontext(context):

@@ -65,13 +65,18 @@ class TrustedKeyServer(object):
 
 
 class KeyConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, config_dir_path, **kwargs):
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
             self.signing_key = read_signing_keys([config["signing_key"]])
         else:
-            self.signing_key_path = config["signing_key_path"]
-            self.signing_key = self.read_signing_key(self.signing_key_path)
+            signing_key_path = config.get("signing_key_path")
+            if signing_key_path is None:
+                signing_key_path = os.path.join(
+                    config_dir_path, config["server_name"] + ".signing.key"
+                )
+
+            self.signing_key = self.read_signing_key(signing_key_path)
 
         self.old_signing_keys = self.read_old_signing_keys(
             config.get("old_signing_keys", {})
@@ -117,7 +122,7 @@ class KeyConfig(Config):
         # falsification of values
         self.form_secret = config.get("form_secret", None)
 
-    def default_config(
+    def generate_config_section(
         self, config_dir_path, server_name, generate_secrets=False, **kwargs
     ):
         base_key_name = os.path.join(config_dir_path, server_name)
@@ -237,10 +242,18 @@ class KeyConfig(Config):
                 )
         return keys
 
-    def generate_files(self, config):
-        signing_key_path = config["signing_key_path"]
+    def generate_files(self, config, config_dir_path):
+        if "signing_key" in config:
+            return
+
+        signing_key_path = config.get("signing_key_path")
+        if signing_key_path is None:
+            signing_key_path = os.path.join(
+                config_dir_path, config["server_name"] + ".signing.key"
+            )
 
         if not self.path_exists(signing_key_path):
+            print("Generating signing key file %s" % (signing_key_path,))
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
                 write_signing_keys(signing_key_file, (generate_signing_key(key_id),))
@@ -348,9 +361,8 @@ def _parse_key_servers(key_servers, federation_verify_certificates):
 
                 result.verify_keys[key_id] = verify_key
 
-        if (
-            not federation_verify_certificates and
-            not server.get("accept_keys_insecurely")
+        if not federation_verify_certificates and not server.get(
+            "accept_keys_insecurely"
         ):
             _assert_keyserver_has_verify_keys(result)
 

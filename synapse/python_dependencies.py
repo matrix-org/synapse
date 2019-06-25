@@ -45,14 +45,11 @@ REQUIREMENTS = [
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
     "idna>=2.5",
-
     # validating SSL certs for IP addresses requires service_identity 18.1.
     "service_identity>=18.1.0",
-
     # our logcontext handling relies on the ability to cancel inlineCallbacks
     # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
     "Twisted>=18.7.0",
-
     "treq>=15.1",
     # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
     "pyopenssl>=16.0.0",
@@ -71,37 +68,29 @@ REQUIREMENTS = [
     # prometheus_client 0.4.0 changed the format of counter metrics
     # (cf https://github.com/matrix-org/synapse/issues/4001)
     "prometheus_client>=0.0.18,<0.4.0",
-
     # we use attr.s(slots), which arrived in 16.0.0
     # Twisted 18.7.0 requires attrs>=17.4.0
     "attrs>=17.4.0",
-
     "netaddr>=0.7.18",
-
-    # Opentracing
     "jaeger-client>=4.0.0",
+    "Jinja2>=2.9",
+    "bleach>=1.4.3",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
-    "email": ["Jinja2>=2.9", "bleach>=1.4.3"],
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
-
     # we use execute_batch, which arrived in psycopg 2.7.
     "postgres": ["psycopg2>=2.7"],
-
     # ConsentResource uses select_autoescape, which arrived in jinja 2.9
     "resources.consent": ["Jinja2>=2.9"],
-
     # ACME support is required to provision TLS certificates from authorities
     # that use the protocol, such as Let's Encrypt.
     "acme": [
         "txacme>=0.9.2",
-
         # txacme depends on eliot. Eliot 1.8.0 is incompatible with
         # python 3.5.2, as per https://github.com/itamarst/eliot/issues/418
         'eliot<1.8.0;python_version<"3.5.3"',
     ],
-
     "saml2": ["pysaml2>=4.5.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
@@ -124,12 +113,14 @@ def list_requirements():
 class DependencyException(Exception):
     @property
     def message(self):
-        return "\n".join([
-            "Missing Requirements: %s" % (", ".join(self.dependencies),),
-            "To install run:",
-            "    pip install --upgrade --force %s" % (" ".join(self.dependencies),),
-            "",
-        ])
+        return "\n".join(
+            [
+                "Missing Requirements: %s" % (", ".join(self.dependencies),),
+                "To install run:",
+                "    pip install --upgrade --force %s" % (" ".join(self.dependencies),),
+                "",
+            ]
+        )
 
     @property
     def dependencies(self):

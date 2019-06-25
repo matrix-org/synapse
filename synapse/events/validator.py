@@ -48,9 +48,7 @@ class EventValidator(object):
                 raise SynapseError(400, "Event does not have key %s" % (k,))
 
         # Check that the following keys have string values
-        event_strings = [
-            "origin",
-        ]
+        event_strings = ["origin"]
 
         for s in event_strings:
             if not isinstance(getattr(event, s), string_types):
@@ -62,8 +60,10 @@ class EventValidator(object):
                     if len(alias) > MAX_ALIAS_LENGTH:
                         raise SynapseError(
                             400,
-                            ("Can't create aliases longer than"
-                             " %d characters" % (MAX_ALIAS_LENGTH,)),
+                            (
+                                "Can't create aliases longer than"
+                                " %d characters" % (MAX_ALIAS_LENGTH,)
+                            ),
                             Codes.INVALID_PARAM,
                         )
 
@@ -76,11 +76,7 @@ class EventValidator(object):
             event (EventBuilder|FrozenEvent)
         """
 
-        strings = [
-            "room_id",
-            "sender",
-            "type",
-        ]
+        strings = ["room_id", "sender", "type"]
 
         if hasattr(event, "state_key"):
             strings.append("state_key")
@@ -93,10 +89,7 @@ class EventValidator(object):
         UserID.from_string(event.sender)
 
         if event.type == EventTypes.Message:
-            strings = [
-                "body",
-                "msgtype",
-            ]
+            strings = ["body", "msgtype"]
 
             self._ensure_strings(event.content, strings)
 
