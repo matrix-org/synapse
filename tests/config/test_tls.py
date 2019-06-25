@@ -15,7 +15,10 @@
 
 import os
 
-from synapse.config.tls import TlsConfig
+from OpenSSL import SSL
+
+from synapse.config.tls import ConfigError, TlsConfig
+from synapse.crypto.context_factory import ContextFactory
 
 from tests.unittest import TestCase
 
@@ -78,3 +81,97 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
                 "or use Synapse's ACME support to provision one."
             ),
         )
+
+    def test_tls_client_minimum_default(self):
+        """
+        The default client TLS version is 1.0.
+        """
+        config = {}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        self.assertEqual(t.federation_minimum_tls_client_version, 1.0)
+
+    def test_tls_client_minimum_set(self):
+        """
+        The default client TLS version can be set to 1.0, 1.1, and 1.2.
+        """
+        config = {"federation_minimum_tls_client_version": 1.0}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_minimum_tls_client_version, 1.0)
+
+        config = {"federation_minimum_tls_client_version": 1.1}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_minimum_tls_client_version, 1.1)
+
+        config = {"federation_minimum_tls_client_version": 1.2}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_minimum_tls_client_version, 1.2)
+
+        # Also test a string version
+        config = {"federation_minimum_tls_client_version": "1.0"}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_minimum_tls_client_version, 1.0)
+
+        # Also just 1 for 1.0
+        config = {"federation_minimum_tls_client_version": "1"}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_minimum_tls_client_version, 1.0)
+
+    def test_tls_client_minimum_1_point_3_missing(self):
+        """
+        If TLS 1.3 support is missing and it's configured, it will raise a
+        ConfigError.
+        """
+        # thanks i hate it
+        if hasattr(SSL, "OP_NO_TLSv1_3"):
+            OP_NO_TLSv1_3 = SSL.OP_NO_TLSv1_3
+            delattr(SSL, "OP_NO_TLSv1_3")
+            self.addCleanup(setattr, SSL, "SSL.OP_NO_TLSv1_3", SSL.OP_NO_TLSv1_3)
+            assert not hasattr(SSL, "OP_NO_TLSv1_3")
+
+        config = {"federation_minimum_tls_client_version": 1.3}
+        t = TestConfig()
+        with self.assertRaises(ConfigError) as e:
+            t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(
+            e.exception.args[0],
+            (
+                "federation_minimum_tls_client_version cannot be 1.3, "
+                "your OpenSSL does not support it"
+            ),
+        )
+
+    def test_tls_client_minimum_1_point_3_exists(self):
+        """
+        If TLS 1.3 support exists and it's configured, it will be settable.
+        """
+        # thanks i hate it, still
+        if not hasattr(SSL, "OP_NO_TLSv1_3"):
+            SSL.OP_NO_TLSv1_3 = 0x00
+            self.addCleanup(lambda: delattr(SSL, "OP_NO_TLSv1_3"))
+            assert hasattr(SSL, "OP_NO_TLSv1_3")
+
+        config = {"federation_minimum_tls_client_version": 1.3}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_minimum_tls_client_version, 1.3)
+
+    def test_tls_client_minimum_set_passed_through(self):
+        """
+        The configured TLS version is correctly configured by the ContextFactory.
+        """
+        config = {"federation_minimum_tls_client_version": 1.2}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        cf = ContextFactory(t)
+
+        # The context has had NO_TLSv1_1 set, but not NO_TLSv1_2
+        self.assertNotEqual(cf._verify_ssl_context._options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(cf._verify_ssl_context._options & SSL.OP_NO_TLSv1_2, 0)
