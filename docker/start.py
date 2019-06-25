@@ -116,8 +116,15 @@ def run_generate_config(environ, ownership):
         if v not in environ:
             error("Environment variable '%s' is mandatory in `generate` mode." % (v,))
 
+    server_name = environ["SYNAPSE_SERVER_NAME"]
     config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
     data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
+
+    # create a suitable log config from our template
+    log_config_file = "%s/%s.log.config" % (config_dir, server_name)
+    if not os.path.exists(log_config_file):
+        log("Creating log config %s" % (log_config_file,))
+        convert("/conf/log.config", log_config_file, environ)
 
     # make sure that synapse has perms to write to the data dir.
     subprocess.check_output(["chown", ownership, data_dir])
@@ -127,7 +134,7 @@ def run_generate_config(environ, ownership):
         "-m",
         "synapse.app.homeserver",
         "--server-name",
-        environ["SYNAPSE_SERVER_NAME"],
+        server_name,
         "--report-stats",
         environ["SYNAPSE_REPORT_STATS"],
         "--config-path",
