@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class TracerConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.tracer_config = config.get("tracer")
 
         if self.tracer_config is None:
@@ -43,7 +43,7 @@ class TracerConfig(Config):
             if type(self.tracer_config.get("homeserver_whitelist")) != list:
                 raise RuntimeError("Tracer homesererver_whitelist config is malformed")
 
-    def default_config(self, **kwargs):
+    def generate_config_section(cls, **kwargs):
         return """\
         ## Tracer ##
 
