@@ -1,11 +1,12 @@
 #!/usr/local/bin/python
 
-import jinja2
-import os
-import sys
-import subprocess
-import glob
 import codecs
+import glob
+import os
+import subprocess
+import sys
+
+import jinja2
 
 
 # Utility functions
