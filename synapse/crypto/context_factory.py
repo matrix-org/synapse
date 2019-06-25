@@ -108,9 +108,7 @@ class ClientTLSOptionsFactory(object):
         self._verify_ssl_context = self._verify_ssl.getContext()
         self._verify_ssl_context.set_info_callback(self._context_info_cb)
 
-        self._no_verify_ssl = CertificateOptions(
-            insecurelyLowerMinimumTo=minTLS
-        )
+        self._no_verify_ssl = CertificateOptions(insecurelyLowerMinimumTo=minTLS)
         self._no_verify_ssl_context = self._no_verify_ssl.getContext()
         self._no_verify_ssl_context.set_info_callback(self._context_info_cb)
 
