@@ -69,7 +69,7 @@ class LogContextScopeManager(ScopeManager):
 
         if ctx is LoggingContext.sentinel:
             # We don't want this scope to affect.
-            logger.warning("Tried to activate scope outside of loggingcontext")
+            logger.error("Tried to activate scope outside of loggingcontext")
             return Scope(None, span)
         elif ctx.scope is not None:
             # We want the logging scope to look exactly the same so we give it
@@ -105,7 +105,7 @@ class _LogContextScope(Scope):
 
     def close(self):
         if self.manager.active is not self:
-            logger.warning("Tried to close a none active scope!")
+            logger.error("Tried to close a none active scope!")
             return
 
         if self._finish_on_close:
