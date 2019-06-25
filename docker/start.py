@@ -67,10 +67,11 @@ def generate_config_from_template(environ, ownership):
             # generate a new secret and write it to a file
 
             if os.path.exists(filename):
+                log("Reading %s from %s" % (secret, filename))
                 with open(filename) as handle:
                     value = handle.read()
             else:
-                log("Generating a random secret for {}".format(name))
+                log("Generating a random secret for {}".format(secret))
                 value = codecs.encode(os.urandom(32), "hex").decode()
                 with open(filename, "w") as handle:
                     handle.write(value)
