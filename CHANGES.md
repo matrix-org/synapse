@@ -1,3 +1,24 @@
+Synapse 1.0.0 (2019-06-11)
+==========================
+
+Bugfixes
+--------
+
+- Fix bug where attempting to send transactions with large number of EDUs can fail. ([\#5418](https://github.com/matrix-org/synapse/issues/5418))
+
+
+Improved Documentation
+----------------------
+
+- Expand the federation guide to include relevant content from the MSC1711 FAQ ([\#5419](https://github.com/matrix-org/synapse/issues/5419))
+
+
+Internal Changes
+----------------
+
+- Move password reset links to /_matrix/client/unstable namespace. ([\#5424](https://github.com/matrix-org/synapse/issues/5424))
+
+
 Synapse 1.0.0rc3 (2019-06-10)
 =============================
 
@@ -31,7 +52,11 @@ Features
 - Add a script to generate new signing-key files. ([\#5361](https://github.com/matrix-org/synapse/issues/5361))
 - Update upgrade and installation guides ahead of 1.0. ([\#5371](https://github.com/matrix-org/synapse/issues/5371))
 - Replace the `perspectives` configuration section with `trusted_key_servers`, and make validating the signatures on responses optional (since TLS will do this job for us). ([\#5374](https://github.com/matrix-org/synapse/issues/5374))
-- Add ability to perform password reset via email without trusting the identity server. ([\#5377](https://github.com/matrix-org/synapse/issues/5377))
+- Add ability to perform password reset via email without trusting the identity server. **As a result of this PR, password resets will now be disabled on the default configuration.**
+
+  Password reset emails are now sent from the homeserver by default, instead of the identity server. To enable this functionality, ensure `email` and `public_baseurl` config options are filled out.
+
+  If you would like to re-enable password resets being sent from the identity server (warning: this is dangerous! See [#5345](https://github.com/matrix-org/synapse/pull/5345)), set `email.trust_identity_server_for_password_resets` to true. ([\#5377](https://github.com/matrix-org/synapse/issues/5377))
 - Set default room version to v4. ([\#5379](https://github.com/matrix-org/synapse/issues/5379))
 
 

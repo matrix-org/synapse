@@ -17,4 +17,4 @@ su -c '/usr/lib/postgresql/9.6/bin/pg_ctl -w -D /var/lib/postgresql/data start' 
 # Run the tests
 cd /src
 export TRIAL_FLAGS="-j 4"
-tox --workdir=/tmp -e py27-postgres
+tox --workdir=/tmp -e py35-postgres

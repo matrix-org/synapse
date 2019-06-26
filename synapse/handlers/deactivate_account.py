@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 class DeactivateAccountHandler(BaseHandler):
     """Handler which deals with deactivating user accounts."""
+
     def __init__(self, hs):
         super(DeactivateAccountHandler, self).__init__(hs)
         self._auth_handler = hs.get_auth_handler()
@@ -41,6 +43,8 @@ class DeactivateAccountHandler(BaseHandler):
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
         hs.get_reactor().callWhenRunning(self._start_user_parting)
+
+        self._account_validity_enabled = hs.config.account_validity.enabled
 
     @defer.inlineCallbacks
     def deactivate_account(self, user_id, erase_data, id_server=None):
@@ -75,9 +79,9 @@ class DeactivateAccountHandler(BaseHandler):
                 result = yield self._identity_handler.try_unbind_threepid(
                     user_id,
                     {
-                        'medium': threepid['medium'],
-                        'address': threepid['address'],
-                        'id_server': id_server,
+                        "medium": threepid["medium"],
+                        "address": threepid["address"],
+                        "id_server": id_server,
                     },
                 )
                 identity_server_supports_unbinding &= result
@@ -86,7 +90,7 @@ class DeactivateAccountHandler(BaseHandler):
                 logger.exception("Failed to remove threepid from ID server")
                 raise SynapseError(400, "Failed to remove threepid from ID server")
             yield self.store.user_delete_threepid(
-                user_id, threepid['medium'], threepid['address'],
+                user_id, threepid["medium"], threepid["address"]
             )
 
         # delete any devices belonging to the user, which will also
@@ -113,6 +117,13 @@ class DeactivateAccountHandler(BaseHandler):
         # Now start the process that goes through that list and
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
+
+        # Remove all information on the user from the account_validity table.
+        if self._account_validity_enabled:
+            yield self.store.delete_account_validity_for_user(user_id)
+
+        # Mark the user as deactivated.
+        yield self.store.set_user_deactivated_status(user_id, True)
 
         defer.returnValue(identity_server_supports_unbinding)
 
@@ -173,5 +184,6 @@ class DeactivateAccountHandler(BaseHandler):
             except Exception:
                 logger.exception(
                     "Failed to part user %r from room %r: ignoring and continuing",
-                    user_id, room_id,
+                    user_id,
+                    room_id,
                 )

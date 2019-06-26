@@ -1,1 +1,0 @@
-Fix bug where attempting to send transactions with large number of EDUs can fail.

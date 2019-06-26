@@ -44,18 +44,16 @@ class SAML2ResponseResource(Resource):
 
     @wrap_html_request_handler
     def _async_render_POST(self, request):
-        resp_bytes = parse_string(request, 'SAMLResponse', required=True)
-        relay_state = parse_string(request, 'RelayState', required=True)
+        resp_bytes = parse_string(request, "SAMLResponse", required=True)
+        relay_state = parse_string(request, "RelayState", required=True)
 
         try:
             saml2_auth = self._saml_client.parse_authn_request_response(
-                resp_bytes, saml2.BINDING_HTTP_POST,
+                resp_bytes, saml2.BINDING_HTTP_POST
             )
         except Exception as e:
             logger.warning("Exception parsing SAML2 response", exc_info=1)
-            raise CodeMessageException(
-                400, "Unable to parse SAML2 response: %s" % (e,),
-            )
+            raise CodeMessageException(400, "Unable to parse SAML2 response: %s" % (e,))
 
         if saml2_auth.not_signed:
             raise CodeMessageException(400, "SAML2 response was not signed")
@@ -67,6 +65,5 @@ class SAML2ResponseResource(Resource):
 
         displayName = saml2_auth.ava.get("displayName", [None])[0]
         return self._sso_auth_handler.on_successful_auth(
-            username, request, relay_state,
-            user_display_name=displayName,
+            username, request, relay_state, user_display_name=displayName
         )

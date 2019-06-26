@@ -100,7 +100,7 @@ class SrvResolverTestCase(unittest.TestCase):
     def test_from_cache(self):
         clock = MockClock()
 
-        dns_client_mock = Mock(spec_set=['lookupService'])
+        dns_client_mock = Mock(spec_set=["lookupService"])
         dns_client_mock.lookupService = Mock(spec_set=[])
 
         service_name = b"test_service.example.com"

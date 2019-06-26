@@ -1,5 +1,22 @@
 # MSC1711 Certificates FAQ
 
+## Historical Note
+This document was originally written to guide server admins through the upgrade
+path towards Synapse 1.0. Specifically,
+[MSC1711](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md)
+required that all servers present valid TLS certificates on their federation
+API. Admins were encouraged to achieve compliance from version 0.99.0 (released
+in February 2019) ahead of version 1.0 (released June 2019) enforcing the
+certificate checks.
+
+Much of what follows is now outdated since most admins will have already
+upgraded, however it may be of use to those with old installs returning to the
+project.
+
+If you are setting up a server from scratch you almost certainly should look at
+the [installation guide](../INSTALL.md) instead.
+
+## Introduction
 The goal of Synapse 0.99.0 is to act as a stepping stone to Synapse 1.0.0. It
 supports the r0.1 release of the server to server specification, but is
 compatible with both the legacy Matrix federation behaviour (pre-r0.1) as well
