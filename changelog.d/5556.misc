@@ -1,0 +1,1 @@
+Treat more outgoing federation connection failures (like refused connection, dead domains, and no route to host) as fatal and not able to be retried immediately.
