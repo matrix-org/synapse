@@ -358,7 +358,7 @@ class LoginRestServlet(RestServlet):
         defer.returnValue(result)
 
 
-class BaseSsoRedirectServlet(RestServlet):
+class BaseSSORedirectServlet(RestServlet):
     """Common base class for /login/sso/redirect impls"""
 
     PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
@@ -386,7 +386,7 @@ class BaseSsoRedirectServlet(RestServlet):
         raise NotImplementedError()
 
 
-class CasRedirectServlet(BaseSsoRedirectServlet):
+class CasRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url.encode("ascii")
@@ -483,7 +483,7 @@ class CasTicketServlet(RestServlet):
         return user, attributes
 
 
-class SAMLRedirectServlet(BaseSsoRedirectServlet):
+class SAMLRedirectServlet(BaseSSORedirectServlet):
     PATTERNS = client_patterns("/login/sso/redirect", v1=True)
 
     def __init__(self, hs):
