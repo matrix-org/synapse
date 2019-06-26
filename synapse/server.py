@@ -194,8 +194,8 @@ class HomeServer(object):
         "sendmail",
         "registration_handler",
         "account_validity_handler",
+        "saml2_handler",
         "event_client_serializer",
-        "saml_client",
     ]
 
     REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
@@ -525,13 +525,13 @@ class HomeServer(object):
     def build_account_validity_handler(self):
         return AccountValidityHandler(self)
 
+    def build_saml2_handler(self):
+        from synapse.handlers.saml2_handler import Saml2Handler
+
+        return Saml2Handler(self)
+
     def build_event_client_serializer(self):
         return EventClientSerializer(self)
-
-    def build_saml_client(self):
-        from saml2.client import Saml2Client
-
-        return Saml2Client(self.config.saml2_sp_config)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

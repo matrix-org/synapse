@@ -487,19 +487,10 @@ class SAMLRedirectServlet(BaseSsoRedirectServlet):
     PATTERNS = client_patterns("/login/sso/redirect", v1=True)
 
     def __init__(self, hs):
-        self._saml_client = hs.get_saml_client()
+        self._saml_handler = hs.get_saml_handler()
 
     def get_sso_url(self, client_redirect_url):
-        reqid, info = self._saml_client.prepare_for_authenticate(
-            relay_state=client_redirect_url
-        )
-
-        for key, value in info["headers"]:
-            if key == "Location":
-                return value
-
-        # this shouldn't happen!
-        raise Exception("prepare_for_authenticate didn't return a Location header")
+        return self._saml_handler.handle_redirect_request(client_redirect_url)
 
 
 class SSOAuthHandler(object):
