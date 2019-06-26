@@ -997,6 +997,13 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #      remote:
 #        - url: https://our_idp/metadata.xml
 #
+#    # By default, the user has to go to our login page first. If you'd like to
+#    # allow IdP-initiated login, set 'allow_unsolicited: True' in an 'sp'
+#    # section:
+#    #
+#    #sp:
+#    #  allow_unsolicited: True
+#    #
 #    # The rest of sp_config is just used to generate our metadata xml, and you
 #    # may well not need it, depending on your setup. Alternatively you
 #    # may need a whole lot more detail - see the pysaml2 docs!
@@ -1020,6 +1027,12 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #  # separate pysaml2 configuration file:
 #  #
 #  config_path: "CONFDIR/sp_conf.py"
+#
+#  # the lifetime of a SAML session. This defines how long a user has to
+#  # complete the authentication process, if allow_unsolicited is unset.
+#  # The default is 5 minutes.
+#  #
+#  # saml_session_lifetime: 5m
 
 
 
