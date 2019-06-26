@@ -181,6 +181,7 @@ class TransportLayerClient(object):
             long_retries=True,
             backoff_on_404=True,  # If we get a 404 the other side has gone
             try_trailing_slash_on_400=True,
+            retry_on_dns_fail=False, # If we get DNS errors, the other side has gone
         )
 
         defer.returnValue(response)

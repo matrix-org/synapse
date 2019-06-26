@@ -19,6 +19,8 @@ import random
 import sys
 from io import BytesIO
 
+from OpenSSL import SSL
+
 from six import PY3, raise_from, string_types
 from six.moves import urllib
 
@@ -29,11 +31,12 @@ from prometheus_client import Counter
 from signedjson.sign import sign_json
 from zope.interface import implementer
 
+from twisted.names.error import DNSServerError
 from twisted.internet import defer, protocol
-from twisted.internet.error import DNSLookupError
+from twisted.internet.error import DNSLookupError, ConnectError, ConnectionRefusedError
 from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.internet.task import _EPSILON, Cooperator
-from twisted.web._newclient import ResponseDone
+from twisted.web._newclient import ResponseDone, RequestTransmissionFailed, ResponseNeverReceived
 from twisted.web.http_headers import Headers
 
 import synapse.metrics
@@ -407,6 +410,35 @@ class MatrixFederationHttpClient(object):
                             response = yield request_deferred
                     except DNSLookupError as e:
                         raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
+                    except DNSServerError as e:
+                        # Their domain's nameserver is busted and can't give us a result
+                        raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
+                    except (ConnectError, ConnectionRefusedError) as e:
+                        if e.osError == 113:
+                            # No route to host -- they're gone
+                            raise_from(RequestSendFailed(e, can_retry=False), e)
+                        elif e.osError == 111:
+                            # Refused connection -- they're gone
+                            raise_from(RequestSendFailed(e, can_retry=False), e)
+                        elif e.osError == 99:
+                            # Cannot assign address -- don't try?
+                            raise_from(RequestSendFailed(e, can_retry=False), e)
+
+                        # Some other socket error, try retrying
+                        logger.info("Failed to send request due to socket error: %s", e)
+                        raise_from(RequestSendFailed(e, can_retry=True), e)
+
+                    except (RequestTransmissionFailed, ResponseNeverReceived) as e:
+                        for i in e.reasons:
+                            # If it's an OpenSSL error, they probably don't have
+                            # a valid certificate or something else very bad went on.
+                            if i.trap(SSL.Error):
+                                raise_from(RequestSendFailed(e, can_retry=False), e)
+
+                        # If it's not that, raise it normally.
+                        logger.info("Failed to send request: %s", e)
+                        raise_from(RequestSendFailed(e, can_retry=True), e)
+
                     except Exception as e:
                         logger.info("Failed to send request: %s", e)
                         raise_from(RequestSendFailed(e, can_retry=True), e)
@@ -557,6 +589,7 @@ class MatrixFederationHttpClient(object):
         ignore_backoff=False,
         backoff_on_404=False,
         try_trailing_slash_on_400=False,
+        retry_on_dns_fail=True,
     ):
         """ Sends the specifed json data using PUT
 
@@ -618,6 +651,7 @@ class MatrixFederationHttpClient(object):
             ignore_backoff=ignore_backoff,
             long_retries=long_retries,
             timeout=timeout,
+            retry_on_dns_fail=retry_on_dns_fail,
         )
 
         body = yield _handle_json_response(
