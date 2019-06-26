@@ -126,6 +126,7 @@ def run_generate_config(environ):
         "--config-path",
         environ["SYNAPSE_CONFIG_PATH"],
         "--generate-config",
+        "--open-private-ports",
     ]
     os.execv("/usr/local/bin/python", args)
 
