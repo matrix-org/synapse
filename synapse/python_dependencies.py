@@ -72,7 +72,6 @@ REQUIREMENTS = [
     # Twisted 18.7.0 requires attrs>=17.4.0
     "attrs>=17.4.0",
     "netaddr>=0.7.18",
-    "jaeger-client>=4.0.0",
     "Jinja2>=2.9",
     "bleach>=1.4.3",
 ]
@@ -96,6 +95,7 @@ CONDITIONAL_REQUIREMENTS = {
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0", "parameterized"],
     "sentry": ["sentry-sdk>=0.7.2"],
+    "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()

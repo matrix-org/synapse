@@ -13,11 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from jaeger_client import Config as JaegerConfig
-
-from synapse.util.scopecontextmanager import LogContextScopeManager
-from synapse.util.tracerutils import TracerUtil
-
 from ._base import Config, ConfigError
 
 
@@ -55,32 +50,3 @@ class TracerConfig(Config):
         #  homeserver_whitelist:
         #    - ".*"
         """
-
-
-def init_tracing(config):
-    """Set the whitelists and initialise the JaegerClient tracer
-
-    Args:
-        config (Config)
-        The config used by the homserver. Here it's used to set the service
-        name to the homeserver's.
-    """
-
-    name = config.worker_name if config.worker_name else "master"
-
-    if config.tracer_config.get("tracer_enabled", False):
-        TracerUtil.set_homeserver_whitelist(
-            config.tracer_config["homeserver_whitelist"]
-        )
-        jaeger_config = JaegerConfig(
-            config={"sampler": {"type": "const", "param": 1}, "logging": True},
-            service_name="{} {}".format(config.server_name, name),
-            scope_manager=LogContextScopeManager(config),
-        )
-    else:  # The tracer is not configured so we instantiate a noop tracer
-        jaeger_config = JaegerConfig(
-            config={"sampler": {"type": "const", "param": 0}},
-            service_name=config.server_name,
-        )
-
-    return jaeger_config.initialize_tracer()

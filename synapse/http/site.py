@@ -15,9 +15,6 @@ import contextlib
 import logging
 import time
 
-import opentracing
-from opentracing import tags
-
 from twisted.web.server import Request, Site
 
 from synapse.http import redact_uri
@@ -239,17 +236,16 @@ class SynapseRequest(Request):
         )
 
         # Start a span
-        span_context = TracerUtil.extract_span_context(self.requestHeaders)
-        opentracing.tracer.start_active_span(
+        TracerUtil.start_active_span_from_context(
+            self.requestHeaders,
             "incoming-federation-request",
             tags={
                 "request_id": self.get_request_id(),
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
-                tags.HTTP_METHOD: self.get_method(),
-                tags.HTTP_URL: self.get_redacted_uri(),
-                tags.PEER_HOST_IPV6: self.getClientIP(),
+                TracerUtil.Tags.SPAN_KIND: TracerUtil.Tags.SPAN_KIND_RPC_SERVER,
+                TracerUtil.Tags.HTTP_METHOD: self.get_method(),
+                TracerUtil.Tags.HTTP_URL: self.get_redacted_uri(),
+                TracerUtil.Tags.PEER_HOST_IPV6: self.getClientIP(),
             },
-            child_of=span_context,
         )
 
     def _finished_processing(self):
@@ -321,11 +317,9 @@ class SynapseRequest(Request):
             usage.evt_db_fetch_count,
         )
 
-        scope = opentracing.tracer.scope_manager.active
-        if scope is not None:
-            # finish the span if it's there.
-            scope.span.set_tag("peer.address", authenticated_entity)
-            scope.__exit__(None, None, None)
+        # finish the span if it's there.
+        TracerUtil.set_tag("peer.address", authenticated_entity)
+        TracerUtil.close_active_span()
 
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)

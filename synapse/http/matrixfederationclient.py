@@ -23,10 +23,8 @@ from six import PY3, raise_from, string_types
 from six.moves import urllib
 
 import attr
-import opentracing
 import treq
 from canonicaljson import encode_canonical_json
-from opentracing import tags
 from prometheus_client import Counter
 from signedjson.sign import sign_json
 from zope.interface import implementer
@@ -343,26 +341,24 @@ class MatrixFederationHttpClient(object):
             query_bytes = b""
 
         # Retreive current span
-        scope = opentracing.tracer.start_active_span(
+        TracerUtil.start_active_span(
             "outgoing-federation-request",
             tags={
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
-                tags.PEER_ADDRESS: request.destination,
-                tags.HTTP_METHOD: request.method,
-                tags.HTTP_URL: request.path,
+                TracerUtil.Tags.SPAN_KIND: TracerUtil.Tags.SPAN_KIND_RPC_CLIENT,
+                TracerUtil.Tags.PEER_ADDRESS: request.destination,
+                TracerUtil.Tags.HTTP_METHOD: request.method,
+                TracerUtil.Tags.HTTP_URL: request.path,
             },
             finish_on_close=True,
         )
 
         # Inject the span into the headers
         headers_dict = {}
-        TracerUtil.inject_span_context_byte_dict(
-            headers_dict, scope.span, request.destination
-        )
+        TracerUtil.inject_active_span_byte_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 
-        with limiter, scope:
+        with limiter:
             # XXX: Would be much nicer to retry only at the transaction-layer
             # (once we have reliable transactions in place)
             if long_retries:
@@ -440,7 +436,7 @@ class MatrixFederationHttpClient(object):
                         response.phrase.decode("ascii", errors="replace"),
                     )
 
-                    scope.span.set_tag(opentracing.tags.HTTP_STATUS_CODE, response.code)
+                    TracerUtil.set_tag(TracerUtil.Tags.HTTP_STATUS_CODE, response.code)
 
                     if 200 <= response.code < 300:
                         pass
@@ -522,7 +518,7 @@ class MatrixFederationHttpClient(object):
                         _flatten_response_never_received(e),
                     )
                     raise
-
+        TracerUtil.close_active_span()
         defer.returnValue(response)
 
     def build_auth_headers(
