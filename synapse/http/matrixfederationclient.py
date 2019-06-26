@@ -19,8 +19,6 @@ import random
 import sys
 from io import BytesIO
 
-from OpenSSL import SSL
-
 from six import PY3, raise_from, string_types
 from six.moves import urllib
 
@@ -31,12 +29,17 @@ from prometheus_client import Counter
 from signedjson.sign import sign_json
 from zope.interface import implementer
 
-from twisted.names.error import DNSServerError
+from OpenSSL import SSL
 from twisted.internet import defer, protocol
-from twisted.internet.error import DNSLookupError, ConnectError, ConnectionRefusedError
+from twisted.internet.error import ConnectError, ConnectionRefusedError, DNSLookupError
 from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.internet.task import _EPSILON, Cooperator
-from twisted.web._newclient import ResponseDone, RequestTransmissionFailed, ResponseNeverReceived
+from twisted.names.error import DNSServerError
+from twisted.web._newclient import (
+    RequestTransmissionFailed,
+    ResponseDone,
+    ResponseNeverReceived,
+)
 from twisted.web.http_headers import Headers
 
 import synapse.metrics
