@@ -91,38 +91,37 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
 
-        self.assertEqual(t.federation_minimum_tls_client_version, 1.0)
+        self.assertEqual(t.federation_minimum_tls_client_version, "1")
 
     def test_tls_client_minimum_set(self):
         """
         The default client TLS version can be set to 1.0, 1.1, and 1.2.
         """
-        config = {"federation_minimum_tls_client_version": 1.0}
+        config = {"federation_minimum_tls_client_version": 1}
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_minimum_tls_client_version, 1.0)
+        self.assertEqual(t.federation_minimum_tls_client_version, "1")
 
         config = {"federation_minimum_tls_client_version": 1.1}
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_minimum_tls_client_version, 1.1)
+        self.assertEqual(t.federation_minimum_tls_client_version, "1.1")
 
         config = {"federation_minimum_tls_client_version": 1.2}
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_minimum_tls_client_version, 1.2)
+        self.assertEqual(t.federation_minimum_tls_client_version, "1.2")
 
         # Also test a string version
-        config = {"federation_minimum_tls_client_version": "1.0"}
-        t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_minimum_tls_client_version, 1.0)
-
-        # Also just 1 for 1.0
         config = {"federation_minimum_tls_client_version": "1"}
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_minimum_tls_client_version, 1.0)
+        self.assertEqual(t.federation_minimum_tls_client_version, "1")
+
+        config = {"federation_minimum_tls_client_version": "1.2"}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_minimum_tls_client_version, "1.2")
 
     def test_tls_client_minimum_1_point_3_missing(self):
         """
@@ -161,9 +160,9 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         config = {"federation_minimum_tls_client_version": 1.3}
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_minimum_tls_client_version, 1.3)
+        self.assertEqual(t.federation_minimum_tls_client_version, "1.3")
 
-    def test_tls_client_minimum_set_passed_through(self):
+    def test_tls_client_minimum_set_passed_through_1_2(self):
         """
         The configured TLS version is correctly configured by the ContextFactory.
         """
@@ -173,6 +172,22 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
 
         cf = ClientTLSOptionsFactory(t)
 
-        # The context has had NO_TLSv1_1 set, but not NO_TLSv1_2
+        # The context has had NO_TLSv1_1 and NO_TLSv1_0 set, but not NO_TLSv1_2
+        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
         self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
+
+    def test_tls_client_minimum_set_passed_through_1_0(self):
+        """
+        The configured TLS version is correctly configured by the ContextFactory.
+        """
+        config = {"federation_minimum_tls_client_version": 1}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        cf = ClientTLSOptionsFactory(t)
+
+        # The context has not had any of the NO_TLS set.
+        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
+        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
         self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)

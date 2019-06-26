@@ -83,22 +83,6 @@ class Config(object):
         return int(value) * size
 
     @staticmethod
-    def parse_float(value, config_name):
-        """
-        Parse a value to a float, raising a configuration error if it is not.
-        """
-        if isinstance(value, (int, float)):
-            return value
-
-        if isinstance(value, str):
-            try:
-                return float(value)
-            except ValueError:
-                raise ConfigError("%s value must be a number" % (config_name))
-        else:
-            raise ConfigError("%s value must be a number" % (config_name))
-
-    @staticmethod
     def abspath(file_path):
         return os.path.abspath(file_path) if file_path else file_path
 

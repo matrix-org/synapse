@@ -36,10 +36,10 @@ logger = logging.getLogger(__name__)
 
 
 _TLS_VERSION_MAP = {
-    1.0: TLSVersion.TLSv1_0,
-    1.1: TLSVersion.TLSv1_1,
-    1.2: TLSVersion.TLSv1_2,
-    1.3: TLSVersion.TLSv1_3,
+    "1": TLSVersion.TLSv1_0,
+    "1.1": TLSVersion.TLSv1_1,
+    "1.2": TLSVersion.TLSv1_2,
+    "1.3": TLSVersion.TLSv1_3,
 }
 
 

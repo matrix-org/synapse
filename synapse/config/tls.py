@@ -82,19 +82,18 @@ class TlsConfig(Config):
         )
 
         # Minimum TLS version to use for outbound federation traffic
-        self.federation_minimum_tls_client_version = self.parse_float(
-            config.get("federation_minimum_tls_client_version", 1.0),
-            "federation_minimum_tls_client_version",
+        self.federation_minimum_tls_client_version = str(
+            config.get("federation_minimum_tls_client_version", 1)
         )
 
-        if self.federation_minimum_tls_client_version not in [1.0, 1.1, 1.2, 1.3]:
+        if self.federation_minimum_tls_client_version not in ["1", "1.1", "1.2", "1.3"]:
             raise ConfigError(
-                "federation_minimum_tls_client_version must be one of: 1.0, 1.1, 1.2, 1.3"
+                "federation_minimum_tls_client_version must be one of: 1, 1.1, 1.2, 1.3"
             )
 
         # Prevent people shooting themselves in the foot here by setting it to
         # the biggest number blindly
-        if self.federation_minimum_tls_client_version == 1.3:
+        if self.federation_minimum_tls_client_version == "1.3":
             if getattr(SSL, "OP_NO_TLSv1_3", None) is None:
                 raise ConfigError(
                     (
@@ -285,7 +284,7 @@ class TlsConfig(Config):
 
         # The minimum TLS version that will be used for outbound federation requests.
         #
-        # Defaults to `1.0`. Configurable to `1.0`, `1.1`, `1.2`, or `1.3`. Note
+        # Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
         # that setting this value higher than `1.2` will prevent federation to most
         # of the public Matrix network, only configure it to `1.3` if you have an
         # entirely private federation setup and you can ensure TLS 1.3 support.
