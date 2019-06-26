@@ -425,7 +425,7 @@ class MatrixFederationHttpClient(object):
                             raise_from(RequestSendFailed(e, can_retry=False), e)
 
                         # Some other socket error, try retrying
-                        logger.info("Failed to send request due to socket error: %s", e)
+                        logger.info("Failed to send request: %s", e)
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
                     except (RequestTransmissionFailed, ResponseNeverReceived) as e:
