@@ -66,13 +66,15 @@ def init_tracing(config):
         name to the homeserver's.
     """
 
+    name = config.worker_name if config.worker_name else "master"
+
     if config.tracer_config.get("tracer_enabled", False):
         TracerUtil.set_homeserver_whitelist(
             config.tracer_config["homeserver_whitelist"]
         )
         jaeger_config = JaegerConfig(
             config={"sampler": {"type": "const", "param": 1}, "logging": True},
-            service_name=config.server_name,
+            service_name="{} {}".format(config.server_name, name),
             scope_manager=LogContextScopeManager(config),
         )
     else:  # The tracer is not configured so we instantiate a noop tracer
