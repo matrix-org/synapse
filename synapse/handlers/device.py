@@ -106,7 +106,7 @@ class DeviceWorkerHandler(BaseHandler):
         users_who_share_room = yield self.store.get_users_who_share_room_with_user(
             user_id
         )
-        changed = yield self.store.get_user_whose_devices_changed(
+        changed = yield self.store.get_users_whose_devices_changed(
             from_token.device_list_key, users_who_share_room
         )
 

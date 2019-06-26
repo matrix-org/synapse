@@ -391,7 +391,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return now_stream_id, []
 
-    def get_user_whose_devices_changed(self, from_key, user_ids):
+    def get_users_whose_devices_changed(self, from_key, user_ids):
         """Get set of users whose devices have changed since `from_key` that
         are in the given list of user_ids.
 
@@ -426,7 +426,7 @@ class DeviceWorkerStore(SQLBaseStore):
             AND user_id IN (%s)
         """
 
-        def _get_user_whose_devices_changed_txn(txn):
+        def _get_users_whose_devices_changed_txn(txn):
             changes = set()
 
             for chunk in chunks:
@@ -436,7 +436,7 @@ class DeviceWorkerStore(SQLBaseStore):
             return changes
 
         return self.runInteraction(
-            "get_user_whose_devices_changed", _get_user_whose_devices_changed_txn
+            "get_users_whose_devices_changed", _get_users_whose_devices_changed_txn
         )
 
     def get_all_device_list_changes_for_remotes(self, from_key, to_key):

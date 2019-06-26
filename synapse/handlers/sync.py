@@ -1080,7 +1080,7 @@ class SyncHandler(object):
             # weren't in the previous sync *or* they left and rejoined.
             changed = users_who_share_room & set(newly_joined_or_invited_users)
 
-            changed_users = yield self.store.get_user_whose_devices_changed(
+            changed_users = yield self.store.get_users_whose_devices_changed(
                 since_token.device_list_key, users_who_share_room
             )
 
