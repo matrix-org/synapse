@@ -101,9 +101,13 @@ class DeviceWorkerHandler(BaseHandler):
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
 
-        # First we check if any devices have changed
+        # First we check if any devices have changed for users that we share
+        # rooms with.
+        users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+            user_id
+        )
         changed = yield self.store.get_user_whose_devices_changed(
-            from_token.device_list_key
+            from_token.device_list_key, users_who_share_room
         )
 
         # Then work out if any users have since joined
@@ -188,10 +192,6 @@ class DeviceWorkerHandler(BaseHandler):
                         break
 
         if possibly_changed or possibly_left:
-            users_who_share_room = yield self.store.get_users_who_share_room_with_user(
-                user_id
-            )
-
             # Take the intersection of the users whose devices may have changed
             # and those that actually still share a room with the user
             possibly_joined = possibly_changed & users_who_share_room

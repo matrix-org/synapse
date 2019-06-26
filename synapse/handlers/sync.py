@@ -1062,10 +1062,6 @@ class SyncHandler(object):
         since_token = sync_result_builder.since_token
 
         if since_token and since_token.device_list_key:
-            changed = yield self.store.get_user_whose_devices_changed(
-                since_token.device_list_key
-            )
-
             # TODO: Be more clever than this, i.e. remove users who we already
             # share a room with?
             for room_id in newly_joined_rooms:
@@ -1076,21 +1072,23 @@ class SyncHandler(object):
                 left_users = yield self.state.get_current_users_in_room(room_id)
                 newly_left_users.update(left_users)
 
-            # TODO: Check that these users are actually new, i.e. either they
-            # weren't in the previous sync *or* they left and rejoined.
-            changed.update(newly_joined_or_invited_users)
-
-            if not changed and not newly_left_users:
-                defer.returnValue(DeviceLists(changed=[], left=newly_left_users))
-
             users_who_share_room = yield self.store.get_users_who_share_room_with_user(
                 user_id
             )
 
+            # TODO: Check that these users are actually new, i.e. either they
+            # weren't in the previous sync *or* they left and rejoined.
+            changed = users_who_share_room & set(newly_joined_or_invited_users)
+
+            changed_users = yield self.store.get_user_whose_devices_changed(
+                since_token.device_list_key, users_who_share_room
+            )
+
+            changed.update(changed_users)
+
             defer.returnValue(
                 DeviceLists(
-                    changed=users_who_share_room & changed,
-                    left=set(newly_left_users) - users_who_share_room,
+                    changed=changed, left=set(newly_left_users) - users_who_share_room
                 )
             )
         else:
