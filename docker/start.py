@@ -112,12 +112,13 @@ def run_generate_config(environ, ownership):
 
     Never returns.
     """
-    for v in ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS", "SYNAPSE_CONFIG_PATH"):
+    for v in ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS"):
         if v not in environ:
             error("Environment variable '%s' is mandatory in `generate` mode." % (v,))
 
     server_name = environ["SYNAPSE_SERVER_NAME"]
     config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
+    config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
     data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
 
     # create a suitable log config from our template
@@ -138,7 +139,7 @@ def run_generate_config(environ, ownership):
         "--report-stats",
         environ["SYNAPSE_REPORT_STATS"],
         "--config-path",
-        environ["SYNAPSE_CONFIG_PATH"],
+        config_path,
         "--config-directory",
         config_dir,
         "--data-directory",
@@ -157,11 +158,30 @@ def main(args, environ):
     if mode == "generate":
         return run_generate_config(environ, ownership)
 
-    # In normal mode, generate missing keys if any, then run synapse
-    if "SYNAPSE_CONFIG_PATH" in environ:
-        config_path = environ["SYNAPSE_CONFIG_PATH"]
-    else:
+    if "SYNAPSE_SERVER_NAME" in environ:
+        # backwards-compatibility generate-a-config-on-the-fly mode
+        if "SYNAPSE_CONFIG_PATH" in environ:
+            error(
+                "SYNAPSE_SERVER_NAME and SYNAPSE_CONFIG_PATH are mutually exclusive "
+                "except in `generate` mode."
+            )
+
         config_path = generate_config_from_template(environ, ownership)
+    else:
+        config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
+        config_path = environ.get(
+            "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
+        )
+        if not os.path.exists(config_path):
+            error(
+                "Config file '%s' does not exist. You should either create a new "
+                "config file by running with the `generate` argument (and then edit "
+                "the resulting file before restarting) or specify the path to an "
+                "existing config file with the SYNAPSE_CONFIG_PATH variable."
+                % (config_path,)
+            )
+
+    log("Starting synapse with config file " + config_path)
 
     args = [
         "python",
