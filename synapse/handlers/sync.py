@@ -1058,38 +1058,74 @@ class SyncHandler(object):
         newly_left_rooms,
         newly_left_users,
     ):
+        """Generate the DeviceLists section of sync
+
+        Args:
+            sync_result_builder (SyncResultBuilder)
+            newly_joined_rooms (set[str]): Set of rooms user has joined since
+                previous sync
+            newly_joined_or_invited_users (set[str]): Set of users that have
+                joined or been invited to a room since previous sync.
+            newly_left_rooms (set[str]): Set of rooms user has left since
+                previous sync
+            newly_left_users (set[str]): Set of users that have left a room
+                we're in since previous sync
+
+        Returns:
+            Deferred[DeviceLists]
+        """
+
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
 
-        if since_token and since_token.device_list_key:
-            # TODO: Be more clever than this, i.e. remove users who we already
-            # share a room with?
-            for room_id in newly_joined_rooms:
-                joined_users = yield self.state.get_current_users_in_room(room_id)
-                newly_joined_or_invited_users.update(joined_users)
+        # We're going to mutate these fields, so lets copy them rather than
+        # assume they won't get used later.
+        newly_joined_or_invited_users = set(newly_joined_or_invited_users)
+        newly_left_users = set(newly_left_users)
 
-            for room_id in newly_left_rooms:
-                left_users = yield self.state.get_current_users_in_room(room_id)
-                newly_left_users.update(left_users)
+        if since_token and since_token.device_list_key:
+            # We want to figure out what user IDs the client should refetch
+            # device keys for, and which users we aren't going to track changes
+            # for anymore.
+            #
+            # For the first step we check:
+            #   1. if any users we share a room with have updated their devices,
+            #      and
+            #   2. we also check if we've joined any new rooms, or if a user has
+            #      joined a room we're in.
+            #
+            # For the second step we just find any users we no longer share a
+            # room with by looking at all users that have left a room plus users
+            # that were in a room we've left.
 
             users_who_share_room = yield self.store.get_users_who_share_room_with_user(
                 user_id
             )
 
-            # TODO: Check that these users are actually new, i.e. either they
-            # weren't in the previous sync *or* they left and rejoined.
-            changed = users_who_share_room & set(newly_joined_or_invited_users)
-
-            changed_users = yield self.store.get_users_whose_devices_changed(
+            # Step 1, check for changes in devices of users we share a room with
+            users_that_have_changed = yield self.store.get_users_whose_devices_changed(
                 since_token.device_list_key, users_who_share_room
             )
 
-            changed.update(changed_users)
+            # Step 2, check for newly joined rooms
+            for room_id in newly_joined_rooms:
+                joined_users = yield self.state.get_current_users_in_room(room_id)
+                newly_joined_or_invited_users.update(joined_users)
+
+            # TODO: Check that these users are actually new, i.e. either they
+            # weren't in the previous sync *or* they left and rejoined.
+            users_that_have_changed.update(newly_joined_or_invited_users)
+
+            # Now find users that we no longer track
+            for room_id in newly_left_rooms:
+                left_users = yield self.state.get_current_users_in_room(room_id)
+                newly_left_users.update(left_users)
+
+            # Remove any users that we still share a room with.
+            newly_left_users -= users_who_share_room
 
             defer.returnValue(
-                DeviceLists(
-                    changed=changed, left=set(newly_left_users) - users_who_share_room
-                )
+                DeviceLists(changed=users_that_have_changed, left=newly_left_users)
             )
         else:
             defer.returnValue(DeviceLists(changed=[], left=[]))
