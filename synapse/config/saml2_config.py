@@ -27,7 +27,7 @@ class SAML2Config(Config):
             return
 
         try:
-            check_requirements('saml2')
+            check_requirements("saml2")
         except DependencyException as e:
             raise ConfigError(e.message)
 
@@ -42,6 +42,11 @@ class SAML2Config(Config):
         config_path = saml2_config.get("config_path", None)
         if config_path is not None:
             self.saml2_sp_config.load_file(config_path)
+
+        # session lifetime: in milliseconds
+        self.saml2_session_lifetime = self.parse_duration(
+            saml2_config.get("saml_session_lifetime", "5m")
+        )
 
     def _default_saml_config_dict(self):
         import saml2
@@ -87,6 +92,13 @@ class SAML2Config(Config):
         #      remote:
         #        - url: https://our_idp/metadata.xml
         #
+        #    # By default, the user has to go to our login page first. If you'd like to
+        #    # allow IdP-initiated login, set 'allow_unsolicited: True' in an 'sp'
+        #    # section:
+        #    #
+        #    #sp:
+        #    #  allow_unsolicited: True
+        #    #
         #    # The rest of sp_config is just used to generate our metadata xml, and you
         #    # may well not need it, depending on your setup. Alternatively you
         #    # may need a whole lot more detail - see the pysaml2 docs!
@@ -110,6 +122,12 @@ class SAML2Config(Config):
         #  # separate pysaml2 configuration file:
         #  #
         #  config_path: "%(config_dir_path)s/sp_conf.py"
+        #
+        #  # the lifetime of a SAML session. This defines how long a user has to
+        #  # complete the authentication process, if allow_unsolicited is unset.
+        #  # The default is 5 minutes.
+        #  #
+        #  # saml_session_lifetime: 5m
         """ % {
             "config_dir_path": config_dir_path
         }

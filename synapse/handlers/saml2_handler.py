@@ -14,6 +14,7 @@
 # limitations under the License.
 import logging
 
+import attr
 import saml2
 from saml2.client import Saml2Client
 
@@ -29,6 +30,12 @@ class Saml2Handler:
         self._saml_client = Saml2Client(hs.config.saml2_sp_config)
         self._sso_auth_handler = SSOAuthHandler(hs)
 
+        # a map from saml session id to Saml2SessionData object
+        self._outstanding_requests_dict = {}
+
+        self._clock = hs.get_clock()
+        self._saml2_session_lifetime = hs.config.saml2_session_lifetime
+
     def handle_redirect_request(self, client_redirect_url):
         """Handle an incoming request to /login/sso/redirect
 
@@ -42,6 +49,9 @@ class Saml2Handler:
         reqid, info = self._saml_client.prepare_for_authenticate(
             relay_state=client_redirect_url
         )
+
+        now = self._clock.time_msec()
+        self._outstanding_requests_dict[reqid] = Saml2SessionData(creation_time=now)
 
         for key, value in info["headers"]:
             if key == "Location":
@@ -63,9 +73,15 @@ class Saml2Handler:
         resp_bytes = parse_string(request, "SAMLResponse", required=True)
         relay_state = parse_string(request, "RelayState", required=True)
 
+        # expire outstanding sessions before parse_authn_request_response checks
+        # the dict.
+        self.expire_sessions()
+
         try:
             saml2_auth = self._saml_client.parse_authn_request_response(
-                resp_bytes, saml2.BINDING_HTTP_POST
+                resp_bytes,
+                saml2.BINDING_HTTP_POST,
+                outstanding=self._outstanding_requests_dict,
             )
         except Exception as e:
             logger.warning("Exception parsing SAML2 response", exc_info=1)
@@ -77,10 +93,29 @@ class Saml2Handler:
         if "uid" not in saml2_auth.ava:
             raise CodeMessageException(400, "uid not in SAML2 response")
 
-        username = saml2_auth.ava["uid"][0]
+        self._outstanding_requests_dict.pop(saml2_auth.in_response_to, None)
 
+        username = saml2_auth.ava["uid"][0]
         displayName = saml2_auth.ava.get("displayName", [None])[0]
 
         return self._sso_auth_handler.on_successful_auth(
             username, request, relay_state, user_display_name=displayName
         )
+
+    def expire_sessions(self):
+        expire_before = self._clock.time_msec() - self._saml2_session_lifetime
+        to_expire = set()
+        for reqid, data in self._outstanding_requests_dict.items():
+            if data.creation_time < expire_before:
+                to_expire.add(reqid)
+        for reqid in to_expire:
+            logger.debug("Expiring session id %s", reqid)
+            del self._outstanding_requests_dict[reqid]
+
+
+@attr.s
+class Saml2SessionData:
+    """Data we track about SAML2 sessions"""
+
+    # time the session was created, in milliseconds
+    creation_time = attr.ib()
