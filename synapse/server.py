@@ -194,7 +194,7 @@ class HomeServer(object):
         "sendmail",
         "registration_handler",
         "account_validity_handler",
-        "saml2_handler",
+        "saml_handler",
         "event_client_serializer",
     ]
 
@@ -525,10 +525,10 @@ class HomeServer(object):
     def build_account_validity_handler(self):
         return AccountValidityHandler(self)
 
-    def build_saml2_handler(self):
-        from synapse.handlers.saml2_handler import Saml2Handler
+    def build_saml_handler(self):
+        from synapse.handlers.saml_handler import SamlHandler
 
-        return Saml2Handler(self)
+        return SamlHandler(self)
 
     def build_event_client_serializer(self):
         return EventClientSerializer(self)

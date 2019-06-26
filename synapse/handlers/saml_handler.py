@@ -25,7 +25,7 @@ from synapse.rest.client.v1.login import SSOAuthHandler
 logger = logging.getLogger(__name__)
 
 
-class Saml2Handler:
+class SamlHandler:
     def __init__(self, hs):
         self._saml_client = Saml2Client(hs.config.saml2_sp_config)
         self._sso_auth_handler = SSOAuthHandler(hs)

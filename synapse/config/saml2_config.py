@@ -83,6 +83,12 @@ class SAML2Config(Config):
         # so it is not normally necessary to specify them unless you need to
         # override them.
         #
+        # Once SAML support is enabled, a metadata file will be exposed at
+        # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
+        # use to configure your SAML IdP with. Alternatively, you can manually configure
+        # the IdP to use an ACS location of
+        # https://<server>:<port>/_matrix/saml2/authn_response.
+        #
         #saml2_config:
         #  sp_config:
         #    # point this to the IdP's metadata. You can use either a local file or
@@ -93,13 +99,14 @@ class SAML2Config(Config):
         #        - url: https://our_idp/metadata.xml
         #
         #    # By default, the user has to go to our login page first. If you'd like to
-        #    # allow IdP-initiated login, set 'allow_unsolicited: True' in an 'sp'
-        #    # section:
+        #    # allow IdP-initiated login, set 'allow_unsolicited: True' in a
+        #    # 'service.sp' section:
         #    #
-        #    #sp:
-        #    #  allow_unsolicited: True
-        #    #
-        #    # The rest of sp_config is just used to generate our metadata xml, and you
+        #    #service:
+        #    #  sp:
+        #    #    allow_unsolicited: True
+        #
+        #    # The examples below are just used to generate our metadata xml, and you
         #    # may well not need it, depending on your setup. Alternatively you
         #    # may need a whole lot more detail - see the pysaml2 docs!
         #
