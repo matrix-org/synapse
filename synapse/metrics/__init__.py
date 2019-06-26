@@ -437,7 +437,7 @@ def runUntilCurrentTimer(func):
         counts = gc.get_count()
         for i in (2, 1, 0):
             if threshold[i] < counts[i]:
-                logger.info("Collecting gc %d", i)
+                logger.debug("Collecting gc %d", i)
 
                 start = time.time()
                 unreachable = gc.collect(i)
