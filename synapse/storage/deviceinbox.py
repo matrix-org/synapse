@@ -118,7 +118,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         defer.returnValue(count)
 
     def get_new_device_msgs_for_remote(
-        self, destination, last_stream_id, current_stream_id, limit=100
+        self, destination, last_stream_id, current_stream_id, limit
     ):
         """
         Args:
@@ -137,6 +137,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         )
         if not has_changed or last_stream_id == current_stream_id:
             return defer.succeed(([], current_stream_id))
+
+        if limit <= 0:
+            # This can happen if we run out of room for EDUs in the transaction.
+            return defer.succeed(([], last_stream_id))
 
         def get_new_messages_for_remote_destination_txn(txn):
             sql = (

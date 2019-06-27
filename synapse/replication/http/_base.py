@@ -17,11 +17,17 @@ import abc
 import logging
 import re
 
+from six import raise_from
 from six.moves import urllib
 
 from twisted.internet import defer
 
-from synapse.api.errors import CodeMessageException, HttpResponseException
+from synapse.api.errors import (
+    CodeMessageException,
+    HttpResponseException,
+    RequestSendFailed,
+    SynapseError,
+)
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
 
@@ -77,8 +83,7 @@ class ReplicationEndpoint(object):
     def __init__(self, hs):
         if self.CACHE:
             self.response_cache = ResponseCache(
-                hs, "repl." + self.NAME,
-                timeout_ms=30 * 60 * 1000,
+                hs, "repl." + self.NAME, timeout_ms=30 * 60 * 1000
             )
 
         assert self.METHOD in ("PUT", "POST", "GET")
@@ -128,8 +133,7 @@ class ReplicationEndpoint(object):
             data = yield cls._serialize_payload(**kwargs)
 
             url_args = [
-                urllib.parse.quote(kwargs[name], safe='')
-                for name in cls.PATH_ARGS
+                urllib.parse.quote(kwargs[name], safe="") for name in cls.PATH_ARGS
             ]
 
             if cls.CACHE:
@@ -150,7 +154,10 @@ class ReplicationEndpoint(object):
                 )
 
             uri = "http://%s:%s/_synapse/replication/%s/%s" % (
-                host, port, cls.NAME, "/".join(url_args)
+                host,
+                port,
+                cls.NAME,
+                "/".join(url_args),
             )
 
             try:
@@ -175,6 +182,8 @@ class ReplicationEndpoint(object):
                 # on the master process that we should send to the client. (And
                 # importantly, not stack traces everywhere)
                 raise e.to_synapse_error()
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to talk to master"), e)
 
             defer.returnValue(result)
 
@@ -194,10 +203,7 @@ class ReplicationEndpoint(object):
             url_args.append("txn_id")
 
         args = "/".join("(?P<%s>[^/]+)" % (arg,) for arg in url_args)
-        pattern = re.compile("^/_synapse/replication/%s/%s$" % (
-            self.NAME,
-            args
-        ))
+        pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
 
         http_server.register_paths(method, [pattern], handler)
 
@@ -211,8 +217,4 @@ class ReplicationEndpoint(object):
 
         assert self.CACHE
 
-        return self.response_cache.wrap(
-            txn_id,
-            self._handle_request,
-            request, **kwargs
-        )
+        return self.response_cache.wrap(txn_id, self._handle_request, request, **kwargs)

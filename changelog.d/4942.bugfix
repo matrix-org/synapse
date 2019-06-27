@@ -1,1 +1,0 @@
-Fix bug where presence updates were sent to all servers in a room when a new server joined, rather than to just the new server.

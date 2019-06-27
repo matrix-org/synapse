@@ -116,7 +116,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
             user_id=SUPPORT_USER,
             token="456",
             password_hash=None,
-            user_type=UserTypes.SUPPORT
+            user_type=UserTypes.SUPPORT,
         )
         res = yield self.store.is_support_user(SUPPORT_USER)
         self.assertTrue(res)
@@ -128,4 +128,4 @@ class TokenGenerator:
 
     def generate(self, user_id):
         self._last_issued_token += 1
-        return u"%s-%d" % (user_id, self._last_issued_token)
+        return "%s-%d" % (user_id, self._last_issued_token)

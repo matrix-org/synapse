@@ -27,6 +27,7 @@ def user_left_room(distributor, user, room_id):
     distributor.fire("user_left_room", user=user, room_id=room_id)
 
 
+# XXX: this is no longer used. We should probably kill it.
 def user_joined_room(distributor, user, room_id):
     distributor.fire("user_joined_room", user=user, room_id=room_id)
 
@@ -50,9 +51,7 @@ class Distributor(object):
         if name in self.signals:
             raise KeyError("%r already has a signal named %s" % (self, name))
 
-        self.signals[name] = Signal(
-            name,
-        )
+        self.signals[name] = Signal(name)
 
         if name in self.pre_registration:
             signal = self.signals[name]
@@ -77,11 +76,7 @@ class Distributor(object):
         if name not in self.signals:
             raise KeyError("%r does not have a signal named %s" % (self, name))
 
-        run_as_background_process(
-            name,
-            self.signals[name].fire,
-            *args, **kwargs
-        )
+        run_as_background_process(name, self.signals[name].fire, *args, **kwargs)
 
 
 class Signal(object):
@@ -117,22 +112,23 @@ class Signal(object):
             def eb(failure):
                 logger.warning(
                     "%s signal observer %s failed: %r",
-                    self.name, observer, failure,
+                    self.name,
+                    observer,
+                    failure,
                     exc_info=(
                         failure.type,
                         failure.value,
-                        failure.getTracebackObject()))
+                        failure.getTracebackObject(),
+                    ),
+                )
 
             return defer.maybeDeferred(observer, *args, **kwargs).addErrback(eb)
 
-        deferreds = [
-            run_in_background(do, o)
-            for o in self.observers
-        ]
+        deferreds = [run_in_background(do, o) for o in self.observers]
 
-        return make_deferred_yieldable(defer.gatherResults(
-            deferreds, consumeErrors=True,
-        ))
+        return make_deferred_yieldable(
+            defer.gatherResults(deferreds, consumeErrors=True)
+        )
 
     def __repr__(self):
         return "<Signal name=%r>" % (self.name,)

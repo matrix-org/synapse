@@ -21,19 +21,19 @@ class UserDirectoryConfig(Config):
     Configuration for the behaviour of the /user_directory API
     """
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.user_directory_search_enabled = True
         self.user_directory_search_all_users = False
         user_directory_config = config.get("user_directory", None)
         if user_directory_config:
-            self.user_directory_search_enabled = (
-                user_directory_config.get("enabled", True)
+            self.user_directory_search_enabled = user_directory_config.get(
+                "enabled", True
             )
-            self.user_directory_search_all_users = (
-                user_directory_config.get("search_all_users", False)
+            self.user_directory_search_all_users = user_directory_config.get(
+                "search_all_users", False
             )
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
         # User Directory configuration
         #
@@ -43,9 +43,9 @@ class UserDirectoryConfig(Config):
         #
         # 'search_all_users' defines whether to search all users visible to your HS
         # when searching the user directory, rather than limiting to users visible
-        # in public rooms.  Defaults to false.  If you set it True, you'll have to run
-        # UPDATE user_directory_stream_pos SET stream_id = NULL;
-        # on your database to tell it to rebuild the user_directory search indexes.
+        # in public rooms.  Defaults to false.  If you set it True, you'll have to
+        # rebuild the user_directory search indexes, see
+        # https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
         #
         #user_directory:
         #  enabled: true

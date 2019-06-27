@@ -69,6 +69,7 @@ Let's assume that we expect clients to connect to our server at
           SSLEngine on
           ServerName matrix.example.com;
 
+          AllowEncodedSlashes NoDecode
           ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
           ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
       </VirtualHost>
@@ -77,6 +78,7 @@ Let's assume that we expect clients to connect to our server at
           SSLEngine on
           ServerName example.com;
           
+          AllowEncodedSlashes NoDecode
           ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
           ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
       </VirtualHost>
@@ -87,8 +89,10 @@ Let's assume that we expect clients to connect to our server at
         bind :::443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
 
         # Matrix client traffic
-        acl matrix hdr(host) -i matrix.example.com
-        use_backend matrix if matrix
+        acl matrix-host hdr(host) -i matrix.example.com
+        acl matrix-path path_beg /_matrix
+
+        use_backend matrix if matrix-host matrix-path
 
       frontend matrix-federation
         bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1

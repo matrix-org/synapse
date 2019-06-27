@@ -37,7 +37,9 @@ from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.directory import DirectoryStore
 from synapse.replication.slave.storage.events import SlavedEventStore
+from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
+from synapse.replication.slave.storage.profile import SlavedProfileStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
@@ -51,6 +53,7 @@ from synapse.rest.client.v1.room import (
     PublicRoomListRestServlet,
     RoomEventContextServlet,
     RoomMemberListRestServlet,
+    RoomMessageListRestServlet,
     RoomStateRestServlet,
 )
 from synapse.rest.client.v1.voip import VoipRestServlet
@@ -73,6 +76,7 @@ class ClientReaderSlavedStore(
     SlavedDeviceStore,
     SlavedReceiptsStore,
     SlavedPushRuleStore,
+    SlavedGroupServerStore,
     SlavedAccountDataStore,
     SlavedEventStore,
     SlavedKeyStore,
@@ -81,6 +85,7 @@ class ClientReaderSlavedStore(
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedTransactionStore,
+    SlavedProfileStore,
     SlavedClientIpStore,
     BaseSlavedStore,
 ):
@@ -107,6 +112,7 @@ class ClientReaderServer(HomeServer):
                     JoinedRoomMemberListRestServlet(self).register(resource)
                     RoomStateRestServlet(self).register(resource)
                     RoomEventContextServlet(self).register(resource)
+                    RoomMessageListRestServlet(self).register(resource)
                     RegisterRestServlet(self).register(resource)
                     LoginRestServlet(self).register(resource)
                     ThreepidRestServlet(self).register(resource)
@@ -116,9 +122,7 @@ class ClientReaderServer(HomeServer):
                     PushRuleRestServlet(self).register(resource)
                     VersionsRestServlet().register(resource)
 
-                    resources.update({
-                        "/_matrix/client": resource,
-                    })
+                    resources.update({"/_matrix/client": resource})
 
         root_resource = create_resource_tree(resources, NoResource())
 
@@ -131,7 +135,7 @@ class ClientReaderServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            )
+            ),
         )
 
         logger.info("Synapse client reader now listening on port %d", port)
@@ -145,18 +149,19 @@ class ClientReaderServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    )
+                        username="matrix", password="rabbithole", globals={"hs": self}
+                    ),
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(("Metrics listener configured, but "
-                                 "enable_metrics is not True!"))
+                    logger.warn(
+                        (
+                            "Metrics listener configured, but "
+                            "enable_metrics is not True!"
+                        )
+                    )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"],
-                                         listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -168,9 +173,7 @@ class ClientReaderServer(HomeServer):
 
 def start(config_options):
     try:
-        config = HomeServerConfig.load_config(
-            "Synapse client reader", config_options
-        )
+        config = HomeServerConfig.load_config("Synapse client reader", config_options)
     except ConfigError as e:
         sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
@@ -197,6 +200,6 @@ def start(config_options):
     _base.start_worker_reactor("synapse-client-reader", config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with LoggingContext("main"):
         start(sys.argv[1:])

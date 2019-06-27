@@ -132,7 +132,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
                 "state_key": "",
                 "room_id": TEST_ROOM_ID,
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -153,7 +153,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
                 "state_key": user_id,
                 "room_id": TEST_ROOM_ID,
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -174,7 +174,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
                 "sender": user_id,
                 "room_id": TEST_ROOM_ID,
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -265,7 +265,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         pr.disable()
         with open("filter_events_for_server.profile", "w+") as f:
-            ps = pstats.Stats(pr, stream=f).sort_stats('cumulative')
+            ps = pstats.Stats(pr, stream=f).sort_stats("cumulative")
             ps.print_stats()
 
         # the result should be 5 redacted events, and 5 unredacted events.

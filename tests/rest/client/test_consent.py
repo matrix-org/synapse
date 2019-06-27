@@ -15,23 +15,18 @@
 
 import os
 
+import synapse.rest.admin
 from synapse.api.urls import ConsentURIBuilder
-from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v1 import login, room
 from synapse.rest.consent import consent_resource
 
 from tests import unittest
 from tests.server import render
 
-try:
-    from synapse.push.mailer import load_jinja2_templates
-except Exception:
-    load_jinja2_templates = None
-
 
 class ConsentResourceTestCase(unittest.HomeserverTestCase):
-    skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
@@ -41,20 +36,23 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.user_consent_version = "1"
-        config.public_baseurl = ""
-        config.form_secret = "123abc"
+        config["public_baseurl"] = "aaaa"
+        config["form_secret"] = "123abc"
 
         # Make some temporary templates...
         temp_consent_path = self.mktemp()
         os.mkdir(temp_consent_path)
-        os.mkdir(os.path.join(temp_consent_path, 'en'))
-        config.user_consent_template_dir = os.path.abspath(temp_consent_path)
+        os.mkdir(os.path.join(temp_consent_path, "en"))
 
-        with open(os.path.join(temp_consent_path, "en/1.html"), 'w') as f:
+        config["user_consent"] = {
+            "version": "1",
+            "template_dir": os.path.abspath(temp_consent_path),
+        }
+
+        with open(os.path.join(temp_consent_path, "en/1.html"), "w") as f:
             f.write("{{version}},{{has_consented}}")
 
-        with open(os.path.join(temp_consent_path, "en/success.html"), 'w') as f:
+        with open(os.path.join(temp_consent_path, "en/success.html"), "w") as f:
             f.write("yay!")
 
         hs = self.setup_test_homeserver(config=config)
@@ -90,7 +88,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Get the version from the body, and whether we've consented
-        version, consented = channel.result["body"].decode('ascii').split(",")
+        version, consented = channel.result["body"].decode("ascii").split(",")
         self.assertEqual(consented, "False")
 
         # POST to the consent page, saying we've agreed
@@ -113,6 +111,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
 
         # Get the version from the body, and check that it's the version we
         # agreed to, and that we've consented to it.
-        version, consented = channel.result["body"].decode('ascii').split(",")
+        version, consented = channel.result["body"].decode("ascii").split(",")
         self.assertEqual(consented, "True")
         self.assertEqual(version, "1")

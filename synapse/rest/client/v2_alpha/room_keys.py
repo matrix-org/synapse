@@ -24,13 +24,13 @@ from synapse.http.servlet import (
     parse_string,
 )
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class RoomKeysServlet(RestServlet):
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/room_keys/keys(/(?P<room_id>[^/]+))?(/(?P<session_id>[^/]+))?$"
     )
 
@@ -129,22 +129,12 @@ class RoomKeysServlet(RestServlet):
         version = parse_string(request, "version")
 
         if session_id:
-            body = {
-                "sessions": {
-                    session_id: body
-                }
-            }
+            body = {"sessions": {session_id: body}}
 
         if room_id:
-            body = {
-                "rooms": {
-                    room_id: body
-                }
-            }
+            body = {"rooms": {room_id: body}}
 
-        yield self.e2e_room_keys_handler.upload_room_keys(
-            user_id, version, body
-        )
+        yield self.e2e_room_keys_handler.upload_room_keys(user_id, version, body)
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
@@ -212,10 +202,10 @@ class RoomKeysServlet(RestServlet):
         if session_id:
             # If the client requests a specific session, but that session was
             # not backed up, then return an M_NOT_FOUND.
-            if room_keys['rooms'] == {}:
+            if room_keys["rooms"] == {}:
                 raise NotFoundError("No room_keys found")
             else:
-                room_keys = room_keys['rooms'][room_id]['sessions'][session_id]
+                room_keys = room_keys["rooms"][room_id]["sessions"][session_id]
         elif room_id:
             # If the client requests all sessions from a room, but no sessions
             # are found, then return an empty result rather than an error, so
@@ -223,10 +213,10 @@ class RoomKeysServlet(RestServlet):
             # empty result is valid.  (Similarly if the client requests all
             # sessions from the backup, but in that case, room_keys is already
             # in the right format, so we don't need to do anything about it.)
-            if room_keys['rooms'] == {}:
-                room_keys = {'sessions': {}}
+            if room_keys["rooms"] == {}:
+                room_keys = {"sessions": {}}
             else:
-                room_keys = room_keys['rooms'][room_id]
+                room_keys = room_keys["rooms"][room_id]
 
         defer.returnValue((200, room_keys))
 
@@ -256,9 +246,7 @@ class RoomKeysServlet(RestServlet):
 
 
 class RoomKeysNewVersionServlet(RestServlet):
-    PATTERNS = client_v2_patterns(
-        "/room_keys/version$"
-    )
+    PATTERNS = client_patterns("/room_keys/version$")
 
     def __init__(self, hs):
         """
@@ -304,9 +292,7 @@ class RoomKeysNewVersionServlet(RestServlet):
         user_id = requester.user.to_string()
         info = parse_json_object_from_request(request)
 
-        new_version = yield self.e2e_room_keys_handler.create_version(
-            user_id, info
-        )
+        new_version = yield self.e2e_room_keys_handler.create_version(user_id, info)
         defer.returnValue((200, {"version": new_version}))
 
     # we deliberately don't have a PUT /version, as these things really should
@@ -314,9 +300,7 @@ class RoomKeysNewVersionServlet(RestServlet):
 
 
 class RoomKeysVersionServlet(RestServlet):
-    PATTERNS = client_v2_patterns(
-        "/room_keys/version(/(?P<version>[^/]+))?$"
-    )
+    PATTERNS = client_patterns("/room_keys/version(/(?P<version>[^/]+))?$")
 
     def __init__(self, hs):
         """
@@ -350,9 +334,7 @@ class RoomKeysVersionServlet(RestServlet):
         user_id = requester.user.to_string()
 
         try:
-            info = yield self.e2e_room_keys_handler.get_version_info(
-                user_id, version
-            )
+            info = yield self.e2e_room_keys_handler.get_version_info(user_id, version)
         except SynapseError as e:
             if e.code == 404:
                 raise SynapseError(404, "No backup found", Codes.NOT_FOUND)
@@ -375,9 +357,7 @@ class RoomKeysVersionServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
-        yield self.e2e_room_keys_handler.delete_version(
-            user_id, version
-        )
+        yield self.e2e_room_keys_handler.delete_version(user_id, version)
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
@@ -407,11 +387,11 @@ class RoomKeysVersionServlet(RestServlet):
         info = parse_json_object_from_request(request)
 
         if version is None:
-            raise SynapseError(400, "No version specified to update", Codes.MISSING_PARAM)
+            raise SynapseError(
+                400, "No version specified to update", Codes.MISSING_PARAM
+            )
 
-        yield self.e2e_room_keys_handler.update_version(
-            user_id, version, info
-        )
+        yield self.e2e_room_keys_handler.update_version(user_id, version, info)
         defer.returnValue((200, {}))
 
 

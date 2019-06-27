@@ -15,7 +15,8 @@
 
 import json
 
-from synapse.rest.client.v1 import admin, login, room
+import synapse.rest.admin
+from synapse.rest.client.v1 import login, room
 
 from tests import unittest
 
@@ -23,7 +24,7 @@ from tests import unittest
 class IdentityTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
@@ -31,7 +32,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.enable_3pid_lookup = False
+        config["enable_3pid_lookup"] = False
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -43,7 +44,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         tok = self.login("kermit", "monkey")
 
         request, channel = self.make_request(
-            b"POST", "/createRoom", b"{}", access_token=tok,
+            b"POST", "/createRoom", b"{}", access_token=tok
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
@@ -55,11 +56,9 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             "address": "test@example.com",
         }
         request_data = json.dumps(params)
-        request_url = (
-            "/rooms/%s/invite" % (room_id)
-        ).encode('ascii')
+        request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
         request, channel = self.make_request(
-            b"POST", request_url, request_data, access_token=tok,
+            b"POST", request_url, request_data, access_token=tok
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)

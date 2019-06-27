@@ -1,1 +1,0 @@
-Rewrite Datastore.get_server_verify_keys to reduce the number of database transactions.

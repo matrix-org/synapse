@@ -15,6 +15,8 @@
 
 from mock import Mock
 
+from netaddr import IPSet
+
 from twisted.internet import defer
 from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
@@ -36,9 +38,7 @@ from tests.unittest import HomeserverTestCase
 def check_logcontext(context):
     current = LoggingContext.current_context()
     if current is not context:
-        raise AssertionError(
-            "Expected logcontext %s but was %s" % (context, current),
-        )
+        raise AssertionError("Expected logcontext %s but was %s" % (context, current))
 
 
 class FederationClientTests(HomeserverTestCase):
@@ -54,6 +54,7 @@ class FederationClientTests(HomeserverTestCase):
         """
         happy-path test of a GET request
         """
+
         @defer.inlineCallbacks
         def do_request():
             with LoggingContext("one") as context:
@@ -82,7 +83,7 @@ class FederationClientTests(HomeserverTestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8008)
 
         # complete the connection and wire it up to a fake transport
@@ -98,7 +99,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertNoResult(test_d)
 
         # Send it the HTTP response
-        res_json = '{ "a": 1 }'.encode('ascii')
+        res_json = '{ "a": 1 }'.encode("ascii")
         protocol.dataReceived(
             b"HTTP/1.1 200 OK\r\n"
             b"Server: Fake\r\n"
@@ -137,7 +138,7 @@ class FederationClientTests(HomeserverTestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8008)
         e = Exception("go away")
         factory.clientConnectionFailed(None, e)
@@ -163,7 +164,7 @@ class FederationClientTests(HomeserverTestCase):
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
-        self.assertEqual(clients[0][0], '1.2.3.4')
+        self.assertEqual(clients[0][0], "1.2.3.4")
         self.assertEqual(clients[0][1], 8008)
 
         # Deferred is still without a result
@@ -175,8 +176,7 @@ class FederationClientTests(HomeserverTestCase):
 
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(
-            f.value.inner_exception,
-            (ConnectingCancelledError, TimeoutError),
+            f.value.inner_exception, (ConnectingCancelledError, TimeoutError)
         )
 
     def test_client_connect_no_response(self):
@@ -194,7 +194,7 @@ class FederationClientTests(HomeserverTestCase):
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
-        self.assertEqual(clients[0][0], '1.2.3.4')
+        self.assertEqual(clients[0][0], "1.2.3.4")
         self.assertEqual(clients[0][1], 8008)
 
         conn = Mock()
@@ -211,14 +211,80 @@ class FederationClientTests(HomeserverTestCase):
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(f.value.inner_exception, ResponseNeverReceived)
 
+    def test_client_ip_range_blacklist(self):
+        """Ensure that Synapse does not try to connect to blacklisted IPs"""
+
+        # Set up the ip_range blacklist
+        self.hs.config.federation_ip_range_blacklist = IPSet(
+            ["127.0.0.0/8", "fe80::/64"]
+        )
+        self.reactor.lookups["internal"] = "127.0.0.1"
+        self.reactor.lookups["internalv6"] = "fe80:0:0:0:0:8a2e:370:7337"
+        self.reactor.lookups["fine"] = "10.20.30.40"
+        cl = MatrixFederationHttpClient(self.hs, None)
+
+        # Try making a GET request to a blacklisted IPv4 address
+        # ------------------------------------------------------
+        # Make the request
+        d = cl.get_json("internal:8008", "foo/bar", timeout=10000)
+
+        # Nothing happened yet
+        self.assertNoResult(d)
+
+        self.pump(1)
+
+        # Check that it was unable to resolve the address
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 0)
+
+        f = self.failureResultOf(d)
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, DNSLookupError)
+
+        # Try making a POST request to a blacklisted IPv6 address
+        # -------------------------------------------------------
+        # Make the request
+        d = cl.post_json("internalv6:8008", "foo/bar", timeout=10000)
+
+        # Nothing has happened yet
+        self.assertNoResult(d)
+
+        # Move the reactor forwards
+        self.pump(1)
+
+        # Check that it was unable to resolve the address
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 0)
+
+        # Check that it was due to a blacklisted DNS lookup
+        f = self.failureResultOf(d, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, DNSLookupError)
+
+        # Try making a GET request to a non-blacklisted IPv4 address
+        # ----------------------------------------------------------
+        # Make the request
+        d = cl.post_json("fine:8008", "foo/bar", timeout=10000)
+
+        # Nothing has happened yet
+        self.assertNoResult(d)
+
+        # Move the reactor forwards
+        self.pump(1)
+
+        # Check that it was able to resolve the address
+        clients = self.reactor.tcpClients
+        self.assertNotEqual(len(clients), 0)
+
+        # Connection will still fail as this IP address does not resolve to anything
+        f = self.failureResultOf(d, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, ConnectingCancelledError)
+
     def test_client_gets_headers(self):
         """
         Once the client gets the headers, _request returns successfully.
         """
         request = MatrixFederationRequest(
-            method="GET",
-            destination="testserv:8008",
-            path="foo/bar",
+            method="GET", destination="testserv:8008", path="foo/bar"
         )
         d = self.cl._send_request(request, timeout=10000)
 
@@ -258,8 +324,10 @@ class FederationClientTests(HomeserverTestCase):
 
         # Send it the HTTP response
         client.dataReceived(
-            (b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-             b"Server: Fake\r\n\r\n")
+            (
+                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                b"Server: Fake\r\n\r\n"
+            )
         )
 
         # Push by enough to time it out
@@ -274,9 +342,7 @@ class FederationClientTests(HomeserverTestCase):
         requiring a trailing slash. We need to retry the request with a
         trailing slash. Workaround for Synapse <= v0.99.3, explained in #3622.
         """
-        d = self.cl.get_json(
-            "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
-        )
+        d = self.cl.get_json("testserv:8008", "foo/bar", try_trailing_slash_on_400=True)
 
         # Send the request
         self.pump()
@@ -315,7 +381,7 @@ class FederationClientTests(HomeserverTestCase):
             b"Content-Type: application/json\r\n"
             b"Content-Length: 2\r\n"
             b"\r\n"
-            b'{}'
+            b"{}"
         )
 
         # We should get a successful response
@@ -329,9 +395,7 @@ class FederationClientTests(HomeserverTestCase):
 
         See test_client_requires_trailing_slashes() for context.
         """
-        d = self.cl.get_json(
-            "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
-        )
+        d = self.cl.get_json("testserv:8008", "foo/bar", try_trailing_slash_on_400=True)
 
         # Send the request
         self.pump()
@@ -368,10 +432,7 @@ class FederationClientTests(HomeserverTestCase):
         self.failureResultOf(d)
 
     def test_client_sends_body(self):
-        self.cl.post_json(
-            "testserv:8008", "foo/bar", timeout=10000,
-            data={"a": "b"}
-        )
+        self.cl.post_json("testserv:8008", "foo/bar", timeout=10000, data={"a": "b"})
 
         self.pump()
 

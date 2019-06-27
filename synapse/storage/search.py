@@ -31,8 +31,8 @@ from .background_updates import BackgroundUpdateStore
 logger = logging.getLogger(__name__)
 
 SearchEntry = namedtuple(
-    'SearchEntry',
-    ['key', 'value', 'event_id', 'room_id', 'stream_ordering', 'origin_server_ts'],
+    "SearchEntry",
+    ["key", "value", "event_id", "room_id", "stream_ordering", "origin_server_ts"],
 )
 
 
@@ -216,7 +216,7 @@ class SearchStore(BackgroundUpdateStore):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
         rows_inserted = progress.get("rows_inserted", 0)
-        have_added_index = progress['have_added_indexes']
+        have_added_index = progress["have_added_indexes"]
 
         if not have_added_index:
 
@@ -341,29 +341,7 @@ class SearchStore(BackgroundUpdateStore):
                 for entry in entries
             )
 
-            # inserts to a GIN index are normally batched up into a pending
-            # list, and then all committed together once the list gets to a
-            # certain size. The trouble with that is that postgres (pre-9.5)
-            # uses work_mem to determine the length of the list, and work_mem
-            # is typically very large.
-            #
-            # We therefore reduce work_mem while we do the insert.
-            #
-            # (postgres 9.5 uses the separate gin_pending_list_limit setting,
-            # so doesn't suffer the same problem, but changing work_mem will
-            # be harmless)
-            #
-            # Note that we don't need to worry about restoring it on
-            # exception, because exceptions will cause the transaction to be
-            # rolled back, including the effects of the SET command.
-            #
-            # Also: we use SET rather than SET LOCAL because there's lots of
-            # other stuff going on in this transaction, which want to have the
-            # normal work_mem setting.
-
-            txn.execute("SET work_mem='256kB'")
             txn.executemany(sql, args)
-            txn.execute("RESET work_mem")
 
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
@@ -460,7 +438,7 @@ class SearchStore(BackgroundUpdateStore):
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
-        events = yield self._get_events([r["event_id"] for r in results])
+        events = yield self.get_events_as_list([r["event_id"] for r in results])
 
         event_map = {ev.event_id: ev for ev in events}
 
@@ -605,7 +583,7 @@ class SearchStore(BackgroundUpdateStore):
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
-        events = yield self._get_events([r["event_id"] for r in results])
+        events = yield self.get_events_as_list([r["event_id"] for r in results])
 
         event_map = {ev.event_id: ev for ev in events}
 

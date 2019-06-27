@@ -20,9 +20,7 @@ class CallVisitor(ast.NodeVisitor):
         else:
             return
 
-        if name == "client_path_patterns":
-            PATTERNS_V1.append(node.args[0].s)
-        elif name == "client_v2_patterns":
+        if name == "client_patterns":
             PATTERNS_V2.append(node.args[0].s)
 
 
@@ -37,11 +35,11 @@ def find_patterns_in_file(filepath):
         find_patterns_in_code(f.read())
 
 
-parser = argparse.ArgumentParser(description='Find url patterns.')
+parser = argparse.ArgumentParser(description="Find url patterns.")
 
 parser.add_argument(
     "directories",
-    nargs='+',
+    nargs="+",
     metavar="DIR",
     help="Directories to search for definitions",
 )

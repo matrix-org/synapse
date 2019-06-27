@@ -46,7 +46,7 @@ class FakeChannel(object):
     def json_body(self):
         if not self.result:
             raise Exception("No result yet.")
-        return json.loads(self.result["body"].decode('utf8'))
+        return json.loads(self.result["body"].decode("utf8"))
 
     @property
     def code(self):
@@ -151,10 +151,10 @@ def make_request(
         Tuple[synapse.http.site.SynapseRequest, channel]
     """
     if not isinstance(method, bytes):
-        method = method.encode('ascii')
+        method = method.encode("ascii")
 
     if not isinstance(path, bytes):
-        path = path.encode('ascii')
+        path = path.encode("ascii")
 
     # Decorate it to be the full path, if we're using shorthand
     if shorthand and not path.startswith(b"/_matrix"):
@@ -165,7 +165,7 @@ def make_request(
         path = b"/" + path
 
     if isinstance(content, text_type):
-        content = content.encode('utf8')
+        content = content.encode("utf8")
 
     site = FakeSite()
     channel = FakeChannel(reactor)
@@ -173,16 +173,17 @@ def make_request(
     req = request(site, channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
-    req.postpath = list(map(unquote, path[1:].split(b'/')))
+    req.postpath = list(map(unquote, path[1:].split(b"/")))
 
     if access_token:
         req.requestHeaders.addRawHeader(
-            b"Authorization", b"Bearer " + access_token.encode('ascii')
+            b"Authorization", b"Bearer " + access_token.encode("ascii")
         )
 
     if federation_auth_origin is not None:
         req.requestHeaders.addRawHeader(
-            b"Authorization", b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin,)
+            b"Authorization",
+            b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin,),
         )
 
     if content:
@@ -226,6 +227,8 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
     """
 
     def __init__(self):
+        self.threadpool = ThreadPool(self)
+
         self._udp = []
         lookups = self.lookups = {}
 
@@ -233,13 +236,13 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         class FakeResolver(object):
             def getHostByName(self, name, timeout=None):
                 if name not in lookups:
-                    return fail(DNSLookupError("OH NO: unknown %s" % (name, )))
+                    return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
                 return succeed(lookups[name])
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super(ThreadedMemoryReactorClock, self).__init__()
 
-    def listenUDP(self, port, protocol, interface='', maxPacketSize=8196):
+    def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
         p.startListening()
         self._udp.append(p)
@@ -252,6 +255,37 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         d = Deferred()
         d.addCallback(lambda x: callback(*args, **kwargs))
         self.callLater(0, d.callback, True)
+        return d
+
+    def getThreadPool(self):
+        return self.threadpool
+
+
+class ThreadPool:
+    """
+    Threadless thread pool.
+    """
+
+    def __init__(self, reactor):
+        self._reactor = reactor
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def callInThreadWithCallback(self, onResult, function, *args, **kwargs):
+        def _(res):
+            if isinstance(res, Failure):
+                onResult(False, res)
+            else:
+                onResult(True, res)
+
+        d = Deferred()
+        d.addCallback(lambda x: function(*args, **kwargs))
+        d.addBoth(_)
+        self._reactor.callLater(0, d.callback, True)
         return d
 
 
@@ -289,36 +323,10 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
             **kwargs
         )
 
-    class ThreadPool:
-        """
-        Threadless thread pool.
-        """
-
-        def start(self):
-            pass
-
-        def stop(self):
-            pass
-
-        def callInThreadWithCallback(self, onResult, function, *args, **kwargs):
-            def _(res):
-                if isinstance(res, Failure):
-                    onResult(False, res)
-                else:
-                    onResult(True, res)
-
-            d = Deferred()
-            d.addCallback(lambda x: function(*args, **kwargs))
-            d.addBoth(_)
-            clock._reactor.callLater(0, d.callback, True)
-            return d
-
-    clock.threadpool = ThreadPool()
-
     if pool:
         pool.runWithConnection = runWithConnection
         pool.runInteraction = runInteraction
-        pool.threadpool = ThreadPool()
+        pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
     return d
 
@@ -363,7 +371,7 @@ class FakeTransport(object):
 
     disconnecting = False
     disconnected = False
-    buffer = attr.ib(default=b'')
+    buffer = attr.ib(default=b"")
     producer = attr.ib(default=None)
     autoflush = attr.ib(default=True)
 
@@ -454,6 +462,6 @@ class FakeTransport(object):
             logger.warning("Exception writing to protocol: %s", e)
             return
 
-        self.buffer = self.buffer[len(to_write):]
+        self.buffer = self.buffer[len(to_write) :]
         if self.buffer and self.autoflush:
             self._reactor.callLater(0.0, self.flush)

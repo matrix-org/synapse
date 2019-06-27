@@ -25,13 +25,11 @@ from six.moves.urllib import parse
 from twisted.internet import defer, reactor
 from twisted.internet.defer import Deferred
 
-from synapse.config.repository import MediaStorageProviderConfig
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
 from synapse.util.logcontext import make_deferred_yieldable
-from synapse.util.module_loader import load_module
 
 from tests import unittest
 
@@ -120,12 +118,14 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         client.get_file = get_file
 
         self.storage_path = self.mktemp()
+        self.media_store_path = self.mktemp()
         os.mkdir(self.storage_path)
+        os.mkdir(self.media_store_path)
 
         config = self.default_config()
-        config.media_store_path = self.storage_path
-        config.thumbnail_requirements = {}
-        config.max_image_pixels = 2000000
+        config["media_store_path"] = self.media_store_path
+        config["thumbnail_requirements"] = {}
+        config["max_image_pixels"] = 2000000
 
         provider_config = {
             "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
@@ -134,12 +134,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             "store_remote": True,
             "config": {"directory": self.storage_path},
         }
-
-        loaded = list(load_module(provider_config)) + [
-            MediaStorageProviderConfig(False, False, False)
-        ]
-
-        config.media_storage_providers = [loaded]
+        config["media_storage_providers"] = [provider_config]
 
         hs = self.setup_test_homeserver(config=config, http_client=client)
 
@@ -148,7 +143,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
 
         self.media_repo = hs.get_media_repository_resource()
-        self.download_resource = self.media_repo.children[b'download']
+        self.download_resource = self.media_repo.children[b"download"]
 
         # smol png
         self.end_content = unhexlify(
@@ -176,7 +171,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         headers = {
             b"Content-Length": [b"%d" % (len(self.end_content))],
-            b"Content-Type": [b'image/png'],
+            b"Content-Type": [b"image/png"],
         }
         if content_disposition:
             headers[b"Content-Disposition"] = [content_disposition]
@@ -209,7 +204,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         correctly decode it as the UTF-8 string, and use filename* in the
         response.
         """
-        filename = parse.quote(u"\u2603".encode('utf8')).encode('ascii')
+        filename = parse.quote("\u2603".encode("utf8")).encode("ascii")
         channel = self._req(b"inline; filename*=utf-8''" + filename + b".png")
 
         headers = channel.headers

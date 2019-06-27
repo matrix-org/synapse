@@ -26,15 +26,15 @@ class TestConfig(TlsConfig):
 
 
 class TLSConfigTests(TestCase):
-
     def test_warn_self_signed(self):
         """
         Synapse will give a warning when it loads a self-signed certificate.
         """
         config_dir = self.mktemp()
         os.mkdir(config_dir)
-        with open(os.path.join(config_dir, "cert.pem"), 'w') as f:
-            f.write("""-----BEGIN CERTIFICATE-----
+        with open(os.path.join(config_dir, "cert.pem"), "w") as f:
+            f.write(
+                """-----BEGIN CERTIFICATE-----
 MIID6DCCAtACAws9CjANBgkqhkiG9w0BAQUFADCBtzELMAkGA1UEBhMCVFIxDzAN
 BgNVBAgMBsOHb3J1bTEUMBIGA1UEBwwLQmHFn21ha8OnxLExEjAQBgNVBAMMCWxv
 Y2FsaG9zdDEcMBoGA1UECgwTVHdpc3RlZCBNYXRyaXggTGFiczEkMCIGA1UECwwb
@@ -56,15 +56,16 @@ I8OtG1xGwcok53lyDuuUUDexnK4O5BkjKiVlNPg4HPim5Kuj2hRNFfNt/F2BVIlj
 iZupikC5MT1LQaRwidkSNxCku1TfAyueiBwhLnFwTmIGNnhuDCutEVAD9kFmcJN2
 SznugAcPk4doX2+rL+ila+ThqgPzIkwTUHtnmjI0TI6xsDUlXz5S3UyudrE2Qsfz
 s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
------END CERTIFICATE-----""")
+-----END CERTIFICATE-----"""
+            )
 
         config = {
             "tls_certificate_path": os.path.join(config_dir, "cert.pem"),
-            "tls_fingerprints": []
+            "tls_fingerprints": [],
         }
 
         t = TestConfig()
-        t.read_config(config)
+        t.read_config(config, config_dir_path="", data_dir_path="")
         t.read_certificate_from_disk(require_cert_and_key=False)
 
         warnings = self.flushWarnings()
@@ -75,5 +76,5 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
                 "Self-signed TLS certificates will not be accepted by "
                 "Synapse 1.0. Please either provide a valid certificate, "
                 "or use Synapse's ACME support to provision one."
-            )
+            ),
         )

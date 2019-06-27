@@ -68,9 +68,7 @@ class SrvResolverTestCase(unittest.TestCase):
 
         dns_client_mock.lookupService.assert_called_once_with(service_name)
 
-        result_deferred.callback(
-            ([answer_srv], None, None)
-        )
+        result_deferred.callback(([answer_srv], None, None))
 
         servers = self.successResultOf(test_d)
 
@@ -102,7 +100,7 @@ class SrvResolverTestCase(unittest.TestCase):
     def test_from_cache(self):
         clock = MockClock()
 
-        dns_client_mock = Mock(spec_set=['lookupService'])
+        dns_client_mock = Mock(spec_set=["lookupService"])
         dns_client_mock.lookupService = Mock(spec_set=[])
 
         service_name = b"test_service.example.com"
@@ -112,7 +110,7 @@ class SrvResolverTestCase(unittest.TestCase):
 
         cache = {service_name: [entry]}
         resolver = SrvResolver(
-            dns_client=dns_client_mock, cache=cache, get_time=clock.time,
+            dns_client=dns_client_mock, cache=cache, get_time=clock.time
         )
 
         servers = yield resolver.resolve_service(service_name)
@@ -168,11 +166,13 @@ class SrvResolverTestCase(unittest.TestCase):
         self.assertNoResult(resolve_d)
 
         # returning a single "." should make the lookup fail with a ConenctError
-        lookup_deferred.callback((
-            [dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"."))],
-            None,
-            None,
-        ))
+        lookup_deferred.callback(
+            (
+                [dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"."))],
+                None,
+                None,
+            )
+        )
 
         self.failureResultOf(resolve_d, ConnectError)
 
@@ -191,14 +191,16 @@ class SrvResolverTestCase(unittest.TestCase):
         resolve_d = resolver.resolve_service(service_name)
         self.assertNoResult(resolve_d)
 
-        lookup_deferred.callback((
-            [
-                dns.RRHeader(type=dns.A, payload=dns.Record_A()),
-                dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"host")),
-            ],
-            None,
-            None,
-        ))
+        lookup_deferred.callback(
+            (
+                [
+                    dns.RRHeader(type=dns.A, payload=dns.Record_A()),
+                    dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"host")),
+                ],
+                None,
+                None,
+            )
+        )
 
         servers = self.successResultOf(resolve_d)
 

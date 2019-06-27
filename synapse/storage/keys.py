@@ -19,6 +19,7 @@ import logging
 
 import six
 
+import attr
 from signedjson.key import decode_verify_key_bytes
 
 from synapse.util import batch_iter
@@ -34,6 +35,12 @@ if six.PY2:
     db_binary_type = six.moves.builtins.buffer
 else:
     db_binary_type = memoryview
+
+
+@attr.s(slots=True, frozen=True)
+class FetchKeyResult(object):
+    verify_key = attr.ib()  # VerifyKey: the key itself
+    valid_until_ts = attr.ib()  # int: how long we can use this key for
 
 
 class KeyStore(SQLBaseStore):
@@ -54,8 +61,8 @@ class KeyStore(SQLBaseStore):
                 iterable of (server_name, key-id) tuples to fetch keys for
 
         Returns:
-            Deferred: resolves to dict[Tuple[str, str], VerifyKey|None]:
-                map from (server_name, key_id) -> VerifyKey, or None if the key is
+            Deferred: resolves to dict[Tuple[str, str], FetchKeyResult|None]:
+                map from (server_name, key_id) -> FetchKeyResult, or None if the key is
                 unknown
         """
         keys = {}
@@ -65,17 +72,27 @@ class KeyStore(SQLBaseStore):
 
             # batch_iter always returns tuples so it's safe to do len(batch)
             sql = (
-                "SELECT server_name, key_id, verify_key FROM server_signature_keys "
-                "WHERE 1=0"
+                "SELECT server_name, key_id, verify_key, ts_valid_until_ms "
+                "FROM server_signature_keys WHERE 1=0"
             ) + " OR (server_name=? AND key_id=?)" * len(batch)
 
             txn.execute(sql, tuple(itertools.chain.from_iterable(batch)))
 
             for row in txn:
-                server_name, key_id, key_bytes = row
-                keys[(server_name, key_id)] = decode_verify_key_bytes(
-                    key_id, bytes(key_bytes)
+                server_name, key_id, key_bytes, ts_valid_until_ms = row
+
+                if ts_valid_until_ms is None:
+                    # Old keys may be stored with a ts_valid_until_ms of null,
+                    # in which case we treat this as if it was set to `0`, i.e.
+                    # it won't match key requests that define a minimum
+                    # `ts_valid_until_ms`.
+                    ts_valid_until_ms = 0
+
+                res = FetchKeyResult(
+                    verify_key=decode_verify_key_bytes(key_id, bytes(key_bytes)),
+                    valid_until_ts=ts_valid_until_ms,
                 )
+                keys[(server_name, key_id)] = res
 
         def _txn(txn):
             for batch in batch_iter(server_name_and_key_ids, 50):
@@ -84,38 +101,53 @@ class KeyStore(SQLBaseStore):
 
         return self.runInteraction("get_server_verify_keys", _txn)
 
-    def store_server_verify_key(
-        self, server_name, from_server, time_now_ms, verify_key
-    ):
-        """Stores a NACL verification key for the given server.
+    def store_server_verify_keys(self, from_server, ts_added_ms, verify_keys):
+        """Stores NACL verification keys for remote servers.
         Args:
-            server_name (str): The name of the server.
-            from_server (str): Where the verification key was looked up
-            time_now_ms (int): The time now in milliseconds
-            verify_key (nacl.signing.VerifyKey): The NACL verify key.
+            from_server (str): Where the verification keys were looked up
+            ts_added_ms (int): The time to record that the key was added
+            verify_keys (iterable[tuple[str, str, FetchKeyResult]]):
+                keys to be stored. Each entry is a triplet of
+                (server_name, key_id, key).
         """
-        key_id = "%s:%s" % (verify_key.alg, verify_key.version)
-
-        # XXX fix this to not need a lock (#3819)
-        def _txn(txn):
-            self._simple_upsert_txn(
-                txn,
-                table="server_signature_keys",
-                keyvalues={"server_name": server_name, "key_id": key_id},
-                values={
-                    "from_server": from_server,
-                    "ts_added_ms": time_now_ms,
-                    "verify_key": db_binary_type(verify_key.encode()),
-                },
+        key_values = []
+        value_values = []
+        invalidations = []
+        for server_name, key_id, fetch_result in verify_keys:
+            key_values.append((server_name, key_id))
+            value_values.append(
+                (
+                    from_server,
+                    ts_added_ms,
+                    fetch_result.valid_until_ts,
+                    db_binary_type(fetch_result.verify_key.encode()),
+                )
             )
             # invalidate takes a tuple corresponding to the params of
             # _get_server_verify_key. _get_server_verify_key only takes one
             # param, which is itself the 2-tuple (server_name, key_id).
-            txn.call_after(
-                self._get_server_verify_key.invalidate, ((server_name, key_id),)
-            )
+            invalidations.append((server_name, key_id))
 
-        return self.runInteraction("store_server_verify_key", _txn)
+        def _invalidate(res):
+            f = self._get_server_verify_key.invalidate
+            for i in invalidations:
+                f((i,))
+            return res
+
+        return self.runInteraction(
+            "store_server_verify_keys",
+            self._simple_upsert_many_txn,
+            table="server_signature_keys",
+            key_names=("server_name", "key_id"),
+            key_values=key_values,
+            value_names=(
+                "from_server",
+                "ts_added_ms",
+                "ts_valid_until_ms",
+                "verify_key",
+            ),
+            value_values=value_values,
+        ).addCallback(_invalidate)
 
     def store_server_keys_json(
         self, server_name, key_id, from_server, ts_now_ms, ts_expires_ms, key_json_bytes

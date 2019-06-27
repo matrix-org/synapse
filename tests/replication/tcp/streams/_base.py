@@ -22,6 +22,7 @@ from tests.server import FakeTransport
 
 class BaseStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests of the replication streams"""
+
     def prepare(self, reactor, clock, hs):
         # build a replication server
         server_factory = ReplicationStreamProtocolFactory(self.hs)
@@ -52,6 +53,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
 class TestReplicationClientHandler(object):
     """Drop-in for ReplicationClientHandler which just collects RDATA rows"""
+
     def __init__(self):
         self.received_rdata_rows = []
 
@@ -69,6 +71,4 @@ class TestReplicationClientHandler(object):
 
     def on_rdata(self, stream_name, token, rows):
         for r in rows:
-            self.received_rdata_rows.append(
-                (stream_name, token, r)
-            )
+            self.received_rdata_rows.append((stream_name, token, r))

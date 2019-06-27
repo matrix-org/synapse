@@ -46,9 +46,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         user3_email = "user3@matrix.org"
 
         threepids = [
-            {'medium': 'email', 'address': user1_email},
-            {'medium': 'email', 'address': user2_email},
-            {'medium': 'email', 'address': user3_email},
+            {"medium": "email", "address": user1_email},
+            {"medium": "email", "address": user2_email},
+            {"medium": "email", "address": user3_email},
         ]
         # -1 because user3 is a support user and does not count
         user_num = len(threepids) - 1
@@ -56,8 +56,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.register(user_id=user1, token="123", password_hash=None)
         self.store.register(user_id=user2, token="456", password_hash=None)
         self.store.register(
-            user_id=user3, token="789",
-            password_hash=None, user_type=UserTypes.SUPPORT
+            user_id=user3, token="789", password_hash=None, user_type=UserTypes.SUPPORT
         )
         self.pump()
 
@@ -173,29 +172,23 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def test_populate_monthly_users_should_update(self):
         self.store.upsert_monthly_active_user = Mock()
 
-        self.store.is_trial_user = Mock(
-            return_value=defer.succeed(False)
-        )
+        self.store.is_trial_user = Mock(return_value=defer.succeed(False))
 
         self.store.user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(None)
         )
-        self.store.populate_monthly_active_users('user_id')
+        self.store.populate_monthly_active_users("user_id")
         self.pump()
         self.store.upsert_monthly_active_user.assert_called_once()
 
     def test_populate_monthly_users_should_not_update(self):
         self.store.upsert_monthly_active_user = Mock()
 
-        self.store.is_trial_user = Mock(
-            return_value=defer.succeed(False)
-        )
+        self.store.is_trial_user = Mock(return_value=defer.succeed(False))
         self.store.user_last_seen_monthly_active = Mock(
-            return_value=defer.succeed(
-                self.hs.get_clock().time_msec()
-            )
+            return_value=defer.succeed(self.hs.get_clock().time_msec())
         )
-        self.store.populate_monthly_active_users('user_id')
+        self.store.populate_monthly_active_users("user_id")
         self.pump()
         self.store.upsert_monthly_active_user.assert_not_called()
 
@@ -205,13 +198,13 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.assertEquals(self.get_success(count), 0)
         # Test reserved users but no registered users
 
-        user1 = '@user1:example.com'
-        user2 = '@user2:example.com'
-        user1_email = 'user1@example.com'
-        user2_email = 'user2@example.com'
+        user1 = "@user1:example.com"
+        user2 = "@user2:example.com"
+        user1_email = "user1@example.com"
+        user2_email = "user2@example.com"
         threepids = [
-            {'medium': 'email', 'address': user1_email},
-            {'medium': 'email', 'address': user2_email},
+            {"medium": "email", "address": user1_email},
+            {"medium": "email", "address": user2_email},
         ]
         self.hs.config.mau_limits_reserved_threepids = threepids
         self.store.runInteraction(
@@ -243,7 +236,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
             user_id=support_user_id,
             token="123",
             password_hash=None,
-            user_type=UserTypes.SUPPORT
+            user_type=UserTypes.SUPPORT,
         )
 
         self.store.upsert_monthly_active_user(support_user_id)

@@ -17,7 +17,7 @@
 import logging
 from io import BytesIO
 
-from six import text_type
+from six import raise_from, text_type
 from six.moves import urllib
 
 import treq
@@ -90,8 +90,31 @@ class IPBlacklistingResolver(object):
     def resolveHostName(self, recv, hostname, portNumber=0):
 
         r = recv()
-        d = defer.Deferred()
         addresses = []
+
+        def _callback():
+            r.resolutionBegan(None)
+
+            has_bad_ip = False
+            for i in addresses:
+                ip_address = IPAddress(i.host)
+
+                if check_against_blacklist(
+                    ip_address, self._ip_whitelist, self._ip_blacklist
+                ):
+                    logger.info(
+                        "Dropped %s from DNS resolution to %s due to blacklist"
+                        % (ip_address, hostname)
+                    )
+                    has_bad_ip = True
+
+            # if we have a blacklisted IP, we'd like to raise an error to block the
+            # request, but all we can really do from here is claim that there were no
+            # valid results.
+            if not has_bad_ip:
+                for i in addresses:
+                    r.addressResolved(i)
+            r.resolutionComplete()
 
         @provider(IResolutionReceiver)
         class EndpointReceiver(object):
@@ -101,33 +124,15 @@ class IPBlacklistingResolver(object):
 
             @staticmethod
             def addressResolved(address):
-                ip_address = IPAddress(address.host)
-
-                if check_against_blacklist(
-                    ip_address, self._ip_whitelist, self._ip_blacklist
-                ):
-                    logger.info(
-                        "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
-                    )
-                    raise SynapseError(403, "IP address blocked by IP blacklist entry")
-
                 addresses.append(address)
 
             @staticmethod
             def resolutionComplete():
-                d.callback(addresses)
+                _callback()
 
         self._reactor.nameResolver.resolveHostName(
             EndpointReceiver, hostname, portNumber=portNumber
         )
-
-        def _callback(addrs):
-            r.resolutionBegan(None)
-            for i in addrs:
-                r.addressResolved(i)
-            r.resolutionComplete()
-
-        d.addCallback(_callback)
 
         return r
 
@@ -151,7 +156,7 @@ class BlacklistingAgentWrapper(Agent):
         self._ip_blacklist = ip_blacklist
 
     def request(self, method, uri, headers=None, bodyProducer=None):
-        h = urllib.parse.urlparse(uri.decode('ascii'))
+        h = urllib.parse.urlparse(uri.decode("ascii"))
 
         try:
             ip_address = IPAddress(h.hostname)
@@ -159,9 +164,7 @@ class BlacklistingAgentWrapper(Agent):
             if check_against_blacklist(
                 ip_address, self._ip_whitelist, self._ip_blacklist
             ):
-                logger.info(
-                    "Blocking access to %s because of blacklist" % (ip_address,)
-                )
+                logger.info("Blocking access to %s due to blacklist" % (ip_address,))
                 e = SynapseError(403, "IP address blocked by IP blacklist entry")
                 return defer.fail(Failure(e))
         except Exception:
@@ -200,7 +203,7 @@ class SimpleHttpClient(object):
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
 
-        self.user_agent = self.user_agent.encode('ascii')
+        self.user_agent = self.user_agent.encode("ascii")
 
         if self._ip_blacklist:
             real_reactor = hs.get_reactor()
@@ -258,9 +261,6 @@ class SimpleHttpClient(object):
             uri (str): URI to query.
             data (bytes): Data to send in the request body, if applicable.
             headers (t.w.http_headers.Headers): Request headers.
-
-        Raises:
-            SynapseError: If the IP is blacklisted.
         """
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
@@ -517,8 +517,8 @@ class SimpleHttpClient(object):
         resp_headers = dict(response.headers.getAllRawHeaders())
 
         if (
-            b'Content-Length' in resp_headers
-            and int(resp_headers[b'Content-Length'][0]) > max_size
+            b"Content-Length" in resp_headers
+            and int(resp_headers[b"Content-Length"][0]) > max_size
         ):
             logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
             raise SynapseError(
@@ -539,17 +539,17 @@ class SimpleHttpClient(object):
             length = yield make_deferred_yieldable(
                 _readBodyToFile(response, output_stream, max_size)
             )
+        except SynapseError:
+            # This can happen e.g. because the body is too large.
+            raise
         except Exception as e:
-            logger.exception("Failed to download body")
-            raise SynapseError(
-                502, ("Failed to download remote body: %s" % e), Codes.UNKNOWN
-            )
+            raise_from(SynapseError(502, ("Failed to download remote body: %s" % e)), e)
 
         defer.returnValue(
             (
                 length,
                 resp_headers,
-                response.request.absoluteURI.decode('ascii'),
+                response.request.absoluteURI.decode("ascii"),
                 response.code,
             )
         )
@@ -639,7 +639,7 @@ def encode_urlencode_args(args):
 
 def encode_urlencode_arg(arg):
     if isinstance(arg, text_type):
-        return arg.encode('utf-8')
+        return arg.encode("utf-8")
     elif isinstance(arg, list):
         return [encode_urlencode_arg(i) for i in arg]
     else:

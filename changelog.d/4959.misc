@@ -1,1 +1,0 @@
-Run `black` to clean up formatting on `synapse/storage/roommember.py` and `synapse/storage/events.py`.

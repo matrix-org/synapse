@@ -23,29 +23,6 @@ server_name: "SERVERNAME"
 #
 pid_file: DATADIR/homeserver.pid
 
-# CPU affinity mask. Setting this restricts the CPUs on which the
-# process will be scheduled. It is represented as a bitmask, with the
-# lowest order bit corresponding to the first logical CPU and the
-# highest order bit corresponding to the last logical CPU. Not all CPUs
-# may exist on a given system but a mask may specify more CPUs than are
-# present.
-#
-# For example:
-#    0x00000001  is processor #0,
-#    0x00000003  is processors #0 and #1,
-#    0xFFFFFFFF  is all processors (#0 through #31).
-#
-# Pinning a Python process to a single CPU is desirable, because Python
-# is inherently single-threaded due to the GIL, and can suffer a
-# 30-40% slowdown due to cache blow-out and thread context switching
-# if the scheduler happens to schedule the underlying threads across
-# different cores. See
-# https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
-#
-# This setting requires the affinity package to be installed!
-#
-#cpu_affinity: 0xFFFFFFFF
-
 # The path to the web client which will be served at /_matrix/client/
 # if 'webclient' is configured under the 'listeners' configuration.
 #
@@ -68,6 +45,34 @@ pid_file: DATADIR/homeserver.pid
 # Set to false to disable presence tracking on this homeserver.
 #
 #use_presence: false
+
+# Whether to require authentication to retrieve profile data (avatars,
+# display names) of other users through the client API. Defaults to
+# 'false'. Note that profile data is also available via the federation
+# API, so this setting is of limited value if federation is enabled on
+# the server.
+#
+#require_auth_for_profile_requests: true
+
+# If set to 'false', requires authentication to access the server's public rooms
+# directory through the client API. Defaults to 'true'.
+#
+#allow_public_rooms_without_auth: false
+
+# If set to 'false', forbids any other homeserver to fetch the server's public
+# rooms directory via federation. Defaults to 'true'.
+#
+#allow_public_rooms_over_federation: false
+
+# The default room version for newly created rooms.
+#
+# Known room versions are listed here:
+# https://matrix.org/docs/spec/#complete-list-of-room-versions
+#
+# For example, for room version 1, default_room_version should be set
+# to "1".
+#
+#default_room_version: "4"
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -100,6 +105,24 @@ pid_file: DATADIR/homeserver.pid
 #  - lon.example.com
 #  - nyc.example.com
 #  - syd.example.com
+
+# Prevent federation requests from being sent to the following
+# blacklist IP address CIDR ranges. If this option is not specified, or
+# specified with an empty list, no ip range blacklist will be enforced.
+#
+# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+# listed here, since they correspond to unroutable addresses.)
+#
+federation_ip_range_blacklist:
+  - '127.0.0.0/8'
+  - '10.0.0.0/8'
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '100.64.0.0/10'
+  - '169.254.0.0/16'
+  - '::1/128'
+  - 'fe80::/64'
+  - 'fc00::/7'
 
 # List of ports that Synapse should listen on, their purpose and their
 # configuration.
@@ -136,8 +159,8 @@ pid_file: DATADIR/homeserver.pid
 #
 # Valid resource names are:
 #
-#   client: the client-server API (/_matrix/client). Also implies 'media' and
-#       'static'.
+#   client: the client-server API (/_matrix/client), and the synapse admin
+#       API (/_synapse/admin). Also implies 'media' and 'static'.
 #
 #   consent: user consent forms (/_matrix/consent). See
 #       docs/consent_tracking.md.
@@ -190,7 +213,7 @@ listeners:
       - names: [client, federation]
         compress: false
 
-    # example additonal_resources:
+    # example additional_resources:
     #
     #additional_resources:
     #  "/_matrix/my/custom/endpoint":
@@ -219,6 +242,22 @@ listeners:
 
 # Monthly Active User Blocking
 #
+# Used in cases where the admin or server owner wants to limit to the
+# number of monthly active users.
+#
+# 'limit_usage_by_mau' disables/enables monthly active user blocking. When
+# anabled and a limit is reached the server returns a 'ResourceLimitError'
+# with error type Codes.RESOURCE_LIMIT_EXCEEDED
+#
+# 'max_mau_value' is the hard limit of monthly active users above which
+# the server will start blocking user actions.
+#
+# 'mau_trial_days' is a means to add a grace period for active users. It
+# means that users must be active for this number of days before they
+# can be considered active and guards against the case where lots of users
+# sign up in a short space of time never to return after their initial
+# session.
+#
 #limit_usage_by_mau: False
 #max_mau_value: 50
 #mau_trial_days: 2
@@ -238,6 +277,17 @@ listeners:
 
 # Used by phonehome stats to group together related servers.
 #server_context: context
+
+# Whether to require a user to be in the room to add an alias to it.
+# Defaults to 'true'.
+#
+#require_membership_for_aliases: false
+
+# Whether to allow per-room membership profiles through the send of membership
+# events with profile information that differ from the target's global profile.
+# Defaults to 'true'.
+#
+#allow_per_room_profiles: false
 
 
 ## TLS ##
@@ -259,6 +309,40 @@ listeners:
 # PEM-encoded private key for TLS
 #
 #tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
+
+# Whether to verify TLS server certificates for outbound federation requests.
+#
+# Defaults to `true`. To disable certificate verification, uncomment the
+# following line.
+#
+#federation_verify_certificates: false
+
+# Skip federation certificate verification on the following whitelist
+# of domains.
+#
+# This setting should only be used in very specific cases, such as
+# federation over Tor hidden services and similar. For private networks
+# of homeservers, you likely want to use a private CA instead.
+#
+# Only effective if federation_verify_certicates is `true`.
+#
+#federation_certificate_verification_whitelist:
+#  - lon.example.com
+#  - *.domain.com
+#  - *.onion
+
+# List of custom certificate authorities for federation traffic.
+#
+# This setting should only normally be used within a private network of
+# homeservers.
+#
+# Note that this list will replace those that are provided by your
+# operating environment. Certificates must be in PEM format.
+#
+#federation_custom_ca_list:
+#  - myCA1.pem
+#  - myCA2.pem
+#  - myCA3.pem
 
 # ACME support: This will configure Synapse to request a valid TLS certificate
 # for your configured `server_name` via Let's Encrypt.
@@ -322,6 +406,13 @@ acme:
     #
     #domain: matrix.example.com
 
+    # file to use for the account key. This will be generated if it doesn't
+    # exist.
+    #
+    # If unspecified, we will use CONFDIR/client.key.
+    #
+    account_key_file: DATADIR/acme_account.key
+
 # List of allowed TLS fingerprints for this server to publish along
 # with the signing keys for this server. Other matrix servers that
 # make HTTPS requests to this server will check that the TLS
@@ -375,21 +466,15 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 
 ## Ratelimiting ##
 
-# Number of messages a client can send per second
-#
-#rc_messages_per_second: 0.2
-
-# Number of message a client can send before being throttled
-#
-#rc_message_burst_count: 10.0
-
-# Ratelimiting settings for registration and login.
+# Ratelimiting settings for client actions (registration, login, messaging).
 #
 # Each ratelimiting configuration is made of two parameters:
 #   - per_second: number of requests a client can send per second.
 #   - burst_count: number of requests a client can send before being throttled.
 #
 # Synapse currently uses the following configurations:
+#   - one for messages that ratelimits sending based on the account the client
+#     is using
 #   - one for registration that ratelimits registration requests based on the
 #     client's IP address.
 #   - one for login that ratelimits login requests based on the client's IP
@@ -401,6 +486,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #     attempts for this account.
 #
 # The defaults are as shown below.
+#
+#rc_message:
+#  per_second: 0.2
+#  burst_count: 10
 #
 #rc_registration:
 #  per_second: 0.17
@@ -417,29 +506,28 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #    per_second: 0.17
 #    burst_count: 3
 
-# The federation window size in milliseconds
-#
-#federation_rc_window_size: 1000
 
-# The number of federation requests from a single server in a window
-# before the server will delay processing the request.
+# Ratelimiting settings for incoming federation
 #
-#federation_rc_sleep_limit: 10
-
-# The duration in milliseconds to delay processing events from
-# remote servers by if they go over the sleep limit.
+# The rc_federation configuration is made up of the following settings:
+#   - window_size: window size in milliseconds
+#   - sleep_limit: number of federation requests from a single server in
+#     a window before the server will delay processing the request.
+#   - sleep_delay: duration in milliseconds to delay processing events
+#     from remote servers by if they go over the sleep limit.
+#   - reject_limit: maximum number of concurrent federation requests
+#     allowed from a single server
+#   - concurrent: number of federation requests to concurrently process
+#     from a single server
 #
-#federation_rc_sleep_delay: 500
-
-# The maximum number of concurrent federation requests allowed
-# from a single server
+# The defaults are as shown below.
 #
-#federation_rc_reject_limit: 50
-
-# The number of federation requests to concurrently process from a
-# single server
-#
-#federation_rc_concurrent: 3
+#rc_federation:
+#  window_size: 1000
+#  sleep_limit: 10
+#  sleep_delay: 500
+#  reject_limit: 50
+#  concurrent: 3
 
 # Target outgoing federation transaction frequency for sending read-receipts,
 # per-room.
@@ -509,11 +597,12 @@ uploads_path: "DATADIR/uploads"
 #    height: 600
 #    method: scale
 
-# Is the preview URL API enabled?  If enabled, you *must* specify
-# an explicit url_preview_ip_range_blacklist of IPs that the spider is
-# denied from accessing.
+# Is the preview URL API enabled?
 #
-#url_preview_enabled: false
+# 'false' by default: uncomment the following to enable it (and specify a
+# url_preview_ip_range_blacklist blacklist).
+#
+#url_preview_enabled: true
 
 # List of IP address CIDR ranges that the URL preview spider is denied
 # from accessing.  There are no defaults: you must explicitly
@@ -522,6 +611,12 @@ uploads_path: "DATADIR/uploads"
 # to connect to, otherwise anyone in any Matrix room could cause your
 # synapse to issue arbitrary GET requests to your internal services,
 # causing serious security issues.
+#
+# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+# listed here, since they correspond to unroutable addresses.)
+#
+# This must be specified if url_preview_enabled is set. It is recommended that
+# you uncomment the following list as a starting point.
 #
 #url_preview_ip_range_blacklist:
 #  - '127.0.0.0/8'
@@ -533,7 +628,7 @@ uploads_path: "DATADIR/uploads"
 #  - '::1/128'
 #  - 'fe80::/64'
 #  - 'fc00::/7'
-#
+
 # List of IP address CIDR ranges that the URL preview spider is allowed
 # to access even if they are specified in url_preview_ip_range_blacklist.
 # This is useful for specifying exceptions to wide-ranging blacklisted
@@ -665,6 +760,16 @@ uploads_path: "DATADIR/uploads"
 # ``renew_email_subject`` is the subject of the email sent out with the renewal
 # link. ``%(app)s`` can be used as a placeholder for the ``app_name`` parameter
 # from the ``email`` section.
+#
+# Once this feature is enabled, Synapse will look for registered users without an
+# expiration date at startup and will add one to every account it found using the
+# current settings at that time.
+# This means that, if a validity period is set, and Synapse is restarted (it will
+# then derive an expiration date from the current validity period), and some time
+# after that the validity period changes and Synapse is restarted, the users'
+# expiration dates won't be updated unless their account is manually renewed. This
+# date will be randomly selected within a range [now + period - d ; now + period],
+# where d is equal to 10% of the validity period.
 #
 #account_validity:
 #  enabled: True
@@ -835,12 +940,43 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 
 # The trusted servers to download signing keys from.
 #
-#perspectives:
-#  servers:
-#    "matrix.org":
-#      verify_keys:
-#        "ed25519:auto":
-#          key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
+# When we need to fetch a signing key, each server is tried in parallel.
+#
+# Normally, the connection to the key server is validated via TLS certificates.
+# Additional security can be provided by configuring a `verify key`, which
+# will make synapse check that the response is signed by that key.
+#
+# This setting supercedes an older setting named `perspectives`. The old format
+# is still supported for backwards-compatibility, but it is deprecated.
+#
+# Options for each entry in the list include:
+#
+#    server_name: the name of the server. required.
+#
+#    verify_keys: an optional map from key id to base64-encoded public key.
+#       If specified, we will check that the response is signed by at least
+#       one of the given keys.
+#
+#    accept_keys_insecurely: a boolean. Normally, if `verify_keys` is unset,
+#       and federation_verify_certificates is not `true`, synapse will refuse
+#       to start, because this would allow anyone who can spoof DNS responses
+#       to masquerade as the trusted key server. If you know what you are doing
+#       and are sure that your network environment provides a secure connection
+#       to the key server, you can set this to `true` to override this
+#       behaviour.
+#
+# An example configuration might look like:
+#
+#trusted_key_servers:
+#  - server_name: "my_trusted_server.example.com"
+#    verify_keys:
+#      "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
+#  - server_name: "my_other_trusted_server.example.com"
+#
+# The default configuration is:
+#
+#trusted_key_servers:
+#  - server_name: "matrix.org"
 
 
 # Enable SAML2 for registration and login. Uses pysaml2.
@@ -923,10 +1059,8 @@ password_config:
 
 
 
-# Enable sending emails for notification events or expiry notices
-# Defining a custom URL for Riot is only needed if email notifications
-# should contain links to a self-hosted installation of Riot; when set
-# the "app_name" setting is ignored.
+# Enable sending emails for password resets, notification events or
+# account expiry notices
 #
 # If your SMTP server requires authentication, the optional smtp_user &
 # smtp_pass variables should be used
@@ -934,22 +1068,64 @@ password_config:
 #email:
 #   enable_notifs: false
 #   smtp_host: "localhost"
-#   smtp_port: 25
+#   smtp_port: 25 # SSL: 465, STARTTLS: 587
 #   smtp_user: "exampleusername"
 #   smtp_pass: "examplepassword"
 #   require_transport_security: False
 #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
 #   app_name: Matrix
-#   # if template_dir is unset, uses the example templates that are part of
-#   # the Synapse distribution.
+#
+#   # Enable email notifications by default
+#   notif_for_new_users: True
+#
+#   # Defining a custom URL for Riot is only needed if email notifications
+#   # should contain links to a self-hosted installation of Riot; when set
+#   # the "app_name" setting is ignored
+#   riot_base_url: "http://localhost/riot"
+#
+#   # Enable sending password reset emails via the configured, trusted
+#   # identity servers
+#   #
+#   # IMPORTANT! This will give a malicious or overtaken identity server
+#   # the ability to reset passwords for your users! Make absolutely sure
+#   # that you want to do this! It is strongly recommended that password
+#   # reset emails be sent by the homeserver instead
+#   #
+#   # If this option is set to false and SMTP options have not been
+#   # configured, resetting user passwords via email will be disabled
+#   #trust_identity_server_for_password_resets: false
+#
+#   # Configure the time that a validation email or text message code
+#   # will expire after sending
+#   #
+#   # This is currently used for password resets
+#   #validation_token_lifetime: 1h
+#
+#   # Template directory. All template files should be stored within this
+#   # directory
+#   #
 #   #template_dir: res/templates
+#
+#   # Templates for email notifications
+#   #
 #   notif_template_html: notif_mail.html
 #   notif_template_text: notif_mail.txt
-#   # Templates for account expiry notices.
+#
+#   # Templates for account expiry notices
+#   #
 #   expiry_template_html: notice_expiry.html
 #   expiry_template_text: notice_expiry.txt
-#   notif_for_new_users: True
-#   riot_base_url: "http://localhost/riot"
+#
+#   # Templates for password reset emails sent by the homeserver
+#   #
+#   #password_reset_template_html: password_reset.html
+#   #password_reset_template_text: password_reset.txt
+#
+#   # Templates for password reset success and failure pages that a user
+#   # will see after attempting to reset their password
+#   #
+#   #password_reset_template_success_html: password_reset_success.html
+#   #password_reset_template_failure_html: password_reset_failure.html
 
 
 #password_providers:
@@ -1010,9 +1186,9 @@ password_config:
 #
 # 'search_all_users' defines whether to search all users visible to your HS
 # when searching the user directory, rather than limiting to users visible
-# in public rooms.  Defaults to false.  If you set it True, you'll have to run
-# UPDATE user_directory_stream_pos SET stream_id = NULL;
-# on your database to tell it to rebuild the user_directory search indexes.
+# in public rooms.  Defaults to false.  If you set it True, you'll have to
+# rebuild the user_directory search indexes, see
+# https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
 #
 #user_directory:
 #  enabled: true
@@ -1068,6 +1244,22 @@ password_config:
 #  require_at_registration: False
 #  policy_name: Privacy Policy
 #
+
+
+
+# Local statistics collection. Used in populating the room directory.
+#
+# 'bucket_size' controls how large each statistics timeslice is. It can
+# be defined in a human readable short form -- e.g. "1d", "1y".
+#
+# 'retention' controls how long historical statistics will be kept for.
+# It can be defined in a human readable short form -- e.g. "1d", "1y".
+#
+#
+#stats:
+#   enabled: true
+#   bucket_size: 1d
+#   retention: 1y
 
 
 # Server Notices room configuration
@@ -1153,3 +1345,16 @@ password_config:
 #    alias: "*"
 #    room_id: "*"
 #    action: allow
+
+
+# Server admins can define a Python module that implements extra rules for
+# allowing or denying incoming events. In order to work, this module needs to
+# override the methods defined in synapse/events/third_party_rules.py.
+#
+# This feature is designed to be used in closed federations only, where each
+# participating server enforces the same rules.
+#
+#third_party_event_rules:
+#  module: "my_custom_project.SuperRulesSet"
+#  config:
+#    example_option: 'things'

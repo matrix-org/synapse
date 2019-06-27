@@ -168,7 +168,7 @@ class StateTestCase(unittest.TestCase):
                 "get_state_resolution_handler",
             ]
         )
-        hs.config = default_config("tesths")
+        hs.config = default_config("tesths", True)
         hs.get_datastore.return_value = self.store
         hs.get_state_handler.return_value = None
         hs.get_clock.return_value = MockClock()
@@ -366,11 +366,11 @@ class StateTestCase(unittest.TestCase):
     def _add_depths(self, nodes, edges):
         def _get_depth(ev):
             node = nodes[ev]
-            if 'depth' not in node:
+            if "depth" not in node:
                 prevs = edges[ev]
                 depth = max(_get_depth(prev) for prev in prevs) + 1
-                node['depth'] = depth
-            return node['depth']
+                node["depth"] = depth
+            return node["depth"]
 
         for n in nodes:
             _get_depth(n)

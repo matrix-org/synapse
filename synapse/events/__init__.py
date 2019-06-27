@@ -21,6 +21,7 @@ import six
 
 from unpaddedbase64 import encode_base64
 
+from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
@@ -91,6 +92,18 @@ class _EventInternalMetadata(object):
         """
         return getattr(self, "soft_failed", False)
 
+    def should_proactively_send(self):
+        """Whether the event, if ours, should be sent to other clients and
+        servers.
+
+        This is used for sending dummy events internally. Servers and clients
+        can still explicitly fetch the event.
+
+        Returns:
+            bool
+        """
+        return getattr(self, "proactively_send", True)
+
 
 def _event_dict_property(key):
     # We want to be able to use hasattr with the event dict properties.
@@ -114,25 +127,25 @@ def _event_dict_property(key):
         except KeyError:
             raise AttributeError(key)
 
-    return property(
-        getter,
-        setter,
-        delete,
-    )
+    return property(getter, setter, delete)
 
 
 class EventBase(object):
-    def __init__(self, event_dict, signatures={}, unsigned={},
-                 internal_metadata_dict={}, rejected_reason=None):
+    def __init__(
+        self,
+        event_dict,
+        signatures={},
+        unsigned={},
+        internal_metadata_dict={},
+        rejected_reason=None,
+    ):
         self.signatures = signatures
         self.unsigned = unsigned
         self.rejected_reason = rejected_reason
 
         self._event_dict = event_dict
 
-        self.internal_metadata = _EventInternalMetadata(
-            internal_metadata_dict
-        )
+        self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
 
     auth_events = _event_dict_property("auth_events")
     depth = _event_dict_property("depth")
@@ -155,10 +168,7 @@ class EventBase(object):
 
     def get_dict(self):
         d = dict(self._event_dict)
-        d.update({
-            "signatures": self.signatures,
-            "unsigned": dict(self.unsigned),
-        })
+        d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
 
         return d
 
@@ -335,11 +345,31 @@ class FrozenEventV2(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<FrozenEventV2 event_id='%s', type='%s', state_key='%s'>" % (
+        return "<%s event_id='%s', type='%s', state_key='%s'>" % (
+            self.__class__.__name__,
             self.event_id,
             self.get("type", None),
             self.get("state_key", None),
         )
+
+
+class FrozenEventV3(FrozenEventV2):
+    """FrozenEventV3, which differs from FrozenEventV2 only in the event_id format"""
+
+    format_version = EventFormatVersions.V3  # All events of this type are V3
+
+    @property
+    def event_id(self):
+        # We have to import this here as otherwise we get an import loop which
+        # is hard to break.
+        from synapse.crypto.event_signing import compute_event_reference_hash
+
+        if self._event_id:
+            return self._event_id
+        self._event_id = "$" + encode_base64(
+            compute_event_reference_hash(self)[1], urlsafe=True
+        )
+        return self._event_id
 
 
 def room_version_to_event_format(room_version):
@@ -350,12 +380,15 @@ def room_version_to_event_format(room_version):
 
     Returns:
         int
+
+    Raises:
+        UnsupportedRoomVersionError if the room version is unknown
     """
     v = KNOWN_ROOM_VERSIONS.get(room_version)
 
     if not v:
-        # We should have already checked version, so this should not happen
-        raise RuntimeError("Unrecognized room version %s" % (room_version,))
+        # this can happen if support is withdrawn for a room version
+        raise UnsupportedRoomVersionError()
 
     return v.event_format
 
@@ -376,7 +409,7 @@ def event_type_from_format_version(format_version):
         return FrozenEvent
     elif format_version == EventFormatVersions.V2:
         return FrozenEventV2
+    elif format_version == EventFormatVersions.V3:
+        return FrozenEventV3
     else:
-        raise Exception(
-            "No event format %r" % (format_version,)
-        )
+        raise Exception("No event format %r" % (format_version,))

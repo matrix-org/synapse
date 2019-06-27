@@ -1,7 +1,29 @@
 Using Postgres
 --------------
 
-Postgres version 9.4 or later is known to work.
+Postgres version 9.5 or later is known to work.
+
+Install postgres client libraries
+=================================
+
+Synapse will require the python postgres client library in order to connect to
+a postgres database.
+
+* If you are using the `matrix.org debian/ubuntu
+  packages <../INSTALL.md#matrixorg-packages>`_,
+  the necessary libraries will already be installed.
+
+* For other pre-built packages, please consult the documentation from the
+  relevant package.
+
+* If you installed synapse `in a virtualenv
+  <../INSTALL.md#installing-from-source>`_, you can install the library with::
+
+      ~/synapse/env/bin/pip install matrix-synapse[postgres]
+
+  (substituting the path to your virtualenv for ``~/synapse/env``, if you used a
+  different path). You will require the postgres development files. These are in
+  the ``libpq-dev`` package on Debian-derived distributions.
 
 Set up database
 ===============
@@ -25,29 +47,6 @@ encoding use, e.g.::
 
 This would create an appropriate database named ``synapse`` owned by the
 ``synapse_user`` user (which must already exist).
-
-Set up client in Debian/Ubuntu
-===========================
-
-Postgres support depends on the postgres python connector ``psycopg2``. In the
-virtual env::
-
-    sudo apt-get install libpq-dev
-    pip install psycopg2
-
-Set up client in RHEL/CentOs 7
-==============================
-
-Make sure you have the appropriate version of postgres-devel installed. For a
-postgres 9.4, use the postgres 9.4 packages from
-[here](https://wiki.postgresql.org/wiki/YUM_Installation).
-
-As with Debian/Ubuntu, postgres support depends on the postgres python connector
-``psycopg2``. In the virtual env::
-
-    sudo yum install postgresql-devel libpqxx-devel.x86_64
-    export PATH=/usr/pgsql-9.4/bin/:$PATH
-    pip install psycopg2
 
 Tuning Postgres
 ===============

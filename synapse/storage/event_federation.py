@@ -45,7 +45,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """
         return self.get_auth_chain_ids(
             event_ids, include_given=include_given
-        ).addCallback(self._get_events)
+        ).addCallback(self.get_events_as_list)
 
     def get_auth_chain_ids(self, event_ids, include_given=False):
         """Get auth events for given event_ids. The events *must* be state events.
@@ -190,6 +190,34 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             room_id,
         )
 
+    def get_rooms_with_many_extremities(self, min_count, limit):
+        """Get the top rooms with at least N extremities.
+
+        Args:
+            min_count (int): The minimum number of extremities
+            limit (int): The maximum number of rooms to return.
+
+        Returns:
+            Deferred[list]: At most `limit` room IDs that have at least
+            `min_count` extremities, sorted by extremity count.
+        """
+
+        def _get_rooms_with_many_extremities_txn(txn):
+            sql = """
+                SELECT room_id FROM event_forward_extremities
+                GROUP BY room_id
+                HAVING count(*) > ?
+                ORDER BY count(*) DESC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (min_count, limit))
+            return [room_id for room_id, in txn]
+
+        return self.runInteraction(
+            "get_rooms_with_many_extremities", _get_rooms_with_many_extremities_txn
+        )
+
     @cached(max_entries=5000, iterable=True)
     def get_latest_event_ids_in_room(self, room_id):
         return self._simple_select_onecol(
@@ -316,7 +344,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 event_list,
                 limit,
             )
-            .addCallback(self._get_events)
+            .addCallback(self.get_events_as_list)
             .addCallback(lambda l: sorted(l, key=lambda e: -e.depth))
         )
 
@@ -382,7 +410,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             latest_events,
             limit,
         )
-        events = yield self._get_events(ids)
+        events = yield self.get_events_as_list(ids)
         defer.returnValue(events)
 
     def _get_missing_events(self, txn, room_id, earliest_events, latest_events, limit):
