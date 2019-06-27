@@ -19,7 +19,10 @@ from six import string_types
 
 from frozendict import frozendict
 
-from synapse.api.constants import EventTypes
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, RelationTypes
+from synapse.util.async_helpers import yieldable_gather_results
 
 from . import EventBase
 
@@ -28,7 +31,7 @@ from . import EventBase
 # by a match for 'stuff'.
 # TODO: This is fast, but fails to handle "foo\\.bar" which should be treated as
 #       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
-SPLIT_FIELD_REGEX = re.compile(r'(?<!\\)\.')
+SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
 
 def prune_event(event):
@@ -38,8 +41,32 @@ def prune_event(event):
     This is used when we "redact" an event. We want to remove all fields that
     the user has specified, but we do want to keep necessary information like
     type, state_key etc.
+
+    Args:
+        event (FrozenEvent)
+
+    Returns:
+        FrozenEvent
     """
-    event_type = event.type
+    pruned_event_dict = prune_event_dict(event.get_dict())
+
+    from . import event_type_from_format_version
+
+    return event_type_from_format_version(event.format_version)(
+        pruned_event_dict, event.internal_metadata.get_dict()
+    )
+
+
+def prune_event_dict(event_dict):
+    """Redacts the event_dict in the same way as `prune_event`, except it
+    operates on dicts rather than event objects
+
+    Args:
+        event_dict (dict)
+
+    Returns:
+        dict: A copy of the pruned event dict
+    """
 
     allowed_keys = [
         "event_id",
@@ -59,13 +86,13 @@ def prune_event(event):
         "membership",
     ]
 
-    event_dict = event.get_dict()
+    event_type = event_dict["type"]
 
     new_content = {}
 
     def add_fields(*fields):
         for field in fields:
-            if field in event.content:
+            if field in event_dict["content"]:
                 new_content[field] = event_dict["content"][field]
 
     if event_type == EventTypes.Member:
@@ -90,25 +117,21 @@ def prune_event(event):
     elif event_type == EventTypes.RoomHistoryVisibility:
         add_fields("history_visibility")
 
-    allowed_fields = {
-        k: v
-        for k, v in event_dict.items()
-        if k in allowed_keys
-    }
+    allowed_fields = {k: v for k, v in event_dict.items() if k in allowed_keys}
 
     allowed_fields["content"] = new_content
 
-    allowed_fields["unsigned"] = {}
+    unsigned = {}
+    allowed_fields["unsigned"] = unsigned
 
-    if "age_ts" in event.unsigned:
-        allowed_fields["unsigned"]["age_ts"] = event.unsigned["age_ts"]
-    if "replaces_state" in event.unsigned:
-        allowed_fields["unsigned"]["replaces_state"] = event.unsigned["replaces_state"]
+    event_unsigned = event_dict.get("unsigned", {})
 
-    return type(event)(
-        allowed_fields,
-        internal_metadata_dict=event.internal_metadata.get_dict()
-    )
+    if "age_ts" in event_unsigned:
+        unsigned["age_ts"] = event_unsigned["age_ts"]
+    if "replaces_state" in event_unsigned:
+        unsigned["replaces_state"] = event_unsigned["replaces_state"]
+
+    return allowed_fields
 
 
 def _copy_field(src, dst, field):
@@ -179,7 +202,7 @@ def only_fields(dictionary, fields):
     # for each element of the output array of arrays:
     # remove escaping so we can use the right key names.
     split_fields[:] = [
-        [f.replace(r'\.', r'.') for f in field_array] for field_array in split_fields
+        [f.replace(r"\.", r".") for f in field_array] for field_array in split_fields
     ]
 
     output = {}
@@ -200,7 +223,10 @@ def format_event_for_client_v1(d):
         d["user_id"] = sender
 
     copy_keys = (
-        "age", "redacted_because", "replaces_state", "prev_content",
+        "age",
+        "redacted_because",
+        "replaces_state",
+        "prev_content",
         "invite_room_state",
     )
     for key in copy_keys:
@@ -212,8 +238,13 @@ def format_event_for_client_v1(d):
 
 def format_event_for_client_v2(d):
     drop_keys = (
-        "auth_events", "prev_events", "hashes", "signatures", "depth",
-        "origin", "prev_state",
+        "auth_events",
+        "prev_events",
+        "hashes",
+        "signatures",
+        "depth",
+        "origin",
+        "prev_state",
     )
     for key in drop_keys:
         d.pop(key, None)
@@ -226,9 +257,15 @@ def format_event_for_client_v2_without_room_id(d):
     return d
 
 
-def serialize_event(e, time_now_ms, as_client_event=True,
-                    event_format=format_event_for_client_v1,
-                    token_id=None, only_event_fields=None, is_invite=False):
+def serialize_event(
+    e,
+    time_now_ms,
+    as_client_event=True,
+    event_format=format_event_for_client_v1,
+    token_id=None,
+    only_event_fields=None,
+    is_invite=False,
+):
     """Serialize event for clients
 
     Args:
@@ -244,6 +281,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
     Returns:
         dict
     """
+
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
@@ -253,14 +291,15 @@ def serialize_event(e, time_now_ms, as_client_event=True,
     # Should this strip out None's?
     d = {k: v for k, v in e.get_dict().items()}
 
+    d["event_id"] = e.event_id
+
     if "age_ts" in d["unsigned"]:
         d["unsigned"]["age"] = time_now_ms - d["unsigned"]["age_ts"]
         del d["unsigned"]["age_ts"]
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
-            e.unsigned["redacted_because"], time_now_ms,
-            event_format=event_format
+            e.unsigned["redacted_because"], time_now_ms, event_format=event_format
         )
 
     if token_id is not None:
@@ -279,9 +318,95 @@ def serialize_event(e, time_now_ms, as_client_event=True,
         d = event_format(d)
 
     if only_event_fields:
-        if (not isinstance(only_event_fields, list) or
-                not all(isinstance(f, string_types) for f in only_event_fields)):
+        if not isinstance(only_event_fields, list) or not all(
+            isinstance(f, string_types) for f in only_event_fields
+        ):
             raise TypeError("only_event_fields must be a list of strings")
         d = only_fields(d, only_event_fields)
 
     return d
+
+
+class EventClientSerializer(object):
+    """Serializes events that are to be sent to clients.
+
+    This is used for bundling extra information with any events to be sent to
+    clients.
+    """
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.experimental_msc1849_support_enabled = (
+            hs.config.experimental_msc1849_support_enabled
+        )
+
+    @defer.inlineCallbacks
+    def serialize_event(self, event, time_now, bundle_aggregations=True, **kwargs):
+        """Serializes a single event.
+
+        Args:
+            event (EventBase)
+            time_now (int): The current time in milliseconds
+            bundle_aggregations (bool): Whether to bundle in related events
+            **kwargs: Arguments to pass to `serialize_event`
+
+        Returns:
+            Deferred[dict]: The serialized event
+        """
+        # To handle the case of presence events and the like
+        if not isinstance(event, EventBase):
+            defer.returnValue(event)
+
+        event_id = event.event_id
+        serialized_event = serialize_event(event, time_now, **kwargs)
+
+        # If MSC1849 is enabled then we need to look if thre are any relations
+        # we need to bundle in with the event
+        if self.experimental_msc1849_support_enabled and bundle_aggregations:
+            annotations = yield self.store.get_aggregation_groups_for_event(event_id)
+            references = yield self.store.get_relations_for_event(
+                event_id, RelationTypes.REFERENCE, direction="f"
+            )
+
+            if annotations.chunk:
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
+                r[RelationTypes.ANNOTATION] = annotations.to_dict()
+
+            if references.chunk:
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
+                r[RelationTypes.REFERENCE] = references.to_dict()
+
+            edit = None
+            if event.type == EventTypes.Message:
+                edit = yield self.store.get_applicable_edit(event_id)
+
+            if edit:
+                # If there is an edit replace the content, preserving existing
+                # relations.
+
+                relations = event.content.get("m.relates_to")
+                serialized_event["content"] = edit.content.get("m.new_content", {})
+                if relations:
+                    serialized_event["content"]["m.relates_to"] = relations
+                else:
+                    serialized_event["content"].pop("m.relates_to", None)
+
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
+                r[RelationTypes.REPLACE] = {"event_id": edit.event_id}
+
+        defer.returnValue(serialized_event)
+
+    def serialize_events(self, events, time_now, **kwargs):
+        """Serializes multiple events.
+
+        Args:
+            event (iter[EventBase])
+            time_now (int): The current time in milliseconds
+            **kwargs: Arguments to pass to `serialize_event`
+
+        Returns:
+            Deferred[list[dict]]: The list of serialized events
+        """
+        return yieldable_gather_results(
+            self.serialize_event, events, time_now=time_now, **kwargs
+        )

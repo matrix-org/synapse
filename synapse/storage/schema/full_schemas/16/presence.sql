@@ -28,13 +28,5 @@ CREATE TABLE IF NOT EXISTS presence_allow_inbound(
   UNIQUE (observed_user_id, observer_user_id)
 );
 
--- For each of /my/ users (watcher), which possibly-remote users are they
--- watching?
-CREATE TABLE IF NOT EXISTS presence_list(
-  user_id TEXT NOT NULL,
-  observed_user_id TEXT NOT NULL, -- a UserID,
-  accepted BOOLEAN NOT NULL,
-  UNIQUE (user_id, observed_user_id)
-);
-
-CREATE INDEX presence_list_user_id ON presence_list (user_id);
+-- We used to create a table called presence_list, but this is no longer used
+-- and is removed in delta 54.

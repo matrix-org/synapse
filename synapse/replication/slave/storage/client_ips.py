@@ -25,9 +25,7 @@ class SlavedClientIpStore(BaseSlavedStore):
         super(SlavedClientIpStore, self).__init__(db_conn, hs)
 
         self.client_ip_last_seen = Cache(
-            name="client_ip_last_seen",
-            keylen=4,
-            max_entries=50000 * CACHE_SIZE_FACTOR,
+            name="client_ip_last_seen", keylen=4, max_entries=50000 * CACHE_SIZE_FACTOR
         )
 
     def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id):
@@ -42,6 +40,8 @@ class SlavedClientIpStore(BaseSlavedStore):
         # Rate-limited inserts
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             return
+
+        self.client_ip_last_seen.prefill(key, now)
 
         self.hs.get_tcp_replication().send_user_ip(
             user_id, access_token, ip, user_agent, device_id, now

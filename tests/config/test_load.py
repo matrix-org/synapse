@@ -24,7 +24,6 @@ from tests import unittest
 
 
 class ConfigLoadingTestCase(unittest.TestCase):
-
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         print(self.dir)
@@ -43,15 +42,14 @@ class ConfigLoadingTestCase(unittest.TestCase):
     def test_generates_and_loads_macaroon_secret_key(self):
         self.generate_config()
 
-        with open(self.file,
-                  "r") as f:
-            raw = yaml.load(f)
+        with open(self.file, "r") as f:
+            raw = yaml.safe_load(f)
         self.assertIn("macaroon_secret_key", raw)
 
         config = HomeServerConfig.load_config("", ["-c", self.file])
         self.assertTrue(
             hasattr(config, "macaroon_secret_key"),
-            "Want config to have attr macaroon_secret_key"
+            "Want config to have attr macaroon_secret_key",
         )
         if len(config.macaroon_secret_key) < 5:
             self.fail(
@@ -62,7 +60,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
         config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
         self.assertTrue(
             hasattr(config, "macaroon_secret_key"),
-            "Want config to have attr macaroon_secret_key"
+            "Want config to have attr macaroon_secret_key",
         )
         if len(config.macaroon_secret_key) < 5:
             self.fail(
@@ -80,10 +78,9 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
     def test_disable_registration(self):
         self.generate_config()
-        self.add_lines_to_config([
-            "enable_registration: true",
-            "disable_registration: true",
-        ])
+        self.add_lines_to_config(
+            ["enable_registration: true", "disable_registration: true"]
+        )
         # Check that disable_registration clobbers enable_registration.
         config = HomeServerConfig.load_config("", ["-c", self.file])
         self.assertFalse(config.enable_registration)
@@ -92,18 +89,23 @@ class ConfigLoadingTestCase(unittest.TestCase):
         self.assertFalse(config.enable_registration)
 
         # Check that either config value is clobbered by the command line.
-        config = HomeServerConfig.load_or_generate_config("", [
-            "-c", self.file, "--enable-registration"
-        ])
+        config = HomeServerConfig.load_or_generate_config(
+            "", ["-c", self.file, "--enable-registration"]
+        )
         self.assertTrue(config.enable_registration)
 
     def generate_config(self):
-        HomeServerConfig.load_or_generate_config("", [
-            "--generate-config",
-            "-c", self.file,
-            "--report-stats=yes",
-            "-H", "lemurs.win"
-        ])
+        HomeServerConfig.load_or_generate_config(
+            "",
+            [
+                "--generate-config",
+                "-c",
+                self.file,
+                "--report-stats=yes",
+                "-H",
+                "lemurs.win",
+            ],
+        )
 
     def generate_config_and_remove_lines_containing(self, needle):
         self.generate_config()

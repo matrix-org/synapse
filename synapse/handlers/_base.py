@@ -90,18 +90,19 @@ class BaseHandler(object):
             messages_per_second = override.messages_per_second
             burst_count = override.burst_count
         else:
-            messages_per_second = self.hs.config.rc_messages_per_second
-            burst_count = self.hs.config.rc_message_burst_count
+            messages_per_second = self.hs.config.rc_message.per_second
+            burst_count = self.hs.config.rc_message.burst_count
 
-        allowed, time_allowed = self.ratelimiter.send_message(
-            user_id, time_now,
-            msg_rate_hz=messages_per_second,
+        allowed, time_allowed = self.ratelimiter.can_do_action(
+            user_id,
+            time_now,
+            rate_hz=messages_per_second,
             burst_count=burst_count,
             update=update,
         )
         if not allowed:
             raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now)),
+                retry_after_ms=int(1000 * (time_allowed - time_now))
             )
 
     @defer.inlineCallbacks
@@ -112,8 +113,9 @@ class BaseHandler(object):
             guest_access = event.content.get("guest_access", "forbidden")
             if guest_access != "can_join":
                 if context:
+                    current_state_ids = yield context.get_current_state_ids(self.store)
                     current_state = yield self.store.get_events(
-                        list(context.current_state_ids.values())
+                        list(current_state_ids.values())
                     )
                 else:
                     current_state = yield self.state_handler.get_current_state(
@@ -138,7 +140,7 @@ class BaseHandler(object):
 
                 if member_event.content["membership"] not in {
                     Membership.JOIN,
-                    Membership.INVITE
+                    Membership.INVITE,
                 }:
                     continue
 
@@ -155,8 +157,7 @@ class BaseHandler(object):
                 # and having homeservers have their own users leave keeps more
                 # of that decision-making and control local to the guest-having
                 # homeserver.
-                requester = synapse.types.create_requester(
-                    target_user, is_guest=True)
+                requester = synapse.types.create_requester(target_user, is_guest=True)
                 handler = self.hs.get_room_member_handler()
                 yield handler.update_membership(
                     requester,
@@ -164,6 +165,7 @@ class BaseHandler(object):
                     member_event.room_id,
                     "leave",
                     ratelimit=False,
+                    require_consent=False,
                 )
             except Exception as e:
-                logger.warn("Error kicking guest user: %s" % (e,))
+                logger.exception("Error kicking guest user: %s" % (e,))

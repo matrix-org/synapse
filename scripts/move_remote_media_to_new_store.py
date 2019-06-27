@@ -36,12 +36,9 @@ from __future__ import print_function
 
 import argparse
 import logging
-
-import sys
-
 import os
-
 import shutil
+import sys
 
 from synapse.rest.media.v1.filepath import MediaFilePaths
 
@@ -53,7 +50,7 @@ def main(src_repo, dest_repo):
     dest_paths = MediaFilePaths(dest_repo)
     for line in sys.stdin:
         line = line.strip()
-        parts = line.split('|')
+        parts = line.split("|")
         if len(parts) != 2:
             print("Unable to parse input line %s" % line, file=sys.stderr)
             exit(1)
@@ -77,24 +74,23 @@ def move_media(origin_server, file_id, src_paths, dest_paths):
     if not os.path.exists(original_file):
         logger.warn(
             "Original for %s/%s (%s) does not exist",
-            origin_server, file_id, original_file,
+            origin_server,
+            file_id,
+            original_file,
         )
     else:
         mkdir_and_move(
-            original_file,
-            dest_paths.remote_media_filepath(origin_server, file_id),
+            original_file, dest_paths.remote_media_filepath(origin_server, file_id)
         )
 
     # now look for thumbnails
-    original_thumb_dir = src_paths.remote_media_thumbnail_dir(
-        origin_server, file_id,
-    )
+    original_thumb_dir = src_paths.remote_media_thumbnail_dir(origin_server, file_id)
     if not os.path.exists(original_thumb_dir):
         return
 
     mkdir_and_move(
         original_thumb_dir,
-        dest_paths.remote_media_thumbnail_dir(origin_server, file_id)
+        dest_paths.remote_media_thumbnail_dir(origin_server, file_id),
     )
 
 
@@ -109,24 +105,16 @@ def mkdir_and_move(original_file, dest_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class = argparse.RawDescriptionHelpFormatter,
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument(
-        "-v", action='store_true', help='enable debug logging')
-    parser.add_argument(
-        "src_repo",
-        help="Path to source content repo",
-    )
-    parser.add_argument(
-        "dest_repo",
-        help="Path to source content repo",
-    )
+    parser.add_argument("-v", action="store_true", help="enable debug logging")
+    parser.add_argument("src_repo", help="Path to source content repo")
+    parser.add_argument("dest_repo", help="Path to source content repo")
     args = parser.parse_args()
 
     logging_config = {
         "level": logging.DEBUG if args.v else logging.INFO,
-        "format": "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s"
+        "format": "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
     }
     logging.basicConfig(**logging_config)
 

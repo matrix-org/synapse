@@ -25,7 +25,7 @@ See doc/log_contexts.rst for details on how this works.
 import logging
 import threading
 
-from twisted.internet import defer
+from twisted.internet import defer, threads
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,8 @@ try:
 
     def get_thread_resource_usage():
         return resource.getrusage(RUSAGE_THREAD)
+
+
 except Exception:
     # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
     # won't track resource usage by returning None.
@@ -64,8 +66,11 @@ class ContextResourceUsage(object):
     """
 
     __slots__ = [
-        "ru_stime", "ru_utime",
-        "db_txn_count", "db_txn_duration_sec", "db_sched_duration_sec",
+        "ru_stime",
+        "ru_utime",
+        "db_txn_count",
+        "db_txn_duration_sec",
+        "db_sched_duration_sec",
         "evt_db_fetch_count",
     ]
 
@@ -91,13 +96,27 @@ class ContextResourceUsage(object):
         return ContextResourceUsage(copy_from=self)
 
     def reset(self):
-        self.ru_stime = 0.
-        self.ru_utime = 0.
+        self.ru_stime = 0.0
+        self.ru_utime = 0.0
         self.db_txn_count = 0
 
         self.db_txn_duration_sec = 0
         self.db_sched_duration_sec = 0
         self.evt_db_fetch_count = 0
+
+    def __repr__(self):
+        return (
+            "<ContextResourceUsage ru_stime='%r', ru_utime='%r', "
+            "db_txn_count='%r', db_txn_duration_sec='%r', "
+            "db_sched_duration_sec='%r', evt_db_fetch_count='%r'>"
+        ) % (
+            self.ru_stime,
+            self.ru_utime,
+            self.db_txn_count,
+            self.db_txn_duration_sec,
+            self.db_sched_duration_sec,
+            self.evt_db_fetch_count,
+        )
 
     def __iadd__(self, other):
         """Add another ContextResourceUsage's stats to this one's.
@@ -148,11 +167,15 @@ class LoggingContext(object):
     """
 
     __slots__ = [
-        "previous_context", "name", "parent_context",
+        "previous_context",
+        "name",
+        "parent_context",
         "_resource_usage",
         "usage_start",
-        "main_thread", "alive",
-        "request", "tag",
+        "main_thread",
+        "alive",
+        "request",
+        "tag",
     ]
 
     thread_local = threading.local()
@@ -185,11 +208,12 @@ class LoggingContext(object):
 
         def __nonzero__(self):
             return False
+
         __bool__ = __nonzero__  # python3
 
     sentinel = Sentinel()
 
-    def __init__(self, name=None, parent_context=None):
+    def __init__(self, name=None, parent_context=None, request=None):
         self.previous_context = LoggingContext.current_context()
         self.name = name
 
@@ -207,7 +231,16 @@ class LoggingContext(object):
 
         self.parent_context = parent_context
 
+        if self.parent_context is not None:
+            self.parent_context.copy_to(self)
+
+        if request is not None:
+            # the request param overrides the request from the parent context
+            self.request = request
+
     def __str__(self):
+        if self.request:
+            return str(self.request)
         return "%s@%x" % (self.name, id(self))
 
     @classmethod
@@ -241,12 +274,10 @@ class LoggingContext(object):
         if self.previous_context != old_context:
             logger.warn(
                 "Expected previous context %r, found %r",
-                self.previous_context, old_context
+                self.previous_context,
+                old_context,
             )
         self.alive = True
-
-        if self.parent_context is not None:
-            self.parent_context.copy_to(self)
 
         return self
 
@@ -259,18 +290,18 @@ class LoggingContext(object):
         current = self.set_current_context(self.previous_context)
         if current is not self:
             if current is self.sentinel:
-                logger.warn("Expected logging context %s has been lost", self)
+                logger.warning("Expected logging context %s was lost", self)
             else:
-                logger.warn(
-                    "Current logging context %s is not expected context %s",
-                    current,
-                    self
+                logger.warning(
+                    "Expected logging context %s but found %s", self, current
                 )
         self.previous_context = None
         self.alive = False
 
         # if we have a parent, pass our CPU usage stats on
-        if self.parent_context is not None:
+        if self.parent_context is not None and hasattr(
+            self.parent_context, "_resource_usage"
+        ):
             self.parent_context._resource_usage += self._resource_usage
 
             # reset them in case we get entered again
@@ -302,15 +333,12 @@ class LoggingContext(object):
 
         # When we stop, let's record the cpu used since we started
         if not self.usage_start:
-            logger.warning(
-                "Called stop on logcontext %s without calling start", self,
-            )
+            logger.warning("Called stop on logcontext %s without calling start", self)
             return
 
-        usage_end = get_thread_resource_usage()
-
-        self._resource_usage.ru_utime += usage_end.ru_utime - self.usage_start.ru_utime
-        self._resource_usage.ru_stime += usage_end.ru_stime - self.usage_start.ru_stime
+        utime_delta, stime_delta = self._get_cputime()
+        self._resource_usage.ru_utime += utime_delta
+        self._resource_usage.ru_stime += stime_delta
 
         self.usage_start = None
 
@@ -328,13 +356,44 @@ class LoggingContext(object):
         # can include resource usage so far.
         is_main_thread = threading.current_thread() is self.main_thread
         if self.alive and self.usage_start and is_main_thread:
-            current = get_thread_resource_usage()
-            res.ru_utime += current.ru_utime - self.usage_start.ru_utime
-            res.ru_stime += current.ru_stime - self.usage_start.ru_stime
+            utime_delta, stime_delta = self._get_cputime()
+            res.ru_utime += utime_delta
+            res.ru_stime += stime_delta
 
         return res
 
+    def _get_cputime(self):
+        """Get the cpu usage time so far
+
+        Returns: Tuple[float, float]: seconds in user mode, seconds in system mode
+        """
+        current = get_thread_resource_usage()
+
+        utime_delta = current.ru_utime - self.usage_start.ru_utime
+        stime_delta = current.ru_stime - self.usage_start.ru_stime
+
+        # sanity check
+        if utime_delta < 0:
+            logger.error(
+                "utime went backwards! %f < %f",
+                current.ru_utime,
+                self.usage_start.ru_utime,
+            )
+            utime_delta = 0
+
+        if stime_delta < 0:
+            logger.error(
+                "stime went backwards! %f < %f",
+                current.ru_stime,
+                self.usage_start.ru_stime,
+            )
+            stime_delta = 0
+
+        return utime_delta, stime_delta
+
     def add_database_transaction(self, duration_sec):
+        if duration_sec < 0:
+            raise ValueError("DB txn time can only be non-negative")
         self._resource_usage.db_txn_count += 1
         self._resource_usage.db_txn_duration_sec += duration_sec
 
@@ -345,6 +404,8 @@ class LoggingContext(object):
             sched_sec (float): number of seconds it took us to get a
                 connection
         """
+        if sched_sec < 0:
+            raise ValueError("DB scheduling time can only be non-negative")
         self._resource_usage.db_sched_duration_sec += sched_sec
 
     def record_event_fetch(self, event_count):
@@ -363,6 +424,7 @@ class LoggingContextFilter(logging.Filter):
         **defaults: Default values to avoid formatters complaining about
             missing fields
     """
+
     def __init__(self, **defaults):
         self.defaults = defaults
 
@@ -374,7 +436,13 @@ class LoggingContextFilter(logging.Filter):
         context = LoggingContext.current_context()
         for key, value in self.defaults.items():
             setattr(record, key, value)
-        context.copy_to(record)
+
+        # context should never be None, but if it somehow ends up being, then
+        # we end up in a death spiral of infinite loops, so let's check, for
+        # robustness' sake.
+        if context is not None:
+            context.copy_to(record)
+
         return True
 
 
@@ -385,45 +453,73 @@ class PreserveLoggingContext(object):
 
     __slots__ = ["current_context", "new_context", "has_parent"]
 
-    def __init__(self, new_context=LoggingContext.sentinel):
+    def __init__(self, new_context=None):
+        if new_context is None:
+            new_context = LoggingContext.sentinel
         self.new_context = new_context
 
     def __enter__(self):
         """Captures the current logging context"""
-        self.current_context = LoggingContext.set_current_context(
-            self.new_context
-        )
+        self.current_context = LoggingContext.set_current_context(self.new_context)
 
         if self.current_context:
             self.has_parent = self.current_context.previous_context is not None
             if not self.current_context.alive:
-                logger.debug(
-                    "Entering dead context: %s",
-                    self.current_context,
-                )
+                logger.debug("Entering dead context: %s", self.current_context)
 
     def __exit__(self, type, value, traceback):
         """Restores the current logging context"""
         context = LoggingContext.set_current_context(self.current_context)
 
         if context != self.new_context:
-            logger.warn(
-                "Unexpected logging context: %s is not %s",
-                context, self.new_context,
-            )
+            if context is LoggingContext.sentinel:
+                logger.warning("Expected logging context %s was lost", self.new_context)
+            else:
+                logger.warning(
+                    "Expected logging context %s but found %s",
+                    self.new_context,
+                    context,
+                )
 
         if self.current_context is not LoggingContext.sentinel:
             if not self.current_context.alive:
-                logger.debug(
-                    "Restoring dead context: %s",
-                    self.current_context,
-                )
+                logger.debug("Restoring dead context: %s", self.current_context)
+
+
+def nested_logging_context(suffix, parent_context=None):
+    """Creates a new logging context as a child of another.
+
+    The nested logging context will have a 'request' made up of the parent context's
+    request, plus the given suffix.
+
+    CPU/db usage stats will be added to the parent context's on exit.
+
+    Normal usage looks like:
+
+        with nested_logging_context(suffix):
+            # ... do stuff
+
+    Args:
+        suffix (str): suffix to add to the parent context's 'request'.
+        parent_context (LoggingContext|None): parent context. Will use the current context
+            if None.
+
+    Returns:
+        LoggingContext: new logging context.
+    """
+    if parent_context is None:
+        parent_context = LoggingContext.current_context()
+    return LoggingContext(
+        parent_context=parent_context, request=parent_context.request + "-" + suffix
+    )
 
 
 def preserve_fn(f):
     """Function decorator which wraps the function with run_in_background"""
+
     def g(*args, **kwargs):
         return run_in_background(f, *args, **kwargs)
+
     return g
 
 
@@ -443,7 +539,7 @@ def run_in_background(f, *args, **kwargs):
     current = LoggingContext.current_context()
     try:
         res = f(*args, **kwargs)
-    except:   # noqa: E722
+    except:  # noqa: E722
         # the assumption here is that the caller doesn't want to be disturbed
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
@@ -510,58 +606,74 @@ def _set_context_cb(result, context):
     return result
 
 
-# modules to ignore in `logcontext_tracer`
-_to_ignore = [
-    "synapse.util.logcontext",
-    "synapse.http.server",
-    "synapse.storage._base",
-    "synapse.util.async",
-]
-
-
-def logcontext_tracer(frame, event, arg):
-    """A tracer that logs whenever a logcontext "unexpectedly" changes within
-    a function. Probably inaccurate.
-
-    Use by calling `sys.settrace(logcontext_tracer)` in the main thread.
+def defer_to_thread(reactor, f, *args, **kwargs):
     """
-    if event == 'call':
-        name = frame.f_globals["__name__"]
-        if name.startswith("synapse"):
-            if name == "synapse.util.logcontext":
-                if frame.f_code.co_name in ["__enter__", "__exit__"]:
-                    tracer = frame.f_back.f_trace
-                    if tracer:
-                        tracer.just_changed = True
+    Calls the function `f` using a thread from the reactor's default threadpool and
+    returns the result as a Deferred.
 
-            tracer = frame.f_trace
-            if tracer:
-                return tracer
+    Creates a new logcontext for `f`, which is created as a child of the current
+    logcontext (so its CPU usage metrics will get attributed to the current
+    logcontext). `f` should preserve the logcontext it is given.
 
-            if not any(name.startswith(ig) for ig in _to_ignore):
-                return LineTracer()
+    The result deferred follows the Synapse logcontext rules: you should `yield`
+    on it.
+
+    Args:
+        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
+            the Deferred will be invoked, and whose threadpool we should use for the
+            function.
+
+            Normally this will be hs.get_reactor().
+
+        f (callable): The function to call.
+
+        args: positional arguments to pass to f.
+
+        kwargs: keyword arguments to pass to f.
+
+    Returns:
+        Deferred: A Deferred which fires a callback with the result of `f`, or an
+            errback if `f` throws an exception.
+    """
+    return defer_to_threadpool(reactor, reactor.getThreadPool(), f, *args, **kwargs)
 
 
-class LineTracer(object):
-    __slots__ = ["context", "just_changed"]
+def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
+    """
+    A wrapper for twisted.internet.threads.deferToThreadpool, which handles
+    logcontexts correctly.
 
-    def __init__(self):
-        self.context = LoggingContext.current_context()
-        self.just_changed = False
+    Calls the function `f` using a thread from the given threadpool and returns
+    the result as a Deferred.
 
-    def __call__(self, frame, event, arg):
-        if event in 'line':
-            if self.just_changed:
-                self.context = LoggingContext.current_context()
-                self.just_changed = False
-            else:
-                c = LoggingContext.current_context()
-                if c != self.context:
-                    logger.info(
-                        "Context changed! %s -> %s, %s, %s",
-                        self.context, c,
-                        frame.f_code.co_filename, frame.f_lineno
-                    )
-                    self.context = c
+    Creates a new logcontext for `f`, which is created as a child of the current
+    logcontext (so its CPU usage metrics will get attributed to the current
+    logcontext). `f` should preserve the logcontext it is given.
 
-        return self
+    The result deferred follows the Synapse logcontext rules: you should `yield`
+    on it.
+
+    Args:
+        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
+            the Deferred will be invoked. Normally this will be hs.get_reactor().
+
+        threadpool (twisted.python.threadpool.ThreadPool): The threadpool to use for
+            running `f`. Normally this will be hs.get_reactor().getThreadPool().
+
+        f (callable): The function to call.
+
+        args: positional arguments to pass to f.
+
+        kwargs: keyword arguments to pass to f.
+
+    Returns:
+        Deferred: A Deferred which fires a callback with the result of `f`, or an
+            errback if `f` throws an exception.
+    """
+    logcontext = LoggingContext.current_context()
+
+    def g():
+        with LoggingContext(parent_context=logcontext):
+            return f(*args, **kwargs)
+
+    return make_deferred_yieldable(threads.deferToThreadPool(reactor, threadpool, g))

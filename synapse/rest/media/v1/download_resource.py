@@ -47,23 +47,27 @@ class DownloadResource(Resource):
     def _async_render_GET(self, request):
         set_cors_headers(request)
         request.setHeader(
-            "Content-Security-Policy",
-            "default-src 'none';"
-            " script-src 'none';"
-            " plugin-types application/pdf;"
-            " style-src 'unsafe-inline';"
-            " object-src 'self';"
+            b"Content-Security-Policy",
+            b"sandbox;"
+            b" default-src 'none';"
+            b" script-src 'none';"
+            b" plugin-types application/pdf;"
+            b" style-src 'unsafe-inline';"
+            b" media-src 'self';"
+            b" object-src 'self';",
         )
         server_name, media_id, name = parse_media_id(request)
         if server_name == self.server_name:
             yield self.media_repo.get_local_media(request, media_id, name)
         else:
             allow_remote = synapse.http.servlet.parse_boolean(
-                request, "allow_remote", default=True)
+                request, "allow_remote", default=True
+            )
             if not allow_remote:
                 logger.info(
                     "Rejecting request for remote media %s/%s due to allow_remote",
-                    server_name, media_id,
+                    server_name,
+                    media_id,
                 )
                 respond_404(request)
                 return

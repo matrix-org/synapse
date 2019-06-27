@@ -21,9 +21,10 @@ import sys
 
 import six
 
-from twisted.internet import defer, threads
+from twisted.internet import defer
 from twisted.protocols.basic import FileSender
 
+from synapse.util import logcontext
 from synapse.util.file_consumer import BackgroundFileConsumer
 from synapse.util.logcontext import make_deferred_yieldable
 
@@ -64,9 +65,9 @@ class MediaStorage(object):
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
             # Write to the main repository
-            yield make_deferred_yieldable(threads.deferToThread(
-                _write_file_synchronously, source, f,
-            ))
+            yield logcontext.defer_to_thread(
+                self.hs.get_reactor(), _write_file_synchronously, source, f
+            )
             yield finish_cb()
 
         defer.returnValue(fname)
@@ -177,7 +178,8 @@ class MediaStorage(object):
             if res:
                 with res:
                     consumer = BackgroundFileConsumer(
-                        open(local_path, "w"), self.hs.get_reactor())
+                        open(local_path, "wb"), self.hs.get_reactor()
+                    )
                     yield res.write_to_consumer(consumer)
                     yield consumer.wait()
                 defer.returnValue(local_path)
@@ -215,10 +217,10 @@ class MediaStorage(object):
                     width=file_info.thumbnail_width,
                     height=file_info.thumbnail_height,
                     content_type=file_info.thumbnail_type,
-                    method=file_info.thumbnail_method
+                    method=file_info.thumbnail_method,
                 )
             return self.filepaths.remote_media_filepath_rel(
-                file_info.server_name, file_info.file_id,
+                file_info.server_name, file_info.file_id
             )
 
         if file_info.thumbnail:
@@ -227,11 +229,9 @@ class MediaStorage(object):
                 width=file_info.thumbnail_width,
                 height=file_info.thumbnail_height,
                 content_type=file_info.thumbnail_type,
-                method=file_info.thumbnail_method
+                method=file_info.thumbnail_method,
             )
-        return self.filepaths.local_media_filepath_rel(
-            file_info.file_id,
-        )
+        return self.filepaths.local_media_filepath_rel(file_info.file_id)
 
 
 def _write_file_synchronously(source, dest):
@@ -253,6 +253,7 @@ class FileResponder(Responder):
         open_file (file): A file like object to be streamed ot the client,
             is closed when finished streaming.
     """
+
     def __init__(self, open_file):
         self.open_file = open_file
 

@@ -1,4 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import tempfile
-
 from mock import Mock, NonCallableMock
-
-from twisted.internet import defer, reactor
 
 from synapse.replication.tcp.client import (
     ReplicationClientFactory,
@@ -25,53 +22,70 @@ from synapse.replication.tcp.client import (
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
+from tests.server import FakeTransport
 
 
-class BaseSlavedStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.hs = yield setup_test_homeserver(
+class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+
+        hs = self.setup_test_homeserver(
             "blue",
-            http_client=None,
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
+            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
-        self.hs.get_ratelimiter().send_message.return_value = (True, 0)
+
+        hs.get_ratelimiter().can_do_action.return_value = (True, 0)
+
+        return hs
+
+    def prepare(self, reactor, clock, hs):
 
         self.master_store = self.hs.get_datastore()
         self.slaved_store = self.STORE_TYPE(self.hs.get_db_conn(), self.hs)
         self.event_id = 0
 
         server_factory = ReplicationStreamProtocolFactory(self.hs)
-        # XXX: mktemp is unsafe and should never be used. but we're just a test.
-        path = tempfile.mktemp(prefix="base_slaved_store_test_case_socket")
-        listener = reactor.listenUNIX(path, server_factory)
-        self.addCleanup(listener.stopListening)
         self.streamer = server_factory.streamer
 
         self.replication_handler = ReplicationClientHandler(self.slaved_store)
         client_factory = ReplicationClientFactory(
             self.hs, "client_name", self.replication_handler
         )
-        client_connector = reactor.connectUNIX(path, client_factory)
-        self.addCleanup(client_factory.stopTrying)
-        self.addCleanup(client_connector.disconnect)
 
-    @defer.inlineCallbacks
+        server = server_factory.buildProtocol(None)
+        client = client_factory.buildProtocol(None)
+
+        client.makeConnection(FakeTransport(server, reactor))
+
+        self.server_to_client_transport = FakeTransport(client, reactor)
+        server.makeConnection(self.server_to_client_transport)
+
     def replicate(self):
-        yield self.streamer.on_notifier_poke()
-        d = self.replication_handler.await_sync("replication_test")
-        self.streamer.send_sync_to_all_connections("replication_test")
-        yield d
+        """Tell the master side of replication that something has happened, and then
+        wait for the replication to occur.
+        """
+        self.streamer.on_notifier_poke()
+        self.pump(0.1)
 
-    @defer.inlineCallbacks
     def check(self, method, args, expected_result=None):
-        master_result = yield getattr(self.master_store, method)(*args)
-        slaved_result = yield getattr(self.slaved_store, method)(*args)
+        master_result = self.get_success(getattr(self.master_store, method)(*args))
+        slaved_result = self.get_success(getattr(self.slaved_store, method)(*args))
         if expected_result is not None:
-            self.assertEqual(master_result, expected_result)
-            self.assertEqual(slaved_result, expected_result)
-        self.assertEqual(master_result, slaved_result)
+            self.assertEqual(
+                master_result,
+                expected_result,
+                "Expected master result to be %r but was %r"
+                % (expected_result, master_result),
+            )
+            self.assertEqual(
+                slaved_result,
+                expected_result,
+                "Expected slave result to be %r but was %r"
+                % (expected_result, slaved_result),
+            )
+        self.assertEqual(
+            master_result,
+            slaved_result,
+            "Slave result %r does not match master result %r"
+            % (slaved_result, master_result),
+        )

@@ -14,182 +14,62 @@
 # limitations under the License.
 
 import logging
-import re
 
 from twisted.internet import defer
 
-from synapse.api.errors import MatrixCodeMessageException, SynapseError
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.servlet import parse_json_object_from_request
+from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import Requester, UserID
 from synapse.util.distributor import user_joined_room, user_left_room
 
 logger = logging.getLogger(__name__)
 
 
-@defer.inlineCallbacks
-def remote_join(client, host, port, requester, remote_room_hosts,
-                room_id, user_id, content):
-    """Ask the master to do a remote join for the given user to the given room
+class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
+    """Does a remote join for the given user to the given room
 
-    Args:
-        client (SimpleHttpClient)
-        host (str): host of master
-        port (int): port on master listening for HTTP replication
-        requester (Requester)
-        remote_room_hosts (list[str]): Servers to try and join via
-        room_id (str)
-        user_id (str)
-        content (dict): The event content to use for the join event
+    Request format:
 
-    Returns:
-        Deferred
-    """
-    uri = "http://%s:%s/_synapse/replication/remote_join" % (host, port)
+        POST /_synapse/replication/remote_join/:room_id/:user_id
 
-    payload = {
-        "requester": requester.serialize(),
-        "remote_room_hosts": remote_room_hosts,
-        "room_id": room_id,
-        "user_id": user_id,
-        "content": content,
-    }
-
-    try:
-        result = yield client.post_json_get_json(uri, payload)
-    except MatrixCodeMessageException as e:
-        # We convert to SynapseError as we know that it was a SynapseError
-        # on the master process that we should send to the client. (And
-        # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
-    defer.returnValue(result)
-
-
-@defer.inlineCallbacks
-def remote_reject_invite(client, host, port, requester, remote_room_hosts,
-                         room_id, user_id):
-    """Ask master to reject the invite for the user and room.
-
-    Args:
-        client (SimpleHttpClient)
-        host (str): host of master
-        port (int): port on master listening for HTTP replication
-        requester (Requester)
-        remote_room_hosts (list[str]): Servers to try and reject via
-        room_id (str)
-        user_id (str)
-
-    Returns:
-        Deferred
-    """
-    uri = "http://%s:%s/_synapse/replication/remote_reject_invite" % (host, port)
-
-    payload = {
-        "requester": requester.serialize(),
-        "remote_room_hosts": remote_room_hosts,
-        "room_id": room_id,
-        "user_id": user_id,
-    }
-
-    try:
-        result = yield client.post_json_get_json(uri, payload)
-    except MatrixCodeMessageException as e:
-        # We convert to SynapseError as we know that it was a SynapseError
-        # on the master process that we should send to the client. (And
-        # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
-    defer.returnValue(result)
-
-
-@defer.inlineCallbacks
-def get_or_register_3pid_guest(client, host, port, requester,
-                               medium, address, inviter_user_id):
-    """Ask the master to get/create a guest account for given 3PID.
-
-    Args:
-        client (SimpleHttpClient)
-        host (str): host of master
-        port (int): port on master listening for HTTP replication
-        requester (Requester)
-        medium (str)
-        address (str)
-        inviter_user_id (str): The user ID who is trying to invite the
-            3PID
-
-    Returns:
-        Deferred[(str, str)]: A 2-tuple of `(user_id, access_token)` of the
-        3PID guest account.
+        {
+            "requester": ...,
+            "remote_room_hosts": [...],
+            "content": { ... }
+        }
     """
 
-    uri = "http://%s:%s/_synapse/replication/get_or_register_3pid_guest" % (host, port)
-
-    payload = {
-        "requester": requester.serialize(),
-        "medium": medium,
-        "address": address,
-        "inviter_user_id": inviter_user_id,
-    }
-
-    try:
-        result = yield client.post_json_get_json(uri, payload)
-    except MatrixCodeMessageException as e:
-        # We convert to SynapseError as we know that it was a SynapseError
-        # on the master process that we should send to the client. (And
-        # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
-    defer.returnValue(result)
-
-
-@defer.inlineCallbacks
-def notify_user_membership_change(client, host, port, user_id, room_id, change):
-    """Notify master that a user has joined or left the room
-
-    Args:
-        client (SimpleHttpClient)
-        host (str): host of master
-        port (int): port on master listening for HTTP replication.
-        user_id (str)
-        room_id (str)
-        change (str): Either "join" or "left"
-
-    Returns:
-        Deferred
-    """
-    assert change in ("joined", "left")
-
-    uri = "http://%s:%s/_synapse/replication/user_%s_room" % (host, port, change)
-
-    payload = {
-        "user_id": user_id,
-        "room_id": room_id,
-    }
-
-    try:
-        result = yield client.post_json_get_json(uri, payload)
-    except MatrixCodeMessageException as e:
-        # We convert to SynapseError as we know that it was a SynapseError
-        # on the master process that we should send to the client. (And
-        # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
-    defer.returnValue(result)
-
-
-class ReplicationRemoteJoinRestServlet(RestServlet):
-    PATTERNS = [re.compile("^/_synapse/replication/remote_join$")]
+    NAME = "remote_join"
+    PATH_ARGS = ("room_id", "user_id")
 
     def __init__(self, hs):
-        super(ReplicationRemoteJoinRestServlet, self).__init__()
+        super(ReplicationRemoteJoinRestServlet, self).__init__(hs)
 
         self.federation_handler = hs.get_handlers().federation_handler
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
+    @staticmethod
+    def _serialize_payload(requester, room_id, user_id, remote_room_hosts, content):
+        """
+        Args:
+            requester(Requester)
+            room_id (str)
+            user_id (str)
+            remote_room_hosts (list[str]): Servers to try and join via
+            content(dict): The event content to use for the join event
+        """
+        return {
+            "requester": requester.serialize(),
+            "remote_room_hosts": remote_room_hosts,
+            "content": content,
+        }
+
     @defer.inlineCallbacks
-    def on_POST(self, request):
+    def _handle_request(self, request, room_id, user_id):
         content = parse_json_object_from_request(request)
 
         remote_room_hosts = content["remote_room_hosts"]
-        room_id = content["room_id"]
-        user_id = content["user_id"]
         event_content = content["content"]
 
         requester = Requester.deserialize(self.store, content["requester"])
@@ -197,54 +77,68 @@ class ReplicationRemoteJoinRestServlet(RestServlet):
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
 
-        logger.info(
-            "remote_join: %s into room: %s",
-            user_id, room_id,
-        )
+        logger.info("remote_join: %s into room: %s", user_id, room_id)
 
         yield self.federation_handler.do_invite_join(
-            remote_room_hosts,
-            room_id,
-            user_id,
-            event_content,
+            remote_room_hosts, room_id, user_id, event_content
         )
 
         defer.returnValue((200, {}))
 
 
-class ReplicationRemoteRejectInviteRestServlet(RestServlet):
-    PATTERNS = [re.compile("^/_synapse/replication/remote_reject_invite$")]
+class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
+    """Rejects the invite for the user and room.
+
+    Request format:
+
+        POST /_synapse/replication/remote_reject_invite/:room_id/:user_id
+
+        {
+            "requester": ...,
+            "remote_room_hosts": [...],
+        }
+    """
+
+    NAME = "remote_reject_invite"
+    PATH_ARGS = ("room_id", "user_id")
 
     def __init__(self, hs):
-        super(ReplicationRemoteRejectInviteRestServlet, self).__init__()
+        super(ReplicationRemoteRejectInviteRestServlet, self).__init__(hs)
 
         self.federation_handler = hs.get_handlers().federation_handler
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
+    @staticmethod
+    def _serialize_payload(requester, room_id, user_id, remote_room_hosts):
+        """
+        Args:
+            requester(Requester)
+            room_id (str)
+            user_id (str)
+            remote_room_hosts (list[str]): Servers to try and reject via
+        """
+        return {
+            "requester": requester.serialize(),
+            "remote_room_hosts": remote_room_hosts,
+        }
+
     @defer.inlineCallbacks
-    def on_POST(self, request):
+    def _handle_request(self, request, room_id, user_id):
         content = parse_json_object_from_request(request)
 
         remote_room_hosts = content["remote_room_hosts"]
-        room_id = content["room_id"]
-        user_id = content["user_id"]
 
         requester = Requester.deserialize(self.store, content["requester"])
 
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
 
-        logger.info(
-            "remote_reject_invite: %s out of room: %s",
-            user_id, room_id,
-        )
+        logger.info("remote_reject_invite: %s out of room: %s", user_id, room_id)
 
         try:
             event = yield self.federation_handler.do_remotely_reject_invite(
-                remote_room_hosts,
-                room_id,
-                user_id,
+                remote_room_hosts, room_id, user_id
             )
             ret = event.get_pdu_json()
         except Exception as e:
@@ -256,26 +150,56 @@ class ReplicationRemoteRejectInviteRestServlet(RestServlet):
             #
             logger.warn("Failed to reject invite: %s", e)
 
-            yield self.store.locally_reject_invite(
-                user_id, room_id
-            )
+            yield self.store.locally_reject_invite(user_id, room_id)
             ret = {}
 
         defer.returnValue((200, ret))
 
 
-class ReplicationRegister3PIDGuestRestServlet(RestServlet):
-    PATTERNS = [re.compile("^/_synapse/replication/get_or_register_3pid_guest$")]
+class ReplicationRegister3PIDGuestRestServlet(ReplicationEndpoint):
+    """Gets/creates a guest account for given 3PID.
+
+    Request format:
+
+        POST /_synapse/replication/get_or_register_3pid_guest/
+
+        {
+            "requester": ...,
+            "medium": ...,
+            "address": ...,
+            "inviter_user_id": ...
+        }
+    """
+
+    NAME = "get_or_register_3pid_guest"
+    PATH_ARGS = ()
 
     def __init__(self, hs):
-        super(ReplicationRegister3PIDGuestRestServlet, self).__init__()
+        super(ReplicationRegister3PIDGuestRestServlet, self).__init__(hs)
 
-        self.registeration_handler = hs.get_handlers().registration_handler
+        self.registeration_handler = hs.get_registration_handler()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
+    @staticmethod
+    def _serialize_payload(requester, medium, address, inviter_user_id):
+        """
+        Args:
+            requester(Requester)
+            medium (str)
+            address (str)
+            inviter_user_id (str): The user ID who is trying to invite the
+                3PID
+        """
+        return {
+            "requester": requester.serialize(),
+            "medium": medium,
+            "address": address,
+            "inviter_user_id": inviter_user_id,
+        }
+
     @defer.inlineCallbacks
-    def on_POST(self, request):
+    def _handle_request(self, request):
         content = parse_json_object_from_request(request)
 
         medium = content["medium"]
@@ -290,29 +214,47 @@ class ReplicationRegister3PIDGuestRestServlet(RestServlet):
         logger.info("get_or_register_3pid_guest: %r", content)
 
         ret = yield self.registeration_handler.get_or_register_3pid_guest(
-            medium, address, inviter_user_id,
+            medium, address, inviter_user_id
         )
 
         defer.returnValue((200, ret))
 
 
-class ReplicationUserJoinedLeftRoomRestServlet(RestServlet):
-    PATTERNS = [re.compile("^/_synapse/replication/user_(?P<change>joined|left)_room$")]
+class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
+    """Notifies that a user has joined or left the room
+
+    Request format:
+
+        POST /_synapse/replication/membership_change/:room_id/:user_id/:change
+
+        {}
+    """
+
+    NAME = "membership_change"
+    PATH_ARGS = ("room_id", "user_id", "change")
+    CACHE = False  # No point caching as should return instantly.
 
     def __init__(self, hs):
-        super(ReplicationUserJoinedLeftRoomRestServlet, self).__init__()
+        super(ReplicationUserJoinedLeftRoomRestServlet, self).__init__(hs)
 
-        self.registeration_handler = hs.get_handlers().registration_handler
+        self.registeration_handler = hs.get_registration_handler()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.distributor = hs.get_distributor()
 
-    def on_POST(self, request, change):
-        content = parse_json_object_from_request(request)
+    @staticmethod
+    def _serialize_payload(room_id, user_id, change):
+        """
+        Args:
+            room_id (str)
+            user_id (str)
+            change (str): Either "joined" or "left"
+        """
+        assert change in ("joined", "left")
 
-        user_id = content["user_id"]
-        room_id = content["room_id"]
+        return {}
 
+    def _handle_request(self, request, room_id, user_id, change):
         logger.info("user membership change: %s in %s", user_id, room_id)
 
         user = UserID.from_string(user_id)

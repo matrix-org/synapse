@@ -63,3 +63,15 @@ Christoph Witzany <christoph at web.crofting.com>
 
 Pierre Jaury <pierre at jaury.eu>
 * Docker packaging
+
+Serban Constantin <serban.constantin at gmail dot com>
+ * Small bug fix
+
+Jason Robinson <jasonr at matrix.org>
+ * Minor fixes
+
+Joseph Weston <joseph at weston.cloud>
+ + Add admin API for querying HS version
+
+Benjamin Saunders <ben.e.saunders at gmail dot com>
+ * Documentation improvements

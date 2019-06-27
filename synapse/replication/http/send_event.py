@@ -14,87 +14,26 @@
 # limitations under the License.
 
 import logging
-import re
 
 from twisted.internet import defer
 
-from synapse.api.errors import (
-    CodeMessageException,
-    MatrixCodeMessageException,
-    SynapseError,
-)
-from synapse.events import FrozenEvent
+from synapse.events import event_type_from_format_version
 from synapse.events.snapshot import EventContext
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.servlet import parse_json_object_from_request
+from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import Requester, UserID
-from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
 
-@defer.inlineCallbacks
-def send_event_to_master(clock, client, host, port, requester, event, context,
-                         ratelimit, extra_users):
-    """Send event to be handled on the master
-
-    Args:
-        clock (synapse.util.Clock)
-        client (SimpleHttpClient)
-        host (str): host of master
-        port (int): port on master listening for HTTP replication
-        requester (Requester)
-        event (FrozenEvent)
-        context (EventContext)
-        ratelimit (bool)
-        extra_users (list(UserID)): Any extra users to notify about event
-    """
-    uri = "http://%s:%s/_synapse/replication/send_event/%s" % (
-        host, port, event.event_id,
-    )
-
-    payload = {
-        "event": event.get_pdu_json(),
-        "internal_metadata": event.internal_metadata.get_dict(),
-        "rejected_reason": event.rejected_reason,
-        "context": context.serialize(event),
-        "requester": requester.serialize(),
-        "ratelimit": ratelimit,
-        "extra_users": [u.to_string() for u in extra_users],
-    }
-
-    try:
-        # We keep retrying the same request for timeouts. This is so that we
-        # have a good idea that the request has either succeeded or failed on
-        # the master, and so whether we should clean up or not.
-        while True:
-            try:
-                result = yield client.put_json(uri, payload)
-                break
-            except CodeMessageException as e:
-                if e.code != 504:
-                    raise
-
-            logger.warn("send_event request timed out")
-
-            # If we timed out we probably don't need to worry about backing
-            # off too much, but lets just wait a little anyway.
-            yield clock.sleep(1)
-    except MatrixCodeMessageException as e:
-        # We convert to SynapseError as we know that it was a SynapseError
-        # on the master process that we should send to the client. (And
-        # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
-    defer.returnValue(result)
-
-
-class ReplicationSendEventRestServlet(RestServlet):
+class ReplicationSendEventRestServlet(ReplicationEndpoint):
     """Handles events newly created on workers, including persisting and
     notifying.
 
     The API looks like:
 
-        POST /_synapse/replication/send_event/:event_id
+        POST /_synapse/replication/send_event/:event_id/:txn_id
 
         {
             "event": { .. serialized event .. },
@@ -106,34 +45,60 @@ class ReplicationSendEventRestServlet(RestServlet):
             "extra_users": [],
         }
     """
-    PATTERNS = [re.compile("^/_synapse/replication/send_event/(?P<event_id>[^/]+)$")]
+
+    NAME = "send_event"
+    PATH_ARGS = ("event_id",)
 
     def __init__(self, hs):
-        super(ReplicationSendEventRestServlet, self).__init__()
+        super(ReplicationSendEventRestServlet, self).__init__(hs)
 
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
-        # The responses are tiny, so we may as well cache them for a while
-        self.response_cache = ResponseCache(hs, "send_event", timeout_ms=30 * 60 * 1000)
+    @staticmethod
+    @defer.inlineCallbacks
+    def _serialize_payload(
+        event_id, store, event, context, requester, ratelimit, extra_users
+    ):
+        """
+        Args:
+            event_id (str)
+            store (DataStore)
+            requester (Requester)
+            event (FrozenEvent)
+            context (EventContext)
+            ratelimit (bool)
+            extra_users (list(UserID)): Any extra users to notify about event
+        """
 
-    def on_PUT(self, request, event_id):
-        return self.response_cache.wrap(
-            event_id,
-            self._handle_request,
-            request
-        )
+        serialized_context = yield context.serialize(event, store)
+
+        payload = {
+            "event": event.get_pdu_json(),
+            "event_format_version": event.format_version,
+            "internal_metadata": event.internal_metadata.get_dict(),
+            "rejected_reason": event.rejected_reason,
+            "context": serialized_context,
+            "requester": requester.serialize(),
+            "ratelimit": ratelimit,
+            "extra_users": [u.to_string() for u in extra_users],
+        }
+
+        defer.returnValue(payload)
 
     @defer.inlineCallbacks
-    def _handle_request(self, request):
+    def _handle_request(self, request, event_id):
         with Measure(self.clock, "repl_send_event_parse"):
             content = parse_json_object_from_request(request)
 
             event_dict = content["event"]
+            format_ver = content["event_format_version"]
             internal_metadata = content["internal_metadata"]
             rejected_reason = content["rejected_reason"]
-            event = FrozenEvent(event_dict, internal_metadata, rejected_reason)
+
+            EventType = event_type_from_format_version(format_ver)
+            event = EventType(event_dict, internal_metadata, rejected_reason)
 
             requester = Requester.deserialize(self.store, content["requester"])
             context = yield EventContext.deserialize(self.store, content["context"])
@@ -145,14 +110,11 @@ class ReplicationSendEventRestServlet(RestServlet):
             request.authenticated_entity = requester.user.to_string()
 
         logger.info(
-            "Got event to send with ID: %s into room: %s",
-            event.event_id, event.room_id,
+            "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
         )
 
         yield self.event_creation_handler.persist_and_notify_client_event(
-            requester, event, context,
-            ratelimit=ratelimit,
-            extra_users=extra_users,
+            requester, event, context, ratelimit=ratelimit, extra_users=extra_users
         )
 
         defer.returnValue((200, {}))

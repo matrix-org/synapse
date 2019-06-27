@@ -16,24 +16,22 @@
 
 from twisted.internet import defer
 
+from synapse.api.constants import UserTypes
+
 from tests import unittest
 from tests.utils import setup_test_homeserver
 
 
 class RegistrationStoreTestCase(unittest.TestCase):
-
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver()
+        hs = yield setup_test_homeserver(self.addCleanup)
         self.db_pool = hs.get_db_pool()
 
         self.store = hs.get_datastore()
 
         self.user_id = "@my-user:test"
-        self.tokens = [
-            "AbCdEfGhIjKlMnOpQrStUvWxYz",
-            "BcDeFgHiJkLmNoPqRsTuVwXyZa"
-        ]
+        self.tokens = ["AbCdEfGhIjKlMnOpQrStUvWxYz", "BcDeFgHiJkLmNoPqRsTuVwXyZa"]
         self.pwhash = "{xx1}123456789"
         self.device_id = "akgjhdjklgshg"
 
@@ -50,35 +48,28 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "consent_version": None,
                 "consent_server_notice_sent": None,
                 "appservice_id": None,
+                "creation_ts": 1000,
             },
-            (yield self.store.get_user_by_id(self.user_id))
+            (yield self.store.get_user_by_id(self.user_id)),
         )
 
         result = yield self.store.get_user_by_access_token(self.tokens[0])
 
-        self.assertDictContainsSubset(
-            {
-                "name": self.user_id,
-            },
-            result
-        )
+        self.assertDictContainsSubset({"name": self.user_id}, result)
 
         self.assertTrue("token_id" in result)
 
     @defer.inlineCallbacks
     def test_add_tokens(self):
         yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
-        yield self.store.add_access_token_to_user(self.user_id, self.tokens[1],
-                                                  self.device_id)
+        yield self.store.add_access_token_to_user(
+            self.user_id, self.tokens[1], self.device_id
+        )
 
         result = yield self.store.get_user_by_access_token(self.tokens[1])
 
         self.assertDictContainsSubset(
-            {
-                "name": self.user_id,
-                "device_id": self.device_id,
-            },
-            result
+            {"name": self.user_id, "device_id": self.device_id}, result
         )
 
         self.assertTrue("token_id" in result)
@@ -87,12 +78,13 @@ class RegistrationStoreTestCase(unittest.TestCase):
     def test_user_delete_access_tokens(self):
         # add some tokens
         yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
-        yield self.store.add_access_token_to_user(self.user_id, self.tokens[1],
-                                                  self.device_id)
+        yield self.store.add_access_token_to_user(
+            self.user_id, self.tokens[1], self.device_id
+        )
 
         # now delete some
         yield self.store.user_delete_access_tokens(
-            self.user_id, device_id=self.device_id,
+            self.user_id, device_id=self.device_id
         )
 
         # check they were deleted
@@ -107,8 +99,27 @@ class RegistrationStoreTestCase(unittest.TestCase):
         yield self.store.user_delete_access_tokens(self.user_id)
 
         user = yield self.store.get_user_by_access_token(self.tokens[0])
-        self.assertIsNone(user,
-                          "access token was not deleted without device_id")
+        self.assertIsNone(user, "access token was not deleted without device_id")
+
+    @defer.inlineCallbacks
+    def test_is_support_user(self):
+        TEST_USER = "@test:test"
+        SUPPORT_USER = "@support:test"
+
+        res = yield self.store.is_support_user(None)
+        self.assertFalse(res)
+        yield self.store.register(user_id=TEST_USER, token="123", password_hash=None)
+        res = yield self.store.is_support_user(TEST_USER)
+        self.assertFalse(res)
+
+        yield self.store.register(
+            user_id=SUPPORT_USER,
+            token="456",
+            password_hash=None,
+            user_type=UserTypes.SUPPORT,
+        )
+        res = yield self.store.is_support_user(SUPPORT_USER)
+        self.assertTrue(res)
 
 
 class TokenGenerator:
@@ -117,4 +128,4 @@ class TokenGenerator:
 
     def generate(self, user_id):
         self._last_issued_token += 1
-        return u"%s-%d" % (user_id, self._last_issued_token,)
+        return "%s-%d" % (user_id, self._last_issued_token)

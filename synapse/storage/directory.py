@@ -22,10 +22,7 @@ from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore
 
-RoomAliasMapping = namedtuple(
-    "RoomAliasMapping",
-    ("room_id", "room_alias", "servers",)
-)
+RoomAliasMapping = namedtuple("RoomAliasMapping", ("room_id", "room_alias", "servers"))
 
 
 class DirectoryWorkerStore(SQLBaseStore):
@@ -63,19 +60,14 @@ class DirectoryWorkerStore(SQLBaseStore):
             defer.returnValue(None)
             return
 
-        defer.returnValue(
-            RoomAliasMapping(room_id, room_alias.to_string(), servers)
-        )
+        defer.returnValue(RoomAliasMapping(room_id, room_alias.to_string(), servers))
 
     def get_room_alias_creator(self, room_alias):
         return self._simple_select_one_onecol(
             table="room_aliases",
-            keyvalues={
-                "room_alias": room_alias,
-            },
+            keyvalues={"room_alias": room_alias},
             retcol="creator",
             desc="get_room_alias_creator",
-            allow_none=True
         )
 
     @cached(max_entries=5000)
@@ -91,7 +83,7 @@ class DirectoryWorkerStore(SQLBaseStore):
 class DirectoryStore(DirectoryWorkerStore):
     @defer.inlineCallbacks
     def create_room_alias_association(self, room_alias, room_id, servers, creator=None):
-        """ Creates an associatin between  a room alias and room_id/servers
+        """ Creates an association between a room alias and room_id/servers
 
         Args:
             room_alias (RoomAlias)
@@ -102,6 +94,7 @@ class DirectoryStore(DirectoryWorkerStore):
         Returns:
             Deferred
         """
+
         def alias_txn(txn):
             self._simple_insert_txn(
                 txn,
@@ -116,10 +109,10 @@ class DirectoryStore(DirectoryWorkerStore):
             self._simple_insert_many_txn(
                 txn,
                 table="room_alias_servers",
-                values=[{
-                    "room_alias": room_alias.to_string(),
-                    "server": server,
-                } for server in servers],
+                values=[
+                    {"room_alias": room_alias.to_string(), "server": server}
+                    for server in servers
+                ],
             )
 
             self._invalidate_cache_and_stream(
@@ -127,9 +120,7 @@ class DirectoryStore(DirectoryWorkerStore):
             )
 
         try:
-            ret = yield self.runInteraction(
-                "create_room_alias_association", alias_txn
-            )
+            ret = yield self.runInteraction("create_room_alias_association", alias_txn)
         except self.database_engine.module.IntegrityError:
             raise SynapseError(
                 409, "Room alias %s already exists" % room_alias.to_string()
@@ -139,9 +130,7 @@ class DirectoryStore(DirectoryWorkerStore):
     @defer.inlineCallbacks
     def delete_room_alias(self, room_alias):
         room_id = yield self.runInteraction(
-            "delete_room_alias",
-            self._delete_room_alias_txn,
-            room_alias,
+            "delete_room_alias", self._delete_room_alias_txn, room_alias
         )
 
         defer.returnValue(room_id)
@@ -149,7 +138,7 @@ class DirectoryStore(DirectoryWorkerStore):
     def _delete_room_alias_txn(self, txn, room_alias):
         txn.execute(
             "SELECT room_id FROM room_aliases WHERE room_alias = ?",
-            (room_alias.to_string(),)
+            (room_alias.to_string(),),
         )
 
         res = txn.fetchone()
@@ -159,31 +148,29 @@ class DirectoryStore(DirectoryWorkerStore):
             return None
 
         txn.execute(
-            "DELETE FROM room_aliases WHERE room_alias = ?",
-            (room_alias.to_string(),)
+            "DELETE FROM room_aliases WHERE room_alias = ?", (room_alias.to_string(),)
         )
 
         txn.execute(
             "DELETE FROM room_alias_servers WHERE room_alias = ?",
-            (room_alias.to_string(),)
+            (room_alias.to_string(),),
         )
 
-        self._invalidate_cache_and_stream(
-            txn, self.get_aliases_for_room, (room_id,)
-        )
+        self._invalidate_cache_and_stream(txn, self.get_aliases_for_room, (room_id,))
 
         return room_id
 
     def update_aliases_for_room(self, old_room_id, new_room_id, creator):
         def _update_aliases_for_room_txn(txn):
             sql = "UPDATE room_aliases SET room_id = ?, creator = ? WHERE room_id = ?"
-            txn.execute(sql, (new_room_id, creator, old_room_id,))
+            txn.execute(sql, (new_room_id, creator, old_room_id))
             self._invalidate_cache_and_stream(
                 txn, self.get_aliases_for_room, (old_room_id,)
             )
             self._invalidate_cache_and_stream(
                 txn, self.get_aliases_for_room, (new_room_id,)
             )
+
         return self.runInteraction(
             "_update_aliases_for_room_txn", _update_aliases_for_room_txn
         )

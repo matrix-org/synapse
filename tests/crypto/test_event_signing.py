@@ -18,15 +18,13 @@ import nacl.signing
 from unpaddedbase64 import decode_base64
 
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.events.builder import EventBuilder
+from synapse.events import FrozenEvent
 
 from tests import unittest
 
 # Perform these tests using given secret key so we get entirely deterministic
 # signatures output that we can test against.
-SIGNING_KEY_SEED = decode_base64(
-    "YJDBA9Xnr2sVqXD9Vj7XVUnmFZcZrlw8Md7kMW+3XA1"
-)
+SIGNING_KEY_SEED = decode_base64("YJDBA9Xnr2sVqXD9Vj7XVUnmFZcZrlw8Md7kMW+3XA1")
 
 KEY_ALG = "ed25519"
 KEY_VER = 1
@@ -36,36 +34,32 @@ HOSTNAME = "domain"
 
 
 class EventSigningTestCase(unittest.TestCase):
-
     def setUp(self):
         self.signing_key = nacl.signing.SigningKey(SIGNING_KEY_SEED)
         self.signing_key.alg = KEY_ALG
         self.signing_key.version = KEY_VER
 
     def test_sign_minimal(self):
-        builder = EventBuilder(
-            {
-                'event_id': "$0:domain",
-                'origin': "domain",
-                'origin_server_ts': 1000000,
-                'signatures': {},
-                'type': "X",
-                'unsigned': {'age_ts': 1000000},
-            },
-        )
+        event_dict = {
+            "event_id": "$0:domain",
+            "origin": "domain",
+            "origin_server_ts": 1000000,
+            "signatures": {},
+            "type": "X",
+            "unsigned": {"age_ts": 1000000},
+        }
 
-        add_hashes_and_signatures(builder, HOSTNAME, self.signing_key)
+        add_hashes_and_signatures(event_dict, HOSTNAME, self.signing_key)
 
-        event = builder.build()
+        event = FrozenEvent(event_dict)
 
-        self.assertTrue(hasattr(event, 'hashes'))
-        self.assertIn('sha256', event.hashes)
+        self.assertTrue(hasattr(event, "hashes"))
+        self.assertIn("sha256", event.hashes)
         self.assertEquals(
-            event.hashes['sha256'],
-            "6tJjLpXtggfke8UxFhAKg82QVkJzvKOVOOSjUDK4ZSI",
+            event.hashes["sha256"], "6tJjLpXtggfke8UxFhAKg82QVkJzvKOVOOSjUDK4ZSI"
         )
 
-        self.assertTrue(hasattr(event, 'signatures'))
+        self.assertTrue(hasattr(event, "signatures"))
         self.assertIn(HOSTNAME, event.signatures)
         self.assertIn(KEY_NAME, event.signatures["domain"])
         self.assertEquals(
@@ -75,38 +69,33 @@ class EventSigningTestCase(unittest.TestCase):
         )
 
     def test_sign_message(self):
-        builder = EventBuilder(
-            {
-                'content': {
-                    'body': "Here is the message content",
-                },
-                'event_id': "$0:domain",
-                'origin': "domain",
-                'origin_server_ts': 1000000,
-                'type': "m.room.message",
-                'room_id': "!r:domain",
-                'sender': "@u:domain",
-                'signatures': {},
-                'unsigned': {'age_ts': 1000000},
-            }
-        )
+        event_dict = {
+            "content": {"body": "Here is the message content"},
+            "event_id": "$0:domain",
+            "origin": "domain",
+            "origin_server_ts": 1000000,
+            "type": "m.room.message",
+            "room_id": "!r:domain",
+            "sender": "@u:domain",
+            "signatures": {},
+            "unsigned": {"age_ts": 1000000},
+        }
 
-        add_hashes_and_signatures(builder, HOSTNAME, self.signing_key)
+        add_hashes_and_signatures(event_dict, HOSTNAME, self.signing_key)
 
-        event = builder.build()
+        event = FrozenEvent(event_dict)
 
-        self.assertTrue(hasattr(event, 'hashes'))
-        self.assertIn('sha256', event.hashes)
+        self.assertTrue(hasattr(event, "hashes"))
+        self.assertIn("sha256", event.hashes)
         self.assertEquals(
-            event.hashes['sha256'],
-            "onLKD1bGljeBWQhWZ1kaP9SorVmRQNdN5aM2JYU2n/g",
+            event.hashes["sha256"], "onLKD1bGljeBWQhWZ1kaP9SorVmRQNdN5aM2JYU2n/g"
         )
 
-        self.assertTrue(hasattr(event, 'signatures'))
+        self.assertTrue(hasattr(event, "signatures"))
         self.assertIn(HOSTNAME, event.signatures)
         self.assertIn(KEY_NAME, event.signatures["domain"])
         self.assertEquals(
             event.signatures[HOSTNAME][KEY_NAME],
             "Wm+VzmOUOz08Ds+0NTWb1d4CZrVsJSikkeRxh6aCcUw"
-            "u6pNC78FunoD7KNWzqFn241eYHYMGCA5McEiVPdhzBA"
+            "u6pNC78FunoD7KNWzqFn241eYHYMGCA5McEiVPdhzBA",
         )

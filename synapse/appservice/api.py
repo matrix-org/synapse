@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import urllib
+
+from six.moves import urllib
 
 from prometheus_client import Counter
 
@@ -31,19 +32,17 @@ logger = logging.getLogger(__name__)
 sent_transactions_counter = Counter(
     "synapse_appservice_api_sent_transactions",
     "Number of /transactions/ requests sent",
-    ["service"]
+    ["service"],
 )
 
 failed_transactions_counter = Counter(
     "synapse_appservice_api_failed_transactions",
     "Number of /transactions/ requests that failed to send",
-    ["service"]
+    ["service"],
 )
 
 sent_events_counter = Counter(
-    "synapse_appservice_api_sent_events",
-    "Number of events sent to the AS",
-    ["service"]
+    "synapse_appservice_api_sent_events", "Number of events sent to the AS", ["service"]
 )
 
 HOUR_IN_MS = 60 * 60 * 1000
@@ -91,19 +90,18 @@ class ApplicationServiceApi(SimpleHttpClient):
         super(ApplicationServiceApi, self).__init__(hs)
         self.clock = hs.get_clock()
 
-        self.protocol_meta_cache = ResponseCache(hs, "as_protocol_meta",
-                                                 timeout_ms=HOUR_IN_MS)
+        self.protocol_meta_cache = ResponseCache(
+            hs, "as_protocol_meta", timeout_ms=HOUR_IN_MS
+        )
 
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
         if service.url is None:
             defer.returnValue(False)
-        uri = service.url + ("/users/%s" % urllib.quote(user_id))
+        uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
         response = None
         try:
-            response = yield self.get_json(uri, {
-                "access_token": service.hs_token
-            })
+            response = yield self.get_json(uri, {"access_token": service.hs_token})
             if response is not None:  # just an empty json object
                 defer.returnValue(True)
         except CodeMessageException as e:
@@ -119,12 +117,10 @@ class ApplicationServiceApi(SimpleHttpClient):
     def query_alias(self, service, alias):
         if service.url is None:
             defer.returnValue(False)
-        uri = service.url + ("/rooms/%s" % urllib.quote(alias))
+        uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
         response = None
         try:
-            response = yield self.get_json(uri, {
-                "access_token": service.hs_token
-            })
+            response = yield self.get_json(uri, {"access_token": service.hs_token})
             if response is not None:  # just an empty json object
                 defer.returnValue(True)
         except CodeMessageException as e:
@@ -143,9 +139,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         elif kind == ThirdPartyEntityKind.LOCATION:
             required_field = "alias"
         else:
-            raise ValueError(
-                "Unrecognised 'kind' argument %r to query_3pe()", kind
-            )
+            raise ValueError("Unrecognised 'kind' argument %r to query_3pe()", kind)
         if service.url is None:
             defer.returnValue([])
 
@@ -153,14 +147,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             service.url,
             APP_SERVICE_PREFIX,
             kind,
-            urllib.quote(protocol)
+            urllib.parse.quote(protocol),
         )
         try:
             response = yield self.get_json(uri, fields)
             if not isinstance(response, list):
                 logger.warning(
-                    "query_3pe to %s returned an invalid response %r",
-                    uri, response
+                    "query_3pe to %s returned an invalid response %r", uri, response
                 )
                 defer.returnValue([])
 
@@ -170,8 +163,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                     ret.append(r)
                 else:
                     logger.warning(
-                        "query_3pe to %s returned an invalid result %r",
-                        uri, r
+                        "query_3pe to %s returned an invalid result %r", uri, r
                     )
 
             defer.returnValue(ret)
@@ -188,27 +180,27 @@ class ApplicationServiceApi(SimpleHttpClient):
             uri = "%s%s/thirdparty/protocol/%s" % (
                 service.url,
                 APP_SERVICE_PREFIX,
-                urllib.quote(protocol)
+                urllib.parse.quote(protocol),
             )
             try:
                 info = yield self.get_json(uri, {})
 
                 if not _is_valid_3pe_metadata(info):
-                    logger.warning("query_3pe_protocol to %s did not return a"
-                                   " valid result", uri)
+                    logger.warning(
+                        "query_3pe_protocol to %s did not return a" " valid result", uri
+                    )
                     defer.returnValue(None)
 
                 for instance in info.get("instances", []):
                     network_id = instance.get("network_id", None)
                     if network_id is not None:
                         instance["instance_id"] = ThirdPartyInstanceID(
-                            service.id, network_id,
+                            service.id, network_id
                         ).to_string()
 
                 defer.returnValue(info)
             except Exception as ex:
-                logger.warning("query_3pe_protocol to %s threw exception %s",
-                               uri, ex)
+                logger.warning("query_3pe_protocol to %s threw exception %s", uri, ex)
                 defer.returnValue(None)
 
         key = (service.id, protocol)
@@ -222,22 +214,19 @@ class ApplicationServiceApi(SimpleHttpClient):
         events = self._serialize(events)
 
         if txn_id is None:
-            logger.warning("push_bulk: Missing txn ID sending events to %s",
-                           service.url)
+            logger.warning(
+                "push_bulk: Missing txn ID sending events to %s", service.url
+            )
             txn_id = str(0)
         txn_id = str(txn_id)
 
-        uri = service.url + ("/transactions/%s" %
-                             urllib.quote(txn_id))
+        uri = service.url + ("/transactions/%s" % urllib.parse.quote(txn_id))
         try:
             yield self.put_json(
                 uri=uri,
-                json_body={
-                    "events": events
-                },
-                args={
-                    "access_token": service.hs_token
-                })
+                json_body={"events": events},
+                args={"access_token": service.hs_token},
+            )
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(events))
             defer.returnValue(True)
@@ -251,6 +240,4 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     def _serialize(self, events):
         time_now = self.clock.time_msec()
-        return [
-            serialize_event(e, time_now, as_client_event=True) for e in events
-        ]
+        return [serialize_event(e, time_now, as_client_event=True) for e in events]

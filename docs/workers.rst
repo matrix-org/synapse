@@ -26,9 +26,8 @@ Configuration
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. Note that this includes
-requests made to the federation port. The caveats regarding running a
-reverse-proxy on the federation port still apply (see
-https://github.com/matrix-org/synapse/blob/master/README.rst#reverse-proxying-the-federation-port).
+requests made to the federation port. See `<reverse_proxy.rst>`_ for
+information on setting up a reverse proxy.
 
 To enable workers, you need to add two replication listeners to the master
 synapse, e.g.::
@@ -74,7 +73,7 @@ replication endpoints that it's talking to on the main synapse process.
 ``worker_replication_port`` should point to the TCP replication listener port and
 ``worker_replication_http_port`` should point to the HTTP replication port.
 
-Currently, only the ``event_creator`` worker requires specifying
+Currently, the ``event_creator`` and ``federation_reader`` workers require specifying
 ``worker_replication_http_port``.
 
 For instance::
@@ -173,9 +172,23 @@ endpoints matching the following regular expressions::
     ^/_matrix/federation/v1/backfill/
     ^/_matrix/federation/v1/get_missing_events/
     ^/_matrix/federation/v1/publicRooms
+    ^/_matrix/federation/v1/query/
+    ^/_matrix/federation/v1/make_join/
+    ^/_matrix/federation/v1/make_leave/
+    ^/_matrix/federation/v1/send_join/
+    ^/_matrix/federation/v1/send_leave/
+    ^/_matrix/federation/v1/invite/
+    ^/_matrix/federation/v1/query_auth/
+    ^/_matrix/federation/v1/event_auth/
+    ^/_matrix/federation/v1/exchange_third_party_invite/
+    ^/_matrix/federation/v1/send/
+    ^/_matrix/key/v2/query
 
 The above endpoints should all be routed to the federation_reader worker by the
 reverse-proxy configuration.
+
+The `^/_matrix/federation/v1/send/` endpoint must only be handled by a single
+instance.
 
 ``synapse.app.federation_sender``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -206,6 +219,33 @@ Handles client API endpoints. It can handle REST endpoints matching the
 following regular expressions::
 
     ^/_matrix/client/(api/v1|r0|unstable)/publicRooms$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/joined_members$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
+    ^/_matrix/client/(api/v1|r0|unstable)/login$
+    ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
+    ^/_matrix/client/(api/v1|r0|unstable)/keys/query$
+    ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
+    ^/_matrix/client/versions$
+    ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
+
+Additionally, the following REST endpoints can be handled for GET requests::
+
+    ^/_matrix/client/(api/v1|r0|unstable)/pushrules/.*$
+
+Additionally, the following REST endpoints can be handled, but all requests must
+be routed to the same instance::
+
+    ^/_matrix/client/(r0|unstable)/register$
+
+Pagination requests can also be handled, but all requests with the same path
+room must be routed to the same instance. Additionally, care must be taken to
+ensure that the purge history admin API is not used while pagination requests
+for the room are in flight::
+
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/messages$
+
 
 ``synapse.app.user_dir``
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -224,6 +264,14 @@ regular expressions::
 
     ^/_matrix/client/(api/v1|r0|unstable)/keys/upload
 
+If ``use_presence`` is False in the homeserver config, it can also handle REST
+endpoints matching the following regular expressions::
+
+    ^/_matrix/client/(api/v1|r0|unstable)/presence/[^/]+/status
+
+This "stub" presence handler will pass through ``GET`` request but make the
+``PUT`` effectively a no-op.
+
 It will proxy any requests it cannot handle to the main synapse instance. It
 must therefore be configured with the location of the main instance, via
 the ``worker_main_http_uri`` setting in the frontend_proxy worker configuration
@@ -240,6 +288,7 @@ Handles some event creation. It can handle REST endpoints matching::
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
     ^/_matrix/client/(api/v1|r0|unstable)/join/
+    ^/_matrix/client/(api/v1|r0|unstable)/profile/
 
 It will create events locally and then send them on to the main synapse
 instance to be persisted and handled.

@@ -1,5 +1,13 @@
-Dockerfile
-.travis.yml
-.gitignore
-demo/etc
-tox.ini
+# ignore everything by default
+*
+
+# things to include
+!docker
+!scripts
+!synapse
+!MANIFEST.in
+!README.rst
+!setup.py
+!synctl
+
+**/__pycache__

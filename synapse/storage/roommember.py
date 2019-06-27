@@ -24,9 +24,9 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.storage.events import EventsWorkerStore
+from synapse.storage.events_worker import EventsWorkerStore
 from synapse.types import get_domain_from_id
-from synapse.util.async import Linearizer
+from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.util.stringutils import to_ascii
@@ -35,22 +35,22 @@ logger = logging.getLogger(__name__)
 
 
 RoomsForUser = namedtuple(
-    "RoomsForUser",
-    ("room_id", "sender", "membership", "event_id", "stream_ordering")
+    "RoomsForUser", ("room_id", "sender", "membership", "event_id", "stream_ordering")
 )
 
 GetRoomsForUserWithStreamOrdering = namedtuple(
-    "_GetRoomsForUserWithStreamOrdering",
-    ("room_id", "stream_ordering",)
+    "_GetRoomsForUserWithStreamOrdering", ("room_id", "stream_ordering")
 )
 
 
 # We store this using a namedtuple so that we save about 3x space over using a
 # dict.
-ProfileInfo = namedtuple(
-    "ProfileInfo", ("avatar_url", "display_name")
-)
+ProfileInfo = namedtuple("ProfileInfo", ("avatar_url", "display_name"))
 
+# "members" points to a truncated list of (user_id, event_id) tuples for users of
+# a given membership type, suitable for use in calculating heroes for a room.
+# "count" points to the total numberr of users of a given membership type.
+MemberSummary = namedtuple("MemberSummary", ("members", "count"))
 
 _MEMBERSHIP_PROFILE_UPDATE_NAME = "room_membership_profile_update"
 
@@ -61,7 +61,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """Returns the set of all hosts currently in the room
         """
         user_ids = yield self.get_users_in_room(
-            room_id, on_invalidate=cache_context.invalidate,
+            room_id, on_invalidate=cache_context.invalidate
         )
         hosts = frozenset(get_domain_from_id(user_id) for user_id in user_ids)
         defer.returnValue(hosts)
@@ -78,9 +78,90 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 " WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?"
             )
 
-            txn.execute(sql, (room_id, Membership.JOIN,))
+            txn.execute(sql, (room_id, Membership.JOIN))
             return [to_ascii(r[0]) for r in txn]
+
         return self.runInteraction("get_users_in_room", f)
+
+    @cached(max_entries=100000)
+    def get_room_summary(self, room_id):
+        """ Get the details of a room roughly suitable for use by the room
+        summary extension to /sync. Useful when lazy loading room members.
+        Args:
+            room_id (str): The room ID to query
+        Returns:
+            Deferred[dict[str, MemberSummary]:
+                dict of membership states, pointing to a MemberSummary named tuple.
+        """
+
+        def _get_room_summary_txn(txn):
+            # first get counts.
+            # We do this all in one transaction to keep the cache small.
+            # FIXME: get rid of this when we have room_stats
+            sql = """
+                SELECT count(*), m.membership FROM room_memberships as m
+                 INNER JOIN current_state_events as c
+                 ON m.event_id = c.event_id
+                 AND m.room_id = c.room_id
+                 AND m.user_id = c.state_key
+                 WHERE c.type = 'm.room.member' AND c.room_id = ?
+                 GROUP BY m.membership
+            """
+
+            txn.execute(sql, (room_id,))
+            res = {}
+            for count, membership in txn:
+                summary = res.setdefault(to_ascii(membership), MemberSummary([], count))
+
+            # we order by membership and then fairly arbitrarily by event_id so
+            # heroes are consistent
+            sql = """
+                SELECT m.user_id, m.membership, m.event_id
+                FROM room_memberships as m
+                 INNER JOIN current_state_events as c
+                 ON m.event_id = c.event_id
+                 AND m.room_id = c.room_id
+                 AND m.user_id = c.state_key
+                 WHERE c.type = 'm.room.member' AND c.room_id = ?
+                 ORDER BY
+                    CASE m.membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
+                    m.event_id ASC
+                 LIMIT ?
+            """
+
+            # 6 is 5 (number of heroes) plus 1, in case one of them is the calling user.
+            txn.execute(sql, (room_id, Membership.JOIN, Membership.INVITE, 6))
+            for user_id, membership, event_id in txn:
+                summary = res[to_ascii(membership)]
+                # we will always have a summary for this membership type at this
+                # point given the summary currently contains the counts.
+                members = summary.members
+                members.append((to_ascii(user_id), to_ascii(event_id)))
+
+            return res
+
+        return self.runInteraction("get_room_summary", _get_room_summary_txn)
+
+    def _get_user_counts_in_room_txn(self, txn, room_id):
+        """
+        Get the user count in a room by membership.
+
+        Args:
+            room_id (str)
+            membership (Membership)
+
+        Returns:
+            Deferred[int]
+        """
+        sql = """
+        SELECT m.membership, count(*) FROM room_memberships as m
+            INNER JOIN current_state_events as c USING(event_id)
+            WHERE c.type = 'm.room.member' AND c.room_id = ?
+            GROUP BY m.membership
+        """
+
+        txn.execute(sql, (room_id,))
+        return {row[0]: row[1] for row in txn}
 
     @cached()
     def get_invited_rooms_for_user(self, user_id):
@@ -91,9 +172,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             A deferred list of RoomsForUser.
         """
 
-        return self.get_rooms_for_user_where_membership_is(
-            user_id, [Membership.INVITE]
-        )
+        return self.get_rooms_for_user_where_membership_is(user_id, [Membership.INVITE])
 
     @defer.inlineCallbacks
     def get_invite_for_user_in_room(self, user_id, room_id):
@@ -131,11 +210,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return self.runInteraction(
             "get_rooms_for_user_where_membership_is",
             self._get_rooms_for_user_where_membership_is_txn,
-            user_id, membership_list
+            user_id,
+            membership_list,
         )
 
-    def _get_rooms_for_user_where_membership_is_txn(self, txn, user_id,
-                                                    membership_list):
+    def _get_rooms_for_user_where_membership_is_txn(
+        self, txn, user_id, membership_list
+    ):
 
         do_invite = Membership.INVITE in membership_list
         membership_list = [m for m in membership_list if m != Membership.INVITE]
@@ -162,9 +243,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             ) % (where_clause,)
 
             txn.execute(sql, args)
-            results = [
-                RoomsForUser(**r) for r in self.cursor_to_dict(txn)
-            ]
+            results = [RoomsForUser(**r) for r in self.cursor_to_dict(txn)]
 
         if do_invite:
             sql = (
@@ -176,13 +255,16 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             )
 
             txn.execute(sql, (user_id,))
-            results.extend(RoomsForUser(
-                room_id=r["room_id"],
-                sender=r["inviter"],
-                event_id=r["event_id"],
-                stream_ordering=r["stream_ordering"],
-                membership=Membership.INVITE,
-            ) for r in self.cursor_to_dict(txn))
+            results.extend(
+                RoomsForUser(
+                    room_id=r["room_id"],
+                    sender=r["inviter"],
+                    event_id=r["event_id"],
+                    stream_ordering=r["stream_ordering"],
+                    membership=Membership.INVITE,
+                )
+                for r in self.cursor_to_dict(txn)
+            )
 
         return results
 
@@ -199,19 +281,21 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             of the most recent join for that user and room.
         """
         rooms = yield self.get_rooms_for_user_where_membership_is(
-            user_id, membership_list=[Membership.JOIN],
+            user_id, membership_list=[Membership.JOIN]
         )
-        defer.returnValue(frozenset(
-            GetRoomsForUserWithStreamOrdering(r.room_id, r.stream_ordering)
-            for r in rooms
-        ))
+        defer.returnValue(
+            frozenset(
+                GetRoomsForUserWithStreamOrdering(r.room_id, r.stream_ordering)
+                for r in rooms
+            )
+        )
 
     @defer.inlineCallbacks
     def get_rooms_for_user(self, user_id, on_invalidate=None):
         """Returns a set of room_ids the user is currently joined to
         """
         rooms = yield self.get_rooms_for_user_with_stream_ordering(
-            user_id, on_invalidate=on_invalidate,
+            user_id, on_invalidate=on_invalidate
         )
         defer.returnValue(frozenset(r.room_id for r in rooms))
 
@@ -220,18 +304,19 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """Returns the set of users who share a room with `user_id`
         """
         room_ids = yield self.get_rooms_for_user(
-            user_id, on_invalidate=cache_context.invalidate,
+            user_id, on_invalidate=cache_context.invalidate
         )
 
         user_who_share_room = set()
         for room_id in room_ids:
             user_ids = yield self.get_users_in_room(
-                room_id, on_invalidate=cache_context.invalidate,
+                room_id, on_invalidate=cache_context.invalidate
             )
             user_who_share_room.update(user_ids)
 
         defer.returnValue(user_who_share_room)
 
+    @defer.inlineCallbacks
     def get_joined_users_from_context(self, event, context):
         state_group = context.state_group
         if not state_group:
@@ -241,11 +326,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # To do this we set the state_group to a new object as object() != object()
             state_group = object()
 
-        return self._get_joined_users_from_context(
-            event.room_id, state_group, context.current_state_ids,
-            event=event,
-            context=context,
+        current_state_ids = yield context.get_current_state_ids(self)
+        result = yield self._get_joined_users_from_context(
+            event.room_id, state_group, current_state_ids, event=event, context=context
         )
+        defer.returnValue(result)
 
     def get_joined_users_from_state(self, room_id, state_entry):
         state_group = state_entry.state_group
@@ -257,13 +342,21 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             state_group = object()
 
         return self._get_joined_users_from_context(
-            room_id, state_group, state_entry.state, context=state_entry,
+            room_id, state_group, state_entry.state, context=state_entry
         )
 
-    @cachedInlineCallbacks(num_args=2, cache_context=True, iterable=True,
-                           max_entries=100000)
-    def _get_joined_users_from_context(self, room_id, state_group, current_state_ids,
-                                       cache_context, event=None, context=None):
+    @cachedInlineCallbacks(
+        num_args=2, cache_context=True, iterable=True, max_entries=100000
+    )
+    def _get_joined_users_from_context(
+        self,
+        room_id,
+        state_group,
+        current_state_ids,
+        cache_context,
+        event=None,
+        context=None,
+    ):
         # We don't use `state_group`, it's there so that we can cache based
         # on it. However, it's important that it's never None, since two current_states
         # with a state_group of None are likely to be different.
@@ -303,9 +396,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # the hit ratio counts. After all, we don't populate the cache if we
         # miss it here
         event_map = self._get_events_from_cache(
-            member_event_ids,
-            allow_rejected=False,
-            update_metrics=False,
+            member_event_ids, allow_rejected=False, update_metrics=False
         )
 
         missing_member_event_ids = []
@@ -329,21 +420,21 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 table="room_memberships",
                 column="event_id",
                 iterable=missing_member_event_ids,
-                retcols=('user_id', 'display_name', 'avatar_url',),
-                keyvalues={
-                    "membership": Membership.JOIN,
-                },
+                retcols=("user_id", "display_name", "avatar_url"),
+                keyvalues={"membership": Membership.JOIN},
                 batch_size=500,
                 desc="_get_joined_users_from_context",
             )
 
-            users_in_room.update({
-                to_ascii(row["user_id"]): ProfileInfo(
-                    avatar_url=to_ascii(row["avatar_url"]),
-                    display_name=to_ascii(row["display_name"]),
-                )
-                for row in rows
-            })
+            users_in_room.update(
+                {
+                    to_ascii(row["user_id"]): ProfileInfo(
+                        avatar_url=to_ascii(row["avatar_url"]),
+                        display_name=to_ascii(row["display_name"]),
+                    )
+                    for row in rows
+                }
+            )
 
         if event is not None and event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
@@ -357,7 +448,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cachedInlineCallbacks(max_entries=10000)
     def is_host_joined(self, room_id, host):
-        if '%' in host or '_' in host:
+        if "%" in host or "_" in host:
             raise Exception("Invalid host name")
 
         sql = """
@@ -399,7 +490,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             Deferred: Resolves to True if the host is/was in the room, otherwise
             False.
         """
-        if '%' in host or '_' in host:
+        if "%" in host or "_" in host:
             raise Exception("Invalid host name")
 
         sql = """
@@ -437,7 +528,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             state_group = object()
 
         return self._get_joined_hosts(
-            room_id, state_group, state_entry.state, state_entry=state_entry,
+            room_id, state_group, state_entry.state, state_entry=state_entry
         )
 
     @cachedInlineCallbacks(num_args=2, max_entries=10000, iterable=True)
@@ -458,17 +549,31 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     def _get_joined_hosts_cache(self, room_id):
         return _JoinedHostsCache(self, room_id)
 
-    @cached()
-    def who_forgot_in_room(self, room_id):
-        return self._simple_select_list(
-            table="room_memberships",
-            retcols=("user_id", "event_id"),
-            keyvalues={
-                "room_id": room_id,
-                "forgotten": 1,
-            },
-            desc="who_forgot"
-        )
+    @cachedInlineCallbacks(num_args=2)
+    def did_forget(self, user_id, room_id):
+        """Returns whether user_id has elected to discard history for room_id.
+
+        Returns False if they have since re-joined."""
+
+        def f(txn):
+            sql = (
+                "SELECT"
+                "  COUNT(*)"
+                " FROM"
+                "  room_memberships"
+                " WHERE"
+                "  user_id = ?"
+                " AND"
+                "  room_id = ?"
+                " AND"
+                "  forgotten = 0"
+            )
+            txn.execute(sql, (user_id, room_id))
+            rows = txn.fetchall()
+            return rows[0][0]
+
+        count = yield self.runInteraction("did_forget_membership", f)
+        defer.returnValue(count == 0)
 
 
 class RoomMemberStore(RoomMemberWorkerStore):
@@ -495,25 +600,26 @@ class RoomMemberStore(RoomMemberWorkerStore):
                     "avatar_url": event.content.get("avatar_url", None),
                 }
                 for event in events
-            ]
+            ],
         )
 
         for event in events:
             txn.call_after(
                 self._membership_stream_cache.entity_has_changed,
-                event.state_key, event.internal_metadata.stream_ordering
+                event.state_key,
+                event.internal_metadata.stream_ordering,
             )
             txn.call_after(
                 self.get_invited_rooms_for_user.invalidate, (event.state_key,)
             )
 
             # We update the local_invites table only if the event is "current",
-            # i.e., its something that has just happened.
-            # The only current event that can also be an outlier is if its an
-            # invite that has come in across federation.
+            # i.e., its something that has just happened. If the event is an
+            # outlier it is only current if its an "out of band membership",
+            # like a remote invite or a rejection of a remote invite.
             is_new_state = not backfilled and (
                 not event.internal_metadata.is_outlier()
-                or event.internal_metadata.is_invite_from_remote()
+                or event.internal_metadata.is_out_of_band_membership()
             )
             is_mine = self.hs.is_mine_id(event.state_key)
             if is_new_state and is_mine:
@@ -527,7 +633,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
                             "inviter": event.sender,
                             "room_id": event.room_id,
                             "stream_id": event.internal_metadata.stream_ordering,
-                        }
+                        },
                     )
                 else:
                     sql = (
@@ -536,12 +642,15 @@ class RoomMemberStore(RoomMemberWorkerStore):
                         " AND replaced_by is NULL"
                     )
 
-                    txn.execute(sql, (
-                        event.internal_metadata.stream_ordering,
-                        event.event_id,
-                        event.room_id,
-                        event.state_key,
-                    ))
+                    txn.execute(
+                        sql,
+                        (
+                            event.internal_metadata.stream_ordering,
+                            event.event_id,
+                            event.room_id,
+                            event.state_key,
+                        ),
+                    )
 
     @defer.inlineCallbacks
     def locally_reject_invite(self, user_id, room_id):
@@ -552,18 +661,14 @@ class RoomMemberStore(RoomMemberWorkerStore):
         )
 
         def f(txn, stream_ordering):
-            txn.execute(sql, (
-                stream_ordering,
-                True,
-                room_id,
-                user_id,
-            ))
+            txn.execute(sql, (stream_ordering, True, room_id, user_id))
 
         with self._stream_id_gen.get_next() as stream_ordering:
             yield self.runInteraction("locally_reject_invite", f, stream_ordering)
 
     def forget(self, user_id, room_id):
         """Indicate that user_id wishes to discard history for room_id."""
+
         def f(txn):
             sql = (
                 "UPDATE"
@@ -577,35 +682,9 @@ class RoomMemberStore(RoomMemberWorkerStore):
             )
             txn.execute(sql, (user_id, room_id))
 
-            txn.call_after(self.did_forget.invalidate, (user_id, room_id))
-            self._invalidate_cache_and_stream(
-                txn, self.who_forgot_in_room, (room_id,)
-            )
+            self._invalidate_cache_and_stream(txn, self.did_forget, (user_id, room_id))
+
         return self.runInteraction("forget_membership", f)
-
-    @cachedInlineCallbacks(num_args=2)
-    def did_forget(self, user_id, room_id):
-        """Returns whether user_id has elected to discard history for room_id.
-
-        Returns False if they have since re-joined."""
-        def f(txn):
-            sql = (
-                "SELECT"
-                "  COUNT(*)"
-                " FROM"
-                "  room_memberships"
-                " WHERE"
-                "  user_id = ?"
-                " AND"
-                "  room_id = ?"
-                " AND"
-                "  forgotten = 0"
-            )
-            txn.execute(sql, (user_id, room_id))
-            rows = txn.fetchall()
-            return rows[0][0]
-        count = yield self.runInteraction("did_forget_membership", f)
-        defer.returnValue(count == 0)
 
     @defer.inlineCallbacks
     def _background_add_membership_profile(self, progress, batch_size):
@@ -619,7 +698,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
         INSERT_CLUMP_SIZE = 1000
 
         def add_membership_profile_txn(txn):
-            sql = ("""
+            sql = """
                 SELECT stream_ordering, event_id, events.room_id, event_json.json
                 FROM events
                 INNER JOIN event_json USING (event_id)
@@ -628,7 +707,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
                 AND type = 'm.room.member'
                 ORDER BY stream_ordering DESC
                 LIMIT ?
-            """)
+            """
 
             txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
 
@@ -644,7 +723,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
                 room_id = row["room_id"]
                 try:
                     event_json = json.loads(row["json"])
-                    content = event_json['content']
+                    content = event_json["content"]
                 except Exception:
                     continue
 
@@ -652,16 +731,14 @@ class RoomMemberStore(RoomMemberWorkerStore):
                 avatar_url = content.get("avatar_url", None)
 
                 if display_name or avatar_url:
-                    to_update.append((
-                        display_name, avatar_url, event_id, room_id
-                    ))
+                    to_update.append((display_name, avatar_url, event_id, room_id))
 
-            to_update_sql = ("""
+            to_update_sql = """
                 UPDATE room_memberships SET display_name = ?, avatar_url = ?
                 WHERE event_id = ? AND room_id = ?
-            """)
+            """
             for index in range(0, len(to_update), INSERT_CLUMP_SIZE):
-                clump = to_update[index:index + INSERT_CLUMP_SIZE]
+                clump = to_update[index : index + INSERT_CLUMP_SIZE]
                 txn.executemany(to_update_sql, clump)
 
             progress = {
@@ -734,7 +811,7 @@ class _JoinedHostsCache(object):
                             self.hosts_to_joined_users.pop(host, None)
             else:
                 joined_users = yield self.store.get_joined_users_from_state(
-                    self.room_id, state_entry,
+                    self.room_id, state_entry
                 )
 
                 self.hosts_to_joined_users = {}

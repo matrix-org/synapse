@@ -21,13 +21,13 @@ from twisted.internet import defer
 from synapse.api.constants import ThirdPartyEntityKind
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class ThirdPartyProtocolsServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/thirdparty/protocols")
+    PATTERNS = client_patterns("/thirdparty/protocols")
 
     def __init__(self, hs):
         super(ThirdPartyProtocolsServlet, self).__init__()
@@ -44,7 +44,7 @@ class ThirdPartyProtocolsServlet(RestServlet):
 
 
 class ThirdPartyProtocolServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/thirdparty/protocol/(?P<protocol>[^/]+)$")
+    PATTERNS = client_patterns("/thirdparty/protocol/(?P<protocol>[^/]+)$")
 
     def __init__(self, hs):
         super(ThirdPartyProtocolServlet, self).__init__()
@@ -57,7 +57,7 @@ class ThirdPartyProtocolServlet(RestServlet):
         yield self.auth.get_user_by_req(request, allow_guest=True)
 
         protocols = yield self.appservice_handler.get_3pe_protocols(
-            only_protocol=protocol,
+            only_protocol=protocol
         )
         if protocol in protocols:
             defer.returnValue((200, protocols[protocol]))
@@ -66,7 +66,7 @@ class ThirdPartyProtocolServlet(RestServlet):
 
 
 class ThirdPartyUserServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/thirdparty/user(/(?P<protocol>[^/]+))?$")
+    PATTERNS = client_patterns("/thirdparty/user(/(?P<protocol>[^/]+))?$")
 
     def __init__(self, hs):
         super(ThirdPartyUserServlet, self).__init__()
@@ -79,7 +79,7 @@ class ThirdPartyUserServlet(RestServlet):
         yield self.auth.get_user_by_req(request, allow_guest=True)
 
         fields = request.args
-        fields.pop("access_token", None)
+        fields.pop(b"access_token", None)
 
         results = yield self.appservice_handler.query_3pe(
             ThirdPartyEntityKind.USER, protocol, fields
@@ -89,7 +89,7 @@ class ThirdPartyUserServlet(RestServlet):
 
 
 class ThirdPartyLocationServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/thirdparty/location(/(?P<protocol>[^/]+))?$")
+    PATTERNS = client_patterns("/thirdparty/location(/(?P<protocol>[^/]+))?$")
 
     def __init__(self, hs):
         super(ThirdPartyLocationServlet, self).__init__()
@@ -102,7 +102,7 @@ class ThirdPartyLocationServlet(RestServlet):
         yield self.auth.get_user_by_req(request, allow_guest=True)
 
         fields = request.args
-        fields.pop("access_token", None)
+        fields.pop(b"access_token", None)
 
         results = yield self.appservice_handler.query_3pe(
             ThirdPartyEntityKind.LOCATION, protocol, fields

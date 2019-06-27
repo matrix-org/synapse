@@ -11,19 +11,19 @@ from tests.utils import MockClock
 
 
 class HttpTransactionCacheTestCase(unittest.TestCase):
-
     def setUp(self):
         self.clock = MockClock()
-        self.cache = HttpTransactionCache(self.clock)
+        self.hs = Mock()
+        self.hs.get_clock = Mock(return_value=self.clock)
+        self.hs.get_auth = Mock()
+        self.cache = HttpTransactionCache(self.hs)
 
         self.mock_http_response = (200, "GOOD JOB!")
         self.mock_key = "foo"
 
     @defer.inlineCallbacks
     def test_executes_given_function(self):
-        cb = Mock(
-            return_value=defer.succeed(self.mock_http_response)
-        )
+        cb = Mock(return_value=defer.succeed(self.mock_http_response))
         res = yield self.cache.fetch_or_execute(
             self.mock_key, cb, "some_arg", keyword="arg"
         )
@@ -32,9 +32,7 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_deduplicates_based_on_key(self):
-        cb = Mock(
-            return_value=defer.succeed(self.mock_http_response)
-        )
+        cb = Mock(return_value=defer.succeed(self.mock_http_response))
         for i in range(3):  # invoke multiple times
             res = yield self.cache.fetch_or_execute(
                 self.mock_key, cb, "some_arg", keyword="arg", changing_args=i
@@ -82,7 +80,7 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
             try:
                 yield self.cache.fetch_or_execute(self.mock_key, cb)
             except Exception as e:
-                self.assertEqual(e.message, "boo")
+                self.assertEqual(e.args[0], "boo")
             self.assertIs(LoggingContext.current_context(), test_context)
 
             res = yield self.cache.fetch_or_execute(self.mock_key, cb)
@@ -108,7 +106,7 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
             try:
                 yield self.cache.fetch_or_execute(self.mock_key, cb)
             except Exception as e:
-                self.assertEqual(e.message, "boo")
+                self.assertEqual(e.args[0], "boo")
             self.assertIs(LoggingContext.current_context(), test_context)
 
             res = yield self.cache.fetch_or_execute(self.mock_key, cb)
@@ -117,29 +115,18 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_cleans_up(self):
-        cb = Mock(
-            return_value=defer.succeed(self.mock_http_response)
-        )
-        yield self.cache.fetch_or_execute(
-            self.mock_key, cb, "an arg"
-        )
+        cb = Mock(return_value=defer.succeed(self.mock_http_response))
+        yield self.cache.fetch_or_execute(self.mock_key, cb, "an arg")
         # should NOT have cleaned up yet
         self.clock.advance_time_msec(CLEANUP_PERIOD_MS / 2)
 
-        yield self.cache.fetch_or_execute(
-            self.mock_key, cb, "an arg"
-        )
+        yield self.cache.fetch_or_execute(self.mock_key, cb, "an arg")
         # still using cache
         cb.assert_called_once_with("an arg")
 
         self.clock.advance_time_msec(CLEANUP_PERIOD_MS)
 
-        yield self.cache.fetch_or_execute(
-            self.mock_key, cb, "an arg"
-        )
+        yield self.cache.fetch_or_execute(self.mock_key, cb, "an arg")
         # no longer using cache
         self.assertEqual(cb.call_count, 2)
-        self.assertEqual(
-            cb.call_args_list,
-            [call("an arg",), call("an arg",)]
-        )
+        self.assertEqual(cb.call_args_list, [call("an arg"), call("an arg")])

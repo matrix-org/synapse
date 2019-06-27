@@ -27,7 +27,6 @@ from tests import unittest
 
 
 class FileConsumerTests(unittest.TestCase):
-
     @defer.inlineCallbacks
     def test_pull_consumer(self):
         string_file = StringIO()
@@ -87,7 +86,9 @@ class FileConsumerTests(unittest.TestCase):
             producer = NonCallableMock(spec_set=["pauseProducing", "resumeProducing"])
 
             resume_deferred = defer.Deferred()
-            producer.resumeProducing.side_effect = lambda: resume_deferred.callback(None)
+            producer.resumeProducing.side_effect = lambda: resume_deferred.callback(
+                None
+            )
 
             consumer.registerProducer(producer, True)
 

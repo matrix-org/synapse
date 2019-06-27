@@ -28,6 +28,7 @@ from synapse.config.logger import setup_logging
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.replication.slave.storage._base import __func__
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
@@ -45,43 +46,31 @@ logger = logging.getLogger("synapse.app.pusher")
 
 
 class PusherSlaveStore(
-    SlavedEventStore, SlavedPusherStore, SlavedReceiptsStore,
-    SlavedAccountDataStore
+    SlavedEventStore, SlavedPusherStore, SlavedReceiptsStore, SlavedAccountDataStore
 ):
-    update_pusher_last_stream_ordering_and_success = (
-        DataStore.update_pusher_last_stream_ordering_and_success.__func__
+    update_pusher_last_stream_ordering_and_success = __func__(
+        DataStore.update_pusher_last_stream_ordering_and_success
     )
 
-    update_pusher_failing_since = (
-        DataStore.update_pusher_failing_since.__func__
+    update_pusher_failing_since = __func__(DataStore.update_pusher_failing_since)
+
+    update_pusher_last_stream_ordering = __func__(
+        DataStore.update_pusher_last_stream_ordering
     )
 
-    update_pusher_last_stream_ordering = (
-        DataStore.update_pusher_last_stream_ordering.__func__
+    get_throttle_params_by_room = __func__(DataStore.get_throttle_params_by_room)
+
+    set_throttle_params = __func__(DataStore.set_throttle_params)
+
+    get_time_of_last_push_action_before = __func__(
+        DataStore.get_time_of_last_push_action_before
     )
 
-    get_throttle_params_by_room = (
-        DataStore.get_throttle_params_by_room.__func__
-    )
-
-    set_throttle_params = (
-        DataStore.set_throttle_params.__func__
-    )
-
-    get_time_of_last_push_action_before = (
-        DataStore.get_time_of_last_push_action_before.__func__
-    )
-
-    get_profile_displayname = (
-        DataStore.get_profile_displayname.__func__
-    )
+    get_profile_displayname = __func__(DataStore.get_profile_displayname)
 
 
 class PusherServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = PusherSlaveStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = PusherSlaveStore
 
     def remove_pusher(self, app_id, push_key, user_id):
         self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
@@ -107,7 +96,7 @@ class PusherServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            )
+            ),
         )
 
         logger.info("Synapse pusher now listening on port %d", port)
@@ -121,18 +110,19 @@ class PusherServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    )
+                        username="matrix", password="rabbithole", globals={"hs": self}
+                    ),
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(("Metrics listener configured, but "
-                                 "enable_metrics is not True!"))
+                    logger.warn(
+                        (
+                            "Metrics listener configured, but "
+                            "enable_metrics is not True!"
+                        )
+                    )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"],
-                                         listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -148,8 +138,9 @@ class PusherReplicationHandler(ReplicationClientHandler):
 
         self.pusher_pool = hs.get_pusherpool()
 
+    @defer.inlineCallbacks
     def on_rdata(self, stream_name, token, rows):
-        super(PusherReplicationHandler, self).on_rdata(stream_name, token, rows)
+        yield super(PusherReplicationHandler, self).on_rdata(stream_name, token, rows)
         run_in_background(self.poke_pushers, stream_name, token, rows)
 
     @defer.inlineCallbacks
@@ -162,9 +153,7 @@ class PusherReplicationHandler(ReplicationClientHandler):
                     else:
                         yield self.start_pusher(row.user_id, row.app_id, row.pushkey)
             elif stream_name == "events":
-                yield self.pusher_pool.on_new_notifications(
-                    token, token,
-                )
+                yield self.pusher_pool.on_new_notifications(token, token)
             elif stream_name == "receipts":
                 yield self.pusher_pool.on_new_receipts(
                     token, token, set(row.room_id for row in rows)
@@ -184,16 +173,14 @@ class PusherReplicationHandler(ReplicationClientHandler):
     def start_pusher(self, user_id, app_id, pushkey):
         key = "%s:%s" % (app_id, pushkey)
         logger.info("Starting pusher %r / %r", user_id, key)
-        return self.pusher_pool._refresh_pusher(app_id, pushkey, user_id)
+        return self.pusher_pool.start_pusher_by_id(app_id, pushkey, user_id)
 
 
 def start(config_options):
     try:
-        config = HomeServerConfig.load_config(
-            "Synapse pusher", config_options
-        )
+        config = HomeServerConfig.load_config("Synapse pusher", config_options)
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.pusher"
@@ -225,18 +212,16 @@ def start(config_options):
     )
 
     ps.setup()
-    ps.start_listening(config.worker_listeners)
 
     def start():
+        _base.start(ps, config.worker_listeners)
         ps.get_pusherpool().start()
-        ps.get_datastore().start_profiling()
-        ps.get_state_handler().start_caching()
 
     reactor.callWhenRunning(start)
 
     _base.start_worker_reactor("synapse-pusher", config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with LoggingContext("main"):
         ps = start(sys.argv[1:])

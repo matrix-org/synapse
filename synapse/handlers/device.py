@@ -20,10 +20,14 @@ from twisted.internet import defer
 
 from synapse.api import errors
 from synapse.api.constants import EventTypes
-from synapse.api.errors import FederationDeniedError
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    RequestSendFailed,
+)
 from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util import stringutils
-from synapse.util.async import Linearizer
+from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination
@@ -33,71 +37,13 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-class DeviceHandler(BaseHandler):
+class DeviceWorkerHandler(BaseHandler):
     def __init__(self, hs):
-        super(DeviceHandler, self).__init__(hs)
+        super(DeviceWorkerHandler, self).__init__(hs)
 
         self.hs = hs
         self.state = hs.get_state_handler()
         self._auth_handler = hs.get_auth_handler()
-        self.federation_sender = hs.get_federation_sender()
-
-        self._edu_updater = DeviceListEduUpdater(hs, self)
-
-        federation_registry = hs.get_federation_registry()
-
-        federation_registry.register_edu_handler(
-            "m.device_list_update", self._edu_updater.incoming_device_list_update,
-        )
-        federation_registry.register_query_handler(
-            "user_devices", self.on_federation_query_user_devices,
-        )
-
-        hs.get_distributor().observe("user_left_room", self.user_left_room)
-
-    @defer.inlineCallbacks
-    def check_device_registered(self, user_id, device_id,
-                                initial_device_display_name=None):
-        """
-        If the given device has not been registered, register it with the
-        supplied display name.
-
-        If no device_id is supplied, we make one up.
-
-        Args:
-            user_id (str):  @user:id
-            device_id (str | None): device id supplied by client
-            initial_device_display_name (str | None): device display name from
-                 client
-        Returns:
-            str: device id (generated if none was supplied)
-        """
-        if device_id is not None:
-            new_device = yield self.store.store_device(
-                user_id=user_id,
-                device_id=device_id,
-                initial_device_display_name=initial_device_display_name,
-            )
-            if new_device:
-                yield self.notify_device_update(user_id, [device_id])
-            defer.returnValue(device_id)
-
-        # if the device id is not specified, we'll autogen one, but loop a few
-        # times in case of a clash.
-        attempts = 0
-        while attempts < 5:
-            device_id = stringutils.random_string(10).upper()
-            new_device = yield self.store.store_device(
-                user_id=user_id,
-                device_id=device_id,
-                initial_device_display_name=initial_device_display_name,
-            )
-            if new_device:
-                yield self.notify_device_update(user_id, [device_id])
-                defer.returnValue(device_id)
-            attempts += 1
-
-        raise errors.StoreError(500, "Couldn't generate a device ID.")
 
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
@@ -112,9 +58,7 @@ class DeviceHandler(BaseHandler):
 
         device_map = yield self.store.get_devices_by_user(user_id)
 
-        ips = yield self.store.get_last_client_ip_by_device(
-            user_id, device_id=None
-        )
+        ips = yield self.store.get_last_client_ip_by_device(user_id, device_id=None)
 
         devices = list(device_map.values())
         for device in devices:
@@ -139,149 +83,9 @@ class DeviceHandler(BaseHandler):
             device = yield self.store.get_device(user_id, device_id)
         except errors.StoreError:
             raise errors.NotFoundError
-        ips = yield self.store.get_last_client_ip_by_device(
-            user_id, device_id,
-        )
+        ips = yield self.store.get_last_client_ip_by_device(user_id, device_id)
         _update_device_from_client_ips(device, ips)
         defer.returnValue(device)
-
-    @defer.inlineCallbacks
-    def delete_device(self, user_id, device_id):
-        """ Delete the given device
-
-        Args:
-            user_id (str):
-            device_id (str):
-
-        Returns:
-            defer.Deferred:
-        """
-
-        try:
-            yield self.store.delete_device(user_id, device_id)
-        except errors.StoreError as e:
-            if e.code == 404:
-                # no match
-                pass
-            else:
-                raise
-
-        yield self._auth_handler.delete_access_tokens_for_user(
-            user_id, device_id=device_id,
-        )
-
-        yield self.store.delete_e2e_keys_by_device(
-            user_id=user_id, device_id=device_id
-        )
-
-        yield self.notify_device_update(user_id, [device_id])
-
-    @defer.inlineCallbacks
-    def delete_all_devices_for_user(self, user_id, except_device_id=None):
-        """Delete all of the user's devices
-
-        Args:
-            user_id (str):
-            except_device_id (str|None): optional device id which should not
-                be deleted
-
-        Returns:
-            defer.Deferred:
-        """
-        device_map = yield self.store.get_devices_by_user(user_id)
-        device_ids = list(device_map)
-        if except_device_id is not None:
-            device_ids = [d for d in device_ids if d != except_device_id]
-        yield self.delete_devices(user_id, device_ids)
-
-    @defer.inlineCallbacks
-    def delete_devices(self, user_id, device_ids):
-        """ Delete several devices
-
-        Args:
-            user_id (str):
-            device_ids (List[str]): The list of device IDs to delete
-
-        Returns:
-            defer.Deferred:
-        """
-
-        try:
-            yield self.store.delete_devices(user_id, device_ids)
-        except errors.StoreError as e:
-            if e.code == 404:
-                # no match
-                pass
-            else:
-                raise
-
-        # Delete access tokens and e2e keys for each device. Not optimised as it is not
-        # considered as part of a critical path.
-        for device_id in device_ids:
-            yield self._auth_handler.delete_access_tokens_for_user(
-                user_id, device_id=device_id,
-            )
-            yield self.store.delete_e2e_keys_by_device(
-                user_id=user_id, device_id=device_id
-            )
-
-        yield self.notify_device_update(user_id, device_ids)
-
-    @defer.inlineCallbacks
-    def update_device(self, user_id, device_id, content):
-        """ Update the given device
-
-        Args:
-            user_id (str):
-            device_id (str):
-            content (dict): body of update request
-
-        Returns:
-            defer.Deferred:
-        """
-
-        try:
-            yield self.store.update_device(
-                user_id,
-                device_id,
-                new_display_name=content.get("display_name")
-            )
-            yield self.notify_device_update(user_id, [device_id])
-        except errors.StoreError as e:
-            if e.code == 404:
-                raise errors.NotFoundError()
-            else:
-                raise
-
-    @measure_func("notify_device_update")
-    @defer.inlineCallbacks
-    def notify_device_update(self, user_id, device_ids):
-        """Notify that a user's device(s) has changed. Pokes the notifier, and
-        remote servers if the user is local.
-        """
-        users_who_share_room = yield self.store.get_users_who_share_room_with_user(
-            user_id
-        )
-
-        hosts = set()
-        if self.hs.is_mine_id(user_id):
-            hosts.update(get_domain_from_id(u) for u in users_who_share_room)
-            hosts.discard(self.server_name)
-
-        position = yield self.store.add_device_change_to_streams(
-            user_id, device_ids, list(hosts)
-        )
-
-        room_ids = yield self.store.get_rooms_for_user(user_id)
-
-        yield self.notifier.on_new_event(
-            "device_list_key", position, rooms=room_ids,
-        )
-
-        if hosts:
-            logger.info("Sending device list update notif to: %r", hosts)
-            for host in hosts:
-                self.federation_sender.send_device_messages(host)
 
     @measure_func("device.get_user_ids_changed")
     @defer.inlineCallbacks
@@ -293,26 +97,28 @@ class DeviceHandler(BaseHandler):
             user_id (str)
             from_token (StreamToken)
         """
-        now_token = yield self.hs.get_event_sources().get_current_token()
+        now_room_key = yield self.store.get_room_events_max_id()
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
 
-        # First we check if any devices have changed
-        changed = yield self.store.get_user_whose_devices_changed(
-            from_token.device_list_key
+        # First we check if any devices have changed for users that we share
+        # rooms with.
+        users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+            user_id
+        )
+        changed = yield self.store.get_users_whose_devices_changed(
+            from_token.device_list_key, users_who_share_room
         )
 
         # Then work out if any users have since joined
         rooms_changed = self.store.get_rooms_that_changed(room_ids, from_token.room_key)
 
         member_events = yield self.store.get_membership_changes_for_user(
-            user_id, from_token.room_key, now_token.room_key
+            user_id, from_token.room_key, now_room_key
         )
         rooms_changed.update(event.room_id for event in member_events)
 
-        stream_ordering = RoomStreamToken.parse_stream_token(
-            from_token.room_key
-        ).stream
+        stream_ordering = RoomStreamToken.parse_stream_token(from_token.room_key).stream
 
         possibly_changed = set(changed)
         possibly_left = set()
@@ -386,10 +192,6 @@ class DeviceHandler(BaseHandler):
                         break
 
         if possibly_changed or possibly_left:
-            users_who_share_room = yield self.store.get_users_who_share_room_with_user(
-                user_id
-            )
-
             # Take the intersection of the users whose devices may have changed
             # and those that actually still share a room with the user
             possibly_joined = possibly_changed & users_who_share_room
@@ -398,19 +200,220 @@ class DeviceHandler(BaseHandler):
             possibly_joined = []
             possibly_left = []
 
-        defer.returnValue({
-            "changed": list(possibly_joined),
-            "left": list(possibly_left),
-        })
+        defer.returnValue(
+            {"changed": list(possibly_joined), "left": list(possibly_left)}
+        )
+
+
+class DeviceHandler(DeviceWorkerHandler):
+    def __init__(self, hs):
+        super(DeviceHandler, self).__init__(hs)
+
+        self.federation_sender = hs.get_federation_sender()
+
+        self._edu_updater = DeviceListEduUpdater(hs, self)
+
+        federation_registry = hs.get_federation_registry()
+
+        federation_registry.register_edu_handler(
+            "m.device_list_update", self._edu_updater.incoming_device_list_update
+        )
+        federation_registry.register_query_handler(
+            "user_devices", self.on_federation_query_user_devices
+        )
+
+        hs.get_distributor().observe("user_left_room", self.user_left_room)
+
+    @defer.inlineCallbacks
+    def check_device_registered(
+        self, user_id, device_id, initial_device_display_name=None
+    ):
+        """
+        If the given device has not been registered, register it with the
+        supplied display name.
+
+        If no device_id is supplied, we make one up.
+
+        Args:
+            user_id (str):  @user:id
+            device_id (str | None): device id supplied by client
+            initial_device_display_name (str | None): device display name from
+                 client
+        Returns:
+            str: device id (generated if none was supplied)
+        """
+        if device_id is not None:
+            new_device = yield self.store.store_device(
+                user_id=user_id,
+                device_id=device_id,
+                initial_device_display_name=initial_device_display_name,
+            )
+            if new_device:
+                yield self.notify_device_update(user_id, [device_id])
+            defer.returnValue(device_id)
+
+        # if the device id is not specified, we'll autogen one, but loop a few
+        # times in case of a clash.
+        attempts = 0
+        while attempts < 5:
+            device_id = stringutils.random_string(10).upper()
+            new_device = yield self.store.store_device(
+                user_id=user_id,
+                device_id=device_id,
+                initial_device_display_name=initial_device_display_name,
+            )
+            if new_device:
+                yield self.notify_device_update(user_id, [device_id])
+                defer.returnValue(device_id)
+            attempts += 1
+
+        raise errors.StoreError(500, "Couldn't generate a device ID.")
+
+    @defer.inlineCallbacks
+    def delete_device(self, user_id, device_id):
+        """ Delete the given device
+
+        Args:
+            user_id (str):
+            device_id (str):
+
+        Returns:
+            defer.Deferred:
+        """
+
+        try:
+            yield self.store.delete_device(user_id, device_id)
+        except errors.StoreError as e:
+            if e.code == 404:
+                # no match
+                pass
+            else:
+                raise
+
+        yield self._auth_handler.delete_access_tokens_for_user(
+            user_id, device_id=device_id
+        )
+
+        yield self.store.delete_e2e_keys_by_device(user_id=user_id, device_id=device_id)
+
+        yield self.notify_device_update(user_id, [device_id])
+
+    @defer.inlineCallbacks
+    def delete_all_devices_for_user(self, user_id, except_device_id=None):
+        """Delete all of the user's devices
+
+        Args:
+            user_id (str):
+            except_device_id (str|None): optional device id which should not
+                be deleted
+
+        Returns:
+            defer.Deferred:
+        """
+        device_map = yield self.store.get_devices_by_user(user_id)
+        device_ids = list(device_map)
+        if except_device_id is not None:
+            device_ids = [d for d in device_ids if d != except_device_id]
+        yield self.delete_devices(user_id, device_ids)
+
+    @defer.inlineCallbacks
+    def delete_devices(self, user_id, device_ids):
+        """ Delete several devices
+
+        Args:
+            user_id (str):
+            device_ids (List[str]): The list of device IDs to delete
+
+        Returns:
+            defer.Deferred:
+        """
+
+        try:
+            yield self.store.delete_devices(user_id, device_ids)
+        except errors.StoreError as e:
+            if e.code == 404:
+                # no match
+                pass
+            else:
+                raise
+
+        # Delete access tokens and e2e keys for each device. Not optimised as it is not
+        # considered as part of a critical path.
+        for device_id in device_ids:
+            yield self._auth_handler.delete_access_tokens_for_user(
+                user_id, device_id=device_id
+            )
+            yield self.store.delete_e2e_keys_by_device(
+                user_id=user_id, device_id=device_id
+            )
+
+        yield self.notify_device_update(user_id, device_ids)
+
+    @defer.inlineCallbacks
+    def update_device(self, user_id, device_id, content):
+        """ Update the given device
+
+        Args:
+            user_id (str):
+            device_id (str):
+            content (dict): body of update request
+
+        Returns:
+            defer.Deferred:
+        """
+
+        try:
+            yield self.store.update_device(
+                user_id, device_id, new_display_name=content.get("display_name")
+            )
+            yield self.notify_device_update(user_id, [device_id])
+        except errors.StoreError as e:
+            if e.code == 404:
+                raise errors.NotFoundError()
+            else:
+                raise
+
+    @measure_func("notify_device_update")
+    @defer.inlineCallbacks
+    def notify_device_update(self, user_id, device_ids):
+        """Notify that a user's device(s) has changed. Pokes the notifier, and
+        remote servers if the user is local.
+        """
+        users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+            user_id
+        )
+
+        hosts = set()
+        if self.hs.is_mine_id(user_id):
+            hosts.update(get_domain_from_id(u) for u in users_who_share_room)
+            hosts.discard(self.server_name)
+
+        position = yield self.store.add_device_change_to_streams(
+            user_id, device_ids, list(hosts)
+        )
+
+        for device_id in device_ids:
+            logger.debug(
+                "Notifying about update %r/%r, ID: %r", user_id, device_id, position
+            )
+
+        room_ids = yield self.store.get_rooms_for_user(user_id)
+
+        yield self.notifier.on_new_event("device_list_key", position, rooms=room_ids)
+
+        if hosts:
+            logger.info(
+                "Sending device list update notif for %r to: %r", user_id, hosts
+            )
+            for host in hosts:
+                self.federation_sender.send_device_messages(host)
 
     @defer.inlineCallbacks
     def on_federation_query_user_devices(self, user_id):
         stream_id, devices = yield self.store.get_devices_with_keys_by_user(user_id)
-        defer.returnValue({
-            "user_id": user_id,
-            "stream_id": stream_id,
-            "devices": devices,
-        })
+        defer.returnValue(
+            {"user_id": user_id, "stream_id": stream_id, "devices": devices}
+        )
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
@@ -424,10 +427,7 @@ class DeviceHandler(BaseHandler):
 
 def _update_device_from_client_ips(device, client_ips):
     ip = client_ips.get((device["user_id"], device["device_id"]), {})
-    device.update({
-        "last_seen_ts": ip.get("last_seen"),
-        "last_seen_ip": ip.get("ip"),
-    })
+    device.update({"last_seen_ts": ip.get("last_seen"), "last_seen_ip": ip.get("ip")})
 
 
 class DeviceListEduUpdater(object):
@@ -465,18 +465,30 @@ class DeviceListEduUpdater(object):
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
         prev_ids = edu_content.pop("prev_id", [])
-        prev_ids = [str(p) for p in prev_ids]   # They may come as ints
+        prev_ids = [str(p) for p in prev_ids]  # They may come as ints
 
         if get_domain_from_id(user_id) != origin:
             # TODO: Raise?
-            logger.warning("Got device list update edu for %r from %r", user_id, origin)
+            logger.warning(
+                "Got device list update edu for %r/%r from %r",
+                user_id,
+                device_id,
+                origin,
+            )
             return
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
         if not room_ids:
             # We don't share any rooms with this user. Ignore update, as we
             # probably won't get any further updates.
+            logger.warning(
+                "Got device list update edu for %r/%r, but don't share a room",
+                user_id,
+                device_id,
+            )
             return
+
+        logger.debug("Received device list update for %r/%r", user_id, device_id)
 
         self._pending_updates.setdefault(user_id, []).append(
             (device_id, stream_id, prev_ids, edu_content)
@@ -495,23 +507,34 @@ class DeviceListEduUpdater(object):
                 # This can happen since we batch updates
                 return
 
+            for device_id, stream_id, prev_ids, content in pending_updates:
+                logger.debug(
+                    "Handling update %r/%r, ID: %r, prev: %r ",
+                    user_id,
+                    device_id,
+                    stream_id,
+                    prev_ids,
+                )
+
             # Given a list of updates we check if we need to resync. This
             # happens if we've missed updates.
             resync = yield self._need_to_do_resync(user_id, pending_updates)
+
+            logger.debug("Need to re-sync devices for %r? %r", user_id, resync)
 
             if resync:
                 # Fetch all devices for the user.
                 origin = get_domain_from_id(user_id)
                 try:
                     result = yield self.federation.query_user_devices(origin, user_id)
-                except NotRetryingDestination:
+                except (
+                    NotRetryingDestination,
+                    RequestSendFailed,
+                    HttpResponseException,
+                ):
                     # TODO: Remember that we are now out of sync and try again
                     # later
-                    logger.warn(
-                        "Failed to handle device list update for %s,"
-                        " we're not retrying the remote",
-                        user_id,
-                    )
+                    logger.warn("Failed to handle device list update for %s", user_id)
                     # We abort on exceptions rather than accepting the update
                     # as otherwise synapse will 'forget' that its device list
                     # is out of date. If we bail then we will retry the resync
@@ -532,26 +555,58 @@ class DeviceListEduUpdater(object):
 
                 stream_id = result["stream_id"]
                 devices = result["devices"]
+
+                # If the remote server has more than ~1000 devices for this user
+                # we assume that something is going horribly wrong (e.g. a bot
+                # that logs in and creates a new device every time it tries to
+                # send a message).  Maintaining lots of devices per user in the
+                # cache can cause serious performance issues as if this request
+                # takes more than 60s to complete, internal replication from the
+                # inbound federation worker to the synapse master may time out
+                # causing the inbound federation to fail and causing the remote
+                # server to retry, causing a DoS.  So in this scenario we give
+                # up on storing the total list of devices and only handle the
+                # delta instead.
+                if len(devices) > 1000:
+                    logger.warn(
+                        "Ignoring device list snapshot for %s as it has >1K devs (%d)",
+                        user_id,
+                        len(devices),
+                    )
+                    devices = []
+
+                for device in devices:
+                    logger.debug(
+                        "Handling resync update %r/%r, ID: %r",
+                        user_id,
+                        device["device_id"],
+                        stream_id,
+                    )
+
                 yield self.store.update_remote_device_list_cache(
-                    user_id, devices, stream_id,
+                    user_id, devices, stream_id
                 )
                 device_ids = [device["device_id"] for device in devices]
                 yield self.device_handler.notify_device_update(user_id, device_ids)
+
+                # We clobber the seen updates since we've re-synced from a given
+                # point.
+                self._seen_updates[user_id] = set([stream_id])
             else:
                 # Simply update the single device, since we know that is the only
                 # change (because of the single prev_id matching the current cache)
                 for device_id, stream_id, prev_ids, content in pending_updates:
                     yield self.store.update_remote_device_list_cache_entry(
-                        user_id, device_id, content, stream_id,
+                        user_id, device_id, content, stream_id
                     )
 
                 yield self.device_handler.notify_device_update(
                     user_id, [device_id for device_id, _, _, _ in pending_updates]
                 )
 
-            self._seen_updates.setdefault(user_id, set()).update(
-                stream_id for _, stream_id, _, _ in pending_updates
-            )
+                self._seen_updates.setdefault(user_id, set()).update(
+                    stream_id for _, stream_id, _, _ in pending_updates
+                )
 
     @defer.inlineCallbacks
     def _need_to_do_resync(self, user_id, updates):
@@ -560,9 +615,9 @@ class DeviceListEduUpdater(object):
         """
         seen_updates = self._seen_updates.get(user_id, set())
 
-        extremity = yield self.store.get_device_list_last_stream_id_for_remote(
-            user_id
-        )
+        extremity = yield self.store.get_device_list_last_stream_id_for_remote(user_id)
+
+        logger.debug("Current extremity for %r: %r", user_id, extremity)
 
         stream_id_in_updates = set()  # stream_ids in updates list
         for _, stream_id, prev_ids, _ in updates:

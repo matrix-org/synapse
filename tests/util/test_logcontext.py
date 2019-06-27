@@ -8,11 +8,8 @@ from .. import unittest
 
 
 class LoggingContextTestCase(unittest.TestCase):
-
     def _check_test_key(self, value):
-        self.assertEquals(
-            LoggingContext.current_context().request, value
-        )
+        self.assertEquals(LoggingContext.current_context().request, value)
 
     def test_with_context(self):
         with LoggingContext() as context_one:
@@ -50,6 +47,7 @@ class LoggingContextTestCase(unittest.TestCase):
                 self._check_test_key("one")
                 callback_completed[0] = True
                 return res
+
             d.addCallback(cb)
 
             return d
@@ -74,8 +72,7 @@ class LoggingContextTestCase(unittest.TestCase):
             # make sure that the context was reset before it got thrown back
             # into the reactor
             try:
-                self.assertIs(LoggingContext.current_context(),
-                              sentinel_context)
+                self.assertIs(LoggingContext.current_context(), sentinel_context)
                 d2.callback(None)
             except BaseException:
                 d2.errback(twisted.python.failure.Failure())
@@ -104,9 +101,7 @@ class LoggingContextTestCase(unittest.TestCase):
         # a function which returns a deferred which looks like it has been
         # called, but is actually paused
         def testfunc():
-            return logcontext.make_deferred_yieldable(
-                _chained_deferred_function()
-            )
+            return logcontext.make_deferred_yieldable(_chained_deferred_function())
 
         return self._test_run_in_background(testfunc)
 
@@ -164,6 +159,11 @@ class LoggingContextTestCase(unittest.TestCase):
             self.assertEqual(r, "bum")
             self._check_test_key("one")
 
+    def test_nested_logging_context(self):
+        with LoggingContext(request="foo"):
+            nested_context = logcontext.nested_logging_context(suffix="bar")
+            self.assertEqual(nested_context.request, "foo-bar")
+
 
 # a function which returns a deferred which has been "called", but
 # which had a function which returned another incomplete deferred on
@@ -175,5 +175,6 @@ def _chained_deferred_function():
         d2 = defer.Deferred()
         reactor.callLater(0, d2.callback, res)
         return d2
+
     d.addCallback(cb)
     return d

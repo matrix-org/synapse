@@ -18,7 +18,7 @@ from ._base import Config
 
 
 class PushConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         push_config = config.get("push", {})
         self.push_include_content = push_config.get("include_content", True)
 
@@ -42,7 +42,7 @@ class PushConfig(Config):
             )
             self.push_include_content = not redact_content
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
         # Clients requesting push notifications can either have the body of
         # the message sent in the notification poke along with other details
@@ -51,11 +51,11 @@ class PushConfig(Config):
         # notification request includes the content of the event (other details
         # like the sender are still included). For `event_id_only` push, it
         # has no effect.
-
+        #
         # For modern android devices the notification content will still appear
         # because it is loaded by the app. iPhone, however will send a
         # notification saying only that a message arrived and who it came from.
         #
         #push:
-        #   include_content: true
+        #  include_content: true
         """

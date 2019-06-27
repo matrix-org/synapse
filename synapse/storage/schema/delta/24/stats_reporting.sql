@@ -1,4 +1,4 @@
-/* Copyright 2015, 2016 OpenMarket Ltd
+/* Copyright 2019 New Vector Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,6 @@
  * limitations under the License.
  */
 
--- Should only ever contain one row
-CREATE TABLE IF NOT EXISTS stats_reporting(
-  -- The stream ordering token which was most recently reported as stats
-  reported_stream_token INTEGER,
-  -- The time (seconds since epoch) stats were most recently reported
-  reported_time BIGINT
-);
+ /* We used to create a table called stats_reporting, but this is no longer
+ * used and is removed in delta 54.
+ */

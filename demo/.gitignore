@@ -1,0 +1,7 @@
+*.db
+*.log
+*.log.*
+*.pid
+
+/media_store.*
+/etc

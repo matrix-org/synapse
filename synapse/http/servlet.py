@@ -29,7 +29,7 @@ def parse_integer(request, name, default=None, required=False):
 
     Args:
         request: the twisted HTTP request.
-        name (str): the name of the query parameter.
+        name (bytes/unicode): the name of the query parameter.
         default (int|None): value to use if the parameter is absent, defaults
             to None.
         required (bool): whether to raise a 400 SynapseError if the
@@ -46,12 +46,16 @@ def parse_integer(request, name, default=None, required=False):
 
 
 def parse_integer_from_args(args, name, default=None, required=False):
+
+    if not isinstance(name, bytes):
+        name = name.encode("ascii")
+
     if name in args:
         try:
             return int(args[name][0])
         except Exception:
             message = "Query parameter %r must be an integer" % (name,)
-            raise SynapseError(400, message)
+            raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
     else:
         if required:
             message = "Missing integer query parameter %r" % (name,)
@@ -65,7 +69,7 @@ def parse_boolean(request, name, default=None, required=False):
 
     Args:
         request: the twisted HTTP request.
-        name (str): the name of the query parameter.
+        name (bytes/unicode): the name of the query parameter.
         default (bool|None): value to use if the parameter is absent, defaults
             to None.
         required (bool): whether to raise a 400 SynapseError if the
@@ -83,16 +87,16 @@ def parse_boolean(request, name, default=None, required=False):
 
 
 def parse_boolean_from_args(args, name, default=None, required=False):
+
+    if not isinstance(name, bytes):
+        name = name.encode("ascii")
+
     if name in args:
         try:
-            return {
-                "true": True,
-                "false": False,
-            }[args[name][0]]
+            return {b"true": True, b"false": False}[args[name][0]]
         except Exception:
             message = (
-                "Boolean query parameter %r must be one of"
-                " ['true', 'false']"
+                "Boolean query parameter %r must be one of" " ['true', 'false']"
             ) % (name,)
             raise SynapseError(400, message)
     else:
@@ -103,22 +107,36 @@ def parse_boolean_from_args(args, name, default=None, required=False):
             return default
 
 
-def parse_string(request, name, default=None, required=False,
-                 allowed_values=None, param_type="string"):
-    """Parse a string parameter from the request query string.
+def parse_string(
+    request,
+    name,
+    default=None,
+    required=False,
+    allowed_values=None,
+    param_type="string",
+    encoding="ascii",
+):
+    """
+    Parse a string parameter from the request query string.
+
+    If encoding is not None, the content of the query param will be
+    decoded to Unicode using the encoding, otherwise it will be encoded
 
     Args:
         request: the twisted HTTP request.
-        name (str): the name of the query parameter.
-        default (str|None): value to use if the parameter is absent, defaults
-            to None.
+        name (bytes|unicode): the name of the query parameter.
+        default (bytes|unicode|None): value to use if the parameter is absent,
+            defaults to None. Must be bytes if encoding is None.
         required (bool): whether to raise a 400 SynapseError if the
             parameter is absent, defaults to False.
-        allowed_values (list[str]): List of allowed values for the string,
-            or None if any value is allowed, defaults to None
+        allowed_values (list[bytes|unicode]): List of allowed values for the
+            string, or None if any value is allowed, defaults to None. Must be
+            the same type as name, if given.
+        encoding (str|None): The encoding to decode the string content with.
 
     Returns:
-        str|None: A string value or the default.
+        bytes/unicode|None: A string value or the default. Unicode if encoding
+        was given, bytes otherwise.
 
     Raises:
         SynapseError if the parameter is absent and required, or if the
@@ -126,17 +144,33 @@ def parse_string(request, name, default=None, required=False,
             is not one of those allowed values.
     """
     return parse_string_from_args(
-        request.args, name, default, required, allowed_values, param_type,
+        request.args, name, default, required, allowed_values, param_type, encoding
     )
 
 
-def parse_string_from_args(args, name, default=None, required=False,
-                           allowed_values=None, param_type="string"):
+def parse_string_from_args(
+    args,
+    name,
+    default=None,
+    required=False,
+    allowed_values=None,
+    param_type="string",
+    encoding="ascii",
+):
+
+    if not isinstance(name, bytes):
+        name = name.encode("ascii")
+
     if name in args:
         value = args[name][0]
+
+        if encoding:
+            value = value.decode(encoding)
+
         if allowed_values is not None and value not in allowed_values:
             message = "Query parameter %r must be one of [%s]" % (
-                name, ", ".join(repr(v) for v in allowed_values)
+                name,
+                ", ".join(repr(v) for v in allowed_values),
             )
             raise SynapseError(400, message)
         else:
@@ -146,6 +180,10 @@ def parse_string_from_args(args, name, default=None, required=False,
             message = "Missing %s query parameter %r" % (param_type, name)
             raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
         else:
+
+            if encoding and isinstance(default, bytes):
+                return default.decode(encoding)
+
             return default
 
 
@@ -171,8 +209,16 @@ def parse_json_value_from_request(request, allow_empty_body=False):
     if not content_bytes and allow_empty_body:
         return None
 
+    # Decode to Unicode so that simplejson will return Unicode strings on
+    # Python 2
     try:
-        content = json.loads(content_bytes)
+        content_unicode = content_bytes.decode("utf8")
+    except UnicodeDecodeError:
+        logger.warn("Unable to decode UTF-8")
+        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
+
+    try:
+        content = json.loads(content_unicode)
     except Exception as e:
         logger.warn("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
@@ -192,9 +238,7 @@ def parse_json_object_from_request(request, allow_empty_body=False):
         SynapseError if the request body couldn't be decoded as JSON or
             if it wasn't a JSON object.
     """
-    content = parse_json_value_from_request(
-        request, allow_empty_body=allow_empty_body,
-    )
+    content = parse_json_value_from_request(request, allow_empty_body=allow_empty_body)
 
     if allow_empty_body and content is None:
         return {}
@@ -206,7 +250,7 @@ def parse_json_object_from_request(request, allow_empty_body=False):
     return content
 
 
-def assert_params_in_request(body, required):
+def assert_params_in_dict(body, required):
     absent = []
     for k in required:
         if k not in body:

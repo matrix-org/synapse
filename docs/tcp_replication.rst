@@ -137,7 +137,6 @@ for each stream so that on reconneciton it can start streaming from the correct
 place. Note: not all RDATA have valid tokens due to batching. See
 ``RdataCommand`` for more details.
 
-
 Example
 ~~~~~~~
 
@@ -189,7 +188,9 @@ RDATA (S)
     A single update in a stream
 
 POSITION (S)
-    The position of the stream has been updated
+    The position of the stream has been updated. Sent to the client after all
+    missing updates for a stream have been sent to the client and they're now
+    up to date.
 
 ERROR (S, C)
     There was an error
@@ -221,3 +222,28 @@ SYNC (S, C)
 
 See ``synapse/replication/tcp/commands.py`` for a detailed description and the
 format of each command.
+
+
+Cache Invalidation Stream
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The cache invalidation stream is used to inform workers when they need to
+invalidate any of their caches in the data store. This is done by streaming all
+cache invalidations done on master down to the workers, assuming that any caches
+on the workers also exist on the master.
+
+Each individual cache invalidation results in a row being sent down replication,
+which includes the cache name (the name of the function) and they key to
+invalidate. For example::
+
+    > RDATA caches 550953771 ["get_user_by_id", ["@bob:example.com"], 1550574873251]
+
+However, there are times when a number of caches need to be invalidated at the
+same time with the same key. To reduce traffic we batch those invalidations into
+a single poke by defining a special cache name that workers understand to mean
+to expand to invalidate the correct caches.
+
+Currently the special cache names are declared in ``synapse/storage/_base.py``
+and are:
+
+1. ``cs_cache_fake`` ─ invalidates caches that depend on the current state

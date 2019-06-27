@@ -14,62 +14,28 @@
 # limitations under the License.
 from six import iteritems
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cached
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, db_to_json
 
 
-class EndToEndKeyStore(SQLBaseStore):
-    def set_e2e_device_keys(self, user_id, device_id, time_now, device_keys):
-        """Stores device keys for a device. Returns whether there was a change
-        or the keys were already in the database.
-        """
-        def _set_e2e_device_keys_txn(txn):
-            old_key_json = self._simple_select_one_onecol_txn(
-                txn,
-                table="e2e_device_keys_json",
-                keyvalues={
-                    "user_id": user_id,
-                    "device_id": device_id,
-                },
-                retcol="key_json",
-                allow_none=True,
-            )
-
-            new_key_json = encode_canonical_json(device_keys)
-            if old_key_json == new_key_json:
-                return False
-
-            self._simple_upsert_txn(
-                txn,
-                table="e2e_device_keys_json",
-                keyvalues={
-                    "user_id": user_id,
-                    "device_id": device_id,
-                },
-                values={
-                    "ts_added_ms": time_now,
-                    "key_json": new_key_json,
-                }
-            )
-
-            return True
-
-        return self.runInteraction(
-            "set_e2e_device_keys", _set_e2e_device_keys_txn
-        )
-
+class EndToEndKeyWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def get_e2e_device_keys(self, query_list, include_all_devices=False):
+    def get_e2e_device_keys(
+        self, query_list, include_all_devices=False, include_deleted_devices=False
+    ):
         """Fetch a list of device keys.
         Args:
             query_list(list): List of pairs of user_ids and device_ids.
             include_all_devices (bool): whether to include entries for devices
                 that don't have device keys
+            include_deleted_devices (bool): whether to include null entries for
+                devices which no longer exist (but were in the query_list).
+                This option only takes effect if include_all_devices is true.
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
             dict containing "key_json", "device_display_name".
@@ -78,19 +44,30 @@ class EndToEndKeyStore(SQLBaseStore):
             defer.returnValue({})
 
         results = yield self.runInteraction(
-            "get_e2e_device_keys", self._get_e2e_device_keys_txn,
-            query_list, include_all_devices,
+            "get_e2e_device_keys",
+            self._get_e2e_device_keys_txn,
+            query_list,
+            include_all_devices,
+            include_deleted_devices,
         )
 
         for user_id, device_keys in iteritems(results):
             for device_id, device_info in iteritems(device_keys):
-                device_info["keys"] = json.loads(device_info.pop("key_json"))
+                device_info["keys"] = db_to_json(device_info.pop("key_json"))
 
         defer.returnValue(results)
 
-    def _get_e2e_device_keys_txn(self, txn, query_list, include_all_devices):
+    def _get_e2e_device_keys_txn(
+        self, txn, query_list, include_all_devices=False, include_deleted_devices=False
+    ):
         query_clauses = []
         query_params = []
+
+        if include_all_devices is False:
+            include_deleted_devices = False
+
+        if include_deleted_devices:
+            deleted_devices = set(query_list)
 
         for (user_id, device_id) in query_list:
             query_clause = "user_id = ?"
@@ -111,7 +88,7 @@ class EndToEndKeyStore(SQLBaseStore):
             " WHERE %s"
         ) % (
             "LEFT" if include_all_devices else "INNER",
-            " OR ".join("(" + q + ")" for q in query_clauses)
+            " OR ".join("(" + q + ")" for q in query_clauses),
         )
 
         txn.execute(sql, query_params)
@@ -119,7 +96,13 @@ class EndToEndKeyStore(SQLBaseStore):
 
         result = {}
         for row in rows:
+            if include_deleted_devices:
+                deleted_devices.remove((row["user_id"], row["device_id"]))
             result.setdefault(row["user_id"], {})[row["device_id"]] = row
+
+        if include_deleted_devices:
+            for user_id, device_id in deleted_devices:
+                result.setdefault(user_id, {})[device_id] = None
 
         return result
 
@@ -142,17 +125,14 @@ class EndToEndKeyStore(SQLBaseStore):
             table="e2e_one_time_keys_json",
             column="key_id",
             iterable=key_ids,
-            retcols=("algorithm", "key_id", "key_json",),
-            keyvalues={
-                "user_id": user_id,
-                "device_id": device_id,
-            },
+            retcols=("algorithm", "key_id", "key_json"),
+            keyvalues={"user_id": user_id, "device_id": device_id},
             desc="add_e2e_one_time_keys_check",
         )
 
-        defer.returnValue({
-            (row["algorithm"], row["key_id"]): row["key_json"] for row in rows
-        })
+        defer.returnValue(
+            {(row["algorithm"], row["key_id"]): row["key_json"] for row in rows}
+        )
 
     @defer.inlineCallbacks
     def add_e2e_one_time_keys(self, user_id, device_id, time_now, new_keys):
@@ -173,7 +153,8 @@ class EndToEndKeyStore(SQLBaseStore):
             # `add_e2e_one_time_keys` then they'll conflict and we will only
             # insert one set.
             self._simple_insert_many_txn(
-                txn, table="e2e_one_time_keys_json",
+                txn,
+                table="e2e_one_time_keys_json",
                 values=[
                     {
                         "user_id": user_id,
@@ -187,8 +168,9 @@ class EndToEndKeyStore(SQLBaseStore):
                 ],
             )
             self._invalidate_cache_and_stream(
-                txn, self.count_e2e_one_time_keys, (user_id, device_id,)
+                txn, self.count_e2e_one_time_keys, (user_id, device_id)
             )
+
         yield self.runInteraction(
             "add_e2e_one_time_keys_insert", _add_e2e_one_time_keys
         )
@@ -199,6 +181,7 @@ class EndToEndKeyStore(SQLBaseStore):
         Returns:
             Dict mapping from algorithm to number of keys for that algorithm.
         """
+
         def _count_e2e_one_time_keys(txn):
             sql = (
                 "SELECT algorithm, COUNT(key_id) FROM e2e_one_time_keys_json"
@@ -210,12 +193,46 @@ class EndToEndKeyStore(SQLBaseStore):
             for algorithm, key_count in txn:
                 result[algorithm] = key_count
             return result
-        return self.runInteraction(
-            "count_e2e_one_time_keys", _count_e2e_one_time_keys
-        )
+
+        return self.runInteraction("count_e2e_one_time_keys", _count_e2e_one_time_keys)
+
+
+class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
+    def set_e2e_device_keys(self, user_id, device_id, time_now, device_keys):
+        """Stores device keys for a device. Returns whether there was a change
+        or the keys were already in the database.
+        """
+
+        def _set_e2e_device_keys_txn(txn):
+            old_key_json = self._simple_select_one_onecol_txn(
+                txn,
+                table="e2e_device_keys_json",
+                keyvalues={"user_id": user_id, "device_id": device_id},
+                retcol="key_json",
+                allow_none=True,
+            )
+
+            # In py3 we need old_key_json to match new_key_json type. The DB
+            # returns unicode while encode_canonical_json returns bytes.
+            new_key_json = encode_canonical_json(device_keys).decode("utf-8")
+
+            if old_key_json == new_key_json:
+                return False
+
+            self._simple_upsert_txn(
+                txn,
+                table="e2e_device_keys_json",
+                keyvalues={"user_id": user_id, "device_id": device_id},
+                values={"ts_added_ms": time_now, "key_json": new_key_json},
+            )
+
+            return True
+
+        return self.runInteraction("set_e2e_device_keys", _set_e2e_device_keys_txn)
 
     def claim_e2e_one_time_keys(self, query_list):
         """Take a list of one time keys out of the database"""
+
         def _claim_e2e_one_time_keys(txn):
             sql = (
                 "SELECT key_id, key_json FROM e2e_one_time_keys_json"
@@ -239,12 +256,11 @@ class EndToEndKeyStore(SQLBaseStore):
             for user_id, device_id, algorithm, key_id in delete:
                 txn.execute(sql, (user_id, device_id, algorithm, key_id))
                 self._invalidate_cache_and_stream(
-                    txn, self.count_e2e_one_time_keys, (user_id, device_id,)
+                    txn, self.count_e2e_one_time_keys, (user_id, device_id)
                 )
             return result
-        return self.runInteraction(
-            "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
-        )
+
+        return self.runInteraction("claim_e2e_one_time_keys", _claim_e2e_one_time_keys)
 
     def delete_e2e_keys_by_device(self, user_id, device_id):
         def delete_e2e_keys_by_device_txn(txn):
@@ -259,8 +275,9 @@ class EndToEndKeyStore(SQLBaseStore):
                 keyvalues={"user_id": user_id, "device_id": device_id},
             )
             self._invalidate_cache_and_stream(
-                txn, self.count_e2e_one_time_keys, (user_id, device_id,)
+                txn, self.count_e2e_one_time_keys, (user_id, device_id)
             )
+
         return self.runInteraction(
             "delete_e2e_keys_by_device", delete_e2e_keys_by_device_txn
         )

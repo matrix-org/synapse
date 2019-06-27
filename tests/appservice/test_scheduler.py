@@ -30,7 +30,6 @@ from ..utils import MockClock
 
 
 class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
-
     def setUp(self):
         self.clock = MockClock()
         self.store = Mock()
@@ -38,8 +37,10 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.recoverer = Mock()
         self.recoverer_fn = Mock(return_value=self.recoverer)
         self.txnctrl = _TransactionController(
-            clock=self.clock, store=self.store, as_api=self.as_api,
-            recoverer_fn=self.recoverer_fn
+            clock=self.clock,
+            store=self.store,
+            as_api=self.as_api,
+            recoverer_fn=self.recoverer_fn,
         )
 
     def test_single_service_up_txn_sent(self):
@@ -54,9 +55,7 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
             return_value=defer.succeed(ApplicationServiceState.UP)
         )
         txn.send = Mock(return_value=defer.succeed(True))
-        self.store.create_appservice_txn = Mock(
-            return_value=defer.succeed(txn)
-        )
+        self.store.create_appservice_txn = Mock(return_value=defer.succeed(txn))
 
         # actual call
         self.txnctrl.send(service, events)
@@ -77,9 +76,7 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.store.get_appservice_state = Mock(
             return_value=defer.succeed(ApplicationServiceState.DOWN)
         )
-        self.store.create_appservice_txn = Mock(
-            return_value=defer.succeed(txn)
-        )
+        self.store.create_appservice_txn = Mock(return_value=defer.succeed(txn))
 
         # actual call
         self.txnctrl.send(service, events)
@@ -104,9 +101,7 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         )
         self.store.set_appservice_state = Mock(return_value=defer.succeed(True))
         txn.send = Mock(return_value=defer.succeed(False))  # fails to send
-        self.store.create_appservice_txn = Mock(
-            return_value=defer.succeed(txn)
-        )
+        self.store.create_appservice_txn = Mock(return_value=defer.succeed(txn))
 
         # actual call
         self.txnctrl.send(service, events)
@@ -124,7 +119,6 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
 
 
 class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
-
     def setUp(self):
         self.clock = MockClock()
         self.as_api = Mock()
@@ -146,6 +140,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
 
         def take_txn(*args, **kwargs):
             return defer.succeed(txns.pop(0))
+
         self.store.get_oldest_unsent_txn = Mock(side_effect=take_txn)
 
         self.recoverer.recover()
@@ -171,6 +166,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
                 return defer.succeed(txns.pop(0))
             else:
                 return defer.succeed(txn)
+
         self.store.get_oldest_unsent_txn = Mock(side_effect=take_txn)
 
         self.recoverer.recover()
@@ -197,7 +193,6 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
 
 
 class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
-
     def setUp(self):
         self.txn_ctrl = Mock()
         self.queuer = _ServiceQueuer(self.txn_ctrl, MockClock())
@@ -211,9 +206,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
 
     def test_send_single_event_with_queue(self):
         d = defer.Deferred()
-        self.txn_ctrl.send = Mock(
-            side_effect=lambda x, y: make_deferred_yieldable(d),
-        )
+        self.txn_ctrl.send = Mock(side_effect=lambda x, y: make_deferred_yieldable(d))
         service = Mock(id=4)
         event = Mock(event_id="first")
         event2 = Mock(event_id="second")
@@ -247,6 +240,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
 
         def do_send(x, y):
             return make_deferred_yieldable(send_return_list.pop(0))
+
         self.txn_ctrl.send = Mock(side_effect=do_send)
 
         # send events for different ASes and make sure they are sent

@@ -14,12 +14,12 @@
 # limitations under the License.
 
 from synapse.api.errors import SynapseError
-from synapse.server import HomeServer
-from synapse.types import GroupID, RoomAlias, UserID
+from synapse.types import GroupID, RoomAlias, UserID, map_username_to_mxid_localpart
 
 from tests import unittest
+from tests.utils import TestHomeServer
 
-mock_homeserver = HomeServer(hostname="my.domain")
+mock_homeserver = TestHomeServer(hostname="my.domain")
 
 
 class UserIDTestCase(unittest.TestCase):
@@ -69,10 +69,7 @@ class GroupIDTestCase(unittest.TestCase):
         self.assertEqual("my.domain", group_id.domain)
 
     def test_validate(self):
-        bad_ids = [
-            "$badsigil:domain",
-            "+:empty",
-        ] + [
+        bad_ids = ["$badsigil:domain", "+:empty"] + [
             "+group" + c + ":domain" for c in "A%?æ£"
         ]
         for id_string in bad_ids:
@@ -82,3 +79,30 @@ class GroupIDTestCase(unittest.TestCase):
             except SynapseError as exc:
                 self.assertEqual(400, exc.code)
                 self.assertEqual("M_UNKNOWN", exc.errcode)
+
+
+class MapUsernameTestCase(unittest.TestCase):
+    def testPassThrough(self):
+        self.assertEqual(map_username_to_mxid_localpart("test1234"), "test1234")
+
+    def testUpperCase(self):
+        self.assertEqual(map_username_to_mxid_localpart("tEST_1234"), "test_1234")
+        self.assertEqual(
+            map_username_to_mxid_localpart("tEST_1234", case_sensitive=True),
+            "t_e_s_t__1234",
+        )
+
+    def testSymbols(self):
+        self.assertEqual(
+            map_username_to_mxid_localpart("test=$?_1234"), "test=3d=24=3f_1234"
+        )
+
+    def testLeadingUnderscore(self):
+        self.assertEqual(map_username_to_mxid_localpart("_test_1234"), "=5ftest_1234")
+
+    def testNonAscii(self):
+        # this should work with either a unicode or a bytes
+        self.assertEqual(map_username_to_mxid_localpart("têst"), "t=c3=aast")
+        self.assertEqual(
+            map_username_to_mxid_localpart("têst".encode("utf-8")), "t=c3=aast"
+        )

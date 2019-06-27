@@ -12,43 +12,38 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 
 from ._base import Config
 
 
 class DatabaseConfig(Config):
-
-    def read_config(self, config):
-        self.event_cache_size = self.parse_size(
-            config.get("event_cache_size", "10K")
-        )
+    def read_config(self, config, **kwargs):
+        self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
 
         self.database_config = config.get("database")
 
         if self.database_config is None:
-            self.database_config = {
-                "name": "sqlite3",
-                "args": {},
-            }
+            self.database_config = {"name": "sqlite3", "args": {}}
 
         name = self.database_config.get("name", None)
         if name == "psycopg2":
             pass
         elif name == "sqlite3":
-            self.database_config.setdefault("args", {}).update({
-                "cp_min": 1,
-                "cp_max": 1,
-                "check_same_thread": False,
-            })
+            self.database_config.setdefault("args", {}).update(
+                {"cp_min": 1, "cp_max": 1, "check_same_thread": False}
+            )
         else:
             raise RuntimeError("Unsupported database type '%s'" % (name,))
 
         self.set_databasepath(config.get("database_path"))
 
-    def default_config(self, **kwargs):
-        database_path = self.abspath("homeserver.db")
-        return """\
-        # Database configuration
+    def generate_config_section(self, data_dir_path, **kwargs):
+        database_path = os.path.join(data_dir_path, "homeserver.db")
+        return (
+            """\
+        ## Database ##
+
         database:
           # The database engine name
           name: "sqlite3"
@@ -58,8 +53,11 @@ class DatabaseConfig(Config):
             database: "%(database_path)s"
 
         # Number of events to cache in memory.
-        event_cache_size: "10K"
-        """ % locals()
+        #
+        #event_cache_size: 10K
+        """
+            % locals()
+        )
 
     def read_arguments(self, args):
         self.set_databasepath(args.database_path)
@@ -74,6 +72,8 @@ class DatabaseConfig(Config):
     def add_arguments(self, parser):
         db_group = parser.add_argument_group("database")
         db_group.add_argument(
-            "-d", "--database-path", metavar="SQLITE_DATABASE_PATH",
-            help="The path to a sqlite database to use."
+            "-d",
+            "--database-path",
+            metavar="SQLITE_DATABASE_PATH",
+            help="The path to a sqlite database to use.",
         )

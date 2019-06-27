@@ -16,120 +16,131 @@
 import json
 import time
 
-# twisted imports
-from twisted.internet import defer
+import attr
 
 from synapse.api.constants import Membership
 
-# trial imports
-from tests import unittest
+from tests.server import make_request, render
 
 
-class RestTestCase(unittest.TestCase):
+@attr.s
+class RestHelper(object):
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
-
-    This subclass assumes there are mock_resource and auth_user_id attributes.
     """
 
-    def __init__(self, *args, **kwargs):
-        super(RestTestCase, self).__init__(*args, **kwargs)
-        self.mock_resource = None
-        self.auth_user_id = None
+    hs = attr.ib()
+    resource = attr.ib()
+    auth_user_id = attr.ib()
 
-    @defer.inlineCallbacks
     def create_room_as(self, room_creator, is_public=True, tok=None):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
-        path = "/createRoom"
-        content = "{}"
+        path = "/_matrix/client/r0/createRoom"
+        content = {}
         if not is_public:
-            content = '{"visibility":"private"}'
+            content["visibility"] = "private"
         if tok:
             path = path + "?access_token=%s" % tok
-        (code, response) = yield self.mock_resource.trigger("POST", path, content)
-        self.assertEquals(200, code, msg=str(response))
+
+        request, channel = make_request(
+            self.hs.get_reactor(), "POST", path, json.dumps(content).encode("utf8")
+        )
+        render(request, self.resource, self.hs.get_reactor())
+
+        assert channel.result["code"] == b"200", channel.result
         self.auth_user_id = temp_id
-        defer.returnValue(response["room_id"])
+        return channel.json_body["room_id"]
 
-    @defer.inlineCallbacks
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
-        yield self.change_membership(room=room, src=src, targ=targ, tok=tok,
-                                     membership=Membership.INVITE,
-                                     expect_code=expect_code)
+        self.change_membership(
+            room=room,
+            src=src,
+            targ=targ,
+            tok=tok,
+            membership=Membership.INVITE,
+            expect_code=expect_code,
+        )
 
-    @defer.inlineCallbacks
     def join(self, room=None, user=None, expect_code=200, tok=None):
-        yield self.change_membership(room=room, src=user, targ=user, tok=tok,
-                                     membership=Membership.JOIN,
-                                     expect_code=expect_code)
+        self.change_membership(
+            room=room,
+            src=user,
+            targ=user,
+            tok=tok,
+            membership=Membership.JOIN,
+            expect_code=expect_code,
+        )
 
-    @defer.inlineCallbacks
     def leave(self, room=None, user=None, expect_code=200, tok=None):
-        yield self.change_membership(room=room, src=user, targ=user, tok=tok,
-                                     membership=Membership.LEAVE,
-                                     expect_code=expect_code)
+        self.change_membership(
+            room=room,
+            src=user,
+            targ=user,
+            tok=tok,
+            membership=Membership.LEAVE,
+            expect_code=expect_code,
+        )
 
-    @defer.inlineCallbacks
-    def change_membership(self, room, src, targ, membership, tok=None,
-                          expect_code=200):
+    def change_membership(self, room, src, targ, membership, tok=None, expect_code=200):
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
-        path = "/rooms/%s/state/m.room.member/%s" % (room, targ)
+        path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (room, targ)
         if tok:
             path = path + "?access_token=%s" % tok
 
-        data = {
-            "membership": membership
-        }
+        data = {"membership": membership}
 
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT", path, json.dumps(data)
+        request, channel = make_request(
+            self.hs.get_reactor(), "PUT", path, json.dumps(data).encode("utf8")
         )
-        self.assertEquals(
-            expect_code, code,
-            msg="Expected: %d, got: %d, resp: %r" % (expect_code, code, response)
+
+        render(request, self.resource, self.hs.get_reactor())
+
+        assert int(channel.result["code"]) == expect_code, (
+            "Expected: %d, got: %d, resp: %r"
+            % (expect_code, int(channel.result["code"]), channel.result["body"])
         )
 
         self.auth_user_id = temp_id
 
-    @defer.inlineCallbacks
-    def register(self, user_id):
-        (code, response) = yield self.mock_resource.trigger(
-            "POST",
-            "/register",
-            json.dumps({
-                "user": user_id,
-                "password": "test",
-                "type": "m.login.password"
-            }))
-        self.assertEquals(200, code)
-        defer.returnValue(response)
-
-    @defer.inlineCallbacks
-    def send(self, room_id, body=None, txn_id=None, tok=None,
-             expect_code=200):
+    def send(self, room_id, body=None, txn_id=None, tok=None, expect_code=200):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
         if body is None:
             body = "body_text_here"
 
-        path = "/rooms/%s/send/m.room.message/%s" % (room_id, txn_id)
-        content = '{"msgtype":"m.text","body":"%s"}' % body
+        path = "/_matrix/client/r0/rooms/%s/send/m.room.message/%s" % (room_id, txn_id)
+        content = {"msgtype": "m.text", "body": body}
         if tok:
             path = path + "?access_token=%s" % tok
 
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(expect_code, code, msg=str(response))
+        request, channel = make_request(
+            self.hs.get_reactor(), "PUT", path, json.dumps(content).encode("utf8")
+        )
+        render(request, self.resource, self.hs.get_reactor())
 
-    def assert_dict(self, required, actual):
-        """Does a partial assert of a dict.
+        assert int(channel.result["code"]) == expect_code, (
+            "Expected: %d, got: %d, resp: %r"
+            % (expect_code, int(channel.result["code"]), channel.result["body"])
+        )
 
-        Args:
-            required (dict): The keys and value which MUST be in 'actual'.
-            actual (dict): The test result. Extra keys will not be checked.
-        """
-        for key in required:
-            self.assertEquals(required[key], actual[key],
-                              msg="%s mismatch. %s" % (key, actual))
+        return channel.json_body
+
+    def send_state(self, room_id, event_type, body, tok, expect_code=200):
+        path = "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, event_type)
+        if tok:
+            path = path + "?access_token=%s" % tok
+
+        request, channel = make_request(
+            self.hs.get_reactor(), "PUT", path, json.dumps(body).encode("utf8")
+        )
+        render(request, self.resource, self.hs.get_reactor())
+
+        assert int(channel.result["code"]) == expect_code, (
+            "Expected: %d, got: %d, resp: %r"
+            % (expect_code, int(channel.result["code"]), channel.result["body"])
+        )
+
+        return channel.json_body

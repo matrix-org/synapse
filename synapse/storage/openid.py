@@ -10,7 +10,7 @@ class OpenIdStore(SQLBaseStore):
                 "ts_valid_until_ms": ts_valid_until_ms,
                 "user_id": user_id,
             },
-            desc="insert_open_id_token"
+            desc="insert_open_id_token",
         )
 
     def get_user_id_for_open_id_token(self, token, ts_now_ms):
@@ -27,6 +27,5 @@ class OpenIdStore(SQLBaseStore):
                 return None
             else:
                 return rows[0][0]
-        return self.runInteraction(
-            "get_user_id_for_token", get_user_id_for_token_txn
-        )
+
+        return self.runInteraction("get_user_id_for_token", get_user_id_for_token_txn)

@@ -17,10 +17,10 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,10 @@ logger = logging.getLogger(__name__)
 class AccountDataServlet(RestServlet):
     """
     PUT /user/{user_id}/account_data/{account_dataType} HTTP/1.1
+    GET /user/{user_id}/account_data/{account_dataType} HTTP/1.1
     """
-    PATTERNS = client_v2_patterns(
+
+    PATTERNS = client_patterns(
         "/user/(?P<user_id>[^/]*)/account_data/(?P<account_data_type>[^/]*)"
     )
 
@@ -51,18 +53,33 @@ class AccountDataServlet(RestServlet):
             user_id, account_data_type, body
         )
 
-        self.notifier.on_new_event(
-            "account_data_key", max_id, users=[user_id]
-        )
+        self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
         defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, user_id, account_data_type):
+        requester = yield self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
+            raise AuthError(403, "Cannot get account data for other users.")
+
+        event = yield self.store.get_global_account_data_by_type_for_user(
+            account_data_type, user_id
+        )
+
+        if event is None:
+            raise NotFoundError("Account data not found")
+
+        defer.returnValue((200, event))
 
 
 class RoomAccountDataServlet(RestServlet):
     """
     PUT /user/{user_id}/rooms/{room_id}/account_data/{account_dataType} HTTP/1.1
+    GET /user/{user_id}/rooms/{room_id}/account_data/{account_dataType} HTTP/1.1
     """
-    PATTERNS = client_v2_patterns(
+
+    PATTERNS = client_patterns(
         "/user/(?P<user_id>[^/]*)"
         "/rooms/(?P<room_id>[^/]*)"
         "/account_data/(?P<account_data_type>[^/]*)"
@@ -86,18 +103,31 @@ class RoomAccountDataServlet(RestServlet):
             raise SynapseError(
                 405,
                 "Cannot set m.fully_read through this API."
-                " Use /rooms/!roomId:server.name/read_markers"
+                " Use /rooms/!roomId:server.name/read_markers",
             )
 
         max_id = yield self.store.add_account_data_to_room(
             user_id, room_id, account_data_type, body
         )
 
-        self.notifier.on_new_event(
-            "account_data_key", max_id, users=[user_id]
-        )
+        self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
         defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, user_id, room_id, account_data_type):
+        requester = yield self.auth.get_user_by_req(request)
+        if user_id != requester.user.to_string():
+            raise AuthError(403, "Cannot get account data for other users.")
+
+        event = yield self.store.get_account_data_for_room_and_type(
+            user_id, room_id, account_data_type
+        )
+
+        if event is None:
+            raise NotFoundError("Room account data not found")
+
+        defer.returnValue((200, event))
 
 
 def register_servlets(hs, http_server):

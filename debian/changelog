@@ -1,0 +1,748 @@
+matrix-synapse-py3 (1.0.0) stable; urgency=medium
+
+  * New synapse release 1.0.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 11 Jun 2019 17:09:53 +0100
+
+matrix-synapse-py3 (0.99.5.2) stable; urgency=medium
+
+  * New synapse release 0.99.5.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 30 May 2019 16:28:07 +0100
+
+matrix-synapse-py3 (0.99.5.1) stable; urgency=medium
+
+  * New synapse release 0.99.5.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 22 May 2019 16:22:24 +0000
+
+matrix-synapse-py3 (0.99.4) stable; urgency=medium
+
+  [ Christoph Müller ]
+  * Configure the systemd units to have a log identifier of `matrix-synapse`
+
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.4.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 15 May 2019 13:58:08 +0100
+
+matrix-synapse-py3 (0.99.3.2) stable; urgency=medium
+
+  * New synapse release 0.99.3.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 18:56:20 +0100
+
+matrix-synapse-py3 (0.99.3.1) stable; urgency=medium
+
+  * New synapse release 0.99.3.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 16:02:43 +0100
+
+matrix-synapse-py3 (0.99.3) stable; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Fix warning during preconfiguration. (Fixes: #4819)
+
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.3.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 01 Apr 2019 12:48:21 +0000
+
+matrix-synapse-py3 (0.99.2) stable; urgency=medium
+
+  * Fix overwriting of config settings on upgrade.
+  * New synapse release 0.99.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 01 Mar 2019 10:55:08 +0000
+
+matrix-synapse-py3 (0.99.1.1) stable; urgency=medium
+
+  * New synapse release 0.99.1.1
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 14 Feb 2019 17:19:44 +0000
+
+matrix-synapse-py3 (0.99.1) stable; urgency=medium
+
+  [ Damjan Georgievski ]
+  * Added ExecReload= in service unit file to send a HUP signal
+
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.1
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 14 Feb 2019 14:12:26 +0000
+
+matrix-synapse-py3 (0.99.0) stable; urgency=medium
+
+  * New synapse release 0.99.0
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 5 Feb 2019 18:25:00 +0000
+
+matrix-synapse-py3 (0.34.1.1++1) stable; urgency=medium
+
+  * Update conflicts specifications to allow smoother transition from matrix-synapse.
+
+ -- Synapse Packaging team <packages@matrix.org>  Sat, 12 Jan 2019 12:58:35 +0000
+
+matrix-synapse-py3 (0.34.1.1) stable; urgency=high
+
+  * New synapse release 0.34.1.1
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 10 Jan 2019 15:04:52 +0000
+
+matrix-synapse-py3 (0.34.1+1) stable; urgency=medium
+
+  * Remove 'Breaks: matrix-synapse-ldap3'. (matrix-synapse-py3 includes
+    the matrix-synapse-ldap3 python files, which makes the
+    matrix-synapse-ldap3 debian package redundant but not broken.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Jan 2019 15:30:00 +0000
+
+matrix-synapse-py3 (0.34.1) stable; urgency=medium
+
+  * New synapse release 0.34.1.
+  * Update Conflicts specifications to allow installation alongside our
+    matrix-synapse transitional package.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Jan 2019 14:52:24 +0000
+
+matrix-synapse-py3 (0.34.0) stable; urgency=medium
+
+  * New synapse release 0.34.0.
+  * Synapse is now installed into a Python 3 virtual environment with
+    up-to-date dependencies.
+  * The matrix-synapse service will now be restarted when the package is
+    upgraded.
+    (Fixes https://github.com/matrix-org/package-synapse-debian/issues/18)
+
+ -- Synapse packaging team <packages@matrix.org>  Wed, 19 Dec 2018 14:00:00 +0000
+
+matrix-synapse (0.33.9-1matrix1) stretch; urgency=medium
+
+  [ Erik Johnston ]
+  * Remove dependency on python-pydenticon
+
+  [ Richard van der Hoff ]
+  * New upstream version 0.33.9
+  * Refresh patches for 0.33.9
+
+ -- Richard van der Hoff <richard@matrix.org>  Tue, 20 Nov 2018 10:26:05 +0000
+
+matrix-synapse (0.33.8-1) stretch; urgency=medium
+
+  * New upstream version 0.33.8
+
+ -- Erik Johnston <erik@matrix.org>  Thu, 01 Nov 2018 14:33:26 +0000
+
+matrix-synapse (0.33.7-1matrix1) stretch; urgency=medium
+
+  * New upstream version 0.33.7
+
+ -- Richard van der Hoff <richard@matrix.org>  Thu, 18 Oct 2018 16:18:26 +0100
+
+matrix-synapse (0.33.6-1matrix1) stretch; urgency=medium
+
+  * Imported Upstream version 0.33.6
+  * Remove redundant explicit dep on python-bcrypt
+  * Run the tests during build
+  * Add dependency on python-attr 16.0
+  * Refresh patches for 0.33.6
+
+ -- Richard van der Hoff <richard@matrix.org>  Thu, 04 Oct 2018 14:40:29 +0100
+
+matrix-synapse (0.33.5.1-1matrix1) stretch; urgency=medium
+
+  * Imported Upstream version 0.33.5.1
+
+ -- Richard van der Hoff <richard@matrix.org>  Mon, 24 Sep 2018 18:20:51 +0100
+
+matrix-synapse (0.33.5-1matrix1) stretch; urgency=medium
+
+  * Imported Upstream version 0.33.5
+
+ -- Richard van der Hoff <richard@matrix.org>  Mon, 24 Sep 2018 16:06:23 +0100
+
+matrix-synapse (0.33.4-1mx1) stretch; urgency=medium
+
+  * Imported Upstream version 0.33.4
+  * Avoid telling people to install packages with pip
+    (fixes https://github.com/matrix-org/synapse/issues/3743)
+
+ -- Richard van der Hoff <richard@matrix.org>  Fri, 07 Sep 2018 14:06:17 +0100
+
+matrix-synapse (0.33.3.1-1mx1) stretch; urgency=critical
+
+  [ Richard van der Hoff ]
+  * Imported Upstream version 0.33.3.1
+
+ -- Richard van der Hoff <richard@matrix.org>  Thu, 06 Sep 2018 11:20:37 +0100
+
+matrix-synapse (0.33.3-2) stretch; urgency=medium
+
+  * We now require python-twisted 17.1.0 or later
+  * Add recommendations for python-psycopg2 and python-lxml
+
+ -- Richard van der Hoff <richard@matrix.org>  Thu, 23 Aug 2018 19:04:08 +0100
+
+matrix-synapse (0.33.3-1) jessie; urgency=medium
+
+  * New upstream version 0.33.3
+
+ -- Richard van der Hoff <richard@matrix.org>  Wed, 22 Aug 2018 14:50:30 +0100
+
+matrix-synapse (0.33.2-1) jessie; urgency=medium
+
+  * New upstream version 0.33.2
+
+ -- Richard van der Hoff <richard@matrix.org>  Thu, 09 Aug 2018 15:40:42 +0100
+
+matrix-synapse (0.33.1-1) jessie; urgency=medium
+
+  * New upstream version 0.33.1
+
+ -- Erik Johnston <erik@matrix.org>  Thu, 02 Aug 2018 15:52:19 +0100
+
+matrix-synapse (0.33.0-1) jessie; urgency=medium
+
+  * New upstream version 0.33.0
+
+ -- Richard van der Hoff <richard@matrix.org>  Thu, 19 Jul 2018 13:38:41 +0100
+
+matrix-synapse (0.32.1-1) jessie; urgency=medium
+
+  * New upstream version 0.32.1
+
+ -- Richard van der Hoff <richard@matrix.org>  Fri, 06 Jul 2018 17:16:29 +0100
+
+matrix-synapse (0.32.0-1) jessie; urgency=medium
+
+  * New upstream version 0.32.0
+
+ -- Erik Johnston <erik@matrix.org>  Fri, 06 Jul 2018 15:34:06 +0100
+
+matrix-synapse (0.31.2-1) jessie; urgency=high
+
+  * New upstream version 0.31.2
+
+ -- Richard van der Hoff <richard@matrix.org>  Thu, 14 Jun 2018 16:49:07 +0100
+
+matrix-synapse (0.31.1-1) jessie; urgency=medium
+
+  * New upstream version 0.31.1
+  * Require python-prometheus-client >= 0.0.14
+
+ -- Richard van der Hoff <richard@matrix.org>  Fri, 08 Jun 2018 16:11:55 +0100
+
+matrix-synapse (0.31.0-1) jessie; urgency=medium
+
+  * New upstream version 0.31.0
+
+ -- Richard van der Hoff <richard@matrix.org>  Wed, 06 Jun 2018 17:23:10 +0100
+
+matrix-synapse (0.30.0-1) jessie; urgency=medium
+
+  [ Michael Kaye ]
+  * update homeserver.yaml to be somewhat more modern.
+
+  [ Erik Johnston ]
+  * New upstream version 0.30.0
+
+ -- Erik Johnston <erik@matrix.org>  Thu, 24 May 2018 16:43:16 +0100
+
+matrix-synapse (0.29.0-1) jessie; urgency=medium
+
+  * New upstream version 0.29.0
+
+ -- Erik Johnston <erik@matrix.org>  Wed, 16 May 2018 17:43:06 +0100
+
+matrix-synapse (0.28.1-1) jessie; urgency=medium
+
+  * New upstream version 0.28.1
+
+ -- Erik Johnston <erik@matrix.org>  Tue, 01 May 2018 19:21:39 +0100
+
+matrix-synapse (0.28.0-1) jessie; urgency=medium
+
+  * New upstream 0.28.0
+
+ -- Erik Johnston <erik@matrix.org>  Fri, 27 Apr 2018 13:15:49 +0100
+
+matrix-synapse (0.27.4-1) jessie; urgency=medium
+
+  * Bump canonicaljson version
+  * New upstream 0.27.4
+
+ -- Erik Johnston <erik@matrix.org>  Fri, 13 Apr 2018 13:37:47 +0100
+
+matrix-synapse (0.27.3-1) jessie; urgency=medium
+
+  * Report stats should default to off
+  * Refresh patches
+  * New upstream 0.27.3
+
+ -- Erik Johnston <erik@matrix.org>  Wed, 11 Apr 2018 11:43:47 +0100
+
+matrix-synapse (0.27.2-1) jessie; urgency=medium
+
+  * New upstream version 0.27.2
+
+ -- Erik Johnston <erik@matrix.org>  Mon, 26 Mar 2018 16:41:57 +0100
+
+matrix-synapse (0.27.1-1) jessie; urgency=medium
+
+  * New upstream version 0.27.1
+
+ -- Erik Johnston <erik@matrix.org>  Mon, 26 Mar 2018 16:22:03 +0100
+
+matrix-synapse (0.27.0-2) jessie; urgency=medium
+
+  * Fix bcrypt dependency
+
+ -- Erik Johnston <erik@matrix.org>  Mon, 26 Mar 2018 16:00:26 +0100
+
+matrix-synapse (0.27.0-1) jessie; urgency=medium
+
+  * New upstream version 0.27.0
+
+ -- Erik Johnston <erik@matrix.org>  Mon, 26 Mar 2018 15:07:52 +0100
+
+matrix-synapse (0.26.1-1) jessie; urgency=medium
+
+  * Ignore RC
+  * New upstream version 0.26.1
+
+ -- Erik Johnston <erik@matrix.org>  Fri, 16 Mar 2018 00:40:08 +0000
+
+matrix-synapse (0.26.0-1) jessie; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Remove `level` for `file` log handler
+
+  [ Erik Johnston ]
+
+ -- Erik Johnston <erik@matrix.org>  Fri, 05 Jan 2018 11:21:26 +0000
+
+matrix-synapse (0.25.1-1) jessie; urgency=medium
+
+  * New upstream version 0.25.1
+
+ -- Erik Johnston <erik@matrix.org>  Mon, 20 Nov 2017 10:05:37 +0000
+
+matrix-synapse (0.25.0-1) jessie; urgency=medium
+
+  * New upstream version 0.25.0
+
+ -- Erik Johnston <erik@matrix.org>  Wed, 15 Nov 2017 11:36:32 +0000
+
+matrix-synapse (0.24.1-1) jessie; urgency=medium
+
+  * New upstream version 0.24.1
+
+ -- Erik Johnston <erik@matrix.org>  Tue, 24 Oct 2017 15:05:03 +0100
+
+matrix-synapse (0.24.0-1) jessie; urgency=medium
+
+  * New upstream version 0.24.0
+
+ -- Erik Johnston <erik@matrix.org>  Mon, 23 Oct 2017 14:11:46 +0100
+
+matrix-synapse (0.23.1-1) xenial; urgency=medium
+
+  * Imported upstream version 0.23.1
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 05 Oct 2017 15:28:25 +0100
+
+matrix-synapse (0.23.0-1) jessie; urgency=medium
+
+  * Fix patch after refactor
+  * Add patch to remove requirement on affinity package
+  * refresh webclient patch
+
+ -- Erik Johnston <erikj@matrix.org>  Mon, 02 Oct 2017 15:34:57 +0100
+
+matrix-synapse (0.22.1-1) jessie; urgency=medium
+
+  * Imported Upstream version 0.22.1
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 06 Jul 2017 18:14:13 +0100
+
+matrix-synapse (0.22.0-1) jessie; urgency=medium
+
+  * Imported upstream version 0.22.0
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 06 Jul 2017 10:47:45 +0100
+
+matrix-synapse (0.21.1-1) jessie; urgency=medium
+
+  * Imported upstream version 0.21.1
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 15 Jun 2017 13:31:13 +0100
+
+matrix-synapse (0.21.0-1) jessie; urgency=medium
+
+  * Imported upstream version 0.21.0
+  * Update patches
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 18 May 2017 14:16:54 +0100
+
+matrix-synapse (0.20.0-2) jessie; urgency=medium
+
+  * Depend on python-jsonschema
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 12 Apr 2017 10:41:46 +0100
+
+matrix-synapse (0.20.0-1) jessie; urgency=medium
+
+  * Imported upstream version 0.20.0
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 11 Apr 2017 12:58:26 +0100
+
+matrix-synapse (0.19.3-1) jessie; urgency=medium
+
+  * Imported upstream version 0.19.3
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 21 Mar 2017 13:45:41 +0000
+
+matrix-synapse (0.19.2-1) jessie; urgency=medium
+
+  [ Sunil Mohan Adapa ]
+  * Bump standards version to 3.9.8
+  * Add debian/copyright file
+  * Don't ignore errors in debian/config
+  * Reformat depenedencies in debian/control
+  * Internationalize strings in template file
+  * Update package description
+  * Add lsb-base as dependency
+  * Update questions for debconf style
+  * Add man pages for all binaries
+
+  [ Erik Johnston ]
+  * Imported upstream version 0.19.2
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 21 Feb 2017 13:55:00 +0000
+
+matrix-synapse (0.19.1-1) jessie; urgency=medium
+
+  * Imported upstream version 0.19.1
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 09 Feb 2017 11:53:27 +0000
+
+matrix-synapse (0.19.0-1) jessie; urgency=medium
+
+  This build requires python-twisted 0.19.0, which may need to be installed
+  from backports.
+
+  [ Bryce Chidester ]
+  * Add EnvironmentFile to the systemd service
+  * Create matrix-synapse.default
+
+  [ Erik Johnston ]
+  * Imported upstream version 0.19.0
+
+ -- Erik Johnston <erikj@matrix.org>  Sat, 04 Feb 2017 09:58:29 +0000
+
+matrix-synapse (0.18.7-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.18.4
+
+ -- Erik Johnston <erikj@matrix.org>  Mon, 09 Jan 2017 15:10:21 +0000
+
+matrix-synapse (0.18.5-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.18.5
+
+ -- Erik Johnston <erikj@matrix.org>  Fri, 16 Dec 2016 10:51:59 +0000
+
+matrix-synapse (0.18.4-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.18.4
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 22 Nov 2016 10:33:41 +0000
+
+matrix-synapse (0.18.3-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.18.3
+  * Remove upstreamed ldap3 patch
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 08 Nov 2016 15:01:49 +0000
+
+matrix-synapse (0.18.2-2) trusty; urgency=high
+
+  * Patch ldap3 support to workaround differences in python-ldap3 0.9,
+    bug allowed unauthorized logins if ldap3 0.9 was used.
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 08 Nov 2016 13:48:09 +0000
+
+matrix-synapse (0.18.2-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.18.2
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 01 Nov 2016 13:30:45 +0000
+
+matrix-synapse (0.18.1-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.18.1
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 05 Oct 2016 14:52:53 +0100
+
+matrix-synapse (0.18.0-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.18.0
+
+ -- Erik Johnston <erikj@matrix.org>  Mon, 19 Sep 2016 17:38:48 +0100
+
+matrix-synapse (0.17.3-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.17.3
+
+ -- Erik Johnston <erikj@matrix.org>  Fri, 09 Sep 2016 11:18:18 +0100
+
+matrix-synapse (0.17.2-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.17.2
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 08 Sep 2016 15:37:14 +0100
+
+matrix-synapse (0.17.1-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.17.1
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 24 Aug 2016 15:11:29 +0100
+
+matrix-synapse (0.17.0-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.17.0
+
+ -- Erik Johnston <erikj@matrix.org>  Mon, 08 Aug 2016 13:56:15 +0100
+
+matrix-synapse (0.16.1-r1-1) trusty; urgency=medium
+
+  * Imported Upstream version 0.16.1-r1
+
+ -- Erik Johnston <erikj@matrix.org>  Fri, 08 Jul 2016 16:47:35 +0100
+
+matrix-synapse (0.16.1-2) trusty; urgency=critical
+
+  * Apply security patch
+
+ -- Erik Johnston <erikj@matrix.org>  Fri, 08 Jul 2016 11:05:27 +0100
+
+matrix-synapse (0.16.1-1) trusty; urgency=medium
+
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 21 Jun 2016 14:56:48 +0100
+
+matrix-synapse (0.16.0-3) trusty; urgency=medium
+
+  * Don't require strict nacl==0.3.0 requirement
+
+ -- Erik Johnston <erikj@matrix.org>  Mon, 20 Jun 2016 13:24:22 +0100
+
+matrix-synapse (0.16.0-2) trusty; urgency=medium
+
+  * Also change the permissions of /etc/matrix-synapse
+  * Add apt webclient instructions
+  * Fix up patches
+  * Update default homeserver.yaml
+  * Add patch
+
+ -- Erik Johnston <erikj@matrix.org>  Fri, 10 Jun 2016 14:06:20 +0100
+
+matrix-synapse (0.16.0-1) trusty; urgency=medium
+
+  [ David A Roberts ]
+  * systemd
+
+  [ Erik Johnston ]
+  * Fixup postinst and matrix-synapse.service
+  * Handle email optional deps
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 09 Jun 2016 16:17:01 +0100
+
+matrix-synapse (0.14.0-1) trusty; urgency=medium
+
+  * Remove saml2 module requirements
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 30 Mar 2016 14:31:17 +0100
+
+matrix-synapse (0.13.3-1) trusty; urgency=medium
+
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 11 Feb 2016 16:35:39 +0000
+
+matrix-synapse (0.13.2-1) trusty; urgency=medium
+
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 11 Feb 2016 11:01:16 +0000
+
+matrix-synapse (0.13.0-1) trusty; urgency=medium
+
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 10 Feb 2016 16:34:39 +0000
+
+matrix-synapse (0.12.0-2) trusty; urgency=medium
+
+  * Don't default `registerion_shared_secret` config option
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 06 Jan 2016 16:34:02 +0000
+
+matrix-synapse (0.12.0-1) stable; urgency=medium
+
+  * Imported Upstream version 0.12.0
+
+ -- Mark Haines <mark@matrix.org>  Mon, 04 Jan 2016 15:38:33 +0000
+
+matrix-synapse (0.11.1-1) unstable; urgency=medium
+
+  * Imported Upstream version 0.11.1
+
+ -- Erik Johnston <erikj@matrix.org>  Fri, 20 Nov 2015 17:56:52 +0000
+
+matrix-synapse (0.11.0-r2-1) stable; urgency=medium
+
+  * Imported Upstream version 0.11.0-r2
+  * Add gbp.conf
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 19 Nov 2015 13:52:36 +0000
+
+matrix-synapse (0.11.0-1) wheezy; urgency=medium
+
+  * Fix dependencies.
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 17 Nov 2015 16:28:06 +0000
+
+matrix-synapse (0.11.0-0) wheezy; urgency=medium
+
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 17 Nov 2015 16:03:01 +0000
+
+matrix-synapse (0.10.0-2) wheezy; urgency=medium
+
+  * Rebuild for wheezy.
+
+ -- Erik Johnston <erikj@matrix.org>  Fri, 04 Sep 2015 14:21:03 +0100
+
+matrix-synapse (0.10.0-1) trusty; urgency=medium
+
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 03 Sep 2015 10:08:34 +0100
+
+matrix-synapse (0.10.0~rc6-3) trusty; urgency=medium
+
+  * Create log directory.
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 02 Sep 2015 17:49:07 +0100
+
+matrix-synapse (0.10.0~rc6-2) trusty; urgency=medium
+
+  * Add patch to work around upstream bug in config directory handling.
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 02 Sep 2015 17:42:42 +0100
+
+matrix-synapse (0.10.0~rc6-1) trusty; urgency=medium
+
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 02 Sep 2015 17:21:21 +0100
+
+matrix-synapse (0.10.0~rc5-3) trusty; urgency=medium
+
+  * Update init script to work.
+
+ -- Erik Johnston <erikj@matrix.org>  Fri, 28 Aug 2015 10:51:56 +0100
+
+matrix-synapse (0.10.0~rc5-2) trusty; urgency=medium
+
+  * Fix where python files are installed.
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 27 Aug 2015 11:55:39 +0100
+
+matrix-synapse (0.10.0~rc5-1) trusty; urgency=medium
+
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 27 Aug 2015 11:26:54 +0100
+
+matrix-synapse (0.10.0~rc4-1) trusty; urgency=medium
+
+  * New upstream version.
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 27 Aug 2015 10:29:31 +0100
+
+matrix-synapse (0.10.0~rc3-7) trusty; urgency=medium
+
+  * Add debian/watch
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 26 Aug 2015 17:57:08 +0100
+
+matrix-synapse (0.10.0~rc3-6) trusty; urgency=medium
+
+  * Deps.
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 26 Aug 2015 17:07:13 +0100
+
+matrix-synapse (0.10.0~rc3-5) trusty; urgency=medium
+
+  * Deps.
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 26 Aug 2015 16:18:02 +0100
+
+matrix-synapse (0.10.0~rc3-4) trusty; urgency=medium
+
+  * More deps.
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 26 Aug 2015 14:09:27 +0100
+
+matrix-synapse (0.10.0~rc3-3) trusty; urgency=medium
+
+  * Update deps.
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 26 Aug 2015 13:49:20 +0100
+
+matrix-synapse (0.10.0~rc3-2) trusty; urgency=medium
+
+  * Add more deps.
+
+ -- Erik Johnston <erikj@matrix.org>  Wed, 26 Aug 2015 13:25:45 +0100
+
+matrix-synapse (0.10.0~rc3-1) trusty; urgency=medium
+
+  * New upstream release
+
+ -- Erik Johnston <erikj@matrix.org>  Tue, 25 Aug 2015 17:52:33 +0100
+
+matrix-synapse (0.9.3-1~trusty1) trusty; urgency=medium
+
+  * Rebuild for trusty.
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 20 Aug 2015 15:05:43 +0100
+
+matrix-synapse (0.9.3-1) wheezy; urgency=medium
+
+  * New upstream release
+  * Create a user, "matrix-synapse", to run as
+  * Log to /var/log/matrix-synapse/ directory
+  * Override the way synapse looks for the angular SDK (syweb) so it finds the
+    packaged one
+
+ -- Paul "LeoNerd" Evans <paul@matrix.org>  Fri, 07 Aug 2015 15:32:12 +0100
+
+matrix-synapse (0.9.2-2) wheezy; urgency=medium
+
+  * Supply a default config file
+  * Create directory in /var/lib
+  * Use debconf to ask the user for the server name at installation time
+
+ -- Paul "LeoNerd" Evans <paul@matrix.org>  Thu, 06 Aug 2015 15:28:00 +0100
+
+matrix-synapse (0.9.2-1) wheezy; urgency=low
+
+  * source package automatically created by stdeb 0.8.2
+
+ -- Paul "LeoNerd" Evans <paul@matrix.org>  Fri, 12 Jun 2015 14:32:03 +0100

@@ -21,6 +21,7 @@ from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import SynapseError
 from synapse.http.server import respond_with_json, wrap_json_request_handler
+from synapse.http.servlet import parse_string
 
 logger = logging.getLogger(__name__)
 
@@ -54,48 +55,36 @@ class UploadResource(Resource):
         requester = yield self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
-        content_length = request.getHeader("Content-Length")
+        content_length = request.getHeader(b"Content-Length").decode("ascii")
         if content_length is None:
-            raise SynapseError(
-                msg="Request must specify a Content-Length", code=400
-            )
+            raise SynapseError(msg="Request must specify a Content-Length", code=400)
         if int(content_length) > self.max_upload_size:
-            raise SynapseError(
-                msg="Upload request body is too large",
-                code=413,
-            )
+            raise SynapseError(msg="Upload request body is too large", code=413)
 
-        upload_name = request.args.get("filename", None)
+        upload_name = parse_string(request, b"filename", encoding=None)
         if upload_name:
             try:
-                upload_name = upload_name[0].decode('UTF-8')
+                upload_name = upload_name.decode("utf8")
             except UnicodeDecodeError:
                 raise SynapseError(
-                    msg="Invalid UTF-8 filename parameter: %r" % (upload_name),
-                    code=400,
+                    msg="Invalid UTF-8 filename parameter: %r" % (upload_name), code=400
                 )
 
         headers = request.requestHeaders
 
-        if headers.hasHeader("Content-Type"):
-            media_type = headers.getRawHeaders(b"Content-Type")[0]
+        if headers.hasHeader(b"Content-Type"):
+            media_type = headers.getRawHeaders(b"Content-Type")[0].decode("ascii")
         else:
-            raise SynapseError(
-                msg="Upload request missing 'Content-Type'",
-                code=400,
-            )
+            raise SynapseError(msg="Upload request missing 'Content-Type'", code=400)
 
         # if headers.hasHeader(b"Content-Disposition"):
         #     disposition = headers.getRawHeaders(b"Content-Disposition")[0]
         # TODO(markjh): parse content-dispostion
 
         content_uri = yield self.media_repo.create_content(
-            media_type, upload_name, request.content,
-            content_length, requester.user
+            media_type, upload_name, request.content, content_length, requester.user
         )
 
         logger.info("Uploaded content with URI %r", content_uri)
 
-        respond_with_json(
-            request, 200, {"content_uri": content_uri}, send_cors=True
-        )
+        respond_with_json(request, 200, {"content_uri": content_uri}, send_cors=True)

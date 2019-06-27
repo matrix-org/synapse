@@ -40,9 +40,7 @@ class UserErasureWorkerStore(SQLBaseStore):
         ).addCallback(operator.truth)
 
     @cachedList(
-        cached_method_name="is_user_erased",
-        list_name="user_ids",
-        inlineCallbacks=True,
+        cached_method_name="is_user_erased", list_name="user_ids", inlineCallbacks=True
     )
     def are_users_erased(self, user_ids):
         """
@@ -61,16 +59,13 @@ class UserErasureWorkerStore(SQLBaseStore):
 
         def _get_erased_users(txn):
             txn.execute(
-                "SELECT user_id FROM erased_users WHERE user_id IN (%s)" % (
-                    ",".join("?" * len(user_ids))
-                ),
+                "SELECT user_id FROM erased_users WHERE user_id IN (%s)"
+                % (",".join("?" * len(user_ids))),
                 user_ids,
             )
             return set(r[0] for r in txn)
 
-        erased_users = yield self.runInteraction(
-            "are_users_erased", _get_erased_users,
-        )
+        erased_users = yield self.runInteraction("are_users_erased", _get_erased_users)
         res = dict((u, u in erased_users) for u in user_ids)
         defer.returnValue(res)
 
@@ -82,22 +77,16 @@ class UserErasureStore(UserErasureWorkerStore):
         Args:
             user_id (str): full user_id to be erased
         """
+
         def f(txn):
             # first check if they are already in the list
-            txn.execute(
-                "SELECT 1 FROM erased_users WHERE user_id = ?",
-                (user_id, )
-            )
+            txn.execute("SELECT 1 FROM erased_users WHERE user_id = ?", (user_id,))
             if txn.fetchone():
                 return
 
             # they are not already there: do the insert.
-            txn.execute(
-                "INSERT INTO erased_users (user_id) VALUES (?)",
-                (user_id, )
-            )
+            txn.execute("INSERT INTO erased_users (user_id) VALUES (?)", (user_id,))
 
-            self._invalidate_cache_and_stream(
-                txn, self.is_user_erased, (user_id,)
-            )
+            self._invalidate_cache_and_stream(txn, self.is_user_erased, (user_id,))
+
         return self.runInteraction("mark_user_erased", f)

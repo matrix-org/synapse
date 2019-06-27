@@ -19,30 +19,23 @@ a:hover   { color: #000; }
 a:active  { color: #000; }
 
 input {
-   width: 90%
-}
-
-textarea, input {
-   font-family: inherit;
-   font-size: inherit;
    margin: 5px;
 }
 
-.smallPrint {
-    color: #888;
-    font-size: 9pt ! important;
-    font-style: italic ! important;
+textbox, input[type="text"], input[type="password"] {
+   width: 90%;
 }
 
-.g-recaptcha div {
-    margin: auto;
+form {
+    text-align: center;
+    margin: 10px 0 0 0;
 }
 
 .login_flow {
+    width: 300px;
     text-align: left;
     padding: 10px;
     margin-bottom: 40px;
-    display: inline-block;
 
     -webkit-border-radius: 10px;
     -moz-border-radius: 10px;

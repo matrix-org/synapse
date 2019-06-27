@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import re
 from itertools import islice
 
 import attr
@@ -39,6 +40,7 @@ class Clock(object):
     Args:
         reactor: The Twisted reactor to use.
     """
+
     _reactor = attr.ib()
 
     @defer.inlineCallbacks
@@ -68,7 +70,8 @@ class Clock(object):
         """
         call = task.LoopingCall(f)
         call.clock = self._reactor
-        call.start(msec / 1000.0, now=False)
+        d = call.start(msec / 1000.0, now=False)
+        d.addErrback(log_failure, "Looping call died", consumeErrors=False)
         return call
 
     def call_later(self, delay, callback, *args, **kwargs):
@@ -80,6 +83,7 @@ class Clock(object):
             *args: Postional arguments to pass to function.
             **kwargs: Key arguments to pass to function.
         """
+
         def wrapped_callback(*args, **kwargs):
             with PreserveLoggingContext():
                 callback(*args, **kwargs)
@@ -109,3 +113,48 @@ def batch_iter(iterable, size):
     sourceiter = iter(iterable)
     # call islice until it returns an empty tuple
     return iter(lambda: tuple(islice(sourceiter, size)), ())
+
+
+def log_failure(failure, msg, consumeErrors=True):
+    """Creates a function suitable for passing to `Deferred.addErrback` that
+    logs any failures that occur.
+
+    Args:
+        msg (str): Message to log
+        consumeErrors (bool): If true consumes the failure, otherwise passes
+            on down the callback chain
+
+    Returns:
+        func(Failure)
+    """
+
+    logger.error(
+        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())
+    )
+
+    if not consumeErrors:
+        return failure
+
+
+def glob_to_regex(glob):
+    """Converts a glob to a compiled regex object.
+
+    The regex is anchored at the beginning and end of the string.
+
+    Args:
+        glob (str)
+
+    Returns:
+        re.RegexObject
+    """
+    res = ""
+    for c in glob:
+        if c == "*":
+            res = res + ".*"
+        elif c == "?":
+            res = res + "."
+        else:
+            res = res + re.escape(c)
+
+    # \A anchors at start of string, \Z at end of string
+    return re.compile(r"\A" + res + r"\Z", re.IGNORECASE)

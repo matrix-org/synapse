@@ -26,7 +26,6 @@ from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.crypto import context_factory
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
@@ -37,6 +36,10 @@ from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.replication.tcp.streams.events import (
+    EventsStream,
+    EventsStreamCurrentStateRow,
+)
 from synapse.rest.client.v2_alpha import user_directory
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
@@ -63,30 +66,31 @@ class UserDirectorySlaveStore(
 
         events_max = self._stream_id_gen.get_current_token()
         curr_state_delta_prefill, min_curr_state_delta_id = self._get_cache_dict(
-            db_conn, "current_state_delta_stream",
+            db_conn,
+            "current_state_delta_stream",
             entity_column="room_id",
             stream_column="stream_id",
             max_value=events_max,  # As we share the stream id with events token
             limit=1000,
         )
         self._curr_state_delta_stream_cache = StreamChangeCache(
-            "_curr_state_delta_stream_cache", min_curr_state_delta_id,
+            "_curr_state_delta_stream_cache",
+            min_curr_state_delta_id,
             prefilled_cache=curr_state_delta_prefill,
         )
 
-        self._current_state_delta_pos = events_max
-
     def stream_positions(self):
         result = super(UserDirectorySlaveStore, self).stream_positions()
-        result["current_state_deltas"] = self._current_state_delta_pos
         return result
 
     def process_replication_rows(self, stream_name, token, rows):
-        if stream_name == "current_state_deltas":
-            self._current_state_delta_pos = token
+        if stream_name == EventsStream.NAME:
+            self._stream_id_gen.advance(token)
             for row in rows:
+                if row.type != EventsStreamCurrentStateRow.TypeId:
+                    continue
                 self._curr_state_delta_stream_cache.entity_has_changed(
-                    row.room_id, token
+                    row.data.room_id, token
                 )
         return super(UserDirectorySlaveStore, self).process_replication_rows(
             stream_name, token, rows
@@ -94,10 +98,7 @@ class UserDirectorySlaveStore(
 
 
 class UserDirectoryServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = UserDirectorySlaveStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = UserDirectorySlaveStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
@@ -111,12 +112,14 @@ class UserDirectoryServer(HomeServer):
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
                     user_directory.register_servlets(self, resource)
-                    resources.update({
-                        "/_matrix/client/r0": resource,
-                        "/_matrix/client/unstable": resource,
-                        "/_matrix/client/v2_alpha": resource,
-                        "/_matrix/client/api/v1": resource,
-                    })
+                    resources.update(
+                        {
+                            "/_matrix/client/r0": resource,
+                            "/_matrix/client/unstable": resource,
+                            "/_matrix/client/v2_alpha": resource,
+                            "/_matrix/client/api/v1": resource,
+                        }
+                    )
 
         root_resource = create_resource_tree(resources, NoResource())
 
@@ -129,7 +132,7 @@ class UserDirectoryServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            )
+            ),
         )
 
         logger.info("Synapse user_dir now listening on port %d", port)
@@ -143,18 +146,19 @@ class UserDirectoryServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    )
+                        username="matrix", password="rabbithole", globals={"hs": self}
+                    ),
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(("Metrics listener configured, but "
-                                 "enable_metrics is not True!"))
+                    logger.warn(
+                        (
+                            "Metrics listener configured, but "
+                            "enable_metrics is not True!"
+                        )
+                    )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"],
-                                         listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -169,11 +173,12 @@ class UserDirectoryReplicationHandler(ReplicationClientHandler):
         super(UserDirectoryReplicationHandler, self).__init__(hs.get_datastore())
         self.user_directory = hs.get_user_directory_handler()
 
+    @defer.inlineCallbacks
     def on_rdata(self, stream_name, token, rows):
-        super(UserDirectoryReplicationHandler, self).on_rdata(
+        yield super(UserDirectoryReplicationHandler, self).on_rdata(
             stream_name, token, rows
         )
-        if stream_name == "current_state_deltas":
+        if stream_name == EventsStream.NAME:
             run_in_background(self._notify_directory)
 
     @defer.inlineCallbacks
@@ -186,11 +191,9 @@ class UserDirectoryReplicationHandler(ReplicationClientHandler):
 
 def start(config_options):
     try:
-        config = HomeServerConfig.load_config(
-            "Synapse user directory", config_options
-        )
+        config = HomeServerConfig.load_config("Synapse user directory", config_options)
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.user_dir"
@@ -213,29 +216,20 @@ def start(config_options):
     # Force the pushers to start since they will be disabled in the main config
     config.update_user_directory = True
 
-    tls_server_context_factory = context_factory.ServerContextFactory(config)
-
-    ps = UserDirectoryServer(
+    ss = UserDirectoryServer(
         config.server_name,
         db_config=config.database_config,
-        tls_server_context_factory=tls_server_context_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
 
-    ps.setup()
-    ps.start_listening(config.worker_listeners)
-
-    def start():
-        ps.get_datastore().start_profiling()
-        ps.get_state_handler().start_caching()
-
-    reactor.callWhenRunning(start)
+    ss.setup()
+    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-user-dir", config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with LoggingContext("main"):
         start(sys.argv[1:])

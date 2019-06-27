@@ -17,44 +17,42 @@
 to ensure idempotency when performing PUTs using the REST API."""
 import logging
 
-from synapse.api.auth import get_access_token_from_request
-from synapse.util.async import ObservableDeferred
+from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
-
-
-def get_transaction_key(request):
-    """A helper function which returns a transaction key that can be used
-    with TransactionCache for idempotent requests.
-
-    Idempotency is based on the returned key being the same for separate
-    requests to the same endpoint. The key is formed from the HTTP request
-    path and the access_token for the requesting user.
-
-    Args:
-        request (twisted.web.http.Request): The incoming request. Must
-        contain an access_token.
-    Returns:
-        str: A transaction key
-    """
-    token = get_access_token_from_request(request)
-    return request.path + "/" + token
-
 
 CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
 
 
 class HttpTransactionCache(object):
-
-    def __init__(self, clock):
-        self.clock = clock
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = self.hs.get_auth()
+        self.clock = self.hs.get_clock()
         self.transactions = {
             # $txn_key: (ObservableDeferred<(res_code, res_json_body)>, timestamp)
         }
         # Try to clean entries every 30 mins. This means entries will exist
         # for at *LEAST* 30 mins, and at *MOST* 60 mins.
         self.cleaner = self.clock.looping_call(self._cleanup, CLEANUP_PERIOD_MS)
+
+    def _get_transaction_key(self, request):
+        """A helper function which returns a transaction key that can be used
+        with TransactionCache for idempotent requests.
+
+        Idempotency is based on the returned key being the same for separate
+        requests to the same endpoint. The key is formed from the HTTP request
+        path and the access_token for the requesting user.
+
+        Args:
+            request (twisted.web.http.Request): The incoming request. Must
+            contain an access_token.
+        Returns:
+            str: A transaction key
+        """
+        token = self.auth.get_access_token_from_request(request)
+        return request.path.decode("utf8") + "/" + token
 
     def fetch_or_execute_request(self, request, fn, *args, **kwargs):
         """A helper function for fetch_or_execute which extracts
@@ -64,7 +62,7 @@ class HttpTransactionCache(object):
             fetch_or_execute
         """
         return self.fetch_or_execute(
-            get_transaction_key(request), fn, *args, **kwargs
+            self._get_transaction_key(request), fn, *args, **kwargs
         )
 
     def fetch_or_execute(self, txn_key, fn, *args, **kwargs):

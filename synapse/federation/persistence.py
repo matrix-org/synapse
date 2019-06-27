@@ -36,7 +36,7 @@ class TransactionActions(object):
         self.store = datastore
 
     @log_function
-    def have_responded(self, transaction):
+    def have_responded(self, origin, transaction):
         """ Have we already responded to a transaction with the same id and
         origin?
 
@@ -46,29 +46,22 @@ class TransactionActions(object):
             response code and response body.
         """
         if not transaction.transaction_id:
-            raise RuntimeError("Cannot persist a transaction with no "
-                               "transaction_id")
+            raise RuntimeError("Cannot persist a transaction with no " "transaction_id")
 
-        return self.store.get_received_txn_response(
-            transaction.transaction_id, transaction.origin
-        )
+        return self.store.get_received_txn_response(transaction.transaction_id, origin)
 
     @log_function
-    def set_response(self, transaction, code, response):
+    def set_response(self, origin, transaction, code, response):
         """ Persist how we responded to a transaction.
 
         Returns:
             Deferred
         """
         if not transaction.transaction_id:
-            raise RuntimeError("Cannot persist a transaction with no "
-                               "transaction_id")
+            raise RuntimeError("Cannot persist a transaction with no " "transaction_id")
 
         return self.store.set_received_txn_response(
-            transaction.transaction_id,
-            transaction.origin,
-            code,
-            response,
+            transaction.transaction_id, origin, code, response
         )
 
     @defer.inlineCallbacks

@@ -84,9 +84,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
 
         def get_tag_content(txn, tag_ids):
             sql = (
-                "SELECT tag, content"
-                " FROM room_tags"
-                " WHERE user_id=? AND room_id=?"
+                "SELECT tag, content" " FROM room_tags" " WHERE user_id=? AND room_id=?"
             )
             results = []
             for stream_id, user_id, room_id in tag_ids:
@@ -105,7 +103,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             tags = yield self.runInteraction(
                 "get_all_updated_tag_content",
                 get_tag_content,
-                tag_ids[i:i + batch_size],
+                tag_ids[i : i + batch_size],
             )
             results.extend(tags)
 
@@ -123,6 +121,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             A deferred dict mapping from room_id strings to lists of tag
             strings for all the rooms that changed since the stream_id token.
         """
+
         def get_updated_tags_txn(txn):
             sql = (
                 "SELECT room_id from room_tags_revisions"
@@ -138,9 +137,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
         if not changed:
             defer.returnValue({})
 
-        room_ids = yield self.runInteraction(
-            "get_updated_tags", get_updated_tags_txn
-        )
+        room_ids = yield self.runInteraction("get_updated_tags", get_updated_tags_txn)
 
         results = {}
         if room_ids:
@@ -163,9 +160,9 @@ class TagsWorkerStore(AccountDataWorkerStore):
             keyvalues={"user_id": user_id, "room_id": room_id},
             retcols=("tag", "content"),
             desc="get_tags_for_room",
-        ).addCallback(lambda rows: {
-            row["tag"]: json.loads(row["content"]) for row in rows
-        })
+        ).addCallback(
+            lambda rows: {row["tag"]: json.loads(row["content"]) for row in rows}
+        )
 
 
 class TagsStore(TagsWorkerStore):
@@ -186,14 +183,8 @@ class TagsStore(TagsWorkerStore):
             self._simple_upsert_txn(
                 txn,
                 table="room_tags",
-                keyvalues={
-                    "user_id": user_id,
-                    "room_id": room_id,
-                    "tag": tag,
-                },
-                values={
-                    "content": content_json,
-                }
+                keyvalues={"user_id": user_id, "room_id": room_id, "tag": tag},
+                values={"content": content_json},
             )
             self._update_revision_txn(txn, user_id, room_id, next_id)
 
@@ -211,6 +202,7 @@ class TagsStore(TagsWorkerStore):
         Returns:
             A deferred that completes once the tag has been removed
         """
+
         def remove_tag_txn(txn, next_id):
             sql = (
                 "DELETE FROM room_tags "
@@ -238,8 +230,7 @@ class TagsStore(TagsWorkerStore):
         """
 
         txn.call_after(
-            self._account_data_stream_cache.entity_has_changed,
-            user_id, next_id
+            self._account_data_stream_cache.entity_has_changed, user_id, next_id
         )
 
         update_max_id_sql = (

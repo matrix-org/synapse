@@ -12,26 +12,36 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
 from collections import namedtuple
 
 from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
 
-MISSING_NETADDR = (
-    "Missing netaddr library. This is required for URL preview API."
-)
+DEFAULT_THUMBNAIL_SIZES = [
+    {"width": 32, "height": 32, "method": "crop"},
+    {"width": 96, "height": 96, "method": "crop"},
+    {"width": 320, "height": 240, "method": "scale"},
+    {"width": 640, "height": 480, "method": "scale"},
+    {"width": 800, "height": 600, "method": "scale"},
+]
 
-MISSING_LXML = (
-    """Missing lxml library. This is required for URL preview API.
+THUMBNAIL_SIZE_YAML = """\
+        #  - width: %(width)i
+        #    height: %(height)i
+        #    method: %(method)s
+"""
+
+MISSING_NETADDR = "Missing netaddr library. This is required for URL preview API."
+
+MISSING_LXML = """Missing lxml library. This is required for URL preview API.
 
     Install by running:
         pip install lxml
 
     Requires libxslt1-dev system package.
     """
-)
 
 
 ThumbnailRequirement = namedtuple(
@@ -39,7 +49,8 @@ ThumbnailRequirement = namedtuple(
 )
 
 MediaStorageProviderConfig = namedtuple(
-    "MediaStorageProviderConfig", (
+    "MediaStorageProviderConfig",
+    (
         "store_local",  # Whether to store newly uploaded local files
         "store_remote",  # Whether to store newly downloaded remote files
         "store_synchronous",  # Whether to wait for successful storage for local uploads
@@ -70,18 +81,19 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         requirements.setdefault("image/gif", []).append(png_thumbnail)
         requirements.setdefault("image/png", []).append(png_thumbnail)
     return {
-        media_type: tuple(thumbnails)
-        for media_type, thumbnails in requirements.items()
+        media_type: tuple(thumbnails) for media_type, thumbnails in requirements.items()
     }
 
 
 class ContentRepositoryConfig(Config):
-    def read_config(self, config):
-        self.max_upload_size = self.parse_size(config["max_upload_size"])
-        self.max_image_pixels = self.parse_size(config["max_image_pixels"])
-        self.max_spider_size = self.parse_size(config["max_spider_size"])
+    def read_config(self, config, **kwargs):
+        self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
+        self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
+        self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
-        self.media_store_path = self.ensure_directory(config["media_store_path"])
+        self.media_store_path = self.ensure_directory(
+            config.get("media_store_path", "media_store")
+        )
 
         backup_media_store_path = config.get("backup_media_store_path")
 
@@ -97,15 +109,15 @@ class ContentRepositoryConfig(Config):
                     "Cannot use both 'backup_media_store_path' and 'storage_providers'"
                 )
 
-            storage_providers = [{
-                "module": "file_system",
-                "store_local": True,
-                "store_synchronous": synchronous_backup_media_store,
-                "store_remote": True,
-                "config": {
-                    "directory": backup_media_store_path,
+            storage_providers = [
+                {
+                    "module": "file_system",
+                    "store_local": True,
+                    "store_synchronous": synchronous_backup_media_store,
+                    "store_remote": True,
+                    "config": {"directory": backup_media_store_path},
                 }
-            }]
+            ]
 
         # This is a list of config that can be used to create the storage
         # providers. The entries are tuples of (Class, class_config,
@@ -135,18 +147,19 @@ class ContentRepositoryConfig(Config):
             )
 
             self.media_storage_providers.append(
-                (provider_class, parsed_config, wrapper_config,)
+                (provider_class, parsed_config, wrapper_config)
             )
 
-        self.uploads_path = self.ensure_directory(config["uploads_path"])
-        self.dynamic_thumbnails = config["dynamic_thumbnails"]
+        self.uploads_path = self.ensure_directory(config.get("uploads_path", "uploads"))
+        self.dynamic_thumbnails = config.get("dynamic_thumbnails", False)
         self.thumbnail_requirements = parse_thumbnail_requirements(
-            config["thumbnail_sizes"]
+            config.get("thumbnail_sizes", DEFAULT_THUMBNAIL_SIZES)
         )
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
             try:
                 import lxml
+
                 lxml  # To stop unused lint.
             except ImportError:
                 raise ConfigError(MISSING_LXML)
@@ -156,84 +169,89 @@ class ContentRepositoryConfig(Config):
             except ImportError:
                 raise ConfigError(MISSING_NETADDR)
 
-            if "url_preview_ip_range_blacklist" in config:
-                self.url_preview_ip_range_blacklist = IPSet(
-                    config["url_preview_ip_range_blacklist"]
-                )
-            else:
+            if "url_preview_ip_range_blacklist" not in config:
                 raise ConfigError(
                     "For security, you must specify an explicit target IP address "
                     "blacklist in url_preview_ip_range_blacklist for url previewing "
                     "to work"
                 )
 
+            self.url_preview_ip_range_blacklist = IPSet(
+                config["url_preview_ip_range_blacklist"]
+            )
+
+            # we always blacklist '0.0.0.0' and '::', which are supposed to be
+            # unroutable addresses.
+            self.url_preview_ip_range_blacklist.update(["0.0.0.0", "::"])
+
             self.url_preview_ip_range_whitelist = IPSet(
                 config.get("url_preview_ip_range_whitelist", ())
             )
 
-            self.url_preview_url_blacklist = config.get(
-                "url_preview_url_blacklist", ()
-            )
+            self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
 
-    def default_config(self, **kwargs):
-        media_store = self.default_path("media_store")
-        uploads_path = self.default_path("uploads")
-        return """
+    def generate_config_section(self, data_dir_path, **kwargs):
+        media_store = os.path.join(data_dir_path, "media_store")
+        uploads_path = os.path.join(data_dir_path, "uploads")
+
+        formatted_thumbnail_sizes = "".join(
+            THUMBNAIL_SIZE_YAML % s for s in DEFAULT_THUMBNAIL_SIZES
+        )
+        # strip final NL
+        formatted_thumbnail_sizes = formatted_thumbnail_sizes[:-1]
+
+        return (
+            r"""
         # Directory where uploaded images and attachments are stored.
+        #
         media_store_path: "%(media_store)s"
 
         # Media storage providers allow media to be stored in different
         # locations.
-        # media_storage_providers:
-        # - module: file_system
-        #   # Whether to write new local files.
-        #   store_local: false
-        #   # Whether to write new remote media
-        #   store_remote: false
-        #   # Whether to block upload requests waiting for write to this
-        #   # provider to complete
-        #   store_synchronous: false
-        #   config:
-        #     directory: /mnt/some/other/directory
+        #
+        #media_storage_providers:
+        #  - module: file_system
+        #    # Whether to write new local files.
+        #    store_local: false
+        #    # Whether to write new remote media
+        #    store_remote: false
+        #    # Whether to block upload requests waiting for write to this
+        #    # provider to complete
+        #    store_synchronous: false
+        #    config:
+        #       directory: /mnt/some/other/directory
 
         # Directory where in-progress uploads are stored.
+        #
         uploads_path: "%(uploads_path)s"
 
         # The largest allowed upload size in bytes
-        max_upload_size: "10M"
+        #
+        #max_upload_size: 10M
 
         # Maximum number of pixels that will be thumbnailed
-        max_image_pixels: "32M"
+        #
+        #max_image_pixels: 32M
 
         # Whether to generate new thumbnails on the fly to precisely match
         # the resolution requested by the client. If true then whenever
         # a new resolution is requested by the client the server will
         # generate a new thumbnail. If false the server will pick a thumbnail
         # from a precalculated list.
-        dynamic_thumbnails: false
+        #
+        #dynamic_thumbnails: false
 
-        # List of thumbnail to precalculate when an image is uploaded.
-        thumbnail_sizes:
-        - width: 32
-          height: 32
-          method: crop
-        - width: 96
-          height: 96
-          method: crop
-        - width: 320
-          height: 240
-          method: scale
-        - width: 640
-          height: 480
-          method: scale
-        - width: 800
-          height: 600
-          method: scale
+        # List of thumbnails to precalculate when an image is uploaded.
+        #
+        #thumbnail_sizes:
+%(formatted_thumbnail_sizes)s
 
-        # Is the preview URL API enabled?  If enabled, you *must* specify
-        # an explicit url_preview_ip_range_blacklist of IPs that the spider is
-        # denied from accessing.
-        url_preview_enabled: False
+        # Is the preview URL API enabled?
+        #
+        # 'false' by default: uncomment the following to enable it (and specify a
+        # url_preview_ip_range_blacklist blacklist).
+        #
+        #url_preview_enabled: true
 
         # List of IP address CIDR ranges that the URL preview spider is denied
         # from accessing.  There are no defaults: you must explicitly
@@ -243,25 +261,31 @@ class ContentRepositoryConfig(Config):
         # synapse to issue arbitrary GET requests to your internal services,
         # causing serious security issues.
         #
-        # url_preview_ip_range_blacklist:
-        # - '127.0.0.0/8'
-        # - '10.0.0.0/8'
-        # - '172.16.0.0/12'
-        # - '192.168.0.0/16'
-        # - '100.64.0.0/10'
-        # - '169.254.0.0/16'
-        # - '::1/128'
-        # - 'fe80::/64'
-        # - 'fc00::/7'
+        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+        # listed here, since they correspond to unroutable addresses.)
         #
+        # This must be specified if url_preview_enabled is set. It is recommended that
+        # you uncomment the following list as a starting point.
+        #
+        #url_preview_ip_range_blacklist:
+        #  - '127.0.0.0/8'
+        #  - '10.0.0.0/8'
+        #  - '172.16.0.0/12'
+        #  - '192.168.0.0/16'
+        #  - '100.64.0.0/10'
+        #  - '169.254.0.0/16'
+        #  - '::1/128'
+        #  - 'fe80::/64'
+        #  - 'fc00::/7'
+
         # List of IP address CIDR ranges that the URL preview spider is allowed
         # to access even if they are specified in url_preview_ip_range_blacklist.
         # This is useful for specifying exceptions to wide-ranging blacklisted
         # target IP ranges - e.g. for enabling URL previews for a specific private
         # website only visible in your network.
         #
-        # url_preview_ip_range_whitelist:
-        # - '192.168.1.1'
+        #url_preview_ip_range_whitelist:
+        #   - '192.168.1.1'
 
         # Optional list of URL matches that the URL preview spider is
         # denied from accessing.  You should use url_preview_ip_range_blacklist
@@ -279,26 +303,27 @@ class ContentRepositoryConfig(Config):
         # specified component matches for a given list item succeed, the URL is
         # blacklisted.
         #
-        # url_preview_url_blacklist:
-        # # blacklist any URL with a username in its URI
-        # - username: '*'
+        #url_preview_url_blacklist:
+        #  # blacklist any URL with a username in its URI
+        #  - username: '*'
         #
-        # # blacklist all *.google.com URLs
-        # - netloc: 'google.com'
-        # - netloc: '*.google.com'
+        #  # blacklist all *.google.com URLs
+        #  - netloc: 'google.com'
+        #  - netloc: '*.google.com'
         #
-        # # blacklist all plain HTTP URLs
-        # - scheme: 'http'
+        #  # blacklist all plain HTTP URLs
+        #  - scheme: 'http'
         #
-        # # blacklist http(s)://www.acme.com/foo
-        # - netloc: 'www.acme.com'
-        #   path: '/foo'
+        #  # blacklist http(s)://www.acme.com/foo
+        #  - netloc: 'www.acme.com'
+        #    path: '/foo'
         #
-        # # blacklist any URL with a literal IPv4 address
-        # - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+        #  # blacklist any URL with a literal IPv4 address
+        #  - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
 
         # The largest allowed URL preview spidering size in bytes
-        max_spider_size: "10M"
-
-
-        """ % locals()
+        #
+        #max_spider_size: 10M
+        """
+            % locals()
+        )

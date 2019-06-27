@@ -30,31 +30,14 @@ logger = logging.getLogger(__name__)
 
 
 class FederationRateLimiter(object):
-    def __init__(self, clock, window_size, sleep_limit, sleep_msec,
-                 reject_limit, concurrent_requests):
+    def __init__(self, clock, config):
         """
         Args:
             clock (Clock)
-            window_size (int): The window size in milliseconds.
-            sleep_limit (int): The number of requests received in the last
-                `window_size` milliseconds before we artificially start
-                delaying processing of requests.
-            sleep_msec (int): The number of milliseconds to delay processing
-                of incoming requests by.
-            reject_limit (int): The maximum number of requests that are can be
-                queued for processing before we start rejecting requests with
-                a 429 Too Many Requests response.
-            concurrent_requests (int): The number of concurrent requests to
-                process.
+            config (FederationRateLimitConfig)
         """
         self.clock = clock
-
-        self.window_size = window_size
-        self.sleep_limit = sleep_limit
-        self.sleep_msec = sleep_msec
-        self.reject_limit = reject_limit
-        self.concurrent_requests = concurrent_requests
-
+        self._config = config
         self.ratelimiters = {}
 
     def ratelimit(self, host):
@@ -73,28 +56,24 @@ class FederationRateLimiter(object):
             _PerHostRatelimiter
         """
         return self.ratelimiters.setdefault(
-            host,
-            _PerHostRatelimiter(
-                clock=self.clock,
-                window_size=self.window_size,
-                sleep_limit=self.sleep_limit,
-                sleep_msec=self.sleep_msec,
-                reject_limit=self.reject_limit,
-                concurrent_requests=self.concurrent_requests,
-            )
+            host, _PerHostRatelimiter(clock=self.clock, config=self._config)
         ).ratelimit()
 
 
 class _PerHostRatelimiter(object):
-    def __init__(self, clock, window_size, sleep_limit, sleep_msec,
-                 reject_limit, concurrent_requests):
+    def __init__(self, clock, config):
+        """
+        Args:
+            clock (Clock)
+            config (FederationRateLimitConfig)
+        """
         self.clock = clock
 
-        self.window_size = window_size
-        self.sleep_limit = sleep_limit
-        self.sleep_sec = sleep_msec / 1000.0
-        self.reject_limit = reject_limit
-        self.concurrent_requests = concurrent_requests
+        self.window_size = config.window_size
+        self.sleep_limit = config.sleep_limit
+        self.sleep_sec = config.sleep_delay / 1000.0
+        self.reject_limit = config.reject_limit
+        self.concurrent_requests = config.concurrent
 
         # request_id objects for requests which have been slept
         self.sleeping_requests = set()
@@ -129,8 +108,7 @@ class _PerHostRatelimiter(object):
 
         # remove any entries from request_times which aren't within the window
         self.request_times[:] = [
-            r for r in self.request_times
-            if time_now - r < self.window_size
+            r for r in self.request_times if time_now - r < self.window_size
         ]
 
         # reject the request if we already have too many queued up (either
@@ -138,9 +116,7 @@ class _PerHostRatelimiter(object):
         queue_size = len(self.ready_request_queue) + len(self.sleeping_requests)
         if queue_size > self.reject_limit:
             raise LimitExceededError(
-                retry_after_ms=int(
-                    self.window_size / self.sleep_limit
-                ),
+                retry_after_ms=int(self.window_size / self.sleep_limit)
             )
 
         self.request_times.append(time_now)
@@ -160,22 +136,18 @@ class _PerHostRatelimiter(object):
 
         logger.debug(
             "Ratelimit [%s]: len(self.request_times)=%d",
-            id(request_id), len(self.request_times),
+            id(request_id),
+            len(self.request_times),
         )
 
         if len(self.request_times) > self.sleep_limit:
-            logger.debug(
-                "Ratelimiter: sleeping request for %f sec", self.sleep_sec,
-            )
+            logger.debug("Ratelimiter: sleeping request for %f sec", self.sleep_sec)
             ret_defer = run_in_background(self.clock.sleep, self.sleep_sec)
 
             self.sleeping_requests.add(request_id)
 
             def on_wait_finished(_):
-                logger.debug(
-                    "Ratelimit [%s]: Finished sleeping",
-                    id(request_id),
-                )
+                logger.debug("Ratelimit [%s]: Finished sleeping", id(request_id))
                 self.sleeping_requests.discard(request_id)
                 queue_defer = queue_request()
                 return queue_defer
@@ -185,10 +157,7 @@ class _PerHostRatelimiter(object):
             ret_defer = queue_request()
 
         def on_start(r):
-            logger.debug(
-                "Ratelimit [%s]: Processing req",
-                id(request_id),
-            )
+            logger.debug("Ratelimit [%s]: Processing req", id(request_id))
             self.current_processing.add(request_id)
             return r
 
@@ -210,10 +179,7 @@ class _PerHostRatelimiter(object):
         return make_deferred_yieldable(ret_defer)
 
     def _on_exit(self, request_id):
-        logger.debug(
-            "Ratelimit [%s]: Processed req",
-            id(request_id),
-        )
+        logger.debug("Ratelimit [%s]: Processed req", id(request_id))
         self.current_processing.discard(request_id)
         try:
             # start processing the next item on the queue.

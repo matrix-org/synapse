@@ -17,6 +17,7 @@ import unittest
 
 from synapse import event_auth
 from synapse.api.errors import AuthError
+from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 
 
@@ -36,7 +37,9 @@ class EventAuthTestCase(unittest.TestCase):
 
         # creator should be able to send state
         event_auth.check(
-            _random_state_event(creator), auth_events,
+            RoomVersions.V1.identifier,
+            _random_state_event(creator),
+            auth_events,
             do_sig_check=False,
         )
 
@@ -44,6 +47,7 @@ class EventAuthTestCase(unittest.TestCase):
         self.assertRaises(
             AuthError,
             event_auth.check,
+            RoomVersions.V1.identifier,
             _random_state_event(joiner),
             auth_events,
             do_sig_check=False,
@@ -61,13 +65,9 @@ class EventAuthTestCase(unittest.TestCase):
         auth_events = {
             ("m.room.create", ""): _create_event(creator),
             ("m.room.member", creator): _join_event(creator),
-            ("m.room.power_levels", ""): _power_levels_event(creator, {
-                "state_default": "30",
-                "users": {
-                    pleb: "29",
-                    king: "30",
-                },
-            }),
+            ("m.room.power_levels", ""): _power_levels_event(
+                creator, {"state_default": "30", "users": {pleb: "29", king: "30"}}
+            ),
             ("m.room.member", pleb): _join_event(pleb),
             ("m.room.member", king): _join_event(king),
         }
@@ -76,6 +76,7 @@ class EventAuthTestCase(unittest.TestCase):
         self.assertRaises(
             AuthError,
             event_auth.check,
+            RoomVersions.V1.identifier,
             _random_state_event(pleb),
             auth_events,
             do_sig_check=False,
@@ -83,7 +84,9 @@ class EventAuthTestCase(unittest.TestCase):
 
         # king should be able to send state
         event_auth.check(
-            _random_state_event(king), auth_events,
+            RoomVersions.V1.identifier,
+            _random_state_event(king),
+            auth_events,
             do_sig_check=False,
         )
 
@@ -94,52 +97,54 @@ TEST_ROOM_ID = "!test:room"
 
 
 def _create_event(user_id):
-    return FrozenEvent({
-        "room_id": TEST_ROOM_ID,
-        "event_id": _get_event_id(),
-        "type": "m.room.create",
-        "sender": user_id,
-        "content": {
-            "creator": user_id,
-        },
-    })
+    return FrozenEvent(
+        {
+            "room_id": TEST_ROOM_ID,
+            "event_id": _get_event_id(),
+            "type": "m.room.create",
+            "sender": user_id,
+            "content": {"creator": user_id},
+        }
+    )
 
 
 def _join_event(user_id):
-    return FrozenEvent({
-        "room_id": TEST_ROOM_ID,
-        "event_id": _get_event_id(),
-        "type": "m.room.member",
-        "sender": user_id,
-        "state_key": user_id,
-        "content": {
-            "membership": "join",
-        },
-    })
+    return FrozenEvent(
+        {
+            "room_id": TEST_ROOM_ID,
+            "event_id": _get_event_id(),
+            "type": "m.room.member",
+            "sender": user_id,
+            "state_key": user_id,
+            "content": {"membership": "join"},
+        }
+    )
 
 
 def _power_levels_event(sender, content):
-    return FrozenEvent({
-        "room_id": TEST_ROOM_ID,
-        "event_id": _get_event_id(),
-        "type": "m.room.power_levels",
-        "sender": sender,
-        "state_key": "",
-        "content": content,
-    })
+    return FrozenEvent(
+        {
+            "room_id": TEST_ROOM_ID,
+            "event_id": _get_event_id(),
+            "type": "m.room.power_levels",
+            "sender": sender,
+            "state_key": "",
+            "content": content,
+        }
+    )
 
 
 def _random_state_event(sender):
-    return FrozenEvent({
-        "room_id": TEST_ROOM_ID,
-        "event_id": _get_event_id(),
-        "type": "test.state",
-        "sender": sender,
-        "state_key": "",
-        "content": {
-            "membership": "join",
-        },
-    })
+    return FrozenEvent(
+        {
+            "room_id": TEST_ROOM_ID,
+            "event_id": _get_event_id(),
+            "type": "test.state",
+            "sender": sender,
+            "state_key": "",
+            "content": {"membership": "join"},
+        }
+    )
 
 
 event_count = 0
@@ -149,4 +154,4 @@ def _get_event_id():
     global event_count
     c = event_count
     event_count += 1
-    return "!%i:example.com" % (c, )
+    return "!%i:example.com" % (c,)

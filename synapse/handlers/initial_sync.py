@@ -18,14 +18,13 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes
-from synapse.events.utils import serialize_event
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
 from synapse.streams.config import PaginationConfig
 from synapse.types import StreamToken, UserID
 from synapse.util import unwrapFirstError
-from synapse.util.async import concurrently_execute
+from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.snapshot_cache import SnapshotCache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.visibility import filter_events_for_client
@@ -43,9 +42,15 @@ class InitialSyncHandler(BaseHandler):
         self.clock = hs.get_clock()
         self.validator = EventValidator()
         self.snapshot_cache = SnapshotCache()
+        self._event_serializer = hs.get_event_client_serializer()
 
-    def snapshot_all_rooms(self, user_id=None, pagin_config=None,
-                           as_client_event=True, include_archived=False):
+    def snapshot_all_rooms(
+        self,
+        user_id=None,
+        pagin_config=None,
+        as_client_event=True,
+        include_archived=False,
+    ):
         """Retrieve a snapshot of all rooms the user is invited or has joined.
 
         This snapshot may include messages for all rooms where the user is
@@ -77,13 +82,22 @@ class InitialSyncHandler(BaseHandler):
         if result is not None:
             return result
 
-        return self.snapshot_cache.set(now_ms, key, self._snapshot_all_rooms(
-            user_id, pagin_config, as_client_event, include_archived
-        ))
+        return self.snapshot_cache.set(
+            now_ms,
+            key,
+            self._snapshot_all_rooms(
+                user_id, pagin_config, as_client_event, include_archived
+            ),
+        )
 
     @defer.inlineCallbacks
-    def _snapshot_all_rooms(self, user_id=None, pagin_config=None,
-                            as_client_event=True, include_archived=False):
+    def _snapshot_all_rooms(
+        self,
+        user_id=None,
+        pagin_config=None,
+        as_client_event=True,
+        include_archived=False,
+    ):
 
         memberships = [Membership.INVITE, Membership.JOIN]
         if include_archived:
@@ -128,8 +142,7 @@ class InitialSyncHandler(BaseHandler):
                 "room_id": event.room_id,
                 "membership": event.membership,
                 "visibility": (
-                    "public" if event.room_id in public_room_ids
-                    else "private"
+                    "public" if event.room_id in public_room_ids else "private"
                 ),
             }
 
@@ -138,7 +151,9 @@ class InitialSyncHandler(BaseHandler):
                 d["inviter"] = event.sender
 
                 invite_event = yield self.store.get_event(event.event_id)
-                d["invite"] = serialize_event(invite_event, time_now, as_client_event)
+                d["invite"] = yield self._event_serializer.serialize_event(
+                    invite_event, time_now, as_client_event
+                )
 
             rooms_ret.append(d)
 
@@ -148,13 +163,13 @@ class InitialSyncHandler(BaseHandler):
             try:
                 if event.membership == Membership.JOIN:
                     room_end_token = now_token.room_key
-                    deferred_room_state = self.state_handler.get_current_state(
-                        event.room_id
+                    deferred_room_state = run_in_background(
+                        self.state_handler.get_current_state, event.room_id
                     )
                 elif event.membership == Membership.LEAVE:
                     room_end_token = "s%d" % (event.stream_ordering,)
-                    deferred_room_state = self.store.get_state_for_events(
-                        [event.event_id], None
+                    deferred_room_state = run_in_background(
+                        self.store.get_state_for_events, [event.event_id]
                     )
                     deferred_room_state.addCallback(
                         lambda states: states[event.event_id]
@@ -174,42 +189,40 @@ class InitialSyncHandler(BaseHandler):
                     )
                 ).addErrback(unwrapFirstError)
 
-                messages = yield filter_events_for_client(
-                    self.store, user_id, messages
-                )
+                messages = yield filter_events_for_client(self.store, user_id, messages)
 
                 start_token = now_token.copy_and_replace("room_key", token)
                 end_token = now_token.copy_and_replace("room_key", room_end_token)
                 time_now = self.clock.time_msec()
 
                 d["messages"] = {
-                    "chunk": [
-                        serialize_event(m, time_now, as_client_event)
-                        for m in messages
-                    ],
+                    "chunk": (
+                        yield self._event_serializer.serialize_events(
+                            messages, time_now=time_now, as_client_event=as_client_event
+                        )
+                    ),
                     "start": start_token.to_string(),
                     "end": end_token.to_string(),
                 }
 
-                d["state"] = [
-                    serialize_event(c, time_now, as_client_event)
-                    for c in current_state.values()
-                ]
+                d["state"] = yield self._event_serializer.serialize_events(
+                    current_state.values(),
+                    time_now=time_now,
+                    as_client_event=as_client_event,
+                )
 
                 account_data_events = []
                 tags = tags_by_room.get(event.room_id)
                 if tags:
-                    account_data_events.append({
-                        "type": "m.tag",
-                        "content": {"tags": tags},
-                    })
+                    account_data_events.append(
+                        {"type": "m.tag", "content": {"tags": tags}}
+                    )
 
                 account_data = account_data_by_room.get(event.room_id, {})
                 for account_data_type, content in account_data.items():
-                    account_data_events.append({
-                        "type": account_data_type,
-                        "content": content,
-                    })
+                    account_data_events.append(
+                        {"type": account_data_type, "content": content}
+                    )
 
                 d["account_data"] = account_data_events
             except Exception:
@@ -219,10 +232,7 @@ class InitialSyncHandler(BaseHandler):
 
         account_data_events = []
         for account_data_type, content in account_data.items():
-            account_data_events.append({
-                "type": account_data_type,
-                "content": content,
-            })
+            account_data_events.append({"type": account_data_type, "content": content})
 
         now = self.clock.time_msec()
 
@@ -260,10 +270,14 @@ class InitialSyncHandler(BaseHandler):
             A JSON serialisable dict with the snapshot of the room.
         """
 
+        blocked = yield self.store.is_room_blocked(room_id)
+        if blocked:
+            raise SynapseError(403, "This room has been blocked on this server")
+
         user_id = requester.user.to_string()
 
         membership, member_event_id = yield self._check_in_room_or_world_readable(
-            room_id, user_id,
+            room_id, user_id
         )
         is_peeking = member_event_id is None
 
@@ -279,28 +293,21 @@ class InitialSyncHandler(BaseHandler):
         account_data_events = []
         tags = yield self.store.get_tags_for_room(user_id, room_id)
         if tags:
-            account_data_events.append({
-                "type": "m.tag",
-                "content": {"tags": tags},
-            })
+            account_data_events.append({"type": "m.tag", "content": {"tags": tags}})
 
         account_data = yield self.store.get_account_data_for_room(user_id, room_id)
         for account_data_type, content in account_data.items():
-            account_data_events.append({
-                "type": account_data_type,
-                "content": content,
-            })
+            account_data_events.append({"type": account_data_type, "content": content})
 
         result["account_data"] = account_data_events
 
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _room_initial_sync_parted(self, user_id, room_id, pagin_config,
-                                  membership, member_event_id, is_peeking):
-        room_state = yield self.store.get_state_for_events(
-            [member_event_id], None
-        )
+    def _room_initial_sync_parted(
+        self, user_id, room_id, pagin_config, membership, member_event_id, is_peeking
+    ):
+        room_state = yield self.store.get_state_for_events([member_event_id])
 
         room_state = room_state[member_event_id]
 
@@ -308,14 +315,10 @@ class InitialSyncHandler(BaseHandler):
         if limit is None:
             limit = 10
 
-        stream_token = yield self.store.get_stream_token_for_event(
-            member_event_id
-        )
+        stream_token = yield self.store.get_stream_token_for_event(member_event_id)
 
         messages, token = yield self.store.get_recent_events_for_room(
-            room_id,
-            limit=limit,
-            end_token=stream_token
+            room_id, limit=limit, end_token=stream_token
         )
 
         messages = yield filter_events_for_client(
@@ -327,32 +330,40 @@ class InitialSyncHandler(BaseHandler):
 
         time_now = self.clock.time_msec()
 
-        defer.returnValue({
-            "membership": membership,
-            "room_id": room_id,
-            "messages": {
-                "chunk": [serialize_event(m, time_now) for m in messages],
-                "start": start_token.to_string(),
-                "end": end_token.to_string(),
-            },
-            "state": [serialize_event(s, time_now) for s in room_state.values()],
-            "presence": [],
-            "receipts": [],
-        })
+        defer.returnValue(
+            {
+                "membership": membership,
+                "room_id": room_id,
+                "messages": {
+                    "chunk": (
+                        yield self._event_serializer.serialize_events(
+                            messages, time_now
+                        )
+                    ),
+                    "start": start_token.to_string(),
+                    "end": end_token.to_string(),
+                },
+                "state": (
+                    yield self._event_serializer.serialize_events(
+                        room_state.values(), time_now
+                    )
+                ),
+                "presence": [],
+                "receipts": [],
+            }
+        )
 
     @defer.inlineCallbacks
-    def _room_initial_sync_joined(self, user_id, room_id, pagin_config,
-                                  membership, is_peeking):
-        current_state = yield self.state.get_current_state(
-            room_id=room_id,
-        )
+    def _room_initial_sync_joined(
+        self, user_id, room_id, pagin_config, membership, is_peeking
+    ):
+        current_state = yield self.state.get_current_state(room_id=room_id)
 
         # TODO: These concurrently
         time_now = self.clock.time_msec()
-        state = [
-            serialize_event(x, time_now)
-            for x in current_state.values()
-        ]
+        state = yield self._event_serializer.serialize_events(
+            current_state.values(), time_now
+        )
 
         now_token = yield self.hs.get_event_sources().get_current_token()
 
@@ -361,7 +372,8 @@ class InitialSyncHandler(BaseHandler):
             limit = 10
 
         room_members = [
-            m for m in current_state.values()
+            m
+            for m in current_state.values()
             if m.type == EventTypes.Member
             and m.content["membership"] == Membership.JOIN
         ]
@@ -370,9 +382,12 @@ class InitialSyncHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_presence():
+            # If presence is disabled, return an empty list
+            if not self.hs.config.use_presence:
+                defer.returnValue([])
+
             states = yield presence_handler.get_states(
-                [m.user_id for m in room_members],
-                as_event=True,
+                [m.user_id for m in room_members], as_event=True
             )
 
             defer.returnValue(states)
@@ -380,29 +395,30 @@ class InitialSyncHandler(BaseHandler):
         @defer.inlineCallbacks
         def get_receipts():
             receipts = yield self.store.get_linearized_receipts_for_room(
-                room_id,
-                to_key=now_token.receipt_key,
+                room_id, to_key=now_token.receipt_key
             )
             if not receipts:
                 receipts = []
             defer.returnValue(receipts)
 
-        presence, receipts, (messages, token) = yield defer.gatherResults(
-            [
-                run_in_background(get_presence),
-                run_in_background(get_receipts),
-                run_in_background(
-                    self.store.get_recent_events_for_room,
-                    room_id,
-                    limit=limit,
-                    end_token=now_token.room_key,
-                )
-            ],
-            consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+        presence, receipts, (messages, token) = yield make_deferred_yieldable(
+            defer.gatherResults(
+                [
+                    run_in_background(get_presence),
+                    run_in_background(get_receipts),
+                    run_in_background(
+                        self.store.get_recent_events_for_room,
+                        room_id,
+                        limit=limit,
+                        end_token=now_token.room_key,
+                    ),
+                ],
+                consumeErrors=True,
+            ).addErrback(unwrapFirstError)
+        )
 
         messages = yield filter_events_for_client(
-            self.store, user_id, messages, is_peeking=is_peeking,
+            self.store, user_id, messages, is_peeking=is_peeking
         )
 
         start_token = now_token.copy_and_replace("room_key", token)
@@ -413,7 +429,9 @@ class InitialSyncHandler(BaseHandler):
         ret = {
             "room_id": room_id,
             "messages": {
-                "chunk": [serialize_event(m, time_now) for m in messages],
+                "chunk": (
+                    yield self._event_serializer.serialize_events(messages, time_now)
+                ),
                 "start": start_token.to_string(),
                 "end": end_token.to_string(),
             },
@@ -442,8 +460,8 @@ class InitialSyncHandler(BaseHandler):
                 room_id, EventTypes.RoomHistoryVisibility, ""
             )
             if (
-                visibility and
-                visibility.content["history_visibility"] == "world_readable"
+                visibility
+                and visibility.content["history_visibility"] == "world_readable"
             ):
                 defer.returnValue((Membership.JOIN, None))
                 return
