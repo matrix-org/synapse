@@ -129,14 +129,19 @@ class IdentityHandler(BaseHandler):
             client_secret = creds['clientSecret']
         else:
             raise SynapseError(400, "No client_secret in creds")
+
         # if we have a rewrite rule set for the identity server,
-        # apply it now.
+        # apply it now, but only for sending the request (not
+        # storing in the database).
         if id_server in self.rewrite_identity_server_urls:
-            id_server = self.rewrite_identity_server_urls[id_server]
+            id_server_host = self.rewrite_identity_server_urls[id_server]
+        else:
+            id_server_host = id_server
+
         try:
             data = yield self.http_client.post_urlencoded_get_json(
                 "https://%s%s" % (
-                    id_server, "/_matrix/identity/api/v1/3pid/bind"
+                    id_server_host, "/_matrix/identity/api/v1/3pid/bind"
                 ),
                 {
                     'sid': creds['sid'],
