@@ -34,22 +34,21 @@ def convert(src, dst, environ):
         outfile.write(rendered)
 
 
-def generate_config_from_template(environ, ownership):
+def generate_config_from_template(config_dir, config_path, environ, ownership):
     """Generate a homeserver.yaml from environment variables
 
     Args:
+        config_dir (str): where to put generated config files
+        config_path (str): where to put the main config file
         environ (dict): environment dictionary
         ownership (str): "<user>:<group>" string which will be used to set
             ownership of the generated configs
-
-    Returns:
-        path to generated config file
     """
     for v in ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS"):
         if v not in environ:
             error(
-                "Environment variable '%s' is mandatory when generating a config "
-                "file on-the-fly." % (v,)
+                "Environment variable '%s' is mandatory when generating a config file."
+                % (v,)
             )
 
     # populate some params from data files (if they exist, else create new ones)
@@ -78,10 +77,8 @@ def generate_config_from_template(environ, ownership):
             environ[secret] = value
 
     environ["SYNAPSE_APPSERVICES"] = glob.glob("/data/appservices/*.yaml")
-    if not os.path.exists("/compiled"):
-        os.mkdir("/compiled")
-
-    config_path = "/compiled/homeserver.yaml"
+    if not os.path.exists(config_dir):
+        os.mkdir(config_dir)
 
     # Convert SYNAPSE_NO_TLS to boolean if exists
     if "SYNAPSE_NO_TLS" in environ:
@@ -98,8 +95,16 @@ def generate_config_from_template(environ, ownership):
                     + '" unrecognized; exiting.'
                 )
 
+    if "SYNAPSE_LOG_CONFIG" not in environ:
+        environ["SYNAPSE_LOG_CONFIG"] = config_dir + "/log.config"
+
+    log("Generating synapse config file " + config_path)
     convert("/conf/homeserver.yaml", config_path, environ)
-    convert("/conf/log.config", "/compiled/log.config", environ)
+
+    log_config_file = environ["SYNAPSE_LOG_CONFIG"]
+    log("Generating log config file " + log_config_file)
+    convert("/conf/log.config", log_config_file, environ)
+
     subprocess.check_output(["chown", "-R", ownership, "/data"])
 
     # Hopefully we already have a signing key, but generate one if not.
@@ -114,12 +119,10 @@ def generate_config_from_template(environ, ownership):
             config_path,
             # tell synapse to put generated keys in /data rather than /compiled
             "--keys-directory",
-            "/data",
+            config_dir,
             "--generate-keys",
         ]
     )
-
-    return config_path
 
 
 def run_generate_config(environ, ownership):
@@ -178,15 +181,36 @@ def main(args, environ):
     if mode == "generate":
         return run_generate_config(environ, ownership)
 
+    if mode == "migrate_config":
+        # generate a config based on environment vars.
+        config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
+        config_path = environ.get(
+            "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
+        )
+        return generate_config_from_template(
+            config_dir, config_path, environ, ownership
+        )
+
+    if mode is not None:
+        error("Unknown execution mode '%s'" % (mode,))
+
     if "SYNAPSE_SERVER_NAME" in environ:
         # backwards-compatibility generate-a-config-on-the-fly mode
         if "SYNAPSE_CONFIG_PATH" in environ:
             error(
                 "SYNAPSE_SERVER_NAME and SYNAPSE_CONFIG_PATH are mutually exclusive "
-                "except in `generate` mode."
+                "except in `generate` or `migrate_config` mode."
             )
 
-        config_path = generate_config_from_template(environ, ownership)
+        config_path = "/compiled/homeserver.yaml"
+        log(
+            "Generating config file '%s' on-the-fly from environment variables.\n"
+            "Note that this mode is deprecated. You can migrate to a static config\n"
+            "file by running with 'migrate_config'. See the README for more details."
+            % (config_path,)
+        )
+
+        generate_config_from_template("/compiled", config_path, environ, ownership)
     else:
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
         config_path = environ.get(
