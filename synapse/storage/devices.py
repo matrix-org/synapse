@@ -425,9 +425,7 @@ class DeviceWorkerStore(SQLBaseStore):
             """
 
             for chunk in batch_iter(to_check, 100):
-                txn.execute(
-                    sql % (",".join("?" for _ in chunk),), [from_key] + list(chunk)
-                )
+                txn.execute(sql % (",".join("?" for _ in chunk),), (from_key,) + chunk)
                 changes.update(user_id for user_id, in txn)
 
             return changes

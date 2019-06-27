@@ -1089,9 +1089,9 @@ class SyncHandler(object):
             # for anymore.
             #
             # For the first step we check:
-            #   1. if any users we share a room with have updated their devices,
+            #   a. if any users we share a room with have updated their devices,
             #      and
-            #   2. we also check if we've joined any new rooms, or if a user has
+            #   b. we also check if we've joined any new rooms, or if a user has
             #      joined a room we're in.
             #
             # For the second step we just find any users we no longer share a
@@ -1102,12 +1102,12 @@ class SyncHandler(object):
                 user_id
             )
 
-            # Step 1, check for changes in devices of users we share a room with
+            # Step 1a, check for changes in devices of users we share a room with
             users_that_have_changed = yield self.store.get_users_whose_devices_changed(
                 since_token.device_list_key, users_who_share_room
             )
 
-            # Step 2, check for newly joined rooms
+            # Step 1b, check for newly joined rooms
             for room_id in newly_joined_rooms:
                 joined_users = yield self.state.get_current_users_in_room(room_id)
                 newly_joined_or_invited_users.update(joined_users)
