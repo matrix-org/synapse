@@ -95,6 +95,7 @@ CONDITIONAL_REQUIREMENTS = {
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0", "parameterized"],
     "sentry": ["sentry-sdk>=0.7.2"],
+    "jwt": ["pyjwt>=1.6.4"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()
