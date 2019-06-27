@@ -1100,13 +1100,13 @@ password_config:
 #   #validation_token_lifetime: 1h
 #
 #   # Template directory. All template files should be stored within this
-#   # directory
+#   # directory. If not set, default templates from within the Synapse
+#   # package will be used
 #   #
-#   # If not set, the default location is `(location of Synapse's
-#   # virtualenv)/res/templates`. Using an absolute path is recommended
-#   # when changing this option from the default.
+#   # For the list of default templates, please see
+#   # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
 #   #
-#   #template_dir: synapse-env/res/templates
+#   #template_dir: res/templates
 #
 #   # Templates for email notifications
 #   #
