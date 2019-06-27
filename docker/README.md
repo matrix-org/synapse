@@ -179,3 +179,16 @@ docker run -d --name synapse \
     -e SYNAPSE_CONFIG_PATH=/data/homeserver.yaml \
     matrixdotorg/synapse:latest
 ```
+
+The following environment variables are supported in this mode:
+
+* `SYNAPSE_SERVER_NAME` (mandatory): the server public hostname.
+* `SYNAPSE_REPORT_STATS` (mandatory, `yes` or `no`): whether to enable
+  anonymous statistics reporting.
+* `SYNAPSE_CONFIG_PATH` (mandatory): path to the file to be generated.
+* `SYNAPSE_CONFIG_DIR`: where additional config files (such as the log config
+  and event signing key) will be stored. Defaults to `/data`.
+* `SYNAPSE_DATA_DIR`: where the generated config will put persistent data
+  such as the datatase and media store. Defaults to `/data`.
+* `UID`, `GID`: the user id and group id to use for creating the data
+  directories. Defaults to `991`, `991`.

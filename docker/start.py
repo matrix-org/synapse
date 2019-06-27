@@ -67,10 +67,11 @@ def generate_config_from_template(environ, ownership):
             # generate a new secret and write it to a file
 
             if os.path.exists(filename):
+                log("Reading %s from %s" % (secret, filename))
                 with open(filename) as handle:
                     value = handle.read()
             else:
-                log("Generating a random secret for {}".format(name))
+                log("Generating a random secret for {}".format(secret))
                 value = codecs.encode(os.urandom(32), "hex").decode()
                 with open(filename, "w") as handle:
                     handle.write(value)
@@ -100,14 +101,33 @@ def generate_config_from_template(environ, ownership):
     convert("/conf/homeserver.yaml", config_path, environ)
     convert("/conf/log.config", "/compiled/log.config", environ)
     subprocess.check_output(["chown", "-R", ownership, "/data"])
+
+    # Hopefully we already have a signing key, but generate one if not.
+    subprocess.check_output(
+        [
+            "su-exec",
+            ownership,
+            "python",
+            "-m",
+            "synapse.app.homeserver",
+            "--config-path",
+            config_path,
+            # tell synapse to put generated keys in /data rather than /compiled
+            "--keys-directory",
+            "/data",
+            "--generate-keys",
+        ]
+    )
+
     return config_path
 
 
-def run_generate_config(environ):
+def run_generate_config(environ, ownership):
     """Run synapse with a --generate-config param to generate a template config file
 
     Args:
-        environ (dict): environment dictionary
+        environ (dict): env var dict
+        ownership (str): "userid:groupid" arg for chmod
 
     Never returns.
     """
@@ -115,19 +135,37 @@ def run_generate_config(environ):
         if v not in environ:
             error("Environment variable '%s' is mandatory in `generate` mode." % (v,))
 
+    server_name = environ["SYNAPSE_SERVER_NAME"]
+    config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
+    data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
+
+    # create a suitable log config from our template
+    log_config_file = "%s/%s.log.config" % (config_dir, server_name)
+    if not os.path.exists(log_config_file):
+        log("Creating log config %s" % (log_config_file,))
+        convert("/conf/log.config", log_config_file, environ)
+
+    # make sure that synapse has perms to write to the data dir.
+    subprocess.check_output(["chown", ownership, data_dir])
+
     args = [
         "python",
         "-m",
         "synapse.app.homeserver",
         "--server-name",
-        environ["SYNAPSE_SERVER_NAME"],
+        server_name,
         "--report-stats",
         environ["SYNAPSE_REPORT_STATS"],
         "--config-path",
         environ["SYNAPSE_CONFIG_PATH"],
+        "--config-directory",
+        config_dir,
+        "--data-directory",
+        data_dir,
         "--generate-config",
         "--open-private-ports",
     ]
+    # log("running %s" % (args, ))
     os.execv("/usr/local/bin/python", args)
 
 
@@ -135,9 +173,9 @@ def main(args, environ):
     mode = args[1] if len(args) > 1 else None
     ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
 
-    # In generate mode, generate a configuration, missing keys, then exit
+    # In generate mode, generate a configuration and missing keys, then exit
     if mode == "generate":
-        return run_generate_config(environ)
+        return run_generate_config(environ, ownership)
 
     # In normal mode, generate missing keys if any, then run synapse
     if "SYNAPSE_CONFIG_PATH" in environ:
@@ -146,19 +184,15 @@ def main(args, environ):
         config_path = generate_config_from_template(environ, ownership)
 
     args = [
+        "su-exec",
+        ownership,
         "python",
         "-m",
         "synapse.app.homeserver",
         "--config-path",
         config_path,
-        # tell synapse to put any generated keys in /data rather than /compiled
-        "--keys-directory",
-        "/data",
     ]
-
-    # Generate missing keys and start synapse
-    subprocess.check_output(args + ["--generate-keys"])
-    os.execv("/sbin/su-exec", ["su-exec", ownership] + args)
+    os.execv("/sbin/su-exec", args)
 
 
 if __name__ == "__main__":
