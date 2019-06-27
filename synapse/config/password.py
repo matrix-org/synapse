@@ -36,10 +36,11 @@ class PasswordConfig(Config):
            #
            #enabled: false
 
-           # set to false if you do not want to authenticate
-           # against the local db (when using other password_providers
+           # Uncomment to disable authentication against the local password
+           # database. This is ignored if `enabled` is false, and is only useful
+           # if you have other password_providers.
            #
-           localdb_enabled: true
+           #localdb_enabled: false
 
            # Uncomment and change to a secret random string for extra security.
            # DO NOT CHANGE THIS AFTER INITIAL SETUP!
