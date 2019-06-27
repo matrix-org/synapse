@@ -34,8 +34,7 @@ class SetPasswordHandler(BaseHandler):
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword, requester=None):
         if not self.hs.config.password_localdb_enabled:
-            raise SynapseError(403, "Password change disabled",
-                               errcode=Codes.FORBIDDEN)
+            raise SynapseError(403, "Password change disabled", errcode=Codes.FORBIDDEN)
 
         password_hash = yield self._auth_handler.hash(newpassword)
 
