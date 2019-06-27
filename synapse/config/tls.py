@@ -286,7 +286,7 @@ class TlsConfig(Config):
         #
         # Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
         # that setting this value higher than `1.2` will prevent federation to most
-        # of the public Matrix network, only configure it to `1.3` if you have an
+        # of the public Matrix network: only configure it to `1.3` if you have an
         # entirely private federation setup and you can ensure TLS 1.3 support.
         #
         #federation_minimum_tls_client_version: 1.2
