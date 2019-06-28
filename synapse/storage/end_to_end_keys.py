@@ -239,7 +239,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             new_key_json = encode_canonical_json(device_keys).decode("utf-8")
 
             if old_key_json == new_key_json:
-                TracerUtil.set_tag("error", True)
+                TracerUtil.log_kv({"event", "key already stored"})
                 return False
 
             self._simple_upsert_txn(
