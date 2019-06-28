@@ -25,6 +25,10 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.types import StreamToken
+from synapse.util.tracerutils import (
+    TracerUtil,
+    trace_defered_function_using_operation_name,
+)
 
 from ._base import client_patterns
 
@@ -68,6 +72,7 @@ class KeyUploadServlet(RestServlet):
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
+    @trace_defered_function_using_operation_name("upload_keys")
     @defer.inlineCallbacks
     def on_POST(self, request, device_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
@@ -78,6 +83,14 @@ class KeyUploadServlet(RestServlet):
             # passing the device_id here is deprecated; however, we allow it
             # for now for compatibility with older clients.
             if requester.device_id is not None and device_id != requester.device_id:
+                TracerUtil.set_tag("error", True)
+                TracerUtil.log_kv(
+                    {
+                        "message": "Client uploading keys for a different device",
+                        "logged_in_id": requester.device_id,
+                        "key_being_uploaded": device_id,
+                    }
+                )
                 logger.warning(
                     "Client uploading keys for a different device "
                     "(logged in as %s, uploading for %s)",
