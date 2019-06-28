@@ -773,7 +773,7 @@ class RoomMemberHandler(object):
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
-        yield self.base_handler.ratelimit(requester)
+        yield self.base_handler.ratelimit(requester, update=False)
 
         can_invite = yield self.third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id,
