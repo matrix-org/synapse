@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from synapse.util.tracerutils import TracerUtil, trace_defered_function
 
 from six import iteritems
 
@@ -46,6 +47,7 @@ class E2eKeysHandler(object):
             "client_keys", self.on_federation_query_client_keys
         )
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def query_devices(self, query_body, timeout):
         """ Handle a device key query from a client
@@ -80,6 +82,9 @@ class E2eKeysHandler(object):
                 local_query[user_id] = device_ids
             else:
                 remote_queries[user_id] = device_ids
+
+        TracerUtil.set_tag("local_key_query", local_query)
+        TracerUtil.set_tag("remote_key_query", remote_queries)
 
         # First get local devices.
         failures = {}
@@ -121,6 +126,7 @@ class E2eKeysHandler(object):
                 r[user_id] = remote_queries[user_id]
 
         # Now fetch any devices that we don't have in our cache
+        @trace_defered_function
         @defer.inlineCallbacks
         def do_remote_query(destination):
             """This is called when we are querying the device list of a user on
@@ -185,6 +191,8 @@ class E2eKeysHandler(object):
             except Exception as e:
                 failure = _exception_to_failure(e)
                 failures[destination] = failure
+                TracerUtil.set_tag("error", True)
+                TracerUtil.set_tag("reason", failure)
 
         yield make_deferred_yieldable(
             defer.gatherResults(
@@ -198,6 +206,7 @@ class E2eKeysHandler(object):
 
         return {"device_keys": results, "failures": failures}
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def query_local_devices(self, query):
         """Get E2E device keys for local users
@@ -210,6 +219,7 @@ class E2eKeysHandler(object):
             defer.Deferred: (resolves to dict[string, dict[string, dict]]):
                  map from user_id -> device_id -> device details
         """
+        TracerUtil.set_tag("local_query", query)
         local_query = []
 
         result_dict = {}
@@ -217,6 +227,14 @@ class E2eKeysHandler(object):
             # we use UserID.from_string to catch invalid user ids
             if not self.is_mine(UserID.from_string(user_id)):
                 logger.warning("Request for keys for non-local user %s", user_id)
+                TracerUtil.log_kv(
+                    {
+                        "message": "Requested a local key for a user which"
+                        + " was not local to the homeserver",
+                        "user_id": user_id,
+                    }
+                )
+                TracerUtil.set_tag("error", True)
                 raise SynapseError(400, "Not a user here")
 
             if not device_ids:
@@ -241,6 +259,7 @@ class E2eKeysHandler(object):
                     r["unsigned"]["device_display_name"] = display_name
                 result_dict[user_id][device_id] = r
 
+        TracerUtil.log_kv(results)
         return result_dict
 
     @defer.inlineCallbacks
@@ -251,6 +270,7 @@ class E2eKeysHandler(object):
         res = yield self.query_local_devices(device_keys_query)
         return {"device_keys": res}
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def claim_one_time_keys(self, query, timeout):
         local_query = []
@@ -265,6 +285,9 @@ class E2eKeysHandler(object):
                 domain = get_domain_from_id(user_id)
                 remote_queries.setdefault(domain, {})[user_id] = device_keys
 
+        TracerUtil.set_tag("local_key_query", local_query)
+        TracerUtil.set_tag("remote_key_query", remote_queries)
+
         results = yield self.store.claim_e2e_one_time_keys(local_query)
 
         json_result = {}
@@ -276,8 +299,10 @@ class E2eKeysHandler(object):
                         key_id: json.loads(json_bytes)
                     }
 
+        @trace_defered_function
         @defer.inlineCallbacks
         def claim_client_keys(destination):
+            TracerUtil.set_tag("destination", destination)
             device_keys = remote_queries[destination]
             try:
                 remote_result = yield self.federation.claim_client_keys(
@@ -290,6 +315,8 @@ class E2eKeysHandler(object):
             except Exception as e:
                 failure = _exception_to_failure(e)
                 failures[destination] = failure
+                TracerUtil.set_tag("error", True)
+                TracerUtil.set_tag("reason", failure)
 
         yield make_deferred_yieldable(
             defer.gatherResults(
@@ -313,15 +340,21 @@ class E2eKeysHandler(object):
             ),
         )
 
+        TracerUtil.log_kv({"one_time_keys": json_result, "failures": failures})
         return {"one_time_keys": json_result, "failures": failures}
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def upload_keys_for_user(self, user_id, device_id, keys):
+        TracerUtil.set_tag("user_id", user_id)
+        TracerUtil.set_tag("device_id", device_id)
+        TracerUtil.set_tag("keys", keys)
 
         time_now = self.clock.time_msec()
 
         # TODO: Validate the JSON to make sure it has the right keys.
         device_keys = keys.get("device_keys", None)
+        TracerUtil.set_tag("device_keys", device_keys)
         if device_keys:
             logger.info(
                 "Updating device_keys for device %r for user %s at %d",
@@ -342,6 +375,10 @@ class E2eKeysHandler(object):
             yield self._upload_one_time_keys_for_user(
                 user_id, device_id, time_now, one_time_keys
             )
+        else:
+            TracerUtil.log_kv(
+                {"event": "did not upload one_time_keys", "reason": "no keys given"}
+            )
 
         # the device should have been registered already, but it may have been
         # deleted due to a race with a DELETE request. Or we may be using an
@@ -352,8 +389,10 @@ class E2eKeysHandler(object):
 
         result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
 
+        TracerUtil.set_tag("one_time_key_counts", result)
         return {"one_time_key_counts": result}
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def _upload_one_time_keys_for_user(
         self, user_id, device_id, time_now, one_time_keys
