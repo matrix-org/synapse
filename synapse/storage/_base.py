@@ -175,22 +175,22 @@ class PerformanceCounters(object):
         self.current_counters = {}
         self.previous_counters = {}
 
-    def update(self, key, start_time, end_time=None):
-        if end_time is None:
-            end_time = time.time()
-        duration = end_time - start_time
+    def update(self, key, duration_secs):
         count, cum_time = self.current_counters.get(key, (0, 0))
         count += 1
-        cum_time += duration
+        cum_time += duration_secs
         self.current_counters[key] = (count, cum_time)
-        return end_time
 
-    def interval(self, interval_duration, limit=3):
+    def interval(self, interval_duration_secs, limit=3):
         counters = []
         for name, (count, cum_time) in iteritems(self.current_counters):
             prev_count, prev_time = self.previous_counters.get(name, (0, 0))
             counters.append(
-                ((cum_time - prev_time) / interval_duration, count - prev_count, name)
+                (
+                    (cum_time - prev_time) / interval_duration_secs,
+                    count - prev_count,
+                    name,
+                )
             )
 
         self.previous_counters = dict(self.current_counters)
@@ -221,7 +221,6 @@ class SQLBaseStore(object):
         #   is running in mainline, and we have some nice monitoring frontends
         #   to watch it
         self._txn_perf_counters = PerformanceCounters()
-        self._get_event_counters = PerformanceCounters()
 
         self._get_event_cache = Cache(
             "*getEvent*", keylen=3, max_entries=hs.config.event_cache_size
@@ -369,21 +368,13 @@ class SQLBaseStore(object):
             time_then = self._previous_loop_ts
             self._previous_loop_ts = time_now
 
-            ratio = (curr - prev) / (time_now - time_then)
+            duration = time_now - time_then
+            ratio = (curr - prev) / duration
 
-            top_three_counters = self._txn_perf_counters.interval(
-                time_now - time_then, limit=3
-            )
-
-            top_3_event_counters = self._get_event_counters.interval(
-                time_now - time_then, limit=3
-            )
+            top_three_counters = self._txn_perf_counters.interval(duration, limit=3)
 
             perf_logger.info(
-                "Total database time: %.3f%% {%s} {%s}",
-                ratio * 100,
-                top_three_counters,
-                top_3_event_counters,
+                "Total database time: %.3f%% {%s}", ratio * 100, top_three_counters
             )
 
         self._clock.looping_call(loop, 10000)
@@ -465,7 +456,7 @@ class SQLBaseStore(object):
             transaction_logger.debug("[TXN END] {%s} %f sec", name, duration)
 
             self._current_txn_total_time += duration
-            self._txn_perf_counters.update(desc, start, end)
+            self._txn_perf_counters.update(desc, duration)
             sql_txn_timer.labels(desc).observe(duration)
 
     @defer.inlineCallbacks

@@ -23,7 +23,7 @@ import six
 
 from unpaddedbase64 import encode_base64
 
-from OpenSSL import crypto
+from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
 
 from synapse.config._base import Config, ConfigError
@@ -80,6 +80,27 @@ class TlsConfig(Config):
         self.federation_verify_certificates = config.get(
             "federation_verify_certificates", True
         )
+
+        # Minimum TLS version to use for outbound federation traffic
+        self.federation_client_minimum_tls_version = str(
+            config.get("federation_client_minimum_tls_version", 1)
+        )
+
+        if self.federation_client_minimum_tls_version not in ["1", "1.1", "1.2", "1.3"]:
+            raise ConfigError(
+                "federation_client_minimum_tls_version must be one of: 1, 1.1, 1.2, 1.3"
+            )
+
+        # Prevent people shooting themselves in the foot here by setting it to
+        # the biggest number blindly
+        if self.federation_client_minimum_tls_version == "1.3":
+            if getattr(SSL, "OP_NO_TLSv1_3", None) is None:
+                raise ConfigError(
+                    (
+                        "federation_client_minimum_tls_version cannot be 1.3, "
+                        "your OpenSSL does not support it"
+                    )
+                )
 
         # Whitelist of domains to not verify certificates for
         fed_whitelist_entries = config.get(
@@ -217,7 +238,9 @@ class TlsConfig(Config):
             if sha256_fingerprint not in sha256_fingerprints:
                 self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
-    def default_config(self, config_dir_path, server_name, data_dir_path, **kwargs):
+    def generate_config_section(
+        self, config_dir_path, server_name, data_dir_path, **kwargs
+    ):
         base_key_name = os.path.join(config_dir_path, server_name)
 
         tls_certificate_path = base_key_name + ".tls.crt"
@@ -258,6 +281,15 @@ class TlsConfig(Config):
         # following line.
         #
         #federation_verify_certificates: false
+
+        # The minimum TLS version that will be used for outbound federation requests.
+        #
+        # Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
+        # that setting this value higher than `1.2` will prevent federation to most
+        # of the public Matrix network: only configure it to `1.3` if you have an
+        # entirely private federation setup and you can ensure TLS 1.3 support.
+        #
+        #federation_client_minimum_tls_version: 1.2
 
         # Skip federation certificate verification on the following whitelist
         # of domains.

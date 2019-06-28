@@ -1,0 +1,1 @@
+Fix a regression where homeservers on private IP addresses were incorrectly blacklisted.

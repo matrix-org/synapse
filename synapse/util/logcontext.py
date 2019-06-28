@@ -336,10 +336,9 @@ class LoggingContext(object):
             logger.warning("Called stop on logcontext %s without calling start", self)
             return
 
-        usage_end = get_thread_resource_usage()
-
-        self._resource_usage.ru_utime += usage_end.ru_utime - self.usage_start.ru_utime
-        self._resource_usage.ru_stime += usage_end.ru_stime - self.usage_start.ru_stime
+        utime_delta, stime_delta = self._get_cputime()
+        self._resource_usage.ru_utime += utime_delta
+        self._resource_usage.ru_stime += stime_delta
 
         self.usage_start = None
 
@@ -357,13 +356,44 @@ class LoggingContext(object):
         # can include resource usage so far.
         is_main_thread = threading.current_thread() is self.main_thread
         if self.alive and self.usage_start and is_main_thread:
-            current = get_thread_resource_usage()
-            res.ru_utime += current.ru_utime - self.usage_start.ru_utime
-            res.ru_stime += current.ru_stime - self.usage_start.ru_stime
+            utime_delta, stime_delta = self._get_cputime()
+            res.ru_utime += utime_delta
+            res.ru_stime += stime_delta
 
         return res
 
+    def _get_cputime(self):
+        """Get the cpu usage time so far
+
+        Returns: Tuple[float, float]: seconds in user mode, seconds in system mode
+        """
+        current = get_thread_resource_usage()
+
+        utime_delta = current.ru_utime - self.usage_start.ru_utime
+        stime_delta = current.ru_stime - self.usage_start.ru_stime
+
+        # sanity check
+        if utime_delta < 0:
+            logger.error(
+                "utime went backwards! %f < %f",
+                current.ru_utime,
+                self.usage_start.ru_utime,
+            )
+            utime_delta = 0
+
+        if stime_delta < 0:
+            logger.error(
+                "stime went backwards! %f < %f",
+                current.ru_stime,
+                self.usage_start.ru_stime,
+            )
+            stime_delta = 0
+
+        return utime_delta, stime_delta
+
     def add_database_transaction(self, duration_sec):
+        if duration_sec < 0:
+            raise ValueError("DB txn time can only be non-negative")
         self._resource_usage.db_txn_count += 1
         self._resource_usage.db_txn_duration_sec += duration_sec
 
@@ -374,6 +404,8 @@ class LoggingContext(object):
             sched_sec (float): number of seconds it took us to get a
                 connection
         """
+        if sched_sec < 0:
+            raise ValueError("DB scheduling time can only be non-negative")
         self._resource_usage.db_sched_duration_sec += sched_sec
 
     def record_event_fetch(self, event_count):

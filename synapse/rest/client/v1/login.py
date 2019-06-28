@@ -336,7 +336,7 @@ class LoginRestServlet(RestServlet):
             }
         else:
             user_id, access_token = (
-                yield self.handlers.registration_handler.register(localpart=user)
+                yield self.registration_handler.register(localpart=user)
             )
 
             device_id = login_submission.get("device_id")

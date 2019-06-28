@@ -14,7 +14,7 @@ upgraded, however it may be of use to those with old installs returning to the
 project.
 
 If you are setting up a server from scratch you almost certainly should look at
-the [installation guide](INSTALL.md) instead.
+the [installation guide](../INSTALL.md) instead.
 
 ## Introduction
 The goal of Synapse 0.99.0 is to act as a stepping stone to Synapse 1.0.0. It
