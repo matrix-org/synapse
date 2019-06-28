@@ -82,22 +82,22 @@ class TlsConfig(Config):
         )
 
         # Minimum TLS version to use for outbound federation traffic
-        self.federation_minimum_tls_client_version = str(
-            config.get("federation_minimum_tls_client_version", 1)
+        self.federation_client_minimum_tls_version = str(
+            config.get("federation_client_minimum_tls_version", 1)
         )
 
-        if self.federation_minimum_tls_client_version not in ["1", "1.1", "1.2", "1.3"]:
+        if self.federation_client_minimum_tls_version not in ["1", "1.1", "1.2", "1.3"]:
             raise ConfigError(
-                "federation_minimum_tls_client_version must be one of: 1, 1.1, 1.2, 1.3"
+                "federation_client_minimum_tls_version must be one of: 1, 1.1, 1.2, 1.3"
             )
 
         # Prevent people shooting themselves in the foot here by setting it to
         # the biggest number blindly
-        if self.federation_minimum_tls_client_version == "1.3":
+        if self.federation_client_minimum_tls_version == "1.3":
             if getattr(SSL, "OP_NO_TLSv1_3", None) is None:
                 raise ConfigError(
                     (
-                        "federation_minimum_tls_client_version cannot be 1.3, "
+                        "federation_client_minimum_tls_version cannot be 1.3, "
                         "your OpenSSL does not support it"
                     )
                 )
@@ -289,7 +289,7 @@ class TlsConfig(Config):
         # of the public Matrix network: only configure it to `1.3` if you have an
         # entirely private federation setup and you can ensure TLS 1.3 support.
         #
-        #federation_minimum_tls_client_version: 1.2
+        #federation_client_minimum_tls_version: 1.2
 
         # Skip federation certificate verification on the following whitelist
         # of domains.

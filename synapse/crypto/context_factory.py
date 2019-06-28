@@ -100,7 +100,7 @@ class ClientTLSOptionsFactory(object):
         # moving to TLS 1.2 by default, we want to respect the config option if
         # it is set to 1.0 (which the alternate option, raiseMinimumTo, will not
         # let us do).
-        minTLS = _TLS_VERSION_MAP[config.federation_minimum_tls_client_version]
+        minTLS = _TLS_VERSION_MAP[config.federation_client_minimum_tls_version]
 
         self._verify_ssl = CertificateOptions(
             trustRoot=trust_root, insecurelyLowerMinimumTo=minTLS
