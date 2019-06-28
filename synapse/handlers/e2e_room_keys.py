@@ -271,7 +271,6 @@ class E2eRoomKeysHandler(object):
             )
             defer.returnValue(new_version)
 
-    @trace_defered_function
     @defer.inlineCallbacks
     def get_version_info(self, user_id, version=None):
         """Get the info about a given version of the user's backup

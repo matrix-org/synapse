@@ -23,6 +23,10 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.util.tracerutils import (
+    TracerUtil,
+    trace_defered_function_using_operation_name,
+)
 
 from ._base import client_patterns
 
@@ -311,6 +315,7 @@ class RoomKeysVersionServlet(RestServlet):
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
+    @trace_defered_function_using_operation_name("get_room_keys_version")
     @defer.inlineCallbacks
     def on_GET(self, request, version):
         """
