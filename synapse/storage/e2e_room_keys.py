@@ -18,7 +18,7 @@ import json
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from synapse.util.tracerutils import trace_defered_function, trace_function
+from synapse.util.tracerutils import trace_defered_function
 
 from ._base import SQLBaseStore
 
@@ -199,7 +199,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             raise StoreError(404, "No current backup version")
         return row[0]
 
-    @trace_function
+    @trace_defered_function
     def get_e2e_room_keys_version_info(self, user_id, version=None):
         """Get info metadata about a version of our room_keys backup.
 
@@ -242,7 +242,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "get_e2e_room_keys_version_info", _get_e2e_room_keys_version_info_txn
         )
 
-    @trace_function
+    @trace_defered_function
     def create_e2e_room_keys_version(self, user_id, info):
         """Atomically creates a new version of this user's e2e_room_keys store
         with the given version info.
@@ -283,7 +283,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
-    @trace_function
+    @trace_defered_function
     def update_e2e_room_keys_version(self, user_id, version, info):
         """Update a given backup version
 
@@ -300,7 +300,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="update_e2e_room_keys_version",
         )
 
-    @trace_function
+    @trace_defered_function
     def delete_e2e_room_keys_version(self, user_id, version=None):
         """Delete a given backup version of the user's room keys.
         Doesn't delete their actual key data.
