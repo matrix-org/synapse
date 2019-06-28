@@ -27,6 +27,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.util.async_helpers import Linearizer
+from synapse.util.tracerutils import TracerUtil, trace_defered_function
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ class E2eRoomKeysHandler(object):
         # changed.
         self._upload_linearizer = Linearizer("upload_room_keys_lock")
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def get_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk get the E2E room keys for a given backup, optionally filtered to a given
@@ -84,8 +86,10 @@ class E2eRoomKeysHandler(object):
                 user_id, version, room_id, session_id
             )
 
+            TracerUtil.log_kv(results)
             defer.returnValue(results)
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def delete_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
@@ -107,6 +111,7 @@ class E2eRoomKeysHandler(object):
         with (yield self._upload_linearizer.queue(user_id)):
             yield self.store.delete_e2e_room_keys(user_id, version, room_id, session_id)
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def upload_room_keys(self, user_id, version, room_keys):
         """Bulk upload a list of room keys into a given backup version, asserting
@@ -174,6 +179,7 @@ class E2eRoomKeysHandler(object):
                         user_id, version, room_id, session_id, session
                     )
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def _upload_room_key(self, user_id, version, room_id, session_id, room_key):
         """Upload a given room_key for a given room and session into a given
@@ -236,6 +242,7 @@ class E2eRoomKeysHandler(object):
                 return False
         return True
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def create_version(self, user_id, version_info):
         """Create a new backup version.  This automatically becomes the new
@@ -264,6 +271,7 @@ class E2eRoomKeysHandler(object):
             )
             defer.returnValue(new_version)
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def get_version_info(self, user_id, version=None):
         """Get the info about a given version of the user's backup
@@ -294,6 +302,7 @@ class E2eRoomKeysHandler(object):
                     raise
             defer.returnValue(res)
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def delete_version(self, user_id, version=None):
         """Deletes a given version of the user's e2e_room_keys backup
@@ -314,6 +323,7 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def update_version(self, user_id, version, version_info):
         """Update the info about a given version of the user's backup
