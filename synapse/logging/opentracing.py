@@ -48,6 +48,7 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
+import inspect
 
 
 class _DumTagNames(object):
@@ -401,9 +402,10 @@ def trace_function(func):
     @wraps(func)
     def f(self, *args, **kwargs):
         TracerUtil.start_active_span(func.__name__)
-        result = func(self, *args, **kwargs)
-        TracerUtil.close_active_span()
-        return result
+        try:
+            return func(self, *args, **kwargs)
+        finally:
+            TracerUtil.close_active_span()
 
     return f
 
@@ -414,5 +416,34 @@ def tag_args(func):
         TracerUtil.set_tag("args", args)
         TracerUtil.set_tag("kwargs", kwargs)
         return func(self, *args, **kwargs)
+
+    return f
+
+
+def wrap_in_span(func):
+    """Its purpose is to wrap a function that is being passed into a context
+    which is a complete break from the current logcontext. This function creates
+    a non active span from the current context and closes it after the function
+    executes."""
+
+    # I haven't use this function yet
+
+    if not TracerUtil._opentracing:
+        return func
+
+    span = TracerUtil._opentracing.tracer.start_span(
+        func.__name__, child_of=TracerUtil._opentracing.tracer.active_span
+    )
+
+    @wraps(func)
+    def f(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except Exception as e:
+            span.set_tag("error", True)
+            span.log_kv({"exception", e})
+            raise
+        finally:
+            span.finish()
 
     return f
