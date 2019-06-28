@@ -22,6 +22,7 @@ from twisted.internet import defer
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.tracerutils import TracerUtil, trace_defered_function, trace_function
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             "get_new_messages_for_device", get_new_messages_for_device_txn
         )
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def delete_messages_for_device(self, user_id, device_id, up_to_stream_id):
         """
@@ -87,11 +89,15 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         last_deleted_stream_id = self._last_device_delete_cache.get(
             (user_id, device_id), None
         )
+
+        TracerUtil.set_tag("last_deleted_stream_id", last_deleted_stream_id)
+
         if last_deleted_stream_id:
             has_changed = self._device_inbox_stream_cache.has_entity_changed(
                 user_id, last_deleted_stream_id
             )
             if not has_changed:
+                TracerUtil.log_kv({"message": "No changes in cache since last check"})
                 return 0
 
         def delete_messages_for_device_txn(txn):
@@ -107,6 +113,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             "delete_messages_for_device", delete_messages_for_device_txn
         )
 
+        TracerUtil.log_kv(
+            {"message": "deleted {} messages for device".format(count), "count": count}
+        )
+
         # Update the cache, ensuring that we only ever increase the value
         last_deleted_stream_id = self._last_device_delete_cache.get(
             (user_id, device_id), 0
@@ -117,6 +127,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         return count
 
+    @trace_defered_function
     def get_new_device_msgs_for_remote(
         self, destination, last_stream_id, current_stream_id, limit
     ):
@@ -132,16 +143,23 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 in the stream the messages got to.
         """
 
+        TracerUtil.set_tag("destination", destination)
+        TracerUtil.set_tag("last_stream_id", last_stream_id)
+        TracerUtil.set_tag("current_stream_id", current_stream_id)
+        TracerUtil.set_tag("limit", limit)
+
         has_changed = self._device_federation_outbox_stream_cache.has_entity_changed(
             destination, last_stream_id
         )
         if not has_changed or last_stream_id == current_stream_id:
+            TracerUtil.log_kv({"message": "No new messages in stream"})
             return defer.succeed(([], current_stream_id))
 
         if limit <= 0:
             # This can happen if we run out of room for EDUs in the transaction.
             return defer.succeed(([], last_stream_id))
 
+        @trace_function
         def get_new_messages_for_remote_destination_txn(txn):
             sql = (
                 "SELECT stream_id, messages_json FROM device_federation_outbox"
@@ -156,6 +174,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 stream_pos = row[0]
                 messages.append(json.loads(row[1]))
             if len(messages) < limit:
+                TracerUtil.log_kv(
+                    {"message": "Set stream position to current position"}
+                )
                 stream_pos = current_stream_id
             return (messages, stream_pos)
 
@@ -164,6 +185,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             get_new_messages_for_remote_destination_txn,
         )
 
+    @trace_defered_function
     def delete_device_msgs_for_remote(self, destination, up_to_stream_id):
         """Used to delete messages when the remote destination acknowledges
         their receipt.
@@ -214,6 +236,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, BackgroundUpdateStore):
             expiry_ms=30 * 60 * 1000,
         )
 
+    @trace_defered_function
     @defer.inlineCallbacks
     def add_messages_to_device_inbox(
         self, local_messages_by_user_then_device, remote_messages_by_destination
