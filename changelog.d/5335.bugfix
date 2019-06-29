@@ -1,1 +1,0 @@
-Fix a bug where we could rapidly mark a server as unreachable even though it was only down for a few minutes.

@@ -30,6 +30,7 @@ def _create_rerouter(func_name):
     """Returns a function that looks at the group id and calls the function
     on federation or the local group server if the group is local
     """
+
     def f(self, group_id, *args, **kwargs):
         if self.is_mine_id(group_id):
             return getattr(self.groups_server_handler, func_name)(
@@ -49,9 +50,7 @@ def _create_rerouter(func_name):
             def http_response_errback(failure):
                 failure.trap(HttpResponseException)
                 e = failure.value
-                if e.code == 403:
-                    raise e.to_synapse_error()
-                return failure
+                raise e.to_synapse_error()
 
             def request_failed_errback(failure):
                 failure.trap(RequestSendFailed)
@@ -60,6 +59,7 @@ def _create_rerouter(func_name):
             d.addErrback(http_response_errback)
             d.addErrback(request_failed_errback)
             return d
+
     return f
 
 
@@ -127,7 +127,7 @@ class GroupsLocalHandler(object):
             )
         else:
             res = yield self.transport_client.get_group_summary(
-                get_domain_from_id(group_id), group_id, requester_user_id,
+                get_domain_from_id(group_id), group_id, requester_user_id
             )
 
             group_server_name = get_domain_from_id(group_id)
@@ -184,7 +184,7 @@ class GroupsLocalHandler(object):
             content["user_profile"] = yield self.profile_handler.get_profile(user_id)
 
             res = yield self.transport_client.create_group(
-                get_domain_from_id(group_id), group_id, user_id, content,
+                get_domain_from_id(group_id), group_id, user_id, content
             )
 
             remote_attestation = res["attestation"]
@@ -197,16 +197,15 @@ class GroupsLocalHandler(object):
 
         is_publicised = content.get("publicise", False)
         token = yield self.store.register_user_group_membership(
-            group_id, user_id,
+            group_id,
+            user_id,
             membership="join",
             is_admin=True,
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
             is_publicised=is_publicised,
         )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
 
         defer.returnValue(res)
 
@@ -223,7 +222,7 @@ class GroupsLocalHandler(object):
         group_server_name = get_domain_from_id(group_id)
 
         res = yield self.transport_client.get_users_in_group(
-            get_domain_from_id(group_id), group_id, requester_user_id,
+            get_domain_from_id(group_id), group_id, requester_user_id
         )
 
         chunk = res["chunk"]
@@ -252,9 +251,7 @@ class GroupsLocalHandler(object):
         """Request to join a group
         """
         if self.is_mine_id(group_id):
-            yield self.groups_server_handler.join_group(
-                group_id, user_id, content
-            )
+            yield self.groups_server_handler.join_group(group_id, user_id, content)
             local_attestation = None
             remote_attestation = None
         else:
@@ -262,7 +259,7 @@ class GroupsLocalHandler(object):
             content["attestation"] = local_attestation
 
             res = yield self.transport_client.join_group(
-                get_domain_from_id(group_id), group_id, user_id, content,
+                get_domain_from_id(group_id), group_id, user_id, content
             )
 
             remote_attestation = res["attestation"]
@@ -278,16 +275,15 @@ class GroupsLocalHandler(object):
         is_publicised = content.get("publicise", False)
 
         token = yield self.store.register_user_group_membership(
-            group_id, user_id,
+            group_id,
+            user_id,
             membership="join",
             is_admin=False,
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
             is_publicised=is_publicised,
         )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
 
         defer.returnValue({})
 
@@ -296,9 +292,7 @@ class GroupsLocalHandler(object):
         """Accept an invite to a group
         """
         if self.is_mine_id(group_id):
-            yield self.groups_server_handler.accept_invite(
-                group_id, user_id, content
-            )
+            yield self.groups_server_handler.accept_invite(group_id, user_id, content)
             local_attestation = None
             remote_attestation = None
         else:
@@ -306,7 +300,7 @@ class GroupsLocalHandler(object):
             content["attestation"] = local_attestation
 
             res = yield self.transport_client.accept_group_invite(
-                get_domain_from_id(group_id), group_id, user_id, content,
+                get_domain_from_id(group_id), group_id, user_id, content
             )
 
             remote_attestation = res["attestation"]
@@ -322,16 +316,15 @@ class GroupsLocalHandler(object):
         is_publicised = content.get("publicise", False)
 
         token = yield self.store.register_user_group_membership(
-            group_id, user_id,
+            group_id,
+            user_id,
             membership="join",
             is_admin=False,
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
             is_publicised=is_publicised,
         )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
 
         defer.returnValue({})
 
@@ -339,17 +332,17 @@ class GroupsLocalHandler(object):
     def invite(self, group_id, user_id, requester_user_id, config):
         """Invite a user to a group
         """
-        content = {
-            "requester_user_id": requester_user_id,
-            "config": config,
-        }
+        content = {"requester_user_id": requester_user_id, "config": config}
         if self.is_mine_id(group_id):
             res = yield self.groups_server_handler.invite_to_group(
-                group_id, user_id, requester_user_id, content,
+                group_id, user_id, requester_user_id, content
             )
         else:
             res = yield self.transport_client.invite_to_group(
-                get_domain_from_id(group_id), group_id, user_id, requester_user_id,
+                get_domain_from_id(group_id),
+                group_id,
+                user_id,
+                requester_user_id,
                 content,
             )
 
@@ -372,13 +365,12 @@ class GroupsLocalHandler(object):
                 local_profile["avatar_url"] = content["profile"]["avatar_url"]
 
         token = yield self.store.register_user_group_membership(
-            group_id, user_id,
+            group_id,
+            user_id,
             membership="invite",
             content={"profile": local_profile, "inviter": content["inviter"]},
         )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
         try:
             user_profile = yield self.profile_handler.get_profile(user_id)
         except Exception as e:
@@ -393,25 +385,25 @@ class GroupsLocalHandler(object):
         """
         if user_id == requester_user_id:
             token = yield self.store.register_user_group_membership(
-                group_id, user_id,
-                membership="leave",
+                group_id, user_id, membership="leave"
             )
-            self.notifier.on_new_event(
-                "groups_key", token, users=[user_id],
-            )
+            self.notifier.on_new_event("groups_key", token, users=[user_id])
 
             # TODO: Should probably remember that we tried to leave so that we can
             # retry if the group server is currently down.
 
         if self.is_mine_id(group_id):
             res = yield self.groups_server_handler.remove_user_from_group(
-                group_id, user_id, requester_user_id, content,
+                group_id, user_id, requester_user_id, content
             )
         else:
             content["requester_user_id"] = requester_user_id
             res = yield self.transport_client.remove_user_from_group(
-                get_domain_from_id(group_id), group_id, requester_user_id,
-                user_id, content,
+                get_domain_from_id(group_id),
+                group_id,
+                requester_user_id,
+                user_id,
+                content,
             )
 
         defer.returnValue(res)
@@ -422,12 +414,9 @@ class GroupsLocalHandler(object):
         """
         # TODO: Check if user in group
         token = yield self.store.register_user_group_membership(
-            group_id, user_id,
-            membership="leave",
+            group_id, user_id, membership="leave"
         )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
 
     @defer.inlineCallbacks
     def get_joined_groups(self, user_id):
@@ -447,7 +436,7 @@ class GroupsLocalHandler(object):
             defer.returnValue({"groups": result})
         else:
             bulk_result = yield self.transport_client.bulk_get_publicised_groups(
-                get_domain_from_id(user_id), [user_id],
+                get_domain_from_id(user_id), [user_id]
             )
             result = bulk_result.get("users", {}).get(user_id)
             # TODO: Verify attestations
@@ -462,9 +451,7 @@ class GroupsLocalHandler(object):
             if self.hs.is_mine_id(user_id):
                 local_users.add(user_id)
             else:
-                destinations.setdefault(
-                    get_domain_from_id(user_id), set()
-                ).add(user_id)
+                destinations.setdefault(get_domain_from_id(user_id), set()).add(user_id)
 
         if not proxy and destinations:
             raise SynapseError(400, "Some user_ids are not local")
@@ -474,16 +461,14 @@ class GroupsLocalHandler(object):
         for destination, dest_user_ids in iteritems(destinations):
             try:
                 r = yield self.transport_client.bulk_get_publicised_groups(
-                    destination, list(dest_user_ids),
+                    destination, list(dest_user_ids)
                 )
                 results.update(r["users"])
             except Exception:
                 failed_results.extend(dest_user_ids)
 
         for uid in local_users:
-            results[uid] = yield self.store.get_publicised_groups_for_user(
-                uid
-            )
+            results[uid] = yield self.store.get_publicised_groups_for_user(uid)
 
             # Check AS associated groups for this user - this depends on the
             # RegExps in the AS registration file (under `users`)

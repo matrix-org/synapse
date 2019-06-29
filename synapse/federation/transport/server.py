@@ -66,8 +66,7 @@ class TransportLayerServer(JsonResource):
 
         self.authenticator = Authenticator(hs)
         self.ratelimiter = FederationRateLimiter(
-            self.clock,
-            config=hs.config.rc_federation,
+            self.clock, config=hs.config.rc_federation
         )
 
         self.register_servlets()
@@ -84,11 +83,13 @@ class TransportLayerServer(JsonResource):
 
 class AuthenticationError(SynapseError):
     """There was a problem authenticating the request"""
+
     pass
 
 
 class NoAuthenticationError(AuthenticationError):
     """The request had no authentication information"""
+
     pass
 
 
@@ -105,8 +106,8 @@ class Authenticator(object):
     def authenticate_request(self, request, content):
         now = self._clock.time_msec()
         json_request = {
-            "method": request.method.decode('ascii'),
-            "uri": request.uri.decode('ascii'),
+            "method": request.method.decode("ascii"),
+            "uri": request.uri.decode("ascii"),
             "destination": self.server_name,
             "signatures": {},
         }
@@ -120,7 +121,7 @@ class Authenticator(object):
 
         if not auth_headers:
             raise NoAuthenticationError(
-                401, "Missing Authorization headers", Codes.UNAUTHORIZED,
+                401, "Missing Authorization headers", Codes.UNAUTHORIZED
             )
 
         for auth in auth_headers:
@@ -130,14 +131,14 @@ class Authenticator(object):
                 json_request["signatures"].setdefault(origin, {})[key] = sig
 
         if (
-            self.federation_domain_whitelist is not None and
-            origin not in self.federation_domain_whitelist
+            self.federation_domain_whitelist is not None
+            and origin not in self.federation_domain_whitelist
         ):
             raise FederationDeniedError(origin)
 
         if not json_request["signatures"]:
             raise NoAuthenticationError(
-                401, "Missing Authorization headers", Codes.UNAUTHORIZED,
+                401, "Missing Authorization headers", Codes.UNAUTHORIZED
             )
 
         yield self.keyring.verify_json_for_server(
@@ -177,12 +178,12 @@ def _parse_auth_header(header_bytes):
         AuthenticationError if the header could not be parsed
     """
     try:
-        header_str = header_bytes.decode('utf-8')
+        header_str = header_bytes.decode("utf-8")
         params = header_str.split(" ")[1].split(",")
         param_dict = dict(kv.split("=") for kv in params)
 
         def strip_quotes(value):
-            if value.startswith("\""):
+            if value.startswith('"'):
                 return value[1:-1]
             else:
                 return value
@@ -198,11 +199,11 @@ def _parse_auth_header(header_bytes):
     except Exception as e:
         logger.warn(
             "Error parsing auth header '%s': %s",
-            header_bytes.decode('ascii', 'replace'),
+            header_bytes.decode("ascii", "replace"),
             e,
         )
         raise AuthenticationError(
-            400, "Malformed Authorization header", Codes.UNAUTHORIZED,
+            400, "Malformed Authorization header", Codes.UNAUTHORIZED
         )
 
 
@@ -242,6 +243,7 @@ class BaseFederationServlet(object):
             Exception: other exceptions will be caught, logged, and a 500 will be
                 returned.
     """
+
     REQUIRE_AUTH = True
 
     PREFIX = FEDERATION_V1_PREFIX  # Allows specifying the API version
@@ -293,9 +295,7 @@ class BaseFederationServlet(object):
                         origin, content, request.args, *args, **kwargs
                     )
             else:
-                response = yield func(
-                    origin, content, request.args, *args, **kwargs
-                )
+                response = yield func(origin, content, request.args, *args, **kwargs)
 
             defer.returnValue(response)
 
@@ -343,14 +343,12 @@ class FederationSendServlet(BaseFederationServlet):
         try:
             transaction_data = content
 
-            logger.debug(
-                "Decoded %s: %s",
-                transaction_id, str(transaction_data)
-            )
+            logger.debug("Decoded %s: %s", transaction_id, str(transaction_data))
 
             logger.info(
                 "Received txn %s from %s. (PDUs: %d, EDUs: %d)",
-                transaction_id, origin,
+                transaction_id,
+                origin,
                 len(transaction_data.get("pdus", [])),
                 len(transaction_data.get("edus", [])),
             )
@@ -361,8 +359,7 @@ class FederationSendServlet(BaseFederationServlet):
             # Add some extra data to the transaction dict that isn't included
             # in the request body.
             transaction_data.update(
-                transaction_id=transaction_id,
-                destination=self.server_name
+                transaction_id=transaction_id, destination=self.server_name
             )
 
         except Exception as e:
@@ -372,7 +369,7 @@ class FederationSendServlet(BaseFederationServlet):
 
         try:
             code, response = yield self.handler.on_incoming_transaction(
-                origin, transaction_data,
+                origin, transaction_data
             )
         except Exception:
             logger.exception("on_incoming_transaction failed")
@@ -416,7 +413,7 @@ class FederationBackfillServlet(BaseFederationServlet):
     PATH = "/backfill/(?P<context>[^/]*)/?"
 
     def on_GET(self, origin, content, query, context):
-        versions = [x.decode('ascii') for x in query[b"v"]]
+        versions = [x.decode("ascii") for x in query[b"v"]]
         limit = parse_integer_from_args(query, "limit", None)
 
         if not limit:
@@ -432,7 +429,7 @@ class FederationQueryServlet(BaseFederationServlet):
     def on_GET(self, origin, content, query, query_type):
         return self.handler.on_query_request(
             query_type,
-            {k.decode('utf8'): v[0].decode("utf-8") for k, v in query.items()}
+            {k.decode("utf8"): v[0].decode("utf-8") for k, v in query.items()},
         )
 
 
@@ -456,15 +453,14 @@ class FederationMakeJoinServlet(BaseFederationServlet):
             Deferred[(int, object)|None]: either (response code, response object) to
                  return a JSON response, or None if the request has already been handled.
         """
-        versions = query.get(b'ver')
+        versions = query.get(b"ver")
         if versions is not None:
             supported_versions = [v.decode("utf-8") for v in versions]
         else:
             supported_versions = ["1"]
 
         content = yield self.handler.on_make_join_request(
-            origin, context, user_id,
-            supported_versions=supported_versions,
+            origin, context, user_id, supported_versions=supported_versions
         )
         defer.returnValue((200, content))
 
@@ -474,9 +470,7 @@ class FederationMakeLeaveServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, context, user_id):
-        content = yield self.handler.on_make_leave_request(
-            origin, context, user_id,
-        )
+        content = yield self.handler.on_make_leave_request(origin, context, user_id)
         defer.returnValue((200, content))
 
 
@@ -517,7 +511,7 @@ class FederationV1InviteServlet(BaseFederationServlet):
         # state resolution algorithm, and we don't use that for processing
         # invites
         content = yield self.handler.on_invite_request(
-            origin, content, room_version=RoomVersions.V1.identifier,
+            origin, content, room_version=RoomVersions.V1.identifier
         )
 
         # V1 federation API is defined to return a content of `[200, {...}]`
@@ -545,7 +539,7 @@ class FederationV2InviteServlet(BaseFederationServlet):
         event.setdefault("unsigned", {})["invite_room_state"] = invite_room_state
 
         content = yield self.handler.on_invite_request(
-            origin, event, room_version=room_version,
+            origin, event, room_version=room_version
         )
         defer.returnValue((200, content))
 
@@ -629,8 +623,10 @@ class On3pidBindServlet(BaseFederationServlet):
             for invite in content["invites"]:
                 try:
                     if "signed" not in invite or "token" not in invite["signed"]:
-                        message = ("Rejecting received notification of third-"
-                                   "party invite without signed: %s" % (invite,))
+                        message = (
+                            "Rejecting received notification of third-"
+                            "party invite without signed: %s" % (invite,)
+                        )
                         logger.info(message)
                         raise SynapseError(400, message)
                     yield self.handler.exchange_third_party_invite(
@@ -671,18 +667,23 @@ class OpenIdUserInfo(BaseFederationServlet):
     def on_GET(self, origin, content, query):
         token = query.get(b"access_token", [None])[0]
         if token is None:
-            defer.returnValue((401, {
-                "errcode": "M_MISSING_TOKEN", "error": "Access Token required"
-            }))
+            defer.returnValue(
+                (401, {"errcode": "M_MISSING_TOKEN", "error": "Access Token required"})
+            )
             return
 
-        user_id = yield self.handler.on_openid_userinfo(token.decode('ascii'))
+        user_id = yield self.handler.on_openid_userinfo(token.decode("ascii"))
 
         if user_id is None:
-            defer.returnValue((401, {
-                "errcode": "M_UNKNOWN_TOKEN",
-                "error": "Access Token unknown or expired"
-            }))
+            defer.returnValue(
+                (
+                    401,
+                    {
+                        "errcode": "M_UNKNOWN_TOKEN",
+                        "error": "Access Token unknown or expired",
+                    },
+                )
+            )
 
         defer.returnValue((200, {"sub": user_id}))
 
@@ -720,15 +721,15 @@ class PublicRoomList(BaseFederationServlet):
 
     PATH = "/publicRooms"
 
-    def __init__(self, handler, authenticator, ratelimiter, server_name, deny_access):
+    def __init__(self, handler, authenticator, ratelimiter, server_name, allow_access):
         super(PublicRoomList, self).__init__(
-            handler, authenticator, ratelimiter, server_name,
+            handler, authenticator, ratelimiter, server_name
         )
-        self.deny_access = deny_access
+        self.allow_access = allow_access
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query):
-        if self.deny_access:
+        if not self.allow_access:
             raise FederationDeniedError(origin)
 
         limit = parse_integer_from_args(query, "limit", 0)
@@ -748,9 +749,7 @@ class PublicRoomList(BaseFederationServlet):
             network_tuple = ThirdPartyInstanceID(None, None)
 
         data = yield self.handler.get_local_public_room_list(
-            limit, since_token,
-            network_tuple=network_tuple,
-            from_federation=True,
+            limit, since_token, network_tuple=network_tuple, from_federation=True
         )
         defer.returnValue((200, data))
 
@@ -761,17 +760,18 @@ class FederationVersionServlet(BaseFederationServlet):
     REQUIRE_AUTH = False
 
     def on_GET(self, origin, content, query):
-        return defer.succeed((200, {
-            "server": {
-                "name": "Synapse",
-                "version": get_version_string(synapse)
-            },
-        }))
+        return defer.succeed(
+            (
+                200,
+                {"server": {"name": "Synapse", "version": get_version_string(synapse)}},
+            )
+        )
 
 
 class FederationGroupsProfileServlet(BaseFederationServlet):
     """Get/set the basic profile of a group on behalf of a user
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/profile"
 
     @defer.inlineCallbacks
@@ -780,9 +780,7 @@ class FederationGroupsProfileServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.get_group_profile(
-            group_id, requester_user_id
-        )
+        new_content = yield self.handler.get_group_profile(group_id, requester_user_id)
 
         defer.returnValue((200, new_content))
 
@@ -808,9 +806,7 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.get_group_summary(
-            group_id, requester_user_id
-        )
+        new_content = yield self.handler.get_group_summary(group_id, requester_user_id)
 
         defer.returnValue((200, new_content))
 
@@ -818,6 +814,7 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
 class FederationGroupsRoomsServlet(BaseFederationServlet):
     """Get the rooms in a group on behalf of a user
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/rooms"
 
     @defer.inlineCallbacks
@@ -826,9 +823,7 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.get_rooms_in_group(
-            group_id, requester_user_id
-        )
+        new_content = yield self.handler.get_rooms_in_group(group_id, requester_user_id)
 
         defer.returnValue((200, new_content))
 
@@ -836,6 +831,7 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
 class FederationGroupsAddRoomsServlet(BaseFederationServlet):
     """Add/remove room from group
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
 
     @defer.inlineCallbacks
@@ -857,7 +853,7 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
         new_content = yield self.handler.remove_room_from_group(
-            group_id, requester_user_id, room_id,
+            group_id, requester_user_id, room_id
         )
 
         defer.returnValue((200, new_content))
@@ -866,6 +862,7 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
 class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
     """Update room config in group
     """
+
     PATH = (
         "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
         "/config/(?P<config_key>[^/]*)"
@@ -878,7 +875,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
         result = yield self.groups_handler.update_room_in_group(
-            group_id, requester_user_id, room_id, config_key, content,
+            group_id, requester_user_id, room_id, config_key, content
         )
 
         defer.returnValue((200, result))
@@ -887,6 +884,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
 class FederationGroupsUsersServlet(BaseFederationServlet):
     """Get the users in a group on behalf of a user
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/users"
 
     @defer.inlineCallbacks
@@ -895,9 +893,7 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        new_content = yield self.handler.get_users_in_group(
-            group_id, requester_user_id
-        )
+        new_content = yield self.handler.get_users_in_group(group_id, requester_user_id)
 
         defer.returnValue((200, new_content))
 
@@ -905,6 +901,7 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
 class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
     """Get the users that have been invited to a group
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/invited_users"
 
     @defer.inlineCallbacks
@@ -923,6 +920,7 @@ class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
 class FederationGroupsInviteServlet(BaseFederationServlet):
     """Ask a group server to invite someone to the group
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
     @defer.inlineCallbacks
@@ -932,7 +930,7 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
         new_content = yield self.handler.invite_to_group(
-            group_id, user_id, requester_user_id, content,
+            group_id, user_id, requester_user_id, content
         )
 
         defer.returnValue((200, new_content))
@@ -941,6 +939,7 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
 class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
     """Accept an invitation from the group server
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite"
 
     @defer.inlineCallbacks
@@ -948,9 +947,7 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
         if get_domain_from_id(user_id) != origin:
             raise SynapseError(403, "user_id doesn't match origin")
 
-        new_content = yield self.handler.accept_invite(
-            group_id, user_id, content,
-        )
+        new_content = yield self.handler.accept_invite(group_id, user_id, content)
 
         defer.returnValue((200, new_content))
 
@@ -958,6 +955,7 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
 class FederationGroupsJoinServlet(BaseFederationServlet):
     """Attempt to join a group
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join"
 
     @defer.inlineCallbacks
@@ -965,9 +963,7 @@ class FederationGroupsJoinServlet(BaseFederationServlet):
         if get_domain_from_id(user_id) != origin:
             raise SynapseError(403, "user_id doesn't match origin")
 
-        new_content = yield self.handler.join_group(
-            group_id, user_id, content,
-        )
+        new_content = yield self.handler.join_group(group_id, user_id, content)
 
         defer.returnValue((200, new_content))
 
@@ -975,6 +971,7 @@ class FederationGroupsJoinServlet(BaseFederationServlet):
 class FederationGroupsRemoveUserServlet(BaseFederationServlet):
     """Leave or kick a user from the group
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
     @defer.inlineCallbacks
@@ -984,7 +981,7 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
         new_content = yield self.handler.remove_user_from_group(
-            group_id, user_id, requester_user_id, content,
+            group_id, user_id, requester_user_id, content
         )
 
         defer.returnValue((200, new_content))
@@ -993,6 +990,7 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
 class FederationGroupsLocalInviteServlet(BaseFederationServlet):
     """A group server has invited a local user
     """
+
     PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
     @defer.inlineCallbacks
@@ -1000,9 +998,7 @@ class FederationGroupsLocalInviteServlet(BaseFederationServlet):
         if get_domain_from_id(group_id) != origin:
             raise SynapseError(403, "group_id doesn't match origin")
 
-        new_content = yield self.handler.on_invite(
-            group_id, user_id, content,
-        )
+        new_content = yield self.handler.on_invite(group_id, user_id, content)
 
         defer.returnValue((200, new_content))
 
@@ -1010,6 +1006,7 @@ class FederationGroupsLocalInviteServlet(BaseFederationServlet):
 class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
     """A group server has removed a local user
     """
+
     PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
     @defer.inlineCallbacks
@@ -1018,7 +1015,7 @@ class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
             raise SynapseError(403, "user_id doesn't match origin")
 
         new_content = yield self.handler.user_removed_from_group(
-            group_id, user_id, content,
+            group_id, user_id, content
         )
 
         defer.returnValue((200, new_content))
@@ -1027,6 +1024,7 @@ class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
 class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
     """A group or user's server renews their attestation
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)"
 
     @defer.inlineCallbacks
@@ -1047,6 +1045,7 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
         - /groups/:group/summary/rooms/:room_id
         - /groups/:group/summary/categories/:category/rooms/:room_id
     """
+
     PATH = (
         "/groups/(?P<group_id>[^/]*)/summary"
         "(/categories/(?P<category_id>[^/]+))?"
@@ -1063,7 +1062,8 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
             raise SynapseError(400, "category_id cannot be empty string")
 
         resp = yield self.handler.update_group_summary_room(
-            group_id, requester_user_id,
+            group_id,
+            requester_user_id,
             room_id=room_id,
             category_id=category_id,
             content=content,
@@ -1081,9 +1081,7 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
             raise SynapseError(400, "category_id cannot be empty string")
 
         resp = yield self.handler.delete_group_summary_room(
-            group_id, requester_user_id,
-            room_id=room_id,
-            category_id=category_id,
+            group_id, requester_user_id, room_id=room_id, category_id=category_id
         )
 
         defer.returnValue((200, resp))
@@ -1092,9 +1090,8 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
 class FederationGroupsCategoriesServlet(BaseFederationServlet):
     """Get all categories for a group
     """
-    PATH = (
-        "/groups/(?P<group_id>[^/]*)/categories/?"
-    )
+
+    PATH = "/groups/(?P<group_id>[^/]*)/categories/?"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -1102,9 +1099,7 @@ class FederationGroupsCategoriesServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        resp = yield self.handler.get_group_categories(
-            group_id, requester_user_id,
-        )
+        resp = yield self.handler.get_group_categories(group_id, requester_user_id)
 
         defer.returnValue((200, resp))
 
@@ -1112,9 +1107,8 @@ class FederationGroupsCategoriesServlet(BaseFederationServlet):
 class FederationGroupsCategoryServlet(BaseFederationServlet):
     """Add/remove/get a category in a group
     """
-    PATH = (
-        "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)"
-    )
+
+    PATH = "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id, category_id):
@@ -1138,7 +1132,7 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
             raise SynapseError(400, "category_id cannot be empty string")
 
         resp = yield self.handler.upsert_group_category(
-            group_id, requester_user_id, category_id, content,
+            group_id, requester_user_id, category_id, content
         )
 
         defer.returnValue((200, resp))
@@ -1153,7 +1147,7 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
             raise SynapseError(400, "category_id cannot be empty string")
 
         resp = yield self.handler.delete_group_category(
-            group_id, requester_user_id, category_id,
+            group_id, requester_user_id, category_id
         )
 
         defer.returnValue((200, resp))
@@ -1162,9 +1156,8 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
 class FederationGroupsRolesServlet(BaseFederationServlet):
     """Get roles in a group
     """
-    PATH = (
-        "/groups/(?P<group_id>[^/]*)/roles/?"
-    )
+
+    PATH = "/groups/(?P<group_id>[^/]*)/roles/?"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -1172,9 +1165,7 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        resp = yield self.handler.get_group_roles(
-            group_id, requester_user_id,
-        )
+        resp = yield self.handler.get_group_roles(group_id, requester_user_id)
 
         defer.returnValue((200, resp))
 
@@ -1182,9 +1173,8 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
 class FederationGroupsRoleServlet(BaseFederationServlet):
     """Add/remove/get a role in a group
     """
-    PATH = (
-        "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)"
-    )
+
+    PATH = "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id, role_id):
@@ -1192,9 +1182,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        resp = yield self.handler.get_group_role(
-            group_id, requester_user_id, role_id
-        )
+        resp = yield self.handler.get_group_role(group_id, requester_user_id, role_id)
 
         defer.returnValue((200, resp))
 
@@ -1208,7 +1196,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
             raise SynapseError(400, "role_id cannot be empty string")
 
         resp = yield self.handler.update_group_role(
-            group_id, requester_user_id, role_id, content,
+            group_id, requester_user_id, role_id, content
         )
 
         defer.returnValue((200, resp))
@@ -1223,7 +1211,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
             raise SynapseError(400, "role_id cannot be empty string")
 
         resp = yield self.handler.delete_group_role(
-            group_id, requester_user_id, role_id,
+            group_id, requester_user_id, role_id
         )
 
         defer.returnValue((200, resp))
@@ -1236,6 +1224,7 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
         - /groups/:group/summary/users/:user_id
         - /groups/:group/summary/roles/:role/users/:user_id
     """
+
     PATH = (
         "/groups/(?P<group_id>[^/]*)/summary"
         "(/roles/(?P<role_id>[^/]+))?"
@@ -1252,7 +1241,8 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
             raise SynapseError(400, "role_id cannot be empty string")
 
         resp = yield self.handler.update_group_summary_user(
-            group_id, requester_user_id,
+            group_id,
+            requester_user_id,
             user_id=user_id,
             role_id=role_id,
             content=content,
@@ -1270,9 +1260,7 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
             raise SynapseError(400, "role_id cannot be empty string")
 
         resp = yield self.handler.delete_group_summary_user(
-            group_id, requester_user_id,
-            user_id=user_id,
-            role_id=role_id,
+            group_id, requester_user_id, user_id=user_id, role_id=role_id
         )
 
         defer.returnValue((200, resp))
@@ -1281,14 +1269,13 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
 class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
     """Get roles in a group
     """
-    PATH = (
-        "/get_groups_publicised"
-    )
+
+    PATH = "/get_groups_publicised"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query):
         resp = yield self.handler.bulk_get_publicised_groups(
-            content["user_ids"], proxy=False,
+            content["user_ids"], proxy=False
         )
 
         defer.returnValue((200, resp))
@@ -1297,6 +1284,7 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
 class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
     """Sets whether a group is joinable without an invite or knock
     """
+
     PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy"
 
     @defer.inlineCallbacks
@@ -1317,6 +1305,7 @@ class RoomComplexityServlet(BaseFederationServlet):
     Indicates to other servers how complex (and therefore likely
     resource-intensive) a public room this server knows about is.
     """
+
     PATH = "/rooms/(?P<room_id>[^/]*)/complexity"
     PREFIX = FEDERATION_UNSTABLE_PREFIX
 
@@ -1325,9 +1314,7 @@ class RoomComplexityServlet(BaseFederationServlet):
 
         store = self.handler.hs.get_datastore()
 
-        is_public = yield store.is_room_world_readable_or_publicly_joinable(
-            room_id
-        )
+        is_public = yield store.is_room_world_readable_or_publicly_joinable(room_id)
 
         if not is_public:
             raise SynapseError(404, "Room not found", errcode=Codes.INVALID_PARAM)
@@ -1362,13 +1349,9 @@ FEDERATION_SERVLET_CLASSES = (
     RoomComplexityServlet,
 )
 
-OPENID_SERVLET_CLASSES = (
-    OpenIdUserInfo,
-)
+OPENID_SERVLET_CLASSES = (OpenIdUserInfo,)
 
-ROOM_LIST_CLASSES = (
-    PublicRoomList,
-)
+ROOM_LIST_CLASSES = (PublicRoomList,)
 
 GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsProfileServlet,
@@ -1399,9 +1382,7 @@ GROUP_LOCAL_SERVLET_CLASSES = (
 )
 
 
-GROUP_ATTESTATION_SERVLET_CLASSES = (
-    FederationGroupsRenewAttestaionServlet,
-)
+GROUP_ATTESTATION_SERVLET_CLASSES = (FederationGroupsRenewAttestaionServlet,)
 
 DEFAULT_SERVLET_GROUPS = (
     "federation",
@@ -1455,7 +1436,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
-                deny_access=hs.config.restrict_public_rooms_to_local_users,
+                allow_access=hs.config.allow_public_rooms_over_federation,
             ).register(resource)
 
     if "group_server" in servlet_groups:

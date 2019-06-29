@@ -26,14 +26,9 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import account_validity, register, sync
+from synapse.rest.client.v2_alpha import account, account_validity, register, sync
 
 from tests import unittest
-
-try:
-    from synapse.push.mailer import load_jinja2_templates
-except ImportError:
-    load_jinja2_templates = None
 
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
@@ -307,13 +302,13 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
 class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
-    skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
         register.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         sync.register_servlets,
         account_validity.register_servlets,
+        account.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -340,7 +335,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         config["email"] = {
             "enable_notifs": True,
             "template_dir": os.path.abspath(
-                pkg_resources.resource_filename('synapse', 'res/templates')
+                pkg_resources.resource_filename("synapse", "res/templates")
             ),
             "expiry_template_html": "notice_expiry.html",
             "expiry_template_text": "notice_expiry.txt",
@@ -364,20 +359,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
     def test_renewal_email(self):
         self.email_attempts = []
 
-        user_id = self.register_user("kermit", "monkey")
-        tok = self.login("kermit", "monkey")
-        # We need to manually add an email address otherwise the handler will do
-        # nothing.
-        now = self.hs.clock.time_msec()
-        self.get_success(
-            self.store.user_add_threepid(
-                user_id=user_id,
-                medium="email",
-                address="kermit@example.com",
-                validated_at=now,
-                added_at=now,
-            )
-        )
+        (user_id, tok) = self.create_user()
 
         # Move 6 days forward. This should trigger a renewal email to be sent.
         self.reactor.advance(datetime.timedelta(days=6).total_seconds())
@@ -402,6 +384,43 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
     def test_manual_email_send(self):
         self.email_attempts = []
 
+        (user_id, tok) = self.create_user()
+        request, channel = self.make_request(
+            b"POST",
+            "/_matrix/client/unstable/account_validity/send_mail",
+            access_token=tok,
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.assertEqual(len(self.email_attempts), 1)
+
+    def test_deactivated_user(self):
+        self.email_attempts = []
+
+        (user_id, tok) = self.create_user()
+
+        request_data = json.dumps(
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "user": user_id,
+                    "password": "monkey",
+                },
+                "erase": False,
+            }
+        )
+        request, channel = self.make_request(
+            "POST", "account/deactivate", request_data, access_token=tok
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
+
+        self.reactor.advance(datetime.timedelta(days=8).total_seconds())
+
+        self.assertEqual(len(self.email_attempts), 0)
+
+    def create_user(self):
         user_id = self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
         # We need to manually add an email address otherwise the handler will do
@@ -416,7 +435,33 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
                 added_at=now,
             )
         )
+        return (user_id, tok)
 
+    def test_manual_email_send_expired_account(self):
+        user_id = self.register_user("kermit", "monkey")
+        tok = self.login("kermit", "monkey")
+
+        # We need to manually add an email address otherwise the handler will do
+        # nothing.
+        now = self.hs.clock.time_msec()
+        self.get_success(
+            self.store.user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address="kermit@example.com",
+                validated_at=now,
+                added_at=now,
+            )
+        )
+
+        # Make the account expire.
+        self.reactor.advance(datetime.timedelta(days=8).total_seconds())
+
+        # Ignore all emails sent by the automatic background task and only focus on the
+        # ones sent manually.
+        self.email_attempts = []
+
+        # Test that we're still able to manually trigger a mail to be sent.
         request, channel = self.make_request(
             b"POST",
             "/_matrix/client/unstable/account_validity/send_mail",
@@ -430,20 +475,16 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
 class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
 
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-    ]
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
 
     def make_homeserver(self, reactor, clock):
         self.validity_period = 10
-        self.max_delta = self.validity_period * 10. / 100.
+        self.max_delta = self.validity_period * 10.0 / 100.0
 
         config = self.default_config()
 
         config["enable_registration"] = True
-        config["account_validity"] = {
-            "enabled": False,
-        }
+        config["account_validity"] = {"enabled": False}
 
         self.hs = self.setup_test_homeserver(config=config)
         self.hs.config.account_validity.period = self.validity_period

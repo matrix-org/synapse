@@ -21,7 +21,7 @@ server_name: "{{ SYNAPSE_SERVER_NAME }}"
 pid_file: /homeserver.pid
 web_client: False
 soft_file_limit: 0
-log_config: "/compiled/log.config"
+log_config: "{{ SYNAPSE_LOG_CONFIG }}"
 
 ## Ports ##
 

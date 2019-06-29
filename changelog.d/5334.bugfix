@@ -1,1 +1,0 @@
-Fix bug which would make certain operations (such as room joins) block for 20 minutes while attemoting to fetch verification keys.

@@ -109,7 +109,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test when user has blocked notice, but notice ought to be there (NOOP)
         """
         self._rlsn._auth.check_auth_blocking = Mock(
-            side_effect=ResourceLimitError(403, 'foo')
+            side_effect=ResourceLimitError(403, "foo")
         )
 
         mock_event = Mock(
@@ -128,7 +128,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
 
         self._rlsn._auth.check_auth_blocking = Mock(
-            side_effect=ResourceLimitError(403, 'foo')
+            side_effect=ResourceLimitError(403, "foo")
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 

@@ -17,14 +17,22 @@
 """ This is a reference implementation of a Matrix home server.
 """
 
+import sys
+
+# Check that we're not running on an unsupported Python version.
+if sys.version_info < (3, 5):
+    print("Synapse requires Python 3.5 or above.")
+    sys.exit(1)
+
 try:
     from twisted.internet import protocol
     from twisted.internet.protocol import Factory
     from twisted.names.dns import DNSDatagramProtocol
+
     protocol.Factory.noisy = False
     Factory.noisy = False
     DNSDatagramProtocol.noisy = False
 except ImportError:
     pass
 
-__version__ = "0.99.5.2"
+__version__ = "1.0.0"

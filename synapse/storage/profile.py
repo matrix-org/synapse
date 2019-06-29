@@ -41,7 +41,7 @@ class ProfileWorkerStore(SQLBaseStore):
 
         defer.returnValue(
             ProfileInfo(
-                avatar_url=profile['avatar_url'], display_name=profile['displayname']
+                avatar_url=profile["avatar_url"], display_name=profile["displayname"]
             )
         )
 
