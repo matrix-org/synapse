@@ -190,7 +190,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             json_data_callback=ANY,
             long_retries=True,
             backoff_on_404=True,
-            retry_on_dns_fail=False,
+            retry_on_dns_fail=True,
             try_trailing_slash_on_400=True,
         )
 
@@ -264,7 +264,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ),
             json_data_callback=ANY,
             long_retries=True,
-            retry_on_dns_fail=False,
+            retry_on_dns_fail=True,
             backoff_on_404=True,
             try_trailing_slash_on_400=True,
         )
