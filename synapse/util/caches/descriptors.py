@@ -410,7 +410,9 @@ class CacheDescriptor(_CacheDescriptorBase):
             wrapped.invalidate = cache.invalidate
             wrapped.invalidate_all = cache.invalidate_all
             wrapped.invalidate_many = cache.invalidate_many
-            wrapped.prefill = cache.prefill
+            wrapped.prefill = lambda key, val: cache.prefill(
+                key, ObservableDeferred(defer.succeed(val))
+            )
 
         wrapped.invalidate_all = cache.invalidate_all
         wrapped.cache = cache

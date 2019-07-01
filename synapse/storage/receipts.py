@@ -300,7 +300,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
         if res is not None:
-            print(res)
             res = res.get_result()
 
         if res and user_id in res:
