@@ -20,6 +20,7 @@ import sys
 from io import BytesIO
 
 from six import PY3, raise_from, string_types
+from service_identity.exceptions import VerificationError
 from six.moves import urllib
 
 import attr
@@ -432,7 +433,7 @@ class MatrixFederationHttpClient(object):
                         for i in e.reasons:
                             # If it's an OpenSSL error, they probably don't have
                             # a valid certificate or something else very bad went on.
-                            if i.check(SSL.Error):
+                            if i.check(SSL.Error) or i.check(VerificationError):
                                 if self.backoff_settings.invalid_tls:
                                     raise_from(RequestSendFailed(e, can_retry=False), e)
 
