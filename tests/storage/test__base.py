@@ -192,7 +192,6 @@ class CacheDecoratorTestCase(unittest.TestCase):
         a = A()
 
         a.func.prefill(("foo",), 123)
-        print(a.func("foo"))
         self.assertEquals(a.func("foo").result, 123)
         self.assertEquals(callcount[0], 0)
 

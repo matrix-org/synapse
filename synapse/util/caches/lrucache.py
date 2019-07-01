@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import threading
-from functools import wraps
 
 import attr
+import threading
+from functools import wraps
 
 from synapse.util.caches.treecache import TreeCache
 
@@ -30,7 +30,7 @@ def enumerate_leaves(node, depth):
                 yield m
 
 
-@attr.s(slots=True)
+@attr.s
 class _Node(object):
     prev_node = attr.ib()
     next_node = attr.ib()
@@ -49,7 +49,14 @@ class LruCache(object):
     when that key gets invalidated/evicted.
     """
 
-    def __init__(self, max_size, keylen=1, cache_type=dict, evicted_callback=None):
+    def __init__(
+        self,
+        max_size,
+        keylen=1,
+        cache_type=dict,
+        size_callback=None,
+        evicted_callback=None,
+    ):
         """
         Args:
             max_size (int):
@@ -59,6 +66,8 @@ class LruCache(object):
             cache_type (type):
                 type of underlying cache to be used. Typically one of dict
                 or TreeCache.
+
+            size_callback (func(V) -> int | None):
 
             evicted_callback (func(int)|None):
                 if not None, called on eviction with the size of the evicted
@@ -88,8 +97,16 @@ class LruCache(object):
 
             return inner
 
-        def cache_len():
-            return len(cache)
+        cached_cache_len = [0]
+        if size_callback is not None:
+
+            def cache_len():
+                return cached_cache_len[0]
+
+        else:
+
+            def cache_len():
+                return len(cache)
 
         self.len = synchronized(cache_len)
 
@@ -100,6 +117,9 @@ class LruCache(object):
             prev_node.next_node = node
             next_node.prev_node = node
             cache[key] = node
+
+            if size_callback:
+                cached_cache_len[0] += size_callback(node.value)
 
         def move_node_to_front(node):
             prev_node = node.prev_node
@@ -120,6 +140,10 @@ class LruCache(object):
             next_node.prev_node = prev_node
 
             deleted_len = 1
+            if size_callback:
+                deleted_len = size_callback(node.value)
+                cached_cache_len[0] -= deleted_len
+
             for cb in node.callbacks:
                 cb()
             node.callbacks.clear()
@@ -146,6 +170,14 @@ class LruCache(object):
                     for cb in node.callbacks:
                         cb()
                     node.callbacks.clear()
+
+                # We don't bother to protect this by value != node.value as
+                # generally size_callback will be cheap compared with equality
+                # checks. (For example, taking the size of two dicts is quicker
+                # than comparing them for equality.)
+                if size_callback:
+                    cached_cache_len[0] -= size_callback(node.value)
+                    cached_cache_len[0] += size_callback(value)
 
                 node.callbacks.update(callbacks)
 
@@ -195,6 +227,8 @@ class LruCache(object):
                 for cb in node.callbacks:
                     cb()
             cache.clear()
+            if size_callback:
+                cached_cache_len[0] = 0
 
         @synchronized
         def cache_contains(key):

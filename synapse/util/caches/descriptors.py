@@ -71,6 +71,7 @@ class Cache(object):
             keylen=keylen,
             cache_type=cache_type,
             evicted_callback=self._on_evicted,
+            size_callback=(lambda d: len(d.result)) if iterable else None,
         )
 
         self.name = name
