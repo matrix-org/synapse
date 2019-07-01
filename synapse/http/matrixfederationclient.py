@@ -475,7 +475,7 @@ class MatrixFederationHttpClient(object):
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
                     except Exception as e:
-                        logger.info("Failed to send request: %s", e)
+                        logger.info("Failed to send request for unhandled reason: %s", e)
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
                     logger.info(
