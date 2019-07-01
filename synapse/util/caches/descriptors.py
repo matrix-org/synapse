@@ -19,7 +19,6 @@ import logging
 import threading
 from collections import namedtuple
 
-
 from twisted.internet import defer
 
 from synapse.util import logcontext, unwrapFirstError
