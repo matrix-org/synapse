@@ -319,12 +319,12 @@ class LoginRestServlet(RestServlet):
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID(user, self.hs.hostname).to_string()
+        device_id = login_submission.get("device_id")
+        initial_display_name = login_submission.get("initial_device_display_name")
 
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)
         if registered_user_id:
-            device_id = login_submission.get("device_id")
-            initial_display_name = login_submission.get("initial_device_display_name")
             device_id, access_token = yield self.registration_handler.register_device(
                 registered_user_id, device_id, initial_display_name
             )
@@ -338,11 +338,8 @@ class LoginRestServlet(RestServlet):
             user_id, access_token = (
                 yield self.registration_handler.register(localpart=user)
             )
-
-            device_id = login_submission.get("device_id")
-            initial_display_name = login_submission.get("initial_device_display_name")
             device_id, access_token = yield self.registration_handler.register_device(
-                registered_user_id, device_id, initial_display_name
+                user_id, device_id, initial_display_name
             )
 
             result = {
