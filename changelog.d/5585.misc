@@ -1,0 +1,1 @@
+Synapse can now handle RestServlets that return coroutines.
