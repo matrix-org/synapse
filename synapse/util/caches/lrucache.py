@@ -14,9 +14,10 @@
 # limitations under the License.
 
 
-import attr
 import threading
 from functools import wraps
+
+import attr
 
 from synapse.util.caches.treecache import TreeCache
 
