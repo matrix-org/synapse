@@ -201,6 +201,26 @@ class Config(object):
 
         Returns: Config object.
         """
+        config_parser = cls.create_argument_parser(description)
+        obj, _ = cls.load_config_with_parser(config_parser, argv)
+
+        return obj
+
+    @classmethod
+    def create_argument_parser(cls, description):
+        """Create an ArgumentParser instance with all the config flags.
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Used for workers where we want to add extra flags/subcommands.
+
+        Args:
+            description (str): App description
+
+        Returns:
+            ArgumentParser
+        """
+
         config_parser = argparse.ArgumentParser(description=description)
         config_parser.add_argument(
             "-c",
@@ -219,9 +239,31 @@ class Config(object):
             " Defaults to the directory containing the last config file",
         )
 
-        obj = cls()
+        # We can only invoke `add_arguments` on an actual object, but
+        # `add_arguments` should be side effect free so this is probably fine.
+        cls().invoke_all("add_arguments", config_parser)
 
-        obj.invoke_all("add_arguments", config_parser)
+        return config_parser
+
+    @classmethod
+    def load_config_with_parser(cls, config_parser, argv):
+        """Parse the commandline and config files with the given parser
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Used for workers where we want to add extra flags/subcommands.
+
+        Args:
+            conifg_parser (ArgumentParser)
+            argv (list[str])
+
+        Returns:
+            tuple[HomeServerConfig, argparse.Namespace]: Returns the parsed
+            config object and the parsed argparse.Namespace object from
+            `config_parser.parse_args(..)`
+        """
+
+        obj = cls()
 
         config_args = config_parser.parse_args(argv)
 
@@ -244,7 +286,7 @@ class Config(object):
 
         obj.invoke_all("read_arguments", config_args)
 
-        return obj
+        return obj, config_args
 
     @classmethod
     def load_or_generate_config(cls, description, argv):
