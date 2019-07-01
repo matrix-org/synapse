@@ -381,7 +381,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 )
 
                 if prev_res is not None:
-                    prev_res = prev_res.get_value()
+                    prev_res = prev_res.get_result()
 
                 if prev_res and isinstance(prev_res, dict):
                     users_in_room = dict(prev_res)

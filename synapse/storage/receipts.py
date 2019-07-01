@@ -300,7 +300,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
         if res is not None:
-            res = res.get_value()
+            print(res)
+            res = res.get_result()
 
         if res and user_id in res:
             # We'd only be adding to the set, so no point invalidating if the
