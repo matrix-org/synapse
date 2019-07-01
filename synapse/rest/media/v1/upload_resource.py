@@ -15,22 +15,24 @@
 
 import logging
 
-from twisted.internet import defer
-from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import SynapseError
-from synapse.http.server import respond_with_json, wrap_json_request_handler
+from synapse.http.server import (
+    DirectServeResource,
+    respond_with_json,
+    wrap_json_request_handler,
+)
 from synapse.http.servlet import parse_string
 
 logger = logging.getLogger(__name__)
 
 
-class UploadResource(Resource):
+class UploadResource(DirectServeResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo):
-        Resource.__init__(self)
+        super().__init__()
 
         self.media_repo = media_repo
         self.filepaths = media_repo.filepaths
@@ -41,18 +43,13 @@ class UploadResource(Resource):
         self.max_upload_size = hs.config.max_upload_size
         self.clock = hs.get_clock()
 
-    def render_POST(self, request):
-        self._async_render_POST(request)
-        return NOT_DONE_YET
-
     def render_OPTIONS(self, request):
         respond_with_json(request, 200, {}, send_cors=True)
         return NOT_DONE_YET
 
     @wrap_json_request_handler
-    @defer.inlineCallbacks
-    def _async_render_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+    async def _async_render_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
         content_length = request.getHeader(b"Content-Length").decode("ascii")
@@ -81,7 +78,7 @@ class UploadResource(Resource):
         #     disposition = headers.getRawHeaders(b"Content-Disposition")[0]
         # TODO(markjh): parse content-dispostion
 
-        content_uri = yield self.media_repo.create_content(
+        content_uri = await self.media_repo.create_content(
             media_type, upload_name, request.content, content_length, requester.user
         )
 

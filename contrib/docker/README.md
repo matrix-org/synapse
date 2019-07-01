@@ -1,5 +1,9 @@
 # Synapse Docker
 
+FIXME: this is out-of-date as of
+https://github.com/matrix-org/synapse/issues/5518. Contributions to bring it up
+to date would be welcome.
+
 ### Automated configuration
 
 It is recommended that you use Docker Compose to run your containers, including
