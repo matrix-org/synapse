@@ -36,6 +36,7 @@ from twisted.internet.error import (
     ConnectionRefusedError,
     DNSLookupError,
     TimeoutError,
+    ConnectingCancelledError,
 )
 from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.internet.task import _EPSILON, Cooperator
@@ -444,7 +445,7 @@ class MatrixFederationHttpClient(object):
                         logger.info("Failed to send request: %s", e)
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
-                    except TimeoutError as e:
+                    except (TimeoutError, ConnectingCancelledError) as e:
                         # Handle timeouts
                         if self.backoff_settings.on_timeout:
                             raise_from(RequestSendFailed(e, can_retry=False), e)
