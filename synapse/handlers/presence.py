@@ -1021,12 +1021,19 @@ class PresenceEventSource(object):
             if from_key == max_token:
                 # This is necessary as due to the way stream ID generators work
                 # we may get updates that have a stream ID greater than the max
-                # token. This is usually fine, as it just means that we may send
-                # down some presence updates multiple times. However, we need to
-                # be careful that the sync stream actually does make some
-                # progress, otherwise clients will end up tight looping calling
-                # /sync due to it returning the same token repeatedly. Hence
-                # this guard. C.f. #5503.
+                # token (e.g. max_token is N but stream generator may return
+                # results for N+2, due to N+1 not having finished being
+                # persisted yet).
+                #
+                # This is usually fine, as it just means that we may send down
+                # some presence updates multiple times. However, we need to be
+                # careful that the sync stream either actually does make some
+                # progress or doesn't return, otherwise clients will end up
+                # tight looping calling /sync due to it immediately returning
+                # the same token repeatedly.
+                #
+                # Hence this guard where we just return nothing so that the sync
+                # doesn't return. C.f. #5503.
                 defer.returnValue(([], max_token))
 
             presence = self.get_presence_handler()
