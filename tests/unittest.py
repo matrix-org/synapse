@@ -443,7 +443,7 @@ class HomeserverTestCase(TestCase):
             "POST", "/_matrix/client/r0/admin/register", body.encode("utf8")
         )
         self.render(request)
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
         return user_id
