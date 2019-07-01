@@ -523,7 +523,7 @@ class MatrixFederationHttpClient(object):
                     break
                 except RequestSendFailed as e:
                     logger.warn(
-                        "{%s} [%s] Request failed, %s - %s: %s %s: %s",
+                        "{%s} [%s] Request failed, %s: %s %s: %s",
                         request.txn_id,
                         request.destination,
                         "retrying" if e.can_retry else "not retrying",
