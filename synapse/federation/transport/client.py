@@ -33,6 +33,7 @@ class TransportLayerClient(object):
     def __init__(self, hs):
         self.server_name = hs.hostname
         self.client = hs.get_http_client()
+        self.backoff_settings = hs.config.federation_backoff_settings
 
     @log_function
     def get_room_state(self, destination, room_id, event_id):
@@ -181,7 +182,7 @@ class TransportLayerClient(object):
             long_retries=True,
             backoff_on_404=True,  # If we get a 404 the other side has gone
             try_trailing_slash_on_400=True,
-            retry_on_dns_fail=False,  # If we get DNS errors, the other side has gone
+            retry_on_dns_fail=self.backoff_settings.dns_resolution,
         )
 
         defer.returnValue(response)

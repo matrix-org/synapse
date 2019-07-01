@@ -18,6 +18,7 @@
 import logging
 import os.path
 
+import attr
 from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -322,6 +323,23 @@ class ServerConfig(Config):
         # by sending dummy events.
         self.cleanup_extremities_with_dummy_events = config.get(
             "cleanup_extremities_with_dummy_events", False
+        )
+
+        @attr.s
+        class FederationBackoffSettings(object):
+            dns_resolution = attr.ib(default=False, type=bool)
+            dns_servfail = attr.ib(default=False, type=bool)
+            no_route_to_host = attr.ib(default=False, type=bool)
+            refused_connection = attr.ib(default=False, type=bool)
+            cannot_assign_address = attr.ib(default=False, type=bool)
+            timeout_amount = attr.ib(default=60, type=int)
+            on_timeout = attr.ib(default=False, type=bool)
+            invalid_tls = attr.ib(default=True, type=bool)
+
+        federation_backoff_settings = config.get("federation_backoff", {})
+
+        self.federation_backoff_settings = FederationBackoffSettings(
+            **federation_backoff_settings
         )
 
     def has_tls_listener(self):
