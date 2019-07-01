@@ -473,5 +473,6 @@ class _Invalidation(namedtuple("_Invalidation", ("cache", "room_id"))):
     # of callbacks would grow.
     def __call__(self):
         rules = self.cache.get(self.room_id, None, update_metrics=False)
-        if rules:
-            rules.invalidate_all()
+
+        if rules is not None:
+            rules.get_result().invalidate_all()
