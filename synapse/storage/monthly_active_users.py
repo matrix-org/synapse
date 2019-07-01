@@ -201,7 +201,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
         user_in_mau = self.user_last_seen_monthly_active.cache.get(
             (user_id,), None, update_metrics=False
-        ).get_result()
+        )
         if user_in_mau is None:
             self.get_monthly_active_count.invalidate(())
 

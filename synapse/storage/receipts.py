@@ -297,7 +297,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         res = self.get_users_with_read_receipts_in_room.cache.get(
             room_id, None, update_metrics=False
-        ).get_result()
+        )
+
+        if res is not None:
+            res = res.get_value()
 
         if res and user_id in res:
             # We'd only be adding to the set, so no point invalidating if the
