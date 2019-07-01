@@ -20,10 +20,10 @@ from os import path
 
 from six.moves import http_client
 
-from twisted.internet import defer
-
 import jinja2
 from jinja2 import TemplateNotFound
+
+from twisted.internet import defer
 
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
