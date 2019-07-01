@@ -36,7 +36,7 @@ class _Node(object):
     next_node = attr.ib()
     key = attr.ib()
     value = attr.ib()
-    callbacks = attr.ib(factory=set)
+    callbacks = attr.ib(default=attr.Factory(set))
 
 
 class LruCache(object):
