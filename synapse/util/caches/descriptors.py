@@ -19,8 +19,6 @@ import logging
 import threading
 from collections import namedtuple
 
-import six
-from six import itervalues, string_types
 
 from twisted.internet import defer
 
@@ -29,7 +27,6 @@ from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
-from synapse.util.stringutils import to_ascii
 
 from . import register_cache
 
@@ -200,7 +197,7 @@ class Cache(object):
     def invalidate_all(self):
         self.check_thread()
         self.cache.clear()
-        for entry in itervalues(self._pending_deferred_cache):
+        for entry in self._pending_deferred_cache.values():
             entry.invalidate()
         self._pending_deferred_cache.clear()
 

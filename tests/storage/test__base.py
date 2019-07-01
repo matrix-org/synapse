@@ -19,7 +19,6 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.descriptors import Cache, cached
 
 from tests import unittest
