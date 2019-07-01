@@ -18,7 +18,7 @@ import attr
 import saml2
 from saml2.client import Saml2Client
 
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import SynapseError
 from synapse.http.servlet import parse_string
 from synapse.rest.client.v1.login import SSOAuthHandler
 
@@ -84,14 +84,16 @@ class SamlHandler:
                 outstanding=self._outstanding_requests_dict,
             )
         except Exception as e:
-            logger.warning("Exception parsing SAML2 response", exc_info=1)
-            raise CodeMessageException(400, "Unable to parse SAML2 response: %s" % (e,))
+            logger.warning("Exception parsing SAML2 response: %s", e)
+            raise SynapseError(400, "Unable to parse SAML2 response: %s" % (e,))
 
         if saml2_auth.not_signed:
-            raise CodeMessageException(400, "SAML2 response was not signed")
+            logger.warning("SAML2 response was not signed")
+            raise SynapseError(400, "SAML2 response was not signed")
 
         if "uid" not in saml2_auth.ava:
-            raise CodeMessageException(400, "uid not in SAML2 response")
+            logger.warning("SAML2 response lacks a 'uid' attestation")
+            raise SynapseError(400, "uid not in SAML2 response")
 
         self._outstanding_requests_dict.pop(saml2_auth.in_response_to, None)
 
