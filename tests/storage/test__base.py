@@ -185,19 +185,16 @@ class CacheDecoratorTestCase(unittest.TestCase):
     def test_prefill(self):
         callcount = [0]
 
-        d = defer.succeed(123)
-
         class A(object):
             @cached()
             def func(self, key):
                 callcount[0] += 1
-                return d
 
         a = A()
 
-        a.func.prefill(("foo",), ObservableDeferred(d))
-
-        self.assertEquals(a.func("foo"), d.result)
+        a.func.prefill(("foo",), 123)
+        print(a.func("foo"))
+        self.assertEquals(a.func("foo").result, 123)
         self.assertEquals(callcount[0], 0)
 
     @defer.inlineCallbacks

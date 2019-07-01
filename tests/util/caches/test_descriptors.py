@@ -57,7 +57,7 @@ class CacheTestCase(unittest.TestCase):
 
         # let one of the lookups complete
         d2.callback("result2")
-        self.assertEqual(cache.get("key2"), "result2")
+        self.assertEqual(cache.get("key2").value, "result2")
 
         # now do the invalidation
         cache.invalidate_all()

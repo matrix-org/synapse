@@ -231,27 +231,3 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
         self.assertEquals(m1.call_count, 1)
         self.assertEquals(m2.call_count, 0)
         self.assertEquals(m3.call_count, 1)
-
-
-class LruCacheSizedTestCase(unittest.TestCase):
-    def test_evict(self):
-        cache = LruCache(5, size_callback=len)
-        cache["key1"] = [0]
-        cache["key2"] = [1, 2]
-        cache["key3"] = [3]
-        cache["key4"] = [4]
-
-        self.assertEquals(cache["key1"], [0])
-        self.assertEquals(cache["key2"], [1, 2])
-        self.assertEquals(cache["key3"], [3])
-        self.assertEquals(cache["key4"], [4])
-        self.assertEquals(len(cache), 5)
-
-        cache["key5"] = [5, 6]
-
-        self.assertEquals(len(cache), 4)
-        self.assertEquals(cache.get("key1"), None)
-        self.assertEquals(cache.get("key2"), None)
-        self.assertEquals(cache["key3"], [3])
-        self.assertEquals(cache["key4"], [4])
-        self.assertEquals(cache["key5"], [5, 6])

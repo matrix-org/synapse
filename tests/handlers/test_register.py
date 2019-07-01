@@ -227,7 +227,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
     def test_register_not_support_user(self):
         res = self.get_success(self.handler.register(localpart="user"))
-        self.assertFalse(self.store.is_support_user(res[0]))
+        self.assertFalse(self.get_success(self.store.is_support_user(res[0])))
 
     def test_invalid_user_id_length(self):
         invalid_user_id = "x" * 256

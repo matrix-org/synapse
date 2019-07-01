@@ -74,7 +74,6 @@ class Cache(object):
             max_size=max_entries,
             keylen=keylen,
             cache_type=cache_type,
-            size_callback=(lambda d: len(d)) if iterable else None,
             evicted_callback=self._on_evicted,
         )
 
@@ -144,7 +143,7 @@ class Cache(object):
         def shuffle(result):
             existing_entry = self._pending_deferred_cache.pop(key, None)
             if existing_entry is entry:
-                self.cache.set(key, result, entry.callbacks)
+                self.cache.set(key, value, entry.callbacks)
             else:
                 # oops, the _pending_deferred_cache has been updated since
                 # we started our query, so we are out of date.
@@ -381,10 +380,13 @@ class CacheDescriptor(_CacheDescriptorBase):
             try:
                 cached_result_d = cache.get(cache_key, callback=invalidate_callback)
 
-                if isinstance(cached_result_d, ObservableDeferred):
-                    observer = cached_result_d.observe()
-                else:
-                    observer = cached_result_d
+                if not isinstance(cached_result_d, ObservableDeferred):
+                    raise ValueError(
+                        "Caching layer returned %s, not an ObservableDeferred"
+                        % (type(cached_result_d))
+                    )
+
+                observer = cached_result_d.observe()
 
             except KeyError:
                 ret = defer.maybeDeferred(
@@ -397,24 +399,17 @@ class CacheDescriptor(_CacheDescriptorBase):
 
                 ret.addErrback(onErr)
 
-                # If our cache_key is a string on py2, try to convert to ascii
-                # to save a bit of space in large caches. Py3 does this
-                # internally automatically.
-                if six.PY2 and isinstance(cache_key, string_types):
-                    cache_key = to_ascii(cache_key)
-
                 result_d = ObservableDeferred(ret, consumeErrors=True)
                 cache.set(cache_key, result_d, callback=invalidate_callback)
                 observer = result_d.observe()
 
-            if isinstance(observer, defer.Deferred):
-                return logcontext.make_deferred_yieldable(observer)
-            else:
-                return observer
+            return logcontext.make_deferred_yieldable(observer)
 
         if self.num_args == 1:
             wrapped.invalidate = lambda key: cache.invalidate(key[0])
-            wrapped.prefill = lambda key, val: cache.prefill(key[0], val)
+            wrapped.prefill = lambda key, val: cache.prefill(
+                key[0], ObservableDeferred(defer.succeed(val))
+            )
         else:
             wrapped.invalidate = cache.invalidate
             wrapped.invalidate_all = cache.invalidate_all
@@ -573,7 +568,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
                 )
                 return logcontext.make_deferred_yieldable(d)
             else:
-                return results
+                return defer.succeed(results)
 
         obj.__dict__[self.orig.__name__] = wrapped
 
