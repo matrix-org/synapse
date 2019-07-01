@@ -295,17 +295,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         if receipt_type != "m.read":
             return
 
-        # Returns either an ObservableDeferred or the raw result
         res = self.get_users_with_read_receipts_in_room.cache.get(
             room_id, None, update_metrics=False
-        )
-
-        # first handle the Deferred case
-        if isinstance(res, defer.Deferred):
-            if res.called:
-                res = res.result
-            else:
-                res = None
+        ).get_result()
 
         if res and user_id in res:
             # We'd only be adding to the set, so no point invalidating if the

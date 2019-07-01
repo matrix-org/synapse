@@ -252,7 +252,7 @@ class PusherStore(PusherWorkerStore):
 
             user_has_pusher = self.get_if_user_has_pusher.cache.get(
                 (user_id,), None, update_metrics=False
-            )
+            ).get_result()
 
             if user_has_pusher is not True:
                 # invalidate, since we the user might not have had a pusher before

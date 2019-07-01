@@ -378,7 +378,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             if context.prev_group and context.delta_ids:
                 prev_res = self._get_joined_users_from_context.cache.get(
                     (room_id, context.prev_group), None
-                )
+                ).get_result()
                 if prev_res and isinstance(prev_res, dict):
                     users_in_room = dict(prev_res)
                     member_event_ids = [
