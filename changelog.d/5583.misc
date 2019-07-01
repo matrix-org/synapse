@@ -1,0 +1,1 @@
+Fix caching decorators not consistently returning Deferreds.
