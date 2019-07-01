@@ -262,7 +262,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
-        token = self.macaroon_generator.generate_access_token(user_id)
+        token = self.hs.get_auth().generate_access_token(user_id)
 
         if need_register:
             yield self.handler.register_with_store(

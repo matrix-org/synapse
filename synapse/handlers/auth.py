@@ -578,7 +578,9 @@ class AuthHandler(BaseHandler):
             StoreError if there was a problem storing the token.
         """
         logger.info("Logging in user %s on device %s", user_id, device_id)
-        access_token = yield self.issue_access_token(user_id, device_id)
+        access_token = self.generate_access_token()
+        yield self.store.add_access_token_to_user(user_id, access_token, device_id)
+
         yield self.auth.check_auth_blocking(user_id)
 
         # the device *should* have been registered before we got here; however,
@@ -831,11 +833,9 @@ class AuthHandler(BaseHandler):
             defer.returnValue(None)
         defer.returnValue(user_id)
 
-    @defer.inlineCallbacks
-    def issue_access_token(self, user_id, device_id=None):
-        access_token = self.macaroon_gen.generate_access_token(user_id)
-        yield self.store.add_access_token_to_user(user_id, access_token, device_id)
-        defer.returnValue(access_token)
+    def generate_access_token(self):
+        """Generates an opaque string, for use as an access token"""
+        return stringutils.random_string(32)
 
     @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
@@ -1052,8 +1052,7 @@ class MacaroonGenerator(object):
 
     hs = attr.ib()
 
-    def generate_access_token(self, user_id, extra_caveats=None):
-        extra_caveats = extra_caveats or []
+    def generate_guest_access_token(self, user_id):
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = access")
         # Include a nonce, to make sure that each login gets a different
@@ -1061,8 +1060,7 @@ class MacaroonGenerator(object):
         macaroon.add_first_party_caveat(
             "nonce = %s" % (stringutils.random_string_with_symbols(16),)
         )
-        for caveat in extra_caveats:
-            macaroon.add_first_party_caveat(caveat)
+        macaroon.add_first_party_caveat("guest = true")
         return macaroon.serialize()
 
     def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):

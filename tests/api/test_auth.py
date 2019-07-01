@@ -240,55 +240,6 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_user_by_id.assert_called_with(user_id)
 
     @defer.inlineCallbacks
-    def test_cannot_use_regular_token_as_guest(self):
-        USER_ID = "@percy:matrix.org"
-        self.store.add_access_token_to_user = Mock()
-
-        token = yield self.hs.handlers.auth_handler.issue_access_token(
-            USER_ID, "DEVICE"
-        )
-        self.store.add_access_token_to_user.assert_called_with(USER_ID, token, "DEVICE")
-
-        def get_user(tok):
-            if token != tok:
-                return None
-            return {
-                "name": USER_ID,
-                "is_guest": False,
-                "token_id": 1234,
-                "device_id": "DEVICE",
-            }
-
-        self.store.get_user_by_access_token = get_user
-        self.store.get_user_by_id = Mock(return_value={"is_guest": False})
-
-        # check the token works
-        request = Mock(args={})
-        request.args[b"access_token"] = [token.encode("ascii")]
-        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        self.assertEqual(UserID.from_string(USER_ID), requester.user)
-        self.assertFalse(requester.is_guest)
-
-        # add an is_guest caveat
-        mac = pymacaroons.Macaroon.deserialize(token)
-        mac.add_first_party_caveat("guest = true")
-        guest_tok = mac.serialize()
-
-        # the token should *not* work now
-        request = Mock(args={})
-        request.args[b"access_token"] = [guest_tok.encode("ascii")]
-        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-
-        with self.assertRaises(AuthError) as cm:
-            yield self.auth.get_user_by_req(request, allow_guest=True)
-
-        self.assertEqual(401, cm.exception.code)
-        self.assertEqual("Guest access token used for regular user", cm.exception.msg)
-
-        self.store.get_user_by_id.assert_called_with(USER_ID)
-
-    @defer.inlineCallbacks
     def test_blocking_mau(self):
         self.hs.config.limit_usage_by_mau = False
         self.hs.config.max_mau_value = 50

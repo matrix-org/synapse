@@ -208,7 +208,7 @@ class RegistrationHandler(BaseHandler):
 
             token = None
             if generate_token:
-                token = self.macaroon_gen.generate_access_token(user_id)
+                token = self._auth_handler.generate_access_token()
             yield self.register_with_store(
                 user_id=user_id,
                 token=token,
@@ -238,7 +238,7 @@ class RegistrationHandler(BaseHandler):
                 user_id = user.to_string()
                 yield self.check_user_id_not_appservice_exclusive(user_id)
                 if generate_token:
-                    token = self.macaroon_gen.generate_access_token(user_id)
+                    token = self._auth_handler.generate_access_token()
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
@@ -668,9 +668,7 @@ class RegistrationHandler(BaseHandler):
                 user_id, device_id, initial_display_name
             )
             if is_guest:
-                access_token = self.macaroon_gen.generate_access_token(
-                    user_id, ["guest = true"]
-                )
+                access_token = self.macaroon_gen.generate_guest_access_token(user_id)
             else:
                 access_token = yield self._auth_handler.get_access_token_for_user_id(
                     user_id, device_id=device_id

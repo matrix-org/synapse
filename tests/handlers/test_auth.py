@@ -44,18 +44,10 @@ class AuthTestCase(unittest.TestCase):
         self.small_number_of_users = 1
         self.large_number_of_users = 100
 
-    def test_token_is_a_macaroon(self):
-        token = self.macaroon_generator.generate_access_token("some_user")
-        # Check that we can parse the thing with pymacaroons
-        macaroon = pymacaroons.Macaroon.deserialize(token)
-        # The most basic of sanity checks
-        if "some_user" not in macaroon.inspect():
-            self.fail("some_user was not in %s" % macaroon.inspect())
-
     def test_macaroon_caveats(self):
         self.hs.clock.now = 5000
 
-        token = self.macaroon_generator.generate_access_token("a_user")
+        token = self.macaroon_generator.generate_guest_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         def verify_gen(caveat):
@@ -70,11 +62,15 @@ class AuthTestCase(unittest.TestCase):
         def verify_nonce(caveat):
             return caveat.startswith("nonce =")
 
+        def verify_guest(caveat):
+            return caveat == "guest = true"
+
         v = pymacaroons.Verifier()
         v.satisfy_general(verify_gen)
         v.satisfy_general(verify_user)
         v.satisfy_general(verify_type)
         v.satisfy_general(verify_nonce)
+        v.satisfy_general(verify_guest)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
     @defer.inlineCallbacks
