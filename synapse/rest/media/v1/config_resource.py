@@ -14,33 +14,28 @@
 # limitations under the License.
 #
 
-from twisted.internet import defer
-from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
-from synapse.http.server import respond_with_json, wrap_json_request_handler
+from synapse.http.server import (
+    DirectServeResource,
+    respond_with_json,
+    wrap_json_request_handler,
+)
 
 
-class MediaConfigResource(Resource):
+class MediaConfigResource(DirectServeResource):
     isLeaf = True
 
     def __init__(self, hs):
-        Resource.__init__(self)
+        super().__init__()
         config = hs.get_config()
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
-        self.limits_dict = {
-            "m.upload.size": config.max_upload_size,
-        }
-
-    def render_GET(self, request):
-        self._async_render_GET(request)
-        return NOT_DONE_YET
+        self.limits_dict = {"m.upload.size": config.max_upload_size}
 
     @wrap_json_request_handler
-    @defer.inlineCallbacks
-    def _async_render_GET(self, request):
-        yield self.auth.get_user_by_req(request)
+    async def _async_render_GET(self, request):
+        await self.auth.get_user_by_req(request)
         respond_with_json(request, 200, self.limits_dict, send_cors=True)
 
     def render_OPTIONS(self, request):

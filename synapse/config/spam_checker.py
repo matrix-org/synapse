@@ -19,14 +19,14 @@ from ._base import Config
 
 
 class SpamCheckerConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.spam_checker = None
 
         provider = config.get("spam_checker", None)
         if provider is not None:
             self.spam_checker = load_module(provider)
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         #spam_checker:
         #  module: "my_custom_project.SuperSpamChecker"

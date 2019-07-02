@@ -17,12 +17,16 @@ import gc
 import hashlib
 import hmac
 import logging
+import time
 
 from mock import Mock
 
 from canonicaljson import json
 
-from twisted.internet.defer import Deferred
+import twisted
+import twisted.logger
+from twisted.internet.defer import Deferred, succeed
+from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
 
 from synapse.api.constants import EventTypes
@@ -158,6 +162,7 @@ class HomeserverTestCase(TestCase):
 
     servlets = []
     hijack_auth = True
+    needs_threadpool = False
 
     def setUp(self):
         """
@@ -186,15 +191,19 @@ class HomeserverTestCase(TestCase):
             if self.hijack_auth:
 
                 def get_user_by_access_token(token=None, allow_guest=False):
-                    return {
-                        "user": UserID.from_string(self.helper.auth_user_id),
-                        "token_id": 1,
-                        "is_guest": False,
-                    }
+                    return succeed(
+                        {
+                            "user": UserID.from_string(self.helper.auth_user_id),
+                            "token_id": 1,
+                            "is_guest": False,
+                        }
+                    )
 
                 def get_user_by_req(request, allow_guest=False, rights="access"):
-                    return create_requester(
-                        UserID.from_string(self.helper.auth_user_id), 1, False, None
+                    return succeed(
+                        create_requester(
+                            UserID.from_string(self.helper.auth_user_id), 1, False, None
+                        )
                     )
 
                 self.hs.get_auth().get_user_by_req = get_user_by_req
@@ -203,8 +212,25 @@ class HomeserverTestCase(TestCase):
                     return_value="1234"
                 )
 
+        if self.needs_threadpool:
+            self.reactor.threadpool = ThreadPool()
+            self.addCleanup(self.reactor.threadpool.stop)
+            self.reactor.threadpool.start()
+
         if hasattr(self, "prepare"):
             self.prepare(self.reactor, self.clock, self.hs)
+
+    def wait_on_thread(self, deferred, timeout=10):
+        """
+        Wait until a Deferred is done, where it's waiting on a real thread.
+        """
+        start_time = time.time()
+
+        while not deferred.called:
+            if start_time + timeout < time.time():
+                raise ValueError("Timed out waiting for threadpool")
+            self.reactor.advance(0.01)
+            time.sleep(0.01)
 
     def make_homeserver(self, reactor, clock):
         """
@@ -292,7 +318,7 @@ class HomeserverTestCase(TestCase):
             Tuple[synapse.http.site.SynapseRequest, channel]
         """
         if isinstance(content, dict):
-            content = json.dumps(content).encode('utf8')
+            content = json.dumps(content).encode("utf8")
 
         return make_request(
             self.reactor,
@@ -336,7 +362,7 @@ class HomeserverTestCase(TestCase):
 
         # Parse the config from a config dict into a HomeServerConfig
         config_obj = HomeServerConfig()
-        config_obj.parse_config_dict(config)
+        config_obj.parse_config_dict(config, "", "")
         kwargs["config"] = config_obj
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
@@ -383,7 +409,7 @@ class HomeserverTestCase(TestCase):
         Returns:
             The MXID of the new user (unicode).
         """
-        self.hs.config.registration_shared_secret = u"shared"
+        self.hs.config.registration_shared_secret = "shared"
 
         # Create the user
         request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
@@ -391,13 +417,13 @@ class HomeserverTestCase(TestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        nonce_str = b"\x00".join([username.encode('utf8'), password.encode('utf8')])
+        nonce_str = b"\x00".join([username.encode("utf8"), password.encode("utf8")])
         if admin:
             nonce_str += b"\x00admin"
         else:
             nonce_str += b"\x00notadmin"
 
-        want_mac.update(nonce.encode('ascii') + b"\x00" + nonce_str)
+        want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -410,7 +436,7 @@ class HomeserverTestCase(TestCase):
             }
         )
         request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/admin/register", body.encode('utf8')
+            "POST", "/_matrix/client/r0/admin/register", body.encode("utf8")
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
@@ -429,7 +455,7 @@ class HomeserverTestCase(TestCase):
             body["device_id"] = device_id
 
         request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode('utf8')
+            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
@@ -475,9 +501,7 @@ class HomeserverTestCase(TestCase):
         if soft_failed:
             event.internal_metadata.soft_failed = True
 
-        self.get_success(
-            event_creator.send_nonmember_event(requester, event, context)
-        )
+        self.get_success(event_creator.send_nonmember_event(requester, event, context))
 
         return event.event_id
 
@@ -502,7 +526,7 @@ class HomeserverTestCase(TestCase):
         body = {"type": "m.login.password", "user": username, "password": password}
 
         request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode('utf8')
+            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
         self.render(request)
         self.assertEqual(channel.code, 403, channel.result)

@@ -94,11 +94,11 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             result,
             [
                 {
-                    'access_token': 'access_token',
-                    'ip': 'ip',
-                    'user_agent': 'user_agent',
-                    'device_id': None,
-                    'last_seen': 12345678000,
+                    "access_token": "access_token",
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "device_id": None,
+                    "last_seen": 12345678000,
                 }
             ],
         )
@@ -125,11 +125,11 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             result,
             [
                 {
-                    'access_token': 'access_token',
-                    'ip': 'ip',
-                    'user_agent': 'user_agent',
-                    'device_id': None,
-                    'last_seen': 12345878000,
+                    "access_token": "access_token",
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "device_id": None,
+                    "last_seen": 12345878000,
                 }
             ],
         )

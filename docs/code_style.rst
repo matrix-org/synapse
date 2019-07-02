@@ -1,43 +1,60 @@
-- Everything should comply with PEP8. Code should pass
-  ``pep8 --max-line-length=100`` without any warnings.
+# Code Style
 
-- **Indenting**:
+The Synapse codebase uses a number of code formatting tools in order to
+quickly and automatically check for formatting (and sometimes logical) errors
+in code.
 
-  - NEVER tabs. 4 spaces to indent.
+The necessary tools are detailed below.
 
-  - follow PEP8; either hanging indent or multiline-visual indent depending
-    on the size and shape of the arguments and what makes more sense to the
-    author. In other words, both this::
+## Formatting tools
 
-      print("I am a fish %s" % "moo")
+The Synapse codebase uses [black](https://pypi.org/project/black/) as an
+opinionated code formatter, ensuring all comitted code is properly
+formatted.
 
-    and this::
+First install ``black`` with::
 
-      print("I am a fish %s" %
-            "moo")
+  pip install --upgrade black
 
-    and this::
+Have ``black`` auto-format your code (it shouldn't change any
+functionality) with::
 
-        print(
-            "I am a fish %s" %
-            "moo",
-        )
+  black . --exclude="\.tox|build|env"
 
-    ...are valid, although given each one takes up 2x more vertical space than
-    the previous, it's up to the author's discretion as to which layout makes
-    most sense for their function invocation.  (e.g. if they want to add
-    comments per-argument, or put expressions in the arguments, or group
-    related arguments together, or want to deliberately extend or preserve
-    vertical/horizontal space)
+- **flake8**
 
-- **Line length**:
+  ``flake8`` is a code checking tool. We require code to pass ``flake8`` before being merged into the codebase.
 
-  Max line length is 79 chars (with flexibility to overflow by a "few chars" if
-  the overflowing content is not semantically significant and avoids an
-  explosion of vertical whitespace).
+  Install ``flake8`` with::
 
-  Use parentheses instead of ``\`` for line continuation where ever possible
-  (which is pretty much everywhere).
+    pip install --upgrade flake8
+
+  Check all application and test code with::
+
+    flake8 synapse tests
+
+- **isort**
+
+  ``isort`` ensures imports are nicely formatted, and can suggest and
+  auto-fix issues such as double-importing.
+
+  Install ``isort`` with::
+
+    pip install --upgrade isort
+
+  Auto-fix imports with::
+
+    isort -rc synapse tests
+
+  ``-rc`` means to recursively search the given directories.
+
+It's worth noting that modern IDEs and text editors can run these tools
+automatically on save. It may be worth looking into whether this
+functionality is supported in your editor for a more convenient development
+workflow. It is not, however, recommended to run ``flake8`` on save as it
+takes a while and is very resource intensive.
+
+## General rules
 
 - **Naming**:
 
@@ -45,26 +62,6 @@
   - Use underscores for functions and variables.
 
 - Use double quotes ``"foo"`` rather than single quotes ``'foo'``.
-
-- **Blank lines**:
-
-  - There should be max a single new line between:
-
-    - statements
-    - functions in a class
-
-  - There should be two new lines between:
-
-    - definitions in a module (e.g., between different classes)
-
-- **Whitespace**:
-
-  There should be spaces where spaces should be and not where there shouldn't
-  be:
-
-  - a single space after a comma
-  - a single space before and after for '=' when used as assignment
-  - no spaces before and after for '=' for default values and keyword arguments.
 
 - **Comments**: should follow the `google code style
   <http://google.github.io/styleguide/pyguide.html?showone=Comments#Comments>`_.
@@ -76,7 +73,7 @@
 
 - **Imports**:
 
-  - Prefer to import classes and functions than packages or modules.
+  - Prefer to import classes and functions rather than packages or modules.
 
     Example::
 

@@ -52,12 +52,13 @@ class TransportLayerClient(object):
         Returns:
             Deferred: Results in a dict received from the remote homeserver.
         """
-        logger.debug("get_room_state dest=%s, room=%s",
-                     destination, room_id)
+        logger.debug("get_room_state dest=%s, room=%s", destination, room_id)
 
         path = _create_v1_path("/state/%s", room_id)
         return self.client.get_json(
-            destination, path=path, args={"event_id": event_id},
+            destination,
+            path=path,
+            args={"event_id": event_id},
             try_trailing_slash_on_400=True,
         )
 
@@ -75,12 +76,13 @@ class TransportLayerClient(object):
         Returns:
             Deferred: Results in a dict received from the remote homeserver.
         """
-        logger.debug("get_room_state_ids dest=%s, room=%s",
-                     destination, room_id)
+        logger.debug("get_room_state_ids dest=%s, room=%s", destination, room_id)
 
         path = _create_v1_path("/state_ids/%s", room_id)
         return self.client.get_json(
-            destination, path=path, args={"event_id": event_id},
+            destination,
+            path=path,
+            args={"event_id": event_id},
             try_trailing_slash_on_400=True,
         )
 
@@ -98,13 +100,11 @@ class TransportLayerClient(object):
         Returns:
             Deferred: Results in a dict received from the remote homeserver.
         """
-        logger.debug("get_pdu dest=%s, event_id=%s",
-                     destination, event_id)
+        logger.debug("get_pdu dest=%s, event_id=%s", destination, event_id)
 
         path = _create_v1_path("/event/%s", event_id)
         return self.client.get_json(
-            destination, path=path, timeout=timeout,
-            try_trailing_slash_on_400=True,
+            destination, path=path, timeout=timeout, try_trailing_slash_on_400=True
         )
 
     @log_function
@@ -123,7 +123,10 @@ class TransportLayerClient(object):
         """
         logger.debug(
             "backfill dest=%s, room_id=%s, event_tuples=%s, limit=%s",
-            destination, room_id, repr(event_tuples), str(limit)
+            destination,
+            room_id,
+            repr(event_tuples),
+            str(limit),
         )
 
         if not event_tuples:
@@ -132,16 +135,10 @@ class TransportLayerClient(object):
 
         path = _create_v1_path("/backfill/%s", room_id)
 
-        args = {
-            "v": event_tuples,
-            "limit": [str(limit)],
-        }
+        args = {"v": event_tuples, "limit": [str(limit)]}
 
         return self.client.get_json(
-            destination,
-            path=path,
-            args=args,
-            try_trailing_slash_on_400=True,
+            destination, path=path, args=args, try_trailing_slash_on_400=True
         )
 
     @defer.inlineCallbacks
@@ -167,7 +164,8 @@ class TransportLayerClient(object):
         """
         logger.debug(
             "send_data dest=%s, txid=%s",
-            transaction.destination, transaction.transaction_id
+            transaction.destination,
+            transaction.transaction_id,
         )
 
         if transaction.destination == self.server_name:
@@ -193,8 +191,9 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def make_query(self, destination, query_type, args, retry_on_dns_fail,
-                   ignore_backoff=False):
+    def make_query(
+        self, destination, query_type, args, retry_on_dns_fail, ignore_backoff=False
+    ):
         path = _create_v1_path("/query/%s", query_type)
 
         content = yield self.client.get_json(
@@ -239,8 +238,8 @@ class TransportLayerClient(object):
         valid_memberships = {Membership.JOIN, Membership.LEAVE}
         if membership not in valid_memberships:
             raise RuntimeError(
-                "make_membership_event called with membership='%s', must be one of %s" %
-                (membership, ",".join(valid_memberships))
+                "make_membership_event called with membership='%s', must be one of %s"
+                % (membership, ",".join(valid_memberships))
             )
         path = _create_v1_path("/make_%s/%s/%s", membership, room_id, user_id)
 
@@ -272,9 +271,7 @@ class TransportLayerClient(object):
         path = _create_v1_path("/send_join/%s/%s", room_id, event_id)
 
         response = yield self.client.put_json(
-            destination=destination,
-            path=path,
-            data=content,
+            destination=destination, path=path, data=content
         )
 
         defer.returnValue(response)
@@ -288,7 +285,6 @@ class TransportLayerClient(object):
             destination=destination,
             path=path,
             data=content,
-
             # we want to do our best to send this through. The problem is
             # that if it fails, we won't retry it later, so if the remote
             # server was just having a momentary blip, the room will be out of
@@ -304,10 +300,7 @@ class TransportLayerClient(object):
         path = _create_v1_path("/invite/%s/%s", room_id, event_id)
 
         response = yield self.client.put_json(
-            destination=destination,
-            path=path,
-            data=content,
-            ignore_backoff=True,
+            destination=destination, path=path, data=content, ignore_backoff=True
         )
 
         defer.returnValue(response)
@@ -318,26 +311,27 @@ class TransportLayerClient(object):
         path = _create_v2_path("/invite/%s/%s", room_id, event_id)
 
         response = yield self.client.put_json(
-            destination=destination,
-            path=path,
-            data=content,
-            ignore_backoff=True,
+            destination=destination, path=path, data=content, ignore_backoff=True
         )
 
         defer.returnValue(response)
 
     @defer.inlineCallbacks
     @log_function
-    def get_public_rooms(self, remote_server, limit, since_token,
-                         search_filter=None, include_all_networks=False,
-                         third_party_instance_id=None):
+    def get_public_rooms(
+        self,
+        remote_server,
+        limit,
+        since_token,
+        search_filter=None,
+        include_all_networks=False,
+        third_party_instance_id=None,
+    ):
         path = _create_v1_path("/publicRooms")
 
-        args = {
-            "include_all_networks": "true" if include_all_networks else "false",
-        }
+        args = {"include_all_networks": "true" if include_all_networks else "false"}
         if third_party_instance_id:
-            args["third_party_instance_id"] = third_party_instance_id,
+            args["third_party_instance_id"] = (third_party_instance_id,)
         if limit:
             args["limit"] = [str(limit)]
         if since_token:
@@ -346,10 +340,7 @@ class TransportLayerClient(object):
         # TODO(erikj): Actually send the search_filter across federation.
 
         response = yield self.client.get_json(
-            destination=remote_server,
-            path=path,
-            args=args,
-            ignore_backoff=True,
+            destination=remote_server, path=path, args=args, ignore_backoff=True
         )
 
         defer.returnValue(response)
@@ -357,12 +348,10 @@ class TransportLayerClient(object):
     @defer.inlineCallbacks
     @log_function
     def exchange_third_party_invite(self, destination, room_id, event_dict):
-        path = _create_v1_path("/exchange_third_party_invite/%s", room_id,)
+        path = _create_v1_path("/exchange_third_party_invite/%s", room_id)
 
         response = yield self.client.put_json(
-            destination=destination,
-            path=path,
-            data=event_dict,
+            destination=destination, path=path, data=event_dict
         )
 
         defer.returnValue(response)
@@ -372,10 +361,7 @@ class TransportLayerClient(object):
     def get_event_auth(self, destination, room_id, event_id):
         path = _create_v1_path("/event_auth/%s/%s", room_id, event_id)
 
-        content = yield self.client.get_json(
-            destination=destination,
-            path=path,
-        )
+        content = yield self.client.get_json(destination=destination, path=path)
 
         defer.returnValue(content)
 
@@ -385,9 +371,7 @@ class TransportLayerClient(object):
         path = _create_v1_path("/query_auth/%s/%s", room_id, event_id)
 
         content = yield self.client.post_json(
-            destination=destination,
-            path=path,
-            data=content,
+            destination=destination, path=path, data=content
         )
 
         defer.returnValue(content)
@@ -420,10 +404,7 @@ class TransportLayerClient(object):
         path = _create_v1_path("/user/keys/query")
 
         content = yield self.client.post_json(
-            destination=destination,
-            path=path,
-            data=query_content,
-            timeout=timeout,
+            destination=destination, path=path, data=query_content, timeout=timeout
         )
         defer.returnValue(content)
 
@@ -447,9 +428,7 @@ class TransportLayerClient(object):
         path = _create_v1_path("/user/devices/%s", user_id)
 
         content = yield self.client.get_json(
-            destination=destination,
-            path=path,
-            timeout=timeout,
+            destination=destination, path=path, timeout=timeout
         )
         defer.returnValue(content)
 
@@ -483,18 +462,23 @@ class TransportLayerClient(object):
         path = _create_v1_path("/user/keys/claim")
 
         content = yield self.client.post_json(
-            destination=destination,
-            path=path,
-            data=query_content,
-            timeout=timeout,
+            destination=destination, path=path, data=query_content, timeout=timeout
         )
         defer.returnValue(content)
 
     @defer.inlineCallbacks
     @log_function
-    def get_missing_events(self, destination, room_id, earliest_events,
-                           latest_events, limit, min_depth, timeout):
-        path = _create_v1_path("/get_missing_events/%s", room_id,)
+    def get_missing_events(
+        self,
+        destination,
+        room_id,
+        earliest_events,
+        latest_events,
+        limit,
+        min_depth,
+        timeout,
+    ):
+        path = _create_v1_path("/get_missing_events/%s", room_id)
 
         content = yield self.client.post_json(
             destination=destination,
@@ -514,7 +498,7 @@ class TransportLayerClient(object):
     def get_group_profile(self, destination, group_id, requester_user_id):
         """Get a group profile
         """
-        path = _create_v1_path("/groups/%s/profile", group_id,)
+        path = _create_v1_path("/groups/%s/profile", group_id)
 
         return self.client.get_json(
             destination=destination,
@@ -533,7 +517,7 @@ class TransportLayerClient(object):
             requester_user_id (str)
             content (dict): The new profile of the group
         """
-        path = _create_v1_path("/groups/%s/profile", group_id,)
+        path = _create_v1_path("/groups/%s/profile", group_id)
 
         return self.client.post_json(
             destination=destination,
@@ -547,7 +531,7 @@ class TransportLayerClient(object):
     def get_group_summary(self, destination, group_id, requester_user_id):
         """Get a group summary
         """
-        path = _create_v1_path("/groups/%s/summary", group_id,)
+        path = _create_v1_path("/groups/%s/summary", group_id)
 
         return self.client.get_json(
             destination=destination,
@@ -560,7 +544,7 @@ class TransportLayerClient(object):
     def get_rooms_in_group(self, destination, group_id, requester_user_id):
         """Get all rooms in a group
         """
-        path = _create_v1_path("/groups/%s/rooms", group_id,)
+        path = _create_v1_path("/groups/%s/rooms", group_id)
 
         return self.client.get_json(
             destination=destination,
@@ -569,11 +553,12 @@ class TransportLayerClient(object):
             ignore_backoff=True,
         )
 
-    def add_room_to_group(self, destination, group_id, requester_user_id, room_id,
-                          content):
+    def add_room_to_group(
+        self, destination, group_id, requester_user_id, room_id, content
+    ):
         """Add a room to a group
         """
-        path = _create_v1_path("/groups/%s/room/%s", group_id, room_id,)
+        path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
 
         return self.client.post_json(
             destination=destination,
@@ -583,13 +568,13 @@ class TransportLayerClient(object):
             ignore_backoff=True,
         )
 
-    def update_room_in_group(self, destination, group_id, requester_user_id, room_id,
-                             config_key, content):
+    def update_room_in_group(
+        self, destination, group_id, requester_user_id, room_id, config_key, content
+    ):
         """Update room in group
         """
         path = _create_v1_path(
-            "/groups/%s/room/%s/config/%s",
-            group_id, room_id, config_key,
+            "/groups/%s/room/%s/config/%s", group_id, room_id, config_key
         )
 
         return self.client.post_json(
@@ -603,7 +588,7 @@ class TransportLayerClient(object):
     def remove_room_from_group(self, destination, group_id, requester_user_id, room_id):
         """Remove a room from a group
         """
-        path = _create_v1_path("/groups/%s/room/%s", group_id, room_id,)
+        path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
 
         return self.client.delete_json(
             destination=destination,
@@ -616,7 +601,7 @@ class TransportLayerClient(object):
     def get_users_in_group(self, destination, group_id, requester_user_id):
         """Get users in a group
         """
-        path = _create_v1_path("/groups/%s/users", group_id,)
+        path = _create_v1_path("/groups/%s/users", group_id)
 
         return self.client.get_json(
             destination=destination,
@@ -629,7 +614,7 @@ class TransportLayerClient(object):
     def get_invited_users_in_group(self, destination, group_id, requester_user_id):
         """Get users that have been invited to a group
         """
-        path = _create_v1_path("/groups/%s/invited_users", group_id,)
+        path = _create_v1_path("/groups/%s/invited_users", group_id)
 
         return self.client.get_json(
             destination=destination,
@@ -642,16 +627,10 @@ class TransportLayerClient(object):
     def accept_group_invite(self, destination, group_id, user_id, content):
         """Accept a group invite
         """
-        path = _create_v1_path(
-            "/groups/%s/users/%s/accept_invite",
-            group_id, user_id,
-        )
+        path = _create_v1_path("/groups/%s/users/%s/accept_invite", group_id, user_id)
 
         return self.client.post_json(
-            destination=destination,
-            path=path,
-            data=content,
-            ignore_backoff=True,
+            destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     @log_function
@@ -661,14 +640,13 @@ class TransportLayerClient(object):
         path = _create_v1_path("/groups/%s/users/%s/join", group_id, user_id)
 
         return self.client.post_json(
-            destination=destination,
-            path=path,
-            data=content,
-            ignore_backoff=True,
+            destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     @log_function
-    def invite_to_group(self, destination, group_id, user_id, requester_user_id, content):
+    def invite_to_group(
+        self, destination, group_id, user_id, requester_user_id, content
+    ):
         """Invite a user to a group
         """
         path = _create_v1_path("/groups/%s/users/%s/invite", group_id, user_id)
@@ -690,15 +668,13 @@ class TransportLayerClient(object):
         path = _create_v1_path("/groups/local/%s/users/%s/invite", group_id, user_id)
 
         return self.client.post_json(
-            destination=destination,
-            path=path,
-            data=content,
-            ignore_backoff=True,
+            destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     @log_function
-    def remove_user_from_group(self, destination, group_id, requester_user_id,
-                               user_id, content):
+    def remove_user_from_group(
+        self, destination, group_id, requester_user_id, user_id, content
+    ):
         """Remove a user fron a group
         """
         path = _create_v1_path("/groups/%s/users/%s/remove", group_id, user_id)
@@ -712,8 +688,9 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def remove_user_from_group_notification(self, destination, group_id, user_id,
-                                            content):
+    def remove_user_from_group_notification(
+        self, destination, group_id, user_id, content
+    ):
         """Sent by group server to inform a user's server that they have been
         kicked from the group.
         """
@@ -721,10 +698,7 @@ class TransportLayerClient(object):
         path = _create_v1_path("/groups/local/%s/users/%s/remove", group_id, user_id)
 
         return self.client.post_json(
-            destination=destination,
-            path=path,
-            data=content,
-            ignore_backoff=True,
+            destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     @log_function
@@ -736,24 +710,24 @@ class TransportLayerClient(object):
         path = _create_v1_path("/groups/%s/renew_attestation/%s", group_id, user_id)
 
         return self.client.post_json(
-            destination=destination,
-            path=path,
-            data=content,
-            ignore_backoff=True,
+            destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     @log_function
-    def update_group_summary_room(self, destination, group_id, user_id, room_id,
-                                  category_id, content):
+    def update_group_summary_room(
+        self, destination, group_id, user_id, room_id, category_id, content
+    ):
         """Update a room entry in a group summary
         """
         if category_id:
             path = _create_v1_path(
                 "/groups/%s/summary/categories/%s/rooms/%s",
-                group_id, category_id, room_id,
+                group_id,
+                category_id,
+                room_id,
             )
         else:
-            path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id,)
+            path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id)
 
         return self.client.post_json(
             destination=destination,
@@ -764,17 +738,20 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def delete_group_summary_room(self, destination, group_id, user_id, room_id,
-                                  category_id):
+    def delete_group_summary_room(
+        self, destination, group_id, user_id, room_id, category_id
+    ):
         """Delete a room entry in a group summary
         """
         if category_id:
             path = _create_v1_path(
                 "/groups/%s/summary/categories/%s/rooms/%s",
-                group_id, category_id, room_id,
+                group_id,
+                category_id,
+                room_id,
             )
         else:
-            path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id,)
+            path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id)
 
         return self.client.delete_json(
             destination=destination,
@@ -787,7 +764,7 @@ class TransportLayerClient(object):
     def get_group_categories(self, destination, group_id, requester_user_id):
         """Get all categories in a group
         """
-        path = _create_v1_path("/groups/%s/categories", group_id,)
+        path = _create_v1_path("/groups/%s/categories", group_id)
 
         return self.client.get_json(
             destination=destination,
@@ -800,7 +777,7 @@ class TransportLayerClient(object):
     def get_group_category(self, destination, group_id, requester_user_id, category_id):
         """Get category info in a group
         """
-        path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id,)
+        path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
         return self.client.get_json(
             destination=destination,
@@ -810,11 +787,12 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def update_group_category(self, destination, group_id, requester_user_id, category_id,
-                              content):
+    def update_group_category(
+        self, destination, group_id, requester_user_id, category_id, content
+    ):
         """Update a category in a group
         """
-        path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id,)
+        path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
         return self.client.post_json(
             destination=destination,
@@ -825,11 +803,12 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def delete_group_category(self, destination, group_id, requester_user_id,
-                              category_id):
+    def delete_group_category(
+        self, destination, group_id, requester_user_id, category_id
+    ):
         """Delete a category in a group
         """
-        path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id,)
+        path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
         return self.client.delete_json(
             destination=destination,
@@ -842,7 +821,7 @@ class TransportLayerClient(object):
     def get_group_roles(self, destination, group_id, requester_user_id):
         """Get all roles in a group
         """
-        path = _create_v1_path("/groups/%s/roles", group_id,)
+        path = _create_v1_path("/groups/%s/roles", group_id)
 
         return self.client.get_json(
             destination=destination,
@@ -855,7 +834,7 @@ class TransportLayerClient(object):
     def get_group_role(self, destination, group_id, requester_user_id, role_id):
         """Get a roles info
         """
-        path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id,)
+        path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
         return self.client.get_json(
             destination=destination,
@@ -865,11 +844,12 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def update_group_role(self, destination, group_id, requester_user_id, role_id,
-                          content):
+    def update_group_role(
+        self, destination, group_id, requester_user_id, role_id, content
+    ):
         """Update a role in a group
         """
-        path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id,)
+        path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
         return self.client.post_json(
             destination=destination,
@@ -883,7 +863,7 @@ class TransportLayerClient(object):
     def delete_group_role(self, destination, group_id, requester_user_id, role_id):
         """Delete a role in a group
         """
-        path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id,)
+        path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
         return self.client.delete_json(
             destination=destination,
@@ -893,17 +873,17 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def update_group_summary_user(self, destination, group_id, requester_user_id,
-                                  user_id, role_id, content):
+    def update_group_summary_user(
+        self, destination, group_id, requester_user_id, user_id, role_id, content
+    ):
         """Update a users entry in a group
         """
         if role_id:
             path = _create_v1_path(
-                "/groups/%s/summary/roles/%s/users/%s",
-                group_id, role_id, user_id,
+                "/groups/%s/summary/roles/%s/users/%s", group_id, role_id, user_id
             )
         else:
-            path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id,)
+            path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id)
 
         return self.client.post_json(
             destination=destination,
@@ -914,11 +894,10 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def set_group_join_policy(self, destination, group_id, requester_user_id,
-                              content):
+    def set_group_join_policy(self, destination, group_id, requester_user_id, content):
         """Sets the join policy for a group
         """
-        path = _create_v1_path("/groups/%s/settings/m.join_policy", group_id,)
+        path = _create_v1_path("/groups/%s/settings/m.join_policy", group_id)
 
         return self.client.put_json(
             destination=destination,
@@ -929,17 +908,17 @@ class TransportLayerClient(object):
         )
 
     @log_function
-    def delete_group_summary_user(self, destination, group_id, requester_user_id,
-                                  user_id, role_id):
+    def delete_group_summary_user(
+        self, destination, group_id, requester_user_id, user_id, role_id
+    ):
         """Delete a users entry in a group
         """
         if role_id:
             path = _create_v1_path(
-                "/groups/%s/summary/roles/%s/users/%s",
-                group_id, role_id, user_id,
+                "/groups/%s/summary/roles/%s/users/%s", group_id, role_id, user_id
             )
         else:
-            path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id,)
+            path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id)
 
         return self.client.delete_json(
             destination=destination,
@@ -957,10 +936,7 @@ class TransportLayerClient(object):
         content = {"user_ids": user_ids}
 
         return self.client.post_json(
-            destination=destination,
-            path=path,
-            data=content,
-            ignore_backoff=True,
+            destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     def get_room_complexity(self, destination, room_id):

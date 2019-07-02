@@ -36,8 +36,7 @@ class ThirdPartyEventRules(object):
 
         if module is not None:
             self.third_party_rules = module(
-                config=config,
-                http_client=hs.get_simple_http_client(),
+                config=config, http_client=hs.get_simple_http_client()
             )
 
     @defer.inlineCallbacks
@@ -109,6 +108,6 @@ class ThirdPartyEventRules(object):
             state_events[key] = room_state_events[event_id]
 
         ret = yield self.third_party_rules.check_threepid_can_be_invited(
-            medium, address, state_events,
+            medium, address, state_events
         )
         defer.returnValue(ret)
