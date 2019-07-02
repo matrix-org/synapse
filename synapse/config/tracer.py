@@ -20,9 +20,7 @@ class TracerConfig(Config):
     def read_config(self, config, **kwargs):
         self.tracer_config = config.get("opentracing")
 
-        if self.tracer_config is None:
-            # If the tracer is not configured we assume it is disabled
-            self.tracer_config = {"tracer_enabled": False}
+        self.tracer_config = config.get("opentracing", {"tracer_enabled": False})
 
         if self.tracer_config.get("tracer_enabled", False):
             # The tracer is enabled so sanitize the config
