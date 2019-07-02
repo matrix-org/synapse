@@ -356,19 +356,30 @@ class DirectServeResource(resource.Resource):
         render_callback_name = "render_" + request.method.decode("ascii")
         async_render_callback_name = "_async_" + render_callback_name
 
-        if hasattr(self, async_render_callback_name):
-            # Call the handler
-            callback = getattr(self, async_render_callback_name)
-        elif hasattr(self, render_callback_name):
-            # Call the handler
-            callback = getattr(self, render_callback_name)
-        else:
-            super().render(request)
+        # Try and get the async renderer
+        callback = getattr(self, async_render_callback_name, None)
+
+        # If it doesn't exist, try and get a regular renderer
+        if not callback:
+            callback = getattr(self, render_callback_name, None)
+
+        # No renderer for this request method. Fall back to Twisted's "not
+        # found" handling.
+        if not callback:
+            return super().render(request)
 
         resp = callback(request)
+
+        # If it's a coroutine, turn it into a Deferred
         if isinstance(resp, types.CoroutineType):
-            defer.ensureDeferred(resp)
-        return NOT_DONE_YET
+            resp = defer.ensureDeferred(resp)
+
+        # If it's a Deferred, return NOT_DONE_YET as it doesn't have a
+        # value yet
+        if not isinstance(resp, defer.Deferred):
+            return NOT_DONE_YET
+
+        return resp
 
 
 def _options_handler(request):
