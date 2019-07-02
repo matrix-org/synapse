@@ -22,11 +22,11 @@ from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore, db_to_json
 
-from synapse.util.tracerutils import TracerUtil, trace_defered_function, trace_function
+import synapse.util.tracerutils as tracerutils
 
 
 class EndToEndKeyWorkerStore(SQLBaseStore):
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def get_e2e_device_keys(
         self, query_list, include_all_devices=False, include_deleted_devices=False
@@ -43,7 +43,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             Dict mapping from user-id to dict mapping from device_id to
             dict containing "key_json", "device_display_name".
         """
-        TracerUtil.set_tag("query_list", query_list)
+        tracerutils.set_tag("query_list", query_list)
         if not query_list:
             return {}
 
@@ -61,12 +61,12 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         return results
 
-    @trace_function
+    @tracerutils.trace_function
     def _get_e2e_device_keys_txn(
         self, txn, query_list, include_all_devices=False, include_deleted_devices=False
     ):
-        TracerUtil.set_tag("include_all_devices", include_all_devices)
-        TracerUtil.set_tag("include_deleted_devices", include_deleted_devices)
+        tracerutils.set_tag("include_all_devices", include_all_devices)
+        tracerutils.set_tag("include_deleted_devices", include_deleted_devices)
 
         query_clauses = []
         query_params = []
@@ -112,10 +112,10 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             for user_id, device_id in deleted_devices:
                 result.setdefault(user_id, {})[device_id] = None
 
-        TracerUtil.log_kv(result)
+        tracerutils.log_kv(result)
         return result
 
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def get_e2e_one_time_keys(self, user_id, device_id, key_ids):
         """Retrieve a number of one-time keys for a user
@@ -131,9 +131,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             key_id) to json string for key
         """
 
-        TracerUtil.set_tag("user_id", user_id)
-        TracerUtil.set_tag("device_id", device_id)
-        TracerUtil.set_tag("key_ids", key_ids)
+        tracerutils.set_tag("user_id", user_id)
+        tracerutils.set_tag("device_id", device_id)
+        tracerutils.set_tag("key_ids", key_ids)
 
         rows = yield self._simple_select_many_batch(
             table="e2e_one_time_keys_json",
@@ -159,11 +159,11 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 (algorithm, key_id, key json)
         """
 
-        @trace_function
+        @tracerutils.strace_function
         def _add_e2e_one_time_keys(txn):
-            TracerUtil.set_tag("user_id", user_id)
-            TracerUtil.set_tag("device_id", device_id)
-            TracerUtil.set_tag("new_keys", new_keys)
+            tracerutils.set_tag("user_id", user_id)
+            tracerutils.set_tag("device_id", device_id)
+            tracerutils.set_tag("new_keys", new_keys)
             # We are protected from race between lookup and insertion due to
             # a unique constraint. If there is a race of two calls to
             # `add_e2e_one_time_keys` then they'll conflict and we will only
@@ -219,12 +219,12 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         or the keys were already in the database.
         """
 
-        @trace_function
+        @tracerutils.trace_function
         def _set_e2e_device_keys_txn(txn):
-            TracerUtil.set_tag("user_id", user_id)
-            TracerUtil.set_tag("device_id", device_id)
-            TracerUtil.set_tag("time_now", time_now)
-            TracerUtil.set_tag("device_keys", device_keys)
+            tracerutils.set_tag("user_id", user_id)
+            tracerutils.set_tag("device_id", device_id)
+            tracerutils.set_tag("time_now", time_now)
+            tracerutils.set_tag("device_keys", device_keys)
 
             old_key_json = self._simple_select_one_onecol_txn(
                 txn,
@@ -239,7 +239,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             new_key_json = encode_canonical_json(device_keys).decode("utf-8")
 
             if old_key_json == new_key_json:
-                TracerUtil.log_kv({"event", "key already stored"})
+                tracerutils.log_kv({"event", "key already stored"})
                 return False
 
             self._simple_upsert_txn(
@@ -256,7 +256,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
     def claim_e2e_one_time_keys(self, query_list):
         """Take a list of one time keys out of the database"""
 
-        @trace_function
+        @tracerutils.trace_function
         def _claim_e2e_one_time_keys(txn):
             sql = (
                 "SELECT key_id, key_json FROM e2e_one_time_keys_json"
@@ -278,11 +278,11 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 " AND key_id = ?"
             )
             for user_id, device_id, algorithm, key_id in delete:
-                TracerUtil.log_kv(
+                tracerutils.log_kv(
                     {"message": "executing claim transaction on database"}
                 )
                 txn.execute(sql, (user_id, device_id, algorithm, key_id))
-                TracerUtil.log_kv(
+                tracerutils.log_kv(
                     {"message": "finished executing and invalidating cache"}
                 )
                 self._invalidate_cache_and_stream(
@@ -293,10 +293,10 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         return self.runInteraction("claim_e2e_one_time_keys", _claim_e2e_one_time_keys)
 
     def delete_e2e_keys_by_device(self, user_id, device_id):
-        @trace_function
+        @tracerutils.trace_function
         def delete_e2e_keys_by_device_txn(txn):
-            TracerUtil.set_tag("user_id", user_id)
-            TracerUtil.set_tag("device_id", device_id)
+            tracerutils.set_tag("user_id", user_id)
+            tracerutils.set_tag("device_id", device_id)
             self._simple_delete_txn(
                 txn,
                 table="e2e_device_keys_json",
