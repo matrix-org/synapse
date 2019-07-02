@@ -20,7 +20,6 @@ from twisted.web.server import Request, Site
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-import synapse.util.tracerutils as tracerutils
 
 logger = logging.getLogger(__name__)
 
