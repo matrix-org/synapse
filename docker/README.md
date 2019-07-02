@@ -62,8 +62,6 @@ The following environment variables are supported in `generate` mode:
   such as the datatase and media store. Defaults to `/data`.
 * `UID`, `GID`: the user id and group id to use for creating the data
   directories. Defaults to `991`, `991`.
-* `TZ`: the [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) the container will run with. Defaults to `UTC`.
-
 
 ## Running synapse
 
