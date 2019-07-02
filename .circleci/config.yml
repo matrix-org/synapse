@@ -8,13 +8,13 @@ jobs:
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
       - run: docker push matrixdotorg/synapse:${CIRCLE_TAG}
       - run: docker push matrixdotorg/synapse:${CIRCLE_TAG}-py3
-  dockerhubuploadreleasebranch:
+  dockerhubuploadreleaseshhs:
     machine: true
     steps:
       - checkout
-      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_BRANCH} --build-arg PYTHON_VERSION=3.7 .
+      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_TAG} --build-arg PYTHON_VERSION=3.7 .
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - run: docker push matrixdotorg/synapse:${CIRCLE_BRANCH}
+      - run: docker push matrixdotorg/synapse:${CIRCLE_TAG}
   dockerhubuploadlatest:
     machine: true
     steps:
@@ -34,10 +34,12 @@ workflows:
               only: /v[0-9].[0-9]+.[0-9]+.*/
             branches:
               ignore: /.*/
-      - dockerhubuploadreleasebranch:
+      - dockerhubuploadreleaseshhs:
           filters:
+            tags:
+              only: /shhs-v[0-9]+.[0-9]+.*/
             branches:
-              only: shhs
+              ignore: /.*/
       - dockerhubuploadlatest:
           filters:
             branches:
