@@ -835,7 +835,7 @@ class AuthHandler(BaseHandler):
 
     def generate_access_token(self):
         """Generates an opaque string, for use as an access token"""
-        return stringutils.random_string(32)
+        return stringutils.random_string(20)
 
     @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
