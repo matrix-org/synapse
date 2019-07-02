@@ -353,16 +353,22 @@ class DirectServeResource(resource.Resource):
         """
         Render the request, using an asynchronous render handler if it exists.
         """
-        render_callback_name = "_async_render_" + request.method.decode("ascii")
+        render_callback_name = "render_" + request.method.decode("ascii")
+        async_render_callback_name = "_async_" + render_callback_name
 
-        if hasattr(self, render_callback_name):
+        if hasattr(self, async_render_callback_name):
+            # Call the handler
+            callback = getattr(self, async_render_callback_name)
+        elif hasattr(self, render_callback_name):
             # Call the handler
             callback = getattr(self, render_callback_name)
-            defer.ensureDeferred(callback(request))
-
-            return NOT_DONE_YET
         else:
             super().render(request)
+
+        resp = callback(request)
+        if isinstance(resp, types.CoroutineType):
+            defer.ensureDeferred(resp)
+        return NOT_DONE_YET
 
 
 def _options_handler(request):

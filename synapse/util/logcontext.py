@@ -22,9 +22,9 @@ them.
 See doc/log_contexts.rst for details on how this works.
 """
 
-import types
 import logging
 import threading
+import types
 
 from twisted.internet import defer, threads
 
