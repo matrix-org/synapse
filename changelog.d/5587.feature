@@ -1,0 +1,1 @@
+Add --no-daemonize option to run synapse in the foreground, per issue #4130. Contributed by Soham Gumaste.
