@@ -57,26 +57,24 @@ def only_if_tracing(func):
     Assumes the function wrapped may return None"""
 
     @wraps(func)
-    def f(cls, *args, **kwargs):
-        if cls._opentracing:
-            return func(cls, *args, **kwargs)
+    def f(self, *args, **kwargs):
+        if self._opentracing:
+            return func(self, *args, **kwargs)
         else:
             return
 
     return f
 
 
-class TracerUtil(object):
+class OpenTracing(object):
     _opentracing = None
-    _opentracing_formats = None
 
     # Block everything by default
     _homeserver_whitelist = None
 
     tags = _DumTagNames
 
-    @classmethod
-    def init_tracer(cls, config):
+    def __init__(self, config=None):
         """Set the whitelists and initialise the JaegerClient tracer
 
         Args:
@@ -84,16 +82,18 @@ class TracerUtil(object):
             The config used by the homserver. Here it's used to set the service
             name to the homeserver's.
         """
+        # If no config is given do not trace. This is useful for testing
+        if config is None:
+            return
         if not config.tracer_config.get("tracer_enabled", False):
             # We don't have a tracer
             return
 
-        cls.import_opentracing()
-        cls.setup_tags()
-        cls.setup_tracing(config)
+        self.import_opentracing()
+        self.setup_tags()
+        self.setup_tracing(config)
 
-    @classmethod
-    def import_opentracing(cls):
+    def import_opentracing(self):
         try:
             # Try to import the tracer. If it's not there we want to throw an eror
             import opentracing
@@ -104,10 +104,9 @@ class TracerUtil(object):
             )
             raise
 
-        cls._opentracing = opentracing
+        self._opentracing = opentracing
 
-    @classmethod
-    def setup_tracing(cls, config):
+    def setup_tracing(self, config):
         try:
             from jaeger_client import Config as JaegerConfig
             from synapse.util.scopecontextmanager import LogContextScopeManager
@@ -121,7 +120,7 @@ class TracerUtil(object):
         # Include the worker name
         name = config.worker_name if config.worker_name else "master"
 
-        cls.set_homeserver_whitelist(config.tracer_config["homeserver_whitelist"])
+        self.set_homeserver_whitelist(config.tracer_config["homeserver_whitelist"])
         jaeger_config = JaegerConfig(
             config={"sampler": {"type": "const", "param": 1}, "logging": True},
             service_name="{} {}".format(config.server_name, name),
@@ -129,16 +128,14 @@ class TracerUtil(object):
         )
         jaeger_config.initialize_tracer()
 
-    @classmethod
     @only_if_tracing
-    def setup_tags(cls):
-        cls.tags = cls._opentracing.tags
+    def setup_tags(self):
+        self.tags = self._opentracing.tags
 
     # Could use kwargs but I want these to be explicit
-    @classmethod
     @only_if_tracing
     def start_active_span(
-        cls,
+        self,
         operation_name,
         child_of=None,
         references=None,
@@ -148,7 +145,7 @@ class TracerUtil(object):
         finish_on_close=True,
     ):
         # We need to enter the scope here for the logcontext to become active
-        cls._opentracing.tracer.start_active_span(
+        self._opentracing.tracer.start_active_span(
             operation_name,
             child_of=child_of,
             references=references,
@@ -158,37 +155,31 @@ class TracerUtil(object):
             finish_on_close=finish_on_close,
         ).__enter__()
 
-    @classmethod
     @only_if_tracing
-    def close_active_span(cls):
-        cls._opentracing.tracer.scope_manager.active.__exit__(None, None, None)
+    def close_active_span(self):
+        self._opentracing.tracer.scope_manager.active.__exit__(None, None, None)
 
-    @classmethod
     @only_if_tracing
-    def set_tag(cls, key, value):
-        cls._opentracing.tracer.active_span.set_tag(key, value)
+    def set_tag(self, key, value):
+        self._opentracing.tracer.active_span.set_tag(key, value)
 
-    @classmethod
     @only_if_tracing
-    def log_kv(cls, key_values, timestamp=None):
-        cls._opentracing.tracer.active_span.log_kv(key_values, timestamp)
+    def log_kv(self, key_values, timestamp=None):
+        self._opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
     # Note: we don't have a get baggage items because we're trying to hide all
     # scope and span state from synapse. I think this method may also be useless
     # as a result
-    @classmethod
     @only_if_tracing
-    def set_baggage_item(cls, key, value):
-        cls._opentracing.tracer.active_span.set_baggage_item(key, value)
+    def set_baggage_item(self, key, value):
+        self._opentracing.tracer.active_span.set_baggage_item(key, value)
 
-    @classmethod
     @only_if_tracing
-    def set_operation_name(cls, operation_name):
-        cls._opentracing.tracer.active_span.set_operation_name(operation_name)
+    def set_operation_name(self, operation_name):
+        self._opentracing.tracer.active_span.set_operation_name(operation_name)
 
-    @classmethod
     @only_if_tracing
-    def set_homeserver_whitelist(cls, homeserver_whitelist):
+    def set_homeserver_whitelist(self, homeserver_whitelist):
         """Sets the whitelist
 
         Args:
@@ -196,21 +187,19 @@ class TracerUtil(object):
         """
         if homeserver_whitelist:
             # Makes a single regex which accepts all passed in regexes in the list
-            cls._homeserver_whitelist = re.compile(
+            self._homeserver_whitelist = re.compile(
                 "({})".format(")|(".join(homeserver_whitelist))
             )
 
-    @classmethod
     @only_if_tracing
-    def whitelisted_homeserver(cls, destination):
-        if cls._homeserver_whitelist:
-            return cls._homeserver_whitelist.match(destination)
+    def whitelisted_homeserver(self, destination):
+        if self._homeserver_whitelist:
+            return self._homeserver_whitelist.match(destination)
         return False
 
-    @classmethod
     @only_if_tracing
     def start_active_span_from_context(
-        cls,
+        self,
         headers,
         operation_name,
         references=None,
@@ -230,11 +219,11 @@ class TracerUtil(object):
         # So, we take the first item in the list.
         # Also, twisted uses byte arrays while opentracing expects strings.
         header_dict = {k.decode(): v[0].decode() for k, v in headers.getAllRawHeaders()}
-        context = cls._opentracing.tracer.extract(
-            cls._opentracing.Format.HTTP_HEADERS, header_dict
+        context = self._opentracing.tracer.extract(
+            self._opentracing.Format.HTTP_HEADERS, header_dict
         )
 
-        cls._opentracing.tracer.start_active_span(
+        self._opentracing.tracer.start_active_span(
             operation_name,
             child_of=context,
             references=references,
@@ -244,9 +233,8 @@ class TracerUtil(object):
             finish_on_close=finish_on_close,
         )
 
-    @classmethod
     @only_if_tracing
-    def inject_active_span_twisted_headers(cls, headers, destination):
+    def inject_active_span_twisted_headers(self, headers, destination):
         """
         Injects a span context into twisted headers inplace
 
@@ -265,21 +253,20 @@ class TracerUtil(object):
             https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
         """
 
-        if not TracerUtil.whitelisted_homeserver(destination):
+        if not self.whitelisted_homeserver(destination):
             return
 
-        span = cls._opentracing.tracer.active_span
+        span = self._opentracing.tracer.active_span
         carrier = {}
-        cls._opentracing.tracer.inject(
-            span, cls._opentracing.Format.HTTP_HEADERS, carrier
+        self._opentracing.tracer.inject(
+            span, self._opentracing.Format.HTTP_HEADERS, carrier
         )
 
         for key, value in carrier.items():
             headers.addRawHeaders(key, value)
 
-    @classmethod
     @only_if_tracing
-    def inject_active_span_byte_dict(cls, headers, destination):
+    def inject_active_span_byte_dict(self, headers, destination):
         """
         Injects a span context into a dict where the headers are encoded as byte
         strings
@@ -298,14 +285,14 @@ class TracerUtil(object):
             here:
             https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
         """
-        if not TracerUtil.whitelisted_homeserver(destination):
+        if not self.whitelisted_homeserver(destination):
             return
 
-        span = cls._opentracing.tracer.active_span
+        span = self._opentracing.tracer.active_span
 
         carrier = {}
-        cls._opentracing.tracer.inject(
-            span, cls._opentracing.Format.HTTP_HEADERS, carrier
+        self._opentracing.tracer.inject(
+            span, self._opentracing.Format.HTTP_HEADERS, carrier
         )
 
         for key, value in carrier.items():
