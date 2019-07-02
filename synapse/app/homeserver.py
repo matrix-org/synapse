@@ -133,6 +133,7 @@ class SynapseHomeServer(HomeServer):
                     listener_config,
                     root_resource,
                     self.version_string,
+                    self.get_opentracing(),
                 ),
                 self.tls_server_context_factory,
                 reactor=self.get_reactor(),
@@ -149,6 +150,7 @@ class SynapseHomeServer(HomeServer):
                     listener_config,
                     root_resource,
                     self.version_string,
+                    self.get_opentracing(),
                 ),
                 reactor=self.get_reactor(),
             )

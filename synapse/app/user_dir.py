@@ -132,6 +132,7 @@ class UserDirectoryServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
+                self.get_opentracing(),
             ),
         )
 
