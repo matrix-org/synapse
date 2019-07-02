@@ -376,7 +376,7 @@ class DirectServeResource(resource.Resource):
 
         # If it's a Deferred, return NOT_DONE_YET as it doesn't have a
         # value yet
-        if not isinstance(resp, defer.Deferred):
+        if isinstance(resp, defer.Deferred):
             return NOT_DONE_YET
 
         return resp
