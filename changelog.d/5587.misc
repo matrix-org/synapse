@@ -1,0 +1,1 @@
+Switch to using opaque strings for access tokens instead of macaroons.
