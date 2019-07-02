@@ -235,19 +235,6 @@ class SynapseRequest(Request):
             self.get_redacted_uri(),
         )
 
-        # Start a span
-        self.opentracing.start_active_span_from_context(
-            self.requestHeaders,
-            "incoming-federation-request",
-            tags={
-                "request_id": self.get_request_id(),
-                self.opentracing.tags.SPAN_KIND: self.opentracing.tags.SPAN_KIND_RPC_SERVER,
-                self.opentracing.tags.HTTP_METHOD: self.get_method(),
-                self.opentracing.tags.HTTP_URL: self.get_redacted_uri(),
-                self.opentracing.tags.PEER_HOST_IPV6: self.getClientIP(),
-            },
-        )
-
     def _finished_processing(self):
         """Log the completion of this request and update the metrics
         """
@@ -317,10 +304,6 @@ class SynapseRequest(Request):
             usage.evt_db_fetch_count,
         )
 
-        # finish the span if it's there.
-        self.opentracing.set_tag("peer.address", authenticated_entity)
-        self.opentracing.close_active_span()
-
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
@@ -358,7 +341,7 @@ class SynapseRequestFactory(object):
 
     def __call__(self, *args, **kwargs):
         if self.x_forwarded_for:
-            return XForwardedForRequest(self.site, *args, **kwargs)
+            return XForwardedForRequest(self.site, self.opentracing, *args, **kwargs)
         else:
             return SynapseRequest(self.site, self.opentracing, *args, **kwargs)
 

@@ -288,6 +288,20 @@ class BaseFederationServlet(object):
                 logger.warn("authenticate_request failed: %s", e)
                 raise
 
+            # Start a span
+            request.opentracing.start_active_span_from_context(
+                request.requestHeaders,
+                "incoming-request",
+                tags={
+                    "request_id": request.get_request_id(),
+                    request.opentracing.tags.SPAN_KIND: request.opentracing.tags.SPAN_KIND_RPC_SERVER,
+                    request.opentracing.tags.HTTP_METHOD: request.get_method(),
+                    request.opentracing.tags.HTTP_URL: request.get_redacted_uri(),
+                    request.opentracing.tags.PEER_HOST_IPV6: request.getClientIP(),
+                },
+            )
+            request.opentracing.set_tag("authenticated_entity", origin)
+
             if origin:
                 with ratelimiter.ratelimit(origin) as d:
                     yield d
@@ -296,6 +310,9 @@ class BaseFederationServlet(object):
                     )
             else:
                 response = yield func(origin, content, request.args, *args, **kwargs)
+
+            # Finish the span
+            request.opentracing.close_active_span()
 
             defer.returnValue(response)
 

@@ -77,6 +77,7 @@ from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
+from synapse.util.tracerutils import OpenTracing
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -260,6 +261,9 @@ class SynapseHomeServer(HomeServer):
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
 
         return resources
+
+    def start_tracing(self):
+        self.opentracing = OpenTracing(self.config)
 
     def start_listening(self, listeners):
         config = self.get_config()

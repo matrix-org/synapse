@@ -241,6 +241,7 @@ def start(hs, listeners=None):
         refresh_certificate(hs)
 
         # It is now safe to start your Synapse.
+        hs.start_tracing()
         hs.start_listening(listeners)
         hs.get_datastore().start_profiling()
 
