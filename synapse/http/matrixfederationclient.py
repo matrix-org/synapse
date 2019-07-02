@@ -344,10 +344,10 @@ class MatrixFederationHttpClient(object):
         TracerUtil.start_active_span(
             "outgoing-federation-request",
             tags={
-                TracerUtil.Tags.SPAN_KIND: TracerUtil.Tags.SPAN_KIND_RPC_CLIENT,
-                TracerUtil.Tags.PEER_ADDRESS: request.destination,
-                TracerUtil.Tags.HTTP_METHOD: request.method,
-                TracerUtil.Tags.HTTP_URL: request.path,
+                TracerUtil.tags.SPAN_KIND: TracerUtil.tags.SPAN_KIND_RPC_CLIENT,
+                TracerUtil.tags.PEER_ADDRESS: request.destination,
+                TracerUtil.tags.HTTP_METHOD: request.method,
+                TracerUtil.tags.HTTP_URL: request.path,
             },
             finish_on_close=True,
         )
@@ -436,7 +436,7 @@ class MatrixFederationHttpClient(object):
                         response.phrase.decode("ascii", errors="replace"),
                     )
 
-                    TracerUtil.set_tag(TracerUtil.Tags.HTTP_STATUS_CODE, response.code)
+                    TracerUtil.set_tag(TracerUtil.tags.HTTP_STATUS_CODE, response.code)
 
                     if 200 <= response.code < 300:
                         pass

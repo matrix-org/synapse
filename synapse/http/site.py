@@ -241,10 +241,10 @@ class SynapseRequest(Request):
             "incoming-federation-request",
             tags={
                 "request_id": self.get_request_id(),
-                TracerUtil.Tags.SPAN_KIND: TracerUtil.Tags.SPAN_KIND_RPC_SERVER,
-                TracerUtil.Tags.HTTP_METHOD: self.get_method(),
-                TracerUtil.Tags.HTTP_URL: self.get_redacted_uri(),
-                TracerUtil.Tags.PEER_HOST_IPV6: self.getClientIP(),
+                TracerUtil.tags.SPAN_KIND: TracerUtil.tags.SPAN_KIND_RPC_SERVER,
+                TracerUtil.tags.HTTP_METHOD: self.get_method(),
+                TracerUtil.tags.HTTP_URL: self.get_redacted_uri(),
+                TracerUtil.tags.PEER_HOST_IPV6: self.getClientIP(),
             },
         )
 

@@ -20,6 +20,38 @@ from functools import wraps
 logger = logging.getLogger(__name__)
 
 
+class _DumTagNames(object):
+    """wrapper of opentracings tags. We need to have them if we
+    want to reference them without opentracing around. Clearly they
+    should never actually show up in a trace. `set_tags` overwrites
+    these with the correct ones."""
+
+    INVALID_TAG = "invalid-tag"
+    COMPONENT = INVALID_TAG
+    DATABASE_INSTANCE = INVALID_TAG
+    DATABASE_STATEMENT = INVALID_TAG
+    DATABASE_TYPE = INVALID_TAG
+    DATABASE_USER = INVALID_TAG
+    ERROR = INVALID_TAG
+    HTTP_METHOD = INVALID_TAG
+    HTTP_STATUS_CODE = INVALID_TAG
+    HTTP_URL = INVALID_TAG
+    MESSAGE_BUS_DESTINATION = INVALID_TAG
+    PEER_ADDRESS = INVALID_TAG
+    PEER_HOSTNAME = INVALID_TAG
+    PEER_HOST_IPV4 = INVALID_TAG
+    PEER_HOST_IPV6 = INVALID_TAG
+    PEER_PORT = INVALID_TAG
+    PEER_SERVICE = INVALID_TAG
+    SAMPLING_PRIORITY = INVALID_TAG
+    SERVICE = INVALID_TAG
+    SPAN_KIND = INVALID_TAG
+    SPAN_KIND_CONSUMER = INVALID_TAG
+    SPAN_KIND_PRODUCER = INVALID_TAG
+    SPAN_KIND_RPC_CLIENT = INVALID_TAG
+    SPAN_KIND_RPC_SERVER = INVALID_TAG
+
+
 def only_if_tracing(func):
     """Executes the function only if we're tracing. Otherwise return.
     Assumes the function wrapped may return None"""
@@ -41,6 +73,8 @@ class TracerUtil(object):
     # Block everything by default
     _homeserver_whitelist = None
 
+    tags = _DumTagNames
+
     @classmethod
     def init_tracer(cls, config):
         """Set the whitelists and initialise the JaegerClient tracer
@@ -55,7 +89,7 @@ class TracerUtil(object):
             return
 
         cls.import_opentracing()
-        cls.set_tags()
+        cls.setup_tags()
         cls.setup_tracing(config)
 
     @classmethod
@@ -71,7 +105,6 @@ class TracerUtil(object):
             raise
 
         cls._opentracing = opentracing
-        cls.set_tags()
 
     @classmethod
     def setup_tracing(cls, config):
@@ -96,40 +129,10 @@ class TracerUtil(object):
         )
         jaeger_config.initialize_tracer()
 
-    class Tags(object):
-        """wrapper of opentracings tags. We need to have them if we
-        want to reference them without opentracing around. Clearly they
-        should never actually show up in a trace. `set_tags` overwrites
-        these with the correct ones."""
-
-        COMPONENT = "invlalid-tag"
-        DATABASE_INSTANCE = "invlalid-tag"
-        DATABASE_STATEMENT = "invlalid-tag"
-        DATABASE_TYPE = "invlalid-tag"
-        DATABASE_USER = "invlalid-tag"
-        ERROR = "invlalid-tag"
-        HTTP_METHOD = "invlalid-tag"
-        HTTP_STATUS_CODE = "invlalid-tag"
-        HTTP_URL = "invlalid-tag"
-        MESSAGE_BUS_DESTINATION = "invlalid-tag"
-        PEER_ADDRESS = "invlalid-tag"
-        PEER_HOSTNAME = "invlalid-tag"
-        PEER_HOST_IPV4 = "invlalid-tag"
-        PEER_HOST_IPV6 = "invlalid-tag"
-        PEER_PORT = "invlalid-tag"
-        PEER_SERVICE = "invlalid-tag"
-        SAMPLING_PRIORITY = "invlalid-tag"
-        SERVICE = "invlalid-tag"
-        SPAN_KIND = "invlalid-tag"
-        SPAN_KIND_CONSUMER = "invlalid-tag"
-        SPAN_KIND_PRODUCER = "invlalid-tag"
-        SPAN_KIND_RPC_CLIENT = "invlalid-tag"
-        SPAN_KIND_RPC_SERVER = "invlalid-tag"
-
     @classmethod
     @only_if_tracing
-    def set_tags(cls):
-        cls.Tags = cls._opentracing.tags
+    def setup_tags(cls):
+        cls.tags = cls._opentracing.tags
 
     # Could use kwargs but I want these to be explicit
     @classmethod
