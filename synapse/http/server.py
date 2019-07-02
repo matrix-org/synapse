@@ -65,8 +65,8 @@ def wrap_json_request_handler(h):
     The handler method must have a signature of "handle_foo(self, request)",
     where "request" must be a SynapseRequest.
 
-    The handler must return a deferred. If the deferred succeeds we assume that
-    a response has been sent. If the deferred fails with a SynapseError we use
+    The handler must return a deferred or a coroutine. If the deferred succeeds
+    we assume that a response has been sent. If the deferred fails with a SynapseError we use
     it to send a JSON response with the appropriate HTTP reponse code. If the
     deferred fails with any other type of error we send a 500 reponse.
     """
