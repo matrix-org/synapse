@@ -22,7 +22,6 @@ from binascii import unhexlify
 from mock import Mock
 from six.moves.urllib import parse
 
-from twisted.internet import defer, reactor
 from twisted.internet.defer import Deferred
 
 from synapse.rest.media.v1._base import FileInfo
@@ -34,15 +33,17 @@ from synapse.util.logcontext import make_deferred_yieldable
 from tests import unittest
 
 
-class MediaStorageTests(unittest.TestCase):
-    def setUp(self):
+class MediaStorageTests(unittest.HomeserverTestCase):
+
+    needs_threadpool = True
+
+    def prepare(self, reactor, clock, hs):
         self.test_dir = tempfile.mkdtemp(prefix="synapse-tests-")
+        self.addCleanup(shutil.rmtree, self.test_dir)
 
         self.primary_base_path = os.path.join(self.test_dir, "primary")
         self.secondary_base_path = os.path.join(self.test_dir, "secondary")
 
-        hs = Mock()
-        hs.get_reactor = Mock(return_value=reactor)
         hs.config.media_store_path = self.primary_base_path
 
         storage_providers = [FileStorageProviderBackend(hs, self.secondary_base_path)]
@@ -52,10 +53,6 @@ class MediaStorageTests(unittest.TestCase):
             hs, self.primary_base_path, self.filepaths, storage_providers
         )
 
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
-
-    @defer.inlineCallbacks
     def test_ensure_media_is_in_local_cache(self):
         media_id = "some_media_id"
         test_body = "Test\n"
@@ -73,7 +70,15 @@ class MediaStorageTests(unittest.TestCase):
         # Now we run ensure_media_is_in_local_cache, which should copy the file
         # to the local cache.
         file_info = FileInfo(None, media_id)
-        local_path = yield self.media_storage.ensure_media_is_in_local_cache(file_info)
+
+        # This uses a real blocking threadpool so we have to wait for it to be
+        # actually done :/
+        x = self.media_storage.ensure_media_is_in_local_cache(file_info)
+
+        # Hotloop until the threadpool does its job...
+        self.wait_on_thread(x)
+
+        local_path = self.get_success(x)
 
         self.assertTrue(os.path.exists(local_path))
 

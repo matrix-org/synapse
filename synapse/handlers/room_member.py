@@ -843,6 +843,7 @@ class RoomMemberHandler(object):
                 "sender": user.to_string(),
                 "state_key": token,
             },
+            ratelimit=False,
             txn_id=txn_id,
         )
 

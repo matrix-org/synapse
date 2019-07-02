@@ -1,1 +1,0 @@
-Warn about disabling email-based password resets when a reset occurs, and remove warning when someone attempts a phone-based reset.

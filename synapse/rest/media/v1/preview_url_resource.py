@@ -32,12 +32,11 @@ from canonicaljson import json
 
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
+    DirectServeResource,
     respond_with_json,
     respond_with_json_bytes,
     wrap_json_request_handler,
@@ -58,11 +57,11 @@ _charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=r
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 
-class PreviewUrlResource(Resource):
+class PreviewUrlResource(DirectServeResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo, media_storage):
-        Resource.__init__(self)
+        super().__init__()
 
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -98,16 +97,11 @@ class PreviewUrlResource(Resource):
     def render_OPTIONS(self, request):
         return respond_with_json(request, 200, {}, send_cors=True)
 
-    def render_GET(self, request):
-        self._async_render_GET(request)
-        return NOT_DONE_YET
-
     @wrap_json_request_handler
-    @defer.inlineCallbacks
-    def _async_render_GET(self, request):
+    async def _async_render_GET(self, request):
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
         url = parse_string(request, "url")
         if b"ts" in request.args:
             ts = parse_integer(request, "ts")
@@ -159,7 +153,7 @@ class PreviewUrlResource(Resource):
         else:
             logger.info("Returning cached response")
 
-        og = yield make_deferred_yieldable(observable.observe())
+        og = await make_deferred_yieldable(defer.maybeDeferred(observable.observe))
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
     @defer.inlineCallbacks
