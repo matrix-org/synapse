@@ -22,6 +22,7 @@ them.
 See doc/log_contexts.rst for details on how this works.
 """
 
+import types
 import logging
 import threading
 
@@ -543,6 +544,9 @@ def run_in_background(f, *args, **kwargs):
         # the assumption here is that the caller doesn't want to be disturbed
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
+
+    if isinstance(res, types.CoroutineType):
+        res = defer.ensureDeferred(res)
 
     if not isinstance(res, defer.Deferred):
         return res
