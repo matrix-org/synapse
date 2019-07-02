@@ -241,7 +241,7 @@ def start(hs, listeners=None):
         refresh_certificate(hs)
 
         # Start the tracer
-        synapse.util.tracerutils.TracerUtil.init_tracer(hs.config)
+        synapse.util.tracerutils.init_tracer(hs.config)
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)

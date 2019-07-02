@@ -38,6 +38,7 @@ from twisted.web.http_headers import Headers
 
 import synapse.metrics
 import synapse.util.retryutils
+import synapse.util.tracerutils as tracerutils
 from synapse.api.errors import (
     Codes,
     FederationDeniedError,
@@ -51,7 +52,6 @@ from synapse.http.federation.matrix_federation_agent import MatrixFederationAgen
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
-from synapse.util.tracerutils import TracerUtil
 
 logger = logging.getLogger(__name__)
 
@@ -341,20 +341,20 @@ class MatrixFederationHttpClient(object):
             query_bytes = b""
 
         # Retreive current span
-        TracerUtil.start_active_span(
+        tracerutils.start_active_span(
             "outgoing-federation-request",
             tags={
-                TracerUtil.tags.SPAN_KIND: TracerUtil.tags.SPAN_KIND_RPC_CLIENT,
-                TracerUtil.tags.PEER_ADDRESS: request.destination,
-                TracerUtil.tags.HTTP_METHOD: request.method,
-                TracerUtil.tags.HTTP_URL: request.path,
+                tracerutils.tags.SPAN_KIND: tracerutils.tags.SPAN_KIND_RPC_CLIENT,
+                tracerutils.tags.PEER_ADDRESS: request.destination,
+                tracerutils.tags.HTTP_METHOD: request.method,
+                tracerutils.tags.HTTP_URL: request.path,
             },
             finish_on_close=True,
         )
 
         # Inject the span into the headers
         headers_dict = {}
-        TracerUtil.inject_active_span_byte_dict(headers_dict, request.destination)
+        tracerutils.inject_active_span_byte_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 
@@ -436,7 +436,9 @@ class MatrixFederationHttpClient(object):
                         response.phrase.decode("ascii", errors="replace"),
                     )
 
-                    TracerUtil.set_tag(TracerUtil.tags.HTTP_STATUS_CODE, response.code)
+                    tracerutils.set_tag(
+                        tracerutils.tags.HTTP_STATUS_CODE, response.code
+                    )
 
                     if 200 <= response.code < 300:
                         pass
@@ -518,7 +520,7 @@ class MatrixFederationHttpClient(object):
                         _flatten_response_never_received(e),
                     )
                     raise
-        TracerUtil.close_active_span()
+        tracerutils.close_active_span()
         defer.returnValue(response)
 
     def build_auth_headers(

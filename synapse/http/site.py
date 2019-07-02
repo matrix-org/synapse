@@ -20,7 +20,7 @@ from twisted.web.server import Request, Site
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.util.tracerutils import TracerUtil
+import synapse.util.tracerutils as tracerutils
 
 logger = logging.getLogger(__name__)
 
@@ -236,15 +236,15 @@ class SynapseRequest(Request):
         )
 
         # Start a span
-        TracerUtil.start_active_span_from_context(
+        tracerutils.start_active_span_from_context(
             self.requestHeaders,
             "incoming-federation-request",
             tags={
                 "request_id": self.get_request_id(),
-                TracerUtil.tags.SPAN_KIND: TracerUtil.tags.SPAN_KIND_RPC_SERVER,
-                TracerUtil.tags.HTTP_METHOD: self.get_method(),
-                TracerUtil.tags.HTTP_URL: self.get_redacted_uri(),
-                TracerUtil.tags.PEER_HOST_IPV6: self.getClientIP(),
+                tracerutils.tags.SPAN_KIND: tracerutils.tags.SPAN_KIND_RPC_SERVER,
+                tracerutils.tags.HTTP_METHOD: self.get_method(),
+                tracerutils.tags.HTTP_URL: self.get_redacted_uri(),
+                tracerutils.tags.PEER_HOST_IPV6: self.getClientIP(),
             },
         )
 
@@ -318,8 +318,8 @@ class SynapseRequest(Request):
         )
 
         # finish the span if it's there.
-        TracerUtil.set_tag("peer.address", authenticated_entity)
-        TracerUtil.close_active_span()
+        tracerutils.set_tag("peer.address", authenticated_entity)
+        tracerutils.close_active_span()
 
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
