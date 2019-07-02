@@ -20,7 +20,7 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.stringutils import random_string
-from synapse.util.tracerutils import TracerUtil, trace_defered_function
+import synapse.util.tracerutils as tracerutils
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class DeviceMessageHandler(object):
             "to_device_key", stream_id, users=local_messages.keys()
         )
 
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def send_device_message(self, sender_user_id, message_type, messages):
 
@@ -111,7 +111,7 @@ class DeviceMessageHandler(object):
                 "message_id": message_id,
             }
 
-        TracerUtil.log_kv(local_messages)
+        tracerutils.log_kv(local_messages)
         stream_id = yield self.store.add_messages_to_device_inbox(
             local_messages, remote_edu_contents
         )
@@ -120,7 +120,7 @@ class DeviceMessageHandler(object):
             "to_device_key", stream_id, users=local_messages.keys()
         )
 
-        TracerUtil.log_kv(remote_messages)
+        tracerutils.log_kv(remote_messages)
         for destination in remote_messages.keys():
             # Enqueue a new federation transaction to send the new
             # device messages to each remote destination.

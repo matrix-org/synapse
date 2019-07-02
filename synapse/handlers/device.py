@@ -31,7 +31,7 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination
-from synapse.util.tracerutils import TracerUtil, trace_defered_function
+import synapse.util.tracerutils as tracerutils
 
 from ._base import BaseHandler
 
@@ -46,7 +46,7 @@ class DeviceWorkerHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self._auth_handler = hs.get_auth_handler()
 
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
         """
@@ -58,7 +58,7 @@ class DeviceWorkerHandler(BaseHandler):
             defer.Deferred: list[dict[str, X]]: info on each device
         """
 
-        TracerUtil.set_tag("user_id", user_id)
+        tracerutils.set_tag("user_id", user_id)
         device_map = yield self.store.get_devices_by_user(user_id)
 
         ips = yield self.store.get_last_client_ip_by_device(user_id, device_id=None)
@@ -67,10 +67,10 @@ class DeviceWorkerHandler(BaseHandler):
         for device in devices:
             _update_device_from_client_ips(device, ips)
 
-        TracerUtil.log_kv(device_map)
+        tracerutils.log_kv(device_map)
         defer.returnValue(devices)
 
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def get_device(self, user_id, device_id):
         """ Retrieve the given device
@@ -91,12 +91,12 @@ class DeviceWorkerHandler(BaseHandler):
         ips = yield self.store.get_last_client_ip_by_device(user_id, device_id)
         _update_device_from_client_ips(device, ips)
 
-        TracerUtil.set_tag("device", device)
-        TracerUtil.set_tag("ips", ips)
+        tracerutils.set_tag("device", device)
+        tracerutils.set_tag("ips", ips)
         defer.returnValue(device)
 
     @measure_func("device.get_user_ids_changed")
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def get_user_ids_changed(self, user_id, from_token):
         """Get list of users that have had the devices updated, or have newly
@@ -107,8 +107,8 @@ class DeviceWorkerHandler(BaseHandler):
             from_token (StreamToken)
         """
 
-        TracerUtil("user_id", user_id)
-        TracerUtil.set_tag("from_token", from_token)
+        tracerutils("user_id", user_id)
+        tracerutils.set_tag("from_token", from_token)
         now_room_key = yield self.store.get_room_events_max_id()
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
@@ -160,7 +160,7 @@ class DeviceWorkerHandler(BaseHandler):
             # special-case for an empty prev state: include all members
             # in the changed list
             if not event_ids:
-                TracerUtil.log_kv(
+                tracerutils.log_kv(
                     {"event": "encountered empty previous state", "room_id": room_id}
                 )
                 for key, event_id in iteritems(current_state_ids):
@@ -215,7 +215,7 @@ class DeviceWorkerHandler(BaseHandler):
             possibly_joined = []
             possibly_left = []
 
-        TracerUtil.log_kv(
+        tracerutils.log_kv(
             {"changed": list(possibly_joined), "left": list(possibly_left)}
         )
 
@@ -288,7 +288,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
 
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def delete_device(self, user_id, device_id):
         """ Delete the given device
@@ -306,8 +306,8 @@ class DeviceHandler(DeviceWorkerHandler):
         except errors.StoreError as e:
             if e.code == 404:
                 # no match
-                TracerUtil.set_tag("error", True)
-                TracerUtil.set_tag("reason", "User doesn't have that device id.")
+                tracerutils.set_tag("error", True)
+                tracerutils.set_tag("reason", "User doesn't have that device id.")
                 pass
             else:
                 raise
@@ -320,7 +320,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         yield self.notify_device_update(user_id, [device_id])
 
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def delete_all_devices_for_user(self, user_id, except_device_id=None):
         """Delete all of the user's devices
@@ -356,8 +356,8 @@ class DeviceHandler(DeviceWorkerHandler):
         except errors.StoreError as e:
             if e.code == 404:
                 # no match
-                TracerUtil.set_tag("error", True)
-                TracerUtil.set_tag("reason", "User doesn't have that device id.")
+                tracerutils.set_tag("error", True)
+                tracerutils.set_tag("reason", "User doesn't have that device id.")
                 pass
             else:
                 raise
@@ -480,15 +480,15 @@ class DeviceListEduUpdater(object):
             iterable=True,
         )
 
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def incoming_device_list_update(self, origin, edu_content):
         """Called on incoming device list update from federation. Responsible
         for parsing the EDU and adding to pending updates list.
         """
 
-        TracerUtil.set_tag("origin", origin)
-        TracerUtil.set_tag("edu_content", edu_content)
+        tracerutils.set_tag("origin", origin)
+        tracerutils.set_tag("edu_content", edu_content)
         user_id = edu_content.pop("user_id")
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
@@ -509,8 +509,8 @@ class DeviceListEduUpdater(object):
         if not room_ids:
             # We don't share any rooms with this user. Ignore update, as we
             # probably won't get any further updates.
-            TracerUtil.set_tag("error", True)
-            TracerUtil.log_kv(
+            tracerutils.set_tag("error", True)
+            tracerutils.log_kv(
                 {
                     "message": "Got an update from a user which "
                     + "doesn't share a room with the current user."

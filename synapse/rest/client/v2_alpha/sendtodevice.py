@@ -20,11 +20,7 @@ from twisted.internet import defer
 from synapse.http import servlet
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.util.tracerutils import (
-    TracerUtil,
-    trace_defered_function_using_operation_name,
-    tag_args,
-)
+import synapse.util.tracerutils as tracerutils
 
 from ._base import client_patterns
 
@@ -47,10 +43,10 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.txns = HttpTransactionCache(hs)
         self.device_message_handler = hs.get_device_message_handler()
 
-    @trace_defered_function_using_operation_name("sendToDevice")
+    @tracerutils.trace_defered_function_using_operation_name("sendToDevice")
     def on_PUT(self, request, message_type, txn_id):
-        TracerUtil.set_tag("message_type", message_type)
-        TracerUtil.set_tag("txn_id", txn_id)
+        tracerutils.set_tag("message_type", message_type)
+        tracerutils.set_tag("txn_id", txn_id)
         return self.txns.fetch_or_execute_request(
             request, self._put, request, message_type, txn_id
         )
