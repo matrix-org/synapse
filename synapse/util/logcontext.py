@@ -529,8 +529,9 @@ def run_in_background(f, *args, **kwargs):
     return from the function, and that the sentinel context is set once the
     deferred returned by the function completes.
 
-    Useful for wrapping functions that return a deferred which you don't yield
-    on (for instance because you want to pass it to deferred.gatherResults()).
+    Useful for wrapping functions that return a deferred or coroutine, which you don't
+    yield or await on (for instance because you want to pass it to
+    deferred.gatherResults()).
 
     Note that if you completely discard the result, you should make sure that
     `f` doesn't raise any deferred exceptions, otherwise a scary-looking
