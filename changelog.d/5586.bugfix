@@ -1,1 +1,0 @@
-Fixed m.login.jwt using unregistred user_id and added pyjwt>=1.6.4 as jwt conditional dependencies. Contributed by Pau Rodriguez-Estivill.
