@@ -51,7 +51,6 @@ from synapse.http.federation.matrix_federation_agent import MatrixFederationAgen
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
-from synapse.util.tracerutils import TracerUtil
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +173,7 @@ class MatrixFederationHttpClient(object):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+        self._opentracing = hs.get_opentracing()
 
         real_reactor = hs.get_reactor()
 
@@ -341,20 +341,22 @@ class MatrixFederationHttpClient(object):
             query_bytes = b""
 
         # Retreive current span
-        TracerUtil.start_active_span(
+        self._opentracing.start_active_span(
             "outgoing-federation-request",
             tags={
-                TracerUtil.tags.SPAN_KIND: TracerUtil.tags.SPAN_KIND_RPC_CLIENT,
-                TracerUtil.tags.PEER_ADDRESS: request.destination,
-                TracerUtil.tags.HTTP_METHOD: request.method,
-                TracerUtil.tags.HTTP_URL: request.path,
+                self._opentracing.tags.SPAN_KIND: self._opentracing.tags.SPAN_KIND_RPC_CLIENT,
+                self._opentracing.tags.PEER_ADDRESS: request.destination,
+                self._opentracing.tags.HTTP_METHOD: request.method,
+                self._opentracing.tags.HTTP_URL: request.path,
             },
             finish_on_close=True,
         )
 
         # Inject the span into the headers
         headers_dict = {}
-        TracerUtil.inject_active_span_byte_dict(headers_dict, request.destination)
+        self._opentracing.inject_active_span_byte_dict(
+            headers_dict, request.destination
+        )
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 
@@ -436,7 +438,9 @@ class MatrixFederationHttpClient(object):
                         response.phrase.decode("ascii", errors="replace"),
                     )
 
-                    TracerUtil.set_tag(TracerUtil.tags.HTTP_STATUS_CODE, response.code)
+                    self._opentracing.set_tag(
+                        self._opentracing.tags.HTTP_STATUS_CODE, response.code
+                    )
 
                     if 200 <= response.code < 300:
                         pass
@@ -518,7 +522,7 @@ class MatrixFederationHttpClient(object):
                         _flatten_response_never_received(e),
                     )
                     raise
-        TracerUtil.close_active_span()
+        self._opentracing.close_active_span()
         defer.returnValue(response)
 
     def build_auth_headers(
