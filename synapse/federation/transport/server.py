@@ -40,6 +40,7 @@ from synapse.types import ThirdPartyInstanceID, get_domain_from_id
 from synapse.util.logcontext import run_in_background
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
+import synapse.util.tracerutils as tracerutils
 
 logger = logging.getLogger(__name__)
 
@@ -288,6 +289,20 @@ class BaseFederationServlet(object):
                 logger.warn("authenticate_request failed: %s", e)
                 raise
 
+            # Start an opentracing span
+            tracerutils.start_active_span_from_context(
+                request.requestHeaders,
+                "incoming-request",
+                tags={
+                    "request_id": request.get_request_id(),
+                    tracerutils.tags.SPAN_KIND: tracerutils.tags.SPAN_KIND_RPC_SERVER,
+                    tracerutils.tags.HTTP_METHOD: request.get_method(),
+                    tracerutils.tags.HTTP_URL: request.get_redacted_uri(),
+                    tracerutils.tags.PEER_HOST_IPV6: request.getClientIP(),
+                    "authenticated_entity": origin,
+                },
+            )
+
             if origin:
                 with ratelimiter.ratelimit(origin) as d:
                     yield d
@@ -296,6 +311,9 @@ class BaseFederationServlet(object):
                     )
             else:
                 response = yield func(origin, content, request.args, *args, **kwargs)
+
+            # Finish the span
+            tracerutils.close_active_span()
 
             defer.returnValue(response)
 

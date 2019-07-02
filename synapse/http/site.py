@@ -235,19 +235,6 @@ class SynapseRequest(Request):
             self.get_redacted_uri(),
         )
 
-        # Start a span
-        tracerutils.start_active_span_from_context(
-            self.requestHeaders,
-            "incoming-federation-request",
-            tags={
-                "request_id": self.get_request_id(),
-                tracerutils.tags.SPAN_KIND: tracerutils.tags.SPAN_KIND_RPC_SERVER,
-                tracerutils.tags.HTTP_METHOD: self.get_method(),
-                tracerutils.tags.HTTP_URL: self.get_redacted_uri(),
-                tracerutils.tags.PEER_HOST_IPV6: self.getClientIP(),
-            },
-        )
-
     def _finished_processing(self):
         """Log the completion of this request and update the metrics
         """
@@ -316,10 +303,6 @@ class SynapseRequest(Request):
             user_agent,
             usage.evt_db_fetch_count,
         )
-
-        # finish the span if it's there.
-        tracerutils.set_tag("peer.address", authenticated_entity)
-        tracerutils.close_active_span()
 
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
