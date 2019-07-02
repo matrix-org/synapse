@@ -98,6 +98,7 @@ from synapse.state import StateHandler, StateResolutionHandler
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
+from synapse.util.tracerutils import OpenTracing
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,7 @@ class HomeServer(object):
         self.registration_ratelimiter = Ratelimiter()
 
         self.datastore = None
+        self.opentracing = None
 
         # Other kwargs are explicit dependencies
         for depname in kwargs:
@@ -230,6 +232,9 @@ class HomeServer(object):
 
     def setup(self):
         logger.info("Setting up.")
+
+        self.opentracing = OpenTracing(self.config)
+
         with self.get_db_conn() as conn:
             self.datastore = self.DATASTORE_CLASS(conn, self)
             conn.commit()
@@ -271,6 +276,9 @@ class HomeServer(object):
 
     def get_distributor(self):
         return self.distributor
+
+    def get_opentracing(self):
+        return self.opentracing
 
     def get_ratelimiter(self):
         return self.ratelimiter
