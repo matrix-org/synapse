@@ -1,0 +1,1 @@
+Fix regression in 1.1rc1 where OPTIONS requests to the media repo would fail.
