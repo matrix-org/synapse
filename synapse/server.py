@@ -223,7 +223,6 @@ class HomeServer(object):
         self.registration_ratelimiter = Ratelimiter()
 
         self.datastore = None
-        self.opentracing = None
 
         # Other kwargs are explicit dependencies
         for depname in kwargs:
@@ -272,9 +271,6 @@ class HomeServer(object):
 
     def get_distributor(self):
         return self.distributor
-
-    def get_opentracing(self):
-        return self.opentracing
 
     def get_ratelimiter(self):
         return self.ratelimiter

@@ -19,7 +19,6 @@ from twisted.web.http_headers import Headers
 
 from synapse.http.site import SynapseRequest
 from synapse.util import Clock
-from synapse.util.tracerutils import OpenTracing
 
 from tests.utils import setup_test_homeserver as _sth
 
@@ -171,7 +170,7 @@ def make_request(
     site = FakeSite()
     channel = FakeChannel(reactor)
 
-    req = request(site, OpenTracing(), channel)
+    req = request(site, channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
     req.postpath = list(map(unquote, path[1:].split(b"/")))

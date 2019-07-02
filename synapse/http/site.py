@@ -20,6 +20,7 @@ from twisted.web.server import Request, Site
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.util.tracerutils import TracerUtil
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +48,12 @@ class SynapseRequest(Request):
         logcontext(LoggingContext) : the log context for this request
     """
 
-    def __init__(self, site, opentracing, channel, *args, **kw):
+    def __init__(self, site, channel, *args, **kw):
         Request.__init__(self, channel, *args, **kw)
         self.site = site
         self._channel = channel  # this is used by the tests
         self.authenticated_entity = None
         self.start_time = 0
-        self.opentracing = opentracing
 
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext = None
@@ -235,6 +235,19 @@ class SynapseRequest(Request):
             self.get_redacted_uri(),
         )
 
+        # Start a span
+        TracerUtil.start_active_span_from_context(
+            self.requestHeaders,
+            "incoming-federation-request",
+            tags={
+                "request_id": self.get_request_id(),
+                TracerUtil.tags.SPAN_KIND: TracerUtil.tags.SPAN_KIND_RPC_SERVER,
+                TracerUtil.tags.HTTP_METHOD: self.get_method(),
+                TracerUtil.tags.HTTP_URL: self.get_redacted_uri(),
+                TracerUtil.tags.PEER_HOST_IPV6: self.getClientIP(),
+            },
+        )
+
     def _finished_processing(self):
         """Log the completion of this request and update the metrics
         """
@@ -304,6 +317,10 @@ class SynapseRequest(Request):
             usage.evt_db_fetch_count,
         )
 
+        # finish the span if it's there.
+        TracerUtil.set_tag("peer.address", authenticated_entity)
+        TracerUtil.close_active_span()
+
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
@@ -334,16 +351,15 @@ class XForwardedForRequest(SynapseRequest):
 
 
 class SynapseRequestFactory(object):
-    def __init__(self, site, x_forwarded_for, opentracing):
+    def __init__(self, site, x_forwarded_for):
         self.site = site
         self.x_forwarded_for = x_forwarded_for
-        self.opentracing = opentracing
 
     def __call__(self, *args, **kwargs):
         if self.x_forwarded_for:
-            return XForwardedForRequest(self.site, self.opentracing, *args, **kwargs)
+            return XForwardedForRequest(self.site, *args, **kwargs)
         else:
-            return SynapseRequest(self.site, self.opentracing, *args, **kwargs)
+            return SynapseRequest(self.site, *args, **kwargs)
 
 
 class SynapseSite(Site):
@@ -359,7 +375,6 @@ class SynapseSite(Site):
         config,
         resource,
         server_version_string,
-        opentracing,
         *args,
         **kwargs
     ):
@@ -368,7 +383,7 @@ class SynapseSite(Site):
         self.site_tag = site_tag
 
         proxied = config.get("x_forwarded", False)
-        self.requestFactory = SynapseRequestFactory(self, proxied, opentracing)
+        self.requestFactory = SynapseRequestFactory(self, proxied)
         self.access_logger = logging.getLogger(logger_name)
         self.server_version_string = server_version_string.encode("ascii")
 

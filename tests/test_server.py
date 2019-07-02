@@ -28,7 +28,6 @@ from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite, logger
 from synapse.util import Clock
 from synapse.util.logcontext import make_deferred_yieldable
-from synapse.util.tracerutils import OpenTracing
 
 from tests import unittest
 from tests.server import (
@@ -182,7 +181,7 @@ class SiteTestCase(unittest.HomeserverTestCase):
         # time out the request while it's 'processing'
         base_resource = Resource()
         base_resource.putChild(b"", HangingResource())
-        site = SynapseSite("test", "site_tag", {}, base_resource, "1.0", OpenTracing())
+        site = SynapseSite("test", "site_tag", {}, base_resource, "1.0")
 
         server = site.buildProtocol(None)
         client = AccumulatingProtocol()
