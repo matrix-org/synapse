@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from synapse.util.tracerutils import TracerUtil, trace_defered_function
+import synapse.util.tracerutils as tracerutils
 
 from six import iteritems
 
@@ -322,7 +322,7 @@ class DeviceWorkerStore(SQLBaseStore):
     def get_device_stream_token(self):
         return self._device_list_id_gen.get_current_token()
 
-    @trace_defered_function
+    @tracerutils.trace_defered_function
     @defer.inlineCallbacks
     def get_user_devices_from_cache(self, query_list):
         """Get the devices (and keys if any) for remote users from the cache.
@@ -354,8 +354,8 @@ class DeviceWorkerStore(SQLBaseStore):
             else:
                 results[user_id] = yield self._get_cached_devices_for_user(user_id)
 
-        TracerUtil.set_tag("in_cache", results)
-        TracerUtil.set_tag("not_in_cache", user_ids_not_in_cache)
+        tracerutils.set_tag("in_cache", results)
+        tracerutils.set_tag("not_in_cache", user_ids_not_in_cache)
 
         return (user_ids_not_in_cache, results)
 
