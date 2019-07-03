@@ -116,7 +116,7 @@ class SynapseRequest(Request):
         # create a LogContext for this request
         request_id = self.get_request_id()
         logcontext = self.logcontext = LoggingContext(request_id)
-        request = request_id
+        logcontext.request = request_id
 
         # override the Server header which is set by twisted
         self.setHeader("Server", self.site.server_version_string)
@@ -243,7 +243,7 @@ class SynapseRequest(Request):
             # have logged a warning, so just bail out.
             return
 
-        usage = self.get_resource_usage()
+        usage = self.logcontext.get_resource_usage()
 
         if self._processing_finished_time is None:
             # we completed the request without anything calling processing()
