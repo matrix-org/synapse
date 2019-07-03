@@ -34,12 +34,16 @@ VALID_ACCESS_RULES = (
 )
 
 # Rules to which we need to apply the power levels restrictions.
-# These are all of the rules that don't forbid users to join based on a server blacklist
-# (except for the rules targetting direct chats, because both users should be able to be
-# room admins in a direct chat created with the "trusted_private_chat" preset).
-# The current restrictions forbid users that would be forbidden from joining under more
-# restrictive rules from being given a non-default PL, and the default PL from being set
-# to a non-0 value.
+#
+# These are all of the rules that neither:
+#  * forbid users from joining based on a server blacklist (which means that there
+#     is no need to apply power level restrictions), nor
+#  * target direct chats (since we allow both users to be room admins in this case).
+#
+# The power-level restrictions, when they are applied, prevent the following:
+#  * the default power level for users (users_default) being set to anything other than 0.
+#  * a non-default power level being assigned to any user which would be forbidden from
+#     joining a restricted room.
 RULES_WITH_RESTRICTED_POWER_LEVELS = (
     ACCESS_RULE_UNRESTRICTED,
 )
