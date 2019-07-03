@@ -201,6 +201,8 @@ class RoomAccessRules(object):
         if event.type == EventTypes.Member or event.type == EventTypes.ThirdPartyInvite:
             return self._on_membership_or_invite(event, rule, state_events)
 
+        return True
+
     def _on_rules_change(self, event, state_events):
         """Implement the checks and behaviour specified on allowing or forbidding a new
         im.vector.room.access_rules event.
