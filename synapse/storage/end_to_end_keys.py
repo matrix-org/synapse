@@ -159,7 +159,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 (algorithm, key_id, key json)
         """
 
-        @tracerutils.strace_function
+        @tracerutils.trace_function
         def _add_e2e_one_time_keys(txn):
             tracerutils.set_tag("user_id", user_id)
             tracerutils.set_tag("device_id", device_id)
