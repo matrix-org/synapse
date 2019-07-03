@@ -66,7 +66,10 @@ class Clock(object):
     def looping_call(self, f, msec):
         """Call a function repeatedly.
 
-         Waits `msec` initially before calling `f` for the first time.
+        Waits `msec` initially before calling `f` for the first time.
+
+        Note that the function will be called with no logcontext, so if it is anything
+        other than trivial, you probably want to wrap it in run_as_background_process.
 
         Args:
             f(function): The function to call repeatedly.
@@ -80,6 +83,9 @@ class Clock(object):
 
     def call_later(self, delay, callback, *args, **kwargs):
         """Call something later
+
+        Note that the function will be called with no logcontext, so if it is anything
+        other than trivial, you probably want to wrap it in run_as_background_process.
 
         Args:
             delay(float): How long to wait in seconds.
