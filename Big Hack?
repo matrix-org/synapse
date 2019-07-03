@@ -1,0 +1,306 @@
+local Rawr = {}
+local Api = {}
+local Log = {}
+
+local function Service(name)
+return game:GetService(name)
+end
+
+local function SecondsToClock(seconds)
+-- https://gist.github.com/jesseadams/791673
+local seconds = tonumber(seconds)
+if seconds <= 0 then
+return "00:00:00";
+else
+local hours = string.format("%02.f", math.floor(seconds/3600));
+local mins = string.format("%02.f", math.floor(seconds/60 - (hours*60)));
+local secs = string.format("%02.f", math.floor(seconds - hours*3600 - mins *60));
+return hours..":"..mins..":"..secs
+end
+end
+
+function Log:Init()
+local Profile = game:GetService("ReplicatedStorage").Profiles[Api.GetPlayer().Name]
+local Vel = Profile.Stats.Vel
+local LastVel = Vel.Value
+Log.Earned = {
+Vel = 0,
+Items = {},
+}
+Profile.Inventory.ChildAdded:Connect(function(item)
+table.insert(Log.Earned.Items, item.Name)
+if(Api.GetSetting("auto_dismantle") == true)then
+Api.Dismantle(item.Name)
+end 
+end)
+Vel.Changed:Connect(function()
+local earn = Vel.Value - LastVel
+LastVel = Vel.Value
+Log.Earned.Vel = Log.Earned.Vel + earn
+end)
+end
+
+function Log.Save()
+Log.Earned.RunTime = SecondsToClock(tick()-Api.Start)
+Synapse:WriteFile(tick() .. "_log.dat", game:GetService("HttpService"):JSONEncode(Log.Earned))
+end
+
+function Rawr:Check(...) --secret sauce
+local player = Api.GetPlayer()
+local character = Api.GetCharacter()
+local args = {...}
+
+if(character and character.PrimaryPart and args[1]:lower()=="cframe")then
+--player.Character = Api.FakeCharacter
+player.Character.RobloxLocked = true 
+wait(Api.GetSetting("rawr_bypass_speed"))
+character:SetPrimaryPartCFrame(args[2])
+wait(Api.GetSetting("rawr_bypass_speed"))
+--player.Character = character
+player.Character.RobloxLocked = false
+end
+end
+
+function Api.GetPlayer()
+return game:GetService("Players").LocalPlayer
+end
+
+function Api.Dismantle(name)
+game.ReplicatedStorage.Event:FireServer("Equipment", {
+"Dismantle",
+game:GetService("ReplicatedStorage").Profiles[Api.GetPlayer().Name].Inventory[name]
+})
+end
+
+function Api.Replicate(object)
+local Model = Instance.new("Model")
+Model.Name = object.Name
+for index, child in pairs(object:GetChildren()) do
+local c = child:Clone()
+c.Parent = Model
+end
+if(object.PrimaryPart)then
+Model.PrimaryPart = Model[object.PrimaryPart.Name]
+end
+return Model
+end
+
+function Api.GetCharacter()
+return Api.Character or Api.GetPlayer().Character
+end
+
+function Api.GetEntity(model)
+return model:FindFirstChild("Entity")
+end
+
+function Api.Settings(...)
+Api.Settings = {}
+for name, value in pairs(...) do
+Api.Settings[name] = value
+end
+end
+
+function Api.GetSetting(name)
+return Api.Settings[name]
+end
+
+function Api.IsValid(model)
+if(model.PrimaryPart and model:FindFirstChild("Entity") and model.Entity:FindFirstChild("Health") and model.Parent~=nil and model:FindFirstChild("Nameplate"))then
+return true
+end
+end
+
+function Api.GetPlayerDistances(model)
+local localPlayer = Api.GetPlayer()
+local distances = {}
+for index, player in pairs(Service("Players"):GetChildren()) do
+if(player~=localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and model:FindFirstChild("HumanoidRootPart"))then
+distances[player.Name] = (model.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).magnitude
+end
+end
+return distances
+end
+
+function Api.CheckNear(monster)
+if(Api.GetSetting("avoid_players_nearby")["Enabled"] == true)then
+local max_distance = Api.GetSetting("avoid_players_nearby")["Distance"]
+local distances = Api.GetPlayerDistances(monster)
+for player, distance in pairs(distances)do
+if(distance <= max_distance)then
+return false
+end
+end
+end
+return true
+end
+
+function Api.CheckBlacklist(monster)
+for index, blacklist in pairs(Api.Blacklist) do
+if(monster == blacklist)then
+return false
+end
+end
+return true
+end
+
+function Api.GetMonsters()
+local targets = {}
+for index, monster in pairs(Service("Workspace").Mobs:GetChildren()) do
+local entity = monster:FindFirstChildOfClass("Folder")
+local filterApplied = false
+local distanceCheck = Api.CheckNear(monster)
+if(monster.PrimaryPart and Api.IsValid(monster) and distanceCheck and Api.CheckBlacklist(monster))then
+if(Api.GetSetting("monster_filter")["Enabled"] == true)then
+if(entity.Health.Value >= Api.GetSetting("monster_filter")["max_monster_health"] and entity.Exp.Value >= Api.GetSetting("monster_filter")["min_exp_earned"])then
+table.insert(targets, monster)
+end
+filterApplied = true
+elseif(Api.GetSetting("target_specific_enemy").Enabled == true)then
+if(Api.GetSetting("target_specific_enemy").Names[monster.Nameplate.SurfaceGui.TextLabel.Text] == true)then
+table.insert(targets, monster)
+end
+filterApplied = true
+end
+if(filterApplied == false)then
+table.insert(targets, monster) 
+end
+end
+end
+return targets
+end
+
+function Api:Connect()
+local player = Api.GetPlayer()
+local character = Api.GetCharacter()
+local setupCharacter = function(character)
+Api.FakeCharacter = Api.Replicate(character)
+end
+
+setupCharacter(character)
+player.CharacterAdded:Connect(setupCharacter)
+end
+
+function Api:SetKeys()
+game:GetService("UserInputService").InputBegan:connect(function(Key)
+if(Key.KeyCode == Api.GetSetting("stop_key"))then
+Api.Enabled = false
+elseif(Key.KeyCode == Api.GetSetting("pause_key"))then
+Api.Paused = true
+elseif(Key.KeyCode == Api.GetSetting("unpause_key"))then
+Api.Paused = false
+end
+end)
+end
+
+function Api:Init()
+Api.Blacklist = {}
+Api.Start = tick()
+Api.Paused = false
+Api.CanClick = false
+Api.Enabled = true
+wait(Api.GetSetting("StartDelay"))
+spawn(function()
+while wait(Api.GetSetting("click_break_speed")) and Api.Enabled do
+if(Api.Paused == false and Api.CanClick == true)then
+if(mouse1click)then
+mouse1click()
+end
+else
+wait()
+end
+end
+end)
+while wait() and Api.Enabled do
+if(Api.Paused == false)then
+for index, monster in pairs(Api.GetMonsters()) do
+local distanceCheck = Api.CheckNear(monster)
+if(distanceCheck and Api.IsValid(monster) and Api.Enabled)then -- recheck 
+Rawr:Check("CFrame", monster:GetPrimaryPartCFrame() * CFrame.new(0, 0, 3)) -- bypass
+wait(Api.GetSetting("swap_monster_speed"))
+local entity = Api.GetEntity(monster)
+local base = entity.Health.Value
+entity.Health.Changed:Connect(function()
+if(entity.Health.Value == base)then
+dontBreak = false
+end
+end)
+dontBreak = true
+local timer = 0
+while dontBreak and Api.Enabled do
+if(Api.Paused == false)then
+local thisTime = wait()
+wait(thisTime)
+timer = timer + thisTime
+if(timer >= Api.GetSetting("timeout")["time"])then
+warn('Timeout exceeded!')
+if(Api.GetSetting("timeout")["blacklist_monster_after_timeout"] == true)then
+table.insert(Api.Blacklist, monster)
+end
+break
+end
+if(Api.IsValid(monster) and entity.Health.Value > 0)then
+local character = Api.GetCharacter()
+if(character)then
+Api.CanClick = true
+character:SetPrimaryPartCFrame(monster:GetPrimaryPartCFrame() * CFrame.new(0, 0, 3))
+else
+character = Api.GetCharacter()
+if(character)then
+Rawr:Check("CFrame", monster:GetPrimaryPartCFrame() * CFrame.new(0, 0, 3)) -- bypass
+wait(Api.GetSetting("swap_monster_speed"))
+end
+end
+else
+Api.CanClick = false
+break
+end
+else
+wait() 
+end
+end
+wait(Api.GetSetting("swap_monster_speed"))
+end
+end
+end
+end
+Log.Save()
+end
+
+Api.Settings({
+["start_delay"] = 2,
+["stop_key"] = Enum.KeyCode.Escape,
+["pause_key"] = Enum.KeyCode.LeftControl,
+["unpause_key"] = Enum.KeyCode.RightControl,
+["rawr_bypass_speed"] = 0.5, -- 0.65
+["swap_monster_speed"] = 0.5, -- 0.7,
+["click_break_speed"] = 0.1,
+["auto_dismantle"] = true,
+["timeout"] = {
+["time"] = 15,
+["blacklist_monster_after_timeout"] = true
+},
+["monster_filter"] = {
+["Enabled"] = false,
+["max_monster_health"] = 0,
+["min_exp_earned"] = 0,
+},
+["avoid_players_nearby"] = {
+["Enabled"] = true,
+["Distance"] = 200
+},
+["target_specific_enemy"] = {
+["Enabled"] = false,
+["Names"] = {
+["Giant Ruins Hornet"] = true,
+["Petal Knight"] = true,
+["Giant Praying Mantis"] = true,
+["Gargoyle Reaper"] = true,
+["Mortis the Flaming Sear"] = true,
+}
+}
+})
+
+Api:SetKeys()
+Api:Connect()
+Log:Init()
+Api:Init()
