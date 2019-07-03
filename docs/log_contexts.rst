@@ -1,4 +1,4 @@
-Log contexts
+Log Contexts
 ============
 
 .. contents::
