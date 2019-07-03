@@ -22,6 +22,7 @@ from email.mime.text import MIMEText
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils
 from synapse.util.logcontext import make_deferred_yieldable
@@ -67,7 +68,14 @@ class AccountValidityHandler(object):
             )
 
             # Check the renewal emails to send and send them every 30min.
-            self.clock.looping_call(self.send_renewal_emails, 30 * 60 * 1000)
+            def send_emails():
+                # run as a background process to make sure that the database transactions
+                # have a logcontext to report to
+                return run_as_background_process(
+                    "send_renewals", self.send_renewal_emails
+                )
+
+            self.clock.looping_call(send_emails, 30 * 60 * 1000)
 
     @defer.inlineCallbacks
     def send_renewal_emails(self):

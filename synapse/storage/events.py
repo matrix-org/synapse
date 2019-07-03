@@ -253,7 +253,14 @@ class EventsStore(
         )
 
         # Read the extrems every 60 minutes
-        hs.get_clock().looping_call(self._read_forward_extremities, 60 * 60 * 1000)
+        def read_forward_extremities():
+            # run as a background process to make sure that the database transactions
+            # have a logcontext to report to
+            return run_as_background_process(
+                "read_forward_extremities", self._read_forward_extremities
+            )
+
+        hs.get_clock().looping_call(read_forward_extremities, 60 * 60 * 1000)
 
     @defer.inlineCallbacks
     def _read_forward_extremities(self):
