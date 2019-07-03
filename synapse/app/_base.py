@@ -112,7 +112,6 @@ def start_reactor(
             if print_pidfile:
                 print(pid_file)
 
-            logger.info("daemonizing")
             daemon = Daemonize(
                 app=appname,
                 pid=pid_file,
