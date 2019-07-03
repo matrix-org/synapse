@@ -525,7 +525,7 @@ class Auth(object):
                 401,
                 "Token soft logged out",
                 errcode=Codes.UNKNOWN_TOKEN,
-                softLogout=True,
+                soft_logout=True,
             )
 
         # we use ret.get() below because *lots* of unit tests stub out

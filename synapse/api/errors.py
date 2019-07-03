@@ -85,7 +85,7 @@ class SynapseError(CodeMessageException):
         errcode (str): Matrix error code e.g 'M_FORBIDDEN'
     """
 
-    def __init__(self, code, msg, errcode=Codes.UNKNOWN, softLogout=False):
+    def __init__(self, code, msg, errcode=Codes.UNKNOWN, soft_logout=False):
         """Constructs a synapse error.
 
         Args:
@@ -95,9 +95,10 @@ class SynapseError(CodeMessageException):
         """
         super(SynapseError, self).__init__(code, msg)
         self.errcode = errcode
+        self.soft_logout = soft_logout
 
     def error_dict(self):
-        return cs_error(self.msg, self.errcode, self.softLogout)
+        return cs_error(self.msg, self.errcode, self.soft_logout)
 
 
 class ProxiedRequestError(SynapseError):
@@ -383,7 +384,7 @@ class RequestSendFailed(RuntimeError):
         self.can_retry = can_retry
 
 
-def cs_error(msg, code=Codes.UNKNOWN, softLogout=False, **kwargs):
+def cs_error(msg, code=Codes.UNKNOWN, soft_logout=False, **kwargs):
     """ Utility method for constructing an error response for client-server
     interactions.
 
@@ -394,7 +395,7 @@ def cs_error(msg, code=Codes.UNKNOWN, softLogout=False, **kwargs):
     Returns:
         A dict representing the error response JSON.
     """
-    err = {"error": msg, "errcode": code, "soft_logout": softLogout}
+    err = {"error": msg, "errcode": code, "soft_logout": soft_logout}
     for key, value in iteritems(kwargs):
         err[key] = value
     return err
