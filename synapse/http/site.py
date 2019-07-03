@@ -211,7 +211,6 @@ class SynapseRequest(Request):
 
         This will log the request's arrival. Once the request completes,
         be sure to call finished_processing.
-        It will also start a span for this request.
 
         Args:
             servlet_name (str): the name of the servlet which will be
