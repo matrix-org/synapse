@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.import opentracing
 
+try:
+    import opentracing
+except ImportError:
+    opentracing = None
+
 import logging
 import re
 from functools import wraps
@@ -58,15 +63,13 @@ def only_if_tracing(func):
 
     @wraps(func)
     def f(*args, **kwargs):
-        if _opentracing:
+        if opentracing:
             return func(*args, **kwargs)
         else:
             return
 
     return f
 
-
-_opentracing = None
 
 # Block everything by default
 _homeserver_whitelist = None
@@ -86,24 +89,15 @@ def init_tracer(config):
         # We don't have a tracer
         return
 
-    import_opentracing()
-    setup_tags()
-    setup_tracing(config)
-
-
-def import_opentracing():
-    global _opentracing
-    try:
-        # Try to import the tracer. If it's not there we want to throw an eror
-        import opentracing
-    except ImportError as e:
+    if not opentracing:
         logger.error(
             "The server has been configure to use opentracing but "
             "the %s module has not been installed.", e.name
         )
-        raise
+        raise ModuleNotFoundError("opentracing")
 
-    _opentracing = opentracing
+    setup_tags()
+    setup_tracing(config)
 
 
 def setup_tracing(config):
@@ -131,8 +125,8 @@ def setup_tracing(config):
 
 @only_if_tracing
 def setup_tags():
-    global tags, _opentracing
-    tags = _opentracing.tags
+    global tags
+    tags = opentracing.tags
 
 
 # Could use kwargs but I want these to be explicit
@@ -147,7 +141,7 @@ def start_active_span(
     finish_on_close=True,
 ):
     # We need to enter the scope here for the logcontext to become active
-    _opentracing.tracer.start_active_span(
+    opentracing.tracer.start_active_span(
         operation_name,
         child_of=child_of,
         references=references,
@@ -160,17 +154,17 @@ def start_active_span(
 
 @only_if_tracing
 def close_active_span():
-    _opentracing.tracer.scope_manager.active.__exit__(None, None, None)
+    opentracing.tracer.scope_manager.active.__exit__(None, None, None)
 
 
 @only_if_tracing
 def set_tag(key, value):
-    _opentracing.tracer.active_span.set_tag(key, value)
+    opentracing.tracer.active_span.set_tag(key, value)
 
 
 @only_if_tracing
 def log_kv(key_values, timestamp=None):
-    _opentracing.tracer.active_span.log_kv(key_values, timestamp)
+    opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
 
 # Note: we don't have a get baggage items because we're trying to hide all
@@ -178,12 +172,12 @@ def log_kv(key_values, timestamp=None):
 # as a result
 @only_if_tracing
 def set_baggage_item(key, value):
-    _opentracing.tracer.active_span.set_baggage_item(key, value)
+    opentracing.tracer.active_span.set_baggage_item(key, value)
 
 
 @only_if_tracing
 def set_operation_name(operation_name):
-    _opentracing.tracer.active_span.set_operation_name(operation_name)
+    opentracing.tracer.active_span.set_operation_name(operation_name)
 
 
 @only_if_tracing
@@ -226,14 +220,13 @@ def start_active_span_from_context(
     returns:
         span_context (opentracing.span.SpanContext)
     """
-    global _opentracing
     # Twisted encodes the values as lists whereas opentracing doesn't.
     # So, we take the first item in the list.
     # Also, twisted uses byte arrays while opentracing expects strings.
     header_dict = {k.decode(): v[0].decode() for k, v in headers.getAllRawHeaders()}
-    context = _opentracing.tracer.extract(_opentracing.Format.HTTP_HEADERS, header_dict)
+    context = opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
 
-    _opentracing.tracer.start_active_span(
+    opentracing.tracer.start_active_span(
         operation_name,
         child_of=context,
         references=references,
@@ -263,14 +256,13 @@ def inject_active_span_twisted_headers(headers, destination):
         here:
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
-    global _opentracing
 
     if not whitelisted_homeserver(destination):
         return
 
-    span = _opentracing.tracer.active_span
+    span = opentracing.tracer.active_span
     carrier = {}
-    _opentracing.tracer.inject(span, _opentracing.Format.HTTP_HEADERS, carrier)
+    opentracing.tracer.inject(span, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
         headers.addRawHeaders(key, value)
@@ -296,14 +288,13 @@ def inject_active_span_byte_dict(headers, destination):
         here:
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
-    global _opentracing
     if not whitelisted_homeserver(destination):
         return
 
-    span = _opentracing.tracer.active_span
+    span = opentracing.tracer.active_span
 
     carrier = {}
-    _opentracing.tracer.inject(span, _opentracing.Format.HTTP_HEADERS, carrier)
+    opentracing.tracer.inject(span, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
         headers[key.encode()] = [value.encode()]
