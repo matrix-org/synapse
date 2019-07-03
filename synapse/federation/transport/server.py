@@ -300,6 +300,7 @@ class BaseFederationServlet(object):
                     opentracing.tags.HTTP_URL: request.get_redacted_uri(),
                     opentracing.tags.PEER_HOST_IPV6: request.getClientIP(),
                     "authenticated_entity": origin,
+                    "servlet_name": request.request_metrics.name,
                 },
             ):
                 if origin:
