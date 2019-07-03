@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 def run_on_reactor():
     d = defer.Deferred()
     reactor.callLater(0, d.callback, 0)
-    return logcontext.make_deferred_yieldable(d)
+    return make_deferred_yieldable(d)
 
 
 class CacheTestCase(unittest.TestCase):
@@ -153,7 +153,7 @@ class DescriptorTestCase(unittest.TestCase):
             def fn(self, arg1):
                 @defer.inlineCallbacks
                 def inner_fn():
-                    with logcontext.PreserveLoggingContext():
+                    with PreserveLoggingContext():
                         yield complete_lookup
                     defer.returnValue(1)
 
@@ -161,10 +161,10 @@ class DescriptorTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def do_lookup():
-            with logcontext.LoggingContext() as c1:
+            with LoggingContext() as c1:
                 c1.name = "c1"
                 r = yield obj.fn(1)
-                self.assertEqual(logcontext.LoggingContext.current_context(), c1)
+                self.assertEqual(LoggingContext.current_context(), c1)
             defer.returnValue(r)
 
         def check_result(r):
@@ -175,16 +175,16 @@ class DescriptorTestCase(unittest.TestCase):
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
         self.assertEqual(
-            logcontext.LoggingContext.current_context(),
-            logcontext.LoggingContext.sentinel,
+            LoggingContext.current_context(),
+            LoggingContext.sentinel,
         )
         d1.addCallback(check_result)
 
         # and another
         d2 = do_lookup()
         self.assertEqual(
-            logcontext.LoggingContext.current_context(),
-            logcontext.LoggingContext.sentinel,
+            LoggingContext.current_context(),
+            LoggingContext.sentinel,
         )
         d2.addCallback(check_result)
 
@@ -210,28 +210,28 @@ class DescriptorTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def do_lookup():
-            with logcontext.LoggingContext() as c1:
+            with LoggingContext() as c1:
                 c1.name = "c1"
                 try:
                     d = obj.fn(1)
                     self.assertEqual(
-                        logcontext.LoggingContext.current_context(),
-                        logcontext.LoggingContext.sentinel,
+                        LoggingContext.current_context(),
+                        LoggingContext.sentinel,
                     )
                     yield d
                     self.fail("No exception thrown")
                 except SynapseError:
                     pass
 
-                self.assertEqual(logcontext.LoggingContext.current_context(), c1)
+                self.assertEqual(LoggingContext.current_context(), c1)
 
         obj = Cls()
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
         self.assertEqual(
-            logcontext.LoggingContext.current_context(),
-            logcontext.LoggingContext.sentinel,
+            LoggingContext.current_context(),
+            LoggingContext.sentinel,
         )
 
         return d1
@@ -288,23 +288,23 @@ class CachedListDescriptorTestCase(unittest.TestCase):
 
             @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
             def list_fn(self, args1, arg2):
-                assert logcontext.LoggingContext.current_context().request == "c1"
+                assert LoggingContext.current_context().request == "c1"
                 # we want this to behave like an asynchronous function
                 yield run_on_reactor()
-                assert logcontext.LoggingContext.current_context().request == "c1"
+                assert LoggingContext.current_context().request == "c1"
                 defer.returnValue(self.mock(args1, arg2))
 
-        with logcontext.LoggingContext() as c1:
+        with LoggingContext() as c1:
             c1.request = "c1"
             obj = Cls()
             obj.mock.return_value = {10: "fish", 20: "chips"}
             d1 = obj.list_fn([10, 20], 2)
             self.assertEqual(
-                logcontext.LoggingContext.current_context(),
-                logcontext.LoggingContext.sentinel,
+                LoggingContext.current_context(),
+                LoggingContext.sentinel,
             )
             r = yield d1
-            self.assertEqual(logcontext.LoggingContext.current_context(), c1)
+            self.assertEqual(LoggingContext.current_context(), c1)
             obj.mock.assert_called_once_with([10, 20], 2)
             self.assertEqual(r, {10: "fish", 20: "chips"})
             obj.mock.reset_mock()

@@ -20,8 +20,7 @@ import shutil
 from twisted.internet import defer
 
 from synapse.config._base import Config
-from synapse.logging.context import run_in_background
-from synapse.util import logcontext
+from synapse.logging.context import defer_to_thread, run_in_background
 
 from .media_storage import FileResponder
 
@@ -125,7 +124,7 @@ class FileStorageProviderBackend(StorageProvider):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        return logcontext.defer_to_thread(
+        return defer_to_thread(
             self.hs.get_reactor(), shutil.copyfile, primary_fname, backup_fname
         )
 

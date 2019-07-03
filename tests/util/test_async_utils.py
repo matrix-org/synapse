@@ -69,14 +69,14 @@ class TimeoutDeferredTest(TestCase):
         @defer.inlineCallbacks
         def blocking():
             non_completing_d = Deferred()
-            with logcontext.PreserveLoggingContext():
+            with PreserveLoggingContext():
                 try:
                     yield non_completing_d
                 except CancelledError:
                     blocking_was_cancelled[0] = True
                     raise
 
-        with logcontext.LoggingContext("one") as context_one:
+        with LoggingContext("one") as context_one:
             # the errbacks should be run in the test logcontext
             def errback(res, deferred_name):
                 self.assertIs(

@@ -51,13 +51,13 @@ class LinearizerTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def func(i, sleep=False):
-            with logcontext.LoggingContext("func(%s)" % i) as lc:
+            with LoggingContext("func(%s)" % i) as lc:
                 with (yield linearizer.queue("")):
-                    self.assertEqual(logcontext.LoggingContext.current_context(), lc)
+                    self.assertEqual(LoggingContext.current_context(), lc)
                     if sleep:
                         yield Clock(reactor).sleep(0)
 
-                self.assertEqual(logcontext.LoggingContext.current_context(), lc)
+                self.assertEqual(LoggingContext.current_context(), lc)
 
         func(0, sleep=True)
         for i in range(1, 100):

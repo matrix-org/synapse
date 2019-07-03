@@ -78,7 +78,7 @@ class ResponseCache(object):
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
         you should wrap normal synapse deferreds with
-        logcontext.run_in_background).
+        synapse.logging.context.run_in_background).
 
         Can return either a new Deferred (which also doesn't follow the synapse
         logcontext rules), or, if *deferred* was already complete, the actual

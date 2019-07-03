@@ -26,6 +26,11 @@ from synapse.federation.sender.per_destination_queue import PerDestinationQueue
 from synapse.federation.sender.transaction_manager import TransactionManager
 from synapse.federation.units import Edu
 from synapse.handlers.presence import get_interested_remotes
+from synapse.logging.context import (
+    make_deferred_yieldable,
+    preserve_fn,
+    run_in_background,
+)
 from synapse.metrics import (
     LaterGauge,
     event_processing_loop_counter,
@@ -33,7 +38,6 @@ from synapse.metrics import (
     events_processed_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util import logcontext
 from synapse.util.metrics import measure_func
 
 logger = logging.getLogger(__name__)
@@ -210,10 +214,10 @@ class FederationSender(object):
                 for event in events:
                     events_by_room.setdefault(event.room_id, []).append(event)
 
-                yield logcontext.make_deferred_yieldable(
+                yield make_deferred_yieldable(
                     defer.gatherResults(
                         [
-                            logcontext.run_in_background(handle_room_events, evs)
+                            run_in_background(handle_room_events, evs)
                             for evs in itervalues(events_by_room)
                         ],
                         consumeErrors=True,
@@ -360,7 +364,7 @@ class FederationSender(object):
         for queue in queues:
             queue.flush_read_receipts_for_room(room_id)
 
-    @logcontext.preserve_fn  # the caller should not yield on this
+    @preserve_fn  # the caller should not yield on this
     @defer.inlineCallbacks
     def send_presence(self, states):
         """Send the new presence states to the appropriate destinations.
