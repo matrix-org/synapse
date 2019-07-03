@@ -82,7 +82,6 @@ class RegistrationWorkerStore(SQLBaseStore):
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
         defer.returnValue(is_trial)
 
-    @cached()
     def get_user_by_access_token(self, token):
         """Get a user from the given access token.
 
