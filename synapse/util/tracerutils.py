@@ -17,7 +17,14 @@ try:
     import opentracing
 except ImportError:
     opentracing = None
+try:
+    from jaeger_client import Config as JaegerConfig
+    from synapse.util.scopecontextmanager import LogContextScopeManager
+except ImportError:
+    JaegerConfig = None
+    LogContextScopeManager = None
 
+import contextlib
 import logging
 import re
 from functools import wraps
@@ -91,8 +98,7 @@ def init_tracer(config):
 
     if not opentracing:
         logger.error(
-            "The server has been configure to use opentracing but "
-            "the %s module has not been installed.", e.name
+            "The server has been configure to use opentracing but opentracing is not installed."
         )
         raise ModuleNotFoundError("opentracing")
 
@@ -101,15 +107,10 @@ def init_tracer(config):
 
 
 def setup_tracing(config):
-    try:
-        from jaeger_client import Config as JaegerConfig
-        from synapse.util.scopecontextmanager import LogContextScopeManager
-    except ImportError as e:
+    if not JaegerConfig:
         logger.error(
-            "The server has been configure to use opentracing but "
-            "the %s module has not been installed.", e.name
+            "The server has been configure to use opentracing but opentracing is not installed."
         )
-        raise
 
     # Include the worker name
     name = config.worker_name if config.worker_name else "master"
@@ -129,8 +130,12 @@ def setup_tags():
     tags = opentracing.tags
 
 
+@contextlib.contextmanager
+def _noop_context_manager(*args, **kwargs):
+    yield
+
+
 # Could use kwargs but I want these to be explicit
-@only_if_tracing
 def start_active_span(
     operation_name,
     child_of=None,
@@ -140,16 +145,19 @@ def start_active_span(
     ignore_active_span=False,
     finish_on_close=True,
 ):
-    # We need to enter the scope here for the logcontext to become active
-    opentracing.tracer.start_active_span(
-        operation_name,
-        child_of=child_of,
-        references=references,
-        tags=tags,
-        start_time=start_time,
-        ignore_active_span=ignore_active_span,
-        finish_on_close=finish_on_close,
-    ).__enter__()
+    if opentracing is None:
+        return _noop_context_manager
+    else:
+        # We need to enter the scope here for the logcontext to become active
+        return opentracing.tracer.start_active_span(
+            operation_name,
+            child_of=child_of,
+            references=references,
+            tags=tags,
+            start_time=start_time,
+            ignore_active_span=ignore_active_span,
+            finish_on_close=finish_on_close,
+        )
 
 
 @only_if_tracing
@@ -203,7 +211,6 @@ def whitelisted_homeserver(destination):
     return False
 
 
-@only_if_tracing
 def start_active_span_from_context(
     headers,
     operation_name,
@@ -226,7 +233,7 @@ def start_active_span_from_context(
     header_dict = {k.decode(): v[0].decode() for k, v in headers.getAllRawHeaders()}
     context = opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
 
-    opentracing.tracer.start_active_span(
+    return opentracing.tracer.start_active_span(
         operation_name,
         child_of=context,
         references=references,
