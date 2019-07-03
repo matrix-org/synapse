@@ -34,6 +34,12 @@ VALID_ACCESS_RULES = (
 )
 
 # Rules to which we need to apply the power levels restrictions.
+# These are all of the rules that don't forbid users to join based on a server blacklist
+# (except for the rules targetting direct chats, because both users should be able to be
+# room admins in a direct chat created with the "trusted_private_chat" preset).
+# The current restrictions forbid users that would be forbidden from joining under more
+# restrictive rules from being given a non-default PL, and the default PL from being set
+# to a non-0 value.
 RULES_WITH_RESTRICTED_POWER_LEVELS = (
     ACCESS_RULE_UNRESTRICTED,
 )
@@ -84,15 +90,12 @@ class RoomAccessRules(object):
         default rule to the initial state.
         """
         is_direct = config.get("is_direct")
-        rules_in_initial_state = False
-        rule = ""
+        rule = None
 
         # If there's a rules event in the initial state, check if it complies with the
         # spec for im.vector.room.access_rules and deny the request if not.
         for event in config.get("initial_state", []):
             if event["type"] == ACCESS_RULES_TYPE:
-                rules_in_initial_state = True
-
                 rule = event["content"].get("rule")
 
                 # Make sure the event has a valid content.
@@ -112,7 +115,7 @@ class RoomAccessRules(object):
 
         # If there's no rules event in the initial state, create one with the default
         # setting.
-        if not rules_in_initial_state:
+        if not rule:
             if is_direct:
                 default_rule = ACCESS_RULE_DIRECT
             else:
@@ -363,9 +366,10 @@ class RoomAccessRules(object):
         return True
 
     def _is_power_level_content_allowed(self, content, access_rule):
-        """Denies a power level events that sets 'users_default' to a non-0 value, and
-        sets the PL of a user that'd be blacklisted in restricted mode to a non-default
-        value.
+        """Check if a given power levels event is permitted under the given access rule.
+        It shouldn't be allowed if it either changes the default PL to a non-0 value or
+        gives a non-0 PL to a user that would have been forbidden from joining the room
+        under a more restrictive access rule.
 
         Args:
             content (dict[]): The content of the m.room.power_levels event to check.
