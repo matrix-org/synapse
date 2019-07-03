@@ -371,6 +371,7 @@ class RoomAccessRules(object):
 
     def _is_power_level_content_allowed(self, content, access_rule):
         """Check if a given power levels event is permitted under the given access rule.
+
         It shouldn't be allowed if it either changes the default PL to a non-0 value or
         gives a non-0 PL to a user that would have been forbidden from joining the room
         under a more restrictive access rule.
