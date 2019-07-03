@@ -519,6 +519,15 @@ class Auth(object):
         if not ret:
             defer.returnValue(None)
 
+        if ret.get("expired", False):
+            logger.warn("Doing soft logout on user")
+            raise AuthError(
+                401,
+                "Token soft logged out",
+                errcode=Codes.UNKNOWN_TOKEN,
+                softLogout=true,
+            )
+
         # we use ret.get() below because *lots* of unit tests stub out
         # get_user_by_access_token in a way where it only returns a couple of
         # the fields.
