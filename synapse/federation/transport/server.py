@@ -303,17 +303,18 @@ class BaseFederationServlet(object):
                 },
             )
 
-            if origin:
-                with ratelimiter.ratelimit(origin) as d:
-                    yield d
-                    response = yield func(
-                        origin, content, request.args, *args, **kwargs
-                    )
-            else:
-                response = yield func(origin, content, request.args, *args, **kwargs)
-
-            # Finish the span
-            tracerutils.close_active_span()
+            try:
+                if origin:
+                    with ratelimiter.ratelimit(origin) as d:
+                        yield d
+                        response = yield func(
+                            origin, content, request.args, *args, **kwargs
+                        )
+                else:
+                    response = yield func(origin, content, request.args, *args, **kwargs)
+            finally:
+                # Finish the span
+                tracerutils.close_active_span()
 
             defer.returnValue(response)
 
