@@ -33,6 +33,11 @@ VALID_ACCESS_RULES = (
     ACCESS_RULE_UNRESTRICTED,
 )
 
+# Rules to which we need to apply the power levels restrictions.
+RULES_WITH_RESTRICTED_POWER_LEVELS = (
+    ACCESS_RULE_UNRESTRICTED,
+)
+
 
 class RoomAccessRules(object):
     """Implementation of the ThirdPartyEventRules module API that allows federation admins
@@ -369,9 +374,8 @@ class RoomAccessRules(object):
             bool, True if the event can be allowed, False otherwise.
 
         """
-        # Blacklisted servers shouldn't have any restriction in "direct" mode, so always
-        # accept the event.
-        if access_rule == ACCESS_RULE_DIRECT:
+        # Check if we need to apply the restrictions with the current rule.
+        if access_rule not in RULES_WITH_RESTRICTED_POWER_LEVELS:
             return True
 
         # If users_default is explicitly set to a non-0 value, deny the event.
