@@ -93,33 +93,37 @@ def start_reactor(
     install_dns_limiter(reactor)
 
     def run():
-        # make sure that we run the reactor with the sentinel log context,
-        # otherwise other PreserveLoggingContext instances will get confused
-        # and complain when they see the logcontext arbitrarily swapping
-        # between the sentinel and `run` logcontexts.
-        with PreserveLoggingContext():
-            logger.info("Running")
+        logger.info("Running")
+        change_resource_limit(soft_file_limit)
+        if gc_thresholds:
+            gc.set_threshold(*gc_thresholds)
+        reactor.run()
 
-            change_resource_limit(soft_file_limit)
-            if gc_thresholds:
-                gc.set_threshold(*gc_thresholds)
-            reactor.run()
+    # make sure that we run the reactor with the sentinel log context,
+    # otherwise other PreserveLoggingContext instances will get confused
+    # and complain when they see the logcontext arbitrarily swapping
+    # between the sentinel and `run` logcontexts.
+    #
+    # We also need to drop the logcontext before forking if we're daemonizing,
+    # otherwise the cputime metrics get confused about the per-thread resource usage
+    # appearing to go backwards.
+    with PreserveLoggingContext():
+        if daemonize:
+            if print_pidfile:
+                print(pid_file)
 
-    if daemonize:
-        if print_pidfile:
-            print(pid_file)
-
-        daemon = Daemonize(
-            app=appname,
-            pid=pid_file,
-            action=run,
-            auto_close_fds=False,
-            verbose=True,
-            logger=logger,
-        )
-        daemon.start()
-    else:
-        run()
+            logger.info("daemonizing")
+            daemon = Daemonize(
+                app=appname,
+                pid=pid_file,
+                action=run,
+                auto_close_fds=False,
+                verbose=True,
+                logger=logger,
+            )
+            daemon.start()
+        else:
+            run()
 
 
 def quit_with_error(error_string):

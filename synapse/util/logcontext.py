@@ -52,6 +52,15 @@ except Exception:
         return None
 
 
+# get an id for the current thread.
+#
+# threading.get_ident doesn't actually return an OS-level tid, and annoyingly,
+# on Linux it actually returns the same value either side of a fork() call. However
+# we only fork in one place, so it's not worth the hoop-jumping to get a real tid.
+#
+get_thread_id = threading.get_ident
+
+
 class ContextResourceUsage(object):
     """Object for tracking the resources used by a log context
 
@@ -225,7 +234,7 @@ class LoggingContext(object):
         # became active.
         self.usage_start = None
 
-        self.main_thread = threading.current_thread()
+        self.main_thread = get_thread_id()
         self.request = None
         self.tag = ""
         self.alive = True
@@ -318,7 +327,7 @@ class LoggingContext(object):
         record.request = self.request
 
     def start(self):
-        if threading.current_thread() is not self.main_thread:
+        if get_thread_id() != self.main_thread:
             logger.warning("Started logcontext %s on different thread", self)
             return
 
@@ -328,7 +337,7 @@ class LoggingContext(object):
             self.usage_start = get_thread_resource_usage()
 
     def stop(self):
-        if threading.current_thread() is not self.main_thread:
+        if get_thread_id() != self.main_thread:
             logger.warning("Stopped logcontext %s on different thread", self)
             return
 
@@ -355,7 +364,7 @@ class LoggingContext(object):
 
         # If we are on the correct thread and we're currently running then we
         # can include resource usage so far.
-        is_main_thread = threading.current_thread() is self.main_thread
+        is_main_thread = get_thread_id() == self.main_thread
         if self.alive and self.usage_start and is_main_thread:
             utime_delta, stime_delta = self._get_cputime()
             res.ru_utime += utime_delta
