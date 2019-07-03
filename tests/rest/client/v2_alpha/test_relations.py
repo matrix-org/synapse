@@ -466,9 +466,16 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.json_body["content"], new_body)
 
-        self.assertEquals(
-            channel.json_body["unsigned"].get("m.relations"),
-            {RelationTypes.REPLACE: {"event_id": edit_event_id}},
+        relations_dict = channel.json_body["unsigned"].get("m.relations")
+
+        self.assertEquals(RelationTypes.REPLACE in relations_dict)
+
+        for key in ["event_id", "sender", "origin_server_ts"]:
+            self.assertEquals(key in relations_dict[RelationTypes.REPLACE])
+
+        self.assert_dict(
+            {"event_id": relations_dict["event_id"], "sender": relations_dict["sender"]},
+            {RelationTypes.REPLACE: {"event_id": edit_event_id, "sender": self.user_id}},
         )
 
     def test_multi_edit(self):
@@ -518,9 +525,16 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.json_body["content"], new_body)
 
-        self.assertEquals(
-            channel.json_body["unsigned"].get("m.relations"),
-            {RelationTypes.REPLACE: {"event_id": edit_event_id}},
+        relations_dict = channel.json_body["unsigned"].get("m.relations")
+
+        self.assertEquals(RelationTypes.REPLACE in relations_dict)
+
+        for key in ["event_id", "sender", "origin_server_ts"]:
+            self.assertEquals(key in relations_dict[RelationTypes.REPLACE])
+
+        self.assert_dict(
+            {"event_id": relations_dict["event_id"], "sender": relations_dict["sender"]},
+            {RelationTypes.REPLACE: {"event_id": edit_event_id, "sender": self.user_id}},
         )
 
     def _send_relation(
