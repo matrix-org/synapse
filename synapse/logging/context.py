@@ -23,13 +23,33 @@ See doc/log_contexts.rst for details on how this works.
 """
 
 import logging
-import resource
 import threading
 import types
 
 from twisted.internet import defer, threads
 
 logger = logging.getLogger(__name__)
+
+try:
+    import resource
+
+    # Python doesn't ship with a definition of RUSAGE_THREAD but it's defined
+    # to be 1 on linux so we hard code it.
+    RUSAGE_THREAD = 1
+
+    # If the system doesn't support RUSAGE_THREAD then this should throw an
+    # exception.
+    resource.getrusage(RUSAGE_THREAD)
+
+    def get_thread_resource_usage():
+        return resource.getrusage(RUSAGE_THREAD)
+
+
+except Exception:
+    # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
+    # won't track resource usage by returning None.
+    def get_thread_resource_usage():
+        return None
 
 
 class ContextResourceUsage(object):
@@ -305,7 +325,7 @@ class LoggingContext(object):
         # If we haven't already started record the thread resource usage so
         # far
         if not self.usage_start:
-            self.usage_start = resource.getrusage(resource.RUSAGE_THREAD)
+            self.usage_start = get_thread_resource_usage()
 
     def stop(self):
         if threading.current_thread() is not self.main_thread:
@@ -348,7 +368,7 @@ class LoggingContext(object):
 
         Returns: Tuple[float, float]: seconds in user mode, seconds in system mode
         """
-        current = resource.getrusage(resource.RUSAGE_THREAD)
+        current = get_thread_resource_usage()
 
         utime_delta = current.ru_utime - self.usage_start.ru_utime
         stime_delta = current.ru_stime - self.usage_start.ru_stime
