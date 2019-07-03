@@ -99,7 +99,7 @@ def import_opentracing():
     except ImportError as e:
         logger.error(
             "The server has been configure to use opentracing but "
-            "the {} module has not been installed.".format(e.name)
+            "the %s module has not been installed.", e.name
         )
         raise
 
@@ -113,7 +113,7 @@ def setup_tracing(config):
     except ImportError as e:
         logger.error(
             "The server has been configure to use opentracing but "
-            "the {} module has not been installed.".format(e.name)
+            "the %s module has not been installed.", e.name
         )
         raise
 
