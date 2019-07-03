@@ -108,7 +108,7 @@ class DeviceWorkerHandler(BaseHandler):
             from_token (StreamToken)
         """
 
-        tracerutils("user_id", user_id)
+        tracerutils.set_tag("user_id", user_id)
         tracerutils.set_tag("from_token", from_token)
         now_room_key = yield self.store.get_room_events_max_id()
 
