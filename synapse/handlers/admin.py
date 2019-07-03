@@ -100,7 +100,7 @@ class AdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def exfiltrate_user_data(self, user_id, writer):
-        """Write all data we have of the user to the specified directory.
+        """Write all data we have on the user to the given writer.
 
         Args:
             user_id (str)
@@ -178,7 +178,7 @@ class AdminHandler(BaseHandler):
 
             # We fetch events in the room the user could see by fetching *all*
             # events that we have and then filtering, this isn't the most
-            # efficient method perhaps but it does guarentee we get everything.
+            # efficient method perhaps but it does guarantee we get everything.
             while True:
                 events, _ = yield self.store.paginate_room_events(
                     room_id, from_key, to_key, limit=100, direction="f"
@@ -233,7 +233,7 @@ class AdminHandler(BaseHandler):
 
 
 class ExfiltrationWriter(object):
-    """Interfaced used to specify how to write exfilrated data.
+    """Interface used to specify how to write exfiltrated data.
     """
 
     def write_events(self, room_id, events):
@@ -263,7 +263,7 @@ class ExfiltrationWriter(object):
 
         Args:
             room_id (str)
-            invite (FrozenEvent)
+            event (FrozenEvent)
             state (list[dict]): A subset of the state at the invite, with a
                 subset of the event keys (type, state_key, content and sender)
         """
@@ -276,13 +276,13 @@ class ExfiltrationWriter(object):
 
 
 class FileExfiltrationWriter(ExfiltrationWriter):
-    """An ExfiltrationWriter that writes the users data to a directory.
+    """An ExfiltrationWriter that writes the user's data to a directory.
 
     Returns the directory location on completion.
 
     Args:
         user_id (str): The user whose data is being exfiltrated.
-        directory (str|None): The directory to write the data to, if None then
+        directory (str|None): The directory to write the data to. If None then
             will write to a temporary directory.
     """
 
