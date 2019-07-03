@@ -63,7 +63,6 @@ The following environment variables are supported in `generate` mode:
 * `UID`, `GID`: the user id and group id to use for creating the data
   directories. Defaults to `991`, `991`.
 
-
 ## Running synapse
 
 Once you have a valid configuration file, you can start synapse as follows:
@@ -91,6 +90,7 @@ The following environment variables are supported in run mode:
 * `SYNAPSE_CONFIG_PATH`: path to the config file. Defaults to
   `<SYNAPSE_CONFIG_DIR>/homeserver.yaml`.
 * `UID`, `GID`: the user and group id to run Synapse as. Defaults to `991`, `991`.
+* `TZ`: the [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) the container will run with. Defaults to `UTC`.
 
 ## TLS support
 

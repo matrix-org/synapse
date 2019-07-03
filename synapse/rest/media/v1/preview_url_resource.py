@@ -95,6 +95,7 @@ class PreviewUrlResource(DirectServeResource):
         )
 
     def render_OPTIONS(self, request):
+        request.setHeader(b"Allow", b"OPTIONS, GET")
         return respond_with_json(request, 200, {}, send_cors=True)
 
     @wrap_json_request_handler

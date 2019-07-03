@@ -39,24 +39,17 @@ class LoggingContextTestCase(unittest.TestCase):
 
         callback_completed = [False]
 
-        def test():
-            context_one.request = "one"
-            d = function()
-
-            def cb(res):
-                self._check_test_key("one")
-                callback_completed[0] = True
-                return res
-
-            d.addCallback(cb)
-
-            return d
-
         with LoggingContext() as context_one:
             context_one.request = "one"
 
             # fire off function, but don't wait on it.
-            logcontext.run_in_background(test)
+            d2 = logcontext.run_in_background(function)
+
+            def cb(res):
+                callback_completed[0] = True
+                return res
+
+            d2.addCallback(cb)
 
             self._check_test_key("one")
 
@@ -102,6 +95,22 @@ class LoggingContextTestCase(unittest.TestCase):
         # called, but is actually paused
         def testfunc():
             return logcontext.make_deferred_yieldable(_chained_deferred_function())
+
+        return self._test_run_in_background(testfunc)
+
+    def test_run_in_background_with_coroutine(self):
+        async def testfunc():
+            self._check_test_key("one")
+            d = Clock(reactor).sleep(0)
+            self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+            await d
+            self._check_test_key("one")
+
+        return self._test_run_in_background(testfunc)
+
+    def test_run_in_background_with_nonblocking_coroutine(self):
+        async def testfunc():
+            self._check_test_key("one")
 
         return self._test_run_in_background(testfunc)
 
