@@ -174,18 +174,12 @@ class DescriptorTestCase(unittest.TestCase):
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(
-            LoggingContext.current_context(),
-            LoggingContext.sentinel,
-        )
+        self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
         d1.addCallback(check_result)
 
         # and another
         d2 = do_lookup()
-        self.assertEqual(
-            LoggingContext.current_context(),
-            LoggingContext.sentinel,
-        )
+        self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
         d2.addCallback(check_result)
 
         # let the lookup complete
@@ -215,8 +209,7 @@ class DescriptorTestCase(unittest.TestCase):
                 try:
                     d = obj.fn(1)
                     self.assertEqual(
-                        LoggingContext.current_context(),
-                        LoggingContext.sentinel,
+                        LoggingContext.current_context(), LoggingContext.sentinel
                     )
                     yield d
                     self.fail("No exception thrown")
@@ -229,10 +222,7 @@ class DescriptorTestCase(unittest.TestCase):
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(
-            LoggingContext.current_context(),
-            LoggingContext.sentinel,
-        )
+        self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
 
         return d1
 
@@ -299,10 +289,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             obj = Cls()
             obj.mock.return_value = {10: "fish", 20: "chips"}
             d1 = obj.list_fn([10, 20], 2)
-            self.assertEqual(
-                LoggingContext.current_context(),
-                LoggingContext.sentinel,
-            )
+            self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
             r = yield d1
             self.assertEqual(LoggingContext.current_context(), c1)
             obj.mock.assert_called_once_with([10, 20], 2)

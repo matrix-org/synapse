@@ -1000,9 +1000,7 @@ class FederationHandler(BaseHandler):
         event_ids = list(extremities.keys())
 
         logger.debug("calling resolve_state_groups in _maybe_backfill")
-        resolve = preserve_fn(
-            self.state_handler.resolve_state_groups_for_events
-        )
+        resolve = preserve_fn(self.state_handler.resolve_state_groups_for_events)
         states = yield make_deferred_yieldable(
             defer.gatherResults(
                 [resolve(room_id, [e]) for e in event_ids], consumeErrors=True
@@ -1647,10 +1645,7 @@ class FederationHandler(BaseHandler):
 
         contexts = yield make_deferred_yieldable(
             defer.gatherResults(
-                [
-                    run_in_background(prep, ev_info)
-                    for ev_info in event_infos
-                ],
+                [run_in_background(prep, ev_info) for ev_info in event_infos],
                 consumeErrors=True,
             )
         )

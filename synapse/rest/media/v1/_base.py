@@ -75,9 +75,7 @@ def respond_with_file(request, media_type, file_path, file_size=None, upload_nam
         add_file_headers(request, media_type, file_size, upload_name)
 
         with open(file_path, "rb") as f:
-            yield make_deferred_yieldable(
-                FileSender().beginFileTransfer(f, request)
-            )
+            yield make_deferred_yieldable(FileSender().beginFileTransfer(f, request))
 
         finish_request(request)
     else:
