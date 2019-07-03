@@ -30,9 +30,9 @@ from synapse.crypto.keyring import (
     ServerKeyFetcher,
     StoreKeyFetcher,
 )
+from synapse.logging.context import LoggingContext
 from synapse.storage.keys import FetchKeyResult
 from synapse.util import logcontext
-from synapse.util.logcontext import LoggingContext
 
 from tests import unittest
 

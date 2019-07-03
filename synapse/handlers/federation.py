@@ -45,6 +45,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import auth_types_for_event
 from synapse.events.validator import EventValidator
+from synapse.logging.utils import log_function
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
@@ -55,7 +56,6 @@ from synapse.types import UserID, get_domain_from_id
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room
-from synapse.util.logutils import log_function
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.visibility import filter_events_for_server
 

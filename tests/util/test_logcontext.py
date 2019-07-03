@@ -1,8 +1,8 @@
 import twisted.python.failure
 from twisted.internet import defer, reactor
 
+from synapse.logging.context import LoggingContext
 from synapse.util import Clock, logcontext
-from synapse.util.logcontext import LoggingContext
 
 from .. import unittest
 

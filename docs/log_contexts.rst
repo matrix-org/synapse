@@ -12,7 +12,7 @@ record.
 Logcontexts are also used for CPU and database accounting, so that we can track
 which requests were responsible for high CPU use or database activity.
 
-The ``synapse.util.logcontext`` module provides a facilities for managing the
+The ``synapse.logging.context`` module provides a facilities for managing the
 current log context (as well as providing the ``LoggingContextFilter`` class).
 
 Deferreds make the whole thing complicated, so this document describes how it
@@ -27,19 +27,19 @@ found them:
 
 .. code:: python
 
-    from synapse.util import logcontext         # omitted from future snippets
+    from synapse.logging import context         # omitted from future snippets
 
     def handle_request(request_id):
-        request_context = logcontext.LoggingContext()
+        request_context = context.LoggingContext()
 
-        calling_context = logcontext.LoggingContext.current_context()
-        logcontext.LoggingContext.set_current_context(request_context)
+        calling_context = context.LoggingContext.current_context()
+        context.LoggingContext.set_current_context(request_context)
         try:
             request_context.request = request_id
             do_request_handling()
             logger.debug("finished")
         finally:
-            logcontext.LoggingContext.set_current_context(calling_context)
+            context.LoggingContext.set_current_context(calling_context)
 
     def do_request_handling():
         logger.debug("phew")  # this will be logged against request_id
@@ -51,7 +51,7 @@ written much more succinctly as:
 .. code:: python
 
     def handle_request(request_id):
-        with logcontext.LoggingContext() as request_context:
+        with context.LoggingContext() as request_context:
             request_context.request = request_id
             do_request_handling()
             logger.debug("finished")
@@ -74,7 +74,7 @@ blocking operation, and returns a deferred:
 
     @defer.inlineCallbacks
     def handle_request(request_id):
-        with logcontext.LoggingContext() as request_context:
+        with context.LoggingContext() as request_context:
             request_context.request = request_id
             yield do_request_handling()
             logger.debug("finished")
@@ -179,7 +179,7 @@ though, we need to make up a new Deferred, or we get a Deferred back from
 external code. We need to make it follow our rules.
 
 The easy way to do it is with a combination of ``defer.inlineCallbacks``, and
-``logcontext.PreserveLoggingContext``. Suppose we want to implement ``sleep``,
+``context.PreserveLoggingContext``. Suppose we want to implement ``sleep``,
 which returns a deferred which will run its callbacks after a given number of
 seconds. That might look like:
 
@@ -204,13 +204,13 @@ That doesn't follow the rules, but we can fix it by wrapping it with
 This technique works equally for external functions which return deferreds,
 or deferreds we have made ourselves.
 
-You can also use ``logcontext.make_deferred_yieldable``, which just does the
+You can also use ``context.make_deferred_yieldable``, which just does the
 boilerplate for you, so the above could be written:
 
 .. code:: python
 
     def sleep(seconds):
-        return logcontext.make_deferred_yieldable(get_sleep_deferred(seconds))
+        return context.make_deferred_yieldable(get_sleep_deferred(seconds))
 
 
 Fire-and-forget
@@ -279,7 +279,7 @@ Obviously that option means that the operations done in
 that might be fixed by setting a different logcontext via a ``with
 LoggingContext(...)`` in ``background_operation``).
 
-The second option is to use ``logcontext.run_in_background``, which wraps a
+The second option is to use ``context.run_in_background``, which wraps a
 function so that it doesn't reset the logcontext even when it returns an
 incomplete deferred, and adds a callback to the returned deferred to reset the
 logcontext. In other words, it turns a function that follows the Synapse rules
@@ -293,7 +293,7 @@ It can be used like this:
     def do_request_handling():
         yield foreground_operation()
 
-        logcontext.run_in_background(background_operation)
+        context.run_in_background(background_operation)
 
         # this will now be logged against the request context
         logger.debug("Request handling complete")
@@ -332,7 +332,7 @@ gathered:
             result = yield defer.gatherResults([d1, d2])
 
 In this case particularly, though, option two, of using
-``logcontext.preserve_fn`` almost certainly makes more sense, so that
+``context.preserve_fn`` almost certainly makes more sense, so that
 ``operation1`` and ``operation2`` are both logged against the original
 logcontext. This looks like:
 
@@ -340,8 +340,8 @@ logcontext. This looks like:
 
     @defer.inlineCallbacks
     def do_request_handling():
-        d1 = logcontext.preserve_fn(operation1)()
-        d2 = logcontext.preserve_fn(operation2)()
+        d1 = context.preserve_fn(operation1)()
+        d2 = context.preserve_fn(operation2)()
 
         with PreserveLoggingContext():
             result = yield defer.gatherResults([d1, d2])
@@ -381,7 +381,7 @@ off the background process, and then leave the ``with`` block to wait for it:
 .. code:: python
 
     def handle_request(request_id):
-        with logcontext.LoggingContext() as request_context:
+        with context.LoggingContext() as request_context:
             request_context.request = request_id
             d = do_request_handling()
 
@@ -414,7 +414,7 @@ runs its callbacks in the original logcontext, all is happy.
 
 The business of a Deferred which runs its callbacks in the original logcontext
 isn't hard to achieve — we have it today, in the shape of
-``logcontext._PreservingContextDeferred``:
+``context._PreservingContextDeferred``:
 
 .. code:: python
 

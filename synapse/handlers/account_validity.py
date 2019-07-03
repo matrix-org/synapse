@@ -22,9 +22,9 @@ from email.mime.text import MIMEText
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.logging.context import make_deferred_yieldable
 from synapse.types import UserID
 from synapse.util import stringutils
-from synapse.util.logcontext import make_deferred_yieldable
 
 try:
     from synapse.push.mailer import load_jinja2_templates

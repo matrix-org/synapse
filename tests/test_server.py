@@ -26,8 +26,8 @@ from twisted.web.server import NOT_DONE_YET
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite, logger
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock
-from synapse.util.logcontext import make_deferred_yieldable
 
 from tests import unittest
 from tests.server import (

@@ -21,9 +21,13 @@ import attr
 
 from twisted.internet import defer, task
 
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.logging import context, formatter
 
 logger = logging.getLogger(__name__)
+
+# Compatibility alias, for existing logconfigs.
+logcontext = context
+logformatter = formatter
 
 
 def unwrapFirstError(failure):
@@ -46,7 +50,7 @@ class Clock(object):
     @defer.inlineCallbacks
     def sleep(self, seconds):
         d = defer.Deferred()
-        with PreserveLoggingContext():
+        with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
             res = yield d
         defer.returnValue(res)
@@ -85,10 +89,10 @@ class Clock(object):
         """
 
         def wrapped_callback(*args, **kwargs):
-            with PreserveLoggingContext():
+            with context.PreserveLoggingContext():
                 callback(*args, **kwargs)
 
-        with PreserveLoggingContext():
+        with context.PreserveLoggingContext():
             return self._reactor.callLater(delay, wrapped_callback, *args, **kwargs)
 
     def cancel_call_later(self, timer, ignore_errs=False):

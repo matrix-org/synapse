@@ -24,9 +24,9 @@ import six
 from twisted.internet import defer
 from twisted.protocols.basic import FileSender
 
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util import logcontext
 from synapse.util.file_consumer import BackgroundFileConsumer
-from synapse.util.logcontext import make_deferred_yieldable
 
 from ._base import Responder
 

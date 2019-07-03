@@ -44,15 +44,15 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.storage.keys import FetchKeyResult
-from synapse.util import logcontext, unwrapFirstError
-from synapse.util.async_helpers import yieldable_gather_results
-from synapse.util.logcontext import (
+from synapse.logging.context import (
     LoggingContext,
     PreserveLoggingContext,
     preserve_fn,
     run_in_background,
 )
+from synapse.storage.keys import FetchKeyResult
+from synapse.util import logcontext, unwrapFirstError
+from synapse.util.async_helpers import yieldable_gather_results
 from synapse.util.metrics import Measure
 from synapse.util.retryutils import NotRetryingDestination
 

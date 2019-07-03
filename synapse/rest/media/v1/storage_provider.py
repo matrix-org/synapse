@@ -20,8 +20,8 @@ import shutil
 from twisted.internet import defer
 
 from synapse.config._base import Config
+from synapse.logging.context import run_in_background
 from synapse.util import logcontext
-from synapse.util.logcontext import run_in_background
 
 from .media_storage import FileResponder
 
