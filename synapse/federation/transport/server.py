@@ -311,7 +311,9 @@ class BaseFederationServlet(object):
                             origin, content, request.args, *args, **kwargs
                         )
                 else:
-                    response = yield func(origin, content, request.args, *args, **kwargs)
+                    response = yield func(
+                        origin, content, request.args, *args, **kwargs
+                    )
             finally:
                 # Finish the span
                 tracerutils.close_active_span()
