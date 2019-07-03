@@ -92,18 +92,18 @@ class RoomAccessRules(object):
 
                 # Make sure the event has a valid content.
                 if rule is None:
-                    raise SynapseError(400, "Invalid access rule",)
+                    raise SynapseError(400, "Invalid access rule")
 
                 # Make sure the rule name is valid.
                 if rule not in VALID_ACCESS_RULES:
-                    raise SynapseError(400, "Invalid access rule", )
+                    raise SynapseError(400, "Invalid access rule")
 
                 # Make sure the rule is "direct" if the room is a direct chat.
                 if (
                     (is_direct and rule != ACCESS_RULE_DIRECT)
                     or (rule == ACCESS_RULE_DIRECT and not is_direct)
                 ):
-                    raise SynapseError(400, "Invalid access rule",)
+                    raise SynapseError(400, "Invalid access rule")
 
         # If there's no rules event in the initial state, create one with the default
         # setting.
@@ -189,29 +189,17 @@ class RoomAccessRules(object):
         Checks the event's type and the current rule and calls the right function to
         determine whether the event can be allowed.
         """
-        # Special-case the access rules event.
         if event.type == ACCESS_RULES_TYPE:
             return self._on_rules_change(event, state_events)
 
+        # We need to know the rule to apply when processing the event types below.
         rule = self._get_rule_from_state(state_events)
 
-        # Special-case the power levels event because it makes more sense to check it
-        # here.
         if event.type == EventTypes.PowerLevels:
             return self._is_power_level_content_allowed(event.content, rule)
 
-        if rule == ACCESS_RULE_RESTRICTED:
-            ret = self._apply_restricted(event)
-        elif rule == ACCESS_RULE_UNRESTRICTED:
-            ret = self._apply_unrestricted()
-        elif rule == ACCESS_RULE_DIRECT:
-            ret = self._apply_direct(event, state_events)
-        else:
-            # We currently apply the default (restricted) if we don't know the rule, we
-            # might want to change that in the future.
-            ret = self._apply_restricted(event)
-
-        return ret
+        if event.type == EventTypes.Member or event.type == EventTypes.ThirdPartyInvite:
+            return self._on_membership_or_invite(event, rule, state_events)
 
     def _on_rules_change(self, event, state_events):
         """Implement the checks and behaviour specified on allowing or forbidding a new
@@ -254,34 +242,66 @@ class RoomAccessRules(object):
 
         return False
 
-    def _apply_restricted(self, event):
+    def _on_membership_or_invite(self, event, rule, state_events):
+        """Applies the correct rule for incoming m.room.member and
+        m.room.third_party_invite events.
+
+        Args:
+            event (synapse.events.EventBase): The event to check.
+            rule (str): The name of the rule to apply.
+            state_events (dict[tuple[event type, state key], EventBase]): The state of the
+                room before the event was sent.
+        Returns:
+            bool, True if the event can be allowed, False otherwise.
+        """
+        if rule == ACCESS_RULE_RESTRICTED:
+            ret = self._on_membership_or_invite_restricted(event)
+        elif rule == ACCESS_RULE_UNRESTRICTED:
+            ret = self._on_membership_or_invite_unrestricted()
+        elif rule == ACCESS_RULE_DIRECT:
+            ret = self._on_membership_or_invite_direct(event, state_events)
+        else:
+            # We currently apply the default (restricted) if we don't know the rule, we
+            # might want to change that in the future.
+            ret = self._on_membership_or_invite_restricted(event)
+
+        return ret
+
+    def _on_membership_or_invite_restricted(self, event):
         """Implements the checks and behaviour specified for the "restricted" rule.
+
+        "restricted" currently means that users can only invite users if their server is
+        included in a limited list of domains.
 
         Args:
             event (synapse.events.EventBase): The event to check.
         Returns:
             bool, True if the event can be allowed, False otherwise.
         """
-        # "restricted" currently means that users can only invite users if their server is
-        # included in a limited list of domains.
-        # We're not filtering on m.room.third_party_member events here because the
-        # filtering on threepids is done in check_threepid_can_be_invited.
-        if event.type != EventTypes.Member:
+        # We're not applying the rules on m.room.third_party_member events here because
+        # the filtering on threepids is done in check_threepid_can_be_invited, which is
+        # called before check_event_allowed.
+        if event.type == EventTypes.ThirdPartyInvite:
             return True
         invitee_domain = get_domain_from_id(event.state_key)
         return invitee_domain not in self.domains_forbidden_when_restricted
 
-    def _apply_unrestricted(self):
+    def _on_membership_or_invite_unrestricted(self):
         """Implements the checks and behaviour specified for the "unrestricted" rule.
+
+        "unrestricted" currently means that every event is allowed.
 
         Returns:
             bool, True if the event can be allowed, False otherwise.
         """
-        # "unrestricted" currently means that every event is allowed.
         return True
 
-    def _apply_direct(self, event, state_events):
+    def _on_membership_or_invite_direct(self, event, state_events):
         """Implements the checks and behaviour specified for the "direct" rule.
+
+        "direct" currently means that no member is allowed apart from the two initial
+        members the room was created for (i.e. the room's creator and their first
+        invitee).
 
         Args:
             event (synapse.events.EventBase): The event to check.
@@ -290,12 +310,6 @@ class RoomAccessRules(object):
         Returns:
             bool, True if the event can be allowed, False otherwise.
         """
-        # "direct" currently means that no member is allowed apart from the two initial
-        # members the room was created for (i.e. the room's creator and their first
-        # invitee).
-        if event.type != EventTypes.Member and event.type != EventTypes.ThirdPartyInvite:
-            return True
-
         # Get the room memberships and 3PID invite tokens from the room's state.
         existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
             state_events,
