@@ -19,7 +19,8 @@ from six.moves import range
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError
 
-from synapse.util import Clock, logcontext
+from synapse.logging.context import LoggingContext
+from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 
 from tests import unittest

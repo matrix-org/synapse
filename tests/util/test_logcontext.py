@@ -1,8 +1,14 @@
 import twisted.python.failure
 from twisted.internet import defer, reactor
 
-from synapse.logging.context import LoggingContext
-from synapse.util import Clock, logcontext
+from synapse.logging.context import (
+    LoggingContext,
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+    nested_logging_context,
+    run_in_background,
+)
+from synapse.util import Clock
 
 from .. import unittest
 

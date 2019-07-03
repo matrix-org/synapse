@@ -30,9 +30,12 @@ from synapse.crypto.keyring import (
     ServerKeyFetcher,
     StoreKeyFetcher,
 )
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import (
+    LoggingContext,
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+)
 from synapse.storage.keys import FetchKeyResult
-from synapse.util import logcontext
 
 from tests import unittest
 

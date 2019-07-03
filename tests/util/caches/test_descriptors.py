@@ -21,7 +21,11 @@ import mock
 from twisted.internet import defer, reactor
 
 from synapse.api.errors import SynapseError
-from synapse.util import logcontext
+from synapse.logging.context import (
+    LoggingContext,
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+)
 from synapse.util.caches import descriptors
 
 from tests import unittest

@@ -16,8 +16,7 @@ from twisted.internet import defer
 from twisted.internet.defer import CancelledError, Deferred
 from twisted.internet.task import Clock
 
-from synapse.logging.context import LoggingContext
-from synapse.util import logcontext
+from synapse.logging.context import LoggingContext, PreserveLoggingContext
 from synapse.util.async_helpers import timeout_deferred
 
 from tests.unittest import TestCase
