@@ -112,10 +112,10 @@ class EmailConfig(Config):
             missing = []
             for k in required:
                 if k not in email_config:
-                    missing.append('email.' + k)
+                    missing.append("email." + k)
 
             if config.get("public_baseurl") is None:
-                missing.append('public_base_url')
+                missing.append("public_base_url")
 
             if len(missing) > 0:
                 raise RuntimeError(
