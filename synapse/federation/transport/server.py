@@ -292,7 +292,7 @@ class BaseFederationServlet(object):
             # Start an opentracing span
             tracerutils.start_active_span_from_context(
                 request.requestHeaders,
-                "incoming-request",
+                "incoming-federation-request",
                 tags={
                     "request_id": request.get_request_id(),
                     tracerutils.tags.SPAN_KIND: tracerutils.tags.SPAN_KIND_RPC_SERVER,
