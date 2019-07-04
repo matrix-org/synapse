@@ -38,7 +38,6 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
     @staticmethod
     def _serialize_payload(
         user_id,
-        token,
         password_hash,
         was_guest,
         make_guest,
@@ -51,9 +50,6 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         """
         Args:
             user_id (str): The desired user ID to register.
-            token (str): The desired access token to use for this user. If this
-                is not None, the given access token is associated with the user
-                id.
             password_hash (str|None): Optional. The password hash for this user.
             was_guest (bool): Optional. Whether this is a guest account being
                 upgraded to a non-guest account.
@@ -68,7 +64,6 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             address (str|None): the IP address used to perform the regitration.
         """
         return {
-            "token": token,
             "password_hash": password_hash,
             "was_guest": was_guest,
             "make_guest": make_guest,
@@ -85,7 +80,6 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
 
         yield self.registration_handler.register_with_store(
             user_id=user_id,
-            token=content["token"],
             password_hash=content["password_hash"],
             was_guest=content["was_guest"],
             make_guest=content["make_guest"],

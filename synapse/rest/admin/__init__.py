@@ -219,11 +219,10 @@ class UserRegisterServlet(RestServlet):
 
         register = RegisterRestServlet(self.hs)
 
-        (user_id, _) = yield register.registration_handler.register(
+        user_id = yield register.registration_handler.register_user(
             localpart=body["username"].lower(),
             password=body["password"],
             admin=bool(admin),
-            generate_token=False,
             user_type=user_type,
         )
 

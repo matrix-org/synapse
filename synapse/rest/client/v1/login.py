@@ -314,10 +314,8 @@ class LoginRestServlet(RestServlet):
 
         registered_user_id = yield self.auth_handler.check_user_exists(user_id)
         if not registered_user_id:
-            registered_user_id, _ = (
-                yield self.registration_handler.register(
-                    localpart=user, generate_token=False
-                )
+            registered_user_id = yield self.registration_handler.register_user(
+                localpart=user
             )
 
         result = yield self._register_device_with_callback(
@@ -505,12 +503,8 @@ class SSOAuthHandler(object):
         user_id = UserID(localpart, self._hostname).to_string()
         registered_user_id = yield self._auth_handler.check_user_exists(user_id)
         if not registered_user_id:
-            registered_user_id, _ = (
-                yield self._registration_handler.register(
-                    localpart=localpart,
-                    generate_token=False,
-                    default_display_name=user_display_name,
-                )
+            registered_user_id = yield self._registration_handler.register_user(
+                localpart=localpart, default_display_name=user_display_name
             )
 
         login_token = self._macaroon_gen.generate_short_term_login_token(
