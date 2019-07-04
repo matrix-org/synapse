@@ -178,6 +178,7 @@ steps:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
+          always-pull: true
     retry:
       automatic:
         - exit_status: -1
@@ -197,6 +198,7 @@ steps:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
+          always-pull: true
     retry:
       automatic:
         - exit_status: -1
@@ -217,6 +219,7 @@ steps:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
+          always-pull: true
     soft_fail: true
     retry:
       automatic:
