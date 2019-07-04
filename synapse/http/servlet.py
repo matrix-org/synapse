@@ -292,7 +292,9 @@ class RestServlet(object):
                 if hasattr(self, "on_%s" % (method,)):
                     method_handler = getattr(self, "on_%s" % (method,))
                     http_server.register_paths(
-                        method, patterns, trace_servlet(method_handler)
+                        method,
+                        patterns,
+                        trace_servlet(self.__class__.__name__, method_handler),
                     )
 
         else:

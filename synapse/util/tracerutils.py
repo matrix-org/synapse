@@ -314,7 +314,7 @@ def inject_active_span_byte_dict(headers, destination):
         headers[key.encode()] = [value.encode()]
 
 
-def trace_servlet(func):
+def trace_servlet(servlet_name, func):
     @wraps(func)
     @defer.inlineCallbacks
     def f(request, *args, **kwargs):
@@ -327,6 +327,7 @@ def trace_servlet(func):
                 tags.HTTP_METHOD: request.get_method(),
                 tags.HTTP_URL: request.get_redacted_uri(),
                 tags.PEER_HOST_IPV6: request.getClientIP(),
+                "servlet_name": servlet_name,
             },
         )
         # A context manager would be the most logical here but defer.returnValue
