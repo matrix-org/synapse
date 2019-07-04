@@ -18,7 +18,7 @@ import json
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from synapse.util.tracerutils import trace_defered_function
+from synapse.logging.opentracing import trace_defered_function
 
 from ._base import SQLBaseStore
 
