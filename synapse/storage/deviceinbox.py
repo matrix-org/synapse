@@ -127,7 +127,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         defer.returnValue(count)
 
-    @tracerutils.trace_defered_function
+    @tracerutils.trace_function
     def get_new_device_msgs_for_remote(
         self, destination, last_stream_id, current_stream_id, limit
     ):
