@@ -117,7 +117,7 @@ class EmailConfig(Config):
             if len(missing) > 0:
                 raise RuntimeError(
                     "Password resets emails are configured to be sent from "
-                    "this homeserver due to a partially email block. "
+                    "this homeserver due to a partial email block. "
                     "However, the following required keys are missing: %s"
                     % (", ".join(["email." + k for k in missing]),)
                 )
@@ -160,8 +160,8 @@ class EmailConfig(Config):
             if config.get("public_baseurl") is None:
                 raise RuntimeError(
                     "Password resets emails will be sent from this homeserver "
-                    "due to a configured email block. However, the "
-                    "public_baseurl config option also requires configuration. "
+                    "due to a configured email block. However, no "
+                    "public_baseurl is set. "
                     "This is necessary to generate password reset links"
                 )
 
