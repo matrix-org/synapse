@@ -173,7 +173,7 @@ steps:
       queue: "medium"
     command:
       - "bash .buildkite/merge_base_branch.sh"
-      - "bash .buildkite/synapse_sytest.sh"
+      - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
