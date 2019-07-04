@@ -335,8 +335,7 @@ class RelationsWorkerStore(SQLBaseStore):
         # Fetches latest edit that has the same type and sender as the
         # original, and is an `m.room.message`.
         sql = """
-            SELECT edit.event_id, edit.origin_server_ts, edit.sender
-            FROM events AS edit
+            SELECT edit.event_id FROM events AS edit
             INNER JOIN event_relations USING (event_id)
             INNER JOIN events AS original ON
                 original.event_id = relates_to_id
