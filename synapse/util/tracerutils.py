@@ -94,8 +94,10 @@ def init_tracer(config):
         The config used by the homserver. Here it's used to set the service
         name to the homeserver's.
     """
+    global opentracing
     if not config.tracer_config.get("tracer_enabled", False):
         # We don't have a tracer
+        opentracing = None
         return
 
     if not opentracing:
@@ -148,7 +150,7 @@ def start_active_span(
     finish_on_close=True,
 ):
     if opentracing is None:
-        return _noop_context_manager
+        return _noop_context_manager()
     else:
         # We need to enter the scope here for the logcontext to become active
         return opentracing.tracer.start_active_span(
@@ -232,6 +234,9 @@ def start_active_span_from_context(
     # Twisted encodes the values as lists whereas opentracing doesn't.
     # So, we take the first item in the list.
     # Also, twisted uses byte arrays while opentracing expects strings.
+    if opentracing is None:
+        return _noop_context_manager()
+
     header_dict = {k.decode(): v[0].decode() for k, v in headers.getAllRawHeaders()}
     context = opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
 
@@ -313,7 +318,7 @@ def trace_servlet(func):
     @wraps(func)
     @defer.inlineCallbacks
     def f(request, *args, **kwargs):
-        with start_active_span_from_context(
+        scope = start_active_span_from_context(
             request.requestHeaders,
             "incoming-client-request",
             tags={
@@ -323,8 +328,16 @@ def trace_servlet(func):
                 tags.HTTP_URL: request.get_redacted_uri(),
                 tags.PEER_HOST_IPV6: request.getClientIP(),
             },
-        ):
+        )
+        # A context manager would be the most logical here but defer.returnValue
+        # raises an exception in order to provide the return value. This causes
+        # opentracing to mark each request as erroring, in order to avoid this we
+        # need to give the finally clause explicitly.
+        scope.__enter__()
+        try:
             result = yield defer.maybeDeferred(func, request, *args, **kwargs)
             defer.returnValue(result)
+        finally:
+            scope.__exit__(None, None, None)
 
     return f
