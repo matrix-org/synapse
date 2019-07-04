@@ -112,14 +112,17 @@ class EmailConfig(Config):
             missing = []
             for k in required:
                 if k not in email_config:
-                    missing.append(k)
+                    missing.append('email.' + k)
+
+            if config.get("public_baseurl") is None:
+                missing.append('public_base_url')
 
             if len(missing) > 0:
                 raise RuntimeError(
                     "Password resets emails are configured to be sent from "
-                    "this homeserver due to a partial email block. "
+                    "this homeserver due to a partial 'email' block. "
                     "However, the following required keys are missing: %s"
-                    % (", ".join(["email." + k for k in missing]),)
+                    % (", ".join(missing),)
                 )
 
             # Templates for password reset emails
@@ -156,14 +159,6 @@ class EmailConfig(Config):
             self.email_password_reset_success_html_content = self.read_file(
                 filepath, "email.password_reset_template_success_html"
             )
-
-            if config.get("public_baseurl") is None:
-                raise RuntimeError(
-                    "Password resets emails will be sent from this homeserver "
-                    "due to a configured email block. However, no "
-                    "public_baseurl is set. "
-                    "This is necessary to generate password reset links"
-                )
 
         if self.email_enable_notifs:
             required = [
