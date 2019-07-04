@@ -244,7 +244,7 @@ class AuthTestCase(unittest.TestCase):
         USER_ID = "@percy:matrix.org"
         self.store.add_access_token_to_user = Mock()
 
-        token = yield self.hs.handlers.auth_handler.issue_access_token(
+        token = yield self.hs.handlers.auth_handler.get_access_token_for_user_id(
             USER_ID, "DEVICE"
         )
         self.store.add_access_token_to_user.assert_called_with(USER_ID, token, "DEVICE")
