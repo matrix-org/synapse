@@ -29,6 +29,8 @@ import logging
 import re
 from functools import wraps
 
+from twisted.internet import defer
+
 logger = logging.getLogger(__name__)
 
 
@@ -305,3 +307,24 @@ def inject_active_span_byte_dict(headers, destination):
 
     for key, value in carrier.items():
         headers[key.encode()] = [value.encode()]
+
+
+def trace_servlet(func):
+    @wraps(func)
+    @defer.inlineCallbacks
+    def f(request, *args, **kwargs):
+        with start_active_span_from_context(
+            request.requestHeaders,
+            "incoming-client-request",
+            tags={
+                "request_id": request.get_request_id(),
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
+                tags.HTTP_METHOD: request.get_method(),
+                tags.HTTP_URL: request.get_redacted_uri(),
+                tags.PEER_HOST_IPV6: request.getClientIP(),
+            },
+        ):
+            result = yield defer.maybeDeferred(func, request, *args, **kwargs)
+            defer.returnValue(result)
+
+    return f
