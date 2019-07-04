@@ -22,6 +22,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventTypes
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.third_party_rules.access_rules import (
@@ -147,12 +148,11 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.assertEqual(rule, ACCESS_RULE_UNRESTRICTED)
 
     def test_create_room_invalid_rule(self):
-        """Tests that creating a room with an invalid rule will set the default value."""
+        """Tests that creating a room with an invalid rule will set fail."""
         self.create_room(rule=ACCESS_RULE_DIRECT, expected_code=400)
 
     def test_create_room_direct_invalid_rule(self):
-        """Tests that creating a direct room with an invalid rule will set the default
-        value.
+        """Tests that creating a direct room with an invalid rule will fail.
         """
         self.create_room(direct=True, rule=ACCESS_RULE_RESTRICTED, expected_code=400)
 
@@ -277,7 +277,9 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         )
 
     def test_unrestricted(self):
-        """Tests that, in unrestricted mode, we can invite whoever we want.
+        """Tests that, in unrestricted mode, we can invite whoever we want, but we can
+        only change the power level of users that wouldn't be forbidden in restricted
+        mode.
         """
         # We can invite
         self.helper.invite(
@@ -309,6 +311,52 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             address="test@allowed_domain",
             room_id=self.unrestricted_room,
             expected_code=200,
+        )
+
+        # We can send a power level event that doesn't redefine the default PL or set a
+        # non-default PL for a user that would be forbidden in restricted mode.
+        self.helper.send_state(
+            room_id=self.unrestricted_room,
+            event_type=EventTypes.PowerLevels,
+            body={
+                "users": {
+                    self.user_id: 100,
+                    "@test:not_forbidden_domain": 10,
+                },
+            },
+            tok=self.tok,
+            expect_code=200,
+        )
+
+        # We can't send a power level event that redefines the default PL and doesn't set
+        # a non-default PL for a user that would be forbidden in restricted mode.
+        self.helper.send_state(
+            room_id=self.unrestricted_room,
+            event_type=EventTypes.PowerLevels,
+            body={
+                "users": {
+                    self.user_id: 100,
+                    "@test:not_forbidden_domain": 10,
+                },
+                "users_default": 10,
+            },
+            tok=self.tok,
+            expect_code=403,
+        )
+
+        # We can't send a power level event that doesn't redefines the default PL but sets
+        # a non-default PL for a user that would be forbidden in restricted mode.
+        self.helper.send_state(
+            room_id=self.unrestricted_room,
+            event_type=EventTypes.PowerLevels,
+            body={
+                "users": {
+                    self.user_id: 100,
+                    "@test:forbidden_domain": 10,
+                },
+            },
+            tok=self.tok,
+            expect_code=403,
         )
 
     def test_change_rules(self):
