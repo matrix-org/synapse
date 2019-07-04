@@ -20,10 +20,10 @@ from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
+from synapse.logging.context import run_in_background
 from synapse.storage.state import StateFilter
 from synapse.types import RoomStreamToken
 from synapse.util.async_helpers import ReadWriteLock
-from synapse.util.logcontext import run_in_background
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
 

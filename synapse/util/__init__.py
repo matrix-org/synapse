@@ -21,9 +21,13 @@ import attr
 
 from twisted.internet import defer, task
 
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.logging import context, formatter
 
 logger = logging.getLogger(__name__)
+
+# Compatibility alias, for existing logconfigs.
+logcontext = context
+logformatter = formatter
 
 
 def unwrapFirstError(failure):
@@ -46,7 +50,7 @@ class Clock(object):
     @defer.inlineCallbacks
     def sleep(self, seconds):
         d = defer.Deferred()
-        with PreserveLoggingContext():
+        with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
             res = yield d
         defer.returnValue(res)
@@ -62,7 +66,10 @@ class Clock(object):
     def looping_call(self, f, msec):
         """Call a function repeatedly.
 
-         Waits `msec` initially before calling `f` for the first time.
+        Waits `msec` initially before calling `f` for the first time.
+
+        Note that the function will be called with no logcontext, so if it is anything
+        other than trivial, you probably want to wrap it in run_as_background_process.
 
         Args:
             f(function): The function to call repeatedly.
@@ -77,6 +84,9 @@ class Clock(object):
     def call_later(self, delay, callback, *args, **kwargs):
         """Call something later
 
+        Note that the function will be called with no logcontext, so if it is anything
+        other than trivial, you probably want to wrap it in run_as_background_process.
+
         Args:
             delay(float): How long to wait in seconds.
             callback(function): Function to call
@@ -85,10 +95,10 @@ class Clock(object):
         """
 
         def wrapped_callback(*args, **kwargs):
-            with PreserveLoggingContext():
+            with context.PreserveLoggingContext():
                 callback(*args, **kwargs)
 
-        with PreserveLoggingContext():
+        with context.PreserveLoggingContext():
             return self._reactor.callLater(delay, wrapped_callback, *args, **kwargs)
 
     def cancel_call_later(self, timer, ignore_errs=False):
