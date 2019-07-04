@@ -468,7 +468,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         relations_dict = channel.json_body["unsigned"].get("m.relations")
 
-        self.assertEquals(RelationTypes.REPLACE in relations_dict)
+        self.assertEquals(RelationTypes.REPLACE in relations_dict, True)
 
         for key in ["event_id", "sender", "origin_server_ts"]:
             self.assertEquals(key in relations_dict[RelationTypes.REPLACE])
@@ -535,7 +535,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         relations_dict = channel.json_body["unsigned"].get("m.relations")
 
-        self.assertEquals(RelationTypes.REPLACE in relations_dict)
+        self.assertEquals(RelationTypes.REPLACE in relations_dict, True)
 
         for key in ["event_id", "sender", "origin_server_ts"]:
             self.assertEquals(key in relations_dict[RelationTypes.REPLACE])
