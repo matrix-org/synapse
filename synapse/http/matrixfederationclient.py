@@ -36,9 +36,9 @@ from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
 from twisted.web.http_headers import Headers
 
+import synapse.logging.opentracing as opentracing
 import synapse.metrics
 import synapse.util.retryutils
-import synapse.logging.opentracing as opentracing
 from synapse.api.errors import (
     Codes,
     FederationDeniedError,
