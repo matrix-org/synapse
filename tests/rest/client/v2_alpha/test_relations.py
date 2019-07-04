@@ -474,8 +474,16 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             self.assertEquals(key in relations_dict[RelationTypes.REPLACE])
 
         self.assert_dict(
-            {"event_id": relations_dict["event_id"], "sender": relations_dict["sender"]},
-            {RelationTypes.REPLACE: {"event_id": edit_event_id, "sender": self.user_id}},
+            {
+                "event_id": relations_dict["event_id"],
+                "sender": relations_dict["sender"],
+            },
+            {
+                RelationTypes.REPLACE: {
+                    "event_id": edit_event_id,
+                    "sender": self.user_id,
+                }
+            },
         )
 
     def test_multi_edit(self):
@@ -533,8 +541,16 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             self.assertEquals(key in relations_dict[RelationTypes.REPLACE])
 
         self.assert_dict(
-            {"event_id": relations_dict["event_id"], "sender": relations_dict["sender"]},
-            {RelationTypes.REPLACE: {"event_id": edit_event_id, "sender": self.user_id}},
+            {
+                "event_id": relations_dict["event_id"],
+                "sender": relations_dict["sender"],
+            },
+            {
+                RelationTypes.REPLACE: {
+                    "event_id": edit_event_id,
+                    "sender": self.user_id,
+                }
+            },
         )
 
     def _send_relation(
