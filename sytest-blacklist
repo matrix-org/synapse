@@ -1,17 +1,35 @@
+# This file serves as a blacklist for SyTest tests that we expect will fail in
+# Synapse.
+# 
+# Each line of this file is scanned by sytest during a run and if the line
+# exactly matches the name of a test, it will be marked as "expected fail",
+# meaning the test will still run, but failure will not mark the entire test
+# suite as failing.
+#
+# Test names are encouraged to have a bug accompanied with them, serving as an
+# explanation for why the test has been excluded.
+
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1679
 Remote room members also see posted message events
+
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/2065
 Guest users can accept invites to private rooms over federation
+
 # Blacklisted due to https://github.com/vector-im/riot-web/issues/7211
 The only membership state included in a gapped incremental sync is for senders in the timeline
+
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1658
 Newly created users see their own presence in /initialSync (SYT-34)
+
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1396
 Should reject keys claiming to belong to a different user
+
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/2306
 Users appear/disappear from directory when join_rules are changed
 Users appear/disappear from directory when history_visibility are changed
+
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1531
 Enabling an unknown default rule fails with 404
+
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1663
 New federated private chats get full presence information (SYN-115)
