@@ -17,7 +17,7 @@ import logging
 
 from opentracing import Scope, ScopeManager
 
-from .logcontext import LoggingContext, nested_logging_context
+from synapse.logging.context import LoggingContext, nested_logging_context
 
 logger = logging.getLogger(__name__)
 

@@ -21,7 +21,7 @@ import re
 from twisted.internet import defer
 
 import synapse
-import synapse.util.tracerutils as tracerutils
+import synapse.logging.opentracing as opentracing
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import (
@@ -290,15 +290,15 @@ class BaseFederationServlet(object):
                 raise
 
             # Start an opentracing span
-            with tracerutils.start_active_span_from_context(
+            with opentracing.start_active_span_from_context(
                 request.requestHeaders,
                 "incoming-federation-request",
                 tags={
                     "request_id": request.get_request_id(),
-                    tracerutils.tags.SPAN_KIND: tracerutils.tags.SPAN_KIND_RPC_SERVER,
-                    tracerutils.tags.HTTP_METHOD: request.get_method(),
-                    tracerutils.tags.HTTP_URL: request.get_redacted_uri(),
-                    tracerutils.tags.PEER_HOST_IPV6: request.getClientIP(),
+                    opentracing.tags.SPAN_KIND: opentracing.tags.SPAN_KIND_RPC_SERVER,
+                    opentracing.tags.HTTP_METHOD: request.get_method(),
+                    opentracing.tags.HTTP_URL: request.get_redacted_uri(),
+                    opentracing.tags.PEER_HOST_IPV6: request.getClientIP(),
                     "authenticated_entity": origin,
                 },
             ):

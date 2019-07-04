@@ -20,7 +20,7 @@ import logging
 from canonicaljson import json
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.util.tracerutils import trace_servlet
+from synapse.logging.opentracing import trace_servlet
 
 logger = logging.getLogger(__name__)
 

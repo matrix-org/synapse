@@ -19,7 +19,7 @@ except ImportError:
     opentracing = None
 try:
     from jaeger_client import Config as JaegerConfig
-    from synapse.util.scopecontextmanager import LogContextScopeManager
+    from synapse.logging.scopecontextmanager import LogContextScopeManager
 except ImportError:
     JaegerConfig = None
     LogContextScopeManager = None
