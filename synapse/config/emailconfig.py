@@ -116,8 +116,9 @@ class EmailConfig(Config):
 
             if len(missing) > 0:
                 raise RuntimeError(
-                    "email.password_reset_behaviour is set to 'local' "
-                    "but required keys are missing: %s"
+                    "Password resets emails are configured to be sent from "
+                    "this homeserver due to a partially email block. "
+                    "However, the following required keys are missing: %s"
                     % (", ".join(["email." + k for k in missing]),)
                 )
 
@@ -158,9 +159,10 @@ class EmailConfig(Config):
 
             if config.get("public_baseurl") is None:
                 raise RuntimeError(
-                    "email.password_reset_behaviour is set to 'local' but no "
-                    "public_baseurl is set. This is necessary to generate password "
-                    "reset links"
+                    "Password resets emails will be sent from this homeserver "
+                    "due to a configured email block. However, the "
+                    "public_baseurl config option also requires configuration. "
+                    "This is necessary to generate password reset links"
                 )
 
         if self.email_enable_notifs:
