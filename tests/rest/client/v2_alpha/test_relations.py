@@ -471,7 +471,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(RelationTypes.REPLACE in relations_dict, True)
 
         for key in ["event_id", "sender", "origin_server_ts"]:
-            self.assertEquals(key in relations_dict[RelationTypes.REPLACE])
+            self.assertEquals(key in relations_dict[RelationTypes.REPLACE], True)
 
         self.assert_dict(
             {
@@ -538,7 +538,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(RelationTypes.REPLACE in relations_dict, True)
 
         for key in ["event_id", "sender", "origin_server_ts"]:
-            self.assertEquals(key in relations_dict[RelationTypes.REPLACE])
+            self.assertEquals(key in relations_dict[RelationTypes.REPLACE], True)
 
         self.assert_dict(
             {
