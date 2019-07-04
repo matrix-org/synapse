@@ -1,6 +1,16 @@
 Synapse 1.1.0 (2019-07-04)
 ==========================
 
+As of v1.1.0, Synapse no longer supports Python 2, nor Postgres version 9.4.
+See the [upgrade notes](UPGRADE.rst#upgrading-to-v110) for more details.
+
+This release also deprecates the use of environment variables to configure the
+docker image. See the [docker README](https://github.com/matrix-org/synapse/blob/release-v1.1.0/docker/README.md#legacy-dynamic-configuration-file-support)
+for more details.
+
+No changes since 1.1.0rc2.
+
+
 Synapse 1.1.0rc2 (2019-07-03)
 =============================
 
