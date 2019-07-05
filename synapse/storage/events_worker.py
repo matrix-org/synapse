@@ -688,31 +688,6 @@ class EventsWorkerStore(SQLBaseStore):
             room_id,
         )
 
-    def _get_current_state_event_counts_txn(self, txn, room_id):
-        """
-        See get_current_state_event_counts.
-        """
-        sql = "SELECT COUNT(*) FROM current_state_events WHERE room_id=?"
-        txn.execute(sql, (room_id,))
-        row = txn.fetchone()
-        return row[0] if row else 0
-
-    def get_current_state_event_counts(self, room_id):
-        """
-        Gets the current number of state events in a room.
-
-        Args:
-            room_id (str)
-
-        Returns:
-            Deferred[int]
-        """
-        return self.runInteraction(
-            "get_current_state_event_counts",
-            self._get_current_state_event_counts_txn,
-            room_id,
-        )
-
     @defer.inlineCallbacks
     def get_room_complexity(self, room_id):
         """
