@@ -467,20 +467,14 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.json_body["content"], new_body)
 
         relations_dict = channel.json_body["unsigned"].get("m.relations")
-
         self.assertIn(RelationTypes.REPLACE, relations_dict)
 
         m_replace_dict = relations_dict[RelationTypes.REPLACE]
-
         for key in ["event_id", "sender", "origin_server_ts"]:
             self.assertIn(key, m_replace_dict)
 
         self.assert_dict(
-            {
-                "event_id": edit_event_id,
-                "sender": self.user_id,
-            },
-            m_replace_dict,
+            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
         )
 
     def test_multi_edit(self):
@@ -531,20 +525,14 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.json_body["content"], new_body)
 
         relations_dict = channel.json_body["unsigned"].get("m.relations")
-
         self.assertIn(RelationTypes.REPLACE, relations_dict)
 
         m_replace_dict = relations_dict[RelationTypes.REPLACE]
-
         for key in ["event_id", "sender", "origin_server_ts"]:
             self.assertIn(key, m_replace_dict)
 
         self.assert_dict(
-            {
-                "event_id": edit_event_id,
-                "sender": self.user_id,
-            },
-            m_replace_dict,
+            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
         )
 
     def _send_relation(
