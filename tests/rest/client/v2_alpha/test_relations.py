@@ -536,7 +536,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT",
             "/rooms/%s/redact/%s/%s"
-            % (self.room, self.parent_id, "some_transaction_id"),
+            % (self.room, self.parent_id, "test_aggregation_redaction_redacts_edits"),
             access_token=self.user_token,
         )
         self.render(request)
