@@ -45,6 +45,13 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import auth_types_for_event
 from synapse.events.validator import EventValidator
+from synapse.logging.context import (
+    make_deferred_yieldable,
+    nested_logging_context,
+    preserve_fn,
+    run_in_background,
+)
+from synapse.logging.utils import log_function
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
@@ -52,10 +59,9 @@ from synapse.replication.http.federation import (
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
 from synapse.state import StateResolutionStore, resolve_events_with_store
 from synapse.types import UserID, get_domain_from_id
-from synapse.util import logcontext, unwrapFirstError
+from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room
-from synapse.util.logutils import log_function
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.visibility import filter_events_for_server
 
@@ -338,7 +344,7 @@ class FederationHandler(BaseHandler):
 
                         room_version = yield self.store.get_room_version(room_id)
 
-                        with logcontext.nested_logging_context(p):
+                        with nested_logging_context(p):
                             # note that if any of the missing prevs share missing state or
                             # auth events, the requests to fetch those events are deduped
                             # by the get_pdu_cache in federation_client.
@@ -532,7 +538,7 @@ class FederationHandler(BaseHandler):
                 event_id,
                 ev.event_id,
             )
-            with logcontext.nested_logging_context(ev.event_id):
+            with nested_logging_context(ev.event_id):
                 try:
                     yield self.on_receive_pdu(origin, ev, sent_to_us_directly=False)
                 except FederationError as e:
@@ -725,10 +731,10 @@ class FederationHandler(BaseHandler):
                     missing_auth - failed_to_fetch,
                 )
 
-                results = yield logcontext.make_deferred_yieldable(
+                results = yield make_deferred_yieldable(
                     defer.gatherResults(
                         [
-                            logcontext.run_in_background(
+                            run_in_background(
                                 self.federation_client.get_pdu,
                                 [dest],
                                 event_id,
@@ -994,10 +1000,8 @@ class FederationHandler(BaseHandler):
         event_ids = list(extremities.keys())
 
         logger.debug("calling resolve_state_groups in _maybe_backfill")
-        resolve = logcontext.preserve_fn(
-            self.state_handler.resolve_state_groups_for_events
-        )
-        states = yield logcontext.make_deferred_yieldable(
+        resolve = preserve_fn(self.state_handler.resolve_state_groups_for_events)
+        states = yield make_deferred_yieldable(
             defer.gatherResults(
                 [resolve(room_id, [e]) for e in event_ids], consumeErrors=True
             )
@@ -1171,7 +1175,7 @@ class FederationHandler(BaseHandler):
             # lots of requests for missing prev_events which we do actually
             # have. Hence we fire off the deferred, but don't wait for it.
 
-            logcontext.run_in_background(self._handle_queued_pdus, room_queue)
+            run_in_background(self._handle_queued_pdus, room_queue)
 
         defer.returnValue(True)
 
@@ -1191,7 +1195,7 @@ class FederationHandler(BaseHandler):
                     p.event_id,
                     p.room_id,
                 )
-                with logcontext.nested_logging_context(p.event_id):
+                with nested_logging_context(p.event_id):
                     yield self.on_receive_pdu(origin, p, sent_to_us_directly=True)
             except Exception as e:
                 logger.warn(
@@ -1610,7 +1614,7 @@ class FederationHandler(BaseHandler):
             success = True
         finally:
             if not success:
-                logcontext.run_in_background(
+                run_in_background(
                     self.store.remove_push_actions_from_staging, event.event_id
                 )
 
@@ -1629,7 +1633,7 @@ class FederationHandler(BaseHandler):
         @defer.inlineCallbacks
         def prep(ev_info):
             event = ev_info["event"]
-            with logcontext.nested_logging_context(suffix=event.event_id):
+            with nested_logging_context(suffix=event.event_id):
                 res = yield self._prep_event(
                     origin,
                     event,
@@ -1639,12 +1643,9 @@ class FederationHandler(BaseHandler):
                 )
             defer.returnValue(res)
 
-        contexts = yield logcontext.make_deferred_yieldable(
+        contexts = yield make_deferred_yieldable(
             defer.gatherResults(
-                [
-                    logcontext.run_in_background(prep, ev_info)
-                    for ev_info in event_infos
-                ],
+                [run_in_background(prep, ev_info) for ev_info in event_infos],
                 consumeErrors=True,
             )
         )
@@ -2106,10 +2107,10 @@ class FederationHandler(BaseHandler):
 
         room_version = yield self.store.get_room_version(event.room_id)
 
-        different_events = yield logcontext.make_deferred_yieldable(
+        different_events = yield make_deferred_yieldable(
             defer.gatherResults(
                 [
-                    logcontext.run_in_background(
+                    run_in_background(
                         self.store.get_event, d, allow_none=True, allow_rejected=False
                     )
                     for d in different_auth

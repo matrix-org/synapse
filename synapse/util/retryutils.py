@@ -17,7 +17,7 @@ import random
 
 from twisted.internet import defer
 
-import synapse.util.logcontext
+import synapse.logging.context
 from synapse.api.errors import CodeMessageException
 
 logger = logging.getLogger(__name__)
@@ -225,4 +225,4 @@ class RetryDestinationLimiter(object):
                 logger.exception("Failed to store destination_retry_timings")
 
         # we deliberately do this in the background.
-        synapse.util.logcontext.run_in_background(store_retry_timings)
+        synapse.logging.context.run_in_background(store_retry_timings)

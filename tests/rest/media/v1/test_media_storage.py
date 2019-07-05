@@ -24,11 +24,11 @@ from six.moves.urllib import parse
 
 from twisted.internet.defer import Deferred
 
+from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
-from synapse.util.logcontext import make_deferred_yieldable
 
 from tests import unittest
 
