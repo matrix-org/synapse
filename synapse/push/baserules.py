@@ -248,6 +248,18 @@ BASE_APPEND_OVERRIDE_RULES = [
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": True}],
     },
+    {
+        "rule_id": "global/override/.m.rule.reaction",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "m.reaction",
+                "_id": "_reaction",
+            }
+        ],
+        "actions": ["dont_notify"],
+    },
 ]
 
 
