@@ -523,6 +523,34 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             {RelationTypes.REPLACE: {"event_id": edit_event_id}},
         )
 
+    def test_aggregation_redaction_redacts_edits(self):
+        """Test that edits of an event are redacted when the original event
+        is redacted.
+
+        NOTE: This will delete the event with id self.parent_id and all
+        associated message edits. Be sure not to put any tests after this
+        that require those.
+        """
+
+        # Redact the original
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/%s/redact/%s/%s" % (self.room, self.parent_id, "some_transaction_id"),
+            access_token=self.user_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # TODO: Make this request 403 (will need to stick it in the new agg. MSC most likely)
+        # Try to check for remaining m.replace relations
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/unstable/rooms/%s/relations/%s/m.replace/m.room.message" % (self.room, self.parent_id),
+            access_token=self.user_token,
+        )
+        self.render(request)
+        self.assertEquals(403, channel.code, channel.json_body)
+
     def _send_relation(
         self, relation_type, event_type, key=None, content={}, access_token=None
     ):

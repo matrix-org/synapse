@@ -718,6 +718,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
 
     def register(self, http_server):
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)"
@@ -740,6 +741,28 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
             txn_id=txn_id,
         )
 
+        # Redact any m.replace relations of this event
+        relation_chunk = yield self.store.get_relations_for_event(
+            event_id,
+            relation_type="m.replace",
+            event_type="m.room.message",
+        )
+        relation_ids = relation_chunk.to_dict()
+
+        for relation_id in relation_ids:
+            self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.Redaction,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                    "redacts": relation_id,
+                },
+                txn_id=txn_id,
+            )
+
+        # Return the event_id of the original event's redaction
         defer.returnValue((200, {"event_id": event.event_id}))
 
     def on_PUT(self, request, room_id, event_id, txn_id):
