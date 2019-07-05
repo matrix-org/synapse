@@ -209,9 +209,7 @@ class AdminHandler(BaseHandler):
                     # Now check if this event is an unseen prev event, if so
                     # then we remove this event from the appropriate dicts.
                     for child_id in unseen_to_child_events.pop(event.event_id, []):
-                        event_to_unseen_prevs.get(child_id, set()).discard(
-                            event.event_id
-                        )
+                        event_to_unseen_prevs[child_id].discard(event.event_id)
 
                     written_events.add(event.event_id)
 
