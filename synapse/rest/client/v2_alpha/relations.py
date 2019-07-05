@@ -173,7 +173,7 @@ class RelationPaginationServlet(RestServlet):
         )
 
         now = self.clock.time_msec()
-        original_event = yield self._event_serializer.serialize_events(event, now)
+        original_event = yield self._event_serializer.serialize_event(event, now)
         events = yield self._event_serializer.serialize_events(events, now)
 
         return_value = result.to_dict()
