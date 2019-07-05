@@ -127,7 +127,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
         # We also expect to get the original event (the id of which is self.parent_id)
-        self.assertEquals(channel.json_body["original_event"]["event_id"], self.parent_id)
+        self.assertEquals(
+            channel.json_body["original_event"]["event_id"], self.parent_id
+        )
 
         # Make sure next_batch has something in it that looks like it could be a
         # valid token.
