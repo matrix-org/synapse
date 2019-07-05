@@ -1,9 +1,12 @@
-matrix-synapse-py3 (1.0.0+nmu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.1.0) stable; urgency=medium
 
   [ Silke Hofstra ]
   * Include systemd-python to allow logging to the systemd journal.
 
- -- Silke Hofstra <silke@slxh.eu>  Wed, 29 May 2019 09:45:29 +0200
+  [ Synapse Packaging team ]
+  * New synapse release 1.1.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 04 Jul 2019 11:43:41 +0100
 
 matrix-synapse-py3 (1.0.0) stable; urgency=medium
 
