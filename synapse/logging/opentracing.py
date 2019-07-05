@@ -365,15 +365,9 @@ def trace_defered_function(func):
     @wraps(func)
     @defer.inlineCallbacks
     def f(self, *args, **kwargs):
-        # Start scope
-        TracerUtil.start_active_span(func.__name__)
-        try:
+        with start_active_span(func.__name__):
             r = yield func(self, *args, **kwargs)
-        except:
-            raise
-        finally:
-            TracerUtil.close_active_span()
-        defer.returnValue(r)
+            defer.returnValue(r)
 
     return f
 
@@ -384,14 +378,9 @@ def trace_defered_function_using_operation_name(name):
         @defer.inlineCallbacks
         def f(self, *args, **kwargs):
             # Start scope
-            TracerUtil.start_active_span(name)
-            try:
+            with start_active_span(name):
                 r = yield func(self, *args, **kwargs)
-            except:
-                raise
-            finally:
-                TracerUtil.close_active_span()
-            defer.returnValue(r)
+                defer.returnValue(r)
 
         return f
 
@@ -431,12 +420,11 @@ def wrap_in_span(func):
     if not TracerUtil._opentracing:
         return func
 
-    span = TracerUtil._opentracing.tracer.start_span(
-        func.__name__, child_of=TracerUtil._opentracing.tracer.active_span
-    )
+    parent_span = opentracing.tracer.active_span
 
     @wraps(func)
     def f(self, *args, **kwargs):
+        span = opentracing.tracer.start_span(func.__name__, child_of=parent_span)
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
