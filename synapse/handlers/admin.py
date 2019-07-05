@@ -14,10 +14,6 @@
 # limitations under the License.
 
 import logging
-import os
-import tempfile
-
-from canonicaljson import json
 
 from twisted.internet import defer
 
