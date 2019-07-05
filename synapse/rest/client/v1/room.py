@@ -743,9 +743,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
 
         # Redact any m.replace relations of this event
         relation_chunk = yield self.store.get_relations_for_event(
-            event_id,
-            relation_type="m.replace",
-            event_type="m.room.message",
+            event_id, relation_type="m.replace", event_type="m.room.message"
         )
         relation_ids = relation_chunk.to_dict()
 

@@ -535,7 +535,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Redact the original
         request, channel = self.make_request(
             "PUT",
-            "/rooms/%s/redact/%s/%s" % (self.room, self.parent_id, "some_transaction_id"),
+            "/rooms/%s/redact/%s/%s"
+            % (self.room, self.parent_id, "some_transaction_id"),
             access_token=self.user_token,
         )
         self.render(request)
@@ -545,7 +546,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Try to check for remaining m.replace relations
         request, channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/relations/%s/m.replace/m.room.message" % (self.room, self.parent_id),
+            "/_matrix/client/unstable/rooms/%s/relations/%s/m.replace/m.room.message"
+            % (self.room, self.parent_id),
             access_token=self.user_token,
         )
         self.render(request)
