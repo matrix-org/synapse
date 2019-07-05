@@ -1030,8 +1030,9 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             )
             if too_complex is True:
                 raise SynapseError(
-                    code=400, msg=ROOM_COMPLEXITY_TOO_GREAT,
-                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED
+                    code=400,
+                    msg=ROOM_COMPLEXITY_TOO_GREAT,
+                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 )
 
         # We don't do an auth check if we are doing an invite
@@ -1058,18 +1059,14 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                 return
 
             # The room is too large. Leave.
-            requester = types.create_requester(
-                user, None, False, None
-            )
+            requester = types.create_requester(user, None, False, None)
             yield self.update_membership(
-                requester=requester,
-                target=user,
-                room_id=room_id,
-                action="leave"
+                requester=requester, target=user, room_id=room_id, action="leave"
             )
             raise SynapseError(
-                code=400, msg=ROOM_COMPLEXITY_TOO_GREAT,
-                errcode=Codes.RESOURCE_LIMIT_EXCEEDED
+                code=400,
+                msg=ROOM_COMPLEXITY_TOO_GREAT,
+                errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
             )
 
     @defer.inlineCallbacks

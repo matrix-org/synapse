@@ -94,8 +94,12 @@ class ContentRepositoryConfig(Config):
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
         if self.enable_media_repo:
-            self.media_store_path = self.ensure_directory(config.get("media_store_path", "media_store"))
-            self.uploads_path = self.ensure_directory(config.get("uploads_path", "uploads"))
+            self.media_store_path = self.ensure_directory(
+                config.get("media_store_path", "media_store")
+            )
+            self.uploads_path = self.ensure_directory(
+                config.get("uploads_path", "uploads")
+            )
         else:
             self.media_store_path = None
             self.uploads_path = None

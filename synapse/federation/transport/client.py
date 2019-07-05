@@ -945,14 +945,9 @@ class TransportLayerClient(object):
             destination (str): The remote server
             room_id (str): The room ID to ask about.
         """
-        path = _create_path(
-            FEDERATION_UNSTABLE_PREFIX, "/rooms/%s/complexity", room_id
-        )
+        path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/rooms/%s/complexity", room_id)
 
-        return self.client.get_json(
-            destination=destination,
-            path=path
-        )
+        return self.client.get_json(destination=destination, path=path)
 
 
 def _create_path(federation_prefix, path, *args):

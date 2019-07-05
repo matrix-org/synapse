@@ -1011,8 +1011,7 @@ class FederationClient(FederationBase):
         """
         try:
             complexity = yield self.transport_layer.get_room_complexity(
-                destination=destination,
-                room_id=room_id
+                destination=destination, room_id=room_id
             )
             defer.returnValue(complexity)
         except CodeMessageException as e:
@@ -1020,12 +1019,13 @@ class FederationClient(FederationBase):
             # servers don't give it to us.
             logger.debug(
                 "Failed to fetch room complexity via %s for %s, got a %d",
-                destination, room_id, e.code
+                destination,
+                room_id,
+                e.code,
             )
         except Exception:
             logger.exception(
-                "Failed to fetch room complexity via %s for %s",
-                destination, room_id
+                "Failed to fetch room complexity via %s for %s", destination, room_id
             )
 
         # If we don't manage to find it, return None. It's not an error if a
