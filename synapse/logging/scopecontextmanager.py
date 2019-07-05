@@ -17,6 +17,8 @@ import logging
 
 from opentracing import Scope, ScopeManager
 
+import twisted
+
 from synapse.logging.context import LoggingContext, nested_logging_context
 
 logger = logging.getLogger(__name__)
@@ -120,7 +122,10 @@ class _LogContextScope(Scope):
             self.logcontext.__enter__()
 
     def __exit__(self, type, value, traceback):
-        super(_LogContextScope, self).__exit__(type, value, traceback)
+        if type == twisted.internet.defer._DefGen_Return:
+            super(_LogContextScope, self).__exit__(None, None, None)
+        else:
+            super(_LogContextScope, self).__exit__(type, value, traceback)
         if self._enter_logcontext:
             self.logcontext.__exit__(type, value, traceback)
         else:  # the logcontext existed before the creation of the scope
