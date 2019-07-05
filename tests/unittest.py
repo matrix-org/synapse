@@ -23,7 +23,6 @@ from mock import Mock
 
 from canonicaljson import json
 
-import twisted
 from twisted.internet.defer import Deferred, succeed
 from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
