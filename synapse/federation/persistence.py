@@ -21,8 +21,6 @@ These actions are mostly only used by the :py:mod:`.replication` module.
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.logging.utils import log_function
 
 logger = logging.getLogger(__name__)
