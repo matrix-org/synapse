@@ -20,7 +20,8 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import LoggingContext
+from synapse.logging.context import LoggingContext
+from synapse.metrics import InFlightGauge
 
 logger = logging.getLogger(__name__)
 
@@ -29,21 +30,34 @@ block_counter = Counter("synapse_util_metrics_block_count", "", ["block_name"])
 block_timer = Counter("synapse_util_metrics_block_time_seconds", "", ["block_name"])
 
 block_ru_utime = Counter(
-    "synapse_util_metrics_block_ru_utime_seconds", "", ["block_name"])
+    "synapse_util_metrics_block_ru_utime_seconds", "", ["block_name"]
+)
 
 block_ru_stime = Counter(
-    "synapse_util_metrics_block_ru_stime_seconds", "", ["block_name"])
+    "synapse_util_metrics_block_ru_stime_seconds", "", ["block_name"]
+)
 
 block_db_txn_count = Counter(
-    "synapse_util_metrics_block_db_txn_count", "", ["block_name"])
+    "synapse_util_metrics_block_db_txn_count", "", ["block_name"]
+)
 
 # seconds spent waiting for db txns, excluding scheduling time, in this block
 block_db_txn_duration = Counter(
-    "synapse_util_metrics_block_db_txn_duration_seconds", "", ["block_name"])
+    "synapse_util_metrics_block_db_txn_duration_seconds", "", ["block_name"]
+)
 
 # seconds spent waiting for a db connection, in this block
 block_db_sched_duration = Counter(
-    "synapse_util_metrics_block_db_sched_duration_seconds", "", ["block_name"])
+    "synapse_util_metrics_block_db_sched_duration_seconds", "", ["block_name"]
+)
+
+# Tracks the number of blocks currently active
+in_flight = InFlightGauge(
+    "synapse_util_metrics_block_in_flight",
+    "",
+    labels=["block_name"],
+    sub_metrics=["real_time_max", "real_time_sum"],
+)
 
 
 def measure_func(name):
@@ -54,13 +68,18 @@ def measure_func(name):
             with Measure(self.clock, name):
                 r = yield func(self, *args, **kwargs)
             defer.returnValue(r)
+
         return measured_func
+
     return wrapper
 
 
 class Measure(object):
     __slots__ = [
-        "clock", "name", "start_context", "start",
+        "clock",
+        "name",
+        "start_context",
+        "start",
         "created_context",
         "start_usage",
     ]
@@ -82,9 +101,13 @@ class Measure(object):
 
         self.start_usage = self.start_context.get_resource_usage()
 
+        in_flight.register((self.name,), self._update_in_flight)
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if isinstance(exc_type, Exception) or not self.start_context:
             return
+
+        in_flight.unregister((self.name,), self._update_in_flight)
 
         duration = self.clock.time() - self.start
 
@@ -96,7 +119,9 @@ class Measure(object):
         if context != self.start_context:
             logger.warn(
                 "Context has unexpectedly changed from '%s' to '%s'. (%r)",
-                self.start_context, context, self.name
+                self.start_context,
+                context,
+                self.name,
             )
             return
 
@@ -114,9 +139,18 @@ class Measure(object):
             block_db_sched_duration.labels(self.name).inc(usage.db_sched_duration_sec)
         except ValueError:
             logger.warn(
-                "Failed to save metrics! OLD: %r, NEW: %r",
-                self.start_usage, current
+                "Failed to save metrics! OLD: %r, NEW: %r", self.start_usage, current
             )
 
         if self.created_context:
             self.start_context.__exit__(exc_type, exc_val, exc_tb)
+
+    def _update_in_flight(self, metrics):
+        """Gets called when processing in flight metrics
+        """
+        duration = self.clock.time() - self.start
+
+        metrics.real_time_max = max(metrics.real_time_max, duration)
+        metrics.real_time_sum += duration
+
+        # TODO: Add other in flight metrics.

@@ -12,14 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-CREATE TABLE IF NOT EXISTS server_tls_certificates(
-  server_name TEXT, -- Server name.
-  fingerprint TEXT, -- Certificate fingerprint.
-  from_server TEXT, -- Which key server the certificate was fetched from.
-  ts_added_ms BIGINT, -- When the certifcate was added.
-  tls_certificate bytea, -- DER encoded x509 certificate.
-  UNIQUE (server_name, fingerprint)
-);
+
+-- we used to create a table called server_tls_certificates, but this is no
+-- longer used, and is removed in delta 54.
 
 CREATE TABLE IF NOT EXISTS server_signature_keys(
   server_name TEXT, -- Server name.

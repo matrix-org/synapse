@@ -16,7 +16,7 @@
 from synapse.storage import DataStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
-from ._base import BaseSlavedStore
+from ._base import BaseSlavedStore, __func__
 from ._slaved_id_tracker import SlavedIdTracker
 
 
@@ -27,15 +27,16 @@ class SlavedGroupServerStore(BaseSlavedStore):
         self.hs = hs
 
         self._group_updates_id_gen = SlavedIdTracker(
-            db_conn, "local_group_updates", "stream_id",
+            db_conn, "local_group_updates", "stream_id"
         )
         self._group_updates_stream_cache = StreamChangeCache(
-            "_group_updates_stream_cache", self._group_updates_id_gen.get_current_token(),
+            "_group_updates_stream_cache",
+            self._group_updates_id_gen.get_current_token(),
         )
 
-    get_groups_changes_for_user = DataStore.get_groups_changes_for_user.__func__
-    get_group_stream_token = DataStore.get_group_stream_token.__func__
-    get_all_groups_for_user = DataStore.get_all_groups_for_user.__func__
+    get_groups_changes_for_user = __func__(DataStore.get_groups_changes_for_user)
+    get_group_stream_token = __func__(DataStore.get_group_stream_token)
+    get_all_groups_for_user = __func__(DataStore.get_all_groups_for_user)
 
     def stream_positions(self):
         result = super(SlavedGroupServerStore, self).stream_positions()
@@ -46,9 +47,7 @@ class SlavedGroupServerStore(BaseSlavedStore):
         if stream_name == "groups":
             self._group_updates_id_gen.advance(token)
             for row in rows:
-                self._group_updates_stream_cache.entity_has_changed(
-                    row.user_id, token
-                )
+                self._group_updates_stream_cache.entity_has_changed(row.user_id, token)
 
         return super(SlavedGroupServerStore, self).process_replication_rows(
             stream_name, token, rows

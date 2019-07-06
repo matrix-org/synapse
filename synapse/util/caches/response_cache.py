@@ -16,9 +16,9 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.util.async import ObservableDeferred
+from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches import register_cache
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +35,10 @@ class ResponseCache(object):
         self.pending_result_cache = {}  # Requests that haven't finished yet.
 
         self.clock = hs.get_clock()
-        self.timeout_sec = timeout_ms / 1000.
+        self.timeout_sec = timeout_ms / 1000.0
 
         self._name = name
-        self._metrics = register_cache(
-            "response_cache", name, self
-        )
+        self._metrics = register_cache("response_cache", name, self)
 
     def size(self):
         return len(self.pending_result_cache)
@@ -80,7 +78,7 @@ class ResponseCache(object):
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
         you should wrap normal synapse deferreds with
-        logcontext.run_in_background).
+        synapse.logging.context.run_in_background).
 
         Can return either a new Deferred (which also doesn't follow the synapse
         logcontext rules), or, if *deferred* was already complete, the actual
@@ -100,8 +98,7 @@ class ResponseCache(object):
         def remove(r):
             if self.timeout_sec:
                 self.clock.call_later(
-                    self.timeout_sec,
-                    self.pending_result_cache.pop, key, None,
+                    self.timeout_sec, self.pending_result_cache.pop, key, None
                 )
             else:
                 self.pending_result_cache.pop(key, None)
@@ -140,21 +137,22 @@ class ResponseCache(object):
 
             *args: positional parameters to pass to the callback, if it is used
 
-            **kwargs: named paramters to pass to the callback, if it is used
+            **kwargs: named parameters to pass to the callback, if it is used
 
         Returns:
             twisted.internet.defer.Deferred: yieldable result
         """
         result = self.get(key)
         if not result:
-            logger.info("[%s]: no cached result for [%s], calculating new one",
-                        self._name, key)
+            logger.info(
+                "[%s]: no cached result for [%s], calculating new one", self._name, key
+            )
             d = run_in_background(callback, *args, **kwargs)
             result = self.set(key, d)
         elif not isinstance(result, defer.Deferred) or result.called:
-            logger.info("[%s]: using completed cached result for [%s]",
-                        self._name, key)
+            logger.info("[%s]: using completed cached result for [%s]", self._name, key)
         else:
-            logger.info("[%s]: using incomplete cached result for [%s]",
-                        self._name, key)
+            logger.info(
+                "[%s]: using incomplete cached result for [%s]", self._name, key
+            )
         return make_deferred_yieldable(result)

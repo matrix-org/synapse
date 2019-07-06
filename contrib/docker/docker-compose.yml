@@ -6,8 +6,11 @@ version: '3'
 services:
 
   synapse:
+    build:
+        context: ../..
+        dockerfile: docker/Dockerfile
     image: docker.io/matrixdotorg/synapse:latest
-    # Since snyapse does not retry to connect to the database, restart upon
+    # Since synapse does not retry to connect to the database, restart upon
     # failure
     restart: unless-stopped
     # See the readme for a full documentation of the environment settings
@@ -34,7 +37,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.frontend.rule=Host:my.matrix.Host
-      - traefik.port=8448
+      - traefik.port=8008
 
   db:
     image: docker.io/postgres:10-alpine
@@ -46,4 +49,4 @@ services:
       # You may store the database tables in a local folder..
       - ./schemas:/var/lib/postgresql/data
       # .. or store them on some high performance storage for better results
-      # - /path/to/ssd/storage:/var/lib/postfesql/data
+      # - /path/to/ssd/storage:/var/lib/postgresql/data

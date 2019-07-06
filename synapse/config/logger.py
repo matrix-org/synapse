@@ -15,7 +15,6 @@
 import logging
 import logging.config
 import os
-import signal
 import sys
 from string import Template
 
@@ -24,12 +23,14 @@ import yaml
 from twisted.logger import STDLibLogObserver, globalLogBeginner
 
 import synapse
-from synapse.util.logcontext import LoggingContextFilter
+from synapse.app import _base as appbase
+from synapse.logging.context import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config
 
-DEFAULT_LOG_CONFIG = Template("""
+DEFAULT_LOG_CONFIG = Template(
+    """
 version: 1
 
 formatters:
@@ -39,7 +40,7 @@ formatters:
 
 filters:
     context:
-        (): synapse.util.logcontext.LoggingContextFilter
+        (): synapse.logging.context.LoggingContextFilter
         request: ""
 
 handlers:
@@ -50,6 +51,7 @@ handlers:
         maxBytes: 104857600
         backupCount: 10
         filters: [context]
+        encoding: utf8
     console:
         class: logging.StreamHandler
         formatter: precise
@@ -67,25 +69,29 @@ loggers:
 root:
     level: INFO
     handlers: [file, console]
-""")
+"""
+)
 
 
 class LoggingConfig(Config):
-
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.verbosity = config.get("verbose", 0)
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
         self.log_config = self.abspath(config.get("log_config"))
         self.log_file = self.abspath(config.get("log_file"))
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
-        log_config = self.abspath(
-            os.path.join(config_dir_path, server_name + ".log.config")
-        )
-        return """
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+        log_config = os.path.join(config_dir_path, server_name + ".log.config")
+        return (
+            """\
+        ## Logging ##
+
         # A yaml python logging config file
+        #
         log_config: "%(log_config)s"
-        """ % locals()
+        """
+            % locals()
+        )
 
     def read_arguments(self, args):
         if args.verbose is not None:
@@ -100,32 +106,43 @@ class LoggingConfig(Config):
     def add_arguments(cls, parser):
         logging_group = parser.add_argument_group("logging")
         logging_group.add_argument(
-            '-v', '--verbose', dest="verbose", action='count',
+            "-v",
+            "--verbose",
+            dest="verbose",
+            action="count",
             help="The verbosity level. Specify multiple times to increase "
-            "verbosity. (Ignored if --log-config is specified.)"
+            "verbosity. (Ignored if --log-config is specified.)",
         )
         logging_group.add_argument(
-            '-f', '--log-file', dest="log_file",
-            help="File to log to. (Ignored if --log-config is specified.)"
+            "-f",
+            "--log-file",
+            dest="log_file",
+            help="File to log to. (Ignored if --log-config is specified.)",
         )
         logging_group.add_argument(
-            '--log-config', dest="log_config", default=None,
-            help="Python logging config file"
+            "--log-config",
+            dest="log_config",
+            default=None,
+            help="Python logging config file",
         )
         logging_group.add_argument(
-            '-n', '--no-redirect-stdio',
-            action='store_true', default=None,
-            help="Do not redirect stdout/stderr to the log"
+            "-n",
+            "--no-redirect-stdio",
+            action="store_true",
+            default=None,
+            help="Do not redirect stdout/stderr to the log",
         )
 
-    def generate_files(self, config):
+    def generate_files(self, config, config_dir_path):
         log_config = config.get("log_config")
         if log_config and not os.path.exists(log_config):
             log_file = self.abspath("homeserver.log")
+            print(
+                "Generating log config file %s which will log to %s"
+                % (log_config, log_file)
+            )
             with open(log_config, "w") as log_config_file:
-                log_config_file.write(
-                    DEFAULT_LOG_CONFIG.substitute(log_file=log_file)
-                )
+                log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
 def setup_logging(config, use_worker_options=False):
@@ -137,11 +154,12 @@ def setup_logging(config, use_worker_options=False):
 
         use_worker_options (bool): True to use 'worker_log_config' and
             'worker_log_file' options instead of 'log_config' and 'log_file'.
+
+        register_sighup (func | None): Function to call to register a
+            sighup handler.
     """
-    log_config = (config.worker_log_config if use_worker_options
-                  else config.log_config)
-    log_file = (config.worker_log_file if use_worker_options
-                else config.log_file)
+    log_config = config.worker_log_config if use_worker_options else config.log_config
+    log_file = config.worker_log_file if use_worker_options else config.log_file
 
     log_format = (
         "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
@@ -159,26 +177,27 @@ def setup_logging(config, use_worker_options=False):
             if config.verbosity > 1:
                 level_for_storage = logging.DEBUG
 
-        logger = logging.getLogger('')
+        logger = logging.getLogger("")
         logger.setLevel(level)
 
-        logging.getLogger('synapse.storage.SQL').setLevel(level_for_storage)
+        logging.getLogger("synapse.storage.SQL").setLevel(level_for_storage)
 
         formatter = logging.Formatter(log_format)
         if log_file:
             # TODO: Customisable file size / backup count
             handler = logging.handlers.RotatingFileHandler(
-                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
+                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3, encoding="utf8"
             )
 
             def sighup(signum, stack):
                 logger.info("Closing log file due to SIGHUP")
                 handler.doRollover()
                 logger.info("Opened new log file due to SIGHUP")
+
         else:
             handler = logging.StreamHandler()
 
-            def sighup(signum, stack):
+            def sighup(*args):
                 pass
 
         handler.setFormatter(formatter)
@@ -187,33 +206,24 @@ def setup_logging(config, use_worker_options=False):
 
         logger.addHandler(handler)
     else:
-        def load_log_config():
-            with open(log_config, 'r') as f:
-                logging.config.dictConfig(yaml.load(f))
 
-        def sighup(signum, stack):
+        def load_log_config():
+            with open(log_config, "r") as f:
+                logging.config.dictConfig(yaml.safe_load(f))
+
+        def sighup(*args):
             # it might be better to use a file watcher or something for this.
-            logging.info("Reloading log config from %s due to SIGHUP",
-                         log_config)
             load_log_config()
+            logging.info("Reloaded log config from %s due to SIGHUP", log_config)
 
         load_log_config()
 
-    # TODO(paul): obviously this is a terrible mechanism for
-    #   stealing SIGHUP, because it means no other part of synapse
-    #   can use it instead. If we want to catch SIGHUP anywhere
-    #   else as well, I'd suggest we find a nicer way to broadcast
-    #   it around.
-    if getattr(signal, "SIGHUP"):
-        signal.signal(signal.SIGHUP, sighup)
+    appbase.register_sighup(sighup)
 
     # make sure that the first thing we log is a thing we can grep backwards
     # for
     logging.warn("***** STARTING SERVER *****")
-    logging.warn(
-        "Server %s version %s",
-        sys.argv[0], get_version_string(synapse),
-    )
+    logging.warn("Server %s version %s", sys.argv[0], get_version_string(synapse))
     logging.info("Server hostname: %s", config.server_name)
 
     # It's critical to point twisted's internal logging somewhere, otherwise it
@@ -227,7 +237,23 @@ def setup_logging(config, use_worker_options=False):
     #
     # However this may not be too much of a problem if we are just writing to a file.
     observer = STDLibLogObserver()
+
+    def _log(event):
+
+        if "log_text" in event:
+            if event["log_text"].startswith("DNSDatagramProtocol starting on "):
+                return
+
+            if event["log_text"].startswith("(UDP Port "):
+                return
+
+            if event["log_text"].startswith("Timing out client"):
+                return
+
+        return observer(event)
+
     globalLogBeginner.beginLoggingTo(
-        [observer],
-        redirectStandardIO=not config.no_redirect_stdio,
+        [_log], redirectStandardIO=not config.no_redirect_stdio
     )
+    if not config.no_redirect_stdio:
+        print("Redirected stdout/stderr to logs")

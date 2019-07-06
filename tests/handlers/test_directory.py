@@ -18,7 +18,9 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from synapse.config.room_directory import RoomDirectoryConfig
 from synapse.handlers.directory import DirectoryHandler
+from synapse.rest.client.v1 import directory, room
 from synapse.types import RoomAlias
 
 from tests import unittest
@@ -42,9 +44,11 @@ class DirectoryTestCase(unittest.TestCase):
 
         def register_query_handler(query_type, handler):
             self.query_handlers[query_type] = handler
+
         self.mock_registry.register_query_handler = register_query_handler
 
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             http_client=None,
             resource_for_federation=Mock(),
             federation_client=self.mock_federation,
@@ -68,10 +72,7 @@ class DirectoryTestCase(unittest.TestCase):
 
         result = yield self.handler.get_association(self.my_room)
 
-        self.assertEquals({
-            "room_id": "!8765qwer:test",
-            "servers": ["test"],
-        }, result)
+        self.assertEquals({"room_id": "!8765qwer:test", "servers": ["test"]}, result)
 
     @defer.inlineCallbacks
     def test_get_remote_association(self):
@@ -81,16 +82,13 @@ class DirectoryTestCase(unittest.TestCase):
 
         result = yield self.handler.get_association(self.remote_room)
 
-        self.assertEquals({
-            "room_id": "!8765qwer:test",
-            "servers": ["test", "remote"],
-        }, result)
+        self.assertEquals(
+            {"room_id": "!8765qwer:test", "servers": ["test", "remote"]}, result
+        )
         self.mock_federation.make_query.assert_called_with(
             destination="remote",
             query_type="directory",
-            args={
-                "room_alias": "#another:remote",
-            },
+            args={"room_alias": "#another:remote"},
             retry_on_dns_fail=False,
             ignore_backoff=True,
         )
@@ -105,7 +103,94 @@ class DirectoryTestCase(unittest.TestCase):
             {"room_alias": "#your-room:test"}
         )
 
-        self.assertEquals({
-            "room_id": "!8765asdf:test",
-            "servers": ["test"],
-        }, response)
+        self.assertEquals({"room_id": "!8765asdf:test", "servers": ["test"]}, response)
+
+
+class TestCreateAliasACL(unittest.HomeserverTestCase):
+    user_id = "@test:test"
+
+    servlets = [directory.register_servlets, room.register_servlets]
+
+    def prepare(self, reactor, clock, hs):
+        # We cheekily override the config to add custom alias creation rules
+        config = {}
+        config["alias_creation_rules"] = [
+            {"user_id": "*", "alias": "#unofficial_*", "action": "allow"}
+        ]
+        config["room_list_publication_rules"] = []
+
+        rd_config = RoomDirectoryConfig()
+        rd_config.read_config(config)
+
+        self.hs.config.is_alias_creation_allowed = rd_config.is_alias_creation_allowed
+
+        return hs
+
+    def test_denied(self):
+        room_id = self.helper.create_room_as(self.user_id)
+
+        request, channel = self.make_request(
+            "PUT",
+            b"directory/room/%23test%3Atest",
+            ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
+        )
+        self.render(request)
+        self.assertEquals(403, channel.code, channel.result)
+
+    def test_allowed(self):
+        room_id = self.helper.create_room_as(self.user_id)
+
+        request, channel = self.make_request(
+            "PUT",
+            b"directory/room/%23unofficial_test%3Atest",
+            ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+
+
+class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
+    user_id = "@test:test"
+
+    servlets = [directory.register_servlets, room.register_servlets]
+
+    def prepare(self, reactor, clock, hs):
+        room_id = self.helper.create_room_as(self.user_id)
+
+        request, channel = self.make_request(
+            "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+
+        self.room_list_handler = hs.get_room_list_handler()
+        self.directory_handler = hs.get_handlers().directory_handler
+
+        return hs
+
+    def test_disabling_room_list(self):
+        self.room_list_handler.enable_room_list_search = True
+        self.directory_handler.enable_room_list_search = True
+
+        # Room list is enabled so we should get some results
+        request, channel = self.make_request("GET", b"publicRooms")
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertTrue(len(channel.json_body["chunk"]) > 0)
+
+        self.room_list_handler.enable_room_list_search = False
+        self.directory_handler.enable_room_list_search = False
+
+        # Room list disabled so we should get no results
+        request, channel = self.make_request("GET", b"publicRooms")
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertTrue(len(channel.json_body["chunk"]) == 0)
+
+        # Room list disabled so we shouldn't be allowed to publish rooms
+        room_id = self.helper.create_room_as(self.user_id)
+        request, channel = self.make_request(
+            "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
+        )
+        self.render(request)
+        self.assertEquals(403, channel.code, channel.result)

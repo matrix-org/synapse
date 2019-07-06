@@ -7,10 +7,9 @@ from tests.utils import setup_test_homeserver
 
 
 class BackgroundUpdateTestCase(unittest.TestCase):
-
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver()  # type: synapse.server.HomeServer
+        hs = yield setup_test_homeserver(self.addCleanup)
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
@@ -51,9 +50,7 @@ class BackgroundUpdateTestCase(unittest.TestCase):
         yield self.store.start_background_update("test_update", {"my_key": 1})
 
         self.update_handler.reset_mock()
-        result = yield self.store.do_next_background_update(
-            duration_ms * desired_count
-        )
+        result = yield self.store.do_next_background_update(duration_ms * desired_count)
         self.assertIsNotNone(result)
         self.update_handler.assert_called_once_with(
             {"my_key": 1}, self.store.DEFAULT_BACKGROUND_BATCH_SIZE
@@ -67,18 +64,12 @@ class BackgroundUpdateTestCase(unittest.TestCase):
 
         self.update_handler.side_effect = update
         self.update_handler.reset_mock()
-        result = yield self.store.do_next_background_update(
-            duration_ms * desired_count
-        )
+        result = yield self.store.do_next_background_update(duration_ms * desired_count)
         self.assertIsNotNone(result)
-        self.update_handler.assert_called_once_with(
-            {"my_key": 2}, desired_count
-        )
+        self.update_handler.assert_called_once_with({"my_key": 2}, desired_count)
 
         # third step: we don't expect to be called any more
         self.update_handler.reset_mock()
-        result = yield self.store.do_next_background_update(
-            duration_ms * desired_count
-        )
+        result = yield self.store.do_next_background_update(duration_ms * desired_count)
         self.assertIsNone(result)
         self.assertFalse(self.update_handler.called)

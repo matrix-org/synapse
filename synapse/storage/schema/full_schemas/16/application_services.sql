@@ -13,22 +13,11 @@
  * limitations under the License.
  */
 
-CREATE TABLE IF NOT EXISTS application_services(
-    id BIGINT PRIMARY KEY,
-    url TEXT,
-    token TEXT,
-    hs_token TEXT,
-    sender TEXT,
-    UNIQUE(token)
-);
+/* We used to create tables called application_services and
+ * application_services_regex, but these are no longer used and are removed in
+ * delta 54.
+ */
 
-CREATE TABLE IF NOT EXISTS application_services_regex(
-    id BIGINT PRIMARY KEY,
-    as_id BIGINT NOT NULL,
-    namespace INTEGER,  /* enum[room_id|room_alias|user_id] */
-    regex TEXT,
-    FOREIGN KEY(as_id) REFERENCES application_services(id)
-);
 
 CREATE TABLE IF NOT EXISTS application_services_state(
     as_id TEXT PRIMARY KEY,

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,58 +18,72 @@
 """Contains constants from the specification."""
 
 # the "depth" field on events is limited to 2**63 - 1
-MAX_DEPTH = 2**63 - 1
+MAX_DEPTH = 2 ** 63 - 1
+
+# the maximum length for a room alias is 255 characters
+MAX_ALIAS_LENGTH = 255
+
+# the maximum length for a user id is 255 characters
+MAX_USERID_LENGTH = 255
 
 
 class Membership(object):
 
     """Represents the membership states of a user in a room."""
-    INVITE = u"invite"
-    JOIN = u"join"
-    KNOCK = u"knock"
-    LEAVE = u"leave"
-    BAN = u"ban"
+
+    INVITE = "invite"
+    JOIN = "join"
+    KNOCK = "knock"
+    LEAVE = "leave"
+    BAN = "ban"
     LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
 
 
 class PresenceState(object):
     """Represents the presence state of a user."""
-    OFFLINE = u"offline"
-    UNAVAILABLE = u"unavailable"
-    ONLINE = u"online"
+
+    OFFLINE = "offline"
+    UNAVAILABLE = "unavailable"
+    ONLINE = "online"
 
 
 class JoinRules(object):
-    PUBLIC = u"public"
-    KNOCK = u"knock"
-    INVITE = u"invite"
-    PRIVATE = u"private"
+    PUBLIC = "public"
+    KNOCK = "knock"
+    INVITE = "invite"
+    PRIVATE = "private"
 
 
 class LoginType(object):
-    PASSWORD = u"m.login.password"
-    EMAIL_IDENTITY = u"m.login.email.identity"
-    MSISDN = u"m.login.msisdn"
-    RECAPTCHA = u"m.login.recaptcha"
-    DUMMY = u"m.login.dummy"
+    PASSWORD = "m.login.password"
+    EMAIL_IDENTITY = "m.login.email.identity"
+    MSISDN = "m.login.msisdn"
+    RECAPTCHA = "m.login.recaptcha"
+    TERMS = "m.login.terms"
+    DUMMY = "m.login.dummy"
 
     # Only for C/S API v1
-    APPLICATION_SERVICE = u"m.login.application_service"
-    SHARED_SECRET = u"org.matrix.login.shared_secret"
+    APPLICATION_SERVICE = "m.login.application_service"
+    SHARED_SECRET = "org.matrix.login.shared_secret"
 
 
 class EventTypes(object):
     Member = "m.room.member"
     Create = "m.room.create"
+    Tombstone = "m.room.tombstone"
     JoinRules = "m.room.join_rules"
     PowerLevels = "m.room.power_levels"
     Aliases = "m.room.aliases"
     Redaction = "m.room.redaction"
     ThirdPartyInvite = "m.room.third_party_invite"
+    Encryption = "m.room.encryption"
+    RelatedGroups = "m.room.related_groups"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
+    Encryption = "m.room.encryption"
     RoomAvatar = "m.room.avatar"
+    RoomEncryption = "m.room.encryption"
     GuestAccess = "m.room.guest_access"
 
     # These are used for validation
@@ -77,6 +92,7 @@ class EventTypes(object):
     Name = "m.room.name"
 
     ServerACL = "m.room.server_acl"
+    Pinned = "m.room.pinned_events"
 
 
 class RejectedReason(object):
@@ -94,3 +110,25 @@ class RoomCreationPreset(object):
 class ThirdPartyEntityKind(object):
     USER = "user"
     LOCATION = "location"
+
+
+ServerNoticeMsgType = "m.server_notice"
+ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
+
+
+class UserTypes(object):
+    """Allows for user type specific behaviour. With the benefit of hindsight
+    'admin' and 'guest' users should also be UserTypes. Normal users are type None
+    """
+
+    SUPPORT = "support"
+    ALL_USER_TYPES = (SUPPORT,)
+
+
+class RelationTypes(object):
+    """The types of relations known to this server.
+    """
+
+    ANNOTATION = "m.annotation"
+    REPLACE = "m.replace"
+    REFERENCE = "m.reference"

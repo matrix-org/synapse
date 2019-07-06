@@ -30,6 +30,7 @@ class ConsentServerNotices(object):
     """Keeps track of whether we need to send users server_notices about
     privacy policy consent, and sends one if we do.
     """
+
     def __init__(self, hs):
         """
 
@@ -49,12 +50,11 @@ class ConsentServerNotices(object):
             if not self._server_notices_manager.is_enabled():
                 raise ConfigError(
                     "user_consent configuration requires server notices, but "
-                    "server notices are not enabled.",
+                    "server notices are not enabled."
                 )
-            if 'body' not in self._server_notice_content:
+            if "body" not in self._server_notice_content:
                 raise ConfigError(
-                    "user_consent server_notice_consent must contain a 'body' "
-                    "key.",
+                    "user_consent server_notice_consent must contain a 'body' " "key."
                 )
 
             self._consent_uri_builder = ConsentURIBuilder(hs.config)
@@ -95,18 +95,14 @@ class ConsentServerNotices(object):
             # need to send a message.
             try:
                 consent_uri = self._consent_uri_builder.build_user_consent_uri(
-                    get_localpart_from_id(user_id),
+                    get_localpart_from_id(user_id)
                 )
                 content = copy_with_str_subst(
-                    self._server_notice_content, {
-                        'consent_uri': consent_uri,
-                    },
+                    self._server_notice_content, {"consent_uri": consent_uri}
                 )
-                yield self._server_notices_manager.send_notice(
-                    user_id, content,
-                )
+                yield self._server_notices_manager.send_notice(user_id, content)
                 yield self._store.user_set_consent_server_notice_sent(
-                    user_id, self._current_consent_version,
+                    user_id, self._current_consent_version
                 )
             except SynapseError as e:
                 logger.error("Error sending server notice about user consent: %s", e)
@@ -128,9 +124,7 @@ def copy_with_str_subst(x, substitutions):
     if isinstance(x, string_types):
         return x % substitutions
     if isinstance(x, dict):
-        return {
-            k: copy_with_str_subst(v, substitutions) for (k, v) in iteritems(x)
-        }
+        return {k: copy_with_str_subst(v, substitutions) for (k, v) in iteritems(x)}
     if isinstance(x, (list, tuple)):
         return [copy_with_str_subst(y) for y in x]
 

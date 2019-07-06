@@ -26,7 +26,7 @@ from synapse.http.servlet import (
 )
 from synapse.types import StreamToken
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,8 @@ class KeyUploadServlet(RestServlet):
       },
     }
     """
-    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
+
+    PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
     def __init__(self, hs):
         """
@@ -76,18 +77,19 @@ class KeyUploadServlet(RestServlet):
         if device_id is not None:
             # passing the device_id here is deprecated; however, we allow it
             # for now for compatibility with older clients.
-            if (requester.device_id is not None and
-                    device_id != requester.device_id):
-                logger.warning("Client uploading keys for a different device "
-                               "(logged in as %s, uploading for %s)",
-                               requester.device_id, device_id)
+            if requester.device_id is not None and device_id != requester.device_id:
+                logger.warning(
+                    "Client uploading keys for a different device "
+                    "(logged in as %s, uploading for %s)",
+                    requester.device_id,
+                    device_id,
+                )
         else:
             device_id = requester.device_id
 
         if device_id is None:
             raise SynapseError(
-                400,
-                "To upload keys, you must pass device_id when authenticating"
+                400, "To upload keys, you must pass device_id when authenticating"
             )
 
         result = yield self.e2e_keys_handler.upload_keys_for_user(
@@ -130,7 +132,7 @@ class KeyQueryServlet(RestServlet):
     } } } } } }
     """
 
-    PATTERNS = client_v2_patterns("/keys/query$")
+    PATTERNS = client_patterns("/keys/query$")
 
     def __init__(self, hs):
         """
@@ -159,7 +161,8 @@ class KeyChangesServlet(RestServlet):
         200 OK
         { "changed": ["@foo:example.com"] }
     """
-    PATTERNS = client_v2_patterns("/keys/changes$")
+
+    PATTERNS = client_patterns("/keys/changes$")
 
     def __init__(self, hs):
         """
@@ -184,9 +187,7 @@ class KeyChangesServlet(RestServlet):
 
         user_id = requester.user.to_string()
 
-        results = yield self.device_handler.get_user_ids_changed(
-            user_id, from_token,
-        )
+        results = yield self.device_handler.get_user_ids_changed(user_id, from_token)
 
         defer.returnValue((200, results))
 
@@ -209,7 +210,8 @@ class OneTimeKeyServlet(RestServlet):
     } } } }
 
     """
-    PATTERNS = client_v2_patterns("/keys/claim$")
+
+    PATTERNS = client_patterns("/keys/claim$")
 
     def __init__(self, hs):
         super(OneTimeKeyServlet, self).__init__()
@@ -221,10 +223,7 @@ class OneTimeKeyServlet(RestServlet):
         yield self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
-        result = yield self.e2e_keys_handler.claim_one_time_keys(
-            body,
-            timeout,
-        )
+        result = yield self.e2e_keys_handler.claim_one_time_keys(body, timeout)
         defer.returnValue((200, result))
 
 

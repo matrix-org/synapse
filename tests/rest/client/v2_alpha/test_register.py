@@ -1,193 +1,512 @@
+# -*- coding: utf-8 -*-
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import datetime
 import json
+import os
 
-from mock import Mock
+import pkg_resources
 
-from twisted.python import failure
-from twisted.test.proto_helpers import MemoryReactorClock
-
-from synapse.api.errors import InteractiveAuthIncompleteError
-from synapse.http.server import JsonResource
-from synapse.rest.client.v2_alpha.register import register_servlets
-from synapse.util import Clock
+import synapse.rest.admin
+from synapse.api.constants import LoginType
+from synapse.api.errors import Codes
+from synapse.appservice import ApplicationService
+from synapse.rest.client.v1 import login
+from synapse.rest.client.v2_alpha import account, account_validity, register, sync
 
 from tests import unittest
-from tests.server import make_request, setup_test_homeserver, wait_until_result
 
 
-class RegisterRestServletTestCase(unittest.TestCase):
-    def setUp(self):
+class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
-        self.clock = MemoryReactorClock()
-        self.hs_clock = Clock(self.clock)
+    servlets = [register.register_servlets]
+
+    def make_homeserver(self, reactor, clock):
+
         self.url = b"/_matrix/client/r0/register"
 
-        self.appservice = None
-        self.auth = Mock(
-            get_appservice_by_req=Mock(side_effect=lambda x: self.appservice)
-        )
-
-        self.auth_result = failure.Failure(InteractiveAuthIncompleteError(None))
-        self.auth_handler = Mock(
-            check_auth=Mock(side_effect=lambda x, y, z: self.auth_result),
-            get_session_data=Mock(return_value=None),
-        )
-        self.registration_handler = Mock()
-        self.identity_handler = Mock()
-        self.login_handler = Mock()
-        self.device_handler = Mock()
-        self.device_handler.check_device_registered = Mock(return_value="FAKE")
-
-        self.datastore = Mock(return_value=Mock())
-        self.datastore.get_current_state_deltas = Mock(return_value=[])
-
-        # do the dance to hook it up to the hs global
-        self.handlers = Mock(
-            registration_handler=self.registration_handler,
-            identity_handler=self.identity_handler,
-            login_handler=self.login_handler,
-        )
-        self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
-        )
-        self.hs.get_auth = Mock(return_value=self.auth)
-        self.hs.get_handlers = Mock(return_value=self.handlers)
-        self.hs.get_auth_handler = Mock(return_value=self.auth_handler)
-        self.hs.get_device_handler = Mock(return_value=self.device_handler)
-        self.hs.get_datastore = Mock(return_value=self.datastore)
+        self.hs = self.setup_test_homeserver()
         self.hs.config.enable_registration = True
         self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
+        self.hs.config.enable_registration_captcha = False
+        self.hs.config.allow_guest_access = True
 
-        self.resource = JsonResource(self.hs)
-        register_servlets(self.hs, self.resource)
+        return self.hs
 
     def test_POST_appservice_registration_valid(self):
-        user_id = "@kermit:muppet"
-        token = "kermits_access_token"
-        self.appservice = {"id": "1234"}
-        self.registration_handler.appservice_register = Mock(return_value=user_id)
-        self.auth_handler.get_access_token_for_user_id = Mock(return_value=token)
-        request_data = json.dumps({"username": "kermit"})
+        user_id = "@as_user_kermit:test"
+        as_token = "i_am_an_app_service"
 
-        request, channel = make_request(
+        appservice = ApplicationService(
+            as_token,
+            self.hs.config.server_name,
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+        )
+
+        self.hs.get_datastore().services_cache.append(appservice)
+        request_data = json.dumps({"username": "as_user_kermit"})
+
+        request, channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
-        det_data = {
-            "user_id": user_id,
-            "access_token": token,
-            "home_server": self.hs.hostname,
-        }
-        self.assertDictContainsSubset(det_data, json.loads(channel.result["body"]))
+        det_data = {"user_id": user_id, "home_server": self.hs.hostname}
+        self.assertDictContainsSubset(det_data, channel.json_body)
 
     def test_POST_appservice_registration_invalid(self):
         self.appservice = None  # no application service exists
         request_data = json.dumps({"username": "kermit"})
-        request, channel = make_request(
+        request, channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        self.render(request)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)
 
     def test_POST_bad_password(self):
         request_data = json.dumps({"username": "kermit", "password": 666})
-        request, channel = make_request(b"POST", self.url, request_data)
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        request, channel = self.make_request(b"POST", self.url, request_data)
+        self.render(request)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"], "Invalid password"
-        )
+        self.assertEquals(channel.json_body["error"], "Invalid password")
 
     def test_POST_bad_username(self):
         request_data = json.dumps({"username": 777, "password": "monkey"})
-        request, channel = make_request(b"POST", self.url, request_data)
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        request, channel = self.make_request(b"POST", self.url, request_data)
+        self.render(request)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"], "Invalid username"
-        )
+        self.assertEquals(channel.json_body["error"], "Invalid username")
 
     def test_POST_user_valid(self):
-        user_id = "@kermit:muppet"
-        token = "kermits_access_token"
+        user_id = "@kermit:test"
         device_id = "frogfone"
-        request_data = json.dumps(
-            {"username": "kermit", "password": "monkey", "device_id": device_id}
-        )
-        self.registration_handler.check_username = Mock(return_value=True)
-        self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)
-        self.registration_handler.register = Mock(return_value=(user_id, None))
-        self.auth_handler.get_access_token_for_user_id = Mock(return_value=token)
-        self.device_handler.check_device_registered = Mock(return_value=device_id)
-
-        request, channel = make_request(b"POST", self.url, request_data)
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        params = {
+            "username": "kermit",
+            "password": "monkey",
+            "device_id": device_id,
+            "auth": {"type": LoginType.DUMMY},
+        }
+        request_data = json.dumps(params)
+        request, channel = self.make_request(b"POST", self.url, request_data)
+        self.render(request)
 
         det_data = {
             "user_id": user_id,
-            "access_token": token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
         self.assertEquals(channel.result["code"], b"200", channel.result)
-        self.assertDictContainsSubset(det_data, json.loads(channel.result["body"]))
-        self.auth_handler.get_login_tuple_for_user_id(
-            user_id, device_id=device_id, initial_device_display_name=None
-        )
+        self.assertDictContainsSubset(det_data, channel.json_body)
 
     def test_POST_disabled_registration(self):
         self.hs.config.enable_registration = False
         request_data = json.dumps({"username": "kermit", "password": "monkey"})
-        self.registration_handler.check_username = Mock(return_value=True)
         self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)
-        self.registration_handler.register = Mock(return_value=("@user:id", "t"))
 
-        request, channel = make_request(b"POST", self.url, request_data)
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        request, channel = self.make_request(b"POST", self.url, request_data)
+        self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"],
-            "Registration has been disabled",
-        )
+        self.assertEquals(channel.json_body["error"], "Registration has been disabled")
 
     def test_POST_guest_registration(self):
-        user_id = "a@b"
         self.hs.config.macaroon_secret_key = "test"
         self.hs.config.allow_guest_access = True
-        self.registration_handler.register = Mock(return_value=(user_id, None))
 
-        request, channel = make_request(b"POST", self.url + b"?kind=guest", b"{}")
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        self.render(request)
 
-        det_data = {
-            "user_id": user_id,
-            "home_server": self.hs.hostname,
-            "device_id": "guest_device",
-        }
+        det_data = {"home_server": self.hs.hostname, "device_id": "guest_device"}
         self.assertEquals(channel.result["code"], b"200", channel.result)
-        self.assertDictContainsSubset(det_data, json.loads(channel.result["body"]))
+        self.assertDictContainsSubset(det_data, channel.json_body)
 
     def test_POST_disabled_guest_registration(self):
         self.hs.config.allow_guest_access = False
 
-        request, channel = make_request(b"POST", self.url + b"?kind=guest", b"{}")
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEquals(channel.json_body["error"], "Guest access is disabled")
+
+    def test_POST_ratelimiting_guest(self):
+        self.hs.config.rc_registration.burst_count = 5
+        self.hs.config.rc_registration.per_second = 0.17
+
+        for i in range(0, 6):
+            url = self.url + b"?kind=guest"
+            request, channel = self.make_request(b"POST", url, b"{}")
+            self.render(request)
+
+            if i == 5:
+                self.assertEquals(channel.result["code"], b"429", channel.result)
+                retry_after_ms = int(channel.json_body["retry_after_ms"])
+            else:
+                self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(retry_after_ms / 1000.0)
+
+        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_POST_ratelimiting(self):
+        self.hs.config.rc_registration.burst_count = 5
+        self.hs.config.rc_registration.per_second = 0.17
+
+        for i in range(0, 6):
+            params = {
+                "username": "kermit" + str(i),
+                "password": "monkey",
+                "device_id": "frogfone",
+                "auth": {"type": LoginType.DUMMY},
+            }
+            request_data = json.dumps(params)
+            request, channel = self.make_request(b"POST", self.url, request_data)
+            self.render(request)
+
+            if i == 5:
+                self.assertEquals(channel.result["code"], b"429", channel.result)
+                retry_after_ms = int(channel.json_body["retry_after_ms"])
+            else:
+                self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(retry_after_ms / 1000.0)
+
+        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+
+class AccountValidityTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        register.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        sync.register_servlets,
+        account_validity.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        # Test for account expiring after a week.
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": True,
+            "period": 604800000,  # Time in ms for 1 week
+        }
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def test_validity_period(self):
+        self.register_user("kermit", "monkey")
+        tok = self.login("kermit", "monkey")
+
+        # The specific endpoint doesn't matter, all we need is an authenticated
+        # endpoint.
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(datetime.timedelta(weeks=1).total_seconds())
+
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(
-            json.loads(channel.result["body"])["error"], "Guest access is disabled"
+            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
         )
+
+    def test_manual_renewal(self):
+        user_id = self.register_user("kermit", "monkey")
+        tok = self.login("kermit", "monkey")
+
+        self.reactor.advance(datetime.timedelta(weeks=1).total_seconds())
+
+        # If we register the admin user at the beginning of the test, it will
+        # expire at the same time as the normal user and the renewal request
+        # will be denied.
+        self.register_user("admin", "adminpassword", admin=True)
+        admin_tok = self.login("admin", "adminpassword")
+
+        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        params = {"user_id": user_id}
+        request_data = json.dumps(params)
+        request, channel = self.make_request(
+            b"POST", url, request_data, access_token=admin_tok
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # The specific endpoint doesn't matter, all we need is an authenticated
+        # endpoint.
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_manual_expire(self):
+        user_id = self.register_user("kermit", "monkey")
+        tok = self.login("kermit", "monkey")
+
+        self.register_user("admin", "adminpassword", admin=True)
+        admin_tok = self.login("admin", "adminpassword")
+
+        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        params = {
+            "user_id": user_id,
+            "expiration_ts": 0,
+            "enable_renewal_emails": False,
+        }
+        request_data = json.dumps(params)
+        request, channel = self.make_request(
+            b"POST", url, request_data, access_token=admin_tok
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # The specific endpoint doesn't matter, all we need is an authenticated
+        # endpoint.
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEquals(
+            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
+        )
+
+
+class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        register.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        sync.register_servlets,
+        account_validity.register_servlets,
+        account.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+
+        # Test for account expiring after a week and renewal emails being sent 2
+        # days before expiry.
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": True,
+            "period": 604800000,  # Time in ms for 1 week
+            "renew_at": 172800000,  # Time in ms for 2 days
+            "renew_by_email_enabled": True,
+            "renew_email_subject": "Renew your account",
+        }
+
+        # Email config.
+        self.email_attempts = []
+
+        def sendmail(*args, **kwargs):
+            self.email_attempts.append((args, kwargs))
+            return
+
+        config["email"] = {
+            "enable_notifs": True,
+            "template_dir": os.path.abspath(
+                pkg_resources.resource_filename("synapse", "res/templates")
+            ),
+            "expiry_template_html": "notice_expiry.html",
+            "expiry_template_text": "notice_expiry.txt",
+            "notif_template_html": "notif_mail.html",
+            "notif_template_text": "notif_mail.txt",
+            "smtp_host": "127.0.0.1",
+            "smtp_port": 20,
+            "require_transport_security": False,
+            "smtp_user": None,
+            "smtp_pass": None,
+            "notif_from": "test@example.com",
+        }
+        config["public_baseurl"] = "aaa"
+
+        self.hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
+
+        self.store = self.hs.get_datastore()
+
+        return self.hs
+
+    def test_renewal_email(self):
+        self.email_attempts = []
+
+        (user_id, tok) = self.create_user()
+
+        # Move 6 days forward. This should trigger a renewal email to be sent.
+        self.reactor.advance(datetime.timedelta(days=6).total_seconds())
+        self.assertEqual(len(self.email_attempts), 1)
+
+        # Retrieving the URL from the email is too much pain for now, so we
+        # retrieve the token from the DB.
+        renewal_token = self.get_success(self.store.get_renewal_token_for_user(user_id))
+        url = "/_matrix/client/unstable/account_validity/renew?token=%s" % renewal_token
+        request, channel = self.make_request(b"GET", url)
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # Move 3 days forward. If the renewal failed, every authed request with
+        # our access token should be denied from now, otherwise they should
+        # succeed.
+        self.reactor.advance(datetime.timedelta(days=3).total_seconds())
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_manual_email_send(self):
+        self.email_attempts = []
+
+        (user_id, tok) = self.create_user()
+        request, channel = self.make_request(
+            b"POST",
+            "/_matrix/client/unstable/account_validity/send_mail",
+            access_token=tok,
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.assertEqual(len(self.email_attempts), 1)
+
+    def test_deactivated_user(self):
+        self.email_attempts = []
+
+        (user_id, tok) = self.create_user()
+
+        request_data = json.dumps(
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "user": user_id,
+                    "password": "monkey",
+                },
+                "erase": False,
+            }
+        )
+        request, channel = self.make_request(
+            "POST", "account/deactivate", request_data, access_token=tok
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
+
+        self.reactor.advance(datetime.timedelta(days=8).total_seconds())
+
+        self.assertEqual(len(self.email_attempts), 0)
+
+    def create_user(self):
+        user_id = self.register_user("kermit", "monkey")
+        tok = self.login("kermit", "monkey")
+        # We need to manually add an email address otherwise the handler will do
+        # nothing.
+        now = self.hs.clock.time_msec()
+        self.get_success(
+            self.store.user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address="kermit@example.com",
+                validated_at=now,
+                added_at=now,
+            )
+        )
+        return (user_id, tok)
+
+    def test_manual_email_send_expired_account(self):
+        user_id = self.register_user("kermit", "monkey")
+        tok = self.login("kermit", "monkey")
+
+        # We need to manually add an email address otherwise the handler will do
+        # nothing.
+        now = self.hs.clock.time_msec()
+        self.get_success(
+            self.store.user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address="kermit@example.com",
+                validated_at=now,
+                added_at=now,
+            )
+        )
+
+        # Make the account expire.
+        self.reactor.advance(datetime.timedelta(days=8).total_seconds())
+
+        # Ignore all emails sent by the automatic background task and only focus on the
+        # ones sent manually.
+        self.email_attempts = []
+
+        # Test that we're still able to manually trigger a mail to be sent.
+        request, channel = self.make_request(
+            b"POST",
+            "/_matrix/client/unstable/account_validity/send_mail",
+            access_token=tok,
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.assertEqual(len(self.email_attempts), 1)
+
+
+class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
+
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
+
+    def make_homeserver(self, reactor, clock):
+        self.validity_period = 10
+        self.max_delta = self.validity_period * 10.0 / 100.0
+
+        config = self.default_config()
+
+        config["enable_registration"] = True
+        config["account_validity"] = {"enabled": False}
+
+        self.hs = self.setup_test_homeserver(config=config)
+        self.hs.config.account_validity.period = self.validity_period
+
+        self.store = self.hs.get_datastore()
+
+        return self.hs
+
+    def test_background_job(self):
+        """
+        Tests the same thing as test_background_job, except that it sets the
+        startup_job_max_delta parameter and checks that the expiration date is within the
+        allowed range.
+        """
+        user_id = self.register_user("kermit_delta", "user")
+
+        self.hs.config.account_validity.startup_job_max_delta = self.max_delta
+
+        now_ms = self.hs.clock.time_msec()
+        self.get_success(self.store._set_expiration_date_when_missing())
+
+        res = self.get_success(self.store.get_expiration_ts_for_user(user_id))
+
+        self.assertGreaterEqual(res, now_ms + self.validity_period - self.max_delta)
+        self.assertLessEqual(res, now_ms + self.validity_period)

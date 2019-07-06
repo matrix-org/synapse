@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2017 New Vector Ltd.
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,7 +60,9 @@ class SpamChecker(object):
         if self.spam_checker is None:
             return True
 
-        return self.spam_checker.user_may_invite(inviter_userid, invitee_userid, room_id)
+        return self.spam_checker.user_may_invite(
+            inviter_userid, invitee_userid, room_id
+        )
 
     def user_may_create_room(self, userid):
         """Checks if a given user may create a room

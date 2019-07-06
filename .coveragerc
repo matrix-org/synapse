@@ -1,0 +1,7 @@
+[run]
+branch = True
+parallel = True
+include = synapse/*
+
+[report]
+precision = 2

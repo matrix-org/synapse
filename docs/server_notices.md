@@ -1,5 +1,4 @@
-Server Notices
-==============
+# Server Notices
 
 'Server Notices' are a new feature introduced in Synapse 0.30. They provide a
 channel whereby server administrators can send messages to users on the server.
@@ -11,8 +10,7 @@ they may also find a use for features such as "Message of the day".
 This is a feature specific to Synapse, but it uses standard Matrix
 communication mechanisms, so should work with any Matrix client.
 
-User experience
----------------
+## User experience
 
 When the user is first sent a server notice, they will get an invitation to a
 room (typically called 'Server Notices', though this is configurable in
@@ -29,8 +27,7 @@ levels.
 Having joined the room, the user can leave the room if they want. Subsequent
 server notices will then cause a new room to be created.
 
-Synapse configuration
----------------------
+## Synapse configuration
 
 Server notices come from a specific user id on the server. Server
 administrators are free to choose the user id - something like `server` is
@@ -58,17 +55,7 @@ room which will be created.
 `system_mxid_display_name` and `system_mxid_avatar_url` can be used to set the
 displayname and avatar of the Server Notices user.
 
-Sending notices
----------------
+## Sending notices
 
-As of the current version of synapse, there is no convenient interface for
-sending notices (other than the automated ones sent as part of consent
-tracking).
-
-In the meantime, it is possible to test this feature using the manhole. Having
-gone into the manhole as described in [manhole.md](manhole.md), a notice can be
-sent with something like:
-
-```
->>> hs.get_server_notices_manager().send_notice('@user:server.com', {'msgtype':'m.text', 'body':'foo'})
-```
+To send server notices to users you can use the
+[admin_api](admin_api/server_notices.md).

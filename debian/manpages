@@ -1,0 +1,4 @@
+debian/hash_password.1
+debian/register_new_matrix_user.1
+debian/synapse_port_db.1
+debian/synctl.1

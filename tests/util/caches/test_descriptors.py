@@ -21,7 +21,11 @@ import mock
 from twisted.internet import defer, reactor
 
 from synapse.api.errors import SynapseError
-from synapse.util import logcontext
+from synapse.logging.context import (
+    LoggingContext,
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+)
 from synapse.util.caches import descriptors
 
 from tests import unittest
@@ -32,7 +36,7 @@ logger = logging.getLogger(__name__)
 def run_on_reactor():
     d = defer.Deferred()
     reactor.callLater(0, d.callback, 0)
-    return logcontext.make_deferred_yieldable(d)
+    return make_deferred_yieldable(d)
 
 
 class CacheTestCase(unittest.TestCase):
@@ -67,12 +71,8 @@ class CacheTestCase(unittest.TestCase):
         self.assertIsNone(cache.get("key2", None))
 
         # both callbacks should have been callbacked
-        self.assertTrue(
-            callback_record[0], "Invalidation callback for key1 not called",
-        )
-        self.assertTrue(
-            callback_record[1], "Invalidation callback for key2 not called",
-        )
+        self.assertTrue(callback_record[0], "Invalidation callback for key1 not called")
+        self.assertTrue(callback_record[1], "Invalidation callback for key2 not called")
 
         # letting the other lookup complete should do nothing
         d1.callback("result1")
@@ -92,24 +92,24 @@ class DescriptorTestCase(unittest.TestCase):
 
         obj = Cls()
 
-        obj.mock.return_value = 'fish'
+        obj.mock.return_value = "fish"
         r = yield obj.fn(1, 2)
-        self.assertEqual(r, 'fish')
+        self.assertEqual(r, "fish")
         obj.mock.assert_called_once_with(1, 2)
         obj.mock.reset_mock()
 
         # a call with different params should call the mock again
-        obj.mock.return_value = 'chips'
+        obj.mock.return_value = "chips"
         r = yield obj.fn(1, 3)
-        self.assertEqual(r, 'chips')
+        self.assertEqual(r, "chips")
         obj.mock.assert_called_once_with(1, 3)
         obj.mock.reset_mock()
 
         # the two values should now be cached
         r = yield obj.fn(1, 2)
-        self.assertEqual(r, 'fish')
+        self.assertEqual(r, "fish")
         r = yield obj.fn(1, 3)
-        self.assertEqual(r, 'chips')
+        self.assertEqual(r, "chips")
         obj.mock.assert_not_called()
 
     @defer.inlineCallbacks
@@ -125,25 +125,25 @@ class DescriptorTestCase(unittest.TestCase):
                 return self.mock(arg1, arg2)
 
         obj = Cls()
-        obj.mock.return_value = 'fish'
+        obj.mock.return_value = "fish"
         r = yield obj.fn(1, 2)
-        self.assertEqual(r, 'fish')
+        self.assertEqual(r, "fish")
         obj.mock.assert_called_once_with(1, 2)
         obj.mock.reset_mock()
 
         # a call with different params should call the mock again
-        obj.mock.return_value = 'chips'
+        obj.mock.return_value = "chips"
         r = yield obj.fn(2, 3)
-        self.assertEqual(r, 'chips')
+        self.assertEqual(r, "chips")
         obj.mock.assert_called_once_with(2, 3)
         obj.mock.reset_mock()
 
         # the two values should now be cached; we should be able to vary
         # the second argument and still get the cached result.
         r = yield obj.fn(1, 4)
-        self.assertEqual(r, 'fish')
+        self.assertEqual(r, "fish")
         r = yield obj.fn(2, 5)
-        self.assertEqual(r, 'chips')
+        self.assertEqual(r, "chips")
         obj.mock.assert_not_called()
 
     def test_cache_logcontexts(self):
@@ -157,7 +157,7 @@ class DescriptorTestCase(unittest.TestCase):
             def fn(self, arg1):
                 @defer.inlineCallbacks
                 def inner_fn():
-                    with logcontext.PreserveLoggingContext():
+                    with PreserveLoggingContext():
                         yield complete_lookup
                     defer.returnValue(1)
 
@@ -165,11 +165,10 @@ class DescriptorTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def do_lookup():
-            with logcontext.LoggingContext() as c1:
+            with LoggingContext() as c1:
                 c1.name = "c1"
                 r = yield obj.fn(1)
-                self.assertEqual(logcontext.LoggingContext.current_context(),
-                                 c1)
+                self.assertEqual(LoggingContext.current_context(), c1)
             defer.returnValue(r)
 
         def check_result(r):
@@ -179,14 +178,12 @@ class DescriptorTestCase(unittest.TestCase):
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(logcontext.LoggingContext.current_context(),
-                         logcontext.LoggingContext.sentinel)
+        self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
         d1.addCallback(check_result)
 
         # and another
         d2 = do_lookup()
-        self.assertEqual(logcontext.LoggingContext.current_context(),
-                         logcontext.LoggingContext.sentinel)
+        self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
         d2.addCallback(check_result)
 
         # let the lookup complete
@@ -211,28 +208,25 @@ class DescriptorTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def do_lookup():
-            with logcontext.LoggingContext() as c1:
+            with LoggingContext() as c1:
                 c1.name = "c1"
                 try:
                     d = obj.fn(1)
                     self.assertEqual(
-                        logcontext.LoggingContext.current_context(),
-                        logcontext.LoggingContext.sentinel,
+                        LoggingContext.current_context(), LoggingContext.sentinel
                     )
                     yield d
                     self.fail("No exception thrown")
                 except SynapseError:
                     pass
 
-                self.assertEqual(logcontext.LoggingContext.current_context(),
-                                 c1)
+                self.assertEqual(LoggingContext.current_context(), c1)
 
         obj = Cls()
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(logcontext.LoggingContext.current_context(),
-                         logcontext.LoggingContext.sentinel)
+        self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
 
         return d1
 
@@ -248,28 +242,120 @@ class DescriptorTestCase(unittest.TestCase):
 
         obj = Cls()
 
-        obj.mock.return_value = 'fish'
+        obj.mock.return_value = "fish"
         r = yield obj.fn(1, 2, 3)
-        self.assertEqual(r, 'fish')
+        self.assertEqual(r, "fish")
         obj.mock.assert_called_once_with(1, 2, 3)
         obj.mock.reset_mock()
 
         # a call with same params shouldn't call the mock again
         r = yield obj.fn(1, 2)
-        self.assertEqual(r, 'fish')
+        self.assertEqual(r, "fish")
         obj.mock.assert_not_called()
         obj.mock.reset_mock()
 
         # a call with different params should call the mock again
-        obj.mock.return_value = 'chips'
+        obj.mock.return_value = "chips"
         r = yield obj.fn(2, 3)
-        self.assertEqual(r, 'chips')
+        self.assertEqual(r, "chips")
         obj.mock.assert_called_once_with(2, 3, 3)
         obj.mock.reset_mock()
 
         # the two values should now be cached
         r = yield obj.fn(1, 2)
-        self.assertEqual(r, 'fish')
+        self.assertEqual(r, "fish")
         r = yield obj.fn(2, 3)
-        self.assertEqual(r, 'chips')
+        self.assertEqual(r, "chips")
         obj.mock.assert_not_called()
+
+
+class CachedListDescriptorTestCase(unittest.TestCase):
+    @defer.inlineCallbacks
+    def test_cache(self):
+        class Cls(object):
+            def __init__(self):
+                self.mock = mock.Mock()
+
+            @descriptors.cached()
+            def fn(self, arg1, arg2):
+                pass
+
+            @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
+            def list_fn(self, args1, arg2):
+                assert LoggingContext.current_context().request == "c1"
+                # we want this to behave like an asynchronous function
+                yield run_on_reactor()
+                assert LoggingContext.current_context().request == "c1"
+                defer.returnValue(self.mock(args1, arg2))
+
+        with LoggingContext() as c1:
+            c1.request = "c1"
+            obj = Cls()
+            obj.mock.return_value = {10: "fish", 20: "chips"}
+            d1 = obj.list_fn([10, 20], 2)
+            self.assertEqual(LoggingContext.current_context(), LoggingContext.sentinel)
+            r = yield d1
+            self.assertEqual(LoggingContext.current_context(), c1)
+            obj.mock.assert_called_once_with([10, 20], 2)
+            self.assertEqual(r, {10: "fish", 20: "chips"})
+            obj.mock.reset_mock()
+
+            # a call with different params should call the mock again
+            obj.mock.return_value = {30: "peas"}
+            r = yield obj.list_fn([20, 30], 2)
+            obj.mock.assert_called_once_with([30], 2)
+            self.assertEqual(r, {20: "chips", 30: "peas"})
+            obj.mock.reset_mock()
+
+            # all the values should now be cached
+            r = yield obj.fn(10, 2)
+            self.assertEqual(r, "fish")
+            r = yield obj.fn(20, 2)
+            self.assertEqual(r, "chips")
+            r = yield obj.fn(30, 2)
+            self.assertEqual(r, "peas")
+            r = yield obj.list_fn([10, 20, 30], 2)
+            obj.mock.assert_not_called()
+            self.assertEqual(r, {10: "fish", 20: "chips", 30: "peas"})
+
+    @defer.inlineCallbacks
+    def test_invalidate(self):
+        """Make sure that invalidation callbacks are called."""
+
+        class Cls(object):
+            def __init__(self):
+                self.mock = mock.Mock()
+
+            @descriptors.cached()
+            def fn(self, arg1, arg2):
+                pass
+
+            @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
+            def list_fn(self, args1, arg2):
+                # we want this to behave like an asynchronous function
+                yield run_on_reactor()
+                defer.returnValue(self.mock(args1, arg2))
+
+        obj = Cls()
+        invalidate0 = mock.Mock()
+        invalidate1 = mock.Mock()
+
+        # cache miss
+        obj.mock.return_value = {10: "fish", 20: "chips"}
+        r1 = yield obj.list_fn([10, 20], 2, on_invalidate=invalidate0)
+        obj.mock.assert_called_once_with([10, 20], 2)
+        self.assertEqual(r1, {10: "fish", 20: "chips"})
+        obj.mock.reset_mock()
+
+        # cache hit
+        r2 = yield obj.list_fn([10, 20], 2, on_invalidate=invalidate1)
+        obj.mock.assert_not_called()
+        self.assertEqual(r2, {10: "fish", 20: "chips"})
+
+        invalidate0.assert_not_called()
+        invalidate1.assert_not_called()
+
+        # now if we invalidate the keys, both invalidations should get called
+        obj.fn.invalidate((10, 2))
+        invalidate0.assert_called_once()
+        invalidate1.assert_called_once()

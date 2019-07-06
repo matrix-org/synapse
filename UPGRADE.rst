@@ -5,20 +5,20 @@ Before upgrading check if any special steps are required to upgrade from the
 what you currently have installed to current version of synapse. The extra
 instructions that may be required are listed later in this document.
 
-1. If synapse was installed in a virtualenv then active that virtualenv before
-   upgrading. If synapse is installed in a virtualenv in ``~/.synapse/`` then
+1. If synapse was installed in a virtualenv then activate that virtualenv before
+   upgrading. If synapse is installed in a virtualenv in ``~/synapse/env`` then
    run:
 
    .. code:: bash
 
-       source ~/.synapse/bin/activate
+       source ~/synapse/env/bin/activate
 
 2. If synapse was installed using pip then upgrade to the latest version by
    running:
 
    .. code:: bash
 
-       pip install --upgrade --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+       pip install --upgrade matrix-synapse[all]
 
        # restart synapse
        synctl restart
@@ -31,14 +31,15 @@ instructions that may be required are listed later in this document.
 
        # Pull the latest version of the master branch.
        git pull
-       # Update the versions of synapse's python dependencies.
-       python synapse/python_dependencies.py | xargs pip install --upgrade
+
+       # Update synapse and its python dependencies.
+       pip install --upgrade .[all]
 
        # restart synapse
        ./synctl restart
 
 
-To check whether your update was sucessful, you can check the Server header
+To check whether your update was successful, you can check the Server header
 returned by the Client-Server API:
 
 .. code:: bash
@@ -48,11 +49,190 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
-Upgrading to $NEXT_VERSION
+Upgrading to v1.1.0
+===================
+
+Synapse v1.1.0 removes support for older Python and PostgreSQL versions, as
+outlined in `our deprecation notice <https://matrix.org/blog/2019/04/08/synapse-deprecating-postgres-9-4-and-python-2-x>`_.
+
+Minimum Python Version
+----------------------
+
+Synapse v1.1.0 has a minimum Python requirement of Python 3.5. Python 3.6 or
+Python 3.7 are recommended as they have improved internal string handling,
+significantly reducing memory usage.
+
+If you use current versions of the Matrix.org-distributed Debian packages or
+Docker images, action is not required.
+
+If you install Synapse in a Python virtual environment, please see "Upgrading to
+v0.34.0" for notes on setting up a new virtualenv under Python 3.
+
+Minimum PostgreSQL Version
+--------------------------
+
+If using PostgreSQL under Synapse, you will need to use PostgreSQL 9.5 or above.
+Please see the
+`PostgreSQL documentation <https://www.postgresql.org/docs/11/upgrading.html>`_
+for more details on upgrading your database.
+
+Upgrading to v1.0
+=================
+
+Validation of TLS certificates
+------------------------------
+
+Synapse v1.0 is the first release to enforce
+validation of TLS certificates for the federation API. It is therefore
+essential that your certificates are correctly configured. See the `FAQ
+<docs/MSC1711_certificates_FAQ.md>`_ for more information.
+
+Note, v1.0 installations will also no longer be able to federate with servers
+that have not correctly configured their certificates.
+
+In rare cases, it may be desirable to disable certificate checking: for
+example, it might be essential to be able to federate with a given legacy
+server in a closed federation. This can be done in one of two ways:-
+
+* Configure the global switch ``federation_verify_certificates`` to ``false``.
+* Configure a whitelist of server domains to trust via ``federation_certificate_verification_whitelist``.
+
+See the `sample configuration file <docs/sample_config.yaml>`_
+for more details on these settings.
+
+Email
+-----
+When a user requests a password reset, Synapse will send an email to the
+user to confirm the request.
+
+Previous versions of Synapse delegated the job of sending this email to an
+identity server. If the identity server was somehow malicious or became
+compromised, it would be theoretically possible to hijack an account through
+this means.
+
+Therefore, by default, Synapse v1.0 will send the confirmation email itself. If
+Synapse is not configured with an SMTP server, password reset via email will be
+disabled.
+
+To configure an SMTP server for Synapse, modify the configuration section
+headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
+and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
+``smtp_pass``, and ``require_transport_security``.
+
+If you are absolutely certain that you wish to continue using an identity
+server for password resets, set ``trust_identity_server_for_password_resets`` to ``true``.
+
+See the `sample configuration file <docs/sample_config.yaml>`_
+for more details on these settings.
+
+Upgrading to v0.99.0
+====================
+
+Please be aware that, before Synapse v1.0 is released around March 2019, you
+will need to replace any self-signed certificates with those verified by a
+root CA. Information on how to do so can be found at `the ACME docs
+<docs/ACME.md>`_.
+
+For more information on configuring TLS certificates see the `FAQ <docs/MSC1711_certificates_FAQ.md>`_.
+
+Upgrading to v0.34.0
+====================
+
+1. This release is the first to fully support Python 3. Synapse will now run on
+   Python versions 3.5, or 3.6 (as well as 2.7). We recommend switching to
+   Python 3, as it has been shown to give performance improvements.
+
+   For users who have installed Synapse into a virtualenv, we recommend doing
+   this by creating a new virtualenv. For example::
+
+       virtualenv -p python3 ~/synapse/env3
+       source ~/synapse/env3/bin/activate
+       pip install matrix-synapse
+
+   You can then start synapse as normal, having activated the new virtualenv::
+
+       cd ~/synapse
+       source env3/bin/activate
+       synctl start
+
+   Users who have installed from distribution packages should see the relevant
+   package documentation. See below for notes on Debian packages.
+
+   * When upgrading to Python 3, you **must** make sure that your log files are
+     configured as UTF-8, by adding ``encoding: utf8`` to the
+     ``RotatingFileHandler`` configuration (if you have one) in your
+     ``<server>.log.config`` file. For example, if your ``log.config`` file
+     contains::
+
+       handlers:
+         file:
+           class: logging.handlers.RotatingFileHandler
+           formatter: precise
+           filename: homeserver.log
+           maxBytes: 104857600
+           backupCount: 10
+           filters: [context]
+         console:
+           class: logging.StreamHandler
+           formatter: precise
+           filters: [context]
+
+     Then you should update this to be::
+
+       handlers:
+         file:
+           class: logging.handlers.RotatingFileHandler
+           formatter: precise
+           filename: homeserver.log
+           maxBytes: 104857600
+           backupCount: 10
+           filters: [context]
+           encoding: utf8
+         console:
+           class: logging.StreamHandler
+           formatter: precise
+           filters: [context]
+
+     There is no need to revert this change if downgrading to Python 2.
+
+   We are also making available Debian packages which will run Synapse on
+   Python 3. You can switch to these packages with ``apt-get install
+   matrix-synapse-py3``, however, please read `debian/NEWS
+   <https://github.com/matrix-org/synapse/blob/release-v0.34.0/debian/NEWS>`_
+   before doing so. The existing ``matrix-synapse`` packages will continue to
+   use Python 2 for the time being.
+
+2. This release removes the ``riot.im`` from the default list of trusted
+   identity servers.
+
+   If ``riot.im`` is in your homeserver's list of
+   ``trusted_third_party_id_servers``, you should remove it. It was added in
+   case a hypothetical future identity server was put there. If you don't
+   remove it, users may be unable to deactivate their accounts.
+
+3. This release no longer installs the (unmaintained) Matrix Console web client
+   as part of the default installation. It is possible to re-enable it by
+   installing it separately and setting the ``web_client_location`` config
+   option, but please consider switching to another client.
+
+Upgrading to v0.33.7
+====================
+
+This release removes the example email notification templates from
+``res/templates`` (they are now internal to the python package). This should
+only affect you if you (a) deploy your Synapse instance from a git checkout or
+a github snapshot URL, and (b) have email notifications enabled.
+
+If you have email notifications enabled, you should ensure that
+``email.template_dir`` is either configured to point at a directory where you
+have installed customised templates, or leave it unset to use the default
+templates.
+
+Upgrading to v0.27.3
 ====================
 
 This release expands the anonymous usage stats sent if the opt-in
-``report_stats`` configuration is set to ``true``. We now capture RSS memory 
+``report_stats`` configuration is set to ``true``. We now capture RSS memory
 and cpu use at a very coarse level. This requires administrators to install
 the optional ``psutil`` python module.
 

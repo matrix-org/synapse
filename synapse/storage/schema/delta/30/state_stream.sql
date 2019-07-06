@@ -14,14 +14,9 @@
  */
 
 
-/**
- * The positions in the event stream_ordering when the current_state was
- * replaced by the state at the event.
+/* We used to create a table called current_state_resets, but this is no
+ * longer used and is removed in delta 54.
  */
-
-CREATE TABLE IF NOT EXISTS current_state_resets(
-    event_stream_ordering BIGINT PRIMARY KEY NOT NULL
-);
 
 /* The outlier events that have aquired a state group typically through
  * backfill. This is tracked separately to the events table, as assigning a

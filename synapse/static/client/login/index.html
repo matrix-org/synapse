@@ -12,35 +12,30 @@
         <h1>Log in with one of the following methods</h1>
 
         <span id="feedback" style="color: #f00"></span>
-        <br/>
-        <br/>
 
         <div id="loading">
             <img src="spinner.gif" />
         </div>
 
-        <div id="cas_flow" class="login_flow" style="display:none"
-                onclick="gotoCas(); return false;">
-            CAS Authentication: <button id="cas_button" style="margin: 10px">Log in</button>
+        <div id="sso_flow" class="login_flow" style="display:none">
+            Single-sign on:
+            <form id="sso_form" action="/_matrix/client/r0/login/sso/redirect" method="get">
+                <input id="sso_redirect_url" type="hidden" name="redirectUrl" value=""/>
+                <input type="submit" value="Log in"/>
+            </form>
         </div>
 
-        <br/>
+        <div id="password_flow" class="login_flow" style="display:none">
+            Password Authentication:
+            <form onsubmit="matrixLogin.password_login(); return false;">
+                <input id="user_id" size="32" type="text" placeholder="Matrix ID (e.g. bob)" autocapitalize="off" autocorrect="off" />
+                <br/>
+                <input id="password" size="32" type="password" placeholder="Password"/>
+                <br/>
 
-        <form id="password_form" class="login_flow" style="display:none"
-                onsubmit="matrixLogin.password_login(); return false;">
-            <div>
-                Password Authentication:<br/>
-
-                <div style="text-align: center">
-                    <input id="user_id" size="32" type="text" placeholder="Matrix ID (e.g. bob)" autocapitalize="off" autocorrect="off" />
-                    <br/>
-                    <input id="password" size="32" type="password" placeholder="Password"/>
-                    <br/>
-
-                    <button type="submit" style="margin: 10px">Log in</button>
-                </div>
-            </div>
-        </form>
+                <input type="submit" value="Log in"/>
+            </form>
+        </div>
 
         <div id="no_login_types" type="button" class="login_flow" style="display:none">
             Log in currently unavailable.

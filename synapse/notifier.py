@@ -23,15 +23,12 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
 from synapse.handlers.presence import format_user_presence_state
+from synapse.logging.context import PreserveLoggingContext
+from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import StreamToken
-from synapse.util.async import (
-    DeferredTimeoutError,
-    ObservableDeferred,
-    add_timeout_to_deferred,
-)
-from synapse.util.logcontext import PreserveLoggingContext, run_in_background
-from synapse.util.logutils import log_function
+from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
 from synapse.util.metrics import Measure
 from synapse.visibility import filter_events_for_client
 
@@ -40,7 +37,8 @@ logger = logging.getLogger(__name__)
 notified_events_counter = Counter("synapse_notifier_notified_events", "")
 
 users_woken_by_stream_counter = Counter(
-    "synapse_notifier_users_woken_by_stream", "", ["stream"])
+    "synapse_notifier_users_woken_by_stream", "", ["stream"]
+)
 
 
 # TODO(paul): Should be shared somewhere
@@ -58,6 +56,7 @@ class _NotificationListener(object):
     The events stream handler will have yielded to the deferred, so to
     notify the handler it is sufficient to resolve the deferred.
     """
+
     __slots__ = ["deferred"]
 
     def __init__(self, deferred):
@@ -98,9 +97,7 @@ class _NotifierUserStream(object):
             stream_id(str): The new id for the stream the event came from.
             time_now_ms(int): The current time in milliseconds.
         """
-        self.current_token = self.current_token.copy_and_advance(
-            stream_key, stream_id
-        )
+        self.current_token = self.current_token.copy_and_advance(stream_key, stream_id)
         self.last_notified_token = self.current_token
         self.last_notified_ms = time_now_ms
         noify_deferred = self.notify_deferred
@@ -144,6 +141,7 @@ class _NotifierUserStream(object):
 class EventStreamResult(namedtuple("EventStreamResult", ("events", "tokens"))):
     def __nonzero__(self):
         return bool(self.events)
+
     __bool__ = __nonzero__  # python3
 
 
@@ -181,39 +179,42 @@ class Notifier(object):
             self.remove_expired_streams, self.UNUSED_STREAM_EXPIRY_MS
         )
 
-        self.replication_deferred = ObservableDeferred(defer.Deferred())
-
         # This is not a very cheap test to perform, but it's only executed
         # when rendering the metrics page, which is likely once per minute at
         # most when scraping it.
         def count_listeners():
             all_user_streams = set()
 
-            for x in self.room_to_user_streams.values():
+            for x in list(self.room_to_user_streams.values()):
                 all_user_streams |= x
-            for x in self.user_to_user_stream.values():
+            for x in list(self.user_to_user_stream.values()):
                 all_user_streams.add(x)
 
             return sum(stream.count_listeners() for stream in all_user_streams)
+
         LaterGauge("synapse_notifier_listeners", "", [], count_listeners)
 
         LaterGauge(
-            "synapse_notifier_rooms", "", [],
-            lambda: count(bool, self.room_to_user_streams.values()),
+            "synapse_notifier_rooms",
+            "",
+            [],
+            lambda: count(bool, list(self.room_to_user_streams.values())),
         )
         LaterGauge(
-            "synapse_notifier_users", "", [],
-            lambda: len(self.user_to_user_stream),
+            "synapse_notifier_users", "", [], lambda: len(self.user_to_user_stream)
         )
 
     def add_replication_callback(self, cb):
         """Add a callback that will be called when some new data is available.
-        Callback is not given any arguments.
+        Callback is not given any arguments. It should *not* return a Deferred - if
+        it needs to do any asynchronous work, a background thread should be started and
+        wrapped with run_as_background_process.
         """
         self.replication_callbacks.append(cb)
 
-    def on_new_room_event(self, event, room_stream_id, max_room_stream_id,
-                          extra_users=[]):
+    def on_new_room_event(
+        self, event, room_stream_id, max_room_stream_id, extra_users=[]
+    ):
         """ Used by handlers to inform the notifier something has happened
         in the room, room event wise.
 
@@ -225,9 +226,7 @@ class Notifier(object):
         until all previous events have been persisted before notifying
         the client streams.
         """
-        self.pending_new_room_events.append((
-            room_stream_id, event, extra_users
-        ))
+        self.pending_new_room_events.append((room_stream_id, event, extra_users))
         self._notify_pending_new_room_events(max_room_stream_id)
 
         self.notify_replication()
@@ -243,16 +242,18 @@ class Notifier(object):
         self.pending_new_room_events = []
         for room_stream_id, event, extra_users in pending:
             if room_stream_id > max_room_stream_id:
-                self.pending_new_room_events.append((
-                    room_stream_id, event, extra_users
-                ))
+                self.pending_new_room_events.append(
+                    (room_stream_id, event, extra_users)
+                )
             else:
                 self._on_new_room_event(event, room_stream_id, extra_users)
 
     def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
-        run_in_background(self._notify_app_services, room_stream_id)
+        run_as_background_process(
+            "notify_app_services", self._notify_app_services, room_stream_id
+        )
 
         if self.federation_sender:
             self.federation_sender.notify_new_events(room_stream_id)
@@ -261,9 +262,7 @@ class Notifier(object):
             self._user_joined_room(event.state_key, event.room_id)
 
         self.on_new_event(
-            "room_key", room_stream_id,
-            users=extra_users,
-            rooms=[event.room_id],
+            "room_key", room_stream_id, users=extra_users, rooms=[event.room_id]
         )
 
     @defer.inlineCallbacks
@@ -305,8 +304,9 @@ class Notifier(object):
         self.notify_replication()
 
     @defer.inlineCallbacks
-    def wait_for_events(self, user_id, timeout, callback, room_ids=None,
-                        from_token=StreamToken.START):
+    def wait_for_events(
+        self, user_id, timeout, callback, room_ids=None, from_token=StreamToken.START
+    ):
         """Wait until the callback returns a non empty response or the
         timeout fires.
         """
@@ -337,9 +337,9 @@ class Notifier(object):
                     # Now we wait for the _NotifierUserStream to be told there
                     # is a new token.
                     listener = user_stream.new_listener(prev_token)
-                    add_timeout_to_deferred(
+                    listener.deferred = timeout_deferred(
                         listener.deferred,
-                        (end_time - now) / 1000.,
+                        (end_time - now) / 1000.0,
                         self.hs.get_reactor(),
                     )
                     with PreserveLoggingContext():
@@ -354,7 +354,7 @@ class Notifier(object):
                     # Update the prev_token to the current_token since nothing
                     # has happened between the old prev_token and the current_token
                     prev_token = current_token
-                except DeferredTimeoutError:
+                except defer.TimeoutError:
                     break
                 except defer.CancelledError:
                     break
@@ -368,9 +368,15 @@ class Notifier(object):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def get_events_for(self, user, pagination_config, timeout,
-                       only_keys=None,
-                       is_guest=False, explicit_room_id=None):
+    def get_events_for(
+        self,
+        user,
+        pagination_config,
+        timeout,
+        only_keys=None,
+        is_guest=False,
+        explicit_room_id=None,
+    ):
         """ For the given user and rooms, return any new events for them. If
         there are no new events wait for up to `timeout` milliseconds for any
         new events to happen before returning.
@@ -419,10 +425,7 @@ class Notifier(object):
 
                 if name == "room":
                     new_events = yield filter_events_for_client(
-                        self.store,
-                        user.to_string(),
-                        new_events,
-                        is_peeking=is_peeking,
+                        self.store, user.to_string(), new_events, is_peeking=is_peeking
                     )
                 elif name == "presence":
                     now = self.clock.time_msec()
@@ -450,7 +453,8 @@ class Notifier(object):
             #
             # I am sorry for what I have done.
             user_id_for_stream = "_PEEKING_%s_%s" % (
-                explicit_room_id, user_id_for_stream
+                explicit_room_id,
+                user_id_for_stream,
             )
 
         result = yield self.wait_for_events(
@@ -477,9 +481,7 @@ class Notifier(object):
     @defer.inlineCallbacks
     def _is_world_readable(self, room_id):
         state = yield self.state_handler.get_current_state(
-            room_id,
-            EventTypes.RoomHistoryVisibility,
-            "",
+            room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if state and "history_visibility" in state.content:
             defer.returnValue(state.content["history_visibility"] == "world_readable")
@@ -517,59 +519,5 @@ class Notifier(object):
 
     def notify_replication(self):
         """Notify the any replication listeners that there's a new event"""
-        with PreserveLoggingContext():
-            deferred = self.replication_deferred
-            self.replication_deferred = ObservableDeferred(defer.Deferred())
-            deferred.callback(None)
-
-            # the callbacks may well outlast the current request, so we run
-            # them in the sentinel logcontext.
-            #
-            # (ideally it would be up to the callbacks to know if they were
-            # starting off background processes and drop the logcontext
-            # accordingly, but that requires more changes)
-            for cb in self.replication_callbacks:
-                cb()
-
-    @defer.inlineCallbacks
-    def wait_for_replication(self, callback, timeout):
-        """Wait for an event to happen.
-
-        Args:
-            callback: Gets called whenever an event happens. If this returns a
-                truthy value then ``wait_for_replication`` returns, otherwise
-                it waits for another event.
-            timeout: How many milliseconds to wait for callback return a truthy
-                value.
-
-        Returns:
-            A deferred that resolves with the value returned by the callback.
-        """
-        listener = _NotificationListener(None)
-
-        end_time = self.clock.time_msec() + timeout
-
-        while True:
-            listener.deferred = self.replication_deferred.observe()
-            result = yield callback()
-            if result:
-                break
-
-            now = self.clock.time_msec()
-            if end_time <= now:
-                break
-
-            add_timeout_to_deferred(
-                listener.deferred.addTimeout,
-                (end_time - now) / 1000.,
-                self.hs.get_reactor(),
-            )
-            try:
-                with PreserveLoggingContext():
-                    yield listener.deferred
-            except DeferredTimeoutError:
-                break
-            except defer.CancelledError:
-                break
-
-        defer.returnValue(result)
+        for cb in self.replication_callbacks:
+            cb()

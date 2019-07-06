@@ -1,7 +1,8 @@
 window.matrixLogin = {
-    endpoint: location.origin + "/_matrix/client/api/v1/login",
+    endpoint: location.origin + "/_matrix/client/r0/login",
     serverAcceptsPassword: false,
-    serverAcceptsCas: false
+    serverAcceptsCas: false,
+    serverAcceptsSso: false,
 };
 
 var submitPassword = function(user, pwd) {
@@ -40,12 +41,6 @@ var errorFunc = function(err) {
     }
 };
 
-var gotoCas = function() {
-    var this_page = window.location.origin + window.location.pathname;
-    var redirect_url = matrixLogin.endpoint + "/cas/redirect?redirectUrl=" + encodeURIComponent(this_page);
-    window.location.replace(redirect_url);
-}
-
 var setFeedbackString = function(text) {
     $("#feedback").text(text);
 };
@@ -53,12 +48,18 @@ var setFeedbackString = function(text) {
 var show_login = function() {
     $("#loading").hide();
 
+    var this_page = window.location.origin + window.location.pathname;
+    $("#sso_redirect_url").val(this_page);
+
     if (matrixLogin.serverAcceptsPassword) {
-        $("#password_form").show();
+        $("#password_flow").show();
     }
 
-    if (matrixLogin.serverAcceptsCas) {
-        $("#cas_flow").show();
+    if (matrixLogin.serverAcceptsSso) {
+        $("#sso_flow").show();
+    } else if (matrixLogin.serverAcceptsCas) {
+        $("#sso_form").attr("action", "/_matrix/client/r0/login/cas/redirect");
+        $("#sso_flow").show();
     }
 
     if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsCas) {
@@ -67,8 +68,8 @@ var show_login = function() {
 };
 
 var show_spinner = function() {
-    $("#password_form").hide();
-    $("#cas_flow").hide();
+    $("#password_flow").hide();
+    $("#sso_flow").hide();
     $("#no_login_types").hide();
     $("#loading").show();
 };
@@ -84,7 +85,10 @@ var fetch_info = function(cb) {
                 matrixLogin.serverAcceptsCas = true;
                 console.log("Server accepts CAS");
             }
-
+            if ("m.login.sso" === flow.type) {
+                matrixLogin.serverAcceptsSso = true;
+                console.log("Server accepts SSO");
+            }
             if ("m.login.password" === flow.type) {
                 matrixLogin.serverAcceptsPassword = true;
                 console.log("Server accepts password");

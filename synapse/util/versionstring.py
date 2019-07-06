@@ -23,44 +23,53 @@ logger = logging.getLogger(__name__)
 
 def get_version_string(module):
     try:
-        null = open(os.devnull, 'w')
+        null = open(os.devnull, "w")
         cwd = os.path.dirname(os.path.abspath(module.__file__))
         try:
-            git_branch = subprocess.check_output(
-                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-                stderr=null,
-                cwd=cwd,
-            ).strip()
+            git_branch = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"], stderr=null, cwd=cwd
+                )
+                .strip()
+                .decode("ascii")
+            )
             git_branch = "b=" + git_branch
         except subprocess.CalledProcessError:
             git_branch = ""
 
         try:
-            git_tag = subprocess.check_output(
-                ['git', 'describe', '--exact-match'],
-                stderr=null,
-                cwd=cwd,
-            ).strip()
+            git_tag = (
+                subprocess.check_output(
+                    ["git", "describe", "--exact-match"], stderr=null, cwd=cwd
+                )
+                .strip()
+                .decode("ascii")
+            )
             git_tag = "t=" + git_tag
         except subprocess.CalledProcessError:
             git_tag = ""
 
         try:
-            git_commit = subprocess.check_output(
-                ['git', 'rev-parse', '--short', 'HEAD'],
-                stderr=null,
-                cwd=cwd,
-            ).strip()
+            git_commit = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"], stderr=null, cwd=cwd
+                )
+                .strip()
+                .decode("ascii")
+            )
         except subprocess.CalledProcessError:
             git_commit = ""
 
         try:
             dirty_string = "-this_is_a_dirty_checkout"
-            is_dirty = subprocess.check_output(
-                ['git', 'describe', '--dirty=' + dirty_string],
-                stderr=null,
-                cwd=cwd,
-            ).strip().endswith(dirty_string)
+            is_dirty = (
+                subprocess.check_output(
+                    ["git", "describe", "--dirty=" + dirty_string], stderr=null, cwd=cwd
+                )
+                .strip()
+                .decode("ascii")
+                .endswith(dirty_string)
+            )
 
             git_dirty = "dirty" if is_dirty else ""
         except subprocess.CalledProcessError:
@@ -68,17 +77,11 @@ def get_version_string(module):
 
         if git_branch or git_tag or git_commit or git_dirty:
             git_version = ",".join(
-                s for s in
-                (git_branch, git_tag, git_commit, git_dirty,)
-                if s
+                s for s in (git_branch, git_tag, git_commit, git_dirty) if s
             )
 
-            return (
-                "%s (%s)" % (
-                    module.__version__, git_version,
-                )
-            ).encode("ascii")
+            return "%s (%s)" % (module.__version__, git_version)
     except Exception as e:
         logger.info("Failed to check for git repository: %s", e)
 
-    return module.__version__.encode("ascii")
+    return module.__version__

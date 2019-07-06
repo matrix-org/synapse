@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class SetPasswordHandler(BaseHandler):
     """Handler which deals with changing user account passwords"""
+
     def __init__(self, hs):
         super(SetPasswordHandler, self).__init__(hs)
         self._auth_handler = hs.get_auth_handler()
@@ -32,6 +33,9 @@ class SetPasswordHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def set_password(self, user_id, newpassword, requester=None):
+        if not self.hs.config.password_localdb_enabled:
+            raise SynapseError(403, "Password change disabled", errcode=Codes.FORBIDDEN)
+
         password_hash = yield self._auth_handler.hash(newpassword)
 
         except_device_id = requester.device_id if requester else None
@@ -47,11 +51,11 @@ class SetPasswordHandler(BaseHandler):
         # we want to log out all of the user's other sessions. First delete
         # all his other devices.
         yield self._device_handler.delete_all_devices_for_user(
-            user_id, except_device_id=except_device_id,
+            user_id, except_device_id=except_device_id
         )
 
         # and now delete any access tokens which weren't associated with
         # devices (or were associated with this device).
         yield self._auth_handler.delete_access_tokens_for_user(
-            user_id, except_token_id=except_access_token_id,
+            user_id, except_token_id=except_access_token_id
         )

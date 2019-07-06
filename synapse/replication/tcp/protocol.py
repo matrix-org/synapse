@@ -42,8 +42,8 @@ indicate which side is sending, these are *not* included on the wire::
     > POSITION backfill 1
     > POSITION caches 1
     > RDATA caches 2 ["get_user_by_id",["@01register-user:localhost:8823"],1490197670513]
-    > RDATA events 14 ["$149019767112vOHxz:localhost:8823",
-        "!AFDCvgApUmpdfVjIXm:localhost:8823","m.room.guest_access","",null]
+    > RDATA events 14 ["ev", ["$149019767112vOHxz:localhost:8823",
+        "!AFDCvgApUmpdfVjIXm:localhost:8823","m.room.guest_access","",null]]
     < PING 1490197675618
     > ERROR server stopping
     * connection closed by server *
@@ -62,7 +62,9 @@ from twisted.internet import defer
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics import LaterGauge
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.stringutils import random_string
 
 from .commands import (
@@ -82,7 +84,8 @@ from .commands import (
 from .streams import STREAMS_MAP
 
 connection_close_counter = Counter(
-    "synapse_replication_tcp_protocol_close_reason", "", ["reason_type"])
+    "synapse_replication_tcp_protocol_close_reason", "", ["reason_type"]
+)
 
 # A list of all connected protocols. This allows us to send metrics about the
 # connections.
@@ -117,7 +120,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     It also sends `PING` periodically, and correctly times out remote connections
     (if they send a `PING` command)
     """
-    delimiter = b'\n'
+
+    delimiter = b"\n"
 
     VALID_INBOUND_COMMANDS = []  # Valid commands we expect to receive
     VALID_OUTBOUND_COMMANDS = []  # Valid commans we can send
@@ -181,10 +185,14 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             if now - self.last_sent_command >= PING_TIME:
                 self.send_command(PingCommand(now))
 
-            if self.received_ping and now - self.last_received_command > PING_TIMEOUT_MS:
+            if (
+                self.received_ping
+                and now - self.last_received_command > PING_TIMEOUT_MS
+            ):
                 logger.info(
                     "[%s] Connection hasn't received command in %r ms. Closing.",
-                    self.id(), now - self.last_received_command
+                    self.id(),
+                    now - self.last_received_command,
                 )
                 self.send_error("ping timeout")
 
@@ -206,7 +214,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         self.last_received_command = self.clock.time_msec()
 
         self.inbound_commands_counter[cmd_name] = (
-            self.inbound_commands_counter[cmd_name] + 1)
+            self.inbound_commands_counter[cmd_name] + 1
+        )
 
         cmd_cls = COMMAND_MAP[cmd_name]
         try:
@@ -221,10 +230,23 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             return
 
         # Now lets try and call on_<CMD_NAME> function
-        try:
-            getattr(self, "on_%s" % (cmd_name,))(cmd)
-        except Exception:
-            logger.exception("[%s] Failed to handle line: %r", self.id(), line)
+        run_as_background_process(
+            "replication-" + cmd.get_logcontext_id(), self.handle_command, cmd
+        )
+
+    def handle_command(self, cmd):
+        """Handle a command we have received over the replication stream.
+
+        By default delegates to on_<COMMAND>
+
+        Args:
+            cmd (synapse.replication.tcp.commands.Command): received command
+
+        Returns:
+            Deferred
+        """
+        handler = getattr(self, "on_%s" % (cmd.NAME,))
+        return handler(cmd)
 
     def close(self):
         logger.warn("[%s] Closing connection", self.id())
@@ -257,12 +279,21 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             return
 
         self.outbound_commands_counter[cmd.NAME] = (
-            self.outbound_commands_counter[cmd.NAME] + 1)
-        string = "%s %s" % (cmd.NAME, cmd.to_line(),)
+            self.outbound_commands_counter[cmd.NAME] + 1
+        )
+        string = "%s %s" % (cmd.NAME, cmd.to_line())
         if "\n" in string:
             raise Exception("Unexpected newline in command: %r", string)
 
-        self.sendLine(string.encode("utf-8"))
+        encoded_string = string.encode("utf-8")
+
+        if len(encoded_string) > self.MAX_LENGTH:
+            raise Exception(
+                "Failed to send command %s as too long (%d > %d)"
+                % (cmd.NAME, len(encoded_string), self.MAX_LENGTH)
+            )
+
+        self.sendLine(encoded_string)
 
         self.last_sent_command = self.clock.time_msec()
 
@@ -348,24 +379,33 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             self.transport.unregisterProducer()
 
     def __str__(self):
+        addr = None
+        if self.transport:
+            addr = str(self.transport.getPeer())
         return "ReplicationConnection<name=%s,conn_id=%s,addr=%s>" % (
-            self.name, self.conn_id, self.addr,
+            self.name,
+            self.conn_id,
+            addr,
         )
 
     def id(self):
         return "%s-%s" % (self.name, self.conn_id)
+
+    def lineLengthExceeded(self, line):
+        """Called when we receive a line that is above the maximum line length
+        """
+        self.send_error("Line length exceeded")
 
 
 class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
     VALID_INBOUND_COMMANDS = VALID_CLIENT_COMMANDS
     VALID_OUTBOUND_COMMANDS = VALID_SERVER_COMMANDS
 
-    def __init__(self, server_name, clock, streamer, addr):
+    def __init__(self, server_name, clock, streamer):
         BaseReplicationStreamProtocol.__init__(self, clock)  # Old style class
 
         self.server_name = server_name
         self.streamer = streamer
-        self.addr = addr
 
         # The streams the client has subscribed to and is up to date with
         self.replication_streams = set()
@@ -387,8 +427,8 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.name = cmd.data
 
     def on_USER_SYNC(self, cmd):
-        self.streamer.on_user_sync(
-            self.conn_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms,
+        return self.streamer.on_user_sync(
+            self.conn_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms
         )
 
     def on_REPLICATE(self, cmd):
@@ -397,29 +437,39 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
         if stream_name == "ALL":
             # Subscribe to all streams we're publishing to.
-            for stream in iterkeys(self.streamer.streams_by_name):
-                self.subscribe_to_stream(stream, token)
+            deferreds = [
+                run_in_background(self.subscribe_to_stream, stream, token)
+                for stream in iterkeys(self.streamer.streams_by_name)
+            ]
+
+            return make_deferred_yieldable(
+                defer.gatherResults(deferreds, consumeErrors=True)
+            )
         else:
-            self.subscribe_to_stream(stream_name, token)
+            return self.subscribe_to_stream(stream_name, token)
 
     def on_FEDERATION_ACK(self, cmd):
-        self.streamer.federation_ack(cmd.token)
+        return self.streamer.federation_ack(cmd.token)
 
     def on_REMOVE_PUSHER(self, cmd):
-        self.streamer.on_remove_pusher(cmd.app_id, cmd.push_key, cmd.user_id)
+        return self.streamer.on_remove_pusher(cmd.app_id, cmd.push_key, cmd.user_id)
 
     def on_INVALIDATE_CACHE(self, cmd):
-        self.streamer.on_invalidate_cache(cmd.cache_func, cmd.keys)
+        return self.streamer.on_invalidate_cache(cmd.cache_func, cmd.keys)
 
     def on_USER_IP(self, cmd):
-        self.streamer.on_user_ip(
-            cmd.user_id, cmd.access_token, cmd.ip, cmd.user_agent, cmd.device_id,
+        return self.streamer.on_user_ip(
+            cmd.user_id,
+            cmd.access_token,
+            cmd.ip,
+            cmd.user_agent,
+            cmd.device_id,
             cmd.last_seen,
         )
 
     @defer.inlineCallbacks
     def subscribe_to_stream(self, stream_name, token):
-        """Subscribe the remote to a streams.
+        """Subscribe the remote to a stream.
 
         This invloves checking if they've missed anything and sending those
         updates down if they have. During that time new updates for the stream
@@ -431,7 +481,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
         try:
             # Get missing updates
             updates, current_token = yield self.streamer.get_stream_updates(
-                stream_name, token,
+                stream_name, token
             )
 
             # Send all the missing updates
@@ -446,10 +496,35 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
             # Now we can send any updates that came in while we were subscribing
             pending_rdata = self.pending_rdata.pop(stream_name, [])
+            updates = []
             for token, update in pending_rdata:
-                # Only send updates newer than the current token
-                if token > current_token:
+                # If the token is null, it is part of a batch update. Batches
+                # are multiple updates that share a single token. To denote
+                # this, the token is set to None for all tokens in the batch
+                # except for the last. If we find a None token, we keep looking
+                # through tokens until we find one that is not None and then
+                # process all previous updates in the batch as if they had the
+                # final token.
+                if token is None:
+                    # Store this update as part of a batch
+                    updates.append(update)
+                    continue
+
+                if token <= current_token:
+                    # This update or batch of updates is older than
+                    # current_token, dismiss it
+                    updates = []
+                    continue
+
+                updates.append(update)
+
+                # Send all updates that are part of this batch with the
+                # found token
+                for update in updates:
                     self.send_command(RdataCommand(stream_name, token, update))
+
+                # Clear stored updates
+                updates = []
 
             # They're now fully subscribed
             self.replication_streams.add(stream_name)
@@ -494,6 +569,11 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.server_name = server_name
         self.handler = handler
 
+        # Set of stream names that have been subscribe to, but haven't yet
+        # caught up with. This is used to track when the client has been fully
+        # connected to the remote.
+        self.streams_connecting = set()
+
         # Map of stream to batched updates. See RdataCommand for info on how
         # batching works.
         self.pending_batches = {}
@@ -516,6 +596,10 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         # We've now finished connecting to so inform the client handler
         self.handler.update_connection(self)
 
+        # This will happen if we don't actually subscribe to any streams
+        if not self.streams_connecting:
+            self.handler.finished_connecting()
+
     def on_SERVER(self, cmd):
         if cmd.data != self.server_name:
             logger.error("[%s] Connected to wrong remote: %r", self.id(), cmd.data)
@@ -526,11 +610,10 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         inbound_rdata_count.labels(stream_name).inc()
 
         try:
-            row = STREAMS_MAP[stream_name].ROW_TYPE(*cmd.row)
+            row = STREAMS_MAP[stream_name].parse_row(cmd.row)
         except Exception:
             logger.exception(
-                "[%s] Failed to parse RDATA: %r %r",
-                self.id(), stream_name, cmd.row
+                "[%s] Failed to parse RDATA: %r %r", self.id(), stream_name, cmd.row
             )
             raise
 
@@ -542,14 +625,19 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
             # Check if this is the last of a batch of updates
             rows = self.pending_batches.pop(stream_name, [])
             rows.append(row)
-
-            self.handler.on_rdata(stream_name, cmd.token, rows)
+            return self.handler.on_rdata(stream_name, cmd.token, rows)
 
     def on_POSITION(self, cmd):
-        self.handler.on_position(cmd.stream_name, cmd.token)
+        # When we get a `POSITION` command it means we've finished getting
+        # missing updates for the given stream, and are now up to date.
+        self.streams_connecting.discard(cmd.stream_name)
+        if not self.streams_connecting:
+            self.handler.finished_connecting()
+
+        return self.handler.on_position(cmd.stream_name, cmd.token)
 
     def on_SYNC(self, cmd):
-        self.handler.on_sync(cmd.data)
+        return self.handler.on_sync(cmd.data)
 
     def replicate(self, stream_name, token):
         """Send the subscription request to the server
@@ -559,8 +647,12 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
         logger.info(
             "[%s] Subscribing to replication stream: %r from %r",
-            self.id(), stream_name, token
+            self.id(),
+            stream_name,
+            token,
         )
+
+        self.streams_connecting.add(stream_name)
 
         self.send_command(ReplicateCommand(stream_name, token))
 
@@ -574,10 +666,8 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 pending_commands = LaterGauge(
     "synapse_replication_tcp_protocol_pending_commands",
     "",
-    ["name", "conn_id"],
-    lambda: {
-        (p.name, p.conn_id): len(p.pending_commands) for p in connected_connections
-    },
+    ["name"],
+    lambda: {(p.name,): len(p.pending_commands) for p in connected_connections},
 )
 
 
@@ -591,10 +681,8 @@ def transport_buffer_size(protocol):
 transport_send_buffer = LaterGauge(
     "synapse_replication_tcp_protocol_transport_send_buffer",
     "",
-    ["name", "conn_id"],
-    lambda: {
-        (p.name, p.conn_id): transport_buffer_size(p) for p in connected_connections
-    },
+    ["name"],
+    lambda: {(p.name,): transport_buffer_size(p) for p in connected_connections},
 )
 
 
@@ -608,7 +696,7 @@ def transport_kernel_read_buffer_size(protocol, read=True):
             op = SIOCINQ
         else:
             op = SIOCOUTQ
-        size = struct.unpack("I", fcntl.ioctl(fileno, op, '\0\0\0\0'))[0]
+        size = struct.unpack("I", fcntl.ioctl(fileno, op, "\0\0\0\0"))[0]
         return size
     return 0
 
@@ -616,9 +704,9 @@ def transport_kernel_read_buffer_size(protocol, read=True):
 tcp_transport_kernel_send_buffer = LaterGauge(
     "synapse_replication_tcp_protocol_transport_kernel_send_buffer",
     "",
-    ["name", "conn_id"],
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): transport_kernel_read_buffer_size(p, False)
+        (p.name,): transport_kernel_read_buffer_size(p, False)
         for p in connected_connections
     },
 )
@@ -627,9 +715,9 @@ tcp_transport_kernel_send_buffer = LaterGauge(
 tcp_transport_kernel_read_buffer = LaterGauge(
     "synapse_replication_tcp_protocol_transport_kernel_read_buffer",
     "",
-    ["name", "conn_id"],
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): transport_kernel_read_buffer_size(p, True)
+        (p.name,): transport_kernel_read_buffer_size(p, True)
         for p in connected_connections
     },
 )
@@ -638,9 +726,9 @@ tcp_transport_kernel_read_buffer = LaterGauge(
 tcp_inbound_commands = LaterGauge(
     "synapse_replication_tcp_protocol_inbound_commands",
     "",
-    ["command", "name", "conn_id"],
+    ["command", "name"],
     lambda: {
-        (k[0], p.name, p.conn_id): count
+        (k, p.name): count
         for p in connected_connections
         for k, count in iteritems(p.inbound_commands_counter)
     },
@@ -649,9 +737,9 @@ tcp_inbound_commands = LaterGauge(
 tcp_outbound_commands = LaterGauge(
     "synapse_replication_tcp_protocol_outbound_commands",
     "",
-    ["command", "name", "conn_id"],
+    ["command", "name"],
     lambda: {
-        (k[0], p.name, p.conn_id): count
+        (k, p.name): count
         for p in connected_connections
         for k, count in iteritems(p.outbound_commands_counter)
     },

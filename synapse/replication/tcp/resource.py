@@ -16,6 +16,7 @@
 """
 
 import logging
+import random
 
 from six import itervalues
 
@@ -25,18 +26,22 @@ from twisted.internet import defer
 from twisted.internet.protocol import Factory
 
 from synapse.metrics import LaterGauge
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.metrics import Measure, measure_func
 
 from .protocol import ServerReplicationStreamProtocol
-from .streams import STREAMS_MAP, FederationStream
+from .streams import STREAMS_MAP
+from .streams.federation import FederationStream
 
-stream_updates_counter = Counter("synapse_replication_tcp_resource_stream_updates",
-                                 "", ["stream_name"])
+stream_updates_counter = Counter(
+    "synapse_replication_tcp_resource_stream_updates", "", ["stream_name"]
+)
 user_sync_counter = Counter("synapse_replication_tcp_resource_user_sync", "")
 federation_ack_counter = Counter("synapse_replication_tcp_resource_federation_ack", "")
 remove_pusher_counter = Counter("synapse_replication_tcp_resource_remove_pusher", "")
-invalidate_cache_counter = Counter("synapse_replication_tcp_resource_invalidate_cache",
-                                   "")
+invalidate_cache_counter = Counter(
+    "synapse_replication_tcp_resource_invalidate_cache", ""
+)
 user_ip_cache_counter = Counter("synapse_replication_tcp_resource_user_ip_cache", "")
 
 logger = logging.getLogger(__name__)
@@ -45,6 +50,7 @@ logger = logging.getLogger(__name__)
 class ReplicationStreamProtocolFactory(Factory):
     """Factory for new replication connections.
     """
+
     def __init__(self, hs):
         self.streamer = ReplicationStreamer(hs)
         self.clock = hs.get_clock()
@@ -52,10 +58,7 @@ class ReplicationStreamProtocolFactory(Factory):
 
     def buildProtocol(self, addr):
         return ServerReplicationStreamProtocol(
-            self.server_name,
-            self.clock,
-            self.streamer,
-            addr
+            self.server_name, self.clock, self.streamer
         )
 
 
@@ -73,32 +76,44 @@ class ReplicationStreamer(object):
         self.notifier = hs.get_notifier()
         self._server_notices_sender = hs.get_server_notices_sender()
 
+        self._replication_torture_level = hs.config.replication_torture_level
+
         # Current connections.
         self.connections = []
 
-        LaterGauge("synapse_replication_tcp_resource_total_connections", "", [],
-                   lambda: len(self.connections))
+        LaterGauge(
+            "synapse_replication_tcp_resource_total_connections",
+            "",
+            [],
+            lambda: len(self.connections),
+        )
 
         # List of streams that clients can subscribe to.
         # We only support federation stream if federation sending hase been
         # disabled on the master.
         self.streams = [
-            stream(hs) for stream in itervalues(STREAMS_MAP)
+            stream(hs)
+            for stream in itervalues(STREAMS_MAP)
             if stream != FederationStream or not hs.config.send_federation
         ]
 
         self.streams_by_name = {stream.NAME: stream for stream in self.streams}
 
         LaterGauge(
-            "synapse_replication_tcp_resource_connections_per_stream", "",
+            "synapse_replication_tcp_resource_connections_per_stream",
+            "",
             ["stream_name"],
             lambda: {
-                (stream_name,): len([
-                    conn for conn in self.connections
-                    if stream_name in conn.replication_streams
-                ])
+                (stream_name,): len(
+                    [
+                        conn
+                        for conn in self.connections
+                        if stream_name in conn.replication_streams
+                    ]
+                )
                 for stream_name in self.streams_by_name
-            })
+            },
+        )
 
         self.federation_sender = None
         if not hs.config.send_federation:
@@ -117,7 +132,6 @@ class ReplicationStreamer(object):
         for conn in self.connections:
             conn.send_error("server shutting down")
 
-    @defer.inlineCallbacks
     def on_notifier_poke(self):
         """Checks if there is actually any new data and sends it to the
         connections if there are.
@@ -132,14 +146,16 @@ class ReplicationStreamer(object):
                 stream.discard_updates_and_advance()
             return
 
-        # If we're in the process of checking for new updates, mark that fact
-        # and return
+        self.pending_updates = True
+
         if self.is_looping:
-            logger.debug("Noitifier poke loop already running")
-            self.pending_updates = True
+            logger.debug("Notifier poke loop already running")
             return
 
-        self.pending_updates = True
+        run_as_background_process("replication_notifier", self._run_notifier_loop)
+
+    @defer.inlineCallbacks
+    def _run_notifier_loop(self):
         self.is_looping = True
 
         try:
@@ -155,13 +171,28 @@ class ReplicationStreamer(object):
                     for stream in self.streams:
                         stream.advance_current_token()
 
-                    for stream in self.streams:
+                    all_streams = self.streams
+
+                    if self._replication_torture_level is not None:
+                        # there is no guarantee about ordering between the streams,
+                        # so let's shuffle them around a bit when we are in torture mode.
+                        all_streams = list(all_streams)
+                        random.shuffle(all_streams)
+
+                    for stream in all_streams:
                         if stream.last_token == stream.upto_token:
                             continue
 
+                        if self._replication_torture_level:
+                            yield self.clock.sleep(
+                                self._replication_torture_level / 1000.0
+                            )
+
                         logger.debug(
                             "Getting stream: %s: %s -> %s",
-                            stream.NAME, stream.last_token, stream.upto_token
+                            stream.NAME,
+                            stream.last_token,
+                            stream.upto_token,
                         )
                         try:
                             updates, current_token = yield stream.get_updates()
@@ -171,7 +202,8 @@ class ReplicationStreamer(object):
 
                         logger.debug(
                             "Sending %d updates to %d connections",
-                            len(updates), len(self.connections),
+                            len(updates),
+                            len(self.connections),
                         )
 
                         if updates:
@@ -225,7 +257,7 @@ class ReplicationStreamer(object):
         """
         user_sync_counter.inc()
         yield self.presence_handler.update_external_syncs_row(
-            conn_id, user_id, is_syncing, last_sync_ms,
+            conn_id, user_id, is_syncing, last_sync_ms
         )
 
     @measure_func("repl.on_remove_pusher")
@@ -254,7 +286,7 @@ class ReplicationStreamer(object):
         """
         user_ip_cache_counter.inc()
         yield self.store.insert_client_ip(
-            user_id, access_token, ip, user_agent, device_id, last_seen,
+            user_id, access_token, ip, user_agent, device_id, last_seen
         )
         yield self._server_notices_sender.on_user_ip(user_id)
 

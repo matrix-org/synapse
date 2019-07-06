@@ -1,1 +1,0 @@
-Attempt to reduce amount of state pulled out of DB during persist_events

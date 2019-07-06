@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,9 +21,11 @@
 # partial one for unit test mocking.
 
 # Imports required for the default HomeServer() implementation
+import abc
 import logging
 
 from twisted.enterprise import adbapi
+from twisted.mail.smtp import sendmail
 from twisted.web.client import BrowserLikePolicyForHTTPS
 
 from synapse.api.auth import Auth
@@ -29,40 +33,49 @@ from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
+from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
+from synapse.events.third_party_rules import ThirdPartyEventRules
+from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
     FederationServer,
+    ReplicationFederationHandlerRegistry,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
-from synapse.federation.transaction_queue import TransactionQueue
+from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler
 from synapse.handlers import Handlers
+from synapse.handlers.account_validity import AccountValidityHandler
+from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
-from synapse.handlers.device import DeviceHandler
+from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
+from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
+from synapse.handlers.register import RegistrationHandler
 from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
@@ -78,9 +91,10 @@ from synapse.rest.media.v1.media_repository import (
 from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
-from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
+from synapse.server_notices.worker_server_notices_sender import (
+    WorkerServerNoticesSender,
+)
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import DataStore
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -108,68 +122,88 @@ class HomeServer(object):
 
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
+        _listening_services (list[twisted.internet.tcp.Port]): TCP ports that
+            we are listening on to provide HTTP services.
     """
 
+    __metaclass__ = abc.ABCMeta
+
     DEPENDENCIES = [
-        'http_client',
-        'db_pool',
-        'federation_client',
-        'federation_server',
-        'handlers',
-        'auth',
-        'room_creation_handler',
-        'state_handler',
-        'state_resolution_handler',
-        'presence_handler',
-        'sync_handler',
-        'typing_handler',
-        'room_list_handler',
-        'auth_handler',
-        'device_handler',
-        'e2e_keys_handler',
-        'event_handler',
-        'event_stream_handler',
-        'initial_sync_handler',
-        'application_service_api',
-        'application_service_scheduler',
-        'application_service_handler',
-        'device_message_handler',
-        'profile_handler',
-        'event_creation_handler',
-        'deactivate_account_handler',
-        'set_password_handler',
-        'notifier',
-        'event_sources',
-        'keyring',
-        'pusherpool',
-        'event_builder_factory',
-        'filtering',
-        'http_client_context_factory',
-        'simple_http_client',
-        'media_repository',
-        'media_repository_resource',
-        'federation_transport_client',
-        'federation_sender',
-        'receipts_handler',
-        'macaroon_generator',
-        'tcp_replication',
-        'read_marker_handler',
-        'action_generator',
-        'user_directory_handler',
-        'groups_local_handler',
-        'groups_server_handler',
-        'groups_attestation_signing',
-        'groups_attestation_renewer',
-        'secrets',
-        'spam_checker',
-        'room_member_handler',
-        'federation_registry',
-        'server_notices_manager',
-        'server_notices_sender',
-        'message_handler',
-        'pagination_handler',
-        'room_context_handler',
+        "http_client",
+        "db_pool",
+        "federation_client",
+        "federation_server",
+        "handlers",
+        "auth",
+        "room_creation_handler",
+        "state_handler",
+        "state_resolution_handler",
+        "presence_handler",
+        "sync_handler",
+        "typing_handler",
+        "room_list_handler",
+        "acme_handler",
+        "auth_handler",
+        "device_handler",
+        "stats_handler",
+        "e2e_keys_handler",
+        "e2e_room_keys_handler",
+        "event_handler",
+        "event_stream_handler",
+        "initial_sync_handler",
+        "application_service_api",
+        "application_service_scheduler",
+        "application_service_handler",
+        "device_message_handler",
+        "profile_handler",
+        "event_creation_handler",
+        "deactivate_account_handler",
+        "set_password_handler",
+        "notifier",
+        "event_sources",
+        "keyring",
+        "pusherpool",
+        "event_builder_factory",
+        "filtering",
+        "http_client_context_factory",
+        "simple_http_client",
+        "media_repository",
+        "media_repository_resource",
+        "federation_transport_client",
+        "federation_sender",
+        "receipts_handler",
+        "macaroon_generator",
+        "tcp_replication",
+        "read_marker_handler",
+        "action_generator",
+        "user_directory_handler",
+        "groups_local_handler",
+        "groups_server_handler",
+        "groups_attestation_signing",
+        "groups_attestation_renewer",
+        "secrets",
+        "spam_checker",
+        "third_party_event_rules",
+        "room_member_handler",
+        "federation_registry",
+        "server_notices_manager",
+        "server_notices_sender",
+        "message_handler",
+        "pagination_handler",
+        "room_context_handler",
+        "sendmail",
+        "registration_handler",
+        "account_validity_handler",
+        "saml_handler",
+        "event_client_serializer",
     ]
+
+    REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
+
+    # This is overridden in derived application classes
+    # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
+    # instantiated during setup() for future return by get_datastore()
+    DATASTORE_CLASS = abc.abstractproperty()
 
     def __init__(self, hostname, reactor=None, **kwargs):
         """
@@ -182,10 +216,14 @@ class HomeServer(object):
         self._reactor = reactor
         self.hostname = hostname
         self._building = {}
+        self._listening_services = []
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
+        self.registration_ratelimiter = Ratelimiter()
+
+        self.datastore = None
 
         # Other kwargs are explicit dependencies
         for depname in kwargs:
@@ -193,8 +231,19 @@ class HomeServer(object):
 
     def setup(self):
         logger.info("Setting up.")
-        self.datastore = DataStore(self.get_db_conn(), self)
+        with self.get_db_conn() as conn:
+            self.datastore = self.DATASTORE_CLASS(conn, self)
+            conn.commit()
         logger.info("Finished setting up.")
+
+    def setup_master(self):
+        """
+        Some handlers have side effects on instantiation (like registering
+        background updates). This function causes them to be fetched, and
+        therefore instantiated, to run those side effects.
+        """
+        for i in self.REQUIRED_ON_MASTER_STARTUP:
+            getattr(self, "get_" + i)()
 
     def get_reactor(self):
         """
@@ -227,6 +276,9 @@ class HomeServer(object):
     def get_ratelimiter(self):
         return self.ratelimiter
 
+    def get_registration_ratelimiter(self):
+        return self.registration_ratelimiter
+
     def build_federation_client(self):
         return FederationClient(self)
 
@@ -255,6 +307,9 @@ class HomeServer(object):
     def build_room_creation_handler(self):
         return RoomCreationHandler(self)
 
+    def build_sendmail(self):
+        return sendmail
+
     def build_state_handler(self):
         return StateHandler(self)
 
@@ -280,13 +335,22 @@ class HomeServer(object):
         return MacaroonGenerator(self)
 
     def build_device_handler(self):
-        return DeviceHandler(self)
+        if self.config.worker_app:
+            return DeviceWorkerHandler(self)
+        else:
+            return DeviceHandler(self)
 
     def build_device_message_handler(self):
         return DeviceMessageHandler(self)
 
     def build_e2e_keys_handler(self):
         return E2eKeysHandler(self)
+
+    def build_e2e_room_keys_handler(self):
+        return E2eRoomKeysHandler(self)
+
+    def build_acme_handler(self):
+        return AcmeHandler(self)
 
     def build_application_service_api(self):
         return ApplicationServiceApi(self)
@@ -307,7 +371,10 @@ class HomeServer(object):
         return InitialSyncHandler(self)
 
     def build_profile_handler(self):
-        return ProfileHandler(self)
+        if self.config.worker_app:
+            return BaseProfileHandler(self)
+        else:
+            return MasterProfileHandler(self)
 
     def build_event_creation_handler(self):
         return EventCreationHandler(self)
@@ -325,10 +392,7 @@ class HomeServer(object):
         return Keyring(self)
 
     def build_event_builder_factory(self):
-        return EventBuilderFactory(
-            clock=self.get_clock(),
-            hostname=self.hostname,
-        )
+        return EventBuilderFactory(self)
 
     def build_filtering(self):
         return Filtering(self)
@@ -337,15 +401,16 @@ class HomeServer(object):
         return PusherPool(self)
 
     def build_http_client(self):
-        return MatrixFederationHttpClient(self)
+        tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+            self.config
+        )
+        return MatrixFederationHttpClient(self, tls_client_options_factory)
 
     def build_db_pool(self):
         name = self.db_config["name"]
 
         return adbapi.ConnectionPool(
-            name,
-            cp_reactor=self.get_reactor(),
-            **self.db_config.get("args", {})
+            name, cp_reactor=self.get_reactor(), **self.db_config.get("args", {})
         )
 
     def get_db_conn(self, run_new_connection=True):
@@ -357,7 +422,8 @@ class HomeServer(object):
         # Any param beginning with cp_ is a parameter for adbapi, and should
         # not be passed to the database engine.
         db_params = {
-            k: v for k, v in self.db_config.get("args", {}).items()
+            k: v
+            for k, v in self.db_config.get("args", {}).items()
             if not k.startswith("cp_")
         }
         db_conn = self.database_engine.module.connect(**db_params)
@@ -378,7 +444,7 @@ class HomeServer(object):
 
     def build_federation_sender(self):
         if self.should_send_federation():
-            return TransactionQueue(self)
+            return FederationSender(self)
         elif not self.config.worker_app:
             return FederationRemoteSendQueue(self)
         else:
@@ -414,8 +480,14 @@ class HomeServer(object):
     def build_secrets(self):
         return Secrets()
 
+    def build_stats_handler(self):
+        return StatsHandler(self)
+
     def build_spam_checker(self):
         return SpamChecker(self)
+
+    def build_third_party_event_rules(self):
+        return ThirdPartyEventRules(self)
 
     def build_room_member_handler(self):
         if self.config.worker_app:
@@ -423,7 +495,10 @@ class HomeServer(object):
         return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
-        return FederationHandlerRegistry()
+        if self.config.worker_app:
+            return ReplicationFederationHandlerRegistry(self)
+        else:
+            return FederationHandlerRegistry()
 
     def build_server_notices_manager(self):
         if self.config.worker_app:
@@ -443,6 +518,20 @@ class HomeServer(object):
 
     def build_room_context_handler(self):
         return RoomContextHandler(self)
+
+    def build_registration_handler(self):
+        return RegistrationHandler(self)
+
+    def build_account_validity_handler(self):
+        return AccountValidityHandler(self)
+
+    def build_saml_handler(self):
+        from synapse.handlers.saml_handler import SamlHandler
+
+        return SamlHandler(self)
+
+    def build_event_client_serializer(self):
+        return EventClientSerializer(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
@@ -470,9 +559,7 @@ def _make_dependency_method(depname):
         if builder:
             # Prevent cyclic dependencies from deadlocking
             if depname in hs._building:
-                raise ValueError("Cyclic dependency while building %s" % (
-                    depname,
-                ))
+                raise ValueError("Cyclic dependency while building %s" % (depname,))
             hs._building[depname] = 1
 
             dep = builder()
@@ -483,9 +570,7 @@ def _make_dependency_method(depname):
             return dep
 
         raise NotImplementedError(
-            "%s has no %s nor a builder for it" % (
-                type(hs).__name__, depname,
-            )
+            "%s has no %s nor a builder for it" % (type(hs).__name__, depname)
         )
 
     setattr(HomeServer, "get_%s" % (depname), _get)

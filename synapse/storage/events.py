@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,38 +17,46 @@
 
 import itertools
 import logging
-from collections import OrderedDict, deque, namedtuple
+from collections import Counter as c_counter, OrderedDict, deque, namedtuple
 from functools import wraps
 
-from six import iteritems
+from six import iteritems, text_type
 from six.moves import range
 
 from canonicaljson import json
-from prometheus_client import Counter
+from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
 
 import synapse.metrics
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
-# these are only included to make the type annotations work
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
+from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
+from synapse.logging.utils import log_function
+from synapse.metrics import BucketCollector
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.state import StateResolutionStore
+from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.events_worker import EventsWorkerStore
+from synapse.storage.state import StateGroupWorkerStore
 from synapse.types import RoomStreamToken, get_domain_from_id
-from synapse.util.async import ObservableDeferred
+from synapse.util import batch_iter
+from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.util.frozenutils import frozendict_json_encoder
-from synapse.util.logcontext import PreserveLoggingContext, make_deferred_yieldable
-from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
 persist_event_counter = Counter("synapse_storage_events_persisted_events", "")
-event_counter = Counter("synapse_storage_events_persisted_events_sep", "",
-                        ["type", "origin_type", "origin_entity"])
+event_counter = Counter(
+    "synapse_storage_events_persisted_events_sep",
+    "",
+    ["type", "origin_type", "origin_entity"],
+)
 
 # The number of times we are recalculating the current state
 state_delta_counter = Counter("synapse_storage_events_state_delta", "")
@@ -55,17 +64,40 @@ state_delta_counter = Counter("synapse_storage_events_state_delta", "")
 # The number of times we are recalculating state when there is only a
 # single forward extremity
 state_delta_single_event_counter = Counter(
-    "synapse_storage_events_state_delta_single_event", "")
+    "synapse_storage_events_state_delta_single_event", ""
+)
 
 # The number of times we are reculating state when we could have resonably
 # calculated the delta when we calculated the state for an event we were
 # persisting.
 state_delta_reuse_delta_counter = Counter(
-    "synapse_storage_events_state_delta_reuse_delta", "")
+    "synapse_storage_events_state_delta_reuse_delta", ""
+)
+
+# The number of forward extremities for each new event.
+forward_extremities_counter = Histogram(
+    "synapse_storage_events_forward_extremities_persisted",
+    "Number of forward extremities for each new event",
+    buckets=(1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
+)
+
+# The number of stale forward extremities for each new event. Stale extremities
+# are those that were in the previous set of extremities as well as the new.
+stale_forward_extremities_counter = Histogram(
+    "synapse_storage_events_stale_forward_extremities_persisted",
+    "Number of unchanged forward extremities for each new event",
+    buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
+)
 
 
 def encode_json(json_object):
-    return frozendict_json_encoder.encode(json_object)
+    """
+    Encode a Python object as JSON and return it in a Unicode string.
+    """
+    out = frozendict_json_encoder.encode(json_object)
+    if isinstance(out, bytes):
+        out = out.decode("utf8")
+    return out
 
 
 class _EventPeristenceQueue(object):
@@ -73,9 +105,9 @@ class _EventPeristenceQueue(object):
     concurrent transaction per room.
     """
 
-    _EventPersistQueueItem = namedtuple("_EventPersistQueueItem", (
-        "events_and_contexts", "backfilled", "deferred",
-    ))
+    _EventPersistQueueItem = namedtuple(
+        "_EventPersistQueueItem", ("events_and_contexts", "backfilled", "deferred")
+    )
 
     def __init__(self):
         self._event_persist_queues = {}
@@ -108,11 +140,13 @@ class _EventPeristenceQueue(object):
 
         deferred = ObservableDeferred(defer.Deferred(), consumeErrors=True)
 
-        queue.append(self._EventPersistQueueItem(
-            events_and_contexts=events_and_contexts,
-            backfilled=backfilled,
-            deferred=deferred,
-        ))
+        queue.append(
+            self._EventPersistQueueItem(
+                events_and_contexts=events_and_contexts,
+                backfilled=backfilled,
+                deferred=deferred,
+            )
+        )
 
         return deferred.observe()
 
@@ -142,15 +176,14 @@ class _EventPeristenceQueue(object):
             try:
                 queue = self._get_drainining_queue(room_id)
                 for item in queue:
-                    # handle_queue_loop runs in the sentinel logcontext, so
-                    # there is no need to preserve_fn when running the
-                    # callbacks on the deferred.
                     try:
                         ret = yield per_item_callback(item)
+                    except Exception:
+                        with PreserveLoggingContext():
+                            item.deferred.errback()
+                    else:
                         with PreserveLoggingContext():
                             item.deferred.callback(ret)
-                    except Exception:
-                        item.deferred.errback()
             finally:
                 queue = self._event_persist_queues.pop(room_id, None)
                 if queue:
@@ -181,6 +214,7 @@ def _retry_on_integrity_error(func):
     Args:
         func: function that returns a Deferred and accepts a `delete_existing` arg
     """
+
     @wraps(func)
     @defer.inlineCallbacks
     def f(self, *args, **kwargs):
@@ -194,50 +228,66 @@ def _retry_on_integrity_error(func):
     return f
 
 
-class EventsStore(EventsWorkerStore):
-    EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
-    EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
-
+# inherits from EventFederationStore so that we can call _update_backward_extremities
+# and _handle_mult_prev_events (though arguably those could both be moved in here)
+class EventsStore(
+    StateGroupWorkerStore,
+    EventFederationStore,
+    EventsWorkerStore,
+    BackgroundUpdateStore,
+):
     def __init__(self, db_conn, hs):
         super(EventsStore, self).__init__(db_conn, hs)
-        self.register_background_update_handler(
-            self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts
-        )
-        self.register_background_update_handler(
-            self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME,
-            self._background_reindex_fields_sender,
-        )
-
-        self.register_background_index_update(
-            "event_contains_url_index",
-            index_name="event_contains_url_index",
-            table="events",
-            columns=["room_id", "topological_ordering", "stream_ordering"],
-            where_clause="contains_url = true AND outlier = false",
-        )
-
-        # an event_id index on event_search is useful for the purge_history
-        # api. Plus it means we get to enforce some integrity with a UNIQUE
-        # clause
-        self.register_background_index_update(
-            "event_search_event_id_idx",
-            index_name="event_search_event_id_idx",
-            table="event_search",
-            columns=["event_id"],
-            unique=True,
-            psql_only=True,
-        )
 
         self._event_persist_queue = _EventPeristenceQueue()
-
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
+        # Collect metrics on the number of forward extremities that exist.
+        # Counter of number of extremities to count
+        self._current_forward_extremities_amount = c_counter()
+
+        BucketCollector(
+            "synapse_forward_extremities",
+            lambda: self._current_forward_extremities_amount,
+            buckets=[1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"],
+        )
+
+        # Read the extrems every 60 minutes
+        def read_forward_extremities():
+            # run as a background process to make sure that the database transactions
+            # have a logcontext to report to
+            return run_as_background_process(
+                "read_forward_extremities", self._read_forward_extremities
+            )
+
+        hs.get_clock().looping_call(read_forward_extremities, 60 * 60 * 1000)
+
+    @defer.inlineCallbacks
+    def _read_forward_extremities(self):
+        def fetch(txn):
+            txn.execute(
+                """
+                select count(*) c from event_forward_extremities
+                group by room_id
+                """
+            )
+            return txn.fetchall()
+
+        res = yield self.runInteraction("read_forward_extremities", fetch)
+        self._current_forward_extremities_amount = c_counter(list(x[0] for x in res))
+
+    @defer.inlineCallbacks
     def persist_events(self, events_and_contexts, backfilled=False):
         """
         Write events to the database
         Args:
             events_and_contexts: list of tuples of (event, context)
-            backfilled: ?
+            backfilled (bool): Whether the results are retrieved from federation
+                via backfill or not. Used to determine if they're "new" events
+                which might update the current state etc.
+
+        Returns:
+            Deferred[int]: the stream ordering of the latest persisted event
         """
         partitioned = {}
         for event, ctx in events_and_contexts:
@@ -246,17 +296,20 @@ class EventsStore(EventsWorkerStore):
         deferreds = []
         for room_id, evs_ctxs in iteritems(partitioned):
             d = self._event_persist_queue.add_to_queue(
-                room_id, evs_ctxs,
-                backfilled=backfilled,
+                room_id, evs_ctxs, backfilled=backfilled
             )
             deferreds.append(d)
 
         for room_id in partitioned:
             self._maybe_start_persisting(room_id)
 
-        return make_deferred_yieldable(
+        yield make_deferred_yieldable(
             defer.gatherResults(deferreds, consumeErrors=True)
         )
+
+        max_persisted_id = yield self._stream_id_gen.get_current_token()
+
+        defer.returnValue(max_persisted_id)
 
     @defer.inlineCallbacks
     @log_function
@@ -273,8 +326,7 @@ class EventsStore(EventsWorkerStore):
             and the stream ordering of the latest persisted event
         """
         deferred = self._event_persist_queue.add_to_queue(
-            event.room_id, [(event, context)],
-            backfilled=backfilled,
+            event.room_id, [(event, context)], backfilled=backfilled
         )
 
         self._maybe_start_persisting(event.room_id)
@@ -289,16 +341,16 @@ class EventsStore(EventsWorkerStore):
         def persisting_queue(item):
             with Measure(self._clock, "persist_events"):
                 yield self._persist_events(
-                    item.events_and_contexts,
-                    backfilled=item.backfilled,
+                    item.events_and_contexts, backfilled=item.backfilled
                 )
 
         self._event_persist_queue.handle_queue(room_id, persisting_queue)
 
     @_retry_on_integrity_error
     @defer.inlineCallbacks
-    def _persist_events(self, events_and_contexts, backfilled=False,
-                        delete_existing=False):
+    def _persist_events(
+        self, events_and_contexts, backfilled=False, delete_existing=False
+    ):
         """Persist events to db
 
         Args:
@@ -322,13 +374,11 @@ class EventsStore(EventsWorkerStore):
             )
 
         with stream_ordering_manager as stream_orderings:
-            for (event, context), stream, in zip(
-                events_and_contexts, stream_orderings
-            ):
+            for (event, context), stream in zip(events_and_contexts, stream_orderings):
                 event.internal_metadata.stream_ordering = stream
 
             chunks = [
-                events_and_contexts[x:x + 100]
+                events_and_contexts[x : x + 100]
                 for x in range(0, len(events_and_contexts), 100)
             ]
 
@@ -367,12 +417,10 @@ class EventsStore(EventsWorkerStore):
                             )
 
                         for room_id, ev_ctx_rm in iteritems(events_by_room):
-                            # Work out new extremities by recursively adding and removing
-                            # the new events.
                             latest_event_ids = yield self.get_latest_event_ids_in_room(
                                 room_id
                             )
-                            new_latest_event_ids = yield self._calculate_new_extremeties(
+                            new_latest_event_ids = yield self._calculate_new_extremities(
                                 room_id, ev_ctx_rm, latest_event_ids
                             )
 
@@ -380,6 +428,12 @@ class EventsStore(EventsWorkerStore):
                             if new_latest_event_ids == latest_event_ids:
                                 # No change in extremities, so no change in state
                                 continue
+
+                            # there should always be at least one forward extremity.
+                            # (except during the initial persistence of the send_join
+                            # results, in which case there will be no existing
+                            # extremities, so we'll `continue` above and skip this bit.)
+                            assert new_latest_event_ids, "No forward extremities left!"
 
                             new_forward_extremeties[room_id] = new_latest_event_ids
 
@@ -389,7 +443,7 @@ class EventsStore(EventsWorkerStore):
                             )
                             if len_1:
                                 all_single_prev_not_state = all(
-                                    len(event.prev_events) == 1
+                                    len(event.prev_event_ids()) == 1
                                     and not event.is_state()
                                     for event, ctx in ev_ctx_rm
                                 )
@@ -413,17 +467,14 @@ class EventsStore(EventsWorkerStore):
                                 # guess this by looking at the prev_events and checking
                                 # if they match the current forward extremities.
                                 for ev, _ in ev_ctx_rm:
-                                    prev_event_ids = set(e for e, _ in ev.prev_events)
+                                    prev_event_ids = set(ev.prev_event_ids())
                                     if latest_event_ids == prev_event_ids:
                                         state_delta_reuse_delta_counter.inc()
                                         break
 
-                            logger.info(
-                                "Calculating state delta for room %s", room_id,
-                            )
+                            logger.info("Calculating state delta for room %s", room_id)
                             with Measure(
-                                self._clock,
-                                "persist_events.get_new_state_after_events",
+                                self._clock, "persist_events.get_new_state_after_events"
                             ):
                                 res = yield self._get_new_state_after_events(
                                     room_id,
@@ -443,11 +494,10 @@ class EventsStore(EventsWorkerStore):
                                 state_delta_for_room[room_id] = ([], delta_ids)
                             elif current_state is not None:
                                 with Measure(
-                                    self._clock,
-                                    "persist_events.calculate_state_delta",
+                                    self._clock, "persist_events.calculate_state_delta"
                                 ):
                                     delta = yield self._calculate_state_delta(
-                                        room_id, current_state,
+                                        room_id, current_state
                                     )
                                 state_delta_for_room[room_id] = delta
 
@@ -466,9 +516,14 @@ class EventsStore(EventsWorkerStore):
                     new_forward_extremeties=new_forward_extremeties,
                 )
                 persist_event_counter.inc(len(chunk))
-                synapse.metrics.event_persisted_position.set(
-                    chunk[-1][0].internal_metadata.stream_ordering,
-                )
+
+                if not backfilled:
+                    # backfilled events have negative stream orderings, so we don't
+                    # want to set the event_persisted_position to that.
+                    synapse.metrics.event_persisted_position.set(
+                        chunk[-1][0].internal_metadata.stream_ordering
+                    )
+
                 for event, context in chunk:
                     if context.app_service:
                         origin_type = "local"
@@ -483,9 +538,7 @@ class EventsStore(EventsWorkerStore):
                     event_counter.labels(event.type, origin_type, origin_entity).inc()
 
                 for room_id, new_state in iteritems(current_state_for_room):
-                    self.get_current_state_ids.prefill(
-                        (room_id, ), new_state
-                    )
+                    self.get_current_state_ids.prefill((room_id,), new_state)
 
                 for room_id, latest_event_ids in iteritems(new_forward_extremeties):
                     self.get_latest_event_ids_in_room.prefill(
@@ -493,49 +546,161 @@ class EventsStore(EventsWorkerStore):
                     )
 
     @defer.inlineCallbacks
-    def _calculate_new_extremeties(self, room_id, event_contexts, latest_event_ids):
-        """Calculates the new forward extremeties for a room given events to
+    def _calculate_new_extremities(self, room_id, event_contexts, latest_event_ids):
+        """Calculates the new forward extremities for a room given events to
         persist.
 
         Assumes that we are only persisting events for one room at a time.
         """
-        new_latest_event_ids = set(latest_event_ids)
-        # First, add all the new events to the list
-        new_latest_event_ids.update(
-            event.event_id for event, ctx in event_contexts
-            if not event.internal_metadata.is_outlier() and not ctx.rejected
-        )
-        # Now remove all events that are referenced by the to-be-added events
-        new_latest_event_ids.difference_update(
-            e_id
+
+        # we're only interested in new events which aren't outliers and which aren't
+        # being rejected.
+        new_events = [
+            event
             for event, ctx in event_contexts
-            for e_id, _ in event.prev_events
-            if not event.internal_metadata.is_outlier() and not ctx.rejected
+            if not event.internal_metadata.is_outlier()
+            and not ctx.rejected
+            and not event.internal_metadata.is_soft_failed()
+        ]
+
+        latest_event_ids = set(latest_event_ids)
+
+        # start with the existing forward extremities
+        result = set(latest_event_ids)
+
+        # add all the new events to the list
+        result.update(event.event_id for event in new_events)
+
+        # Now remove all events which are prev_events of any of the new events
+        result.difference_update(
+            e_id for event in new_events for e_id in event.prev_event_ids()
         )
 
-        # And finally remove any events that are referenced by previously added
-        # events.
-        rows = yield self._simple_select_many_batch(
-            table="event_edges",
-            column="prev_event_id",
-            iterable=list(new_latest_event_ids),
-            retcols=["prev_event_id"],
-            keyvalues={
-                "room_id": room_id,
-                "is_state": False,
-            },
-            desc="_calculate_new_extremeties",
-        )
+        # Remove any events which are prev_events of any existing events.
+        existing_prevs = yield self._get_events_which_are_prevs(result)
+        result.difference_update(existing_prevs)
 
-        new_latest_event_ids.difference_update(
-            row["prev_event_id"] for row in rows
+        # Finally handle the case where the new events have soft-failed prev
+        # events. If they do we need to remove them and their prev events,
+        # otherwise we end up with dangling extremities.
+        existing_prevs = yield self._get_prevs_before_rejected(
+            e_id for event in new_events for e_id in event.prev_event_ids()
         )
+        result.difference_update(existing_prevs)
 
-        defer.returnValue(new_latest_event_ids)
+        # We only update metrics for events that change forward extremities
+        # (e.g. we ignore backfill/outliers/etc)
+        if result != latest_event_ids:
+            forward_extremities_counter.observe(len(result))
+            stale = latest_event_ids & result
+            stale_forward_extremities_counter.observe(len(stale))
+
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _get_new_state_after_events(self, room_id, events_context, old_latest_event_ids,
-                                    new_latest_event_ids):
+    def _get_events_which_are_prevs(self, event_ids):
+        """Filter the supplied list of event_ids to get those which are prev_events of
+        existing (non-outlier/rejected) events.
+
+        Args:
+            event_ids (Iterable[str]): event ids to filter
+
+        Returns:
+            Deferred[List[str]]: filtered event ids
+        """
+        results = []
+
+        def _get_events_which_are_prevs_txn(txn, batch):
+            sql = """
+            SELECT prev_event_id, internal_metadata
+            FROM event_edges
+                INNER JOIN events USING (event_id)
+                LEFT JOIN rejections USING (event_id)
+                LEFT JOIN event_json USING (event_id)
+            WHERE
+                prev_event_id IN (%s)
+                AND NOT events.outlier
+                AND rejections.event_id IS NULL
+            """ % (
+                ",".join("?" for _ in batch),
+            )
+
+            txn.execute(sql, batch)
+            results.extend(r[0] for r in txn if not json.loads(r[1]).get("soft_failed"))
+
+        for chunk in batch_iter(event_ids, 100):
+            yield self.runInteraction(
+                "_get_events_which_are_prevs", _get_events_which_are_prevs_txn, chunk
+            )
+
+        defer.returnValue(results)
+
+    @defer.inlineCallbacks
+    def _get_prevs_before_rejected(self, event_ids):
+        """Get soft-failed ancestors to remove from the extremities.
+
+        Given a set of events, find all those that have been soft-failed or
+        rejected. Returns those soft failed/rejected events and their prev
+        events (whether soft-failed/rejected or not), and recurses up the
+        prev-event graph until it finds no more soft-failed/rejected events.
+
+        This is used to find extremities that are ancestors of new events, but
+        are separated by soft failed events.
+
+        Args:
+            event_ids (Iterable[str]): Events to find prev events for. Note
+                that these must have already been persisted.
+
+        Returns:
+            Deferred[set[str]]
+        """
+
+        # The set of event_ids to return. This includes all soft-failed events
+        # and their prev events.
+        existing_prevs = set()
+
+        def _get_prevs_before_rejected_txn(txn, batch):
+            to_recursively_check = batch
+
+            while to_recursively_check:
+                sql = """
+                SELECT
+                    event_id, prev_event_id, internal_metadata,
+                    rejections.event_id IS NOT NULL
+                FROM event_edges
+                    INNER JOIN events USING (event_id)
+                    LEFT JOIN rejections USING (event_id)
+                    LEFT JOIN event_json USING (event_id)
+                WHERE
+                    event_id IN (%s)
+                    AND NOT events.outlier
+                """ % (
+                    ",".join("?" for _ in to_recursively_check),
+                )
+
+                txn.execute(sql, to_recursively_check)
+                to_recursively_check = []
+
+                for event_id, prev_event_id, metadata, rejected in txn:
+                    if prev_event_id in existing_prevs:
+                        continue
+
+                    soft_failed = json.loads(metadata).get("soft_failed")
+                    if soft_failed or rejected:
+                        to_recursively_check.append(prev_event_id)
+                        existing_prevs.add(prev_event_id)
+
+        for chunk in batch_iter(event_ids, 100):
+            yield self.runInteraction(
+                "_get_prevs_before_rejected", _get_prevs_before_rejected_txn, chunk
+            )
+
+        defer.returnValue(existing_prevs)
+
+    @defer.inlineCallbacks
+    def _get_new_state_after_events(
+        self, room_id, events_context, old_latest_event_ids, new_latest_event_ids
+    ):
         """Calculate the current state dict after adding some new events to
         a room
 
@@ -563,10 +728,6 @@ class EventsStore(EventsWorkerStore):
             the new current state is only returned if we've already calculated
             it.
         """
-
-        if not new_latest_event_ids:
-            return
-
         # map from state_group to ((type, key) -> event_id) state map
         state_groups_map = {}
 
@@ -575,11 +736,13 @@ class EventsStore(EventsWorkerStore):
 
         for ev, ctx in events_context:
             if ctx.state_group is None:
-                # I don't think this can happen, but let's double-check
-                raise Exception(
-                    "Context for new extremity event %s has no state "
-                    "group" % (ev.event_id, ),
-                )
+                # This should only happen for outlier events.
+                if not ev.internal_metadata.is_outlier():
+                    raise Exception(
+                        "Context for new event %s has no state "
+                        "group" % (ev.event_id,)
+                    )
+                continue
 
             if ctx.state_group in state_groups_map:
                 continue
@@ -607,7 +770,7 @@ class EventsStore(EventsWorkerStore):
         for event_id in new_latest_event_ids:
             # First search in the list of new events we're adding.
             for ev, ctx in events_context:
-                if event_id == ev.event_id:
+                if event_id == ev.event_id and ctx.state_group is not None:
                     event_id_to_state_group[event_id] = ctx.state_group
                     break
             else:
@@ -617,9 +780,7 @@ class EventsStore(EventsWorkerStore):
 
         if missing_event_ids:
             # Now pull out the state groups for any missing events from DB
-            event_to_groups = yield self._get_state_group_for_events(
-                missing_event_ids,
-            )
+            event_to_groups = yield self._get_state_group_for_events(missing_event_ids)
             event_id_to_state_group.update(event_to_groups)
 
         # State groups of old_latest_event_ids
@@ -645,9 +806,7 @@ class EventsStore(EventsWorkerStore):
             new_state_group = next(iter(new_state_groups))
             old_state_group = next(iter(old_state_groups))
 
-            delta_ids = state_group_deltas.get(
-                (old_state_group, new_state_group,), None
-            )
+            delta_ids = state_group_deltas.get((old_state_group, new_state_group), None)
             if delta_ids is not None:
                 # We have a delta from the existing to new current state,
                 # so lets just return that. If we happen to already have
@@ -670,19 +829,29 @@ class EventsStore(EventsWorkerStore):
 
         # Ok, we need to defer to the state handler to resolve our state sets.
 
-        def get_events(ev_ids):
-            return self.get_events(
-                ev_ids, get_prev_content=False, check_redacted=False,
-            )
-
-        state_groups = {
-            sg: state_groups_map[sg] for sg in new_state_groups
-        }
+        state_groups = {sg: state_groups_map[sg] for sg in new_state_groups}
 
         events_map = {ev.event_id: ev for ev, _ in events_context}
+
+        # We need to get the room version, which is in the create event.
+        # Normally that'd be in the database, but its also possible that we're
+        # currently trying to persist it.
+        room_version = None
+        for ev, _ in events_context:
+            if ev.type == EventTypes.Create and ev.state_key == "":
+                room_version = ev.content.get("room_version", "1")
+                break
+
+        if not room_version:
+            room_version = yield self.get_room_version(room_id)
+
         logger.debug("calling resolve_state_groups from preserve_events")
         res = yield self._state_resolution_handler.resolve_state_groups(
-            room_id, state_groups, events_map, get_events
+            room_id,
+            room_version,
+            state_groups,
+            events_map,
+            state_res_store=StateResolutionStore(self),
         )
 
         defer.returnValue((res.state, None))
@@ -700,22 +869,26 @@ class EventsStore(EventsWorkerStore):
         """
         existing_state = yield self.get_current_state_ids(room_id)
 
-        to_delete = [
-            key for key in existing_state
-            if key not in current_state
-        ]
+        to_delete = [key for key in existing_state if key not in current_state]
 
         to_insert = {
-            key: ev_id for key, ev_id in iteritems(current_state)
+            key: ev_id
+            for key, ev_id in iteritems(current_state)
             if ev_id != existing_state.get(key)
         }
 
         defer.returnValue((to_delete, to_insert))
 
     @log_function
-    def _persist_events_txn(self, txn, events_and_contexts, backfilled,
-                            delete_existing=False, state_delta_for_room={},
-                            new_forward_extremeties={}):
+    def _persist_events_txn(
+        self,
+        txn,
+        events_and_contexts,
+        backfilled,
+        delete_existing=False,
+        state_delta_for_room={},
+        new_forward_extremeties={},
+    ):
         """Insert some number of room events into the necessary database tables.
 
         Rejected events are only inserted into the events table, the events_json table,
@@ -742,9 +915,10 @@ class EventsStore(EventsWorkerStore):
         """
         all_events_and_contexts = events_and_contexts
 
+        min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering
         max_stream_order = events_and_contexts[-1][0].internal_metadata.stream_ordering
 
-        self._update_current_state_txn(txn, state_delta_for_room, max_stream_order)
+        self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)
 
         self._update_forward_extremities_txn(
             txn,
@@ -754,20 +928,17 @@ class EventsStore(EventsWorkerStore):
 
         # Ensure that we don't have the same event twice.
         events_and_contexts = self._filter_events_and_contexts_for_duplicates(
-            events_and_contexts,
+            events_and_contexts
         )
 
         self._update_room_depths_txn(
-            txn,
-            events_and_contexts=events_and_contexts,
-            backfilled=backfilled,
+            txn, events_and_contexts=events_and_contexts, backfilled=backfilled
         )
 
         # _update_outliers_txn filters out any events which have already been
         # persisted, and returns the filtered list.
         events_and_contexts = self._update_outliers_txn(
-            txn,
-            events_and_contexts=events_and_contexts,
+            txn, events_and_contexts=events_and_contexts
         )
 
         # From this point onwards the events are only events that we haven't
@@ -778,24 +949,38 @@ class EventsStore(EventsWorkerStore):
             # for these events so we can reinsert them.
             # This gets around any problems with some tables already having
             # entries.
-            self._delete_existing_rows_txn(
-                txn,
-                events_and_contexts=events_and_contexts,
-            )
+            self._delete_existing_rows_txn(txn, events_and_contexts=events_and_contexts)
 
-        self._store_event_txn(
-            txn,
-            events_and_contexts=events_and_contexts,
-        )
+        self._store_event_txn(txn, events_and_contexts=events_and_contexts)
 
         # Insert into event_to_state_groups.
         self._store_event_state_mappings_txn(txn, events_and_contexts)
 
+        # We want to store event_auth mappings for rejected events, as they're
+        # used in state res v2.
+        # This is only necessary if the rejected event appears in an accepted
+        # event's auth chain, but its easier for now just to store them (and
+        # it doesn't take much storage compared to storing the entire event
+        # anyway).
+        self._simple_insert_many_txn(
+            txn,
+            table="event_auth",
+            values=[
+                {
+                    "event_id": event.event_id,
+                    "room_id": event.room_id,
+                    "auth_id": auth_id,
+                }
+                for event, _ in events_and_contexts
+                for auth_id in event.auth_event_ids()
+                if event.is_state()
+            ],
+        )
+
         # _store_rejected_events_txn filters out any events which were
         # rejected, and returns the filtered list.
         events_and_contexts = self._store_rejected_events_txn(
-            txn,
-            events_and_contexts=events_and_contexts,
+            txn, events_and_contexts=events_and_contexts
         )
 
         # From this point onwards the events are only ones that weren't
@@ -808,124 +993,129 @@ class EventsStore(EventsWorkerStore):
             backfilled=backfilled,
         )
 
-    def _update_current_state_txn(self, txn, state_delta_by_room, max_stream_order):
+    def _update_current_state_txn(self, txn, state_delta_by_room, stream_id):
         for room_id, current_state_tuple in iteritems(state_delta_by_room):
-                to_delete, to_insert = current_state_tuple
+            to_delete, to_insert = current_state_tuple
 
-                # First we add entries to the current_state_delta_stream. We
-                # do this before updating the current_state_events table so
-                # that we can use it to calculate the `prev_event_id`. (This
-                # allows us to not have to pull out the existing state
-                # unnecessarily).
-                sql = """
-                    INSERT INTO current_state_delta_stream
-                    (stream_id, room_id, type, state_key, event_id, prev_event_id)
-                    SELECT ?, ?, ?, ?, ?, (
-                        SELECT event_id FROM current_state_events
-                        WHERE room_id = ? AND type = ? AND state_key = ?
-                    )
-                """
-                txn.executemany(sql, (
+            # First we add entries to the current_state_delta_stream. We
+            # do this before updating the current_state_events table so
+            # that we can use it to calculate the `prev_event_id`. (This
+            # allows us to not have to pull out the existing state
+            # unnecessarily).
+            #
+            # The stream_id for the update is chosen to be the minimum of the stream_ids
+            # for the batch of the events that we are persisting; that means we do not
+            # end up in a situation where workers see events before the
+            # current_state_delta updates.
+            #
+            sql = """
+                INSERT INTO current_state_delta_stream
+                (stream_id, room_id, type, state_key, event_id, prev_event_id)
+                SELECT ?, ?, ?, ?, ?, (
+                    SELECT event_id FROM current_state_events
+                    WHERE room_id = ? AND type = ? AND state_key = ?
+                )
+            """
+            txn.executemany(
+                sql,
+                (
                     (
-                        max_stream_order, room_id, etype, state_key, None,
-                        room_id, etype, state_key,
+                        stream_id,
+                        room_id,
+                        etype,
+                        state_key,
+                        None,
+                        room_id,
+                        etype,
+                        state_key,
                     )
                     for etype, state_key in to_delete
                     # We sanity check that we're deleting rather than updating
                     if (etype, state_key) not in to_insert
-                ))
-                txn.executemany(sql, (
+                ),
+            )
+            txn.executemany(
+                sql,
+                (
                     (
-                        max_stream_order, room_id, etype, state_key, ev_id,
-                        room_id, etype, state_key,
+                        stream_id,
+                        room_id,
+                        etype,
+                        state_key,
+                        ev_id,
+                        room_id,
+                        etype,
+                        state_key,
                     )
                     for (etype, state_key), ev_id in iteritems(to_insert)
-                ))
+                ),
+            )
 
-                # Now we actually update the current_state_events table
+            # Now we actually update the current_state_events table
 
-                txn.executemany(
-                    "DELETE FROM current_state_events"
-                    " WHERE room_id = ? AND type = ? AND state_key = ?",
-                    (
-                        (room_id, etype, state_key)
-                        for etype, state_key in itertools.chain(to_delete, to_insert)
-                    ),
-                )
+            txn.executemany(
+                "DELETE FROM current_state_events"
+                " WHERE room_id = ? AND type = ? AND state_key = ?",
+                (
+                    (room_id, etype, state_key)
+                    for etype, state_key in itertools.chain(to_delete, to_insert)
+                ),
+            )
 
-                self._simple_insert_many_txn(
-                    txn,
-                    table="current_state_events",
-                    values=[
-                        {
-                            "event_id": ev_id,
-                            "room_id": room_id,
-                            "type": key[0],
-                            "state_key": key[1],
-                        }
-                        for key, ev_id in iteritems(to_insert)
-                    ],
-                )
+            self._simple_insert_many_txn(
+                txn,
+                table="current_state_events",
+                values=[
+                    {
+                        "event_id": ev_id,
+                        "room_id": room_id,
+                        "type": key[0],
+                        "state_key": key[1],
+                    }
+                    for key, ev_id in iteritems(to_insert)
+                ],
+            )
 
+            txn.call_after(
+                self._curr_state_delta_stream_cache.entity_has_changed,
+                room_id,
+                stream_id,
+            )
+
+            # Invalidate the various caches
+
+            # Figure out the changes of membership to invalidate the
+            # `get_rooms_for_user` cache.
+            # We find out which membership events we may have deleted
+            # and which we have added, then we invlidate the caches for all
+            # those users.
+            members_changed = set(
+                state_key
+                for ev_type, state_key in itertools.chain(to_delete, to_insert)
+                if ev_type == EventTypes.Member
+            )
+
+            for member in members_changed:
                 txn.call_after(
-                    self._curr_state_delta_stream_cache.entity_has_changed,
-                    room_id, max_stream_order,
+                    self.get_rooms_for_user_with_stream_ordering.invalidate, (member,)
                 )
 
-                # Invalidate the various caches
+            self._invalidate_state_caches_and_stream(txn, room_id, members_changed)
 
-                # Figure out the changes of membership to invalidate the
-                # `get_rooms_for_user` cache.
-                # We find out which membership events we may have deleted
-                # and which we have added, then we invlidate the caches for all
-                # those users.
-                members_changed = set(
-                    state_key
-                    for ev_type, state_key in itertools.chain(to_delete, to_insert)
-                    if ev_type == EventTypes.Member
-                )
-
-                for member in members_changed:
-                    self._invalidate_cache_and_stream(
-                        txn, self.get_rooms_for_user_with_stream_ordering, (member,)
-                    )
-
-                for host in set(get_domain_from_id(u) for u in members_changed):
-                    self._invalidate_cache_and_stream(
-                        txn, self.is_host_joined, (room_id, host)
-                    )
-                    self._invalidate_cache_and_stream(
-                        txn, self.was_host_joined, (room_id, host)
-                    )
-
-                self._invalidate_cache_and_stream(
-                    txn, self.get_users_in_room, (room_id,)
-                )
-
-                self._invalidate_cache_and_stream(
-                    txn, self.get_current_state_ids, (room_id,)
-                )
-
-    def _update_forward_extremities_txn(self, txn, new_forward_extremities,
-                                        max_stream_order):
+    def _update_forward_extremities_txn(
+        self, txn, new_forward_extremities, max_stream_order
+    ):
         for room_id, new_extrem in iteritems(new_forward_extremities):
             self._simple_delete_txn(
-                txn,
-                table="event_forward_extremities",
-                keyvalues={"room_id": room_id},
+                txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
-            txn.call_after(
-                self.get_latest_event_ids_in_room.invalidate, (room_id,)
-            )
+            txn.call_after(self.get_latest_event_ids_in_room.invalidate, (room_id,))
 
         self._simple_insert_many_txn(
             txn,
             table="event_forward_extremities",
             values=[
-                {
-                    "event_id": ev_id,
-                    "room_id": room_id,
-                }
+                {"event_id": ev_id, "room_id": room_id}
                 for room_id, new_extrem in iteritems(new_forward_extremities)
                 for ev_id in new_extrem
             ],
@@ -945,7 +1135,7 @@ class EventsStore(EventsWorkerStore):
                 }
                 for room_id, new_extrem in iteritems(new_forward_extremities)
                 for event_id in new_extrem
-            ]
+            ],
         )
 
     @classmethod
@@ -989,7 +1179,8 @@ class EventsStore(EventsWorkerStore):
             if not backfilled:
                 txn.call_after(
                     self._events_stream_cache.entity_has_changed,
-                    event.room_id, event.internal_metadata.stream_ordering,
+                    event.room_id,
+                    event.internal_metadata.stream_ordering,
                 )
 
             if not event.internal_metadata.is_outlier() and not context.rejected:
@@ -1016,16 +1207,12 @@ class EventsStore(EventsWorkerStore):
             are already in the events table.
         """
         txn.execute(
-            "SELECT event_id, outlier FROM events WHERE event_id in (%s)" % (
-                ",".join(["?"] * len(events_and_contexts)),
-            ),
-            [event.event_id for event, _ in events_and_contexts]
+            "SELECT event_id, outlier FROM events WHERE event_id in (%s)"
+            % (",".join(["?"] * len(events_and_contexts)),),
+            [event.event_id for event, _ in events_and_contexts],
         )
 
-        have_persisted = {
-            event_id: outlier
-            for event_id, outlier in txn
-        }
+        have_persisted = {event_id: outlier for event_id, outlier in txn}
 
         to_remove = set()
         for event, context in events_and_contexts:
@@ -1052,18 +1239,12 @@ class EventsStore(EventsWorkerStore):
                     logger.exception("")
                     raise
 
-                metadata_json = encode_json(
-                    event.internal_metadata.get_dict()
-                ).decode("UTF-8")
+                metadata_json = encode_json(event.internal_metadata.get_dict())
 
                 sql = (
-                    "UPDATE event_json SET internal_metadata = ?"
-                    " WHERE event_id = ?"
+                    "UPDATE event_json SET internal_metadata = ?" " WHERE event_id = ?"
                 )
-                txn.execute(
-                    sql,
-                    (metadata_json, event.event_id,)
-                )
+                txn.execute(sql, (metadata_json, event.event_id))
 
                 # Add an entry to the ex_outlier_stream table to replicate the
                 # change in outlier status to our workers.
@@ -1076,25 +1257,17 @@ class EventsStore(EventsWorkerStore):
                         "event_stream_ordering": stream_order,
                         "event_id": event.event_id,
                         "state_group": state_group_id,
-                    }
+                    },
                 )
 
-                sql = (
-                    "UPDATE events SET outlier = ?"
-                    " WHERE event_id = ?"
-                )
-                txn.execute(
-                    sql,
-                    (False, event.event_id,)
-                )
+                sql = "UPDATE events SET outlier = ?" " WHERE event_id = ?"
+                txn.execute(sql, (False, event.event_id))
 
                 # Update the event_backward_extremities table now that this
                 # event isn't an outlier any more.
                 self._update_backward_extremeties(txn, [event])
 
-        return [
-            ec for ec in events_and_contexts if ec[0] not in to_remove
-        ]
+        return [ec for ec in events_and_contexts if ec[0] not in to_remove]
 
     @classmethod
     def _delete_existing_rows_txn(cls, txn, events_and_contexts):
@@ -1105,39 +1278,33 @@ class EventsStore(EventsWorkerStore):
         logger.info("Deleting existing")
 
         for table in (
-                "events",
-                "event_auth",
-                "event_json",
-                "event_content_hashes",
-                "event_destinations",
-                "event_edge_hashes",
-                "event_edges",
-                "event_forward_extremities",
-                "event_reference_hashes",
-                "event_search",
-                "event_signatures",
-                "event_to_state_groups",
-                "guest_access",
-                "history_visibility",
-                "local_invites",
-                "room_names",
-                "state_events",
-                "rejections",
-                "redactions",
-                "room_memberships",
-                "topics"
+            "events",
+            "event_auth",
+            "event_json",
+            "event_edges",
+            "event_forward_extremities",
+            "event_reference_hashes",
+            "event_search",
+            "event_to_state_groups",
+            "guest_access",
+            "history_visibility",
+            "local_invites",
+            "room_names",
+            "state_events",
+            "rejections",
+            "redactions",
+            "room_memberships",
+            "topics",
         ):
             txn.executemany(
                 "DELETE FROM %s WHERE event_id = ?" % (table,),
-                [(ev.event_id,) for ev, _ in events_and_contexts]
+                [(ev.event_id,) for ev, _ in events_and_contexts],
             )
 
-        for table in (
-            "event_push_actions",
-        ):
+        for table in ("event_push_actions",):
             txn.executemany(
                 "DELETE FROM %s WHERE room_id = ? AND event_id = ?" % (table,),
-                [(ev.event_id,) for ev, _ in events_and_contexts]
+                [(ev.room_id, ev.event_id) for ev, _ in events_and_contexts],
             )
 
     def _store_event_txn(self, txn, events_and_contexts):
@@ -1168,8 +1335,9 @@ class EventsStore(EventsWorkerStore):
                     "room_id": event.room_id,
                     "internal_metadata": encode_json(
                         event.internal_metadata.get_dict()
-                    ).decode("UTF-8"),
-                    "json": encode_json(event_dict(event)).decode("UTF-8"),
+                    ),
+                    "json": encode_json(event_dict(event)),
+                    "format_version": event.format_version,
                 }
                 for event, _ in events_and_contexts
             ],
@@ -1188,13 +1356,12 @@ class EventsStore(EventsWorkerStore):
                     "type": event.type,
                     "processed": True,
                     "outlier": event.internal_metadata.is_outlier(),
-                    "content": encode_json(event.content).decode("UTF-8"),
                     "origin_server_ts": int(event.origin_server_ts),
                     "received_ts": self._clock.time_msec(),
                     "sender": event.sender,
                     "contains_url": (
                         "url" in event.content
-                        and isinstance(event.content["url"], basestring)
+                        and isinstance(event.content["url"], text_type)
                     ),
                 }
                 for event, _ in events_and_contexts
@@ -1220,17 +1387,14 @@ class EventsStore(EventsWorkerStore):
         for event, context in events_and_contexts:
             if context.rejected:
                 # Insert the event_id into the rejections table
-                self._store_rejections_txn(
-                    txn, event.event_id, context.rejected
-                )
+                self._store_rejections_txn(txn, event.event_id, context.rejected)
                 to_remove.add(event)
 
-        return [
-            ec for ec in events_and_contexts if ec[0] not in to_remove
-        ]
+        return [ec for ec in events_and_contexts if ec[0] not in to_remove]
 
-    def _update_metadata_tables_txn(self, txn, events_and_contexts,
-                                    all_events_and_contexts, backfilled):
+    def _update_metadata_tables_txn(
+        self, txn, events_and_contexts, all_events_and_contexts, backfilled
+    ):
         """Update all the miscellaneous tables for new events
 
         Args:
@@ -1263,26 +1427,13 @@ class EventsStore(EventsWorkerStore):
                     txn, event.room_id, event.redacts
                 )
 
-        self._simple_insert_many_txn(
-            txn,
-            table="event_auth",
-            values=[
-                {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "auth_id": auth_id,
-                }
-                for event, _ in events_and_contexts
-                for auth_id, _ in event.auth_events
-                if event.is_state()
-            ],
-        )
+                # Remove from relations table.
+                self._handle_redaction(txn, event.redacts)
 
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
         self._handle_mult_prev_events(
-            txn,
-            events=[event for event, _ in events_and_contexts],
+            txn, events=[event for event, _ in events_and_contexts]
         )
 
         for event, _ in events_and_contexts:
@@ -1304,6 +1455,8 @@ class EventsStore(EventsWorkerStore):
             elif event.type == EventTypes.GuestAccess:
                 # Insert into the event_search table.
                 self._store_guest_access_txn(txn, event)
+
+            self._handle_event_relations(txn, event)
 
         # Insert into the room_memberships table.
         self._store_room_members_txn(
@@ -1340,26 +1493,7 @@ class EventsStore(EventsWorkerStore):
 
             state_values.append(vals)
 
-        self._simple_insert_many_txn(
-            txn,
-            table="state_events",
-            values=state_values,
-        )
-
-        self._simple_insert_many_txn(
-            txn,
-            table="event_edges",
-            values=[
-                {
-                    "event_id": event.event_id,
-                    "prev_event_id": prev_id,
-                    "room_id": event.room_id,
-                    "is_state": True,
-                }
-                for event, _ in state_events_and_contexts
-                for prev_id, _ in event.prev_state
-            ],
-        )
+        self._simple_insert_many_txn(txn, table="state_events", values=state_values)
 
         # Prefill the event cache
         self._add_to_cache(txn, events_and_contexts)
@@ -1370,10 +1504,7 @@ class EventsStore(EventsWorkerStore):
         rows = []
         N = 200
         for i in range(0, len(events_and_contexts), N):
-            ev_map = {
-                e[0].event_id: e[0]
-                for e in events_and_contexts[i:i + N]
-            }
+            ev_map = {e[0].event_id: e[0] for e in events_and_contexts[i : i + N]}
             if not ev_map:
                 break
 
@@ -1393,14 +1524,14 @@ class EventsStore(EventsWorkerStore):
             for row in rows:
                 event = ev_map[row["event_id"]]
                 if not row["rejects"] and not row["redacts"]:
-                    to_prefill.append(_EventCacheEntry(
-                        event=event,
-                        redacted_event=None,
-                    ))
+                    to_prefill.append(
+                        _EventCacheEntry(event=event, redacted_event=None)
+                    )
 
         def prefill():
             for cache_entry in to_prefill:
                 self._get_event_cache.prefill((cache_entry[0].event_id,), cache_entry)
+
         txn.call_after(prefill)
 
     def _store_redaction(self, txn, event):
@@ -1408,90 +1539,8 @@ class EventsStore(EventsWorkerStore):
         txn.call_after(self._invalidate_get_event_cache, event.redacts)
         txn.execute(
             "INSERT INTO redactions (event_id, redacts) VALUES (?,?)",
-            (event.event_id, event.redacts)
+            (event.event_id, event.redacts),
         )
-
-    @defer.inlineCallbacks
-    def have_events_in_timeline(self, event_ids):
-        """Given a list of event ids, check if we have already processed and
-        stored them as non outliers.
-        """
-        rows = yield self._simple_select_many_batch(
-            table="events",
-            retcols=("event_id",),
-            column="event_id",
-            iterable=list(event_ids),
-            keyvalues={"outlier": False},
-            desc="have_events_in_timeline",
-        )
-
-        defer.returnValue(set(r["event_id"] for r in rows))
-
-    @defer.inlineCallbacks
-    def have_seen_events(self, event_ids):
-        """Given a list of event ids, check if we have already processed them.
-
-        Args:
-            event_ids (iterable[str]):
-
-        Returns:
-            Deferred[set[str]]: The events we have already seen.
-        """
-        results = set()
-
-        def have_seen_events_txn(txn, chunk):
-            sql = (
-                "SELECT event_id FROM events as e WHERE e.event_id IN (%s)"
-                % (",".join("?" * len(chunk)), )
-            )
-            txn.execute(sql, chunk)
-            for (event_id, ) in txn:
-                results.add(event_id)
-
-        # break the input up into chunks of 100
-        input_iterator = iter(event_ids)
-        for chunk in iter(lambda: list(itertools.islice(input_iterator, 100)),
-                          []):
-            yield self.runInteraction(
-                "have_seen_events",
-                have_seen_events_txn,
-                chunk,
-            )
-        defer.returnValue(results)
-
-    def get_seen_events_with_rejections(self, event_ids):
-        """Given a list of event ids, check if we rejected them.
-
-        Args:
-            event_ids (list[str])
-
-        Returns:
-            Deferred[dict[str, str|None):
-                Has an entry for each event id we already have seen. Maps to
-                the rejected reason string if we rejected the event, else maps
-                to None.
-        """
-        if not event_ids:
-            return defer.succeed({})
-
-        def f(txn):
-            sql = (
-                "SELECT e.event_id, reason FROM events as e "
-                "LEFT JOIN rejections as r ON e.event_id = r.event_id "
-                "WHERE e.event_id = ?"
-            )
-
-            res = {}
-            for event_id in event_ids:
-                txn.execute(sql, (event_id,))
-                row = txn.fetchone()
-                if row:
-                    _, rejected = row
-                    res[event_id] = rejected
-
-            return res
-
-        return self.runInteraction("get_rejection_reasons", f)
 
     @defer.inlineCallbacks
     def count_daily_messages(self):
@@ -1501,6 +1550,7 @@ class EventsStore(EventsWorkerStore):
         If it has been significantly less or more than one day since the last
         call to this function, it will return None.
         """
+
         def _count_messages(txn):
             sql = """
                 SELECT COALESCE(COUNT(*), 0) FROM events
@@ -1528,7 +1578,7 @@ class EventsStore(EventsWorkerStore):
                 AND stream_ordering > ?
             """
 
-            txn.execute(sql, (like_clause, self.stream_ordering_day_ago,))
+            txn.execute(sql, (like_clause, self.stream_ordering_day_ago))
             count, = txn.fetchone()
             return count
 
@@ -1550,160 +1600,6 @@ class EventsStore(EventsWorkerStore):
         ret = yield self.runInteraction("count_daily_active_rooms", _count)
         defer.returnValue(ret)
 
-    @defer.inlineCallbacks
-    def _background_reindex_fields_sender(self, progress, batch_size):
-        target_min_stream_id = progress["target_min_stream_id_inclusive"]
-        max_stream_id = progress["max_stream_id_exclusive"]
-        rows_inserted = progress.get("rows_inserted", 0)
-
-        INSERT_CLUMP_SIZE = 1000
-
-        def reindex_txn(txn):
-            sql = (
-                "SELECT stream_ordering, event_id, json FROM events"
-                " INNER JOIN event_json USING (event_id)"
-                " WHERE ? <= stream_ordering AND stream_ordering < ?"
-                " ORDER BY stream_ordering DESC"
-                " LIMIT ?"
-            )
-
-            txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
-
-            rows = txn.fetchall()
-            if not rows:
-                return 0
-
-            min_stream_id = rows[-1][0]
-
-            update_rows = []
-            for row in rows:
-                try:
-                    event_id = row[1]
-                    event_json = json.loads(row[2])
-                    sender = event_json["sender"]
-                    content = event_json["content"]
-
-                    contains_url = "url" in content
-                    if contains_url:
-                        contains_url &= isinstance(content["url"], basestring)
-                except (KeyError, AttributeError):
-                    # If the event is missing a necessary field then
-                    # skip over it.
-                    continue
-
-                update_rows.append((sender, contains_url, event_id))
-
-            sql = (
-                "UPDATE events SET sender = ?, contains_url = ? WHERE event_id = ?"
-            )
-
-            for index in range(0, len(update_rows), INSERT_CLUMP_SIZE):
-                clump = update_rows[index:index + INSERT_CLUMP_SIZE]
-                txn.executemany(sql, clump)
-
-            progress = {
-                "target_min_stream_id_inclusive": target_min_stream_id,
-                "max_stream_id_exclusive": min_stream_id,
-                "rows_inserted": rows_inserted + len(rows)
-            }
-
-            self._background_update_progress_txn(
-                txn, self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, progress
-            )
-
-            return len(rows)
-
-        result = yield self.runInteraction(
-            self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, reindex_txn
-        )
-
-        if not result:
-            yield self._end_background_update(self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME)
-
-        defer.returnValue(result)
-
-    @defer.inlineCallbacks
-    def _background_reindex_origin_server_ts(self, progress, batch_size):
-        target_min_stream_id = progress["target_min_stream_id_inclusive"]
-        max_stream_id = progress["max_stream_id_exclusive"]
-        rows_inserted = progress.get("rows_inserted", 0)
-
-        INSERT_CLUMP_SIZE = 1000
-
-        def reindex_search_txn(txn):
-            sql = (
-                "SELECT stream_ordering, event_id FROM events"
-                " WHERE ? <= stream_ordering AND stream_ordering < ?"
-                " ORDER BY stream_ordering DESC"
-                " LIMIT ?"
-            )
-
-            txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
-
-            rows = txn.fetchall()
-            if not rows:
-                return 0
-
-            min_stream_id = rows[-1][0]
-            event_ids = [row[1] for row in rows]
-
-            rows_to_update = []
-
-            chunks = [
-                event_ids[i:i + 100]
-                for i in range(0, len(event_ids), 100)
-            ]
-            for chunk in chunks:
-                ev_rows = self._simple_select_many_txn(
-                    txn,
-                    table="event_json",
-                    column="event_id",
-                    iterable=chunk,
-                    retcols=["event_id", "json"],
-                    keyvalues={},
-                )
-
-                for row in ev_rows:
-                    event_id = row["event_id"]
-                    event_json = json.loads(row["json"])
-                    try:
-                        origin_server_ts = event_json["origin_server_ts"]
-                    except (KeyError, AttributeError):
-                        # If the event is missing a necessary field then
-                        # skip over it.
-                        continue
-
-                    rows_to_update.append((origin_server_ts, event_id))
-
-            sql = (
-                "UPDATE events SET origin_server_ts = ? WHERE event_id = ?"
-            )
-
-            for index in range(0, len(rows_to_update), INSERT_CLUMP_SIZE):
-                clump = rows_to_update[index:index + INSERT_CLUMP_SIZE]
-                txn.executemany(sql, clump)
-
-            progress = {
-                "target_min_stream_id_inclusive": target_min_stream_id,
-                "max_stream_id_exclusive": min_stream_id,
-                "rows_inserted": rows_inserted + len(rows_to_update)
-            }
-
-            self._background_update_progress_txn(
-                txn, self.EVENT_ORIGIN_SERVER_TS_NAME, progress
-            )
-
-            return len(rows_to_update)
-
-        result = yield self.runInteraction(
-            self.EVENT_ORIGIN_SERVER_TS_NAME, reindex_search_txn
-        )
-
-        if not result:
-            yield self._end_background_update(self.EVENT_ORIGIN_SERVER_TS_NAME)
-
-        defer.returnValue(result)
-
     def get_current_backfill_token(self):
         """The current minimum token that backfilled events have reached"""
         return -self._backfill_id_gen.get_current_token()
@@ -1719,10 +1615,11 @@ class EventsStore(EventsWorkerStore):
         def get_all_new_forward_event_rows(txn):
             sql = (
                 "SELECT e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " state_key, redacts"
+                " state_key, redacts, relates_to_id"
                 " FROM events AS e"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? < stream_ordering AND stream_ordering <= ?"
                 " ORDER BY stream_ordering ASC"
                 " LIMIT ?"
@@ -1737,11 +1634,12 @@ class EventsStore(EventsWorkerStore):
 
             sql = (
                 "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " state_key, redacts"
+                " state_key, redacts, relates_to_id"
                 " FROM events AS e"
                 " INNER JOIN ex_outlier_stream USING (event_id)"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? < event_stream_ordering"
                 " AND event_stream_ordering <= ?"
                 " ORDER BY event_stream_ordering DESC"
@@ -1750,6 +1648,7 @@ class EventsStore(EventsWorkerStore):
             new_event_updates.extend(txn)
 
             return new_event_updates
+
         return self.runInteraction(
             "get_all_new_forward_event_rows", get_all_new_forward_event_rows
         )
@@ -1761,10 +1660,11 @@ class EventsStore(EventsWorkerStore):
         def get_all_new_backfill_event_rows(txn):
             sql = (
                 "SELECT -e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " state_key, redacts"
+                " state_key, redacts, relates_to_id"
                 " FROM events AS e"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? > stream_ordering AND stream_ordering >= ?"
                 " ORDER BY stream_ordering ASC"
                 " LIMIT ?"
@@ -1779,11 +1679,12 @@ class EventsStore(EventsWorkerStore):
 
             sql = (
                 "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " state_key, redacts"
+                " state_key, redacts, relates_to_id"
                 " FROM events AS e"
                 " INNER JOIN ex_outlier_stream USING (event_id)"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? > event_stream_ordering"
                 " AND event_stream_ordering >= ?"
                 " ORDER BY event_stream_ordering DESC"
@@ -1792,13 +1693,20 @@ class EventsStore(EventsWorkerStore):
             new_event_updates.extend(txn.fetchall())
 
             return new_event_updates
+
         return self.runInteraction(
             "get_all_new_backfill_event_rows", get_all_new_backfill_event_rows
         )
 
     @cached(num_args=5, max_entries=10)
-    def get_all_new_events(self, last_backfill_id, last_forward_id,
-                           current_backfill_id, current_forward_id, limit):
+    def get_all_new_events(
+        self,
+        last_backfill_id,
+        last_forward_id,
+        current_backfill_id,
+        current_forward_id,
+        limit,
+    ):
         """Get all the new events that have arrived at the server either as
         new events or as backfilled events"""
         have_backfill_events = last_backfill_id != current_backfill_id
@@ -1873,14 +1781,15 @@ class EventsStore(EventsWorkerStore):
                 backward_ex_outliers = []
 
             return AllNewEventsResult(
-                new_forward_events, new_backfill_events,
-                forward_ex_outliers, backward_ex_outliers,
+                new_forward_events,
+                new_backfill_events,
+                forward_ex_outliers,
+                backward_ex_outliers,
             )
+
         return self.runInteraction("get_all_new_events", get_all_new_events_txn)
 
-    def purge_history(
-        self, room_id, token, delete_local_events,
-    ):
+    def purge_history(self, room_id, token, delete_local_events):
         """Deletes room history before a certain point
 
         Args:
@@ -1896,28 +1805,24 @@ class EventsStore(EventsWorkerStore):
 
         return self.runInteraction(
             "purge_history",
-            self._purge_history_txn, room_id, token,
+            self._purge_history_txn,
+            room_id,
+            token,
             delete_local_events,
         )
 
-    def _purge_history_txn(
-        self, txn, room_id, token_str, delete_local_events,
-    ):
+    def _purge_history_txn(self, txn, room_id, token_str, delete_local_events):
         token = RoomStreamToken.parse(token_str)
 
         # Tables that should be pruned:
         #     event_auth
         #     event_backward_extremities
-        #     event_content_hashes
-        #     event_destinations
-        #     event_edge_hashes
         #     event_edges
         #     event_forward_extremities
         #     event_json
         #     event_push_actions
         #     event_reference_hashes
         #     event_search
-        #     event_signatures
         #     event_to_state_groups
         #     events
         #     rejections
@@ -1942,20 +1847,6 @@ class EventsStore(EventsWorkerStore):
             ")"
         )
 
-        # create an index on should_delete because later we'll be looking for
-        # the should_delete / shouldn't_delete subsets
-        txn.execute(
-            "CREATE INDEX events_to_purge_should_delete"
-            " ON events_to_purge(should_delete)",
-        )
-
-        # We do joins against events_to_purge for e.g. calculating state
-        # groups to purge, etc., so lets make an index.
-        txn.execute(
-            "CREATE INDEX events_to_purge_id"
-            " ON events_to_purge(event_id)",
-        )
-
         # First ensure that we're not about to delete all the forward extremeties
         txn.execute(
             "SELECT e.event_id, e.depth FROM events as e "
@@ -1963,13 +1854,13 @@ class EventsStore(EventsWorkerStore):
             "ON e.event_id = f.event_id "
             "AND e.room_id = f.room_id "
             "WHERE f.room_id = ?",
-            (room_id,)
+            (room_id,),
         )
         rows = txn.fetchall()
-        max_depth = max(row[0] for row in rows)
+        max_depth = max(row[1] for row in rows)
 
-        if max_depth <= token.topological:
-            # We need to ensure we don't delete all the events from the datanase
+        if max_depth < token.topological:
+            # We need to ensure we don't delete all the events from the database
             # otherwise we wouldn't be able to send any events (due to not
             # having any backwards extremeties)
             raise SynapseError(
@@ -1982,26 +1873,42 @@ class EventsStore(EventsWorkerStore):
         should_delete_params = ()
         if not delete_local_events:
             should_delete_expr += " AND event_id NOT LIKE ?"
-            should_delete_params += ("%:" + self.hs.hostname, )
+
+            # We include the parameter twice since we use the expression twice
+            should_delete_params += ("%:" + self.hs.hostname, "%:" + self.hs.hostname)
 
         should_delete_params += (room_id, token.topological)
 
+        # Note that we insert events that are outliers and aren't going to be
+        # deleted, as nothing will happen to them.
         txn.execute(
             "INSERT INTO events_to_purge"
             " SELECT event_id, %s"
             " FROM events AS e LEFT JOIN state_events USING (event_id)"
-            " WHERE e.room_id = ? AND topological_ordering < ?" % (
-                should_delete_expr,
-            ),
+            " WHERE (NOT outlier OR (%s)) AND e.room_id = ? AND topological_ordering < ?"
+            % (should_delete_expr, should_delete_expr),
             should_delete_params,
         )
+
+        # We create the indices *after* insertion as that's a lot faster.
+
+        # create an index on should_delete because later we'll be looking for
+        # the should_delete / shouldn't_delete subsets
         txn.execute(
-            "SELECT event_id, should_delete FROM events_to_purge"
+            "CREATE INDEX events_to_purge_should_delete"
+            " ON events_to_purge(should_delete)"
         )
+
+        # We do joins against events_to_purge for e.g. calculating state
+        # groups to purge, etc., so lets make an index.
+        txn.execute("CREATE INDEX events_to_purge_id" " ON events_to_purge(event_id)")
+
+        txn.execute("SELECT event_id, should_delete FROM events_to_purge")
         event_rows = txn.fetchall()
         logger.info(
             "[purge] found %i events before cutoff, of which %i can be deleted",
-            len(event_rows), sum(1 for e in event_rows if e[1]),
+            len(event_rows),
+            sum(1 for e in event_rows if e[1]),
         )
 
         logger.info("[purge] Finding new backward extremities")
@@ -2013,101 +1920,67 @@ class EventsStore(EventsWorkerStore):
             "SELECT DISTINCT e.event_id FROM events_to_purge AS e"
             " INNER JOIN event_edges AS ed ON e.event_id = ed.prev_event_id"
             " LEFT JOIN events_to_purge AS ep2 ON ed.event_id = ep2.event_id"
-            " WHERE ep2.event_id IS NULL",
+            " WHERE ep2.event_id IS NULL"
         )
         new_backwards_extrems = txn.fetchall()
 
         logger.info("[purge] replacing backward extremities: %r", new_backwards_extrems)
 
         txn.execute(
-            "DELETE FROM event_backward_extremities WHERE room_id = ?",
-            (room_id,)
+            "DELETE FROM event_backward_extremities WHERE room_id = ?", (room_id,)
         )
 
         # Update backward extremeties
         txn.executemany(
             "INSERT INTO event_backward_extremities (room_id, event_id)"
             " VALUES (?, ?)",
-            [
-                (room_id, event_id) for event_id, in new_backwards_extrems
-            ]
+            [(room_id, event_id) for event_id, in new_backwards_extrems],
         )
 
         logger.info("[purge] finding redundant state groups")
 
-        # Get all state groups that are only referenced by events that are
-        # to be deleted.
-        # This works by first getting state groups that we may want to delete,
-        # joining against event_to_state_groups to get events that use that
-        # state group, then left joining against events_to_purge again. Any
-        # state group where the left join produce *no nulls* are referenced
-        # only by events that are going to be purged.
-        txn.execute("""
-            SELECT state_group FROM
-            (
-                SELECT DISTINCT state_group FROM events_to_purge
-                INNER JOIN event_to_state_groups USING (event_id)
-            ) AS sp
-            INNER JOIN event_to_state_groups USING (state_group)
-            LEFT JOIN events_to_purge AS ep USING (event_id)
-            GROUP BY state_group
-            HAVING SUM(CASE WHEN ep.event_id IS NULL THEN 1 ELSE 0 END) = 0
-        """)
+        # Get all state groups that are referenced by events that are to be
+        # deleted. We then go and check if they are referenced by other events
+        # or state groups, and if not we delete them.
+        txn.execute(
+            """
+            SELECT DISTINCT state_group FROM events_to_purge
+            INNER JOIN event_to_state_groups USING (event_id)
+        """
+        )
 
-        state_rows = txn.fetchall()
-        logger.info("[purge] found %i redundant state groups", len(state_rows))
+        referenced_state_groups = set(sg for sg, in txn)
+        logger.info(
+            "[purge] found %i referenced state groups", len(referenced_state_groups)
+        )
 
-        # make a set of the redundant state groups, so that we can look them up
-        # efficiently
-        state_groups_to_delete = set([sg for sg, in state_rows])
+        logger.info("[purge] finding state groups that can be deleted")
 
-        # Now we get all the state groups that rely on these state groups
-        logger.info("[purge] finding state groups which depend on redundant"
-                    " state groups")
-        remaining_state_groups = []
-        for i in range(0, len(state_rows), 100):
-            chunk = [sg for sg, in state_rows[i:i + 100]]
-            # look for state groups whose prev_state_group is one we are about
-            # to delete
-            rows = self._simple_select_many_txn(
-                txn,
-                table="state_group_edges",
-                column="prev_state_group",
-                iterable=chunk,
-                retcols=["state_group"],
-                keyvalues={},
-            )
-            remaining_state_groups.extend(
-                row["state_group"] for row in rows
+        _ = self._find_unreferenced_groups_during_purge(txn, referenced_state_groups)
+        state_groups_to_delete, remaining_state_groups = _
 
-                # exclude state groups we are about to delete: no point in
-                # updating them
-                if row["state_group"] not in state_groups_to_delete
-            )
+        logger.info(
+            "[purge] found %i state groups to delete", len(state_groups_to_delete)
+        )
+
+        logger.info(
+            "[purge] de-delta-ing %i remaining state groups",
+            len(remaining_state_groups),
+        )
 
         # Now we turn the state groups that reference to-be-deleted state
         # groups to non delta versions.
         for sg in remaining_state_groups:
             logger.info("[purge] de-delta-ing remaining state group %s", sg)
-            curr_state = self._get_state_groups_from_groups_txn(
-                txn, [sg], types=None
-            )
+            curr_state = self._get_state_groups_from_groups_txn(txn, [sg])
             curr_state = curr_state[sg]
 
             self._simple_delete_txn(
-                txn,
-                table="state_groups_state",
-                keyvalues={
-                    "state_group": sg,
-                }
+                txn, table="state_groups_state", keyvalues={"state_group": sg}
             )
 
             self._simple_delete_txn(
-                txn,
-                table="state_group_edges",
-                keyvalues={
-                    "state_group": sg,
-                }
+                txn, table="state_group_edges", keyvalues={"state_group": sg}
             )
 
             self._simple_insert_many_txn(
@@ -2128,11 +2001,11 @@ class EventsStore(EventsWorkerStore):
         logger.info("[purge] removing redundant state groups")
         txn.executemany(
             "DELETE FROM state_groups_state WHERE state_group = ?",
-            state_rows
+            ((sg,) for sg in state_groups_to_delete),
         )
         txn.executemany(
             "DELETE FROM state_groups WHERE id = ?",
-            state_rows
+            ((sg,) for sg in state_groups_to_delete),
         )
 
         logger.info("[purge] removing events from event_to_state_groups")
@@ -2141,23 +2014,17 @@ class EventsStore(EventsWorkerStore):
             "WHERE event_id IN (SELECT event_id from events_to_purge)"
         )
         for event_id, _ in event_rows:
-            txn.call_after(self._get_state_group_for_event.invalidate, (
-                event_id,
-            ))
+            txn.call_after(self._get_state_group_for_event.invalidate, (event_id,))
 
         # Delete all remote non-state events
         for table in (
             "events",
             "event_json",
             "event_auth",
-            "event_content_hashes",
-            "event_destinations",
-            "event_edge_hashes",
             "event_edges",
             "event_forward_extremities",
             "event_reference_hashes",
             "event_search",
-            "event_signatures",
             "rejections",
         ):
             logger.info("[purge] removing events from %s", table)
@@ -2165,21 +2032,19 @@ class EventsStore(EventsWorkerStore):
             txn.execute(
                 "DELETE FROM %s WHERE event_id IN ("
                 "    SELECT event_id FROM events_to_purge WHERE should_delete"
-                ")" % (table,),
+                ")" % (table,)
             )
 
         # event_push_actions lacks an index on event_id, and has one on
         # (room_id, event_id) instead.
-        for table in (
-            "event_push_actions",
-        ):
+        for table in ("event_push_actions",):
             logger.info("[purge] removing events from %s", table)
 
             txn.execute(
                 "DELETE FROM %s WHERE room_id = ? AND event_id IN ("
                 "    SELECT event_id FROM events_to_purge WHERE should_delete"
                 ")" % (table,),
-                (room_id, )
+                (room_id,),
             )
 
         # Mark all state and own events as outliers
@@ -2204,29 +2069,111 @@ class EventsStore(EventsWorkerStore):
         # extremities. However, the events in event_backward_extremities
         # are ones we don't have yet so we need to look at the events that
         # point to it via event_edges table.
-        txn.execute("""
+        txn.execute(
+            """
             SELECT COALESCE(MIN(depth), 0)
             FROM event_backward_extremities AS eb
             INNER JOIN event_edges AS eg ON eg.prev_event_id = eb.event_id
             INNER JOIN events AS e ON e.event_id = eg.event_id
             WHERE eb.room_id = ?
-        """, (room_id,))
+        """,
+            (room_id,),
+        )
         min_depth, = txn.fetchone()
 
         logger.info("[purge] updating room_depth to %d", min_depth)
 
         txn.execute(
             "UPDATE room_depth SET min_depth = ? WHERE room_id = ?",
-            (min_depth, room_id,)
+            (min_depth, room_id),
         )
 
         # finally, drop the temp table. this will commit the txn in sqlite,
         # so make sure to keep this actually last.
-        txn.execute(
-            "DROP TABLE events_to_purge"
-        )
+        txn.execute("DROP TABLE events_to_purge")
 
         logger.info("[purge] done")
+
+    def _find_unreferenced_groups_during_purge(self, txn, state_groups):
+        """Used when purging history to figure out which state groups can be
+        deleted and which need to be de-delta'ed (due to one of its prev groups
+        being scheduled for deletion).
+
+        Args:
+            txn
+            state_groups (set[int]): Set of state groups referenced by events
+                that are going to be deleted.
+
+        Returns:
+            tuple[set[int], set[int]]: The set of state groups that can be
+            deleted and the set of state groups that need to be de-delta'ed
+        """
+        # Graph of state group -> previous group
+        graph = {}
+
+        # Set of events that we have found to be referenced by events
+        referenced_groups = set()
+
+        # Set of state groups we've already seen
+        state_groups_seen = set(state_groups)
+
+        # Set of state groups to handle next.
+        next_to_search = set(state_groups)
+        while next_to_search:
+            # We bound size of groups we're looking up at once, to stop the
+            # SQL query getting too big
+            if len(next_to_search) < 100:
+                current_search = next_to_search
+                next_to_search = set()
+            else:
+                current_search = set(itertools.islice(next_to_search, 100))
+                next_to_search -= current_search
+
+            # Check if state groups are referenced
+            sql = """
+                SELECT DISTINCT state_group FROM event_to_state_groups
+                LEFT JOIN events_to_purge AS ep USING (event_id)
+                WHERE state_group IN (%s) AND ep.event_id IS NULL
+            """ % (
+                ",".join("?" for _ in current_search),
+            )
+            txn.execute(sql, list(current_search))
+
+            referenced = set(sg for sg, in txn)
+            referenced_groups |= referenced
+
+            # We don't continue iterating up the state group graphs for state
+            # groups that are referenced.
+            current_search -= referenced
+
+            rows = self._simple_select_many_txn(
+                txn,
+                table="state_group_edges",
+                column="prev_state_group",
+                iterable=current_search,
+                keyvalues={},
+                retcols=("prev_state_group", "state_group"),
+            )
+
+            prevs = set(row["state_group"] for row in rows)
+            # We don't bother re-handling groups we've already seen
+            prevs -= state_groups_seen
+            next_to_search |= prevs
+            state_groups_seen |= prevs
+
+            for row in rows:
+                # Note: Each state group can have at most one prev group
+                graph[row["state_group"]] = row["prev_state_group"]
+
+        to_delete = state_groups_seen - referenced_groups
+
+        to_dedelta = set()
+        for sg in referenced_groups:
+            prev_sg = graph.get(sg)
+            if prev_sg and prev_sg in to_delete:
+                to_dedelta.add(sg)
+
+        return to_delete, to_dedelta
 
     @defer.inlineCallbacks
     def is_event_after(self, event_id1, event_id2):
@@ -2242,16 +2189,15 @@ class EventsStore(EventsWorkerStore):
             table="events",
             retcols=["topological_ordering", "stream_ordering"],
             keyvalues={"event_id": event_id},
-            allow_none=True
+            allow_none=True,
         )
 
         if not res:
             raise SynapseError(404, "Could not find event %s" % (event_id,))
 
-        defer.returnValue((int(res["topological_ordering"]), int(res["stream_ordering"])))
-
-    def get_max_current_state_delta_stream_id(self):
-        return self._stream_id_gen.get_current_token()
+        defer.returnValue(
+            (int(res["topological_ordering"]), int(res["stream_ordering"]))
+        )
 
     def get_all_updated_current_state_deltas(self, from_token, to_token, limit):
         def get_all_updated_current_state_deltas_txn(txn):
@@ -2263,13 +2209,19 @@ class EventsStore(EventsWorkerStore):
             """
             txn.execute(sql, (from_token, to_token, limit))
             return txn.fetchall()
+
         return self.runInteraction(
             "get_all_updated_current_state_deltas",
             get_all_updated_current_state_deltas_txn,
         )
 
 
-AllNewEventsResult = namedtuple("AllNewEventsResult", [
-    "new_forward_events", "new_backfill_events",
-    "forward_ex_outliers", "backward_ex_outliers",
-])
+AllNewEventsResult = namedtuple(
+    "AllNewEventsResult",
+    [
+        "new_forward_events",
+        "new_backfill_events",
+        "forward_ex_outliers",
+        "backward_ex_outliers",
+    ],
+)

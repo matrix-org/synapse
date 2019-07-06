@@ -16,65 +16,50 @@
 """ Tests REST events for /events paths."""
 
 from mock import Mock, NonCallableMock
-from six import PY3
 
-from twisted.internet import defer
+import synapse.rest.admin
+from synapse.rest.client.v1 import events, login, room
 
-from ....utils import MockHttpResource, setup_test_homeserver
-from .utils import RestTestCase
-
-PATH_PREFIX = "/_matrix/client/api/v1"
+from tests import unittest
 
 
-class EventStreamPermissionsTestCase(RestTestCase):
+class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
     """ Tests event streaming (GET /events). """
 
-    if PY3:
-        skip = "Skip on Py3 until ported to use not V1 only register."
+    servlets = [
+        events.register_servlets,
+        room.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+    ]
 
-    @defer.inlineCallbacks
-    def setUp(self):
-        import synapse.rest.client.v1.events
-        import synapse.rest.client.v1_only.register
-        import synapse.rest.client.v1.room
+    def make_homeserver(self, reactor, clock):
 
-        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
+        config = self.default_config()
+        config["enable_registration_captcha"] = False
+        config["enable_registration"] = True
+        config["auto_join_rooms"] = []
 
-        hs = yield setup_test_homeserver(
-            http_client=None,
-            federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
+        hs = self.setup_test_homeserver(
+            config=config, ratelimiter=NonCallableMock(spec_set=["can_do_action"])
         )
         self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.send_message.return_value = (True, 0)
-        hs.config.enable_registration_captcha = False
-        hs.config.enable_registration = True
-        hs.config.auto_join_rooms = []
+        self.ratelimiter.can_do_action.return_value = (True, 0)
 
         hs.get_handlers().federation_handler = Mock()
 
-        synapse.rest.client.v1_only.register.register_servlets(hs, self.mock_resource)
-        synapse.rest.client.v1.events.register_servlets(hs, self.mock_resource)
-        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
+        return hs
+
+    def prepare(self, hs, reactor, clock):
 
         # register an account
-        self.user_id = "sid1"
-        response = yield self.register(self.user_id)
-        self.token = response["access_token"]
-        self.user_id = response["user_id"]
+        self.user_id = self.register_user("sid1", "pass")
+        self.token = self.login(self.user_id, "pass")
 
         # register a 2nd account
-        self.other_user = "other1"
-        response = yield self.register(self.other_user)
-        self.other_token = response["access_token"]
-        self.other_user = response["user_id"]
+        self.other_user = self.register_user("other2", "pass")
+        self.other_token = self.login(self.other_user, "pass")
 
-    def tearDown(self):
-        pass
-
-    @defer.inlineCallbacks
     def test_stream_basic_permissions(self):
         # invalid token, expect 401
         # note: this is in violation of the original v1 spec, which expected
@@ -82,55 +67,55 @@ class EventStreamPermissionsTestCase(RestTestCase):
         # implementation is now part of the r0 implementation, the newer
         # behaviour is used instead to be consistent with the r0 spec.
         # see issue #2602
-        (code, response) = yield self.mock_resource.trigger_get(
-            "/events?access_token=%s" % ("invalid" + self.token, )
+        request, channel = self.make_request(
+            "GET", "/events?access_token=%s" % ("invalid" + self.token,)
         )
-        self.assertEquals(401, code, msg=str(response))
+        self.render(request)
+        self.assertEquals(channel.code, 401, msg=channel.result)
 
         # valid token, expect content
-        (code, response) = yield self.mock_resource.trigger_get(
-            "/events?access_token=%s&timeout=0" % (self.token,)
+        request, channel = self.make_request(
+            "GET", "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.assertEquals(200, code, msg=str(response))
-        self.assertTrue("chunk" in response)
-        self.assertTrue("start" in response)
-        self.assertTrue("end" in response)
+        self.render(request)
+        self.assertEquals(channel.code, 200, msg=channel.result)
+        self.assertTrue("chunk" in channel.json_body)
+        self.assertTrue("start" in channel.json_body)
+        self.assertTrue("end" in channel.json_body)
 
-    @defer.inlineCallbacks
     def test_stream_room_permissions(self):
-        room_id = yield self.create_room_as(
-            self.other_user,
-            tok=self.other_token
-        )
-        yield self.send(room_id, tok=self.other_token)
+        room_id = self.helper.create_room_as(self.other_user, tok=self.other_token)
+        self.helper.send(room_id, tok=self.other_token)
 
         # invited to room (expect no content for room)
-        yield self.invite(
-            room_id,
-            src=self.other_user,
-            targ=self.user_id,
-            tok=self.other_token
+        self.helper.invite(
+            room_id, src=self.other_user, targ=self.user_id, tok=self.other_token
         )
 
-        (code, response) = yield self.mock_resource.trigger_get(
-            "/events?access_token=%s&timeout=0" % (self.token,)
+        # valid token, expect content
+        request, channel = self.make_request(
+            "GET", "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.assertEquals(200, code, msg=str(response))
+        self.render(request)
+        self.assertEquals(channel.code, 200, msg=channel.result)
 
         # We may get a presence event for ourselves down
         self.assertEquals(
             0,
-            len([
-                c for c in response["chunk"]
-                if not (
-                    c.get("type") == "m.presence"
-                    and c["content"].get("user_id") == self.user_id
-                )
-            ])
+            len(
+                [
+                    c
+                    for c in channel.json_body["chunk"]
+                    if not (
+                        c.get("type") == "m.presence"
+                        and c["content"].get("user_id") == self.user_id
+                    )
+                ]
+            ),
         )
 
         # joined room (expect all content for room)
-        yield self.join(room=room_id, user=self.user_id, tok=self.token)
+        self.helper.join(room=room_id, user=self.user_id, tok=self.token)
 
         # left to room (expect no content for room)
 

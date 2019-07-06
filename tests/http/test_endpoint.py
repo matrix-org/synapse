@@ -20,12 +20,12 @@ from tests import unittest
 class ServerNameTestCase(unittest.TestCase):
     def test_parse_server_name(self):
         test_data = {
-            'localhost': ('localhost', None),
-            'my-example.com:1234': ('my-example.com', 1234),
-            '1.2.3.4': ('1.2.3.4', None),
-            '[0abc:1def::1234]': ('[0abc:1def::1234]', None),
-            '1.2.3.4:1': ('1.2.3.4', 1),
-            '[0abc:1def::1234]:8080': ('[0abc:1def::1234]', 8080),
+            "localhost": ("localhost", None),
+            "my-example.com:1234": ("my-example.com", 1234),
+            "1.2.3.4": ("1.2.3.4", None),
+            "[0abc:1def::1234]": ("[0abc:1def::1234]", None),
+            "1.2.3.4:1": ("1.2.3.4", 1),
+            "[0abc:1def::1234]:8080": ("[0abc:1def::1234]", 8080),
         }
 
         for i, o in test_data.items():
@@ -39,15 +39,13 @@ class ServerNameTestCase(unittest.TestCase):
             "[1234",
             "underscore_.com",
             "percent%65.com",
-            "1234:5678:80",   # too many colons
+            "1234:5678:80",  # too many colons
         ]
         for i in test_data:
             try:
                 parse_and_validate_server_name(i)
                 self.fail(
-                    "Expected parse_and_validate_server_name('%s') to throw" % (
-                        i,
-                    ),
+                    "Expected parse_and_validate_server_name('%s') to throw" % (i,)
                 )
             except ValueError:
                 pass

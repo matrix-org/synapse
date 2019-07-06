@@ -17,11 +17,12 @@ import logging
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
+from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.visibility import filter_events_for_server
 
 import tests.unittest
-from tests.utils import setup_test_homeserver
+from tests.utils import create_room, setup_test_homeserver
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +32,12 @@ TEST_ROOM_ID = "!TEST:ROOM"
 class FilterEventsForServerTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver()
+        self.hs = yield setup_test_homeserver(self.addCleanup)
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.store = self.hs.get_datastore()
+
+        yield create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM")
 
     @defer.inlineCallbacks
     def test_filtering(self):
@@ -54,14 +57,12 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         events_to_filter = []
 
         for i in range(0, 10):
-            user = "@user%i:%s" % (
-                i, "test_server" if i == 5 else "other_server"
-            )
+            user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
             evt = yield self.inject_room_member(user, extra_content={"a": "b"})
             events_to_filter.append(evt)
 
         filtered = yield filter_events_for_server(
-            self.store, "test_server", events_to_filter,
+            self.store, "test_server", events_to_filter
         )
 
         # the result should be 5 redacted events, and 5 unredacted events.
@@ -96,23 +97,25 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         events_to_filter.append(evt)
 
         # the erasey user gets erased
-        self.hs.get_datastore().mark_user_erased("@erased:local_hs")
+        yield self.hs.get_datastore().mark_user_erased("@erased:local_hs")
 
         # ... and the filtering happens.
         filtered = yield filter_events_for_server(
-            self.store, "test_server", events_to_filter,
+            self.store, "test_server", events_to_filter
         )
 
         for i in range(0, len(events_to_filter)):
             self.assertEqual(
-                events_to_filter[i].event_id, filtered[i].event_id,
-                "Unexpected event at result position %i" % (i, )
+                events_to_filter[i].event_id,
+                filtered[i].event_id,
+                "Unexpected event at result position %i" % (i,),
             )
 
         for i in (0, 3):
             self.assertEqual(
-                events_to_filter[i].content["body"], filtered[i].content["body"],
-                "Unexpected event content at result position %i" % (i,)
+                events_to_filter[i].content["body"],
+                filtered[i].content["body"],
+                "Unexpected event content at result position %i" % (i,),
             )
 
         for i in (1, 4):
@@ -121,13 +124,16 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def inject_visibility(self, user_id, visibility):
         content = {"history_visibility": visibility}
-        builder = self.event_builder_factory.new({
-            "type": "m.room.history_visibility",
-            "sender": user_id,
-            "state_key": "",
-            "room_id": TEST_ROOM_ID,
-            "content": content,
-        })
+        builder = self.event_builder_factory.for_room_version(
+            RoomVersions.V1,
+            {
+                "type": "m.room.history_visibility",
+                "sender": user_id,
+                "state_key": "",
+                "room_id": TEST_ROOM_ID,
+                "content": content,
+            },
+        )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder
@@ -139,13 +145,16 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     def inject_room_member(self, user_id, membership="join", extra_content={}):
         content = {"membership": membership}
         content.update(extra_content)
-        builder = self.event_builder_factory.new({
-            "type": "m.room.member",
-            "sender": user_id,
-            "state_key": user_id,
-            "room_id": TEST_ROOM_ID,
-            "content": content,
-        })
+        builder = self.event_builder_factory.for_room_version(
+            RoomVersions.V1,
+            {
+                "type": "m.room.member",
+                "sender": user_id,
+                "state_key": user_id,
+                "room_id": TEST_ROOM_ID,
+                "content": content,
+            },
+        )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder
@@ -157,13 +166,16 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def inject_message(self, user_id, content=None):
         if content is None:
-            content = {"body": "testytest"}
-        builder = self.event_builder_factory.new({
-            "type": "m.room.message",
-            "sender": user_id,
-            "room_id": TEST_ROOM_ID,
-            "content": content,
-        })
+            content = {"body": "testytest", "msgtype": "m.text"}
+        builder = self.event_builder_factory.for_room_version(
+            RoomVersions.V1,
+            {
+                "type": "m.room.message",
+                "sender": user_id,
+                "room_id": TEST_ROOM_ID,
+                "content": content,
+            },
+        )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder
@@ -192,56 +204,54 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         # history_visibility event.
         room_state = []
 
-        history_visibility_evt = FrozenEvent({
-            "event_id": "$history_vis",
-            "type": "m.room.history_visibility",
-            "sender": "@resident_user_0:test.com",
-            "state_key": "",
-            "room_id": TEST_ROOM_ID,
-            "content": {"history_visibility": "joined"},
-        })
+        history_visibility_evt = FrozenEvent(
+            {
+                "event_id": "$history_vis",
+                "type": "m.room.history_visibility",
+                "sender": "@resident_user_0:test.com",
+                "state_key": "",
+                "room_id": TEST_ROOM_ID,
+                "content": {"history_visibility": "joined"},
+            }
+        )
         room_state.append(history_visibility_evt)
         test_store.add_event(history_visibility_evt)
 
         for i in range(0, 100000):
-            user = "@resident_user_%i:test.com" % (i, )
-            evt = FrozenEvent({
-                "event_id": "$res_event_%i" % (i, ),
-                "type": "m.room.member",
-                "state_key": user,
-                "sender": user,
-                "room_id": TEST_ROOM_ID,
-                "content": {
-                    "membership": "join",
-                    "extra": "zzz,"
-                },
-            })
+            user = "@resident_user_%i:test.com" % (i,)
+            evt = FrozenEvent(
+                {
+                    "event_id": "$res_event_%i" % (i,),
+                    "type": "m.room.member",
+                    "state_key": user,
+                    "sender": user,
+                    "room_id": TEST_ROOM_ID,
+                    "content": {"membership": "join", "extra": "zzz,"},
+                }
+            )
             room_state.append(evt)
             test_store.add_event(evt)
 
         events_to_filter = []
         for i in range(0, 10):
-            user = "@user%i:%s" % (
-                i, "test_server" if i == 5 else "other_server"
+            user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
+            evt = FrozenEvent(
+                {
+                    "event_id": "$evt%i" % (i,),
+                    "type": "m.room.member",
+                    "state_key": user,
+                    "sender": user,
+                    "room_id": TEST_ROOM_ID,
+                    "content": {"membership": "join", "extra": "zzz"},
+                }
             )
-            evt = FrozenEvent({
-                "event_id": "$evt%i" % (i, ),
-                "type": "m.room.member",
-                "state_key": user,
-                "sender": user,
-                "room_id": TEST_ROOM_ID,
-                "content": {
-                    "membership": "join",
-                    "extra": "zzz",
-                },
-            })
             events_to_filter.append(evt)
             room_state.append(evt)
 
             test_store.add_event(evt)
-            test_store.set_state_ids_for_event(evt, {
-                (e.type, e.state_key): e.event_id for e in room_state
-            })
+            test_store.set_state_ids_for_event(
+                evt, {(e.type, e.state_key): e.event_id for e in room_state}
+            )
 
         pr = cProfile.Profile()
         pr.enable()
@@ -249,13 +259,13 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         logger.info("Starting filtering")
         start = time.time()
         filtered = yield filter_events_for_server(
-            test_store, "test_server", events_to_filter,
+            test_store, "test_server", events_to_filter
         )
         logger.info("Filtering took %f seconds", time.time() - start)
 
         pr.disable()
         with open("filter_events_for_server.profile", "w+") as f:
-            ps = pstats.Stats(pr, stream=f).sort_stats('cumulative')
+            ps = pstats.Stats(pr, stream=f).sort_stats("cumulative")
             ps.print_stats()
 
         # the result should be 5 redacted events, and 5 unredacted events.
@@ -275,6 +285,7 @@ class _TestStore(object):
     filter_events_for_server
 
     """
+
     def __init__(self):
         # data for get_events: a map from event_id to event
         self.events = {}
@@ -298,8 +309,8 @@ class _TestStore(object):
                 continue
             if type != "m.room.member" or state_key is not None:
                 raise RuntimeError(
-                    "Unimplemented: get_state_ids with type (%s, %s)" %
-                    (type, state_key),
+                    "Unimplemented: get_state_ids with type (%s, %s)"
+                    % (type, state_key)
                 )
             include_memberships = True
 
@@ -316,9 +327,7 @@ class _TestStore(object):
         return succeed(res)
 
     def get_events(self, events):
-        return succeed({
-            event_id: self.events[event_id] for event_id in events
-        })
+        return succeed({event_id: self.events[event_id] for event_id in events})
 
     def are_users_erased(self, users):
         return succeed({u: False for u in users})

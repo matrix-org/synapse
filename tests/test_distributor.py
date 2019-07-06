@@ -22,7 +22,6 @@ from . import unittest
 
 
 class DistributorTestCase(unittest.TestCase):
-
     def setUp(self):
         self.dist = Distributor()
 
@@ -44,18 +43,14 @@ class DistributorTestCase(unittest.TestCase):
 
         observers[0].side_effect = Exception("Awoogah!")
 
-        with patch(
-            "synapse.util.distributor.logger", spec=["warning"]
-        ) as mock_logger:
+        with patch("synapse.util.distributor.logger", spec=["warning"]) as mock_logger:
             self.dist.fire("alarm", "Go")
 
             observers[0].assert_called_once_with("Go")
             observers[1].assert_called_once_with("Go")
 
             self.assertEquals(mock_logger.warning.call_count, 1)
-            self.assertIsInstance(
-                mock_logger.warning.call_args[0][0], str
-            )
+            self.assertIsInstance(mock_logger.warning.call_args[0][0], str)
 
     def test_signal_prereg(self):
         observer = Mock()
@@ -69,4 +64,5 @@ class DistributorTestCase(unittest.TestCase):
     def test_signal_undeclared(self):
         def code():
             self.dist.fire("notification")
+
         self.assertRaises(KeyError, code)

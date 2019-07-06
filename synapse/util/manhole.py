@@ -1,4 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,30 +12,50 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
+import traceback
 
 from twisted.conch import manhole_ssh
 from twisted.conch.insults import insults
-from twisted.conch.manhole import ColoredManhole
+from twisted.conch.manhole import ColoredManhole, ManholeInterpreter
 from twisted.conch.ssh.keys import Key
 from twisted.cred import checkers, portal
 
 PUBLIC_KEY = (
-    "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAGEArzJx8OYOnJmzf4tfBEvLi8DVPrJ3/c9k2I/Az"
-    "64fxjHf9imyRJbixtQhlH9lfNjUIx+4LmrJH5QNRsFporcHDKOTwTTYLh5KmRpslkYHRivcJS"
-    "kbh/C+BR3utDS555mV"
+    "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHhGATaW4KhE23+7nrH4jFx3yLq9OjaEs5"
+    "XALqeK+7385NlLja3DE/DO9mGhnd9+bAy39EKT3sTV6+WXQ4yD0TvEEyUEMtjWkSEm6U32+C"
+    "DaS3TW/vPBUMeJQwq+Ydcif1UlnpXrDDTamD0AU9VaEvHq+3HAkipqn0TGpKON6aqk4vauDx"
+    "oXSsV5TXBVrxP/y7HpMOpU4GUWsaaacBTKKNnUaQB4UflvydaPJUuwdaCUJGTMjbhWrjVfK+"
+    "jslseSPxU6XvrkZMyCr4znxvuDxjMk1RGIdO7v+rbBMLEgqtSMNqJbYeVCnj2CFgc3fcTcld"
+    "X2uOJDrJb/WRlHulthCh"
 )
 
 PRIVATE_KEY = """-----BEGIN RSA PRIVATE KEY-----
-MIIByAIBAAJhAK8ycfDmDpyZs3+LXwRLy4vA1T6yd/3PZNiPwM+uH8Yx3/YpskSW
-4sbUIZR/ZXzY1CMfuC5qyR+UDUbBaaK3Bwyjk8E02C4eSpkabJZGB0Yr3CUpG4fw
-vgUd7rQ0ueeZlQIBIwJgbh+1VZfr7WftK5lu7MHtqE1S1vPWZQYE3+VUn8yJADyb
-Z4fsZaCrzW9lkIqXkE3GIY+ojdhZhkO1gbG0118sIgphwSWKRxK0mvh6ERxKqIt1
-xJEJO74EykXZV4oNJ8sjAjEA3J9r2ZghVhGN6V8DnQrTk24Td0E8hU8AcP0FVP+8
-PQm/g/aXf2QQkQT+omdHVEJrAjEAy0pL0EBH6EVS98evDCBtQw22OZT52qXlAwZ2
-gyTriKFVoqjeEjt3SZKKqXHSApP/AjBLpF99zcJJZRq2abgYlf9lv1chkrWqDHUu
-DZttmYJeEfiFBBavVYIF1dOlZT0G8jMCMBc7sOSZodFnAiryP+Qg9otSBjJ3bQML
-pSTqy7c3a2AScC/YyOwkDaICHnnD3XyjMwIxALRzl0tQEKMXs6hH8ToUdlLROCrP
-EhQ0wahUTCk1gKA4uPD6TMTChavbh4K63OvbKg==
+MIIEpQIBAAKCAQEAx4RgE2luCoRNt/u56x+Ixcd8i6vTo2hLOVwC6nivu9/OTZS4
+2twxPwzvZhoZ3ffmwMt/RCk97E1evll0OMg9E7xBMlBDLY1pEhJulN9vgg2kt01v
+7zwVDHiUMKvmHXIn9VJZ6V6ww02pg9AFPVWhLx6vtxwJIqap9ExqSjjemqpOL2rg
+8aF0rFeU1wVa8T/8ux6TDqVOBlFrGmmnAUyijZ1GkAeFH5b8nWjyVLsHWglCRkzI
+24Vq41Xyvo7JbHkj8VOl765GTMgq+M58b7g8YzJNURiHTu7/q2wTCxIKrUjDaiW2
+HlQp49ghYHN33E3JXV9rjiQ6yW/1kZR7pbYQoQIDAQABAoIBAQC8KJ0q8Wzzwh5B
+esa1dQHZ8+4DEsL/Amae66VcVwD0X3cCN1W2IZ7X5W0Ij2kBqr8V51RYhcR+S+Ek
+BtzSiBUBvbKGrqcMGKaUgomDIMzai99hd0gvCCyZnEW1OQhFkNkaRNXCfqiZJ27M
+fqvSUiU2eOwh9fCvmxoA6Of8o3FbzcJ+1GMcobWRllDtLmj6lgVbDzuA+0jC5daB
+9Tj1pBzu3wn3ufxiS+gBnJ+7NcXH3E73lqCcPa2ufbZ1haxfiGCnRIhFXuQDgxFX
+vKdEfDgtvas6r1ahGbc+b/q8E8fZT7cABuIU4yfOORK+MhpyWbvoyyzuVGKj3PKt
+KSPJu5CZAoGBAOkoJfAVyYteqKcmGTanGqQnAY43CaYf6GdSPX/jg+JmKZg0zqMC
+jWZUtPb93i+jnOInbrnuHOiHAxI8wmhEPed28H2lC/LU8PzlqFkZXKFZ4vLOhhRB
+/HeHCFIDosPFlohWi3b+GAjD7sXgnIuGmnXWe2ea/TS3yersifDEoKKjAoGBANsQ
+gJX2cJv1c3jhdgcs8vAt5zIOKcCLTOr/QPmVf/kxjNgndswcKHwsxE/voTO9q+TF
+v/6yCSTxAdjuKz1oIYWgi/dZo82bBKWxNRpgrGviU3/zwxiHlyIXUhzQu78q3VS/
+7S1XVbc7qMV++XkYKHPVD+nVG/gGzFxumX7MLXfrAoGBAJit9cn2OnjNj9uFE1W6
+r7N254ndeLAUjPe73xH0RtTm2a4WRopwjW/JYIetTuYbWgyujc+robqTTuuOZjAp
+H/CG7o0Ym251CypQqaFO/l2aowclPp/dZhpPjp9GSjuxFBZLtiBB3DNBOwbRQzIK
+/vLTdRQvZkgzYkI4i0vjNt3JAoGBANP8HSKBLymMlShlrSx2b8TB9tc2Y2riohVJ
+2ttqs0M2kt/dGJWdrgOz4mikL+983Olt/0P9juHDoxEEMK2kpcPEv40lnmBpYU7h
+s8yJvnBLvJe2EJYdJ8AipyAhUX1FgpbvfxmASP8eaUxsegeXvBWTGWojAoS6N2o+
+0KSl+l3vAoGAFqm0gO9f/Q1Se60YQd4l2PZeMnJFv0slpgHHUwegmd6wJhOD7zJ1
+CkZcXwiv7Nog7AI9qKJEUXLjoqL+vJskBzSOqU3tcd670YQMi1aXSXJqYE202K7o
+EddTrx3TNpr1D5m/f+6mnXWrc8u9y1+GNx9yz889xMjIBTBI9KqaaOs=
 -----END RSA PRIVATE KEY-----"""
 
 
@@ -52,19 +73,71 @@ def manhole(username, password, globals):
     Returns:
         twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
     """
+    if not isinstance(password, bytes):
+        password = password.encode("ascii")
 
-    checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(
-        **{username: password}
-    )
+    checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(**{username: password})
 
     rlm = manhole_ssh.TerminalRealm()
     rlm.chainedProtocolFactory = lambda: insults.ServerProtocol(
-        ColoredManhole,
-        dict(globals, __name__="__console__")
+        SynapseManhole, dict(globals, __name__="__console__")
     )
 
     factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
-    factory.publicKeys['ssh-rsa'] = Key.fromString(PUBLIC_KEY)
-    factory.privateKeys['ssh-rsa'] = Key.fromString(PRIVATE_KEY)
+    factory.publicKeys[b"ssh-rsa"] = Key.fromString(PUBLIC_KEY)
+    factory.privateKeys[b"ssh-rsa"] = Key.fromString(PRIVATE_KEY)
 
     return factory
+
+
+class SynapseManhole(ColoredManhole):
+    """Overrides connectionMade to create our own ManholeInterpreter"""
+
+    def connectionMade(self):
+        super(SynapseManhole, self).connectionMade()
+
+        # replace the manhole interpreter with our own impl
+        self.interpreter = SynapseManholeInterpreter(self, self.namespace)
+
+        # this would also be a good place to add more keyHandlers.
+
+
+class SynapseManholeInterpreter(ManholeInterpreter):
+    def showsyntaxerror(self, filename=None):
+        """Display the syntax error that just occurred.
+
+        Overrides the base implementation, ignoring sys.excepthook. We always want
+        any syntax errors to be sent to the terminal, rather than sentry.
+        """
+        type, value, tb = sys.exc_info()
+        sys.last_type = type
+        sys.last_value = value
+        sys.last_traceback = tb
+        if filename and type is SyntaxError:
+            # Work hard to stuff the correct filename in the exception
+            try:
+                msg, (dummy_filename, lineno, offset, line) = value.args
+            except ValueError:
+                # Not the format we expect; leave it alone
+                pass
+            else:
+                # Stuff in the right filename
+                value = SyntaxError(msg, (filename, lineno, offset, line))
+                sys.last_value = value
+        lines = traceback.format_exception_only(type, value)
+        self.write("".join(lines))
+
+    def showtraceback(self):
+        """Display the exception that just occurred.
+
+        Overrides the base implementation, ignoring sys.excepthook. We always want
+        any syntax errors to be sent to the terminal, rather than sentry.
+        """
+        sys.last_type, sys.last_value, last_tb = ei = sys.exc_info()
+        sys.last_traceback = last_tb
+        try:
+            # We remove the first stack item because it is our own code.
+            lines = traceback.format_exception(ei[0], ei[1], last_tb.tb_next)
+            self.write("".join(lines))
+        finally:
+            last_tb = ei = None

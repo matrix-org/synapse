@@ -21,7 +21,7 @@ from twisted.internet import defer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import GroupID
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 class GroupServlet(RestServlet):
     """Get the group profile
     """
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/profile$")
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/profile$")
 
     def __init__(self, hs):
         super(GroupServlet, self).__init__()
@@ -43,8 +44,7 @@ class GroupServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         group_description = yield self.groups_handler.get_group_profile(
-            group_id,
-            requester_user_id,
+            group_id, requester_user_id
         )
 
         defer.returnValue((200, group_description))
@@ -56,7 +56,7 @@ class GroupServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         yield self.groups_handler.update_group_profile(
-            group_id, requester_user_id, content,
+            group_id, requester_user_id, content
         )
 
         defer.returnValue((200, {}))
@@ -65,7 +65,8 @@ class GroupServlet(RestServlet):
 class GroupSummaryServlet(RestServlet):
     """Get the full group summary
     """
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/summary$")
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/summary$")
 
     def __init__(self, hs):
         super(GroupSummaryServlet, self).__init__()
@@ -79,8 +80,7 @@ class GroupSummaryServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         get_group_summary = yield self.groups_handler.get_group_summary(
-            group_id,
-            requester_user_id,
+            group_id, requester_user_id
         )
 
         defer.returnValue((200, get_group_summary))
@@ -93,7 +93,8 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         - /groups/:group/summary/rooms/:room_id
         - /groups/:group/summary/categories/:category/rooms/:room_id
     """
-    PATTERNS = client_v2_patterns(
+
+    PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/summary"
         "(/categories/(?P<category_id>[^/]+))?"
         "/rooms/(?P<room_id>[^/]*)$"
@@ -112,7 +113,8 @@ class GroupSummaryRoomsCatServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         resp = yield self.groups_handler.update_group_summary_room(
-            group_id, requester_user_id,
+            group_id,
+            requester_user_id,
             room_id=room_id,
             category_id=category_id,
             content=content,
@@ -126,9 +128,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         resp = yield self.groups_handler.delete_group_summary_room(
-            group_id, requester_user_id,
-            room_id=room_id,
-            category_id=category_id,
+            group_id, requester_user_id, room_id=room_id, category_id=category_id
         )
 
         defer.returnValue((200, resp))
@@ -137,7 +137,8 @@ class GroupSummaryRoomsCatServlet(RestServlet):
 class GroupCategoryServlet(RestServlet):
     """Get/add/update/delete a group category
     """
-    PATTERNS = client_v2_patterns(
+
+    PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
     )
 
@@ -153,8 +154,7 @@ class GroupCategoryServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         category = yield self.groups_handler.get_group_category(
-            group_id, requester_user_id,
-            category_id=category_id,
+            group_id, requester_user_id, category_id=category_id
         )
 
         defer.returnValue((200, category))
@@ -166,9 +166,7 @@ class GroupCategoryServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         resp = yield self.groups_handler.update_group_category(
-            group_id, requester_user_id,
-            category_id=category_id,
-            content=content,
+            group_id, requester_user_id, category_id=category_id, content=content
         )
 
         defer.returnValue((200, resp))
@@ -179,8 +177,7 @@ class GroupCategoryServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         resp = yield self.groups_handler.delete_group_category(
-            group_id, requester_user_id,
-            category_id=category_id,
+            group_id, requester_user_id, category_id=category_id
         )
 
         defer.returnValue((200, resp))
@@ -189,9 +186,8 @@ class GroupCategoryServlet(RestServlet):
 class GroupCategoriesServlet(RestServlet):
     """Get all group categories
     """
-    PATTERNS = client_v2_patterns(
-        "/groups/(?P<group_id>[^/]*)/categories/$"
-    )
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/categories/$")
 
     def __init__(self, hs):
         super(GroupCategoriesServlet, self).__init__()
@@ -205,7 +201,7 @@ class GroupCategoriesServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         category = yield self.groups_handler.get_group_categories(
-            group_id, requester_user_id,
+            group_id, requester_user_id
         )
 
         defer.returnValue((200, category))
@@ -214,9 +210,8 @@ class GroupCategoriesServlet(RestServlet):
 class GroupRoleServlet(RestServlet):
     """Get/add/update/delete a group role
     """
-    PATTERNS = client_v2_patterns(
-        "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$"
-    )
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$")
 
     def __init__(self, hs):
         super(GroupRoleServlet, self).__init__()
@@ -230,8 +225,7 @@ class GroupRoleServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         category = yield self.groups_handler.get_group_role(
-            group_id, requester_user_id,
-            role_id=role_id,
+            group_id, requester_user_id, role_id=role_id
         )
 
         defer.returnValue((200, category))
@@ -243,9 +237,7 @@ class GroupRoleServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         resp = yield self.groups_handler.update_group_role(
-            group_id, requester_user_id,
-            role_id=role_id,
-            content=content,
+            group_id, requester_user_id, role_id=role_id, content=content
         )
 
         defer.returnValue((200, resp))
@@ -256,8 +248,7 @@ class GroupRoleServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         resp = yield self.groups_handler.delete_group_role(
-            group_id, requester_user_id,
-            role_id=role_id,
+            group_id, requester_user_id, role_id=role_id
         )
 
         defer.returnValue((200, resp))
@@ -266,9 +257,8 @@ class GroupRoleServlet(RestServlet):
 class GroupRolesServlet(RestServlet):
     """Get all group roles
     """
-    PATTERNS = client_v2_patterns(
-        "/groups/(?P<group_id>[^/]*)/roles/$"
-    )
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/$")
 
     def __init__(self, hs):
         super(GroupRolesServlet, self).__init__()
@@ -282,7 +272,7 @@ class GroupRolesServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         category = yield self.groups_handler.get_group_roles(
-            group_id, requester_user_id,
+            group_id, requester_user_id
         )
 
         defer.returnValue((200, category))
@@ -295,7 +285,8 @@ class GroupSummaryUsersRoleServlet(RestServlet):
         - /groups/:group/summary/users/:room_id
         - /groups/:group/summary/roles/:role/users/:user_id
     """
-    PATTERNS = client_v2_patterns(
+
+    PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/summary"
         "(/roles/(?P<role_id>[^/]+))?"
         "/users/(?P<user_id>[^/]*)$"
@@ -314,7 +305,8 @@ class GroupSummaryUsersRoleServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         resp = yield self.groups_handler.update_group_summary_user(
-            group_id, requester_user_id,
+            group_id,
+            requester_user_id,
             user_id=user_id,
             role_id=role_id,
             content=content,
@@ -328,9 +320,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         resp = yield self.groups_handler.delete_group_summary_user(
-            group_id, requester_user_id,
-            user_id=user_id,
-            role_id=role_id,
+            group_id, requester_user_id, user_id=user_id, role_id=role_id
         )
 
         defer.returnValue((200, resp))
@@ -339,7 +329,8 @@ class GroupSummaryUsersRoleServlet(RestServlet):
 class GroupRoomServlet(RestServlet):
     """Get all rooms in a group
     """
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
 
     def __init__(self, hs):
         super(GroupRoomServlet, self).__init__()
@@ -352,7 +343,9 @@ class GroupRoomServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_rooms_in_group(group_id, requester_user_id)
+        result = yield self.groups_handler.get_rooms_in_group(
+            group_id, requester_user_id
+        )
 
         defer.returnValue((200, result))
 
@@ -360,7 +353,8 @@ class GroupRoomServlet(RestServlet):
 class GroupUsersServlet(RestServlet):
     """Get all users in a group
     """
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/users$")
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/users$")
 
     def __init__(self, hs):
         super(GroupUsersServlet, self).__init__()
@@ -373,7 +367,9 @@ class GroupUsersServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_users_in_group(group_id, requester_user_id)
+        result = yield self.groups_handler.get_users_in_group(
+            group_id, requester_user_id
+        )
 
         defer.returnValue((200, result))
 
@@ -381,7 +377,8 @@ class GroupUsersServlet(RestServlet):
 class GroupInvitedUsersServlet(RestServlet):
     """Get users invited to a group
     """
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/invited_users$")
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/invited_users$")
 
     def __init__(self, hs):
         super(GroupInvitedUsersServlet, self).__init__()
@@ -395,8 +392,7 @@ class GroupInvitedUsersServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         result = yield self.groups_handler.get_invited_users_in_group(
-            group_id,
-            requester_user_id,
+            group_id, requester_user_id
         )
 
         defer.returnValue((200, result))
@@ -405,7 +401,8 @@ class GroupInvitedUsersServlet(RestServlet):
 class GroupSettingJoinPolicyServlet(RestServlet):
     """Set group join policy
     """
-    PATTERNS = client_v2_patterns("/groups/(?P<group_id>[^/]*)/settings/m.join_policy$")
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/settings/m.join_policy$")
 
     def __init__(self, hs):
         super(GroupSettingJoinPolicyServlet, self).__init__()
@@ -420,9 +417,7 @@ class GroupSettingJoinPolicyServlet(RestServlet):
         content = parse_json_object_from_request(request)
 
         result = yield self.groups_handler.set_group_join_policy(
-            group_id,
-            requester_user_id,
-            content,
+            group_id, requester_user_id, content
         )
 
         defer.returnValue((200, result))
@@ -431,7 +426,8 @@ class GroupSettingJoinPolicyServlet(RestServlet):
 class GroupCreateServlet(RestServlet):
     """Create a group
     """
-    PATTERNS = client_v2_patterns("/create_group$")
+
+    PATTERNS = client_patterns("/create_group$")
 
     def __init__(self, hs):
         super(GroupCreateServlet, self).__init__()
@@ -451,9 +447,7 @@ class GroupCreateServlet(RestServlet):
         group_id = GroupID(localpart, self.server_name).to_string()
 
         result = yield self.groups_handler.create_group(
-            group_id,
-            requester_user_id,
-            content,
+            group_id, requester_user_id, content
         )
 
         defer.returnValue((200, result))
@@ -462,7 +456,8 @@ class GroupCreateServlet(RestServlet):
 class GroupAdminRoomsServlet(RestServlet):
     """Add a room to the group
     """
-    PATTERNS = client_v2_patterns(
+
+    PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)$"
     )
 
@@ -479,7 +474,7 @@ class GroupAdminRoomsServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         result = yield self.groups_handler.add_room_to_group(
-            group_id, requester_user_id, room_id, content,
+            group_id, requester_user_id, room_id, content
         )
 
         defer.returnValue((200, result))
@@ -490,7 +485,7 @@ class GroupAdminRoomsServlet(RestServlet):
         requester_user_id = requester.user.to_string()
 
         result = yield self.groups_handler.remove_room_from_group(
-            group_id, requester_user_id, room_id,
+            group_id, requester_user_id, room_id
         )
 
         defer.returnValue((200, result))
@@ -499,7 +494,8 @@ class GroupAdminRoomsServlet(RestServlet):
 class GroupAdminRoomsConfigServlet(RestServlet):
     """Update the config of a room in a group
     """
-    PATTERNS = client_v2_patterns(
+
+    PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)"
         "/config/(?P<config_key>[^/]*)$"
     )
@@ -517,7 +513,7 @@ class GroupAdminRoomsConfigServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         result = yield self.groups_handler.update_room_in_group(
-            group_id, requester_user_id, room_id, config_key, content,
+            group_id, requester_user_id, room_id, config_key, content
         )
 
         defer.returnValue((200, result))
@@ -526,7 +522,8 @@ class GroupAdminRoomsConfigServlet(RestServlet):
 class GroupAdminUsersInviteServlet(RestServlet):
     """Invite a user to the group
     """
-    PATTERNS = client_v2_patterns(
+
+    PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/users/invite/(?P<user_id>[^/]*)$"
     )
 
@@ -546,7 +543,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
         content = parse_json_object_from_request(request)
         config = content.get("config", {})
         result = yield self.groups_handler.invite(
-            group_id, user_id, requester_user_id, config,
+            group_id, user_id, requester_user_id, config
         )
 
         defer.returnValue((200, result))
@@ -555,7 +552,8 @@ class GroupAdminUsersInviteServlet(RestServlet):
 class GroupAdminUsersKickServlet(RestServlet):
     """Kick a user from the group
     """
-    PATTERNS = client_v2_patterns(
+
+    PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/users/remove/(?P<user_id>[^/]*)$"
     )
 
@@ -572,7 +570,7 @@ class GroupAdminUsersKickServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         result = yield self.groups_handler.remove_user_from_group(
-            group_id, user_id, requester_user_id, content,
+            group_id, user_id, requester_user_id, content
         )
 
         defer.returnValue((200, result))
@@ -581,9 +579,8 @@ class GroupAdminUsersKickServlet(RestServlet):
 class GroupSelfLeaveServlet(RestServlet):
     """Leave a joined group
     """
-    PATTERNS = client_v2_patterns(
-        "/groups/(?P<group_id>[^/]*)/self/leave$"
-    )
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/leave$")
 
     def __init__(self, hs):
         super(GroupSelfLeaveServlet, self).__init__()
@@ -598,7 +595,7 @@ class GroupSelfLeaveServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         result = yield self.groups_handler.remove_user_from_group(
-            group_id, requester_user_id, requester_user_id, content,
+            group_id, requester_user_id, requester_user_id, content
         )
 
         defer.returnValue((200, result))
@@ -607,9 +604,8 @@ class GroupSelfLeaveServlet(RestServlet):
 class GroupSelfJoinServlet(RestServlet):
     """Attempt to join a group, or knock
     """
-    PATTERNS = client_v2_patterns(
-        "/groups/(?P<group_id>[^/]*)/self/join$"
-    )
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/join$")
 
     def __init__(self, hs):
         super(GroupSelfJoinServlet, self).__init__()
@@ -624,7 +620,7 @@ class GroupSelfJoinServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         result = yield self.groups_handler.join_group(
-            group_id, requester_user_id, content,
+            group_id, requester_user_id, content
         )
 
         defer.returnValue((200, result))
@@ -633,9 +629,8 @@ class GroupSelfJoinServlet(RestServlet):
 class GroupSelfAcceptInviteServlet(RestServlet):
     """Accept a group invite
     """
-    PATTERNS = client_v2_patterns(
-        "/groups/(?P<group_id>[^/]*)/self/accept_invite$"
-    )
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/accept_invite$")
 
     def __init__(self, hs):
         super(GroupSelfAcceptInviteServlet, self).__init__()
@@ -650,7 +645,7 @@ class GroupSelfAcceptInviteServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         result = yield self.groups_handler.accept_invite(
-            group_id, requester_user_id, content,
+            group_id, requester_user_id, content
         )
 
         defer.returnValue((200, result))
@@ -659,9 +654,8 @@ class GroupSelfAcceptInviteServlet(RestServlet):
 class GroupSelfUpdatePublicityServlet(RestServlet):
     """Update whether we publicise a users membership of a group
     """
-    PATTERNS = client_v2_patterns(
-        "/groups/(?P<group_id>[^/]*)/self/update_publicity$"
-    )
+
+    PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/update_publicity$")
 
     def __init__(self, hs):
         super(GroupSelfUpdatePublicityServlet, self).__init__()
@@ -676,9 +670,7 @@ class GroupSelfUpdatePublicityServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         publicise = content["publicise"]
-        yield self.store.update_group_publicity(
-            group_id, requester_user_id, publicise,
-        )
+        yield self.store.update_group_publicity(group_id, requester_user_id, publicise)
 
         defer.returnValue((200, {}))
 
@@ -686,9 +678,8 @@ class GroupSelfUpdatePublicityServlet(RestServlet):
 class PublicisedGroupsForUserServlet(RestServlet):
     """Get the list of groups a user is advertising
     """
-    PATTERNS = client_v2_patterns(
-        "/publicised_groups/(?P<user_id>[^/]*)$"
-    )
+
+    PATTERNS = client_patterns("/publicised_groups/(?P<user_id>[^/]*)$")
 
     def __init__(self, hs):
         super(PublicisedGroupsForUserServlet, self).__init__()
@@ -701,9 +692,7 @@ class PublicisedGroupsForUserServlet(RestServlet):
     def on_GET(self, request, user_id):
         yield self.auth.get_user_by_req(request, allow_guest=True)
 
-        result = yield self.groups_handler.get_publicised_groups_for_user(
-            user_id
-        )
+        result = yield self.groups_handler.get_publicised_groups_for_user(user_id)
 
         defer.returnValue((200, result))
 
@@ -711,9 +700,8 @@ class PublicisedGroupsForUserServlet(RestServlet):
 class PublicisedGroupsForUsersServlet(RestServlet):
     """Get the list of groups a user is advertising
     """
-    PATTERNS = client_v2_patterns(
-        "/publicised_groups$"
-    )
+
+    PATTERNS = client_patterns("/publicised_groups$")
 
     def __init__(self, hs):
         super(PublicisedGroupsForUsersServlet, self).__init__()
@@ -729,9 +717,7 @@ class PublicisedGroupsForUsersServlet(RestServlet):
         content = parse_json_object_from_request(request)
         user_ids = content["user_ids"]
 
-        result = yield self.groups_handler.bulk_get_publicised_groups(
-            user_ids
-        )
+        result = yield self.groups_handler.bulk_get_publicised_groups(user_ids)
 
         defer.returnValue((200, result))
 
@@ -739,9 +725,8 @@ class PublicisedGroupsForUsersServlet(RestServlet):
 class GroupsForUserServlet(RestServlet):
     """Get all groups the logged in user is joined to
     """
-    PATTERNS = client_v2_patterns(
-        "/joined_groups$"
-    )
+
+    PATTERNS = client_patterns("/joined_groups$")
 
     def __init__(self, hs):
         super(GroupsForUserServlet, self).__init__()

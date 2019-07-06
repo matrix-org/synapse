@@ -25,7 +25,14 @@ from twisted.internet import defer
 import synapse
 import synapse.types
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
+from synapse.api.errors import (
+    Codes,
+    LimitExceededError,
+    SynapseError,
+    UnrecognizedRequestError,
+)
+from synapse.config.ratelimiting import FederationRateLimitConfig
+from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -36,7 +43,7 @@ from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
 
-from ._base import client_v2_patterns, interactive_auth_handler
+from ._base import client_patterns, interactive_auth_handler
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
 # exist. It's a _really minor_ security flaw to use plain string comparison
@@ -45,6 +52,7 @@ from ._base import client_v2_patterns, interactive_auth_handler
 if hasattr(hmac, "compare_digest"):
     compare_digest = hmac.compare_digest
 else:
+
     def compare_digest(a, b):
         return a == b
 
@@ -53,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmailRegisterRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register/email/requestToken$")
+    PATTERNS = client_patterns("/register/email/requestToken$")
 
     def __init__(self, hs):
         """
@@ -68,17 +76,19 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(body, [
-            'id_server', 'client_secret', 'email', 'send_attempt'
-        ])
+        assert_params_in_dict(
+            body, ["id_server", "client_secret", "email", "send_attempt"]
+        )
 
-        if not check_3pid_allowed(self.hs, "email", body['email']):
+        if not check_3pid_allowed(self.hs, "email", body["email"]):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Your email domain is not authorized to register on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
-            'email', body['email']
+            "email", body["email"]
         )
 
         if existingUid is not None:
@@ -89,7 +99,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register/msisdn/requestToken$")
+    PATTERNS = client_patterns("/register/msisdn/requestToken$")
 
     def __init__(self, hs):
         """
@@ -104,21 +114,22 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(body, [
-            'id_server', 'client_secret',
-            'country', 'phone_number',
-            'send_attempt',
-        ])
+        assert_params_in_dict(
+            body,
+            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+        )
 
-        msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
+        msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Phone numbers are not authorized to register on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
-            'msisdn', msisdn
+            "msisdn", msisdn
         )
 
         if existingUid is not None:
@@ -131,7 +142,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register/available")
+    PATTERNS = client_patterns("/register/available")
 
     def __init__(self, hs):
         """
@@ -140,19 +151,21 @@ class UsernameAvailabilityRestServlet(RestServlet):
         """
         super(UsernameAvailabilityRestServlet, self).__init__()
         self.hs = hs
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
             hs.get_clock(),
-            # Time window of 2s
-            window_size=2000,
-            # Artificially delay requests if rate > sleep_limit/window_size
-            sleep_limit=1,
-            # Amount of artificial delay to apply
-            sleep_msec=1000,
-            # Error with 429 if more than reject_limit requests are queued
-            reject_limit=1,
-            # Allow 1 request at a time
-            concurrent_requests=1,
+            FederationRateLimitConfig(
+                # Time window of 2s
+                window_size=2000,
+                # Artificially delay requests if rate > sleep_limit/window_size
+                sleep_limit=1,
+                # Amount of artificial delay to apply
+                sleep_msec=1000,
+                # Error with 429 if more than reject_limit requests are queued
+                reject_limit=1,
+                # Allow 1 request at a time
+                concurrent_requests=1,
+            ),
         )
 
     @defer.inlineCallbacks
@@ -169,7 +182,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
 
 class RegisterRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/register$")
+    PATTERNS = client_patterns("/register$")
 
     def __init__(self, hs):
         """
@@ -182,26 +195,44 @@ class RegisterRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.auth_handler = hs.get_auth_handler()
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
         self.identity_handler = hs.get_handlers().identity_handler
         self.room_member_handler = hs.get_room_member_handler()
-        self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
+        self.ratelimiter = hs.get_registration_ratelimiter()
+        self.clock = hs.get_clock()
 
     @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        kind = "user"
-        if "kind" in request.args:
-            kind = request.args["kind"][0]
+        client_addr = request.getClientIP()
 
-        if kind == "guest":
-            ret = yield self._do_guest_registration(body)
+        time_now = self.clock.time()
+
+        allowed, time_allowed = self.ratelimiter.can_do_action(
+            client_addr,
+            time_now_s=time_now,
+            rate_hz=self.hs.config.rc_registration.per_second,
+            burst_count=self.hs.config.rc_registration.burst_count,
+            update=False,
+        )
+
+        if not allowed:
+            raise LimitExceededError(
+                retry_after_ms=int(1000 * (time_allowed - time_now))
+            )
+
+        kind = b"user"
+        if b"kind" in request.args:
+            kind = request.args[b"kind"][0]
+
+        if kind == b"guest":
+            ret = yield self._do_guest_registration(body, address=client_addr)
             defer.returnValue(ret)
             return
-        elif kind != "user":
+        elif kind != b"user":
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
             )
@@ -209,18 +240,22 @@ class RegisterRestServlet(RestServlet):
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the username/password provided to us.
         desired_password = None
-        if 'password' in body:
-            if (not isinstance(body['password'], string_types) or
-                    len(body['password']) > 512):
+        if "password" in body:
+            if (
+                not isinstance(body["password"], string_types)
+                or len(body["password"]) > 512
+            ):
                 raise SynapseError(400, "Invalid password")
             desired_password = body["password"]
 
         desired_username = None
-        if 'username' in body:
-            if (not isinstance(body['username'], string_types) or
-                    len(body['username']) > 512):
+        if "username" in body:
+            if (
+                not isinstance(body["username"], string_types)
+                or len(body["username"]) > 512
+            ):
                 raise SynapseError(400, "Invalid username")
-            desired_username = body['username']
+            desired_username = body["username"]
 
         appservice = None
         if self.auth.has_access_token(request):
@@ -260,7 +295,7 @@ class RegisterRestServlet(RestServlet):
             desired_username = desired_username.lower()
 
         # == Shared Secret Registration == (e.g. create new user scripts)
-        if 'mac' in body:
+        if "mac" in body:
             # FIXME: Should we really be determining if this is shared secret
             # auth based purely on the 'mac' key?
             result = yield self._do_shared_secret_registration(
@@ -275,16 +310,13 @@ class RegisterRestServlet(RestServlet):
 
         guest_access_token = body.get("guest_access_token", None)
 
-        if (
-            'initial_device_display_name' in body and
-            'password' not in body
-        ):
+        if "initial_device_display_name" in body and "password" not in body:
             # ignore 'initial_device_display_name' if sent without
             # a password to work around a client bug where it sent
             # the 'initial_device_display_name' param alone, wiping out
             # the original registration params
             logger.warn("Ignoring initial_device_display_name without password")
-            del body['initial_device_display_name']
+            del body["initial_device_display_name"]
 
         session_id = self.auth_handler.get_session_id(body)
         registered_user_id = None
@@ -304,39 +336,37 @@ class RegisterRestServlet(RestServlet):
                 assigned_user_id=registered_user_id,
             )
 
-        # Only give msisdn flows if the x_show_msisdn flag is given:
-        # this is a hack to work around the fact that clients were shipped
-        # that use fallback registration if they see any flows that they don't
-        # recognise, which means we break registration for these clients if we
-        # advertise msisdn flows. Once usage of Riot iOS <=0.3.9 and Riot
-        # Android <=0.6.9 have fallen below an acceptable threshold, this
-        # parameter should go away and we should always advertise msisdn flows.
-        show_msisdn = False
-        if 'x_show_msisdn' in body and body['x_show_msisdn']:
-            show_msisdn = True
-
         # FIXME: need a better error than "no auth flow found" for scenarios
         # where we required 3PID for registration but the user didn't give one
-        require_email = 'email' in self.hs.config.registrations_require_3pid
-        require_msisdn = 'msisdn' in self.hs.config.registrations_require_3pid
+        require_email = "email" in self.hs.config.registrations_require_3pid
+        require_msisdn = "msisdn" in self.hs.config.registrations_require_3pid
+
+        show_msisdn = True
+        if self.hs.config.disable_msisdn_registration:
+            show_msisdn = False
+            require_msisdn = False
 
         flows = []
         if self.hs.config.enable_registration_captcha:
             # only support 3PIDless registration if no 3PIDs are required
             if not require_email and not require_msisdn:
-                flows.extend([[LoginType.RECAPTCHA]])
+                # Also add a dummy flow here, otherwise if a client completes
+                # recaptcha first we'll assume they were going for this flow
+                # and complete the request, when they could have been trying to
+                # complete one of the flows with email/msisdn auth.
+                flows.extend([[LoginType.RECAPTCHA, LoginType.DUMMY]])
             # only support the email-only flow if we don't require MSISDN 3PIDs
             if not require_msisdn:
-                flows.extend([[LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA]])
+                flows.extend([[LoginType.RECAPTCHA, LoginType.EMAIL_IDENTITY]])
 
             if show_msisdn:
                 # only support the MSISDN-only flow if we don't require email 3PIDs
                 if not require_email:
-                    flows.extend([[LoginType.MSISDN, LoginType.RECAPTCHA]])
+                    flows.extend([[LoginType.RECAPTCHA, LoginType.MSISDN]])
                 # always let users provide both MSISDN & email
-                flows.extend([
-                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
-                ])
+                flows.extend(
+                    [[LoginType.RECAPTCHA, LoginType.MSISDN, LoginType.EMAIL_IDENTITY]]
+                )
         else:
             # only support 3PIDless registration if no 3PIDs are required
             if not require_email and not require_msisdn:
@@ -350,9 +380,22 @@ class RegisterRestServlet(RestServlet):
                 if not require_email or require_msisdn:
                     flows.extend([[LoginType.MSISDN]])
                 # always let users provide both MSISDN & email
-                flows.extend([
-                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY]
-                ])
+                flows.extend([[LoginType.MSISDN, LoginType.EMAIL_IDENTITY]])
+
+        # Append m.login.terms to all flows if we're requiring consent
+        if self.hs.config.user_consent_at_registration:
+            new_flows = []
+            for flow in flows:
+                inserted = False
+                # m.login.terms should go near the end but before msisdn or email auth
+                for i, stage in enumerate(flow):
+                    if stage == LoginType.EMAIL_IDENTITY or stage == LoginType.MSISDN:
+                        flow.insert(i, LoginType.TERMS)
+                        inserted = True
+                        break
+                if not inserted:
+                    flow.append(LoginType.TERMS)
+            flows.extend(new_flows)
 
         auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
@@ -367,40 +410,75 @@ class RegisterRestServlet(RestServlet):
         if auth_result:
             for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
                 if login_type in auth_result:
-                    medium = auth_result[login_type]['medium']
-                    address = auth_result[login_type]['address']
+                    medium = auth_result[login_type]["medium"]
+                    address = auth_result[login_type]["address"]
 
                     if not check_3pid_allowed(self.hs, medium, address):
                         raise SynapseError(
-                            403, "Third party identifier is not allowed",
+                            403,
+                            "Third party identifiers (email/phone numbers)"
+                            + " are not authorized on this server",
                             Codes.THREEPID_DENIED,
                         )
 
         if registered_user_id is not None:
             logger.info(
-                "Already registered user ID %r for this session",
-                registered_user_id
+                "Already registered user ID %r for this session", registered_user_id
             )
             # don't re-register the threepids
-            add_email = False
-            add_msisdn = False
+            registered = False
         else:
             # NB: This may be from the auth handler and NOT from the POST
             assert_params_in_dict(params, ["password"])
 
             desired_username = params.get("username", None)
-            new_password = params.get("password", None)
             guest_access_token = params.get("guest_access_token", None)
+            new_password = params.get("password", None)
 
             if desired_username is not None:
                 desired_username = desired_username.lower()
+
+            threepid = None
+            if auth_result:
+                threepid = auth_result.get(LoginType.EMAIL_IDENTITY)
+
+                # Also check that we're not trying to register a 3pid that's already
+                # been registered.
+                #
+                # This has probably happened in /register/email/requestToken as well,
+                # but if a user hits this endpoint twice then clicks on each link from
+                # the two activation emails, they would register the same 3pid twice.
+                for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
+                    if login_type in auth_result:
+                        medium = auth_result[login_type]["medium"]
+                        address = auth_result[login_type]["address"]
+
+                        existingUid = yield self.store.get_user_id_by_threepid(
+                            medium, address
+                        )
+
+                        if existingUid is not None:
+                            raise SynapseError(
+                                400,
+                                "%s is already in use" % medium,
+                                Codes.THREEPID_IN_USE,
+                            )
 
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
                 password=new_password,
                 guest_access_token=guest_access_token,
                 generate_token=False,
+                threepid=threepid,
+                address=client_addr,
             )
+            # Necessary due to auth checks prior to the threepid being
+            # written to the db
+            if threepid:
+                if is_threepid_reserved(
+                    self.hs.config.mau_limits_reserved_threepids, threepid
+                ):
+                    yield self.store.upsert_monthly_active_user(registered_user_id)
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
@@ -408,25 +486,19 @@ class RegisterRestServlet(RestServlet):
                 session_id, "registered_user_id", registered_user_id
             )
 
-            add_email = True
-            add_msisdn = True
+            registered = True
 
         return_dict = yield self._create_registration_details(
             registered_user_id, params
         )
 
-        if add_email and auth_result and LoginType.EMAIL_IDENTITY in auth_result:
-            threepid = auth_result[LoginType.EMAIL_IDENTITY]
-            yield self._register_email_threepid(
-                registered_user_id, threepid, return_dict["access_token"],
-                params.get("bind_email")
-            )
-
-        if add_msisdn and auth_result and LoginType.MSISDN in auth_result:
-            threepid = auth_result[LoginType.MSISDN]
-            yield self._register_msisdn_threepid(
-                registered_user_id, threepid, return_dict["access_token"],
-                params.get("bind_msisdn")
+        if registered:
+            yield self.registration_handler.post_registration_actions(
+                user_id=registered_user_id,
+                auth_result=auth_result,
+                access_token=return_dict.get("access_token"),
+                bind_email=params.get("bind_email"),
+                bind_msisdn=params.get("bind_msisdn"),
             )
 
         defer.returnValue((200, return_dict))
@@ -447,7 +519,7 @@ class RegisterRestServlet(RestServlet):
             raise SynapseError(400, "Shared secret registration is not enabled")
         if not username:
             raise SynapseError(
-                400, "username must be specified", errcode=Codes.BAD_JSON,
+                400, "username must be specified", errcode=Codes.BAD_JSON
             )
 
         # use the username from the original request rather than the
@@ -468,125 +540,14 @@ class RegisterRestServlet(RestServlet):
         ).hexdigest()
 
         if not compare_digest(want_mac, got_mac):
-            raise SynapseError(
-                403, "HMAC incorrect",
-            )
+            raise SynapseError(403, "HMAC incorrect")
 
         (user_id, _) = yield self.registration_handler.register(
-            localpart=username, password=password, generate_token=False,
+            localpart=username, password=password, generate_token=False
         )
 
         result = yield self._create_registration_details(user_id, body)
         defer.returnValue(result)
-
-    @defer.inlineCallbacks
-    def _register_email_threepid(self, user_id, threepid, token, bind_email):
-        """Add an email address as a 3pid identifier
-
-        Also adds an email pusher for the email address, if configured in the
-        HS config
-
-        Also optionally binds emails to the given user_id on the identity server
-
-        Args:
-            user_id (str): id of user
-            threepid (object): m.login.email.identity auth response
-            token (str): access_token for the user
-            bind_email (bool): true if the client requested the email to be
-                bound at the identity server
-        Returns:
-            defer.Deferred:
-        """
-        reqd = ('medium', 'address', 'validated_at')
-        if any(x not in threepid for x in reqd):
-            # This will only happen if the ID server returns a malformed response
-            logger.info("Can't add incomplete 3pid")
-            return
-
-        yield self.auth_handler.add_threepid(
-            user_id,
-            threepid['medium'],
-            threepid['address'],
-            threepid['validated_at'],
-        )
-
-        # And we add an email pusher for them by default, but only
-        # if email notifications are enabled (so people don't start
-        # getting mail spam where they weren't before if email
-        # notifs are set up on a home server)
-        if (self.hs.config.email_enable_notifs and
-                self.hs.config.email_notif_for_new_users):
-            # Pull the ID of the access token back out of the db
-            # It would really make more sense for this to be passed
-            # up when the access token is saved, but that's quite an
-            # invasive change I'd rather do separately.
-            user_tuple = yield self.store.get_user_by_access_token(
-                token
-            )
-            token_id = user_tuple["token_id"]
-
-            yield self.hs.get_pusherpool().add_pusher(
-                user_id=user_id,
-                access_token=token_id,
-                kind="email",
-                app_id="m.email",
-                app_display_name="Email Notifications",
-                device_display_name=threepid["address"],
-                pushkey=threepid["address"],
-                lang=None,  # We don't know a user's language here
-                data={},
-            )
-
-        if bind_email:
-            logger.info("bind_email specified: binding")
-            logger.debug("Binding emails %s to %s" % (
-                threepid, user_id
-            ))
-            yield self.identity_handler.bind_threepid(
-                threepid['threepid_creds'], user_id
-            )
-        else:
-            logger.info("bind_email not specified: not binding email")
-
-    @defer.inlineCallbacks
-    def _register_msisdn_threepid(self, user_id, threepid, token, bind_msisdn):
-        """Add a phone number as a 3pid identifier
-
-        Also optionally binds msisdn to the given user_id on the identity server
-
-        Args:
-            user_id (str): id of user
-            threepid (object): m.login.msisdn auth response
-            token (str): access_token for the user
-            bind_email (bool): true if the client requested the email to be
-                bound at the identity server
-        Returns:
-            defer.Deferred:
-        """
-        try:
-            assert_params_in_dict(threepid, ['medium', 'address', 'validated_at'])
-        except SynapseError as ex:
-            if ex.errcode == Codes.MISSING_PARAM:
-                # This will only happen if the ID server returns a malformed response
-                logger.info("Can't add incomplete 3pid")
-                defer.returnValue(None)
-            raise
-
-        yield self.auth_handler.add_threepid(
-            user_id,
-            threepid['medium'],
-            threepid['address'],
-            threepid['validated_at'],
-        )
-
-        if bind_msisdn:
-            logger.info("bind_msisdn specified: binding")
-            logger.debug("Binding msisdn %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(
-                threepid['threepid_creds'], user_id
-            )
-        else:
-            logger.info("bind_msisdn not specified: not binding msisdn")
 
     @defer.inlineCallbacks
     def _create_registration_details(self, user_id, params):
@@ -601,71 +562,44 @@ class RegisterRestServlet(RestServlet):
         Returns:
             defer.Deferred: (object) dictionary for response from /register
         """
-        result = {
-            "user_id": user_id,
-            "home_server": self.hs.hostname,
-        }
+        result = {"user_id": user_id, "home_server": self.hs.hostname}
         if not params.get("inhibit_login", False):
-            device_id = yield self._register_device(user_id, params)
-
-            access_token = (
-                yield self.auth_handler.get_access_token_for_user_id(
-                    user_id, device_id=device_id,
-                )
+            device_id = params.get("device_id")
+            initial_display_name = params.get("initial_device_display_name")
+            device_id, access_token = yield self.registration_handler.register_device(
+                user_id, device_id, initial_display_name, is_guest=False
             )
 
-            result.update({
-                "access_token": access_token,
-                "device_id": device_id,
-            })
+            result.update({"access_token": access_token, "device_id": device_id})
         defer.returnValue(result)
 
-    def _register_device(self, user_id, params):
-        """Register a device for a user.
-
-        This is called after the user's credentials have been validated, but
-        before the access token has been issued.
-
-        Args:
-            (str) user_id: full canonical @user:id
-            (object) params: registration parameters, from which we pull
-                device_id and initial_device_name
-        Returns:
-            defer.Deferred: (str) device_id
-        """
-        # register the user's device
-        device_id = params.get("device_id")
-        initial_display_name = params.get("initial_device_display_name")
-        return self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
-        )
-
     @defer.inlineCallbacks
-    def _do_guest_registration(self, params):
+    def _do_guest_registration(self, params, address=None):
         if not self.hs.config.allow_guest_access:
             raise SynapseError(403, "Guest access is disabled")
         user_id, _ = yield self.registration_handler.register(
-            generate_token=False,
-            make_guest=True
+            generate_token=False, make_guest=True, address=address
         )
 
         # we don't allow guests to specify their own device_id, because
         # we have nowhere to store it.
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
-        yield self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
+        device_id, access_token = yield self.registration_handler.register_device(
+            user_id, device_id, initial_display_name, is_guest=True
         )
 
-        access_token = self.macaroon_gen.generate_access_token(
-            user_id, ["guest = true"]
+        defer.returnValue(
+            (
+                200,
+                {
+                    "user_id": user_id,
+                    "device_id": device_id,
+                    "access_token": access_token,
+                    "home_server": self.hs.hostname,
+                },
+            )
         )
-        defer.returnValue((200, {
-            "user_id": user_id,
-            "device_id": device_id,
-            "access_token": access_token,
-            "home_server": self.hs.hostname,
-        }))
 
 
 def register_servlets(hs, http_server):

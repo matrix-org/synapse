@@ -16,15 +16,27 @@
 import logging
 from collections import OrderedDict
 
+from six import iteritems, itervalues
+
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
 
 
+SENTINEL = object()
+
+
 class ExpiringCache(object):
-    def __init__(self, cache_name, clock, max_len=0, expiry_ms=0,
-                 reset_expiry_on_get=False, iterable=False):
+    def __init__(
+        self,
+        cache_name,
+        clock,
+        max_len=0,
+        expiry_ms=0,
+        reset_expiry_on_get=False,
+        iterable=False,
+    ):
         """
         Args:
             cache_name (str): Name of this cache, used for logging.
@@ -54,19 +66,15 @@ class ExpiringCache(object):
 
         self.iterable = iterable
 
-        self._size_estimate = 0
-
         self.metrics = register_cache("expiring", cache_name, self)
 
-    def start(self):
         if not self._expiry_ms:
             # Don't bother starting the loop if things never expire
             return
 
         def f():
-            run_as_background_process(
-                "prune_cache_%s" % self._cache_name,
-                self._prune_cache,
+            return run_as_background_process(
+                "prune_cache_%s" % self._cache_name, self._prune_cache
             )
 
         self._clock.looping_call(f, self._expiry_ms / 2)
@@ -75,16 +83,11 @@ class ExpiringCache(object):
         now = self._clock.time_msec()
         self._cache[key] = _CacheEntry(now, value)
 
-        if self.iterable:
-            self._size_estimate += len(value)
-
         # Evict if there are now too many items
         while self._max_len and len(self) > self._max_len:
             _key, value = self._cache.popitem(last=False)
             if self.iterable:
-                removed_len = len(value.value)
-                self.metrics.inc_evictions(removed_len)
-                self._size_estimate -= removed_len
+                self.metrics.inc_evictions(len(value.value))
             else:
                 self.metrics.inc_evictions()
 
@@ -100,6 +103,21 @@ class ExpiringCache(object):
             entry.time = self._clock.time_msec()
 
         return entry.value
+
+    def pop(self, key, default=SENTINEL):
+        """Removes and returns the value with the given key from the cache.
+
+        If the key isn't in the cache then `default` will be returned if
+        specified, otherwise `KeyError` will get raised.
+
+        Identical functionality to `dict.pop(..)`.
+        """
+
+        value = self._cache.pop(key, default)
+        if value is SENTINEL:
+            raise KeyError(key)
+
+        return value
 
     def __contains__(self, key):
         return key in self._cache
@@ -128,28 +146,34 @@ class ExpiringCache(object):
 
         keys_to_delete = set()
 
-        for key, cache_entry in self._cache.items():
+        for key, cache_entry in iteritems(self._cache):
             if now - cache_entry.time > self._expiry_ms:
                 keys_to_delete.add(key)
 
         for k in keys_to_delete:
             value = self._cache.pop(k)
             if self.iterable:
-                self._size_estimate -= len(value.value)
+                self.metrics.inc_evictions(len(value.value))
+            else:
+                self.metrics.inc_evictions()
 
         logger.debug(
             "[%s] _prune_cache before: %d, after len: %d",
-            self._cache_name, begin_length, len(self)
+            self._cache_name,
+            begin_length,
+            len(self),
         )
 
     def __len__(self):
         if self.iterable:
-            return self._size_estimate
+            return sum(len(entry.value) for entry in itervalues(self._cache))
         else:
             return len(self._cache)
 
 
 class _CacheEntry(object):
+    __slots__ = ["time", "value"]
+
     def __init__(self, time, value):
         self.time = time
         self.value = value

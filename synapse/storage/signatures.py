@@ -27,7 +27,7 @@ from ._base import SQLBaseStore
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
 # despite being deprecated and removed in favor of memoryview
 if six.PY2:
-    db_binary_type = buffer
+    db_binary_type = six.moves.builtins.buffer
 else:
     db_binary_type = memoryview
 
@@ -39,8 +39,9 @@ class SignatureWorkerStore(SQLBaseStore):
         # to use its cache
         raise NotImplementedError()
 
-    @cachedList(cached_method_name="get_event_reference_hash",
-                list_name="event_ids", num_args=1)
+    @cachedList(
+        cached_method_name="get_event_reference_hash", list_name="event_ids", num_args=1
+    )
     def get_event_reference_hashes(self, event_ids):
         def f(txn):
             return {
@@ -48,21 +49,13 @@ class SignatureWorkerStore(SQLBaseStore):
                 for event_id in event_ids
             }
 
-        return self.runInteraction(
-            "get_event_reference_hashes",
-            f
-        )
+        return self.runInteraction("get_event_reference_hashes", f)
 
     @defer.inlineCallbacks
     def add_event_hashes(self, event_ids):
-        hashes = yield self.get_event_reference_hashes(
-            event_ids
-        )
+        hashes = yield self.get_event_reference_hashes(event_ids)
         hashes = {
-            e_id: {
-                k: encode_base64(v) for k, v in h.items()
-                if k == "sha256"
-            }
+            e_id: {k: encode_base64(v) for k, v in h.items() if k == "sha256"}
             for e_id, h in hashes.items()
         }
 
@@ -74,14 +67,14 @@ class SignatureWorkerStore(SQLBaseStore):
             txn (cursor):
             event_id (str): Id for the Event.
         Returns:
-            A dict of algorithm -> hash.
+            A dict[unicode, bytes] of algorithm -> hash.
         """
         query = (
             "SELECT algorithm, hash"
             " FROM event_reference_hashes"
             " WHERE event_id = ?"
         )
-        txn.execute(query, (event_id, ))
+        txn.execute(query, (event_id,))
         return {k: v for k, v in txn}
 
 
@@ -98,14 +91,12 @@ class SignatureStore(SignatureWorkerStore):
         vals = []
         for event in events:
             ref_alg, ref_hash_bytes = compute_event_reference_hash(event)
-            vals.append({
-                "event_id": event.event_id,
-                "algorithm": ref_alg,
-                "hash": db_binary_type(ref_hash_bytes),
-            })
+            vals.append(
+                {
+                    "event_id": event.event_id,
+                    "algorithm": ref_alg,
+                    "hash": db_binary_type(ref_hash_bytes),
+                }
+            )
 
-        self._simple_insert_many_txn(
-            txn,
-            table="event_reference_hashes",
-            values=vals,
-        )
+        self._simple_insert_many_txn(txn, table="event_reference_hashes", values=vals)

@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from six import text_type
+
 import jsonschema
 from canonicaljson import json
 from jsonschema import FormatChecker
@@ -26,111 +28,55 @@ FILTER_SCHEMA = {
     "additionalProperties": False,
     "type": "object",
     "properties": {
-        "limit": {
-            "type": "number"
-        },
-        "senders": {
-            "$ref": "#/definitions/user_id_array"
-        },
-        "not_senders": {
-            "$ref": "#/definitions/user_id_array"
-        },
+        "limit": {"type": "number"},
+        "senders": {"$ref": "#/definitions/user_id_array"},
+        "not_senders": {"$ref": "#/definitions/user_id_array"},
         # TODO: We don't limit event type values but we probably should...
         # check types are valid event types
-        "types": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        },
-        "not_types": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        }
-    }
+        "types": {"type": "array", "items": {"type": "string"}},
+        "not_types": {"type": "array", "items": {"type": "string"}},
+    },
 }
 
 ROOM_FILTER_SCHEMA = {
     "additionalProperties": False,
     "type": "object",
     "properties": {
-        "not_rooms": {
-            "$ref": "#/definitions/room_id_array"
-        },
-        "rooms": {
-            "$ref": "#/definitions/room_id_array"
-        },
-        "ephemeral": {
-            "$ref": "#/definitions/room_event_filter"
-        },
-        "include_leave": {
-            "type": "boolean"
-        },
-        "state": {
-            "$ref": "#/definitions/room_event_filter"
-        },
-        "timeline": {
-            "$ref": "#/definitions/room_event_filter"
-        },
-        "account_data": {
-            "$ref": "#/definitions/room_event_filter"
-        },
-    }
+        "not_rooms": {"$ref": "#/definitions/room_id_array"},
+        "rooms": {"$ref": "#/definitions/room_id_array"},
+        "ephemeral": {"$ref": "#/definitions/room_event_filter"},
+        "include_leave": {"type": "boolean"},
+        "state": {"$ref": "#/definitions/room_event_filter"},
+        "timeline": {"$ref": "#/definitions/room_event_filter"},
+        "account_data": {"$ref": "#/definitions/room_event_filter"},
+    },
 }
 
 ROOM_EVENT_FILTER_SCHEMA = {
     "additionalProperties": False,
     "type": "object",
     "properties": {
-        "limit": {
-            "type": "number"
-        },
-        "senders": {
-            "$ref": "#/definitions/user_id_array"
-        },
-        "not_senders": {
-            "$ref": "#/definitions/user_id_array"
-        },
-        "types": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        },
-        "not_types": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        },
-        "rooms": {
-            "$ref": "#/definitions/room_id_array"
-        },
-        "not_rooms": {
-            "$ref": "#/definitions/room_id_array"
-        },
-        "contains_url": {
-            "type": "boolean"
-        }
-    }
+        "limit": {"type": "number"},
+        "senders": {"$ref": "#/definitions/user_id_array"},
+        "not_senders": {"$ref": "#/definitions/user_id_array"},
+        "types": {"type": "array", "items": {"type": "string"}},
+        "not_types": {"type": "array", "items": {"type": "string"}},
+        "rooms": {"$ref": "#/definitions/room_id_array"},
+        "not_rooms": {"$ref": "#/definitions/room_id_array"},
+        "contains_url": {"type": "boolean"},
+        "lazy_load_members": {"type": "boolean"},
+        "include_redundant_members": {"type": "boolean"},
+    },
 }
 
 USER_ID_ARRAY_SCHEMA = {
     "type": "array",
-    "items": {
-        "type": "string",
-        "format": "matrix_user_id"
-    }
+    "items": {"type": "string", "format": "matrix_user_id"},
 }
 
 ROOM_ID_ARRAY_SCHEMA = {
     "type": "array",
-    "items": {
-        "type": "string",
-        "format": "matrix_room_id"
-    }
+    "items": {"type": "string", "format": "matrix_room_id"},
 }
 
 USER_FILTER_SCHEMA = {
@@ -142,22 +88,13 @@ USER_FILTER_SCHEMA = {
         "user_id_array": USER_ID_ARRAY_SCHEMA,
         "filter": FILTER_SCHEMA,
         "room_filter": ROOM_FILTER_SCHEMA,
-        "room_event_filter": ROOM_EVENT_FILTER_SCHEMA
+        "room_event_filter": ROOM_EVENT_FILTER_SCHEMA,
     },
     "properties": {
-        "presence": {
-            "$ref": "#/definitions/filter"
-        },
-        "account_data": {
-            "$ref": "#/definitions/filter"
-        },
-        "room": {
-            "$ref": "#/definitions/room_filter"
-        },
-        "event_format": {
-            "type": "string",
-            "enum": ["client", "federation"]
-        },
+        "presence": {"$ref": "#/definitions/filter"},
+        "account_data": {"$ref": "#/definitions/filter"},
+        "room": {"$ref": "#/definitions/room_filter"},
+        "event_format": {"type": "string", "enum": ["client", "federation"]},
         "event_fields": {
             "type": "array",
             "items": {
@@ -166,26 +103,28 @@ USER_FILTER_SCHEMA = {
                 # events a lot easier as we can then use a negative lookbehind
                 # assertion to split '\.' If we allowed \\ then it would
                 # incorrectly split '\\.' See synapse.events.utils.serialize_event
-                "pattern": "^((?!\\\).)*$"
-            }
-        }
+                #
+                # Note that because this is a regular expression, we have to escape
+                # each backslash in the pattern.
+                "pattern": r"^((?!\\\\).)*$",
+            },
+        },
     },
-    "additionalProperties": False
+    "additionalProperties": False,
 }
 
 
-@FormatChecker.cls_checks('matrix_room_id')
+@FormatChecker.cls_checks("matrix_room_id")
 def matrix_room_id_validator(room_id_str):
     return RoomID.from_string(room_id_str)
 
 
-@FormatChecker.cls_checks('matrix_user_id')
+@FormatChecker.cls_checks("matrix_user_id")
 def matrix_user_id_validator(user_id_str):
     return UserID.from_string(user_id_str)
 
 
 class Filtering(object):
-
     def __init__(self, hs):
         super(Filtering, self).__init__()
         self.store = hs.get_datastore()
@@ -217,10 +156,11 @@ class Filtering(object):
         # individual top-level key e.g. public_user_data. Filters are made of
         # many definitions.
         try:
-            jsonschema.validate(user_filter_json, USER_FILTER_SCHEMA,
-                                format_checker=FormatChecker())
+            jsonschema.validate(
+                user_filter_json, USER_FILTER_SCHEMA, format_checker=FormatChecker()
+            )
         except jsonschema.ValidationError as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
 
 class FilterCollection(object):
@@ -229,10 +169,9 @@ class FilterCollection(object):
 
         room_filter_json = self._filter_json.get("room", {})
 
-        self._room_filter = Filter({
-            k: v for k, v in room_filter_json.items()
-            if k in ("rooms", "not_rooms")
-        })
+        self._room_filter = Filter(
+            {k: v for k, v in room_filter_json.items() if k in ("rooms", "not_rooms")}
+        )
 
         self._room_timeline_filter = Filter(room_filter_json.get("timeline", {}))
         self._room_state_filter = Filter(room_filter_json.get("state", {}))
@@ -241,10 +180,9 @@ class FilterCollection(object):
         self._presence_filter = Filter(filter_json.get("presence", {}))
         self._account_data = Filter(filter_json.get("account_data", {}))
 
-        self.include_leave = filter_json.get("room", {}).get(
-            "include_leave", False
-        )
+        self.include_leave = filter_json.get("room", {}).get("include_leave", False)
         self.event_fields = filter_json.get("event_fields", [])
+        self.event_format = filter_json.get("event_format", "client")
 
     def __repr__(self):
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
@@ -260,6 +198,12 @@ class FilterCollection(object):
 
     def ephemeral_limit(self):
         return self._room_ephemeral_filter.limit()
+
+    def lazy_load_members(self):
+        return self._room_state_filter.lazy_load_members()
+
+    def include_redundant_members(self):
+        return self._room_state_filter.include_redundant_members()
 
     def filter_presence(self, events):
         return self._presence_filter.filter(events)
@@ -281,22 +225,22 @@ class FilterCollection(object):
 
     def blocks_all_presence(self):
         return (
-            self._presence_filter.filters_all_types() or
-            self._presence_filter.filters_all_senders()
+            self._presence_filter.filters_all_types()
+            or self._presence_filter.filters_all_senders()
         )
 
     def blocks_all_room_ephemeral(self):
         return (
-            self._room_ephemeral_filter.filters_all_types() or
-            self._room_ephemeral_filter.filters_all_senders() or
-            self._room_ephemeral_filter.filters_all_rooms()
+            self._room_ephemeral_filter.filters_all_types()
+            or self._room_ephemeral_filter.filters_all_senders()
+            or self._room_ephemeral_filter.filters_all_rooms()
         )
 
     def blocks_all_room_timeline(self):
         return (
-            self._room_timeline_filter.filters_all_types() or
-            self._room_timeline_filter.filters_all_senders() or
-            self._room_timeline_filter.filters_all_rooms()
+            self._room_timeline_filter.filters_all_types()
+            or self._room_timeline_filter.filters_all_senders()
+            or self._room_timeline_filter.filters_all_rooms()
         )
 
 
@@ -337,7 +281,7 @@ class Filter(object):
             sender = event.user_id
             room_id = None
             ev_type = "m.presence"
-            is_url = False
+            contains_url = False
         else:
             sender = event.get("sender", None)
             if not sender:
@@ -352,14 +296,12 @@ class Filter(object):
 
             room_id = event.get("room_id", None)
             ev_type = event.get("type", None)
-            is_url = "url" in event.get("content", {})
 
-        return self.check_fields(
-            room_id,
-            sender,
-            ev_type,
-            is_url,
-        )
+            content = event.get("content", {})
+            # check if there is a string url field in the content for filtering purposes
+            contains_url = isinstance(content.get("url"), text_type)
+
+        return self.check_fields(room_id, sender, ev_type, contains_url)
 
     def check_fields(self, room_id, sender, event_type, contains_url):
         """Checks whether the filter matches the given event fields.
@@ -370,7 +312,7 @@ class Filter(object):
         literal_keys = {
             "rooms": lambda v: room_id == v,
             "senders": lambda v: sender == v,
-            "types": lambda v: _matches_wildcard(event_type, v)
+            "types": lambda v: _matches_wildcard(event_type, v),
         }
 
         for name, match_func in literal_keys.items():
@@ -416,6 +358,26 @@ class Filter(object):
 
     def limit(self):
         return self.filter_json.get("limit", 10)
+
+    def lazy_load_members(self):
+        return self.filter_json.get("lazy_load_members", False)
+
+    def include_redundant_members(self):
+        return self.filter_json.get("include_redundant_members", False)
+
+    def with_room_ids(self, room_ids):
+        """Returns a new filter with the given room IDs appended.
+
+        Args:
+            room_ids (iterable[unicode]): The room_ids to add
+
+        Returns:
+            filter: A new filter including the given rooms and the old
+                    filter's rooms.
+        """
+        newFilter = Filter(self.filter_json)
+        newFilter.rooms += room_ids
+        return newFilter
 
 
 def _matches_wildcard(actual_value, filter_value):

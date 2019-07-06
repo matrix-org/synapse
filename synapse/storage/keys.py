@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,17 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import hashlib
+import itertools
 import logging
 
 import six
 
+import attr
 from signedjson.key import decode_verify_key_bytes
 
-import OpenSSL
-from twisted.internet import defer
-
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util import batch_iter
+from synapse.util.caches.descriptors import cached, cachedList
 
 from ._base import SQLBaseStore
 
@@ -32,131 +32,126 @@ logger = logging.getLogger(__name__)
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
 # despite being deprecated and removed in favor of memoryview
 if six.PY2:
-    db_binary_type = buffer
+    db_binary_type = six.moves.builtins.buffer
 else:
     db_binary_type = memoryview
 
 
+@attr.s(slots=True, frozen=True)
+class FetchKeyResult(object):
+    verify_key = attr.ib()  # VerifyKey: the key itself
+    valid_until_ts = attr.ib()  # int: how long we can use this key for
+
+
 class KeyStore(SQLBaseStore):
-    """Persistence for signature verification keys and tls X.509 certificates
+    """Persistence for signature verification keys
     """
 
-    @defer.inlineCallbacks
-    def get_server_certificate(self, server_name):
-        """Retrieve the TLS X.509 certificate for the given server
-        Args:
-            server_name (bytes): The name of the server.
-        Returns:
-            (OpenSSL.crypto.X509): The tls certificate.
+    @cached()
+    def _get_server_verify_key(self, server_name_and_key_id):
+        raise NotImplementedError()
+
+    @cachedList(
+        cached_method_name="_get_server_verify_key", list_name="server_name_and_key_ids"
+    )
+    def get_server_verify_keys(self, server_name_and_key_ids):
         """
-        tls_certificate_bytes, = yield self._simple_select_one(
-            table="server_tls_certificates",
-            keyvalues={"server_name": server_name},
-            retcols=("tls_certificate",),
-            desc="get_server_certificate",
-        )
-        tls_certificate = OpenSSL.crypto.load_certificate(
-            OpenSSL.crypto.FILETYPE_ASN1, tls_certificate_bytes,
-        )
-        defer.returnValue(tls_certificate)
-
-    def store_server_certificate(self, server_name, from_server, time_now_ms,
-                                 tls_certificate):
-        """Stores the TLS X.509 certificate for the given server
         Args:
-            server_name (str): The name of the server.
-            from_server (str): Where the certificate was looked up
-            time_now_ms (int): The time now in milliseconds
-            tls_certificate (OpenSSL.crypto.X509): The X.509 certificate.
-        """
-        tls_certificate_bytes = OpenSSL.crypto.dump_certificate(
-            OpenSSL.crypto.FILETYPE_ASN1, tls_certificate
-        )
-        fingerprint = hashlib.sha256(tls_certificate_bytes).hexdigest()
-        return self._simple_upsert(
-            table="server_tls_certificates",
-            keyvalues={
-                "server_name": server_name,
-                "fingerprint": fingerprint,
-            },
-            values={
-                "from_server": from_server,
-                "ts_added_ms": time_now_ms,
-                "tls_certificate": db_binary_type(tls_certificate_bytes),
-            },
-            desc="store_server_certificate",
-        )
+            server_name_and_key_ids (iterable[Tuple[str, str]]):
+                iterable of (server_name, key-id) tuples to fetch keys for
 
-    @cachedInlineCallbacks()
-    def _get_server_verify_key(self, server_name, key_id):
-        verify_key_bytes = yield self._simple_select_one_onecol(
-            table="server_signature_keys",
-            keyvalues={
-                "server_name": server_name,
-                "key_id": key_id,
-            },
-            retcol="verify_key",
-            desc="_get_server_verify_key",
-            allow_none=True,
-        )
-
-        if verify_key_bytes:
-            defer.returnValue(decode_verify_key_bytes(
-                key_id, bytes(verify_key_bytes)
-            ))
-
-    @defer.inlineCallbacks
-    def get_server_verify_keys(self, server_name, key_ids):
-        """Retrieve the NACL verification key for a given server for the given
-        key_ids
-        Args:
-            server_name (str): The name of the server.
-            key_ids (iterable[str]): key_ids to try and look up.
         Returns:
-            Deferred: resolves to dict[str, VerifyKey]: map from
-               key_id to verification key.
+            Deferred: resolves to dict[Tuple[str, str], FetchKeyResult|None]:
+                map from (server_name, key_id) -> FetchKeyResult, or None if the key is
+                unknown
         """
         keys = {}
-        for key_id in key_ids:
-            key = yield self._get_server_verify_key(server_name, key_id)
-            if key:
-                keys[key_id] = key
-        defer.returnValue(keys)
 
-    def store_server_verify_key(self, server_name, from_server, time_now_ms,
-                                verify_key):
-        """Stores a NACL verification key for the given server.
-        Args:
-            server_name (str): The name of the server.
-            from_server (str): Where the verification key was looked up
-            time_now_ms (int): The time now in milliseconds
-            verify_key (nacl.signing.VerifyKey): The NACL verify key.
-        """
-        key_id = "%s:%s" % (verify_key.alg, verify_key.version)
+        def _get_keys(txn, batch):
+            """Processes a batch of keys to fetch, and adds the result to `keys`."""
+
+            # batch_iter always returns tuples so it's safe to do len(batch)
+            sql = (
+                "SELECT server_name, key_id, verify_key, ts_valid_until_ms "
+                "FROM server_signature_keys WHERE 1=0"
+            ) + " OR (server_name=? AND key_id=?)" * len(batch)
+
+            txn.execute(sql, tuple(itertools.chain.from_iterable(batch)))
+
+            for row in txn:
+                server_name, key_id, key_bytes, ts_valid_until_ms = row
+
+                if ts_valid_until_ms is None:
+                    # Old keys may be stored with a ts_valid_until_ms of null,
+                    # in which case we treat this as if it was set to `0`, i.e.
+                    # it won't match key requests that define a minimum
+                    # `ts_valid_until_ms`.
+                    ts_valid_until_ms = 0
+
+                res = FetchKeyResult(
+                    verify_key=decode_verify_key_bytes(key_id, bytes(key_bytes)),
+                    valid_until_ts=ts_valid_until_ms,
+                )
+                keys[(server_name, key_id)] = res
 
         def _txn(txn):
-            self._simple_upsert_txn(
-                txn,
-                table="server_signature_keys",
-                keyvalues={
-                    "server_name": server_name,
-                    "key_id": key_id,
-                },
-                values={
-                    "from_server": from_server,
-                    "ts_added_ms": time_now_ms,
-                    "verify_key": db_binary_type(verify_key.encode()),
-                },
-            )
-            txn.call_after(
-                self._get_server_verify_key.invalidate,
-                (server_name, key_id)
-            )
+            for batch in batch_iter(server_name_and_key_ids, 50):
+                _get_keys(txn, batch)
+            return keys
 
-        return self.runInteraction("store_server_verify_key", _txn)
+        return self.runInteraction("get_server_verify_keys", _txn)
 
-    def store_server_keys_json(self, server_name, key_id, from_server,
-                               ts_now_ms, ts_expires_ms, key_json_bytes):
+    def store_server_verify_keys(self, from_server, ts_added_ms, verify_keys):
+        """Stores NACL verification keys for remote servers.
+        Args:
+            from_server (str): Where the verification keys were looked up
+            ts_added_ms (int): The time to record that the key was added
+            verify_keys (iterable[tuple[str, str, FetchKeyResult]]):
+                keys to be stored. Each entry is a triplet of
+                (server_name, key_id, key).
+        """
+        key_values = []
+        value_values = []
+        invalidations = []
+        for server_name, key_id, fetch_result in verify_keys:
+            key_values.append((server_name, key_id))
+            value_values.append(
+                (
+                    from_server,
+                    ts_added_ms,
+                    fetch_result.valid_until_ts,
+                    db_binary_type(fetch_result.verify_key.encode()),
+                )
+            )
+            # invalidate takes a tuple corresponding to the params of
+            # _get_server_verify_key. _get_server_verify_key only takes one
+            # param, which is itself the 2-tuple (server_name, key_id).
+            invalidations.append((server_name, key_id))
+
+        def _invalidate(res):
+            f = self._get_server_verify_key.invalidate
+            for i in invalidations:
+                f((i,))
+            return res
+
+        return self.runInteraction(
+            "store_server_verify_keys",
+            self._simple_upsert_many_txn,
+            table="server_signature_keys",
+            key_names=("server_name", "key_id"),
+            key_values=key_values,
+            value_names=(
+                "from_server",
+                "ts_added_ms",
+                "ts_valid_until_ms",
+                "verify_key",
+            ),
+            value_values=value_values,
+        ).addCallback(_invalidate)
+
+    def store_server_keys_json(
+        self, server_name, key_id, from_server, ts_now_ms, ts_expires_ms, key_json_bytes
+    ):
         """Stores the JSON bytes for a set of keys from a server
         The JSON should be signed by the originating server, the intermediate
         server, and by this server. Updates the value for the
@@ -196,9 +191,10 @@ class KeyStore(SQLBaseStore):
         Args:
             server_keys (list): List of (server_name, key_id, source) triplets.
         Returns:
-            Dict mapping (server_name, key_id, source) triplets to dicts with
-            "ts_valid_until_ms" and "key_json" keys.
+            Deferred[dict[Tuple[str, str, str|None], list[dict]]]:
+                Dict mapping (server_name, key_id, source) triplets to lists of dicts
         """
+
         def _get_server_keys_json_txn(txn):
             results = {}
             for server_name, key_id, from_server in server_keys:
@@ -221,6 +217,5 @@ class KeyStore(SQLBaseStore):
                 )
                 results[(server_name, key_id, from_server)] = rows
             return results
-        return self.runInteraction(
-            "get_server_keys_json", _get_server_keys_json_txn
-        )
+
+        return self.runInteraction("get_server_keys_json", _get_server_keys_json_txn)

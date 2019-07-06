@@ -26,6 +26,7 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.http.site import SynapseSite
+from synapse.logging.context import LoggingContext, run_in_background
 from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
@@ -36,7 +37,6 @@ from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.logcontext import LoggingContext, run_in_background
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 
@@ -44,17 +44,16 @@ logger = logging.getLogger("synapse.app.appservice")
 
 
 class AppserviceSlaveStore(
-    DirectoryStore, SlavedEventStore, SlavedApplicationServiceStore,
+    DirectoryStore,
+    SlavedEventStore,
+    SlavedApplicationServiceStore,
     SlavedRegistrationStore,
 ):
     pass
 
 
 class AppserviceServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = AppserviceSlaveStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = AppserviceSlaveStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
@@ -77,7 +76,7 @@ class AppserviceServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            )
+            ),
         )
 
         logger.info("Synapse appservice now listening on port %d", port)
@@ -91,18 +90,19 @@ class AppserviceServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    )
+                        username="matrix", password="rabbithole", globals={"hs": self}
+                    ),
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(("Metrics listener configured, but "
-                                 "enable_metrics is not True!"))
+                    logger.warn(
+                        (
+                            "Metrics listener configured, but "
+                            "enable_metrics is not True!"
+                        )
+                    )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"],
-                                         listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -117,8 +117,9 @@ class ASReplicationHandler(ReplicationClientHandler):
         super(ASReplicationHandler, self).__init__(hs.get_datastore())
         self.appservice_handler = hs.get_application_service_handler()
 
+    @defer.inlineCallbacks
     def on_rdata(self, stream_name, token, rows):
-        super(ASReplicationHandler, self).on_rdata(stream_name, token, rows)
+        yield super(ASReplicationHandler, self).on_rdata(stream_name, token, rows)
 
         if stream_name == "events":
             max_stream_id = self.store.get_room_max_stream_ordering()
@@ -134,11 +135,9 @@ class ASReplicationHandler(ReplicationClientHandler):
 
 def start(config_options):
     try:
-        config = HomeServerConfig.load_config(
-            "Synapse appservice", config_options
-        )
+        config = HomeServerConfig.load_config("Synapse appservice", config_options)
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.appservice"
@@ -170,17 +169,11 @@ def start(config_options):
     )
 
     ps.setup()
-    ps.start_listening(config.worker_listeners)
-
-    def start():
-        ps.get_datastore().start_profiling()
-        ps.get_state_handler().start_caching()
-
-    reactor.callWhenRunning(start)
+    reactor.callWhenRunning(_base.start, ps, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-appservice", config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with LoggingContext("main"):
         start(sys.argv[1:])

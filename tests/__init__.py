@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,4 +16,9 @@
 
 from twisted.trial import util
 
-util.DEFAULT_TIMEOUT_DURATION = 10
+import tests.patch_inline_callbacks
+
+# attempt to do the patch before we load any synapse code
+tests.patch_inline_callbacks.do_patch()
+
+util.DEFAULT_TIMEOUT_DURATION = 20
