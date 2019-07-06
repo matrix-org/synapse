@@ -1,6 +1,7 @@
 # -*- CODING: UTF-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 Michael Telatynski <7t3chguy@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,9 +28,9 @@ from synapse.util.async_helpers import concurrently_execute
 logger = logging.getLogger(__name__)
 
 
-# TODO: Allow users to "knock" or simpkly join depending on rules
+# TODO: Allow users to "knock" or simply join depending on rules
 # TODO: Federation admin APIs
-# TODO: is_priveged flag to users and is_public to users and rooms
+# TODO: is_privileged flag to users and is_public to users and rooms
 # TODO: Audit log for admins (profile updates, membership changes, users who tried
 #       to join but were rejected, etc)
 # TODO: Flairs
