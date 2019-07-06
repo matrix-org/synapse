@@ -1,0 +1,1 @@
+Return a 403:M_BAD_STATE upon attempt to invite into a community a user who has already joined the community.
