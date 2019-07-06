@@ -601,9 +601,13 @@ class GroupsServerHandler(object):
 
         invited_users = yield self.store.get_invited_users_in_group(group_id)
         if user_id in invited_users:
-            raise SynapseError(403, "User already invited to group", errcode=Codes.BAD_STATE)
+            raise SynapseError(
+                403, "User already invited to group", errcode=Codes.BAD_STATE
+            )
 
-        user_results = yield self.store.get_users_in_group(group_id, include_private=True)
+        user_results = yield self.store.get_users_in_group(
+            group_id, include_private=True
+        )
         if user_id in [user_result["user_id"] for user_result in user_results]:
             raise SynapseError(400, "User already in group")
 
