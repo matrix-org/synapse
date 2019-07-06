@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- CODING: UTF-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -20,7 +20,7 @@ from six import string_types
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, Codes
 from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
@@ -626,7 +626,7 @@ class GroupsServerHandler(object):
 
         invited_users = yield self.store.get_invited_users_in_group(group_id)
         if user_id in invited_users:
-            raise SynapseError(400, "User already invited to group")
+            raise SynapseError(403, "User already invited to group", errcode=Codes.BAD_STATE)
 
         user_results = yield self.store.get_users_in_group(group_id, include_private=True)
         if user_id in [user_result["user_id"] for user_result in user_results]:
