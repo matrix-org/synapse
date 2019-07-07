@@ -756,7 +756,7 @@ class RoomCreationHandler(BaseHandler):
                 raise SynapseError(
                     400,
                     "Not a valid power_level_content_override, did not contain %s"
-                    % (creator_id,)
+                    % (creator_id,),
                 )
 
             yield send(etype=EventTypes.PowerLevels, content=power_level_content)
