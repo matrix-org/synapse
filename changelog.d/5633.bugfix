@@ -1,0 +1,1 @@
+Fix bad room creation with power_level_content_override.users not containing creator_id
