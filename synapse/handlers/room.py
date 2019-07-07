@@ -752,6 +752,9 @@ class RoomCreationHandler(BaseHandler):
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
 
+            if creator_id not in power_level_content["users"]:
+                raise SynapseError(400, "Not a valid power_level_content_override, did not contain %s" % (creator_id,))
+
             yield send(etype=EventTypes.PowerLevels, content=power_level_content)
 
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
