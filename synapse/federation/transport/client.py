@@ -22,7 +22,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.urls import FEDERATION_V1_PREFIX, FEDERATION_V2_PREFIX
-from synapse.util.logutils import log_function
+from synapse.logging.utils import log_function
 
 logger = logging.getLogger(__name__)
 

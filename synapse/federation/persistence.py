@@ -21,9 +21,7 @@ These actions are mostly only used by the :py:mod:`.replication` module.
 
 import logging
 
-from twisted.internet import defer
-
-from synapse.util.logutils import log_function
+from synapse.logging.utils import log_function
 
 logger = logging.getLogger(__name__)
 
@@ -62,34 +60,4 @@ class TransactionActions(object):
 
         return self.store.set_received_txn_response(
             transaction.transaction_id, origin, code, response
-        )
-
-    @defer.inlineCallbacks
-    @log_function
-    def prepare_to_send(self, transaction):
-        """ Persists the `Transaction` we are about to send and works out the
-        correct value for the `prev_ids` key.
-
-        Returns:
-            Deferred
-        """
-        transaction.prev_ids = yield self.store.prep_send_transaction(
-            transaction.transaction_id,
-            transaction.destination,
-            transaction.origin_server_ts,
-        )
-
-    @log_function
-    def delivered(self, transaction, response_code, response_dict):
-        """ Marks the given `Transaction` as having been successfully
-        delivered to the remote homeserver, and what the response was.
-
-        Returns:
-            Deferred
-        """
-        return self.store.delivered_txn(
-            transaction.transaction_id,
-            transaction.destination,
-            response_code,
-            response_dict,
         )
