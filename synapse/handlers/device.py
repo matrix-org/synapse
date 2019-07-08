@@ -397,6 +397,7 @@ class DeviceHandler(DeviceWorkerHandler):
             else:
                 raise
 
+    @opentracing.trace_defered_function
     @measure_func("notify_device_update")
     @defer.inlineCallbacks
     def notify_device_update(self, user_id, device_ids):
@@ -411,6 +412,8 @@ class DeviceHandler(DeviceWorkerHandler):
         if self.hs.is_mine_id(user_id):
             hosts.update(get_domain_from_id(u) for u in users_who_share_room)
             hosts.discard(self.server_name)
+
+        opentracing.set_tag("hosts to update", hosts)
 
         position = yield self.store.add_device_change_to_streams(
             user_id, device_ids, list(hosts)
@@ -431,6 +434,9 @@ class DeviceHandler(DeviceWorkerHandler):
             )
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
+                opentracing.log_kv(
+                    {"message": "sent device update to host", "host": host}
+                )
 
     @defer.inlineCallbacks
     def on_federation_query_user_devices(self, user_id):
