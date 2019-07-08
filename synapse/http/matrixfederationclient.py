@@ -20,13 +20,13 @@ import sys
 from io import BytesIO
 
 from six import PY3, raise_from, string_types
-from service_identity.exceptions import VerificationError
 from six.moves import urllib
 
 import attr
 import treq
 from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
+from service_identity.exceptions import VerificationError
 from signedjson.sign import sign_json
 from zope.interface import implementer
 
@@ -34,10 +34,10 @@ from OpenSSL import SSL
 from twisted.internet import defer, protocol
 from twisted.internet.error import (
     ConnectError,
+    ConnectingCancelledError,
     ConnectionRefusedError,
     DNSLookupError,
     TimeoutError,
-    ConnectingCancelledError,
 )
 from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.internet.task import _EPSILON, Cooperator
@@ -477,7 +477,9 @@ class MatrixFederationHttpClient(object):
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
                     except Exception as e:
-                        logger.info("Failed to send request for unhandled reason: %s", e)
+                        logger.info(
+                            "Failed to send request for unhandled reason: %s", e
+                        )
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
                     logger.info(
