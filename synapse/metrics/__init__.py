@@ -24,12 +24,21 @@ import time
 import six
 
 import attr
+import pkg_resources
 from prometheus_client import Counter, Gauge, Histogram
 from prometheus_client.core import REGISTRY, GaugeMetricFamily, HistogramMetricFamily
 
 from twisted.internet import reactor
 
+from synapse.metrics._exposition import (
+    MetricsResource,
+    generate_latest,
+    start_http_server,
+)
+
 logger = logging.getLogger(__name__)
+
+METRICS_PREFIX = "/_synapse/metrics"
 
 running_on_pypy = platform.python_implementation() == "PyPy"
 all_metrics = []
@@ -470,3 +479,12 @@ try:
         gc.disable()
 except AttributeError:
     pass
+
+__all__ = [
+    "MetricsResource",
+    "generate_latest",
+    "start_http_server",
+    "LaterGauge",
+    "InFlightGauge",
+    "BucketCollector",
+]
