@@ -39,6 +39,8 @@ exclude = '''
     | \.git          # root of the project
     | \.tox
     | \.venv
+    | \.env
+    | env
     | _build
     | _trial_temp.*
     | build

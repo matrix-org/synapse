@@ -433,19 +433,6 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_3pid_guest_access_token(self, medium, address):
-        ret = yield self._simple_select_one(
-            "threepid_guest_access_tokens",
-            {"medium": medium, "address": address},
-            ["guest_access_token"],
-            True,
-            "get_3pid_guest_access_token",
-        )
-        if ret:
-            defer.returnValue(ret["guest_access_token"])
-        defer.returnValue(None)
-
-    @defer.inlineCallbacks
     def get_user_id_by_threepid(self, medium, address, require_verified=False):
         """Returns user id from threepid
 
@@ -978,40 +965,6 @@ class RegistrationStore(
         )
 
         defer.returnValue(res if res else False)
-
-    @defer.inlineCallbacks
-    def save_or_get_3pid_guest_access_token(
-        self, medium, address, access_token, inviter_user_id
-    ):
-        """
-        Gets the 3pid's guest access token if exists, else saves access_token.
-
-        Args:
-            medium (str): Medium of the 3pid. Must be "email".
-            address (str): 3pid address.
-            access_token (str): The access token to persist if none is
-                already persisted.
-            inviter_user_id (str): User ID of the inviter.
-
-        Returns:
-            deferred str: Whichever access token is persisted at the end
-            of this function call.
-        """
-
-        def insert(txn):
-            txn.execute(
-                "INSERT INTO threepid_guest_access_tokens "
-                "(medium, address, guest_access_token, first_inviter) "
-                "VALUES (?, ?, ?, ?)",
-                (medium, address, access_token, inviter_user_id),
-            )
-
-        try:
-            yield self.runInteraction("save_3pid_guest_access_token", insert)
-            defer.returnValue(access_token)
-        except self.database_engine.module.IntegrityError:
-            ret = yield self.get_3pid_guest_access_token(medium, address)
-            defer.returnValue(ret)
 
     def add_user_pending_deactivation(self, user_id):
         """

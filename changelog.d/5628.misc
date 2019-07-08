@@ -1,0 +1,1 @@
+Move RegistrationHandler.get_or_create_user to test code.

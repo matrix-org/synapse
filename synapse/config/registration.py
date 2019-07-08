@@ -71,9 +71,8 @@ class RegistrationConfig(Config):
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
-        self.invite_3pid_guest = self.allow_guest_access and config.get(
-            "invite_3pid_guest", False
-        )
+        if config.get("invite_3pid_guest", False):
+            raise ConfigError("invite_3pid_guest is no longer supported")
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
         for room_alias in self.auto_join_rooms:
