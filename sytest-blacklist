@@ -24,10 +24,6 @@ Newly created users see their own presence in /initialSync (SYT-34)
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1396
 Should reject keys claiming to belong to a different user
 
-# Blacklisted due to https://github.com/matrix-org/synapse/issues/2306
-Users appear/disappear from directory when join_rules are changed
-Users appear/disappear from directory when history_visibility are changed
-
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1531
 Enabling an unknown default rule fails with 404
 
