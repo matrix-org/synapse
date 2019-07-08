@@ -914,7 +914,8 @@ class RoomMemberHandler(object):
             # https://github.com/matrix-org/sydent/pull/170
             logger.info(
                 "Failed to POST %s with JSON, falling back to urlencoded form: %s",
-                is_url, e,
+                is_url,
+                e,
             )
             data = yield self.simple_http_client.post_urlencoded_get_json(
                 is_url, invite_config
