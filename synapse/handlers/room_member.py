@@ -29,7 +29,7 @@ from twisted.internet import defer
 import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, HttpResponseException, SynapseError
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -904,9 +904,22 @@ class RoomMemberHandler(object):
                 }
             )
 
-        data = yield self.simple_http_client.post_urlencoded_get_json(
-            is_url, invite_config
-        )
+        try:
+            data = yield self.simple_http_client.post_json_get_json(
+                is_url, invite_config
+            )
+        except HttpResponseException as e:
+            # Some identity servers may only support application/x-www-form-urlencoded
+            # types. This is especially true with old instances of Sydent, see
+            # https://github.com/matrix-org/sydent/pull/170
+            logger.info(
+                "Failed to POST %s with JSON, falling back to urlencoded form: %s",
+                is_url, e,
+            )
+            data = yield self.simple_http_client.post_urlencoded_get_json(
+                is_url, invite_config
+            )
+
         # TODO: Check for success
         token = data["token"]
         public_keys = data.get("public_keys", [])
