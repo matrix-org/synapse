@@ -27,7 +27,7 @@ from twisted.web.resource import Resource
 CONTENT_TYPE_LATEST = str("text/plain; version=0.0.4; charset=utf-8")
 
 
-def sample_line(line):
+def sample_line(line, name):
     if line.labels:
         labelstr = "{{{0}}}".format(
             ",".join(
@@ -47,7 +47,7 @@ def sample_line(line):
         # Convert to milliseconds.
         timestamp = " {0:d}".format(int(float(line.timestamp) * 1000))
     return "{0}{1} {2}{3}\n".format(
-        line.name, labelstr, floatToGoString(line.value), timestamp
+        name, labelstr, floatToGoString(line.value), timestamp
     )
 
 
@@ -56,14 +56,16 @@ def generate_latest(registry):
 
     for metric in registry.collect():
 
+        if metric.name.startswith("__unused"):
+            continue
+
+        if not metric.samples:
+            # No samples, don't bother.
+            continue
+
         mname = metric.name
         mnewname = metric.name
         mtype = metric.type
-
-        # Get rid of the weird colon things while we're at it
-        if mtype == "counter":
-            mnewname = mnewname.replace(":total", "")
-        mnewname = mnewname.replace(":", "_")
 
         # OpenMetrics -> Prometheus
         if mtype == "counter":
@@ -82,21 +84,33 @@ def generate_latest(registry):
         output.append("# TYPE {0} {1}\n".format(mname, mtype))
         for sample in metric.samples:
             # Get rid of the OpenMetrics specific samples
-            for suffix in ['_created', '_gsum', '_gcount']:
-                if sample.name == metric.name + suffix:
+            for suffix in ["_created", "_gsum", "_gcount"]:
+                if sample.name.endswith(suffix):
                     break
+            else:
+                output.append(sample_line(sample, sample.name.replace(mnewname, mname)))
 
-            output.append(sample_line(sample))
+        # Get rid of the weird colon things while we're at it
+        if mtype == "counter":
+            mnewname = mnewname.replace(":total", "")
+        mnewname = mnewname.replace(":", "_")
 
-        # Also output in the new format.
+        if mname == mnewname:
+            continue
+
+        # Also output in the new format, if it's different.
         output.append("# TYPE {0} {1}\n".format(mnewname, mtype))
         for sample in metric.samples:
             # Get rid of the OpenMetrics specific samples
-            for suffix in ['_created', '_gsum', '_gcount']:
-                if sample.name == metric.name + suffix:
+            for suffix in ["_created", "_gsum", "_gcount"]:
+                if sample.name.endswith(suffix):
                     break
-
-            output.append(sample_line(sample))
+            else:
+                output.append(
+                    sample_line(
+                        sample, sample.name.replace(":total", "").replace(":", "_")
+                    )
+                )
 
     return "".join(output).encode("utf-8")
 
