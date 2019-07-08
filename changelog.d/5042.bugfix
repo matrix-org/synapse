@@ -1,1 +1,0 @@
-Fix bug processing incoming events over federation if call to `/get_missing_events` fails.

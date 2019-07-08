@@ -48,8 +48,8 @@ from synapse.api.errors import (
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import BlacklistingAgentWrapper, IPBlacklistingResolver
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util.async_helpers import timeout_deferred
-from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)

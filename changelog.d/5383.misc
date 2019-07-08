@@ -1,1 +1,0 @@
-Don't log non-200 responses from federation queries as exceptions.

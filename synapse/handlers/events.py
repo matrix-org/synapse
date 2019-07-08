@@ -21,8 +21,8 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
+from synapse.logging.utils import log_function
 from synapse.types import UserID
-from synapse.util.logutils import log_function
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler

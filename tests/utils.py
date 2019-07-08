@@ -34,6 +34,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import HttpServer
+from synapse.logging.context import LoggingContext
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import PostgresEngine, create_engine
@@ -42,7 +43,6 @@ from synapse.storage.prepare_database import (
     _setup_new_database,
     prepare_database,
 )
-from synapse.util.logcontext import LoggingContext
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 # set this to True to run the tests against postgres instead of sqlite.
@@ -152,12 +152,6 @@ def default_config(name, parse=False):
         "mau_stats_only": False,
         "mau_limits_reserved_threepids": [],
         "admin_contact": None,
-        "rc_federation": {
-            "reject_limit": 10,
-            "sleep_limit": 10,
-            "sleep_delay": 10,
-            "concurrent": 10,
-        },
         "rc_message": {"per_second": 10000, "burst_count": 10000},
         "rc_registration": {"per_second": 10000, "burst_count": 10000},
         "rc_login": {

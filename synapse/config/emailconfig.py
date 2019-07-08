@@ -112,13 +112,17 @@ class EmailConfig(Config):
             missing = []
             for k in required:
                 if k not in email_config:
-                    missing.append(k)
+                    missing.append("email." + k)
+
+            if config.get("public_baseurl") is None:
+                missing.append("public_base_url")
 
             if len(missing) > 0:
                 raise RuntimeError(
-                    "email.password_reset_behaviour is set to 'local' "
-                    "but required keys are missing: %s"
-                    % (", ".join(["email." + k for k in missing]),)
+                    "Password resets emails are configured to be sent from "
+                    "this homeserver due to a partial 'email' block. "
+                    "However, the following required keys are missing: %s"
+                    % (", ".join(missing),)
                 )
 
             # Templates for password reset emails
@@ -155,13 +159,6 @@ class EmailConfig(Config):
             self.email_password_reset_success_html_content = self.read_file(
                 filepath, "email.password_reset_template_success_html"
             )
-
-            if config.get("public_baseurl") is None:
-                raise RuntimeError(
-                    "email.password_reset_behaviour is set to 'local' but no "
-                    "public_baseurl is set. This is necessary to generate password "
-                    "reset links"
-                )
 
         if self.email_enable_notifs:
             required = [
@@ -233,11 +230,13 @@ class EmailConfig(Config):
         #   app_name: Matrix
         #
         #   # Enable email notifications by default
+        #   #
         #   notif_for_new_users: True
         #
         #   # Defining a custom URL for Riot is only needed if email notifications
         #   # should contain links to a self-hosted installation of Riot; when set
         #   # the "app_name" setting is ignored
+        #   #
         #   riot_base_url: "http://localhost/riot"
         #
         #   # Enable sending password reset emails via the configured, trusted
@@ -250,16 +249,22 @@ class EmailConfig(Config):
         #   #
         #   # If this option is set to false and SMTP options have not been
         #   # configured, resetting user passwords via email will be disabled
+        #   #
         #   #trust_identity_server_for_password_resets: false
         #
         #   # Configure the time that a validation email or text message code
         #   # will expire after sending
         #   #
         #   # This is currently used for password resets
+        #   #
         #   #validation_token_lifetime: 1h
         #
         #   # Template directory. All template files should be stored within this
-        #   # directory
+        #   # directory. If not set, default templates from within the Synapse
+        #   # package will be used
+        #   #
+        #   # For the list of default templates, please see
+        #   # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
         #   #
         #   #template_dir: res/templates
         #

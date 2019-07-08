@@ -36,9 +36,9 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.logging.context import defer_to_thread
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
-from synapse.util import logcontext
 from synapse.util.caches.expiringcache import ExpiringCache
 
 from ._base import BaseHandler
@@ -743,7 +743,7 @@ class AuthHandler(BaseHandler):
                     result = (result, None)
                 defer.returnValue(result)
 
-        if login_type == LoginType.PASSWORD:
+        if login_type == LoginType.PASSWORD and self.hs.config.password_localdb_enabled:
             known_login_type = True
 
             canonical_user_id = yield self._check_local_password(
@@ -987,7 +987,7 @@ class AuthHandler(BaseHandler):
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode("ascii")
 
-        return logcontext.defer_to_thread(self.hs.get_reactor(), _do_hash)
+        return defer_to_thread(self.hs.get_reactor(), _do_hash)
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
@@ -1013,7 +1013,7 @@ class AuthHandler(BaseHandler):
             if not isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.encode("ascii")
 
-            return logcontext.defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
+            return defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
 
