@@ -124,6 +124,71 @@ federation_ip_range_blacklist:
   - 'fe80::/64'
   - 'fc00::/7'
 
+# Federation Backoff Tuning
+#
+# These options control what Synapse will consider an unrecoverable
+# network error as a federation client. Unrecoverable network errors
+# trigger immediate backoff. Setting these options too aggressively may
+# cause your Synapse to consider other servers down due to temporary
+# networking hiccups, causing outward federation delays for the duration
+# of the backoff period.
+#
+# These options may be useful on more constrained instances that are in
+# rooms with lots of servers.
+#
+# The options are:
+#
+#   dns_resolution: DNS lookup failure (NXDOMAIN and others) will cause
+#       immediate backoff. Default: False.
+#
+#   dns_servfail: DNS lookup failures where the server cannot process
+#       the request (SERVFAIL) will cause immediate backoff. This can be
+#       triggered either by temporary outages on your DNS server, or
+#       failure of the DNS server responsible for the target domain.
+#       Only enable this if you have reliable DNS servers.
+#       Default: False.
+#
+#   no_route_to_host: EHOSTUNREACH errors will cause immediate backoff.
+#       This can be caused by DNS resolving to unroutable IP addresses.
+#       Default: False.
+#
+#   refused_connection: ECONNREFUSED errors will cause immediate backoff.
+#       This can result in temporary outages (e.g. restarts of other
+#       servers) triggering backoff and subsequent federation delays.
+#       Default: False.
+#
+#   cannot_assign_address: Being unable to assign an address when binding
+#       a socket will cause immediate backoff. Can be caused by IPv4/v6
+#       misconfiguration.
+#       Default: False.
+#
+#   invalid_tls: Invalid TLS negotiation or a TLS certificate failure
+#       will cause immediate backoff. This is generally safe to enable,
+#       but it will cause Synapse to not check for a new valid TLS
+#       setup until the end of the backoff, which may cause a delay in
+#       re-establishing federation with servers that fix their TLS.
+#       Default: False.
+#
+#   on_timeout: A timeout will cause immediate backoff. Timeouts can be
+#       caused by various reasons (overloading of the target server,
+#       network degradation) and may cause Synapse to consider a
+#       temporarily overloaded server as down, and cause subsequent
+#       federation delays. Default: False.
+#
+#   timeout_amount: How long Synapse will wait for before timing out
+#       federation client requests. This accepts a human-readable time
+#       (e.g. "60s") or a flat number of milliseconds. Default: 60s.
+#
+#federation_backoff:
+#  dns_resolution: False
+#  dns_servfail: False
+#  no_route_to_host: False
+#  refused_connection: False
+#  cannot_assign_address: False
+#  invalid_tls: False
+#  on_timeout: False
+#  timeout_amount: "60s"
+
 # List of ports that Synapse should listen on, their purpose and their
 # configuration.
 #

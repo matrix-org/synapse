@@ -1,0 +1,1 @@
+Synapse's federation backoff behaviour can now be tuned using the new `federation_backoff` settings.
