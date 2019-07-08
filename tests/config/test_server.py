@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.config.server import ConfigError, ServerConfig, is_threepid_reserved
+from synapse.config.server import ServerConfig, is_threepid_reserved
 
 from tests import unittest
 

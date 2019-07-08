@@ -15,8 +15,6 @@
 
 from mock import Mock
 
-from netaddr import IPSet
-
 from twisted.internet import defer
 from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
@@ -25,14 +23,11 @@ from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
 from synapse.api.errors import RequestSendFailed
-from synapse.http.matrixfederationclient import (
-    MatrixFederationHttpClient,
-    MatrixFederationRequest,
-)
+from synapse.http.matrixfederationclient import MatrixFederationRequest
 from synapse.logging.context import LoggingContext
 
-from tests.server import FakeTransport
 from tests import unittest
+from tests.server import FakeTransport
 
 
 def check_logcontext(context):
@@ -216,9 +211,9 @@ class FederationClientTests(unittest.HomeserverTestCase):
 
         # Set up the ip_range blacklist
 
-        self.amend_config({
-            "federation_ip_range_blacklist": ["127.0.0.0/8", "fe80::/64"]
-        })
+        self.amend_config(
+            {"federation_ip_range_blacklist": ["127.0.0.0/8", "fe80::/64"]}
+        )
         self.reactor.lookups["internal"] = "127.0.0.1"
         self.reactor.lookups["internalv6"] = "fe80:0:0:0:0:8a2e:370:7337"
         self.reactor.lookups["fine"] = "10.20.30.40"

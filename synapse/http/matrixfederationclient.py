@@ -181,7 +181,7 @@ class _Reactor(object):
 
     def __getattr__(self, attr):
         if attr == "nameResolver":
-            return nameResolver
+            return self.nameResolver
         else:
             return getattr(self.real_reactor, attr)
 
