@@ -592,9 +592,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         # Check that no relations are returned
         self.assertIn("chunk", channel.json_body)
-        self.assertEquals(
-            channel.json_body["chunk"], [],
-        )
+        self.assertEquals(channel.json_body["chunk"], [])
 
     def test_aggregations_redaction_prevents_access_to_aggregations(self):
         """Test that annotations of an event are redacted when the original event
@@ -606,7 +604,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         # Add a relation
         channel = self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", key="👍", parent_id=original_event_id,
+            RelationTypes.ANNOTATION, "m.reaction", key="👍", parent_id=original_event_id
         )
         self.assertEquals(200, channel.code, channel.json_body)
 
@@ -636,15 +634,12 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertIn("chunk", channel.json_body)
-        self.assertEquals(
-            channel.json_body["chunk"], [],
-        )
-
+        self.assertEquals(channel.json_body["chunk"], [])
 
     def _send_relation(
         self,
         relation_type,
-        event_type, 
+        event_type,
         key=None,
         content={},
         access_token=None,
