@@ -173,6 +173,19 @@ def _handle_json_response(reactor, timeout_sec, request, response):
     defer.returnValue(body)
 
 
+@implementer(IReactorPluggableNameResolver)
+@attr.s
+class _Reactor(object):
+    real_reactor = attr.ib()
+    nameResolver = attr.ib()
+
+    def __getattr__(self, attr):
+        if attr == "nameResolver":
+            return nameResolver
+        else:
+            return getattr(self.real_reactor, attr)
+
+
 class MatrixFederationHttpClient(object):
     """HTTP client used to talk to other homeservers over the federation
     protocol. Send client certificates and signs requests.
@@ -182,49 +195,43 @@ class MatrixFederationHttpClient(object):
             requests.
     """
 
-    def __init__(self, hs, tls_client_options_factory):
+    def __init__(self, hs):
         self.hs = hs
-        self.signing_key = hs.config.signing_key[0]
-        self.server_name = hs.hostname
-        self.backoff_settings = hs.config.federation_backoff_settings
+        self.server_name = self.hs.hostname
+        self.version_string_bytes = hs.version_string.encode("ascii")
 
-        real_reactor = hs.get_reactor()
+        self._real_reactor = hs.get_reactor()
+        self.clock = hs.get_clock()
+        self._store = hs.get_datastore()
+        self._cooperator = Cooperator(
+            scheduler=lambda x: self.reactor.callLater(_EPSILON, x)
+        )
+
+        self.refresh_config()
+
+    def refresh_config(self):
+        self.signing_key = self.hs.config.signing_key[0]
 
         # We need to use a DNS resolver which filters out blacklisted IP
         # addresses, to prevent DNS rebinding.
         nameResolver = IPBlacklistingResolver(
-            real_reactor, None, hs.config.federation_ip_range_blacklist
+            self._real_reactor, None, self.hs.config.federation_ip_range_blacklist
         )
+        self.reactor = _Reactor(self._real_reactor, nameResolver)
 
-        @implementer(IReactorPluggableNameResolver)
-        class Reactor(object):
-            def __getattr__(_self, attr):
-                if attr == "nameResolver":
-                    return nameResolver
-                else:
-                    return getattr(real_reactor, attr)
-
-        self.reactor = Reactor()
-
-        self.agent = MatrixFederationAgent(self.reactor, tls_client_options_factory)
+        self.agent = MatrixFederationAgent(
+            self.reactor, self.hs.get_client_tls_options()
+        )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
             self.agent,
             self.reactor,
-            ip_blacklist=hs.config.federation_ip_range_blacklist,
+            ip_blacklist=self.hs.config.federation_ip_range_blacklist,
         )
 
-        self.clock = hs.get_clock()
-        self._store = hs.get_datastore()
-        self.version_string_bytes = hs.version_string.encode("ascii")
-        self.default_timeout = self.backoff_settings.timeout_amount
-
-        def schedule(x):
-            self.reactor.callLater(_EPSILON, x)
-
-        self._cooperator = Cooperator(scheduler=schedule)
+        self.backoff_settings = self.hs.config.federation_backoff_settings
 
     @defer.inlineCallbacks
     def _send_request_with_optional_trailing_slash(
@@ -329,7 +336,7 @@ class MatrixFederationHttpClient(object):
         if timeout:
             _sec_timeout = timeout / 1000
         else:
-            _sec_timeout = self.default_timeout
+            _sec_timeout = self.backoff_settings.timeout_amount / 1000
 
         if (
             self.hs.config.federation_domain_whitelist is not None
@@ -480,6 +487,8 @@ class MatrixFederationHttpClient(object):
                         logger.info(
                             "Failed to send request for unhandled reason: %s", e
                         )
+                        import traceback
+                        logger.debug(traceback.format_exc())
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
                     logger.info(
@@ -762,7 +771,7 @@ class MatrixFederationHttpClient(object):
         if timeout:
             _sec_timeout = timeout / 1000
         else:
-            _sec_timeout = self.default_timeout
+            _sec_timeout = self.backoff_settings.timeout_amount / 1000
 
         body = yield _handle_json_response(
             self.reactor, _sec_timeout, request, response

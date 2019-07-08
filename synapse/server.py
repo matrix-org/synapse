@@ -401,10 +401,7 @@ class HomeServer(object):
         return PusherPool(self)
 
     def build_http_client(self):
-        tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-            self.config
-        )
-        return MatrixFederationHttpClient(self, tls_client_options_factory)
+        return MatrixFederationHttpClient(self)
 
     def build_db_pool(self):
         name = self.db_config["name"]
@@ -412,6 +409,9 @@ class HomeServer(object):
         return adbapi.ConnectionPool(
             name, cp_reactor=self.get_reactor(), **self.db_config.get("args", {})
         )
+
+    def get_client_tls_options(self):
+        return context_factory.ClientTLSOptionsFactory(self.config)
 
     def get_db_conn(self, run_new_connection=True):
         """Makes a new connection to the database, skipping the db pool

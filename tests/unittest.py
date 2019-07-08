@@ -379,6 +379,21 @@ class HomeserverTestCase(TestCase):
 
         return hs
 
+    def amend_config(self, config, with_default=True):
+        """
+        Amend the homeserver's config during a test.
+        """
+        conf = dict(self._hs_args)
+
+        if with_default:
+            conf.update(self.default_config())
+
+        conf.update(config)
+        config_obj = HomeServerConfig()
+        config_obj.parse_config_dict(conf, "", "")
+
+        self.hs.config = config_obj
+
     def pump(self, by=0.0):
         """
         Pump the reactor enough that Deferreds will fire.

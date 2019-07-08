@@ -184,6 +184,13 @@ def default_config(name, parse=False):
 
 class TestHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
+    _client_tls_options = None
+
+    def get_client_tls_options(self):
+        """
+        No client TLS here.
+        """
+        return self._client_tls_options
 
 
 @defer.inlineCallbacks

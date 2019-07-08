@@ -32,7 +32,7 @@ from synapse.http.matrixfederationclient import (
 from synapse.logging.context import LoggingContext
 
 from tests.server import FakeTransport
-from tests.unittest import HomeserverTestCase
+from tests import unittest
 
 
 def check_logcontext(context):
@@ -41,13 +41,13 @@ def check_logcontext(context):
         raise AssertionError("Expected logcontext %s but was %s" % (context, current))
 
 
-class FederationClientTests(HomeserverTestCase):
+class FederationClientTests(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(reactor=reactor, clock=clock)
         return hs
 
     def prepare(self, reactor, clock, homeserver):
-        self.cl = MatrixFederationHttpClient(self.hs, None)
+        self.cl = MatrixFederationHttpClient(self.hs)
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
     def test_client_get(self):
@@ -221,7 +221,7 @@ class FederationClientTests(HomeserverTestCase):
         self.reactor.lookups["internal"] = "127.0.0.1"
         self.reactor.lookups["internalv6"] = "fe80:0:0:0:0:8a2e:370:7337"
         self.reactor.lookups["fine"] = "10.20.30.40"
-        cl = MatrixFederationHttpClient(self.hs, None)
+        cl = MatrixFederationHttpClient(self.hs)
 
         # Try making a GET request to a blacklisted IPv4 address
         # ------------------------------------------------------
@@ -489,3 +489,41 @@ class FederationClientTests(HomeserverTestCase):
         self.pump(120)
 
         self.assertTrue(conn.disconnecting)
+
+    @unittest.INFO
+    def test_client_respects_timeout_backoff(self):
+        """
+        If federation_backoff.on_timeout is set, Synapse will immediately
+        backoff on a timeout.
+        """
+
+        self.amend_config({"federation_backoff": {"on_timeout": True}})
+        self.cl.refresh_config()
+
+        d = self.cl.get_json("testserv:8008", "foo/bar")
+
+        # Send the request
+        self.pump()
+
+        # there should have been a call to connectTCP
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (_host, _port, factory, _timeout, _bindAddress) = clients[0]
+
+        # complete the connection and wire it up to a fake transport
+        client = factory.buildProtocol(None)
+        conn = StringTransport()
+        client.makeConnection(conn)
+
+        # that should have made it send the request to the connection
+        self.assertRegex(conn.value(), b"^GET /foo/bar")
+
+        # Clear the original request data before sending a response
+        conn.clear()
+
+        # Timeout.
+        self.pump(120)
+
+        # We should get a 404 failure response
+        f = self.failureResultOf(d)
+        print(f)
