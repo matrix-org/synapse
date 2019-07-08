@@ -24,7 +24,6 @@ import time
 import six
 
 import attr
-import pkg_resources
 from prometheus_client import Counter, Gauge, Histogram
 from prometheus_client.core import REGISTRY, GaugeMetricFamily, HistogramMetricFamily
 
