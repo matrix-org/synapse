@@ -504,7 +504,7 @@ class E2eKeysHandler(object):
             # the signature stream matches the semantics that we want for
             # user-signing key updates: only the user themselves is notified of
             # their own user-signing key updates
-            yield self.defice_handler.notify_user_signature_update(user_id, [user_id])
+            yield self.device_handler.notify_user_signature_update(user_id, [user_id])
 
         # master key and self-signing key updates match the semantics of device
         # list updates: all users who share an encrypted room are notified
