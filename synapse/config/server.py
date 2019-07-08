@@ -332,8 +332,10 @@ class ServerConfig(Config):
             no_route_to_host = attr.ib(default=False, type=bool)
             refused_connection = attr.ib(default=False, type=bool)
             cannot_assign_address = attr.ib(default=False, type=bool)
-            invalid_tls = attr.ib(default=True, type=bool)
-            timeout_amount = attr.ib(default="60s", converter=self.parse_duration, type=int)
+            invalid_tls = attr.ib(default=False, type=bool)
+            timeout_amount = attr.ib(
+                default="60s", converter=self.parse_duration, type=int
+            )
             on_timeout = attr.ib(default=False, type=bool)
 
         federation_backoff_settings = config.get("federation_backoff", {})
