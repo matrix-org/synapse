@@ -275,7 +275,9 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             )
             for user_id, device_id, algorithm, key_id in delete:
                 opentracing.log_kv(
-                    {"message": "executing claim transaction on database"}
+                    {
+                        "message": "Executing claim e2e_one_time_keys transaction on database."
+                    }
                 )
                 txn.execute(sql, (user_id, device_id, algorithm, key_id))
                 opentracing.log_kv(
