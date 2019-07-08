@@ -173,11 +173,12 @@ steps:
       queue: "medium"
     command:
       - "bash .buildkite/merge_base_branch.sh"
-      - "bash .buildkite/synapse_sytest.sh"
+      - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
+          always-pull: true
     retry:
       automatic:
         - exit_status: -1
@@ -192,11 +193,12 @@ steps:
       POSTGRES: "1"
     command:
       - "bash .buildkite/merge_base_branch.sh"
-      - "bash .buildkite/synapse_sytest.sh"
+      - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
+          always-pull: true
     retry:
       automatic:
         - exit_status: -1
@@ -212,11 +214,12 @@ steps:
       WORKERS: "1"
     command:
       - "bash .buildkite/merge_base_branch.sh"
-      - "bash .buildkite/synapse_sytest.sh"
+      - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
+          always-pull: true
     soft_fail: true
     retry:
       automatic:

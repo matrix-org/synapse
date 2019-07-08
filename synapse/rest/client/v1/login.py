@@ -283,19 +283,7 @@ class LoginRestServlet(RestServlet):
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
 
-        device_id = login_submission.get("device_id")
-        initial_display_name = login_submission.get("initial_device_display_name")
-        device_id, access_token = yield self.registration_handler.register_device(
-            user_id, device_id, initial_display_name
-        )
-
-        result = {
-            "user_id": user_id,  # may have changed
-            "access_token": access_token,
-            "home_server": self.hs.hostname,
-            "device_id": device_id,
-        }
-
+        result = yield self._register_device_with_callback(user_id, login_submission)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -323,35 +311,16 @@ class LoginRestServlet(RestServlet):
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID(user, self.hs.hostname).to_string()
-        device_id = login_submission.get("device_id")
-        initial_display_name = login_submission.get("initial_device_display_name")
 
-        auth_handler = self.auth_handler
-        registered_user_id = yield auth_handler.check_user_exists(user_id)
-        if registered_user_id:
-            device_id, access_token = yield self.registration_handler.register_device(
-                registered_user_id, device_id, initial_display_name
+        registered_user_id = yield self.auth_handler.check_user_exists(user_id)
+        if not registered_user_id:
+            registered_user_id = yield self.registration_handler.register_user(
+                localpart=user
             )
 
-            result = {
-                "user_id": registered_user_id,
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            }
-        else:
-            user_id, access_token = (
-                yield self.registration_handler.register(localpart=user)
-            )
-            device_id, access_token = yield self.registration_handler.register_device(
-                user_id, device_id, initial_display_name
-            )
-
-            result = {
-                "user_id": user_id,  # may have changed
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            }
-
+        result = yield self._register_device_with_callback(
+            registered_user_id, login_submission
+        )
         defer.returnValue(result)
 
 
@@ -534,12 +503,8 @@ class SSOAuthHandler(object):
         user_id = UserID(localpart, self._hostname).to_string()
         registered_user_id = yield self._auth_handler.check_user_exists(user_id)
         if not registered_user_id:
-            registered_user_id, _ = (
-                yield self._registration_handler.register(
-                    localpart=localpart,
-                    generate_token=False,
-                    default_display_name=user_display_name,
-                )
+            registered_user_id = yield self._registration_handler.register_user(
+                localpart=localpart, default_display_name=user_display_name
             )
 
         login_token = self._macaroon_gen.generate_short_term_login_token(
