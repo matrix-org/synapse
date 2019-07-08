@@ -485,7 +485,6 @@ class FederationClientTests(unittest.HomeserverTestCase):
 
         self.assertTrue(conn.disconnecting)
 
-    @unittest.INFO
     def test_client_respects_timeout_backoff(self):
         """
         If federation_backoff.on_timeout is set, Synapse will immediately

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +14,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import cgi
 import logging
 import random
 import sys
+import traceback
 from io import BytesIO
 
 from six import PY3, raise_from, string_types
@@ -487,8 +490,6 @@ class MatrixFederationHttpClient(object):
                         logger.info(
                             "Failed to send request for unhandled reason: %s", e
                         )
-                        import traceback
-
                         logger.debug(traceback.format_exc())
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
