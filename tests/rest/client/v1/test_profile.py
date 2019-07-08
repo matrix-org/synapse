@@ -323,7 +323,7 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET",
             "/profile/" + self.requester + "/displayname",
-            access_token=self.requester_tok
+            access_token=self.requester_tok,
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
@@ -331,7 +331,7 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET",
             "/profile/" + self.requester + "/avatar_url",
-            access_token=self.requester_tok
+            access_token=self.requester_tok,
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
