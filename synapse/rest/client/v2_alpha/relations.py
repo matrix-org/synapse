@@ -147,11 +147,19 @@ class RelationPaginationServlet(RestServlet):
 
         # This checks that a) the event exists and b) the user is allowed to
         # view it.
-        yield self.event_handler.get_event(requester.user, room_id, parent_id)
+        event = yield self.event_handler.get_event(requester.user, room_id, parent_id)
 
         limit = parse_integer(request, "limit", default=5)
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
+
+        # Check if the event is redacted, and if so return an empty chunk
+        # list and zero tokens
+        if "redacted_because" in event.unsigned:
+            res = {
+                "chunk": [],
+            }
+            defer.returnValue((200, res))
 
         if from_token:
             from_token = RelationPaginationToken.from_string(from_token)
@@ -222,7 +230,7 @@ class RelationAggregationPaginationServlet(RestServlet):
 
         # This checks that a) the event exists and b) the user is allowed to
         # view it.
-        yield self.event_handler.get_event(requester.user, room_id, parent_id)
+        event = yield self.event_handler.get_event(requester.user, room_id, parent_id)
 
         if relation_type not in (RelationTypes.ANNOTATION, None):
             raise SynapseError(400, "Relation type must be 'annotation'")
@@ -230,6 +238,14 @@ class RelationAggregationPaginationServlet(RestServlet):
         limit = parse_integer(request, "limit", default=5)
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
+
+        # Check if the event is redacted, and if so return an empty chunk
+        # list and zero tokens
+        if "redacted_because" in event.unsigned:
+            res = {
+                "chunk": [],
+            }
+            defer.returnValue((200, res))
 
         if from_token:
             from_token = AggregationPaginationToken.from_string(from_token)

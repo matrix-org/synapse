@@ -748,7 +748,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         relation_ids = relation_chunk.to_dict()
 
         for relation_id in relation_ids:
-            self.event_creation_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Redaction,
