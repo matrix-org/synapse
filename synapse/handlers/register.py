@@ -557,36 +557,6 @@ class RegistrationHandler(BaseHandler):
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
-    def get_or_register_3pid_guest(self, medium, address, inviter_user_id):
-        """Get a guest access token for a 3PID, creating a guest account if
-        one doesn't already exist.
-
-        Args:
-            medium (str)
-            address (str)
-            inviter_user_id (str): The user ID who is trying to invite the
-                3PID
-
-        Returns:
-            Deferred[(str, str)]: A 2-tuple of `(user_id, access_token)` of the
-            3PID guest account.
-        """
-        access_token = yield self.store.get_3pid_guest_access_token(medium, address)
-        if access_token:
-            user_info = yield self.auth.get_user_by_access_token(access_token)
-
-            defer.returnValue((user_info["user"].to_string(), access_token))
-
-        user_id, access_token = yield self.register(
-            generate_token=True, make_guest=True
-        )
-        access_token = yield self.store.save_or_get_3pid_guest_access_token(
-            medium, address, access_token, inviter_user_id
-        )
-
-        defer.returnValue((user_id, access_token))
-
-    @defer.inlineCallbacks
     def _join_user_to_room(self, requester, room_identifier):
         room_id = None
         room_member_handler = self.hs.get_room_member_handler()

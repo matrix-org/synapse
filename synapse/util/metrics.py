@@ -20,8 +20,8 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
+from synapse.logging.context import LoggingContext
 from synapse.metrics import InFlightGauge
-from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)
 
