@@ -210,12 +210,43 @@ class NotFoundError(SynapseError):
 
 
 class AuthError(SynapseError):
-    """An error raised when there was a problem authorising an event."""
+    """An error raised when there was a problem authorising an event, and at various
+    other poorly-defined times.
+    """
 
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.FORBIDDEN
         super(AuthError, self).__init__(*args, **kwargs)
+
+
+class InvalidClientCredentialsError(SynapseError):
+    """An error raised when there was a problem with the authorisation credentials
+    in a client request.
+
+    https://matrix.org/docs/spec/client_server/r0.5.0#using-access-tokens:
+
+    When credentials are required but missing or invalid, the HTTP call will
+    return with a status of 401 and the error code, M_MISSING_TOKEN or
+    M_UNKNOWN_TOKEN respectively.
+    """
+
+    def __init__(self, msg, errcode):
+        super().__init__(code=401, msg=msg, errcode=errcode)
+
+
+class MissingClientTokenError(InvalidClientCredentialsError):
+    """Raised when we couldn't find the access token in a request"""
+
+    def __init__(self, msg="Missing access token"):
+        super().__init__(msg=msg, errcode="M_MISSING_TOKEN")
+
+
+class InvalidClientTokenError(InvalidClientCredentialsError):
+    """Raised when we didn't understand the access token in a request"""
+
+    def __init__(self, msg="Unrecognised access token"):
+        super().__init__(msg=msg, errcode="M_UNKNOWN_TOKEN")
 
 
 class ResourceLimitError(SynapseError):
