@@ -115,7 +115,6 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         opentracing.log_kv(result)
         return result
 
-    @opentracing.trace_defered_function
     @defer.inlineCallbacks
     def get_e2e_one_time_keys(self, user_id, device_id, key_ids):
         """Retrieve a number of one-time keys for a user
@@ -131,10 +130,6 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             key_id) to json string for key
         """
 
-        opentracing.set_tag("user_id", user_id)
-        opentracing.set_tag("device_id", device_id)
-        opentracing.set_tag("key_ids", key_ids)
-
         rows = yield self._simple_select_many_batch(
             table="e2e_one_time_keys_json",
             column="key_id",
@@ -143,8 +138,11 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             keyvalues={"user_id": user_id, "device_id": device_id},
             desc="add_e2e_one_time_keys_check",
         )
-
-        return {(row["algorithm"], row["key_id"]): row["key_json"] for row in rows}
+        result = {(row["algorithm"], row["key_id"]): row["key_json"] for row in rows}
+        opentracing.log_kv(
+            {"message": "Fetched one time keys for user", "one_time_keys": result}
+        )
+        return result
 
     @defer.inlineCallbacks
     def add_e2e_one_time_keys(self, user_id, device_id, time_now, new_keys):
@@ -159,7 +157,6 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 (algorithm, key_id, key json)
         """
 
-        @opentracing.trace_function
         def _add_e2e_one_time_keys(txn):
             opentracing.set_tag("user_id", user_id)
             opentracing.set_tag("device_id", device_id)
@@ -219,7 +216,6 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         or the keys were already in the database.
         """
 
-        @opentracing.trace_function
         def _set_e2e_device_keys_txn(txn):
             opentracing.set_tag("user_id", user_id)
             opentracing.set_tag("device_id", device_id)
@@ -239,7 +235,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             new_key_json = encode_canonical_json(device_keys).decode("utf-8")
 
             if old_key_json == new_key_json:
-                opentracing.log_kv({"event", "key already stored"})
+                opentracing.log_kv({"Message", "Device key already stored."})
                 return False
 
             self._simple_upsert_txn(
@@ -248,7 +244,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 keyvalues={"user_id": user_id, "device_id": device_id},
                 values={"ts_added_ms": time_now, "key_json": new_key_json},
             )
-
+            opentracing.log_kv({"message": "Device keys stored."})
             return True
 
         return self.runInteraction("set_e2e_device_keys", _set_e2e_device_keys_txn)

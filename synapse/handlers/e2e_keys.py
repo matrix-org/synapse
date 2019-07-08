@@ -343,12 +343,10 @@ class E2eKeysHandler(object):
         opentracing.log_kv({"one_time_keys": json_result, "failures": failures})
         return {"one_time_keys": json_result, "failures": failures}
 
-    @opentracing.trace_defered_function
     @defer.inlineCallbacks
     def upload_keys_for_user(self, user_id, device_id, keys):
         opentracing.set_tag("user_id", user_id)
         opentracing.set_tag("device_id", device_id)
-        opentracing.set_tag("keys", keys)
 
         time_now = self.clock.time_msec()
 
@@ -362,6 +360,13 @@ class E2eKeysHandler(object):
                 user_id,
                 time_now,
             )
+            opentracing.log_kv(
+                {
+                    "message": "Updating device_keys for user.",
+                    "user_id": user_id,
+                    "device_id": device_id,
+                }
+            )
             # TODO: Sign the JSON with the server key
             changed = yield self.store.set_e2e_device_keys(
                 user_id, device_id, time_now, device_keys
@@ -369,15 +374,26 @@ class E2eKeysHandler(object):
             if changed:
                 # Only notify about device updates *if* the keys actually changed
                 yield self.device_handler.notify_device_update(user_id, [device_id])
-
+        else:
+            opentracing.log_kv(
+                {"message": "Not updating device_keys for user", "user_id": user_id}
+            )
         one_time_keys = keys.get("one_time_keys", None)
+        opentracing.set_tag("one_time_keys", one_time_keys)
         if one_time_keys:
+            opentracing.log_kv(
+                {
+                    "message": "Updating one_time_keys for device.",
+                    "user_id": user_id,
+                    "device_id": device_id,
+                }
+            )
             yield self._upload_one_time_keys_for_user(
                 user_id, device_id, time_now, one_time_keys
             )
         else:
             opentracing.log_kv(
-                {"event": "did not upload one_time_keys", "reason": "no keys given"}
+                {"message": "Did not update one_time_keys", "reason": "no keys given"}
             )
 
         # the device should have been registered already, but it may have been
@@ -392,7 +408,6 @@ class E2eKeysHandler(object):
         opentracing.set_tag("one_time_key_counts", result)
         return {"one_time_key_counts": result}
 
-    @opentracing.trace_defered_function
     @defer.inlineCallbacks
     def _upload_one_time_keys_for_user(
         self, user_id, device_id, time_now, one_time_keys
@@ -434,6 +449,9 @@ class E2eKeysHandler(object):
                     (algorithm, key_id, encode_canonical_json(key).decode("ascii"))
                 )
 
+        opentracing.log_kv(
+            {"message": "Inserting new one_time_keys.", "keys": new_keys}
+        )
         yield self.store.add_e2e_one_time_keys(user_id, device_id, time_now, new_keys)
 
 
