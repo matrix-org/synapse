@@ -160,7 +160,7 @@ class InFlightGauge(object):
         Note: may be called by a separate thread.
         """
         in_flight = GaugeMetricFamily(
-            self.name + "_total", self.desc, labels=self.labels
+            self.name, self.desc, labels=self.labels
         )
 
         metrics_by_key = {}

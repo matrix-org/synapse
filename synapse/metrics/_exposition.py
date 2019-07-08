@@ -60,6 +60,11 @@ def generate_latest(registry):
         mnewname = metric.name
         mtype = metric.type
 
+        # Get rid of the weird colon things while we're at it
+        if mtype == "counter":
+            mnewname = mnewname.replace(":total", "")
+        mnewname = mnewname.replace(":", "_")
+
         # OpenMetrics -> Prometheus
         if mtype == "counter":
             mnewname = mnewname + "_total"
@@ -76,11 +81,21 @@ def generate_latest(registry):
         # Output in the old format for compatibility.
         output.append("# TYPE {0} {1}\n".format(mname, mtype))
         for sample in metric.samples:
+            # Get rid of the OpenMetrics specific samples
+            for suffix in ['_created', '_gsum', '_gcount']:
+                if sample.name == metric.name + suffix:
+                    break
+
             output.append(sample_line(sample))
 
         # Also output in the new format.
         output.append("# TYPE {0} {1}\n".format(mnewname, mtype))
         for sample in metric.samples:
+            # Get rid of the OpenMetrics specific samples
+            for suffix in ['_created', '_gsum', '_gcount']:
+                if sample.name == metric.name + suffix:
+                    break
+
             output.append(sample_line(sample))
 
     return "".join(output).encode("utf-8")
