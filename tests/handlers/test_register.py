@@ -77,11 +77,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         store = self.hs.get_datastore()
         frank = UserID.from_string("@frank:test")
         self.get_success(
-            store.register(
-                user_id=frank.to_string(),
-                token="jkv;g498752-43gj['eamb!-5",
-                password_hash=None,
-            )
+            store.register_user(user_id=frank.to_string(), password_hash=None)
         )
         local_part = frank.localpart
         user_id = frank.to_string()

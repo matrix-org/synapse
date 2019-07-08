@@ -584,7 +584,7 @@ class RegistrationHandler(BaseHandler):
                 address=address,
             )
         else:
-            return self.store.register(
+            return self.store.register_user(
                 user_id=user_id,
                 password_hash=password_hash,
                 was_guest=was_guest,

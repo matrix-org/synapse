@@ -698,10 +698,9 @@ class RegistrationStore(
             desc="add_access_token_to_user",
         )
 
-    def register(
+    def register_user(
         self,
         user_id,
-        token=None,
         password_hash=None,
         was_guest=False,
         make_guest=False,
@@ -714,9 +713,6 @@ class RegistrationStore(
 
         Args:
             user_id (str): The desired user ID to register.
-            token (str): The desired access token to use for this user. If this
-                is not None, the given access token is associated with the user
-                id.
             password_hash (str): Optional. The password hash for this user.
             was_guest (bool): Optional. Whether this is a guest account being
                 upgraded to a non-guest account.
@@ -733,10 +729,9 @@ class RegistrationStore(
             StoreError if the user_id could not be registered.
         """
         return self.runInteraction(
-            "register",
-            self._register,
+            "register_user",
+            self._register_user,
             user_id,
-            token,
             password_hash,
             was_guest,
             make_guest,
@@ -746,11 +741,10 @@ class RegistrationStore(
             user_type,
         )
 
-    def _register(
+    def _register_user(
         self,
         txn,
         user_id,
-        token,
         password_hash,
         was_guest,
         make_guest,
@@ -762,8 +756,6 @@ class RegistrationStore(
         user_id_obj = UserID.from_string(user_id)
 
         now = int(self.clock.time())
-
-        next_id = self._access_tokens_id_gen.get_next()
 
         try:
             if was_guest:
@@ -811,14 +803,6 @@ class RegistrationStore(
 
         if self._account_validity.enabled:
             self.set_expiration_date_for_user_txn(txn, user_id)
-
-        if token:
-            # it's possible for this to get a conflict, but only for a single user
-            # since tokens are namespaced based on their user ID
-            txn.execute(
-                "INSERT INTO access_tokens(id, user_id, token)" " VALUES (?,?,?)",
-                (next_id, user_id, token),
-            )
 
         if create_profile_with_displayname:
             # set a default displayname serverside to avoid ugly race
