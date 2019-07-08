@@ -393,6 +393,7 @@ class HomeserverTestCase(TestCase):
         config_obj.parse_config_dict(conf, "", "")
 
         self.hs.config = config_obj
+        self.hs.reload_config()
 
     def pump(self, by=0.0):
         """

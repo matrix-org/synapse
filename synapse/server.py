@@ -543,6 +543,26 @@ class HomeServer(object):
             or self.config.worker_app == "synapse.app.federation_sender"
         )
 
+    def reload_config(self):
+        """
+        Reload the config of every loaded module.
+        """
+        for depname in self.DEPENDENCIES:
+            try:
+                dep = getattr(self, depname)
+                try:
+                    reloader = getattr(dep, "reload_config")
+                    reloader()
+                    logger.info("Reloaded the config of %s", depname)
+                except AttributeError:
+                    logger.info("Skipping reloading the config of %s", depname)
+                except Exception:
+                    logger.error("Failed reloading the config of %s!", depname)
+                    raise ValueError("Failed reloading the config of %s!" % (depname,))
+            except AttributeError:
+                # Dependency is not loaded yet.
+                pass
+
 
 def _make_dependency_method(depname):
     def _get(hs):

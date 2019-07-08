@@ -47,7 +47,7 @@ class FederationClientTests(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, homeserver):
-        self.cl = MatrixFederationHttpClient(self.hs)
+        self.cl = self.hs.get_http_client()
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
     def test_client_get(self):
@@ -215,18 +215,18 @@ class FederationClientTests(unittest.HomeserverTestCase):
         """Ensure that Synapse does not try to connect to blacklisted IPs"""
 
         # Set up the ip_range blacklist
-        self.hs.config.federation_ip_range_blacklist = IPSet(
-            ["127.0.0.0/8", "fe80::/64"]
-        )
+
+        self.amend_config({
+            "federation_ip_range_blacklist": ["127.0.0.0/8", "fe80::/64"]
+        })
         self.reactor.lookups["internal"] = "127.0.0.1"
         self.reactor.lookups["internalv6"] = "fe80:0:0:0:0:8a2e:370:7337"
         self.reactor.lookups["fine"] = "10.20.30.40"
-        cl = MatrixFederationHttpClient(self.hs)
 
         # Try making a GET request to a blacklisted IPv4 address
         # ------------------------------------------------------
         # Make the request
-        d = cl.get_json("internal:8008", "foo/bar", timeout=10000)
+        d = self.cl.get_json("internal:8008", "foo/bar", timeout=10000)
 
         # Nothing happened yet
         self.assertNoResult(d)
@@ -244,7 +244,7 @@ class FederationClientTests(unittest.HomeserverTestCase):
         # Try making a POST request to a blacklisted IPv6 address
         # -------------------------------------------------------
         # Make the request
-        d = cl.post_json("internalv6:8008", "foo/bar", timeout=10000)
+        d = self.cl.post_json("internalv6:8008", "foo/bar", timeout=10000)
 
         # Nothing has happened yet
         self.assertNoResult(d)
@@ -263,7 +263,7 @@ class FederationClientTests(unittest.HomeserverTestCase):
         # Try making a GET request to a non-blacklisted IPv4 address
         # ----------------------------------------------------------
         # Make the request
-        d = cl.post_json("fine:8008", "foo/bar", timeout=10000)
+        d = self.cl.post_json("fine:8008", "foo/bar", timeout=10000)
 
         # Nothing has happened yet
         self.assertNoResult(d)
@@ -496,9 +496,7 @@ class FederationClientTests(unittest.HomeserverTestCase):
         If federation_backoff.on_timeout is set, Synapse will immediately
         backoff on a timeout.
         """
-
         self.amend_config({"federation_backoff": {"on_timeout": True}})
-        self.cl.refresh_config()
 
         d = self.cl.get_json("testserv:8008", "foo/bar")
 
@@ -521,9 +519,21 @@ class FederationClientTests(unittest.HomeserverTestCase):
         # Clear the original request data before sending a response
         conn.clear()
 
-        # Timeout.
+        # No retry interval for this destination.
+        retry_timings = self.get_success(
+            self.hs.get_datastore().get_destination_retry_timings("testserv:8008")
+        )
+        self.assertIsNone(retry_timings)
+
+        # Timeout the connection.
         self.pump(120)
 
-        # We should get a 404 failure response
+        # We should get the response failure bubbled up.
         f = self.failureResultOf(d)
-        print(f)
+        self.assertIsNotNone(f.check(RequestSendFailed))
+
+        # Retry in 600s
+        retry_timings = self.get_success(
+            self.hs.get_datastore().get_destination_retry_timings("testserv:8008")
+        )
+        self.assertEqual(retry_timings["retry_interval"], 600000)
