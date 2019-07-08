@@ -256,8 +256,14 @@ class RegistrationHandler(BaseHandler):
                     user_id = None
                     token = None
                     attempts += 1
+
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
+        else:
+            logger.info(
+                "Skipping auto-join for %s because consent is required at registration",
+                user_id,
+            )
 
         # Bind any specified emails to this account
         current_time = self.hs.get_clock().time_msec()
@@ -298,6 +304,7 @@ class RegistrationHandler(BaseHandler):
             count = yield self.store.count_all_users()
             should_auto_create_rooms = count == 1
         for r in self.hs.config.auto_join_rooms:
+            logger.info("Auto-joining %s to %s", user_id, r)
             try:
                 if should_auto_create_rooms:
                     room_alias = RoomAlias.from_string(r)
