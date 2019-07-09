@@ -745,9 +745,13 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         relation_chunk = yield self.store.get_relations_for_event(
             event_id, relation_type="m.replace", event_type="m.room.message"
         )
-        relation_ids = relation_chunk.to_dict()
+        relation_chunk_dict = relation_chunk.to_dict()
 
-        for relation_id in relation_ids.get("chunk", []):
+        # Extract each event_id out of the list of dictionaries
+        # Ex. {'chunk': [{'event_id': '$someid'}]}
+        relation_ids = [x["event_id"] for x in relation_chunk_dict.get("chunk", [])]
+
+        for relation_id in relation_ids:
             yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
