@@ -145,8 +145,8 @@ class RelationPaginationServlet(RestServlet):
             room_id, requester.user.to_string()
         )
 
-        # This checks that a) the event exists and b) the user is allowed to
-        # view it.
+        # This gets the original event and checks that a) the event exists and
+        # b) the user is allowed to view it.
         event = yield self.event_handler.get_event(requester.user, room_id, parent_id)
 
         limit = parse_integer(request, "limit", default=5)
@@ -179,10 +179,12 @@ class RelationPaginationServlet(RestServlet):
         )
 
         now = self.clock.time_msec()
+        original_event = yield self._event_serializer.serialize_event(event, now)
         events = yield self._event_serializer.serialize_events(events, now)
 
         return_value = result.to_dict()
         return_value["chunk"] = events
+        return_value["original_event"] = original_event
 
         defer.returnValue((200, return_value))
 
