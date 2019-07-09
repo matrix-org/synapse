@@ -752,7 +752,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
                 requester,
                 {
                     "type": EventTypes.Redaction,
-                    "content": content,
+                    "content": {},
                     "room_id": room_id,
                     "sender": requester.user.to_string(),
                     "redacts": relation_id,
