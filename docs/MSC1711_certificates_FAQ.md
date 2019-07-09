@@ -1,5 +1,22 @@
 # MSC1711 Certificates FAQ
 
+## Historical Note
+This document was originally written to guide server admins through the upgrade
+path towards Synapse 1.0. Specifically,
+[MSC1711](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md)
+required that all servers present valid TLS certificates on their federation
+API. Admins were encouraged to achieve compliance from version 0.99.0 (released
+in February 2019) ahead of version 1.0 (released June 2019) enforcing the
+certificate checks.
+
+Much of what follows is now outdated since most admins will have already
+upgraded, however it may be of use to those with old installs returning to the
+project.
+
+If you are setting up a server from scratch you almost certainly should look at
+the [installation guide](../INSTALL.md) instead.
+
+## Introduction
 The goal of Synapse 0.99.0 is to act as a stepping stone to Synapse 1.0.0. It
 supports the r0.1 release of the server to server specification, but is
 compatible with both the legacy Matrix federation behaviour (pre-r0.1) as well
@@ -68,15 +85,13 @@ Admins should upgrade and configure a valid CA cert. Homeservers that require a
 .well-known entry (see below), should retain their SRV record and use it
 alongside their .well-known record.
 
-**>= 5th March 2019  - Synapse 1.0.0 is released**
+**10th June 2019  - Synapse 1.0.0 is released**
 
-1.0.0 will land no sooner than 1 month after 0.99.0, leaving server admins one
-month after 5th February to upgrade to 0.99.0 and deploy their certificates. In
+1.0.0 is scheduled for release on 10th June. In
 accordance with the the [S2S spec](https://matrix.org/docs/spec/server_server/r0.1.0.html)
 1.0.0 will enforce certificate validity. This means that any homeserver without a
 valid certificate after this point will no longer be able to federate with
 1.0.0 servers.
-
 
 ## Configuring certificates for compatibility with Synapse 1.0.0
 
@@ -145,12 +160,11 @@ You can do this with a `.well-known` file as follows:
  1. Keep the SRV record in place - it is needed for backwards compatibility
     with Synapse 0.34 and earlier.
 
- 2. Give synapse a certificate corresponding to the target domain
-    (`customer.example.net` in the above example). Currently Synapse's ACME
-    support [does not support
-    this](https://github.com/matrix-org/synapse/issues/4552), so you will have
-    to acquire a certificate yourself and give it to Synapse via
-    `tls_certificate_path` and `tls_private_key_path`.
+  2. Give Synapse a certificate corresponding to the target domain
+    (`customer.example.net` in the above example). You can either use Synapse's
+    built-in [ACME support](./ACME.md) for this (via the `domain` parameter in
+    the `acme` section), or acquire a certificate yourself and give it to
+    Synapse via `tls_certificate_path` and `tls_private_key_path`.
 
  3. Restart Synapse to ensure the new certificate is loaded.
 

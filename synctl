@@ -69,10 +69,14 @@ def abort(message, colour=RED, stream=sys.stderr):
     sys.exit(1)
 
 
-def start(configfile):
+def start(configfile, daemonize=True):
     write("Starting ...")
     args = SYNAPSE
-    args.extend(["--daemonize", "-c", configfile])
+
+    if daemonize:
+        args.extend(["--daemonize", "-c", configfile])
+    else:
+        args.extend(["-c", configfile])
 
     try:
         subprocess.check_call(args)
@@ -143,11 +147,21 @@ def main():
         help="start or stop all the workers in the given directory"
         " and the main synapse process",
     )
+    parser.add_argument(
+        "--no-daemonize",
+        action="store_false",
+        dest="daemonize",
+        help="Run synapse in the foreground for debugging. "
+        "Will work only if the daemonize option is not set in the config.",
+    )
 
     options = parser.parse_args()
 
     if options.worker and options.all_processes:
         write('Cannot use "--worker" with "--all-processes"', stream=sys.stderr)
+        sys.exit(1)
+    if not options.daemonize and options.all_processes:
+        write('Cannot use "--no-daemonize" with "--all-processes"', stream=sys.stderr)
         sys.exit(1)
 
     configfile = options.configfile
@@ -156,9 +170,8 @@ def main():
         write(
             "No config file found\n"
             "To generate a config file, run '%s -c %s --generate-config"
-            " --server-name=<server name> --report-stats=<yes/no>'\n" % (
-                " ".join(SYNAPSE), options.configfile,
-            ),
+            " --server-name=<server name> --report-stats=<yes/no>'\n"
+            % (" ".join(SYNAPSE), options.configfile),
             stream=sys.stderr,
         )
         sys.exit(1)
@@ -276,7 +289,7 @@ def main():
             # Check if synapse is already running
             if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
                 abort("synapse.app.homeserver already running")
-            start(configfile)
+            start(configfile, bool(options.daemonize))
 
         for worker in workers:
             env = os.environ.copy()

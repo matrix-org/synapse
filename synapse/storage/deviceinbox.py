@@ -138,6 +138,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         if not has_changed or last_stream_id == current_stream_id:
             return defer.succeed(([], current_stream_id))
 
+        if limit <= 0:
+            # This can happen if we run out of room for EDUs in the transaction.
+            return defer.succeed(([], last_stream_id))
+
         def get_new_messages_for_remote_destination_txn(txn):
             sql = (
                 "SELECT stream_id, messages_json FROM device_federation_outbox"

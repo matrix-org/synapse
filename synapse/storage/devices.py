@@ -16,7 +16,7 @@
 # limitations under the License.
 import logging
 
-from six import iteritems, itervalues
+from six import iteritems
 
 from canonicaljson import json
 
@@ -27,6 +27,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import Cache, SQLBaseStore, db_to_json
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.types import get_verify_key_from_cross_signing_key
+from synapse.util import batch_iter
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 
 logger = logging.getLogger(__name__)
@@ -75,11 +76,14 @@ class DeviceWorkerStore(SQLBaseStore):
 
         defer.returnValue({d["device_id"]: d for d in devices})
 
-    def get_devices_by_remote(self, destination, from_stream_id):
+    @defer.inlineCallbacks
+    def get_devices_by_remote(self, destination, from_stream_id, limit):
         """Get stream of updates to send to remote servers
 
         Returns:
-            (int, list[dict]): current stream id and list of updates
+            Deferred[tuple[int, list[dict]]]:
+                current stream id (ie, the stream id of the last update included in the
+                response), and the list of updates
         """
         now_stream_id = self._device_list_id_gen.get_current_token()
 
@@ -87,55 +91,127 @@ class DeviceWorkerStore(SQLBaseStore):
             destination, int(from_stream_id)
         )
         if not has_changed:
-            return (now_stream_id, [])
+            defer.returnValue((now_stream_id, []))
 
-        return self.runInteraction(
+        # We retrieve n+1 devices from the list of outbound pokes where n is
+        # our outbound device update limit. We then check if the very last
+        # device has the same stream_id as the second-to-last device. If so,
+        # then we ignore all devices with that stream_id and only send the
+        # devices with a lower stream_id.
+        #
+        # If when culling the list we end up with no devices afterwards, we
+        # consider the device update to be too large, and simply skip the
+        # stream_id; the rationale being that such a large device list update
+        # is likely an error.
+        updates = yield self.runInteraction(
             "get_devices_by_remote",
             self._get_devices_by_remote_txn,
             destination,
             from_stream_id,
             now_stream_id,
+            limit + 1,
         )
 
-    def _get_devices_by_remote_txn(
-        self, txn, destination, from_stream_id, now_stream_id
-    ):
-        sql = """
-            SELECT user_id, device_id, max(stream_id) FROM device_lists_outbound_pokes
-            WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
-            GROUP BY user_id, device_id
-            LIMIT 20
-        """
-        txn.execute(sql, (destination, from_stream_id, now_stream_id, False))
+        # Return an empty list if there are no updates
+        if not updates:
+            defer.returnValue((now_stream_id, []))
 
+        # if we have exceeded the limit, we need to exclude any results with the
+        # same stream_id as the last row.
+        if len(updates) > limit:
+            stream_id_cutoff = updates[-1][2]
+            now_stream_id = stream_id_cutoff - 1
+        else:
+            stream_id_cutoff = None
+
+        # Perform the equivalent of a GROUP BY
+        #
+        # Iterate through the updates list and copy non-duplicate
+        # (user_id, device_id) entries into a map, with the value being
+        # the max stream_id across each set of duplicate entries
+        #
         # maps (user_id, device_id) -> stream_id
-        query_map = {(r[0], r[1]): r[2] for r in txn}
+        # as long as their stream_id does not match that of the last row
+        query_map = {}
+        for update in updates:
+            if stream_id_cutoff is not None and update[2] >= stream_id_cutoff:
+                # Stop processing updates
+                break
+
+            key = (update[0], update[1])
+            query_map[key] = max(query_map.get(key, 0), update[2])
+
+        # If we didn't find any updates with a stream_id lower than the cutoff, it
+        # means that there are more than limit updates all of which have the same
+        # steam_id.
+
+        # That should only happen if a client is spamming the server with new
+        # devices, in which case E2E isn't going to work well anyway. We'll just
+        # skip that stream_id and return an empty list, and continue with the next
+        # stream_id next time.
         if not query_map:
-            return (now_stream_id, [])
+            defer.returnValue((stream_id_cutoff, []))
 
-        if len(query_map) >= 20:
-            now_stream_id = max(stream_id for stream_id in itervalues(query_map))
+        results = yield self._get_device_update_edus_by_remote(
+            destination, from_stream_id, query_map
+        )
 
-        devices = self._get_e2e_device_keys_txn(
-            txn,
+        defer.returnValue((now_stream_id, results))
+
+    def _get_devices_by_remote_txn(
+        self, txn, destination, from_stream_id, now_stream_id, limit
+    ):
+        """Return device update information for a given remote destination
+
+        Args:
+            txn (LoggingTransaction): The transaction to execute
+            destination (str): The host the device updates are intended for
+            from_stream_id (int): The minimum stream_id to filter updates by, exclusive
+            now_stream_id (int): The maximum stream_id to filter updates by, inclusive
+            limit (int): Maximum number of device updates to return
+
+        Returns:
+            List: List of device updates
+        """
+        sql = """
+            SELECT user_id, device_id, stream_id FROM device_lists_outbound_pokes
+            WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
+            ORDER BY stream_id
+            LIMIT ?
+        """
+        txn.execute(sql, (destination, from_stream_id, now_stream_id, False, limit))
+
+        return list(txn)
+
+    @defer.inlineCallbacks
+    def _get_device_update_edus_by_remote(self, destination, from_stream_id, query_map):
+        """Returns a list of device update EDUs as well as E2EE keys
+
+        Args:
+            destination (str): The host the device updates are intended for
+            from_stream_id (int): The minimum stream_id to filter updates by, exclusive
+            query_map (Dict[(str, str): int]): Dictionary mapping
+                user_id/device_id to update stream_id
+
+        Returns:
+            List[Dict]: List of objects representing an device update EDU
+
+        """
+        devices = yield self.runInteraction(
+            "_get_e2e_device_keys_txn",
+            self._get_e2e_device_keys_txn,
             query_map.keys(),
             include_all_devices=True,
             include_deleted_devices=True,
         )
 
-        prev_sent_id_sql = """
-            SELECT coalesce(max(stream_id), 0) as stream_id
-            FROM device_lists_outbound_last_success
-            WHERE destination = ? AND user_id = ? AND stream_id <= ?
-        """
-
         results = []
         for user_id, user_devices in iteritems(devices):
             # The prev_id for the first row is always the last row before
             # `from_stream_id`
-            txn.execute(prev_sent_id_sql, (destination, user_id, from_stream_id))
-            rows = txn.fetchall()
-            prev_id = rows[0][0]
+            prev_id = yield self._get_last_device_update_for_remote_user(
+                destination, user_id, from_stream_id
+            )
             for device_id, device in iteritems(user_devices):
                 stream_id = query_map[(user_id, device_id)]
                 result = {
@@ -159,7 +235,22 @@ class DeviceWorkerStore(SQLBaseStore):
 
                 results.append(result)
 
-        return (now_stream_id, results)
+        defer.returnValue(results)
+
+    def _get_last_device_update_for_remote_user(
+        self, destination, user_id, from_stream_id
+    ):
+        def f(txn):
+            prev_sent_id_sql = """
+                SELECT coalesce(max(stream_id), 0) as stream_id
+                FROM device_lists_outbound_last_success
+                WHERE destination = ? AND user_id = ? AND stream_id <= ?
+            """
+            txn.execute(prev_sent_id_sql, (destination, user_id, from_stream_id))
+            rows = txn.fetchall()
+            return rows[0][0]
+
+        return self.runInteraction("get_last_device_update_for_remote_user", f)
 
     def mark_as_sent_devices_by_remote(self, destination, stream_id):
         """Mark that updates have successfully been sent to the destination.
@@ -331,22 +422,47 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return now_stream_id, []
 
-    @defer.inlineCallbacks
-    def get_user_whose_devices_changed(self, from_key):
-        """Get set of users whose devices have changed since `from_key`.
+    def get_users_whose_devices_changed(self, from_key, user_ids):
+        """Get set of users whose devices have changed since `from_key` that
+        are in the given list of user_ids.
+
+        Args:
+            from_key (str): The device lists stream token
+            user_ids (Iterable[str])
+
+        Returns:
+            Deferred[set[str]]: The set of user_ids whose devices have changed
+            since `from_key`
         """
         from_key = int(from_key)
-        changed = self._device_list_stream_cache.get_all_entities_changed(from_key)
-        if changed is not None:
-            defer.returnValue(set(changed))
 
-        sql = """
-            SELECT DISTINCT user_id FROM device_lists_stream WHERE stream_id > ?
-        """
-        rows = yield self._execute(
-            "get_user_whose_devices_changed", None, sql, from_key
+        # Get set of users who *may* have changed. Users not in the returned
+        # list have definitely not changed.
+        to_check = list(
+            self._device_list_stream_cache.get_entities_changed(user_ids, from_key)
         )
-        defer.returnValue(set(row[0] for row in rows))
+
+        if not to_check:
+            return defer.succeed(set())
+
+        def _get_users_whose_devices_changed_txn(txn):
+            changes = set()
+
+            sql = """
+                SELECT DISTINCT user_id FROM device_lists_stream
+                WHERE stream_id > ?
+                AND user_id IN (%s)
+            """
+
+            for chunk in batch_iter(to_check, 100):
+                txn.execute(sql % (",".join("?" for _ in chunk),), (from_key,) + chunk)
+                changes.update(user_id for user_id, in txn)
+
+            return changes
+
+        return self.runInteraction(
+            "get_users_whose_devices_changed", _get_users_whose_devices_changed_txn
+        )
 
     @defer.inlineCallbacks
     def get_users_whose_signatures_changed(self, user_id, from_key):

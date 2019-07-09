@@ -17,11 +17,11 @@ from synapse.util.module_loader import load_module
 
 from ._base import Config
 
-LDAP_PROVIDER = 'ldap_auth_provider.LdapAuthProvider'
+LDAP_PROVIDER = "ldap_auth_provider.LdapAuthProvider"
 
 
 class PasswordAuthProviderConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.password_providers = []
         providers = []
 
@@ -29,28 +29,24 @@ class PasswordAuthProviderConfig(Config):
         # param.
         ldap_config = config.get("ldap_config", {})
         if ldap_config.get("enabled", False):
-            providers.append({
-                'module': LDAP_PROVIDER,
-                'config': ldap_config,
-            })
+            providers.append({"module": LDAP_PROVIDER, "config": ldap_config})
 
         providers.extend(config.get("password_providers", []))
         for provider in providers:
-            mod_name = provider['module']
+            mod_name = provider["module"]
 
             # This is for backwards compat when the ldap auth provider resided
             # in this package.
             if mod_name == "synapse.util.ldap_auth_provider.LdapAuthProvider":
                 mod_name = LDAP_PROVIDER
 
-            (provider_class, provider_config) = load_module({
-                "module": mod_name,
-                "config": provider['config'],
-            })
+            (provider_class, provider_config) = load_module(
+                {"module": mod_name, "config": provider["config"]}
+            )
 
             self.password_providers.append((provider_class, provider_config))
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         #password_providers:
         #    - module: "ldap_auth_provider.LdapAuthProvider"

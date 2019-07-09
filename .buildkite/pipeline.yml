@@ -2,10 +2,11 @@ env:
   CODECOV_TOKEN: "2dd7eb9b-0eda-45fe-a47c-9b5ac040045f"
 
 steps:
+
   - command:
       - "python -m pip install tox"
-      - "tox -e pep8"
-    label: "\U0001F9F9 PEP-8"
+      - "tox -e check_codestyle"
+    label: "\U0001F9F9 Check Style"
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
@@ -36,8 +37,6 @@ steps:
           image: "python:3.6"
           propagate-environment: true
 
-  - wait
-
   - command:
       - "python -m pip install tox"
       - "tox -e check-sampleconfig"
@@ -46,16 +45,25 @@ steps:
       - docker#v3.0.1:
           image: "python:3.6"
 
+  - wait
+
+
   - command:
       - "python -m pip install tox"
-      - "tox -e py27,codecov"
-    label: ":python: 2.7 / SQLite"
+      - "tox -e py35-old,codecov"
+    label: ":python: 3.5 / SQLite / Old Deps"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
       - docker#v3.0.1:
-          image: "python:2.7"
+          image: "python:3.5"
           propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - command:
       - "python -m pip install tox"
@@ -67,6 +75,12 @@ steps:
       - docker#v3.0.1:
           image: "python:3.5"
           propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - command:
       - "python -m pip install tox"
@@ -78,6 +92,12 @@ steps:
       - docker#v3.0.1:
           image: "python:3.6"
           propagate-environment: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - command:
       - "python -m pip install tox"
@@ -89,50 +109,12 @@ steps:
       - docker#v3.0.1:
           image: "python:3.7"
           propagate-environment: true
-
-  - command:
-      - "python -m pip install tox"
-      - "tox -e py27-old,codecov"
-    label: ":python: 2.7 / SQLite / Old Deps"
-    env:
-      TRIAL_FLAGS: "-j 2"
-    plugins:
-      - docker#v3.0.1:
-          image: "python:2.7"
-          propagate-environment: true
-
-  - label: ":python: 2.7 / :postgres: 9.4"
-    env:
-      TRIAL_FLAGS: "-j 4"
-    command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
-    plugins:
-      - docker-compose#v2.1.0:
-          run: testenv
-          config:
-            - .buildkite/docker-compose.py27.pg94.yaml
-
-  - label: ":python: 2.7 / :postgres: 9.5"
-    env:
-      TRIAL_FLAGS: "-j 4"
-    command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
-    plugins:
-      - docker-compose#v2.1.0:
-          run: testenv
-          config:
-            - .buildkite/docker-compose.py27.pg95.yaml
-
-  - label: ":python: 3.5 / :postgres: 9.4"
-    env:
-      TRIAL_FLAGS: "-j 4"
-    command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
-    plugins:
-      - docker-compose#v2.1.0:
-          run: testenv
-          config:
-            - .buildkite/docker-compose.py35.pg94.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: ":python: 3.5 / :postgres: 9.5"
     env:
@@ -144,6 +126,12 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py35.pg95.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: ":python: 3.7 / :postgres: 9.5"
     env:
@@ -155,6 +143,12 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg95.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: ":python: 3.7 / :postgres: 11"
     env:
@@ -166,3 +160,70 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg11.yaml
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
+
+
+  - label: "SyTest - :python: 3.5 / SQLite / Monolith"
+    agents:
+      queue: "medium"
+    command:
+      - "bash .buildkite/merge_base_branch.sh"
+      - "bash /synapse_sytest.sh"
+    plugins:
+      - docker#v3.0.1:
+          image: "matrixdotorg/sytest-synapse:py35"
+          propagate-environment: true
+          always-pull: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
+
+  - label: "SyTest - :python: 3.5 / :postgres: 9.6 / Monolith"
+    agents:
+      queue: "medium"
+    env:
+      POSTGRES: "1"
+    command:
+      - "bash .buildkite/merge_base_branch.sh"
+      - "bash /synapse_sytest.sh"
+    plugins:
+      - docker#v3.0.1:
+          image: "matrixdotorg/sytest-synapse:py35"
+          propagate-environment: true
+          always-pull: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
+
+  - label: "SyTest - :python: 3.5 / :postgres: 9.6 / Workers"
+    agents:
+      queue: "medium"
+    env:
+      POSTGRES: "1"
+      WORKERS: "1"
+    command:
+      - "bash .buildkite/merge_base_branch.sh"
+      - "bash /synapse_sytest.sh"
+    plugins:
+      - docker#v3.0.1:
+          image: "matrixdotorg/sytest-synapse:py35"
+          propagate-environment: true
+          always-pull: true
+    soft_fail: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2

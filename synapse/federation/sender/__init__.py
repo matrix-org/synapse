@@ -26,6 +26,11 @@ from synapse.federation.sender.per_destination_queue import PerDestinationQueue
 from synapse.federation.sender.transaction_manager import TransactionManager
 from synapse.federation.units import Edu
 from synapse.handlers.presence import get_interested_remotes
+from synapse.logging.context import (
+    make_deferred_yieldable,
+    preserve_fn,
+    run_in_background,
+)
 from synapse.metrics import (
     LaterGauge,
     event_processing_loop_counter,
@@ -33,7 +38,6 @@ from synapse.metrics import (
     events_processed_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util import logcontext
 from synapse.util.metrics import measure_func
 
 logger = logging.getLogger(__name__)
@@ -44,8 +48,8 @@ sent_pdus_destination_dist_count = Counter(
 )
 
 sent_pdus_destination_dist_total = Counter(
-    "synapse_federation_client_sent_pdu_destinations:total", ""
-    "Total number of PDUs queued for sending across all destinations",
+    "synapse_federation_client_sent_pdu_destinations:total",
+    "" "Total number of PDUs queued for sending across all destinations",
 )
 
 
@@ -63,14 +67,15 @@ class FederationSender(object):
         self._transaction_manager = TransactionManager(hs)
 
         # map from destination to PerDestinationQueue
-        self._per_destination_queues = {}   # type: dict[str, PerDestinationQueue]
+        self._per_destination_queues = {}  # type: dict[str, PerDestinationQueue]
 
         LaterGauge(
             "synapse_federation_transaction_queue_pending_destinations",
             "",
             [],
             lambda: sum(
-                1 for d in self._per_destination_queues.values()
+                1
+                for d in self._per_destination_queues.values()
                 if d.transmission_loop_running
             ),
         )
@@ -108,8 +113,9 @@ class FederationSender(object):
         # awaiting a call to flush_read_receipts_for_room. The presence of an entry
         # here for a given room means that we are rate-limiting RR flushes to that room,
         # and that there is a pending call to _flush_rrs_for_room in the system.
-        self._queues_awaiting_rr_flush_by_room = {
-        }   # type: dict[str, set[PerDestinationQueue]]
+        self._queues_awaiting_rr_flush_by_room = (
+            {}
+        )  # type: dict[str, set[PerDestinationQueue]]
 
         self._rr_txn_interval_per_room_ms = (
             1000.0 / hs.get_config().federation_rr_transactions_per_room_per_second
@@ -141,8 +147,7 @@ class FederationSender(object):
 
         # fire off a processing loop in the background
         run_as_background_process(
-            "process_event_queue_for_federation",
-            self._process_event_queue_loop,
+            "process_event_queue_for_federation", self._process_event_queue_loop
         )
 
     @defer.inlineCallbacks
@@ -152,7 +157,7 @@ class FederationSender(object):
             while True:
                 last_token = yield self.store.get_federation_out_pos("events")
                 next_token, events = yield self.store.get_all_new_events_stream(
-                    last_token, self._last_poked_id, limit=100,
+                    last_token, self._last_poked_id, limit=100
                 )
 
                 logger.debug("Handling %s -> %s", last_token, next_token)
@@ -168,6 +173,9 @@ class FederationSender(object):
                     if not is_mine and send_on_behalf_of is None:
                         return
 
+                    if not event.internal_metadata.should_proactively_send():
+                        return
+
                     try:
                         # Get the state from before the event.
                         # We need to make sure that this is the state from before
@@ -176,7 +184,7 @@ class FederationSender(object):
                         # banned then it won't receive the event because it won't
                         # be in the room after the ban.
                         destinations = yield self.state.get_current_hosts_in_room(
-                            event.room_id, latest_event_ids=event.prev_event_ids(),
+                            event.room_id, latest_event_ids=event.prev_event_ids()
                         )
                     except Exception:
                         logger.exception(
@@ -206,37 +214,40 @@ class FederationSender(object):
                 for event in events:
                     events_by_room.setdefault(event.room_id, []).append(event)
 
-                yield logcontext.make_deferred_yieldable(defer.gatherResults(
-                    [
-                        logcontext.run_in_background(handle_room_events, evs)
-                        for evs in itervalues(events_by_room)
-                    ],
-                    consumeErrors=True
-                ))
-
-                yield self.store.update_federation_out_pos(
-                    "events", next_token
+                yield make_deferred_yieldable(
+                    defer.gatherResults(
+                        [
+                            run_in_background(handle_room_events, evs)
+                            for evs in itervalues(events_by_room)
+                        ],
+                        consumeErrors=True,
+                    )
                 )
+
+                yield self.store.update_federation_out_pos("events", next_token)
 
                 if events:
                     now = self.clock.time_msec()
                     ts = yield self.store.get_received_ts(events[-1].event_id)
 
                     synapse.metrics.event_processing_lag.labels(
-                        "federation_sender").set(now - ts)
+                        "federation_sender"
+                    ).set(now - ts)
                     synapse.metrics.event_processing_last_ts.labels(
-                        "federation_sender").set(ts)
+                        "federation_sender"
+                    ).set(ts)
 
                     events_processed_counter.inc(len(events))
 
-                    event_processing_loop_room_count.labels(
-                        "federation_sender"
-                    ).inc(len(events_by_room))
+                    event_processing_loop_room_count.labels("federation_sender").inc(
+                        len(events_by_room)
+                    )
 
                 event_processing_loop_counter.labels("federation_sender").inc()
 
                 synapse.metrics.event_processing_positions.labels(
-                    "federation_sender").set(next_token)
+                    "federation_sender"
+                ).set(next_token)
 
         finally:
             self._is_processing = False
@@ -309,9 +320,7 @@ class FederationSender(object):
         if not domains:
             return
 
-        queues_pending_flush = self._queues_awaiting_rr_flush_by_room.get(
-            room_id
-        )
+        queues_pending_flush = self._queues_awaiting_rr_flush_by_room.get(room_id)
 
         # if there is no flush yet scheduled, we will send out these receipts with
         # immediate flushes, and schedule the next flush for this room.
@@ -355,7 +364,7 @@ class FederationSender(object):
         for queue in queues:
             queue.flush_read_receipts_for_room(room_id)
 
-    @logcontext.preserve_fn  # the caller should not yield on this
+    @preserve_fn  # the caller should not yield on this
     @defer.inlineCallbacks
     def send_presence(self, states):
         """Send the new presence states to the appropriate destinations.
@@ -374,10 +383,9 @@ class FederationSender(object):
         # updates in quick succession are correctly handled.
         # We only want to send presence for our own users, so lets always just
         # filter here just in case.
-        self.pending_presence.update({
-            state.user_id: state for state in states
-            if self.is_mine_id(state.user_id)
-        })
+        self.pending_presence.update(
+            {state.user_id: state for state in states if self.is_mine_id(state.user_id)}
+        )
 
         # We then handle the new pending presence in batches, first figuring
         # out the destinations we need to send each state to and then poking it

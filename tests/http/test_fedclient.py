@@ -29,7 +29,7 @@ from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
 )
-from synapse.util.logcontext import LoggingContext
+from synapse.logging.context import LoggingContext
 
 from tests.server import FakeTransport
 from tests.unittest import HomeserverTestCase
@@ -83,7 +83,7 @@ class FederationClientTests(HomeserverTestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8008)
 
         # complete the connection and wire it up to a fake transport
@@ -99,7 +99,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertNoResult(test_d)
 
         # Send it the HTTP response
-        res_json = '{ "a": 1 }'.encode('ascii')
+        res_json = '{ "a": 1 }'.encode("ascii")
         protocol.dataReceived(
             b"HTTP/1.1 200 OK\r\n"
             b"Server: Fake\r\n"
@@ -138,7 +138,7 @@ class FederationClientTests(HomeserverTestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 8008)
         e = Exception("go away")
         factory.clientConnectionFailed(None, e)
@@ -164,7 +164,7 @@ class FederationClientTests(HomeserverTestCase):
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
-        self.assertEqual(clients[0][0], '1.2.3.4')
+        self.assertEqual(clients[0][0], "1.2.3.4")
         self.assertEqual(clients[0][1], 8008)
 
         # Deferred is still without a result
@@ -194,7 +194,7 @@ class FederationClientTests(HomeserverTestCase):
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
-        self.assertEqual(clients[0][0], '1.2.3.4')
+        self.assertEqual(clients[0][0], "1.2.3.4")
         self.assertEqual(clients[0][1], 8008)
 
         conn = Mock()
@@ -215,10 +215,9 @@ class FederationClientTests(HomeserverTestCase):
         """Ensure that Synapse does not try to connect to blacklisted IPs"""
 
         # Set up the ip_range blacklist
-        self.hs.config.federation_ip_range_blacklist = IPSet([
-            "127.0.0.0/8",
-            "fe80::/64",
-        ])
+        self.hs.config.federation_ip_range_blacklist = IPSet(
+            ["127.0.0.0/8", "fe80::/64"]
+        )
         self.reactor.lookups["internal"] = "127.0.0.1"
         self.reactor.lookups["internalv6"] = "fe80:0:0:0:0:8a2e:370:7337"
         self.reactor.lookups["fine"] = "10.20.30.40"
@@ -382,7 +381,7 @@ class FederationClientTests(HomeserverTestCase):
             b"Content-Type: application/json\r\n"
             b"Content-Length: 2\r\n"
             b"\r\n"
-            b'{}'
+            b"{}"
         )
 
         # We should get a successful response

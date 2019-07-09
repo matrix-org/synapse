@@ -21,8 +21,8 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
+from synapse.logging.utils import log_function
 from synapse.types import UserID
-from synapse.util.logutils import log_function
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 class EventStreamHandler(BaseHandler):
-
     def __init__(self, hs):
         super(EventStreamHandler, self).__init__(hs)
 
@@ -53,9 +52,17 @@ class EventStreamHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def get_stream(self, auth_user_id, pagin_config, timeout=0,
-                   as_client_event=True, affect_presence=True,
-                   only_keys=None, room_id=None, is_guest=False):
+    def get_stream(
+        self,
+        auth_user_id,
+        pagin_config,
+        timeout=0,
+        as_client_event=True,
+        affect_presence=True,
+        only_keys=None,
+        room_id=None,
+        is_guest=False,
+    ):
         """Fetches the events stream for a given user.
 
         If `only_keys` is not None, events from keys will be sent down.
@@ -73,7 +80,7 @@ class EventStreamHandler(BaseHandler):
         presence_handler = self.hs.get_presence_handler()
 
         context = yield presence_handler.user_syncing(
-            auth_user_id, affect_presence=affect_presence,
+            auth_user_id, affect_presence=affect_presence
         )
         with context:
             if timeout:
@@ -85,9 +92,12 @@ class EventStreamHandler(BaseHandler):
                 timeout = random.randint(int(timeout * 0.9), int(timeout * 1.1))
 
             events, tokens = yield self.notifier.get_events_for(
-                auth_user, pagin_config, timeout,
+                auth_user,
+                pagin_config,
+                timeout,
                 only_keys=only_keys,
-                is_guest=is_guest, explicit_room_id=room_id
+                is_guest=is_guest,
+                explicit_room_id=room_id,
             )
 
             # When the user joins a new room, or another user joins a currently
@@ -102,17 +112,15 @@ class EventStreamHandler(BaseHandler):
                     # Send down presence.
                     if event.state_key == auth_user_id:
                         # Send down presence for everyone in the room.
-                        users = yield self.state.get_current_users_in_room(event.room_id)
-                        states = yield presence_handler.get_states(
-                            users,
-                            as_event=True,
+                        users = yield self.state.get_current_users_in_room(
+                            event.room_id
                         )
+                        states = yield presence_handler.get_states(users, as_event=True)
                         to_add.extend(states)
                     else:
 
                         ev = yield presence_handler.get_state(
-                            UserID.from_string(event.state_key),
-                            as_event=True,
+                            UserID.from_string(event.state_key), as_event=True
                         )
                         to_add.append(ev)
 
@@ -121,7 +129,12 @@ class EventStreamHandler(BaseHandler):
             time_now = self.clock.time_msec()
 
             chunks = yield self._event_serializer.serialize_events(
-                events, time_now, as_client_event=as_client_event,
+                events,
+                time_now,
+                as_client_event=as_client_event,
+                # We don't bundle "live" events, as otherwise clients
+                # will end up double counting annotations.
+                bundle_aggregations=False,
             )
 
             chunk = {
@@ -134,7 +147,6 @@ class EventStreamHandler(BaseHandler):
 
 
 class EventHandler(BaseHandler):
-
     @defer.inlineCallbacks
     def get_event(self, user, room_id, event_id):
         """Retrieve a single specified event.
@@ -161,16 +173,10 @@ class EventHandler(BaseHandler):
         is_peeking = user.to_string() not in users
 
         filtered = yield filter_events_for_client(
-            self.store,
-            user.to_string(),
-            [event],
-            is_peeking=is_peeking
+            self.store, user.to_string(), [event], is_peeking=is_peeking
         )
 
         if not filtered:
-            raise AuthError(
-                403,
-                "You don't have permission to access that event."
-            )
+            raise AuthError(403, "You don't have permission to access that event.")
 
         defer.returnValue(event)

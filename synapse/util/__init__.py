@@ -21,7 +21,7 @@ import attr
 
 from twisted.internet import defer, task
 
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.logging import context
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +40,13 @@ class Clock(object):
     Args:
         reactor: The Twisted reactor to use.
     """
+
     _reactor = attr.ib()
 
     @defer.inlineCallbacks
     def sleep(self, seconds):
         d = defer.Deferred()
-        with PreserveLoggingContext():
+        with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
             res = yield d
         defer.returnValue(res)
@@ -61,7 +62,10 @@ class Clock(object):
     def looping_call(self, f, msec):
         """Call a function repeatedly.
 
-         Waits `msec` initially before calling `f` for the first time.
+        Waits `msec` initially before calling `f` for the first time.
+
+        Note that the function will be called with no logcontext, so if it is anything
+        other than trivial, you probably want to wrap it in run_as_background_process.
 
         Args:
             f(function): The function to call repeatedly.
@@ -70,13 +74,14 @@ class Clock(object):
         call = task.LoopingCall(f)
         call.clock = self._reactor
         d = call.start(msec / 1000.0, now=False)
-        d.addErrback(
-            log_failure, "Looping call died", consumeErrors=False,
-        )
+        d.addErrback(log_failure, "Looping call died", consumeErrors=False)
         return call
 
     def call_later(self, delay, callback, *args, **kwargs):
         """Call something later
+
+        Note that the function will be called with no logcontext, so if it is anything
+        other than trivial, you probably want to wrap it in run_as_background_process.
 
         Args:
             delay(float): How long to wait in seconds.
@@ -84,11 +89,12 @@ class Clock(object):
             *args: Postional arguments to pass to function.
             **kwargs: Key arguments to pass to function.
         """
+
         def wrapped_callback(*args, **kwargs):
-            with PreserveLoggingContext():
+            with context.PreserveLoggingContext():
                 callback(*args, **kwargs)
 
-        with PreserveLoggingContext():
+        with context.PreserveLoggingContext():
             return self._reactor.callLater(delay, wrapped_callback, *args, **kwargs)
 
     def cancel_call_later(self, timer, ignore_errs=False):
@@ -129,12 +135,7 @@ def log_failure(failure, msg, consumeErrors=True):
     """
 
     logger.error(
-        msg,
-        exc_info=(
-            failure.type,
-            failure.value,
-            failure.getTracebackObject()
-        )
+        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())
     )
 
     if not consumeErrors:
@@ -152,12 +153,12 @@ def glob_to_regex(glob):
     Returns:
         re.RegexObject
     """
-    res = ''
+    res = ""
     for c in glob:
-        if c == '*':
-            res = res + '.*'
-        elif c == '?':
-            res = res + '.'
+        if c == "*":
+            res = res + ".*"
+        elif c == "?":
+            res = res + "."
         else:
             res = res + re.escape(c)
 

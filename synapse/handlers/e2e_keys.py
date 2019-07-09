@@ -30,14 +30,12 @@ from synapse.api.errors import (
     FederationDeniedError,
     SynapseError,
 )
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import (
     UserID,
     get_domain_from_id,
     get_verify_key_from_cross_signing_key,
 )
-from synapse.util.async_helpers import Linearizer
-from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
@@ -117,9 +115,7 @@ class E2eKeysHandler(object):
                     query_list.append((user_id, None))
 
             user_ids_not_in_cache, remote_results = (
-                yield self.store.get_user_devices_from_cache(
-                    query_list
-                )
+                yield self.store.get_user_devices_from_cache(query_list)
             )
             for user_id, devices in iteritems(remote_results):
                 user_devices = results.setdefault(user_id, {})
@@ -149,9 +145,7 @@ class E2eKeysHandler(object):
             destination_query = remote_queries_not_in_cache[destination]
             try:
                 remote_result = yield self.federation.query_client_keys(
-                    destination,
-                    {"device_keys": destination_query},
-                    timeout=timeout
+                    destination, {"device_keys": destination_query}, timeout=timeout
                 )
 
                 for user_id, keys in remote_result["device_keys"].items():
@@ -169,14 +163,17 @@ class E2eKeysHandler(object):
             except Exception as e:
                 failures[destination] = _exception_to_failure(e)
 
-        yield make_deferred_yieldable(defer.gatherResults([
-            run_in_background(do_remote_query, destination)
-            for destination in remote_queries_not_in_cache
-        ], consumeErrors=True))
+        yield make_deferred_yieldable(
+            defer.gatherResults(
+                [
+                    run_in_background(do_remote_query, destination)
+                    for destination in remote_queries_not_in_cache
+                ],
+                consumeErrors=True,
+            )
+        )
 
-        ret = {
-            "device_keys": results, "failures": failures,
-        }
+        ret = {"device_keys": results, "failures": failures}
 
         for key, value in iteritems(cross_signing_keys):
             ret[key + "_keys"] = value
@@ -264,8 +261,7 @@ class E2eKeysHandler(object):
         for user_id, device_ids in query.items():
             # we use UserID.from_string to catch invalid user ids
             if not self.is_mine(UserID.from_string(user_id)):
-                logger.warning("Request for keys for non-local user %s",
-                               user_id)
+                logger.warning("Request for keys for non-local user %s", user_id)
                 raise SynapseError(400, "Not a user here")
 
             if not device_ids:
@@ -330,9 +326,7 @@ class E2eKeysHandler(object):
             device_keys = remote_queries[destination]
             try:
                 remote_result = yield self.federation.claim_client_keys(
-                    destination,
-                    {"one_time_keys": device_keys},
-                    timeout=timeout
+                    destination, {"one_time_keys": device_keys}, timeout=timeout
                 )
                 for user_id, keys in remote_result["one_time_keys"].items():
                     if user_id in device_keys:
@@ -340,25 +334,29 @@ class E2eKeysHandler(object):
             except Exception as e:
                 failures[destination] = _exception_to_failure(e)
 
-        yield make_deferred_yieldable(defer.gatherResults([
-            run_in_background(claim_client_keys, destination)
-            for destination in remote_queries
-        ], consumeErrors=True))
+        yield make_deferred_yieldable(
+            defer.gatherResults(
+                [
+                    run_in_background(claim_client_keys, destination)
+                    for destination in remote_queries
+                ],
+                consumeErrors=True,
+            )
+        )
 
         logger.info(
             "Claimed one-time-keys: %s",
-            ",".join((
-                "%s for %s:%s" % (key_id, user_id, device_id)
-                for user_id, user_keys in iteritems(json_result)
-                for device_id, device_keys in iteritems(user_keys)
-                for key_id, _ in iteritems(device_keys)
-            )),
+            ",".join(
+                (
+                    "%s for %s:%s" % (key_id, user_id, device_id)
+                    for user_id, user_keys in iteritems(json_result)
+                    for device_id, device_keys in iteritems(user_keys)
+                    for key_id, _ in iteritems(device_keys)
+                )
+            ),
         )
 
-        defer.returnValue({
-            "one_time_keys": json_result,
-            "failures": failures
-        })
+        defer.returnValue({"one_time_keys": json_result, "failures": failures})
 
     @defer.inlineCallbacks
     def upload_keys_for_user(self, user_id, device_id, keys):
@@ -369,11 +367,13 @@ class E2eKeysHandler(object):
         if device_keys:
             logger.info(
                 "Updating device_keys for device %r for user %s at %d",
-                device_id, user_id, time_now
+                device_id,
+                user_id,
+                time_now,
             )
             # TODO: Sign the JSON with the server key
             changed = yield self.store.set_e2e_device_keys(
-                user_id, device_id, time_now, device_keys,
+                user_id, device_id, time_now, device_keys
             )
             if changed:
                 # Only notify about device updates *if* the keys actually changed
@@ -382,7 +382,7 @@ class E2eKeysHandler(object):
         one_time_keys = keys.get("one_time_keys", None)
         if one_time_keys:
             yield self._upload_one_time_keys_for_user(
-                user_id, device_id, time_now, one_time_keys,
+                user_id, device_id, time_now, one_time_keys
             )
 
         # the device should have been registered already, but it may have been
@@ -397,20 +397,22 @@ class E2eKeysHandler(object):
         defer.returnValue({"one_time_key_counts": result})
 
     @defer.inlineCallbacks
-    def _upload_one_time_keys_for_user(self, user_id, device_id, time_now,
-                                       one_time_keys):
+    def _upload_one_time_keys_for_user(
+        self, user_id, device_id, time_now, one_time_keys
+    ):
         logger.info(
             "Adding one_time_keys %r for device %r for user %r at %d",
-            one_time_keys.keys(), device_id, user_id, time_now,
+            one_time_keys.keys(),
+            device_id,
+            user_id,
+            time_now,
         )
 
         # make a list of (alg, id, key) tuples
         key_list = []
         for key_id, key_obj in one_time_keys.items():
             algorithm, key_id = key_id.split(":")
-            key_list.append((
-                algorithm, key_id, key_obj
-            ))
+            key_list.append((algorithm, key_id, key_obj))
 
         # First we check if we have already persisted any of the keys.
         existing_key_map = yield self.store.get_e2e_one_time_keys(
@@ -424,17 +426,18 @@ class E2eKeysHandler(object):
                 if not _one_time_keys_match(ex_json, key):
                     raise SynapseError(
                         400,
-                        ("One time key %s:%s already exists. "
-                         "Old key: %s; new key: %r") %
-                        (algorithm, key_id, ex_json, key)
+                        (
+                            "One time key %s:%s already exists. "
+                            "Old key: %s; new key: %r"
+                        )
+                        % (algorithm, key_id, ex_json, key),
                     )
             else:
-                new_keys.append((
-                    algorithm, key_id, encode_canonical_json(key).decode('ascii')))
+                new_keys.append(
+                    (algorithm, key_id, encode_canonical_json(key).decode("ascii"))
+                )
 
-        yield self.store.add_e2e_one_time_keys(
-            user_id, device_id, time_now, new_keys
-        )
+        yield self.store.add_e2e_one_time_keys(user_id, device_id, time_now, new_keys)
 
     @defer.inlineCallbacks
     def upload_signing_keys_for_user(self, user_id, keys):
@@ -514,7 +517,6 @@ class E2eKeysHandler(object):
         defer.returnValue({})
 
 
-
 def _check_cross_signing_key(key, user_id, key_type, signing_key=None):
     """Check a cross-signing key uploaded by a user.  Performs some basic sanity
     checking, and ensures that it is signed, if a signature is required.
@@ -544,29 +546,22 @@ def _check_cross_signing_key(key, user_id, key_type, signing_key=None):
                 Codes.INVALID_SIGNATURE
             )
 
+
 def _exception_to_failure(e):
     if isinstance(e, CodeMessageException):
-        return {
-            "status": e.code, "message": str(e),
-        }
+        return {"status": e.code, "message": str(e)}
 
     if isinstance(e, NotRetryingDestination):
-        return {
-            "status": 503, "message": "Not ready for retry",
-        }
+        return {"status": 503, "message": "Not ready for retry"}
 
     if isinstance(e, FederationDeniedError):
-        return {
-            "status": 403, "message": "Federation Denied",
-        }
+        return {"status": 403, "message": "Federation Denied"}
 
     # include ConnectionRefused and other errors
     #
     # Note that some Exceptions (notably twisted's ResponseFailed etc) don't
     # give a string for e.message, which json then fails to serialize.
-    return {
-        "status": 503, "message": str(e),
-    }
+    return {"status": 503, "message": str(e)}
 
 
 def _one_time_keys_match(old_key_json, new_key):

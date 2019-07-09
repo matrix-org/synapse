@@ -30,7 +30,7 @@ from tests import unittest
 
 
 class VersionTestCase(unittest.HomeserverTestCase):
-    url = '/_synapse/admin/v1/server_version'
+    url = "/_synapse/admin/v1/server_version"
 
     def create_test_json_resource(self):
         resource = JsonResource(self.hs)
@@ -43,7 +43,7 @@ class VersionTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
-            {'server_version', 'python_version'}, set(channel.json_body.keys())
+            {"server_version", "python_version"}, set(channel.json_body.keys())
         )
 
 
@@ -68,7 +68,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.hs = self.setup_test_homeserver()
 
-        self.hs.config.registration_shared_secret = u"shared"
+        self.hs.config.registration_shared_secret = "shared"
 
         self.hs.get_media_repository = Mock()
         self.hs.get_deactivate_account_handler = Mock()
@@ -82,12 +82,12 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         """
         self.hs.config.registration_shared_secret = None
 
-        request, channel = self.make_request("POST", self.url, b'{}')
+        request, channel = self.make_request("POST", self.url, b"{}")
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
-            'Shared secret registration is not enabled', channel.json_body["error"]
+            "Shared secret registration is not enabled", channel.json_body["error"]
         )
 
     def test_get_nonce(self):
@@ -118,20 +118,20 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(59)
 
         body = json.dumps({"nonce": nonce})
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('username must be specified', channel.json_body["error"])
+        self.assertEqual("username must be specified", channel.json_body["error"])
 
         # 61 seconds
         self.reactor.advance(2)
 
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('unrecognised nonce', channel.json_body["error"])
+        self.assertEqual("unrecognised nonce", channel.json_body["error"])
 
     def test_register_incorrect_nonce(self):
         """
@@ -154,7 +154,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
                 "mac": want_mac,
             }
         )
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
@@ -171,7 +171,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
         want_mac.update(
-            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin\x00support"
+            nonce.encode("ascii") + b"\x00bob\x00abc123\x00admin\x00support"
         )
         want_mac = want_mac.hexdigest()
 
@@ -185,7 +185,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
                 "mac": want_mac,
             }
         )
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -200,7 +200,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin")
+        want_mac.update(nonce.encode("ascii") + b"\x00bob\x00abc123\x00admin")
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -212,18 +212,18 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
                 "mac": want_mac,
             }
         )
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["user_id"])
 
         # Now, try and reuse it
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('unrecognised nonce', channel.json_body["error"])
+        self.assertEqual("unrecognised nonce", channel.json_body["error"])
 
     def test_missing_parts(self):
         """
@@ -243,11 +243,11 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         # Must be present
         body = json.dumps({})
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('nonce must be specified', channel.json_body["error"])
+        self.assertEqual("nonce must be specified", channel.json_body["error"])
 
         #
         # Username checks
@@ -255,35 +255,35 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         # Must be present
         body = json.dumps({"nonce": nonce()})
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('username must be specified', channel.json_body["error"])
+        self.assertEqual("username must be specified", channel.json_body["error"])
 
         # Must be a string
         body = json.dumps({"nonce": nonce(), "username": 1234})
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('Invalid username', channel.json_body["error"])
+        self.assertEqual("Invalid username", channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": u"abcd\u0000"})
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        body = json.dumps({"nonce": nonce(), "username": "abcd\u0000"})
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('Invalid username', channel.json_body["error"])
+        self.assertEqual("Invalid username", channel.json_body["error"])
 
         # Must not have null bytes
         body = json.dumps({"nonce": nonce(), "username": "a" * 1000})
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('Invalid username', channel.json_body["error"])
+        self.assertEqual("Invalid username", channel.json_body["error"])
 
         #
         # Password checks
@@ -291,37 +291,35 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         # Must be present
         body = json.dumps({"nonce": nonce(), "username": "a"})
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('password must be specified', channel.json_body["error"])
+        self.assertEqual("password must be specified", channel.json_body["error"])
 
         # Must be a string
         body = json.dumps({"nonce": nonce(), "username": "a", "password": 1234})
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('Invalid password', channel.json_body["error"])
+        self.assertEqual("Invalid password", channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps(
-            {"nonce": nonce(), "username": "a", "password": u"abcd\u0000"}
-        )
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        body = json.dumps({"nonce": nonce(), "username": "a", "password": "abcd\u0000"})
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('Invalid password', channel.json_body["error"])
+        self.assertEqual("Invalid password", channel.json_body["error"])
 
         # Super long
         body = json.dumps({"nonce": nonce(), "username": "a", "password": "A" * 1000})
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('Invalid password', channel.json_body["error"])
+        self.assertEqual("Invalid password", channel.json_body["error"])
 
         #
         # user_type check
@@ -336,11 +334,11 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
                 "user_type": "invalid",
             }
         )
-        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('Invalid user type', channel.json_body["error"])
+        self.assertEqual("Invalid user type", channel.json_body["error"])
 
 
 class ShutdownRoomTestCase(unittest.HomeserverTestCase):
@@ -396,7 +394,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         url = "admin/shutdown_room/" + room_id
         request, channel = self.make_request(
             "POST",
-            url.encode('ascii'),
+            url.encode("ascii"),
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
         )
@@ -408,7 +406,6 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         users_in_room = self.get_success(self.store.get_users_in_room(room_id))
         self.assertEqual([], users_in_room)
 
-    @unittest.DEBUG
     def test_shutdown_room_block_peek(self):
         """Test that a world_readable room can no longer be peeked into after
         it has been shut down.
@@ -422,7 +419,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         url = "rooms/%s/state/m.room.history_visibility" % (room_id,)
         request, channel = self.make_request(
             "PUT",
-            url.encode('ascii'),
+            url.encode("ascii"),
             json.dumps({"history_visibility": "world_readable"}),
             access_token=self.other_user_token,
         )
@@ -433,7 +430,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         url = "admin/shutdown_room/" + room_id
         request, channel = self.make_request(
             "POST",
-            url.encode('ascii'),
+            url.encode("ascii"),
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
         )
@@ -450,7 +447,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
         url = "rooms/%s/initialSync" % (room_id,)
         request, channel = self.make_request(
-            "GET", url.encode('ascii'), access_token=self.admin_user_tok
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
         self.render(request)
         self.assertEqual(
@@ -459,7 +456,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
         url = "events?timeout=0&room_id=" + room_id
         request, channel = self.make_request(
-            "GET", url.encode('ascii'), access_token=self.admin_user_tok
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
         self.render(request)
         self.assertEqual(
@@ -487,7 +484,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         # Create a new group
         request, channel = self.make_request(
             "POST",
-            "/create_group".encode('ascii'),
+            "/create_group".encode("ascii"),
             access_token=self.admin_user_tok,
             content={"localpart": "test"},
         )
@@ -503,14 +500,14 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
         url = "/groups/%s/admin/users/invite/%s" % (group_id, self.other_user)
         request, channel = self.make_request(
-            "PUT", url.encode('ascii'), access_token=self.admin_user_tok, content={}
+            "PUT", url.encode("ascii"), access_token=self.admin_user_tok, content={}
         )
         self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         url = "/groups/%s/self/accept_invite" % (group_id,)
         request, channel = self.make_request(
-            "PUT", url.encode('ascii'), access_token=self.other_user_token, content={}
+            "PUT", url.encode("ascii"), access_token=self.other_user_token, content={}
         )
         self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -523,7 +520,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         url = "/admin/delete_group/" + group_id
         request, channel = self.make_request(
             "POST",
-            url.encode('ascii'),
+            url.encode("ascii"),
             access_token=self.admin_user_tok,
             content={"localpart": "test"},
         )
@@ -545,7 +542,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
         url = "/groups/%s/profile" % (group_id,)
         request, channel = self.make_request(
-            "GET", url.encode('ascii'), access_token=self.admin_user_tok
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
 
         self.render(request)
@@ -557,7 +554,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         """Returns the list of groups the user is in (given their access token)
         """
         request, channel = self.make_request(
-            "GET", "/joined_groups".encode('ascii'), access_token=access_token
+            "GET", "/joined_groups".encode("ascii"), access_token=access_token
         )
 
         self.render(request)

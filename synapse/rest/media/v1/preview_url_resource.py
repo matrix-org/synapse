@@ -32,22 +32,21 @@ from canonicaljson import json
 
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
+    DirectServeResource,
     respond_with_json,
     respond_with_json_bytes,
     wrap_json_request_handler,
 )
 from synapse.http.servlet import parse_integer, parse_string
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.stringutils import random_string
 
 from ._base import FileInfo
@@ -58,11 +57,11 @@ _charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=r
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 
-class PreviewUrlResource(Resource):
+class PreviewUrlResource(DirectServeResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo, media_storage):
-        Resource.__init__(self)
+        super().__init__()
 
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -92,22 +91,18 @@ class PreviewUrlResource(Resource):
         )
 
         self._cleaner_loop = self.clock.looping_call(
-            self._start_expire_url_cache_data, 10 * 1000,
+            self._start_expire_url_cache_data, 10 * 1000
         )
 
     def render_OPTIONS(self, request):
+        request.setHeader(b"Allow", b"OPTIONS, GET")
         return respond_with_json(request, 200, {}, send_cors=True)
 
-    def render_GET(self, request):
-        self._async_render_GET(request)
-        return NOT_DONE_YET
-
     @wrap_json_request_handler
-    @defer.inlineCallbacks
-    def _async_render_GET(self, request):
+    async def _async_render_GET(self, request):
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
         url = parse_string(request, "url")
         if b"ts" in request.args:
             ts = parse_integer(request, "ts")
@@ -121,16 +116,16 @@ class PreviewUrlResource(Resource):
             for attrib in entry:
                 pattern = entry[attrib]
                 value = getattr(url_tuple, attrib)
-                logger.debug((
-                    "Matching attrib '%s' with value '%s' against"
-                    " pattern '%s'"
-                ) % (attrib, value, pattern))
+                logger.debug(
+                    ("Matching attrib '%s' with value '%s' against" " pattern '%s'")
+                    % (attrib, value, pattern)
+                )
 
                 if value is None:
                     match = False
                     continue
 
-                if pattern.startswith('^'):
+                if pattern.startswith("^"):
                     if not re.match(pattern, getattr(url_tuple, attrib)):
                         match = False
                         continue
@@ -139,12 +134,9 @@ class PreviewUrlResource(Resource):
                         match = False
                         continue
             if match:
-                logger.warn(
-                    "URL %s blocked by url_blacklist entry %s", url, entry
-                )
+                logger.warn("URL %s blocked by url_blacklist entry %s", url, entry)
                 raise SynapseError(
-                    403, "URL blocked by url pattern blacklist entry",
-                    Codes.UNKNOWN
+                    403, "URL blocked by url pattern blacklist entry", Codes.UNKNOWN
                 )
 
         # the in-memory cache:
@@ -156,19 +148,13 @@ class PreviewUrlResource(Resource):
         observable = self._cache.get(url)
 
         if not observable:
-            download = run_in_background(
-                self._do_preview,
-                url, requester.user, ts,
-            )
-            observable = ObservableDeferred(
-                download,
-                consumeErrors=True
-            )
+            download = run_in_background(self._do_preview, url, requester.user, ts)
+            observable = ObservableDeferred(download, consumeErrors=True)
             self._cache[url] = observable
         else:
             logger.info("Returning cached response")
 
-        og = yield make_deferred_yieldable(observable.observe())
+        og = await make_deferred_yieldable(defer.maybeDeferred(observable.observe))
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
     @defer.inlineCallbacks
@@ -187,15 +173,15 @@ class PreviewUrlResource(Resource):
         # historical previews, if we have any)
         cache_result = yield self.store.get_url_cache(url, ts)
         if (
-            cache_result and
-            cache_result["expires_ts"] > ts and
-            cache_result["response_code"] / 100 == 2
+            cache_result
+            and cache_result["expires_ts"] > ts
+            and cache_result["response_code"] / 100 == 2
         ):
             # It may be stored as text in the database, not as bytes (such as
             # PostgreSQL). If so, encode it back before handing it on.
             og = cache_result["og"]
             if isinstance(og, six.text_type):
-                og = og.encode('utf8')
+                og = og.encode("utf8")
             defer.returnValue(og)
             return
 
@@ -203,33 +189,31 @@ class PreviewUrlResource(Resource):
 
         logger.debug("got media_info of '%s'" % media_info)
 
-        if _is_media(media_info['media_type']):
-            file_id = media_info['filesystem_id']
+        if _is_media(media_info["media_type"]):
+            file_id = media_info["filesystem_id"]
             dims = yield self.media_repo._generate_thumbnails(
-                None, file_id, file_id, media_info["media_type"],
-                url_cache=True,
+                None, file_id, file_id, media_info["media_type"], url_cache=True
             )
 
             og = {
-                "og:description": media_info['download_name'],
-                "og:image": "mxc://%s/%s" % (
-                    self.server_name, media_info['filesystem_id']
-                ),
-                "og:image:type": media_info['media_type'],
-                "matrix:image:size": media_info['media_length'],
+                "og:description": media_info["download_name"],
+                "og:image": "mxc://%s/%s"
+                % (self.server_name, media_info["filesystem_id"]),
+                "og:image:type": media_info["media_type"],
+                "matrix:image:size": media_info["media_length"],
             }
 
             if dims:
-                og["og:image:width"] = dims['width']
-                og["og:image:height"] = dims['height']
+                og["og:image:width"] = dims["width"]
+                og["og:image:height"] = dims["height"]
             else:
                 logger.warn("Couldn't get dims for %s" % url)
 
             # define our OG response for this media
-        elif _is_html(media_info['media_type']):
+        elif _is_html(media_info["media_type"]):
             # TODO: somehow stop a big HTML tree from exploding synapse's RAM
 
-            with open(media_info['filename'], 'rb') as file:
+            with open(media_info["filename"], "rb") as file:
                 body = file.read()
 
             encoding = None
@@ -242,45 +226,43 @@ class PreviewUrlResource(Resource):
             # If we find a match, it should take precedence over the
             # Content-Type header, so set it here.
             if match:
-                encoding = match.group(1).decode('ascii')
+                encoding = match.group(1).decode("ascii")
 
             # If we don't find a match, we'll look at the HTTP Content-Type, and
             # if that doesn't exist, we'll fall back to UTF-8.
             if not encoding:
-                match = _content_type_match.match(
-                    media_info['media_type']
-                )
+                match = _content_type_match.match(media_info["media_type"])
                 encoding = match.group(1) if match else "utf-8"
 
-            og = decode_and_calc_og(body, media_info['uri'], encoding)
+            og = decode_and_calc_og(body, media_info["uri"], encoding)
 
             # pre-cache the image for posterity
             # FIXME: it might be cleaner to use the same flow as the main /preview_url
             # request itself and benefit from the same caching etc.  But for now we
             # just rely on the caching on the master request to speed things up.
-            if 'og:image' in og and og['og:image']:
+            if "og:image" in og and og["og:image"]:
                 image_info = yield self._download_url(
-                    _rebase_url(og['og:image'], media_info['uri']), user
+                    _rebase_url(og["og:image"], media_info["uri"]), user
                 )
 
-                if _is_media(image_info['media_type']):
+                if _is_media(image_info["media_type"]):
                     # TODO: make sure we don't choke on white-on-transparent images
-                    file_id = image_info['filesystem_id']
+                    file_id = image_info["filesystem_id"]
                     dims = yield self.media_repo._generate_thumbnails(
-                        None, file_id, file_id, image_info["media_type"],
-                        url_cache=True,
+                        None, file_id, file_id, image_info["media_type"], url_cache=True
                     )
                     if dims:
-                        og["og:image:width"] = dims['width']
-                        og["og:image:height"] = dims['height']
+                        og["og:image:width"] = dims["width"]
+                        og["og:image:height"] = dims["height"]
                     else:
                         logger.warn("Couldn't get dims for %s" % og["og:image"])
 
                     og["og:image"] = "mxc://%s/%s" % (
-                        self.server_name, image_info['filesystem_id']
+                        self.server_name,
+                        image_info["filesystem_id"],
                     )
-                    og["og:image:type"] = image_info['media_type']
-                    og["matrix:image:size"] = image_info['media_length']
+                    og["og:image:type"] = image_info["media_type"]
+                    og["matrix:image:size"] = image_info["media_length"]
                 else:
                     del og["og:image"]
         else:
@@ -289,7 +271,7 @@ class PreviewUrlResource(Resource):
 
         logger.debug("Calculated OG for %s as %s" % (url, og))
 
-        jsonog = json.dumps(og).encode('utf8')
+        jsonog = json.dumps(og).encode("utf8")
 
         # store OG in history-aware DB cache
         yield self.store.store_url_cache(
@@ -310,19 +292,15 @@ class PreviewUrlResource(Resource):
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
 
-        file_id = datetime.date.today().isoformat() + '_' + random_string(16)
+        file_id = datetime.date.today().isoformat() + "_" + random_string(16)
 
-        file_info = FileInfo(
-            server_name=None,
-            file_id=file_id,
-            url_cache=True,
-        )
+        file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             try:
                 logger.debug("Trying to get url '%s'" % url)
                 length, headers, uri, code = yield self.client.get_file(
-                    url, output_stream=f, max_size=self.max_spider_size,
+                    url, output_stream=f, max_size=self.max_spider_size
                 )
             except SynapseError:
                 # Pass SynapseErrors through directly, so that the servlet
@@ -334,24 +312,25 @@ class PreviewUrlResource(Resource):
                 # Note: This will also be the case if one of the resolved IP
                 # addresses is blacklisted
                 raise SynapseError(
-                    502, "DNS resolution failure during URL preview generation",
-                    Codes.UNKNOWN
+                    502,
+                    "DNS resolution failure during URL preview generation",
+                    Codes.UNKNOWN,
                 )
             except Exception as e:
                 # FIXME: pass through 404s and other error messages nicely
                 logger.warn("Error downloading %s: %r", url, e)
 
                 raise SynapseError(
-                    500, "Failed to download content: %s" % (
-                        traceback.format_exception_only(sys.exc_info()[0], e),
-                    ),
+                    500,
+                    "Failed to download content: %s"
+                    % (traceback.format_exception_only(sys.exc_info()[0], e),),
                     Codes.UNKNOWN,
                 )
             yield finish()
 
         try:
             if b"Content-Type" in headers:
-                media_type = headers[b"Content-Type"][0].decode('ascii')
+                media_type = headers[b"Content-Type"][0].decode("ascii")
             else:
                 media_type = "application/octet-stream"
             time_now_ms = self.clock.time_msec()
@@ -375,24 +354,26 @@ class PreviewUrlResource(Resource):
             # therefore not expire it.
             raise
 
-        defer.returnValue({
-            "media_type": media_type,
-            "media_length": length,
-            "download_name": download_name,
-            "created_ts": time_now_ms,
-            "filesystem_id": file_id,
-            "filename": fname,
-            "uri": uri,
-            "response_code": code,
-            # FIXME: we should calculate a proper expiration based on the
-            # Cache-Control and Expire headers.  But for now, assume 1 hour.
-            "expires": 60 * 60 * 1000,
-            "etag": headers["ETag"][0] if "ETag" in headers else None,
-        })
+        defer.returnValue(
+            {
+                "media_type": media_type,
+                "media_length": length,
+                "download_name": download_name,
+                "created_ts": time_now_ms,
+                "filesystem_id": file_id,
+                "filename": fname,
+                "uri": uri,
+                "response_code": code,
+                # FIXME: we should calculate a proper expiration based on the
+                # Cache-Control and Expire headers.  But for now, assume 1 hour.
+                "expires": 60 * 60 * 1000,
+                "etag": headers["ETag"][0] if "ETag" in headers else None,
+            }
+        )
 
     def _start_expire_url_cache_data(self):
         return run_as_background_process(
-            "expire_url_cache_data", self._expire_url_cache_data,
+            "expire_url_cache_data", self._expire_url_cache_data
         )
 
     @defer.inlineCallbacks
@@ -496,7 +477,7 @@ def decode_and_calc_og(body, media_uri, request_encoding=None):
         # blindly try decoding the body as utf-8, which seems to fix
         # the charset mismatches on https://google.com
         parser = etree.HTMLParser(recover=True, encoding=request_encoding)
-        tree = etree.fromstring(body.decode('utf-8', 'ignore'), parser)
+        tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
         og = _calc_og(tree, media_uri)
 
     return og
@@ -523,8 +504,8 @@ def _calc_og(tree, media_uri):
 
     og = {}
     for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-        if 'content' in tag.attrib:
-            og[tag.attrib['property']] = tag.attrib['content']
+        if "content" in tag.attrib:
+            og[tag.attrib["property"]] = tag.attrib["content"]
 
     # TODO: grab article: meta tags too, e.g.:
 
@@ -535,39 +516,43 @@ def _calc_og(tree, media_uri):
     # "article:published_time" content="2016-03-31T19:58:24+00:00" />
     # "article:modified_time" content="2016-04-01T18:31:53+00:00" />
 
-    if 'og:title' not in og:
+    if "og:title" not in og:
         # do some basic spidering of the HTML
         title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
         if title and title[0].text is not None:
-            og['og:title'] = title[0].text.strip()
+            og["og:title"] = title[0].text.strip()
         else:
-            og['og:title'] = None
+            og["og:title"] = None
 
-    if 'og:image' not in og:
+    if "og:image" not in og:
         # TODO: extract a favicon failing all else
         meta_image = tree.xpath(
             "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content"
         )
         if meta_image:
-            og['og:image'] = _rebase_url(meta_image[0], media_uri)
+            og["og:image"] = _rebase_url(meta_image[0], media_uri)
         else:
             # TODO: consider inlined CSS styles as well as width & height attribs
             images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
-            images = sorted(images, key=lambda i: (
-                -1 * float(i.attrib['width']) * float(i.attrib['height'])
-            ))
+            images = sorted(
+                images,
+                key=lambda i: (
+                    -1 * float(i.attrib["width"]) * float(i.attrib["height"])
+                ),
+            )
             if not images:
                 images = tree.xpath("//img[@src]")
             if images:
-                og['og:image'] = images[0].attrib['src']
+                og["og:image"] = images[0].attrib["src"]
 
-    if 'og:description' not in og:
+    if "og:description" not in og:
         meta_description = tree.xpath(
             "//*/meta"
             "[translate(@name, 'DESCRIPTION', 'description')='description']"
-            "/@content")
+            "/@content"
+        )
         if meta_description:
-            og['og:description'] = meta_description[0]
+            og["og:description"] = meta_description[0]
         else:
             # grab any text nodes which are inside the <body/> tag...
             # unless they are within an HTML5 semantic markup tag...
@@ -588,18 +573,18 @@ def _calc_og(tree, media_uri):
                 "script",
                 "noscript",
                 "style",
-                etree.Comment
+                etree.Comment,
             )
 
             # Split all the text nodes into paragraphs (by splitting on new
             # lines)
             text_nodes = (
-                re.sub(r'\s+', '\n', el).strip()
+                re.sub(r"\s+", "\n", el).strip()
                 for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
             )
-            og['og:description'] = summarize_paragraphs(text_nodes)
+            og["og:description"] = summarize_paragraphs(text_nodes)
     else:
-        og['og:description'] = summarize_paragraphs([og['og:description']])
+        og["og:description"] = summarize_paragraphs([og["og:description"]])
 
     # TODO: delete the url downloads to stop diskfilling,
     # as we only ever cared about its OG
@@ -636,7 +621,7 @@ def _iterate_over_text(tree, *tags_to_ignore):
                     [child, child.tail] if child.tail else [child]
                     for child in el.iterchildren()
                 ),
-                elements
+                elements,
             )
 
 
@@ -647,8 +632,8 @@ def _rebase_url(url, base):
         url[0] = base[0] or "http"
     if not url[1]:  # fix up hostname
         url[1] = base[1]
-        if not url[2].startswith('/'):
-            url[2] = re.sub(r'/[^/]+$', '/', base[2]) + url[2]
+        if not url[2].startswith("/"):
+            url[2] = re.sub(r"/[^/]+$", "/", base[2]) + url[2]
     return urlparse.urlunparse(url)
 
 
@@ -659,9 +644,8 @@ def _is_media(content_type):
 
 def _is_html(content_type):
     content_type = content_type.lower()
-    if (
-        content_type.startswith("text/html") or
-        content_type.startswith("application/xhtml")
+    if content_type.startswith("text/html") or content_type.startswith(
+        "application/xhtml"
     ):
         return True
 
@@ -671,19 +655,19 @@ def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
     # first paragraph and then word boundaries.
     # TODO: Respect sentences?
 
-    description = ''
+    description = ""
 
     # Keep adding paragraphs until we get to the MIN_SIZE.
     for text_node in text_nodes:
         if len(description) < min_size:
-            text_node = re.sub(r'[\t \r\n]+', ' ', text_node)
-            description += text_node + '\n\n'
+            text_node = re.sub(r"[\t \r\n]+", " ", text_node)
+            description += text_node + "\n\n"
         else:
             break
 
     description = description.strip()
-    description = re.sub(r'[\t ]+', ' ', description)
-    description = re.sub(r'[\t \r\n]*[\r\n]+', '\n\n', description)
+    description = re.sub(r"[\t ]+", " ", description)
+    description = re.sub(r"[\t \r\n]*[\r\n]+", "\n\n", description)
 
     # If the concatenation of paragraphs to get above MIN_SIZE
     # took us over MAX_SIZE, then we need to truncate mid paragraph
@@ -715,5 +699,5 @@ def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
 
         # We always add an ellipsis because at the very least
         # we chopped mid paragraph.
-        description = new_desc.strip() + u"…"
+        description = new_desc.strip() + "…"
     return description if description else None

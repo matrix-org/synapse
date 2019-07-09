@@ -21,14 +21,14 @@ from synapse.http import servlet
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.rest.client.transactions import HttpTransactionCache
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class SendToDeviceRestServlet(servlet.RestServlet):
-    PATTERNS = client_v2_patterns(
-        "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$",
+    PATTERNS = client_patterns(
+        "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$"
     )
 
     def __init__(self, hs):

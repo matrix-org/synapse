@@ -72,6 +72,7 @@ class RoomMemberHandler(object):
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
+        self.third_party_event_rules = hs.get_third_party_event_rules()
         self._server_notices_mxid = self.config.server_notices_mxid
         self._enable_lookup = hs.config.enable_3pid_lookup
         self.allow_per_room_profiles = self.config.allow_per_room_profiles
@@ -118,24 +119,6 @@ class RoomMemberHandler(object):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def get_or_register_3pid_guest(self, requester, medium, address, inviter_user_id):
-        """Get a guest access token for a 3PID, creating a guest account if
-        one doesn't already exist.
-
-        Args:
-            requester (Requester)
-            medium (str)
-            address (str)
-            inviter_user_id (str): The user ID who is trying to invite the
-                3PID
-
-        Returns:
-            Deferred[(str, str)]: A 2-tuple of `(user_id, access_token)` of the
-            3PID guest account.
-        """
-        raise NotImplementedError()
-
-    @abc.abstractmethod
     def _user_joined_room(self, target, room_id):
         """Notifies distributor on master process that the user has joined the
         room.
@@ -165,7 +148,11 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _local_membership_update(
-        self, requester, target, room_id, membership,
+        self,
+        requester,
+        target,
+        room_id,
+        membership,
         prev_events_and_hashes,
         txn_id=None,
         ratelimit=True,
@@ -189,7 +176,6 @@ class RoomMemberHandler(object):
                 "room_id": room_id,
                 "sender": requester.user.to_string(),
                 "state_key": user_id,
-
                 # For backwards compatibility:
                 "membership": membership,
             },
@@ -201,26 +187,19 @@ class RoomMemberHandler(object):
 
         # Check if this event matches the previous membership event for the user.
         duplicate = yield self.event_creation_handler.deduplicate_state_event(
-            event, context,
+            event, context
         )
         if duplicate is not None:
             # Discard the new event since this membership change is a no-op.
             defer.returnValue(duplicate)
 
         yield self.event_creation_handler.handle_new_client_event(
-            requester,
-            event,
-            context,
-            extra_users=[target],
-            ratelimit=ratelimit,
+            requester, event, context, extra_users=[target], ratelimit=ratelimit
         )
 
         prev_state_ids = yield context.get_prev_state_ids(self.store)
 
-        prev_member_event_id = prev_state_ids.get(
-            (EventTypes.Member, user_id),
-            None
-        )
+        prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
 
         if event.membership == Membership.JOIN:
             # Only fire user_joined_room if the user has actually joined the
@@ -242,11 +221,11 @@ class RoomMemberHandler(object):
             if predecessor:
                 # It is an upgraded room. Copy over old tags
                 self.copy_room_tags_and_direct_to_room(
-                    predecessor["room_id"], room_id, user_id,
+                    predecessor["room_id"], room_id, user_id
                 )
                 # Move over old push rules
                 self.store.move_push_rules_from_room_to_room_for_user(
-                    predecessor["room_id"], room_id, user_id,
+                    predecessor["room_id"], room_id, user_id
                 )
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
@@ -257,12 +236,7 @@ class RoomMemberHandler(object):
         defer.returnValue(event)
 
     @defer.inlineCallbacks
-    def copy_room_tags_and_direct_to_room(
-        self,
-        old_room_id,
-        new_room_id,
-        user_id,
-    ):
+    def copy_room_tags_and_direct_to_room(self, old_room_id, new_room_id, user_id):
         """Copies the tags and direct room state from one room to another.
 
         Args:
@@ -274,9 +248,7 @@ class RoomMemberHandler(object):
             Deferred[None]
         """
         # Retrieve user account data for predecessor room
-        user_account_data, _ = yield self.store.get_account_data_for_user(
-            user_id,
-        )
+        user_account_data, _ = yield self.store.get_account_data_for_user(user_id)
 
         # Copy direct message state if applicable
         direct_rooms = user_account_data.get("m.direct", {})
@@ -290,34 +262,30 @@ class RoomMemberHandler(object):
 
                     # Save back to user's m.direct account data
                     yield self.store.add_account_data_for_user(
-                        user_id, "m.direct", direct_rooms,
+                        user_id, "m.direct", direct_rooms
                     )
                     break
 
         # Copy room tags if applicable
-        room_tags = yield self.store.get_tags_for_room(
-            user_id, old_room_id,
-        )
+        room_tags = yield self.store.get_tags_for_room(user_id, old_room_id)
 
         # Copy each room tag to the new room
         for tag, tag_content in room_tags.items():
-            yield self.store.add_tag_to_room(
-                user_id, new_room_id, tag, tag_content
-            )
+            yield self.store.add_tag_to_room(user_id, new_room_id, tag, tag_content)
 
     @defer.inlineCallbacks
     def update_membership(
-            self,
-            requester,
-            target,
-            room_id,
-            action,
-            txn_id=None,
-            remote_room_hosts=None,
-            third_party_signed=None,
-            ratelimit=True,
-            content=None,
-            require_consent=True,
+        self,
+        requester,
+        target,
+        room_id,
+        action,
+        txn_id=None,
+        remote_room_hosts=None,
+        third_party_signed=None,
+        ratelimit=True,
+        content=None,
+        require_consent=True,
     ):
         key = (room_id,)
 
@@ -339,17 +307,17 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _update_membership(
-            self,
-            requester,
-            target,
-            room_id,
-            action,
-            txn_id=None,
-            remote_room_hosts=None,
-            third_party_signed=None,
-            ratelimit=True,
-            content=None,
-            require_consent=True,
+        self,
+        requester,
+        target,
+        room_id,
+        action,
+        txn_id=None,
+        remote_room_hosts=None,
+        third_party_signed=None,
+        ratelimit=True,
+        content=None,
+        require_consent=True,
     ):
         content_specified = bool(content)
         if content is None:
@@ -383,7 +351,7 @@ class RoomMemberHandler(object):
         if not remote_room_hosts:
             remote_room_hosts = []
 
-        if effective_membership_state not in ("leave", "ban",):
+        if effective_membership_state not in ("leave", "ban"):
             is_blocked = yield self.store.is_room_blocked(room_id)
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
@@ -391,22 +359,19 @@ class RoomMemberHandler(object):
         if effective_membership_state == Membership.INVITE:
             # block any attempts to invite the server notices mxid
             if target.to_string() == self._server_notices_mxid:
-                raise SynapseError(
-                    http_client.FORBIDDEN,
-                    "Cannot invite this user",
-                )
+                raise SynapseError(http_client.FORBIDDEN, "Cannot invite this user")
 
             block_invite = False
 
-            if (self._server_notices_mxid is not None and
-                    requester.user.to_string() == self._server_notices_mxid):
+            if (
+                self._server_notices_mxid is not None
+                and requester.user.to_string() == self._server_notices_mxid
+            ):
                 # allow the server notices mxid to send invites
                 is_requester_admin = True
 
             else:
-                is_requester_admin = yield self.auth.is_server_admin(
-                    requester.user,
-                )
+                is_requester_admin = yield self.auth.is_server_admin(requester.user)
 
             if not is_requester_admin:
                 if self.config.block_non_admin_invites:
@@ -417,25 +382,19 @@ class RoomMemberHandler(object):
                     block_invite = True
 
                 if not self.spam_checker.user_may_invite(
-                    requester.user.to_string(), target.to_string(), room_id,
+                    requester.user.to_string(), target.to_string(), room_id
                 ):
                     logger.info("Blocking invite due to spam checker")
                     block_invite = True
 
             if block_invite:
-                raise SynapseError(
-                    403, "Invites have been disabled on this server",
-                )
+                raise SynapseError(403, "Invites have been disabled on this server")
 
-        prev_events_and_hashes = yield self.store.get_prev_events_for_room(
-            room_id,
-        )
-        latest_event_ids = (
-            event_id for (event_id, _, _) in prev_events_and_hashes
-        )
+        prev_events_and_hashes = yield self.store.get_prev_events_for_room(room_id)
+        latest_event_ids = (event_id for (event_id, _, _) in prev_events_and_hashes)
 
         current_state_ids = yield self.state_handler.get_current_state_ids(
-            room_id, latest_event_ids=latest_event_ids,
+            room_id, latest_event_ids=latest_event_ids
         )
 
         # TODO: Refactor into dictionary of explicitly allowed transitions
@@ -450,13 +409,13 @@ class RoomMemberHandler(object):
                     403,
                     "Cannot unban user who was not banned"
                     " (membership=%s)" % old_membership,
-                    errcode=Codes.BAD_STATE
+                    errcode=Codes.BAD_STATE,
                 )
             if old_membership == "ban" and action != "unban":
                 raise SynapseError(
                     403,
                     "Cannot %s user who was banned" % (action,),
-                    errcode=Codes.BAD_STATE
+                    errcode=Codes.BAD_STATE,
                 )
 
             if old_state:
@@ -472,8 +431,8 @@ class RoomMemberHandler(object):
             # we don't allow people to reject invites to the server notice
             # room, but they can leave it once they are joined.
             if (
-                old_membership == Membership.INVITE and
-                effective_membership_state == Membership.LEAVE
+                old_membership == Membership.INVITE
+                and effective_membership_state == Membership.LEAVE
             ):
                 is_blocked = yield self._is_server_notice_room(room_id)
                 if is_blocked:
@@ -534,7 +493,7 @@ class RoomMemberHandler(object):
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
                     res = yield self._remote_reject_invite(
-                        requester, remote_room_hosts, room_id, target,
+                        requester, remote_room_hosts, room_id, target
                     )
                     defer.returnValue(res)
 
@@ -553,12 +512,7 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def send_membership_event(
-            self,
-            requester,
-            event,
-            context,
-            remote_room_hosts=None,
-            ratelimit=True,
+        self, requester, event, context, remote_room_hosts=None, ratelimit=True
     ):
         """
         Change the membership status of a user in a room.
@@ -584,16 +538,15 @@ class RoomMemberHandler(object):
 
         if requester is not None:
             sender = UserID.from_string(event.sender)
-            assert sender == requester.user, (
-                "Sender (%s) must be same as requester (%s)" %
-                (sender, requester.user)
-            )
+            assert (
+                sender == requester.user
+            ), "Sender (%s) must be same as requester (%s)" % (sender, requester.user)
             assert self.hs.is_mine(sender), "Sender must be our own: %s" % (sender,)
         else:
             requester = synapse.types.create_requester(target_user)
 
         prev_event = yield self.event_creation_handler.deduplicate_state_event(
-            event, context,
+            event, context
         )
         if prev_event is not None:
             return
@@ -613,16 +566,11 @@ class RoomMemberHandler(object):
                 raise SynapseError(403, "This room has been blocked on this server")
 
         yield self.event_creation_handler.handle_new_client_event(
-            requester,
-            event,
-            context,
-            extra_users=[target_user],
-            ratelimit=ratelimit,
+            requester, event, context, extra_users=[target_user], ratelimit=ratelimit
         )
 
         prev_member_event_id = prev_state_ids.get(
-            (EventTypes.Member, event.state_key),
-            None
+            (EventTypes.Member, event.state_key), None
         )
 
         if event.membership == Membership.JOIN:
@@ -692,58 +640,45 @@ class RoomMemberHandler(object):
     @defer.inlineCallbacks
     def _get_inviter(self, user_id, room_id):
         invite = yield self.store.get_invite_for_user_in_room(
-            user_id=user_id,
-            room_id=room_id,
+            user_id=user_id, room_id=room_id
         )
         if invite:
             defer.returnValue(UserID.from_string(invite.sender))
 
     @defer.inlineCallbacks
     def do_3pid_invite(
-            self,
-            room_id,
-            inviter,
-            medium,
-            address,
-            id_server,
-            requester,
-            txn_id
+        self, room_id, inviter, medium, address, id_server, requester, txn_id
     ):
         if self.config.block_non_admin_invites:
-            is_requester_admin = yield self.auth.is_server_admin(
-                requester.user,
-            )
+            is_requester_admin = yield self.auth.is_server_admin(requester.user)
             if not is_requester_admin:
                 raise SynapseError(
-                    403, "Invites have been disabled on this server",
-                    Codes.FORBIDDEN,
+                    403, "Invites have been disabled on this server", Codes.FORBIDDEN
                 )
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
         yield self.base_handler.ratelimit(requester)
 
-        invitee = yield self._lookup_3pid(
-            id_server, medium, address
+        can_invite = yield self.third_party_event_rules.check_threepid_can_be_invited(
+            medium, address, room_id
         )
+        if not can_invite:
+            raise SynapseError(
+                403,
+                "This third-party identifier can not be invited in this room",
+                Codes.FORBIDDEN,
+            )
+
+        invitee = yield self._lookup_3pid(id_server, medium, address)
 
         if invitee:
             yield self.update_membership(
-                requester,
-                UserID.from_string(invitee),
-                room_id,
-                "invite",
-                txn_id=txn_id,
+                requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
         else:
             yield self._make_and_store_3pid_invite(
-                requester,
-                id_server,
-                medium,
-                address,
-                room_id,
-                inviter,
-                txn_id=txn_id
+                requester, id_server, medium, address, room_id, inviter, txn_id=txn_id
             )
 
     @defer.inlineCallbacks
@@ -761,15 +696,12 @@ class RoomMemberHandler(object):
         """
         if not self._enable_lookup:
             raise SynapseError(
-                403, "Looking up third-party identifiers is denied from this server",
+                403, "Looking up third-party identifiers is denied from this server"
             )
         try:
             data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server,),
-                {
-                    "medium": medium,
-                    "address": address,
-                }
+                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
+                {"medium": medium, "address": address},
             )
 
             if "mxid" in data:
@@ -788,29 +720,25 @@ class RoomMemberHandler(object):
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
             key_data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/pubkey/%s" %
-                (id_server_scheme, server_hostname, key_name,),
+                "%s%s/_matrix/identity/api/v1/pubkey/%s"
+                % (id_server_scheme, server_hostname, key_name)
             )
             if "public_key" not in key_data:
-                raise AuthError(401, "No public key named %s from %s" %
-                                (key_name, server_hostname,))
+                raise AuthError(
+                    401, "No public key named %s from %s" % (key_name, server_hostname)
+                )
             verify_signed_json(
                 data,
                 server_hostname,
-                decode_verify_key_bytes(key_name, decode_base64(key_data["public_key"]))
+                decode_verify_key_bytes(
+                    key_name, decode_base64(key_data["public_key"])
+                ),
             )
             return
 
     @defer.inlineCallbacks
     def _make_and_store_3pid_invite(
-            self,
-            requester,
-            id_server,
-            medium,
-            address,
-            room_id,
-            user,
-            txn_id
+        self, requester, id_server, medium, address, room_id, user, txn_id
     ):
         room_state = yield self.state_handler.get_current_state(room_id)
 
@@ -858,7 +786,7 @@ class RoomMemberHandler(object):
                 room_join_rules=room_join_rules,
                 room_name=room_name,
                 inviter_display_name=inviter_display_name,
-                inviter_avatar_url=inviter_avatar_url
+                inviter_avatar_url=inviter_avatar_url,
             )
         )
 
@@ -869,7 +797,6 @@ class RoomMemberHandler(object):
                 "content": {
                     "display_name": display_name,
                     "public_keys": public_keys,
-
                     # For backwards compatibility:
                     "key_validity_url": fallback_public_key["key_validity_url"],
                     "public_key": fallback_public_key["public_key"],
@@ -878,24 +805,25 @@ class RoomMemberHandler(object):
                 "sender": user.to_string(),
                 "state_key": token,
             },
+            ratelimit=False,
             txn_id=txn_id,
         )
 
     @defer.inlineCallbacks
     def _ask_id_server_for_third_party_invite(
-            self,
-            requester,
-            id_server,
-            medium,
-            address,
-            room_id,
-            inviter_user_id,
-            room_alias,
-            room_avatar_url,
-            room_join_rules,
-            room_name,
-            inviter_display_name,
-            inviter_avatar_url
+        self,
+        requester,
+        id_server,
+        medium,
+        address,
+        room_id,
+        inviter_user_id,
+        room_alias,
+        room_avatar_url,
+        room_join_rules,
+        room_name,
+        inviter_display_name,
+        inviter_avatar_url,
     ):
         """
         Asks an identity server for a third party invite.
@@ -927,7 +855,8 @@ class RoomMemberHandler(object):
         """
 
         is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
-            id_server_scheme, id_server,
+            id_server_scheme,
+            id_server,
         )
 
         invite_config = {
@@ -943,22 +872,8 @@ class RoomMemberHandler(object):
             "sender_avatar_url": inviter_avatar_url,
         }
 
-        if self.config.invite_3pid_guest:
-            guest_user_id, guest_access_token = yield self.get_or_register_3pid_guest(
-                requester=requester,
-                medium=medium,
-                address=address,
-                inviter_user_id=inviter_user_id,
-            )
-
-            invite_config.update({
-                "guest_access_token": guest_access_token,
-                "guest_user_id": guest_user_id,
-            })
-
         data = yield self.simple_http_client.post_urlencoded_get_json(
-            is_url,
-            invite_config
+            is_url, invite_config
         )
         # TODO: Check for success
         token = data["token"]
@@ -966,9 +881,8 @@ class RoomMemberHandler(object):
         if "public_key" in data:
             fallback_public_key = {
                 "public_key": data["public_key"],
-                "key_validity_url": "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
-                    id_server_scheme, id_server,
-                ),
+                "key_validity_url": "%s%s/_matrix/identity/api/v1/pubkey/isvalid"
+                % (id_server_scheme, id_server),
             }
         else:
             fallback_public_key = public_keys[0]
@@ -1037,10 +951,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         # that we are allowed to join when we decide whether or not we
         # need to do the invite/join dance.
         yield self.federation_handler.do_invite_join(
-            remote_room_hosts,
-            room_id,
-            user.to_string(),
-            content,
+            remote_room_hosts, room_id, user.to_string(), content
         )
         yield self._user_joined_room(user, room_id)
 
@@ -1051,9 +962,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         fed_handler = self.federation_handler
         try:
             ret = yield fed_handler.do_remotely_reject_invite(
-                remote_room_hosts,
-                room_id,
-                target.to_string(),
+                remote_room_hosts, room_id, target.to_string()
             )
             defer.returnValue(ret)
         except Exception as e:
@@ -1065,16 +974,8 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             #
             logger.warn("Failed to reject invite: %s", e)
 
-            yield self.store.locally_reject_invite(
-                target.to_string(), room_id
-            )
+            yield self.store.locally_reject_invite(target.to_string(), room_id)
             defer.returnValue({})
-
-    def get_or_register_3pid_guest(self, requester, medium, address, inviter_user_id):
-        """Implements RoomMemberHandler.get_or_register_3pid_guest
-        """
-        rg = self.registration_handler
-        return rg.get_or_register_3pid_guest(medium, address, inviter_user_id)
 
     def _user_joined_room(self, target, room_id):
         """Implements RoomMemberHandler._user_joined_room
@@ -1091,18 +992,15 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         user_id = user.to_string()
 
         member = yield self.state_handler.get_current_state(
-            room_id=room_id,
-            event_type=EventTypes.Member,
-            state_key=user_id
+            room_id=room_id, event_type=EventTypes.Member, state_key=user_id
         )
         membership = member.membership if member else None
 
         if membership is not None and membership not in [
-            Membership.LEAVE, Membership.BAN
+            Membership.LEAVE,
+            Membership.BAN,
         ]:
-            raise SynapseError(400, "User %s in room %s" % (
-                user_id, room_id
-            ))
+            raise SynapseError(400, "User %s in room %s" % (user_id, room_id))
 
         if membership:
             yield self.store.forget(user_id, room_id)

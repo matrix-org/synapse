@@ -26,6 +26,7 @@ CLIENT_API_PREFIX = "/_matrix/client"
 FEDERATION_PREFIX = "/_matrix/federation"
 FEDERATION_V1_PREFIX = FEDERATION_PREFIX + "/v1"
 FEDERATION_V2_PREFIX = FEDERATION_PREFIX + "/v2"
+FEDERATION_UNSTABLE_PREFIX = FEDERATION_PREFIX + "/unstable"
 STATIC_PREFIX = "/_matrix/static"
 WEB_CLIENT_PREFIX = "/_matrix/client"
 CONTENT_REPO_PREFIX = "/_matrix/content"
@@ -41,13 +42,9 @@ class ConsentURIBuilder(object):
             hs_config (synapse.config.homeserver.HomeServerConfig):
         """
         if hs_config.form_secret is None:
-            raise ConfigError(
-                "form_secret not set in config",
-            )
+            raise ConfigError("form_secret not set in config")
         if hs_config.public_baseurl is None:
-            raise ConfigError(
-                "public_baseurl not set in config",
-            )
+            raise ConfigError("public_baseurl not set in config")
 
         self._hmac_secret = hs_config.form_secret.encode("utf-8")
         self._public_baseurl = hs_config.public_baseurl
@@ -63,15 +60,10 @@ class ConsentURIBuilder(object):
             (str) the URI where the user can do consent
         """
         mac = hmac.new(
-            key=self._hmac_secret,
-            msg=user_id.encode('ascii'),
-            digestmod=sha256,
+            key=self._hmac_secret, msg=user_id.encode("ascii"), digestmod=sha256
         ).hexdigest()
         consent_uri = "%s_matrix/consent?%s" % (
             self._public_baseurl,
-            urlencode({
-                "u": user_id,
-                "h": mac
-            }),
+            urlencode({"u": user_id, "h": mac}),
         )
         return consent_uri

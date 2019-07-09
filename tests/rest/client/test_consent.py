@@ -23,14 +23,8 @@ from synapse.rest.consent import consent_resource
 from tests import unittest
 from tests.server import render
 
-try:
-    from synapse.push.mailer import load_jinja2_templates
-except Exception:
-    load_jinja2_templates = None
-
 
 class ConsentResourceTestCase(unittest.HomeserverTestCase):
-    skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -48,17 +42,17 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         # Make some temporary templates...
         temp_consent_path = self.mktemp()
         os.mkdir(temp_consent_path)
-        os.mkdir(os.path.join(temp_consent_path, 'en'))
+        os.mkdir(os.path.join(temp_consent_path, "en"))
 
         config["user_consent"] = {
             "version": "1",
             "template_dir": os.path.abspath(temp_consent_path),
         }
 
-        with open(os.path.join(temp_consent_path, "en/1.html"), 'w') as f:
+        with open(os.path.join(temp_consent_path, "en/1.html"), "w") as f:
             f.write("{{version}},{{has_consented}}")
 
-        with open(os.path.join(temp_consent_path, "en/success.html"), 'w') as f:
+        with open(os.path.join(temp_consent_path, "en/success.html"), "w") as f:
             f.write("yay!")
 
         hs = self.setup_test_homeserver(config=config)
@@ -94,7 +88,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Get the version from the body, and whether we've consented
-        version, consented = channel.result["body"].decode('ascii').split(",")
+        version, consented = channel.result["body"].decode("ascii").split(",")
         self.assertEqual(consented, "False")
 
         # POST to the consent page, saying we've agreed
@@ -117,6 +111,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
 
         # Get the version from the body, and check that it's the version we
         # agreed to, and that we've consented to it.
-        version, consented = channel.result["body"].decode('ascii').split(",")
+        version, consented = channel.result["body"].decode("ascii").split(",")
         self.assertEqual(consented, "True")
         self.assertEqual(version, "1")

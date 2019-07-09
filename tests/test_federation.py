@@ -3,9 +3,9 @@ from mock import Mock
 from twisted.internet.defer import maybeDeferred, succeed
 
 from synapse.events import FrozenEvent
+from synapse.logging.context import LoggingContext
 from synapse.types import Requester, UserID
 from synapse.util import Clock
-from synapse.util.logcontext import LoggingContext
 
 from tests import unittest
 from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver

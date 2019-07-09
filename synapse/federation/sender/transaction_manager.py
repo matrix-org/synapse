@@ -29,9 +29,10 @@ class TransactionManager(object):
 
     shared between PerDestinationQueue objects
     """
+
     def __init__(self, hs):
         self._server_name = hs.hostname
-        self.clock = hs.get_clock()   # nb must be called this for @measure_func
+        self.clock = hs.get_clock()  # nb must be called this for @measure_func
         self._store = hs.get_datastore()
         self._transaction_actions = TransactionActions(self._store)
         self._transport_layer = hs.get_federation_transport_client()
@@ -55,14 +56,12 @@ class TransactionManager(object):
         txn_id = str(self._next_txn_id)
 
         logger.debug(
-            "TX [%s] {%s} Attempting new transaction"
-            " (pdus: %d, edus: %d)",
-            destination, txn_id,
+            "TX [%s] {%s} Attempting new transaction" " (pdus: %d, edus: %d)",
+            destination,
+            txn_id,
             len(pdus),
             len(edus),
         )
-
-        logger.debug("TX [%s] Persisting transaction...", destination)
 
         transaction = Transaction.create_new(
             origin_server_ts=int(self.clock.time_msec()),
@@ -75,13 +74,10 @@ class TransactionManager(object):
 
         self._next_txn_id += 1
 
-        yield self._transaction_actions.prepare_to_send(transaction)
-
-        logger.debug("TX [%s] Persisted transaction", destination)
         logger.info(
-            "TX [%s] {%s} Sending transaction [%s],"
-            " (PDUs: %d, EDUs: %d)",
-            destination, txn_id,
+            "TX [%s] {%s} Sending transaction [%s]," " (PDUs: %d, EDUs: %d)",
+            destination,
+            txn_id,
             transaction.transaction_id,
             len(pdus),
             len(edus),
@@ -112,35 +108,28 @@ class TransactionManager(object):
             response = e.response
 
             if e.code in (401, 404, 429) or 500 <= e.code:
-                logger.info(
-                    "TX [%s] {%s} got %d response",
-                    destination, txn_id, code
-                )
+                logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
                 raise e
 
-        logger.info(
-            "TX [%s] {%s} got %d response",
-            destination, txn_id, code
-        )
-
-        yield self._transaction_actions.delivered(
-            transaction, code, response
-        )
-
-        logger.debug("TX [%s] {%s} Marked as delivered", destination, txn_id)
+        logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
 
         if code == 200:
             for e_id, r in response.get("pdus", {}).items():
                 if "error" in r:
                     logger.warn(
                         "TX [%s] {%s} Remote returned error for %s: %s",
-                        destination, txn_id, e_id, r,
+                        destination,
+                        txn_id,
+                        e_id,
+                        r,
                     )
         else:
             for p in pdus:
                 logger.warn(
                     "TX [%s] {%s} Failed to send event %s",
-                    destination, txn_id, p.event_id,
+                    destination,
+                    txn_id,
+                    p.event_id,
                 )
             success = False
 

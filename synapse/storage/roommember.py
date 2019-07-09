@@ -142,26 +142,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return self.runInteraction("get_room_summary", _get_room_summary_txn)
 
-    def _get_user_count_in_room_txn(self, txn, room_id, membership):
+    def _get_user_counts_in_room_txn(self, txn, room_id):
         """
-        See get_user_count_in_room.
-        """
-        sql = (
-            "SELECT count(*) FROM room_memberships as m"
-            " INNER JOIN current_state_events as c"
-            " ON m.event_id = c.event_id "
-            " AND m.room_id = c.room_id "
-            " AND m.user_id = c.state_key"
-            " WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?"
-        )
-
-        txn.execute(sql, (room_id, membership))
-        row = txn.fetchone()
-        return row[0]
-
-    def get_user_count_in_room(self, room_id, membership):
-        """
-        Get the user count in a room with a particular membership.
+        Get the user count in a room by membership.
 
         Args:
             room_id (str)
@@ -170,9 +153,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         Returns:
             Deferred[int]
         """
-        return self.runInteraction(
-            "get_users_in_room", self._get_user_count_in_room_txn, room_id, membership
-        )
+        sql = """
+        SELECT m.membership, count(*) FROM room_memberships as m
+            INNER JOIN current_state_events as c USING(event_id)
+            WHERE c.type = 'm.room.member' AND c.room_id = ?
+            GROUP BY m.membership
+        """
+
+        txn.execute(sql, (room_id,))
+        return {row[0]: row[1] for row in txn}
 
     @cached()
     def get_invited_rooms_for_user(self, user_id):
@@ -431,7 +420,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 table="room_memberships",
                 column="event_id",
                 iterable=missing_member_event_ids,
-                retcols=('user_id', 'display_name', 'avatar_url'),
+                retcols=("user_id", "display_name", "avatar_url"),
                 keyvalues={"membership": Membership.JOIN},
                 batch_size=500,
                 desc="_get_joined_users_from_context",
@@ -459,7 +448,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cachedInlineCallbacks(max_entries=10000)
     def is_host_joined(self, room_id, host):
-        if '%' in host or '_' in host:
+        if "%" in host or "_" in host:
             raise Exception("Invalid host name")
 
         sql = """
@@ -501,7 +490,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             Deferred: Resolves to True if the host is/was in the room, otherwise
             False.
         """
-        if '%' in host or '_' in host:
+        if "%" in host or "_" in host:
             raise Exception("Invalid host name")
 
         sql = """
@@ -734,7 +723,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
                 room_id = row["room_id"]
                 try:
                     event_json = json.loads(row["json"])
-                    content = event_json['content']
+                    content = event_json["content"]
                 except Exception:
                     continue
 

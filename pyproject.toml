@@ -28,3 +28,24 @@
         directory = "misc"
         name = "Internal Changes"
         showcontent = true
+
+[tool.black]
+target-version = ['py34']
+exclude = '''
+
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.tox
+    | \.venv
+    | \.env
+    | env
+    | _build
+    | _trial_temp.*
+    | build
+    | dist
+    | debian
+  )/
+)
+'''

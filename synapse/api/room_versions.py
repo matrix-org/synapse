@@ -19,9 +19,10 @@ class EventFormatVersions(object):
     """This is an internal enum for tracking the version of the event format,
     independently from the room version.
     """
-    V1 = 1   # $id:server event id format
-    V2 = 2   # MSC1659-style $hash event id format: introduced for room v3
-    V3 = 3   # MSC1884-style $hash format: introduced for room v4
+
+    V1 = 1  # $id:server event id format
+    V2 = 2  # MSC1659-style $hash event id format: introduced for room v3
+    V3 = 3  # MSC1884-style $hash format: introduced for room v4
 
 
 KNOWN_EVENT_FORMAT_VERSIONS = {
@@ -33,8 +34,9 @@ KNOWN_EVENT_FORMAT_VERSIONS = {
 
 class StateResolutionVersions(object):
     """Enum to identify the state resolution algorithms"""
-    V1 = 1   # room v1 state res
-    V2 = 2   # MSC1442 state res: room v2 and later
+
+    V1 = 1  # room v1 state res
+    V2 = 2  # MSC1442 state res: room v2 and later
 
 
 class RoomDisposition(object):
@@ -46,10 +48,11 @@ class RoomDisposition(object):
 class RoomVersion(object):
     """An object which describes the unique attributes of a room version."""
 
-    identifier = attr.ib()      # str; the identifier for this version
-    disposition = attr.ib()     # str; one of the RoomDispositions
-    event_format = attr.ib()    # int; one of the EventFormatVersions
-    state_res = attr.ib()       # int; one of the StateResolutionVersions
+    identifier = attr.ib()  # str; the identifier for this version
+    disposition = attr.ib()  # str; one of the RoomDispositions
+    event_format = attr.ib()  # int; one of the EventFormatVersions
+    state_res = attr.ib()  # int; one of the StateResolutionVersions
+    enforce_key_validity = attr.ib()  # bool
 
 
 class RoomVersions(object):
@@ -58,43 +61,45 @@ class RoomVersions(object):
         RoomDisposition.STABLE,
         EventFormatVersions.V1,
         StateResolutionVersions.V1,
-    )
-    STATE_V2_TEST = RoomVersion(
-        "state-v2-test",
-        RoomDisposition.UNSTABLE,
-        EventFormatVersions.V1,
-        StateResolutionVersions.V2,
+        enforce_key_validity=False,
     )
     V2 = RoomVersion(
         "2",
         RoomDisposition.STABLE,
         EventFormatVersions.V1,
         StateResolutionVersions.V2,
+        enforce_key_validity=False,
     )
     V3 = RoomVersion(
         "3",
         RoomDisposition.STABLE,
         EventFormatVersions.V2,
         StateResolutionVersions.V2,
+        enforce_key_validity=False,
     )
     V4 = RoomVersion(
         "4",
         RoomDisposition.STABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
+        enforce_key_validity=False,
     )
-
-
-# the version we will give rooms which are created on this server
-DEFAULT_ROOM_VERSION = RoomVersions.V1
+    V5 = RoomVersion(
+        "5",
+        RoomDisposition.STABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+    )
 
 
 KNOWN_ROOM_VERSIONS = {
-    v.identifier: v for v in (
+    v.identifier: v
+    for v in (
         RoomVersions.V1,
         RoomVersions.V2,
         RoomVersions.V3,
-        RoomVersions.STATE_V2_TEST,
         RoomVersions.V4,
+        RoomVersions.V5,
     )
-}   # type: dict[str, RoomVersion]
+}  # type: dict[str, RoomVersion]
