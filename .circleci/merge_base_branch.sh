@@ -9,11 +9,12 @@ source $BASH_ENV
 
 if [[ -z "${CIRCLE_PR_NUMBER}" ]]
 then
-    echo "Can't figure out what the PR number is! Assuming merge target is develop."
+    echo "Can't figure out what the PR number is! Assuming merge target is dinsic."
 
-    # It probably hasn't had a PR opened yet. Since all PRs land on develop, we
-    # can probably assume it's based on it and will be merged into it.
-    GITBASE="develop"
+    # It probably hasn't had a PR opened yet. Since all PRs for dinsic land on
+    # dinsic, we can probably assume it's based on it and will be merged into
+    # it.
+    GITBASE="dinsic"
 else
     # Get the reference, using the GitHub API
     GITBASE=`wget -O- https://api.github.com/repos/matrix-org/synapse/pulls/${CIRCLE_PR_NUMBER} | jq -r '.base.ref'`
