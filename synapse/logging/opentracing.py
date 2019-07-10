@@ -331,6 +331,6 @@ def trace_servlet(servlet_name, func):
             },
         ):
             result = yield defer.maybeDeferred(func, request, *args, **kwargs)
-            defer.returnValue(result)
+        defer.returnValue(result)
 
     return f
