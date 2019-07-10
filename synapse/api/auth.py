@@ -319,6 +319,17 @@ class Auth(object):
             # first look in the database
             r = yield self._look_up_user_by_access_token(token)
             if r:
+                valid_until_ms = r["valid_until_ms"]
+                if (
+                    valid_until_ms is not None
+                    and valid_until_ms < self.clock.time_msec()
+                ):
+                    # there was a valid access token, but it has expired.
+                    # soft-logout the user.
+                    raise InvalidClientTokenError(
+                        msg="Access token has expired", soft_logout=True
+                    )
+
                 defer.returnValue(r)
 
         # otherwise it needs to be a valid macaroon
@@ -505,6 +516,7 @@ class Auth(object):
             "token_id": ret.get("token_id", None),
             "is_guest": False,
             "device_id": ret.get("device_id"),
+            "valid_until_ms": ret.get("valid_until_ms"),
         }
         defer.returnValue(user_info)
 

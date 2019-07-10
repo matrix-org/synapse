@@ -245,8 +245,14 @@ class MissingClientTokenError(InvalidClientCredentialsError):
 class InvalidClientTokenError(InvalidClientCredentialsError):
     """Raised when we didn't understand the access token in a request"""
 
-    def __init__(self, msg="Unrecognised access token"):
+    def __init__(self, msg="Unrecognised access token", soft_logout=False):
         super().__init__(msg=msg, errcode="M_UNKNOWN_TOKEN")
+        self._soft_logout = soft_logout
+
+    def error_dict(self):
+        d = super().error_dict()
+        d["soft_logout"] = self._soft_logout
+        return d
 
 
 class ResourceLimitError(SynapseError):

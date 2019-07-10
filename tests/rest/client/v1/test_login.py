@@ -2,10 +2,12 @@ import json
 
 import synapse.rest.admin
 from synapse.rest.client.v1 import login
+from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
 
 from tests import unittest
 
 LOGIN_URL = b"/_matrix/client/r0/login"
+TEST_URL = b"/_matrix/client/r0/account/whoami"
 
 
 class LoginRestServletTestCase(unittest.HomeserverTestCase):
@@ -13,6 +15,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
+        lambda hs, http_server: WhoamiRestServlet(hs).register(http_server),
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -144,3 +147,45 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
+
+    def test_soft_logout(self):
+        self.register_user("kermit", "monkey")
+
+        # we shouldn't be able to make requests without an access token
+        request, channel = self.make_request(b"GET", TEST_URL)
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        self.assertEquals(channel.json_body["errcode"], "M_MISSING_TOKEN")
+
+        # log in as normal
+        params = {
+            "type": "m.login.password",
+            "identifier": {"type": "m.id.user", "user": "kermit"},
+            "password": "monkey",
+        }
+        request, channel = self.make_request(b"POST", LOGIN_URL, params)
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # we should now be able to make requests with the access token
+        access_token = channel.json_body["access_token"]
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # time passes
+        self.reactor.advance(24 * 3600 * 1000)
+
+        # ... and we should be soft-logouted
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEquals(channel.json_body["soft_logout"], True)
+
+    test_soft_logout.extra_config = {"session_lifetime": "24h"}
