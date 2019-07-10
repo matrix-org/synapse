@@ -52,12 +52,13 @@ def prune_event(event):
 
     from . import event_type_from_format_version
 
-    # Mark the event as redacted
-    event.internal_metadata.redacted = True
-
-    return event_type_from_format_version(event.format_version)(
+    pruned_event = event_type_from_format_version(event.format_version)(
         pruned_event_dict, event.internal_metadata.get_dict()
     )
+    # Mark the event as redacted
+    pruned_event.internal_metadata.redacted = True
+
+    return pruned_event
 
 
 def prune_event_dict(event_dict):
