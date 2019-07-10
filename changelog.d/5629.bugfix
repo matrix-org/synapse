@@ -1,1 +1,1 @@
-Redact message edits when the original message has been redacted.
+Forbid viewing relations on an event once it has been redacted.
