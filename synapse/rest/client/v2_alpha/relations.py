@@ -155,7 +155,7 @@ class RelationPaginationServlet(RestServlet):
 
         # Check if the event is redacted, and if so return an empty chunk
         # list and zero tokens
-        if "redacted_because" in event.unsigned:
+        if event.internal_metadata.is_redacted():
             res = {"chunk": []}
             defer.returnValue((200, res))
 
@@ -241,7 +241,7 @@ class RelationAggregationPaginationServlet(RestServlet):
 
         # Check if the event is redacted, and if so return an empty chunk
         # list and zero tokens
-        if "redacted_because" in event.unsigned:
+        if event.internal_metadata.is_redacted():
             res = {"chunk": []}
             defer.returnValue((200, res))
 

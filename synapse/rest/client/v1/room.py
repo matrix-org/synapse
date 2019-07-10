@@ -741,29 +741,6 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
             txn_id=txn_id,
         )
 
-        # Redact any m.replace relations of this event
-        relation_chunk = yield self.store.get_relations_for_event(
-            event_id, relation_type="m.replace", event_type="m.room.message"
-        )
-        relation_chunk_dict = relation_chunk.to_dict()
-
-        # Extract each event_id out of the list of dictionaries
-        # Ex. {'chunk': [{'event_id': '$someid'}]}
-        relation_ids = [x["event_id"] for x in relation_chunk_dict.get("chunk", [])]
-
-        for relation_id in relation_ids:
-            yield self.event_creation_handler.create_and_send_nonmember_event(
-                requester,
-                {
-                    "type": EventTypes.Redaction,
-                    "content": {},
-                    "room_id": room_id,
-                    "sender": requester.user.to_string(),
-                    "redacts": relation_id,
-                },
-                txn_id=txn_id,
-            )
-
         # Return the event_id of the original event's redaction
         defer.returnValue((200, {"event_id": event.event_id}))
 
