@@ -179,8 +179,18 @@ class RelationPaginationServlet(RestServlet):
         )
 
         now = self.clock.time_msec()
-        original_event = yield self._event_serializer.serialize_event(event, now)
-        events = yield self._event_serializer.serialize_events(events, now)
+        # We set bundle_aggregations to False when retrieving the original
+        # event because we want the content before relations were applied to
+        # it.
+        original_event = yield self._event_serializer.serialize_event(
+            event, now, bundle_aggregations=False
+        )
+        # Similarly, we don't allow relations to be applied to relations, so we
+        # return the original relations without any aggregations on top of them
+        # here.
+        events = yield self._event_serializer.serialize_events(
+            events, now, bundle_aggregations=False
+        )
 
         return_value = result.to_dict()
         return_value["chunk"] = events
