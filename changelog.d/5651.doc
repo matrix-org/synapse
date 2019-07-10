@@ -1,1 +1,1 @@
---no-pep517 should be --no-use-pep517 in the documention to setup the development environment.
+--no-pep517 should be --no-use-pep517 in the documentation to setup the development environment.
