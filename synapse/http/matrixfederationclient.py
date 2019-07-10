@@ -520,7 +520,6 @@ class MatrixFederationHttpClient(object):
                         _flatten_response_never_received(e),
                     )
                     raise
-        opentracing.close_active_span()
         defer.returnValue(response)
 
     def build_auth_headers(
