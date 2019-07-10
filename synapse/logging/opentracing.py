@@ -71,13 +71,13 @@ def only_if_tracing(func):
     Assumes the function wrapped may return None"""
 
     @wraps(func)
-    def f(*args, **kwargs):
+    def _only_if_tracing_inner(*args, **kwargs):
         if opentracing:
             return func(*args, **kwargs)
         else:
             return
 
-    return f
+    return _only_if_tracing_inner
 
 
 # Block everything by default
@@ -317,7 +317,7 @@ def inject_active_span_byte_dict(headers, destination):
 def trace_servlet(servlet_name, func):
     @wraps(func)
     @defer.inlineCallbacks
-    def f(request, *args, **kwargs):
+    def _trace_servlet_inner(request, *args, **kwargs):
         with start_active_span_from_context(
             request.requestHeaders,
             "incoming-client-request",
@@ -333,4 +333,4 @@ def trace_servlet(servlet_name, func):
             result = yield defer.maybeDeferred(func, request, *args, **kwargs)
         defer.returnValue(result)
 
-    return f
+    return _trace_servlet_inner
