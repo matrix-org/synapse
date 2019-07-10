@@ -302,6 +302,10 @@ class DeviceWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def add_user_signature_change_to_streams(self, from_user_id, user_ids):
         """Persist that a user has made new signatures
+
+        Args:
+            from_user_id (str): the user who made the signatures
+            user_ids (list[str]): the users who were signed
         """
 
         with self._device_list_id_gen.get_next() as stream_id:
@@ -466,9 +470,12 @@ class DeviceWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_users_whose_signatures_changed(self, user_id, from_key):
-        """Get set of users who have new cross-signing signatures have changed since
+        """Get the users who have new cross-signing signatures made by `user_id` since
         `from_key`.
 
+        Args:
+            user_id (str): the user who made the signatures
+            from_key (str): The device lists stream token
         """
         from_key = int(from_key)
         if self._user_signature_stream_cache.has_entity_changed(user_id, from_key):
@@ -589,6 +596,8 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         Returns:
             defer.Deferred: boolean whether the device was inserted or an
                 existing device existed with that ID.
+        Raises:
+            StoreError: if the device is already in use
         """
         key = (user_id, device_id)
         if self.device_id_exists_cache.get(key, None):
