@@ -35,7 +35,7 @@ Assuming your PostgreSQL database user is called ``postgres``, create a user
    createuser --pwprompt synapse_user
 
 Before you can authenticate with the ``synapse_user``, you must create a 
-database that it can access. Connect to the database with your database user:
+database that it can access. Connect to the database with your database user::
 
    su - postgres
    psql
