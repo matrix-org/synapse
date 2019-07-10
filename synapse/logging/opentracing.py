@@ -13,6 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.import opentracing
 
+
+# NOTE
+# This is a small wrapper around opentracing because opentracing is not currently
+# packaged downstream (specifically debian). Since opentracing instrumentation is
+# fairly invasive it was awkward to make it optional. As a result we opted to encapsulate
+# all opentracing state in these methods which effectively noop if opentracing is
+# not present. We should strongly consider encouraging the downstream distributers
+# to package opentracing and making opentracing a full dependency. In order to facilitate
+# this move the methods have work very similarly to opentracing's and it should only
+# be a matter of few regexes to move over to opentracing's access patterns proper.
+
 try:
     import opentracing
 except ImportError:
@@ -129,6 +140,8 @@ def init_tracer(config):
 
 @contextlib.contextmanager
 def _noop_context_manager(*args, **kwargs):
+    """Does absolutely nothing really well. Can be entered and exited arbitrarily.
+    Good substitute for an opentracing scope."""
     yield
 
 
@@ -142,6 +155,14 @@ def start_active_span(
     ignore_active_span=False,
     finish_on_close=True,
 ):
+    """Starts an active opentracing span. Note, the scope doesn't become active
+    until it has been entered, however, the span starts from the time this
+    message is called.
+    Args:
+        See opentracing.tracer
+    Returns:
+        scope (Scope) or noop_context_manager
+    """
     if opentracing is None:
         return _noop_context_manager()
     else:
@@ -159,16 +180,20 @@ def start_active_span(
 
 @only_if_tracing
 def close_active_span():
+    """Closes the active span. This will close it's logcontext if the context
+    was made for the span"""
     opentracing.tracer.scope_manager.active.__exit__(None, None, None)
 
 
 @only_if_tracing
 def set_tag(key, value):
+    """Set's a tag on the active span"""
     opentracing.tracer.active_span.set_tag(key, value)
 
 
 @only_if_tracing
 def log_kv(key_values, timestamp=None):
+    """Log to the active span"""
     opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
 
@@ -177,11 +202,13 @@ def log_kv(key_values, timestamp=None):
 # as a result
 @only_if_tracing
 def set_baggage_item(key, value):
+    """Attach baggage to the active span"""
     opentracing.tracer.active_span.set_baggage_item(key, value)
 
 
 @only_if_tracing
 def set_operation_name(operation_name):
+    """Sets the operation name of the active span"""
     opentracing.tracer.active_span.set_operation_name(operation_name)
 
 
@@ -202,6 +229,9 @@ def set_homeserver_whitelist(homeserver_whitelist):
 
 @only_if_tracing
 def whitelisted_homeserver(destination):
+    """Checks if a destination matches the whitelist
+    Args:
+        destination (String)"""
     global _homeserver_whitelist
     if _homeserver_whitelist:
         return _homeserver_whitelist.match(destination)
@@ -308,6 +338,9 @@ def inject_active_span_byte_dict(headers, destination):
 
 
 def trace_servlet(servlet_name, func):
+    """Decorator which traces a serlet. It starts a span with some servlet specific
+    tags such as the servlet_name and request information"""
+
     @wraps(func)
     @defer.inlineCallbacks
     def _trace_servlet_inner(request, *args, **kwargs):
