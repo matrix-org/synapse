@@ -91,7 +91,7 @@ def init_tracer(config):
 
     Args:
         config (Config)
-        The config used by the homserver. Here it's used to set the service
+        The config used by the homeserver. Here it's used to set the service
         name to the homeserver's.
     """
     global opentracing
@@ -106,11 +106,6 @@ def init_tracer(config):
         )
         raise ModuleNotFoundError("opentracing")
 
-    setup_tags()
-    setup_tracing(config)
-
-
-def setup_tracing(config):
     if not JaegerConfig:
         logger.error(
             "The server has been configure to use opentracing but opentracing is not installed."
@@ -127,9 +122,7 @@ def setup_tracing(config):
     )
     jaeger_config.initialize_tracer()
 
-
-@only_if_tracing
-def setup_tags():
+    # Set up tags to be opentracing's tags
     global tags
     tags = opentracing.tags
 
