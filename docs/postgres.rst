@@ -34,6 +34,12 @@ Assuming your PostgreSQL database user is called ``postgres``, create a user
    su - postgres
    createuser --pwprompt synapse_user
 
+Before you can authenticate with the ``synapse_user``, you must create a 
+database that it can access. Connect to the database with your database user:
+
+   su - postgres
+   psql
+
 The PostgreSQL database used *must* have the correct encoding set, otherwise it
 would not be able to store UTF8 strings. To create a database with the correct
 encoding use, e.g.::
@@ -47,6 +53,9 @@ encoding use, e.g.::
 
 This would create an appropriate database named ``synapse`` owned by the
 ``synapse_user`` user (which must already exist).
+
+You may need to enable password authentication so ``synapse_user`` can connect
+to the database. See https://www.postgresql.org/docs/11/auth-pg-hba-conf.html
 
 Tuning Postgres
 ===============
