@@ -72,7 +72,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             {
                 "errcode": "M_FORBIDDEN",
-                "error": "Presence is disabled on this homeserver"
+                "error": "Presence is disabled on this homeserver",
             },
             channel.json_body,
         )
@@ -94,7 +94,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             {
                 "errcode": "M_FORBIDDEN",
-                "error": "Presence is disabled on this homeserver"
+                "error": "Presence is disabled on this homeserver",
             },
             channel.json_body,
         )
