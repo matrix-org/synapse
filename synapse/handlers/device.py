@@ -307,7 +307,9 @@ class DeviceHandler(DeviceWorkerHandler):
             if e.code == 404:
                 # no match
                 opentracing.set_tag("error", True)
-                opentracing.set_tag("reason", "User doesn't have that device id.")
+                opentracing.log_kv(
+                    {"reason": "User doesn't have device id.", "device_id": device_id}
+                )
                 pass
             else:
                 raise
@@ -509,6 +511,15 @@ class DeviceListEduUpdater(object):
                 device_id,
                 origin,
             )
+
+            opentracing.set_tag("error", True)
+            opentracing.log_kv(
+                {
+                    "message": "Got a device list update edu from a user and device which does not match the origin of the request.",
+                    "user_id": user_id,
+                    "device_id": device_id,
+                }
+            )
             return
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
@@ -518,8 +529,9 @@ class DeviceListEduUpdater(object):
             opentracing.set_tag("error", True)
             opentracing.log_kv(
                 {
-                    "message": "Got an update from a user which "
-                    + "doesn't share a room with the current user."
+                    "message": "Got an update from a user for which "
+                    + "we don't share any rooms",
+                    "other user_id": user_id,
                 }
             )
             logger.warning(
@@ -564,6 +576,7 @@ class DeviceListEduUpdater(object):
             logger.debug("Need to re-sync devices for %r? %r", user_id, resync)
 
             if resync:
+                opentracing.log_kv({"message": "Doing resync to update device list."})
                 # Fetch all devices for the user.
                 origin = get_domain_from_id(user_id)
                 try:

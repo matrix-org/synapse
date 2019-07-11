@@ -182,19 +182,23 @@ class KeyChangesServlet(RestServlet):
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
 
+    @opentracing.trace_defered_function
     @defer.inlineCallbacks
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         from_token_string = parse_string(request, "from")
+        opentracing.set_tag("from", from_token_string)
 
         # We want to enforce they do pass us one, but we ignore it and return
         # changes after the "to" as well as before.
-        parse_string(request, "to")
+        opentracing.set_tag("to", parse_string(request, "to"))
 
         from_token = StreamToken.from_string(from_token_string)
 
         user_id = requester.user.to_string()
+
+        opentracing.set_tag("user_id", user_id)
 
         results = yield self.device_handler.get_user_ids_changed(user_id, from_token)
 
