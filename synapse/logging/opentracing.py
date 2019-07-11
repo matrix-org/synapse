@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 import inspect
 
 
-class _DumTagNames(object):
+class _DummyTagNames(object):
     """wrapper of opentracings tags. We need to have them if we
     want to reference them without opentracing around. Clearly they
     should never actually show up in a trace. `set_tags` overwrites
@@ -102,7 +102,7 @@ def only_if_tracing(func):
 # None means 'block everything'.
 _homeserver_whitelist = None
 
-tags = _DumTagNames
+tags = _DummyTagNames
 
 
 def init_tracer(config):
@@ -305,7 +305,7 @@ def start_active_span_from_edu(
         for x in carrier.get("references", [])
     ]
 
-    # For some reason jaeger decided not to support the visualisation of multiple parent
+    # For some reason jaeger decided not to support the visualization of multiple parent
     # spans or explicitely show references. I include the span context as a tag here as
     # an aid to people debugging but it's really not an ideal solution.
 
@@ -421,7 +421,7 @@ def extract_text_map(carrier):
 
 
 def trace_deferred(func):
-    """Decorator to trace a defered function. Sets the operation name to that of the
+    """Decorator to trace a deferred function. Sets the operation name to that of the
     function's."""
 
 
@@ -462,7 +462,7 @@ def trace_defered_function(func):
 
 
 def trace_deferred_using_operation_name(name):
-    """Decorator to trace a defered function. Explicitely sets the operation_name to name"""
+    """Decorator to trace a deferred function. Explicitely sets the operation_name."""
 
     def trace_deferred(func):
         @wraps(func)
@@ -491,7 +491,7 @@ def trace(func):
 
 
 def trace_using_operation_name(operation_name):
-    """Decorator to trace a function. Explicitely sets the operation_name to name"""
+    """Decorator to trace a function. Explicitely sets the operation_name."""
 
     def trace(func):
         @wraps(func)
