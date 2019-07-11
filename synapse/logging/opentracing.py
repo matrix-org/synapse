@@ -72,11 +72,6 @@ def only_if_tracing(func):
     return _only_if_tracing_inner
 
 
-<<<<<<< HEAD
-# A regex which matches the server_names to expose traces for.
-# None means 'block everything'.
-_homeserver_whitelist = None
-=======
 @contextlib.contextmanager
 def _noop_context_manager(*args, **kwargs):
     """Does exactly what it says on the tin"""
@@ -84,7 +79,6 @@ def _noop_context_manager(*args, **kwargs):
 
 
 ##### Setup
->>>>>>> Group utils
 
 
 def init_tracer(config):
@@ -120,6 +114,8 @@ def init_tracer(config):
     global tags
     tags = opentracing.tags
 
+
+##### Start spans and scopes
 
 # Could use kwargs but I want these to be explicit
 def start_active_span(
@@ -161,63 +157,6 @@ def start_active_span_follows_from(operation_name, contexts):
         references = [opentracing.follows_from(context) for context in contexts]
         scope = start_active_span(operation_name, references=references)
         return scope
-
-
-@only_if_tracing
-def set_tag(key, value):
-    """Set's a tag on the active span"""
-    opentracing.tracer.active_span.set_tag(key, value)
-
-
-@only_if_tracing
-def log_kv(key_values, timestamp=None):
-    """Log to the active span"""
-    opentracing.tracer.active_span.log_kv(key_values, timestamp)
-
-
-# Note: we don't have a get baggage items because we're trying to hide all
-# scope and span state from synapse. I think this method may also be useless
-# as a result
-
-# I also thinks it's dangerous with respect to pii. If the whitelisting
-# is missconfigured or buggy span information will leak. This is no issue
-# if it's jaeger span id's but baggage can contain any arbitrary data. I would
-# suggest removing this.
-@only_if_tracing
-def set_baggage_item(key, value):
-    """Attach baggage to the active span"""
-    opentracing.tracer.active_span.set_baggage_item(key, value)
-
-
-@only_if_tracing
-def set_operation_name(operation_name):
-    """Sets the operation name of the active span"""
-    opentracing.tracer.active_span.set_operation_name(operation_name)
-
-
-@only_if_tracing
-def set_homeserver_whitelist(homeserver_whitelist):
-    """Sets the whitelist
-
-    Args:
-        homeserver_whitelist (iterable of strings): regex of whitelisted homeservers
-    """
-    global _homeserver_whitelist
-    if homeserver_whitelist:
-        # Makes a single regex which accepts all passed in regexes in the list
-        _homeserver_whitelist = re.compile(
-            "({})".format(")|(".join(homeserver_whitelist))
-        )
-
-
-@only_if_tracing
-def whitelisted_homeserver(destination):
-    """Checks if a destination matches the whitelist
-    Args:
-        destination (String)"""
-    if _homeserver_whitelist:
-        return _homeserver_whitelist.match(destination)
-    return False
 
 
 def start_active_span_from_context(
@@ -298,6 +237,68 @@ def start_active_span_from_edu(
 
     scope.span.set_tag("references", carrier.get("references", []))
     return scope
+
+
+###### Opentracing setters for tags, logs, etc
+
+
+@only_if_tracing
+def set_tag(key, value):
+    """Set's a tag on the active span"""
+    opentracing.tracer.active_span.set_tag(key, value)
+
+
+@only_if_tracing
+def log_kv(key_values, timestamp=None):
+    """Log to the active span"""
+    opentracing.tracer.active_span.log_kv(key_values, timestamp)
+
+
+# Note: we don't have a get baggage items because we're trying to hide all
+# scope and span state from synapse. I think this method may also be useless
+# as a result
+
+# I also thinks it's dangerous with respect to pii. If the whitelisting
+# is missconfigured or buggy span information will leak. This is no issue
+# if it's jaeger span id's but baggage can contain any arbitrary data. I would
+# suggest removing this.
+@only_if_tracing
+def set_baggage_item(key, value):
+    """Attach baggage to the active span"""
+    opentracing.tracer.active_span.set_baggage_item(key, value)
+
+
+@only_if_tracing
+def set_operation_name(operation_name):
+    """Sets the operation name of the active span"""
+    opentracing.tracer.active_span.set_operation_name(operation_name)
+
+
+@only_if_tracing
+def set_homeserver_whitelist(homeserver_whitelist):
+    """Sets the homeserver whitelist
+
+    Args:
+        homeserver_whitelist (iterable of strings): regex of whitelisted homeservers
+    """
+    global _homeserver_whitelist
+    if homeserver_whitelist:
+        # Makes a single regex which accepts all passed in regexes in the list
+        _homeserver_whitelist = re.compile(
+            "({})".format(")|(".join(homeserver_whitelist))
+        )
+
+
+@only_if_tracing
+def whitelisted_homeserver(destination):
+    """Checks if a destination matches the whitelist
+
+    Args:
+        destination (String)"""
+    global _homeserver_whitelist
+    if _homeserver_whitelist:
+        return _homeserver_whitelist.match(destination)
+    return False
 
 
 @only_if_tracing
