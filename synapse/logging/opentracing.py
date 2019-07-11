@@ -453,49 +453,60 @@ def trace_servlet(servlet_name, func):
 def trace_defered_function(func):
     @wraps(func)
     @defer.inlineCallbacks
-    def f(self, *args, **kwargs):
+    def _trace_defered_function_inner(self, *args, **kwargs):
         with start_active_span(func.__name__):
             r = yield func(self, *args, **kwargs)
             defer.returnValue(r)
 
-    return f
+    return _trace_defered_function_inner
 
 
 def trace_defered_function_using_operation_name(name):
     def trace_defered_function(func):
         @wraps(func)
         @defer.inlineCallbacks
-        def f(self, *args, **kwargs):
+        def _trace_defered_function_inner(self, *args, **kwargs):
             # Start scope
             with start_active_span(name):
                 r = yield func(self, *args, **kwargs)
                 defer.returnValue(r)
 
-        return f
+        return _trace_defered_function_inner
 
     return trace_defered_function
 
 
 def trace_function(func):
     @wraps(func)
-    def f(self, *args, **kwargs):
-        TracerUtil.start_active_span(func.__name__)
-        try:
+    def _trace_function_inner(self, *args, **kwargs):
+        with start_active_span(func.__name__):
             return func(self, *args, **kwargs)
-        finally:
-            TracerUtil.close_active_span()
 
-    return f
+    return _trace_function_inner
+
+
+def trace_function_using_operation_name(operation_name):
+    """Decorator to trace a function. Explicitely sets the operation_name to name"""
+
+    def trace_function(func):
+        @wraps(func)
+        def _trace_function_inner(self, *args, **kwargs):
+            with start_active_span(operation_name):
+                return func(self, *args, **kwargs)
+
+        return _trace_function_inner
+
+    return trace_function
 
 
 def tag_args(func):
     @wraps(func)
-    def f(self, *args, **kwargs):
-        TracerUtil.set_tag("args", args)
-        TracerUtil.set_tag("kwargs", kwargs)
+    def _tag_args_inner(self, *args, **kwargs):
+        set_tag("args", args)
+        set_tag("kwargs", kwargs)
         return func(self, *args, **kwargs)
 
-    return f
+    return _tag_args_inner
 
 
 def wrap_in_span(func):
@@ -512,7 +523,7 @@ def wrap_in_span(func):
     parent_span = opentracing.tracer.active_span
 
     @wraps(func)
-    def f(self, *args, **kwargs):
+    def _wrap_in_span_inner(self, *args, **kwargs):
         span = opentracing.tracer.start_span(func.__name__, child_of=parent_span)
         try:
             return func(self, *args, **kwargs)
@@ -523,4 +534,4 @@ def wrap_in_span(func):
         finally:
             span.finish()
 
-    return f
+    return _wrap_in_span_inner
