@@ -90,14 +90,8 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         capabilities = channel.json_body["capabilities"]
         self.assertEqual(channel.code, 200)
 
-        self.assertEqual(
-            True,
-            capabilities["m.presence"]["send_enabled"],
-        )
-        self.assertEqual(
-            True,
-            capabilities["m.presence"]["receive_enabled"],
-        )
+        self.assertEqual(True, capabilities["m.presence"]["send_enabled"])
+        self.assertEqual(True, capabilities["m.presence"]["receive_enabled"])
 
         self.hs.get_config().use_presence = False
         request, channel = self.make_request("GET", self.url, access_token=access_token)
@@ -105,11 +99,5 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         capabilities = channel.json_body["capabilities"]
         self.assertEqual(channel.code, 200)
 
-        self.assertEqual(
-            False,
-            capabilities["m.presence"]["send_enabled"],
-        )
-        self.assertEqual(
-            False,
-            capabilities["m.presence"]["receive_enabled"],
-        )
+        self.assertEqual(False, capabilities["m.presence"]["send_enabled"])
+        self.assertEqual(False, capabilities["m.presence"]["receive_enabled"])

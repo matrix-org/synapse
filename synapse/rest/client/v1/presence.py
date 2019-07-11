@@ -48,7 +48,6 @@ class PresenceStatusRestServlet(RestServlet):
         if not self.hs.config.use_presence:
             raise AuthError(403, "Presence is disabled on this homeserver")
 
-
         if requester.user != user:
             allowed = yield self.presence_handler.is_visible(
                 observed_user=user, observer_user=requester.user

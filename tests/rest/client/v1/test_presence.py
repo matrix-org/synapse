@@ -69,10 +69,13 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(channel.code, 403)
-        self.assertEqual({
-            "errcode": "M_FORBIDDEN",
-            "error": "Presence is disabled on this homeserver"
-        }, channel.json_body)
+        self.assertEqual(
+            {
+                "errcode": "M_FORBIDDEN",
+                "error": "Presence is disabled on this homeserver"
+            },
+            channel.json_body,
+        )
         self.assertEqual(self.hs.presence_handler.set_state.call_count, 0)
 
     def test_get_presence_disabled(self):
@@ -88,7 +91,10 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(channel.code, 403)
-        self.assertEqual({
-            "errcode": "M_FORBIDDEN",
-            "error": "Presence is disabled on this homeserver"
-        }, channel.json_body)
+        self.assertEqual(
+            {
+                "errcode": "M_FORBIDDEN",
+                "error": "Presence is disabled on this homeserver"
+            },
+            channel.json_body,
+        )
