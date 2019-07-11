@@ -1,3 +1,0 @@
-Updated postgres.rst
-Added that synapse_user needs a database to access before it can auth
-Noted you'll need to enable password auth, linked to pg_hba.conf docs
