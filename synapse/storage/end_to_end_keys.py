@@ -235,7 +235,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             new_key_json = encode_canonical_json(device_keys).decode("utf-8")
 
             if old_key_json == new_key_json:
-                opentracing.log_kv({"Message", "Device key already stored."})
+                opentracing.log_kv({"Message": "Device key already stored."})
                 return False
 
             self._simple_upsert_txn(
@@ -291,10 +291,14 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         return self.runInteraction("claim_e2e_one_time_keys", _claim_e2e_one_time_keys)
 
     def delete_e2e_keys_by_device(self, user_id, device_id):
-        @opentracing.trace_function
         def delete_e2e_keys_by_device_txn(txn):
-            opentracing.set_tag("user_id", user_id)
-            opentracing.set_tag("device_id", device_id)
+            opentracing.log_kv(
+                {
+                    "message": "Deleting keys for device",
+                    "device_id": device_id,
+                    "user_id": user_id,
+                }
+            )
             self._simple_delete_txn(
                 txn,
                 table="e2e_device_keys_json",
