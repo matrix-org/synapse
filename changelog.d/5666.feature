@@ -1,0 +1,1 @@
+Support m.presence in the capabilities API for MSC1862
