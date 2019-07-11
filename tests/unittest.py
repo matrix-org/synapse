@@ -157,6 +157,20 @@ class HomeserverTestCase(TestCase):
     """
     A base TestCase that reduces boilerplate for HomeServer-using test cases.
 
+    Defines a setUp method which creates a mock reactor, and instantiates a homeserver
+    running on that reactor.
+
+    There are various hooks for modifying the way that the homeserver is instantiated:
+
+    * override make_homeserver, for example by making it pass different parameters into
+      setup_test_homeserver.
+
+    * override default_config, to return a modified configuration dictionary for use
+      by setup_test_homeserver.
+
+    * On a per-test basis, you can attach an 'extra_config' attribute, with a dictionary
+      containing additional configuration settings to be added to the basic config dict.
+
     Attributes:
         servlets (list[function]): List of servlet registration function.
         user_id (str): The user ID to assume if auth is hijacked.
@@ -167,6 +181,13 @@ class HomeserverTestCase(TestCase):
     servlets = []
     hijack_auth = True
     needs_threadpool = False
+
+    def __init__(self, methodName, *args, **kwargs):
+        super().__init__(methodName, *args, **kwargs)
+
+        # see if we have a custom config method for this test
+        method = getattr(self, methodName)
+        self._extra_config = getattr(method, "extra_config", None)
 
     def setUp(self):
         """
@@ -276,7 +297,14 @@ class HomeserverTestCase(TestCase):
         Args:
             name (str): The homeserver name/domain.
         """
-        return default_config(name)
+        config = default_config(name)
+
+        # apply any additional config which was specified as an extra_config attribute
+        # on the test method..
+        if self._extra_config is not None:
+            config.update(self._extra_config)
+
+        return config
 
     def prepare(self, reactor, clock, homeserver):
         """
