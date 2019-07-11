@@ -21,6 +21,7 @@ import re
 from twisted.internet import defer
 
 import synapse
+import synapse.logging.opentracing as opentracing
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import (
@@ -288,14 +289,29 @@ class BaseFederationServlet(object):
                 logger.warn("authenticate_request failed: %s", e)
                 raise
 
-            if origin:
-                with ratelimiter.ratelimit(origin) as d:
-                    yield d
+            # Start an opentracing span
+            with opentracing.start_active_span_from_context(
+                request.requestHeaders,
+                "incoming-federation-request",
+                tags={
+                    "request_id": request.get_request_id(),
+                    opentracing.tags.SPAN_KIND: opentracing.tags.SPAN_KIND_RPC_SERVER,
+                    opentracing.tags.HTTP_METHOD: request.get_method(),
+                    opentracing.tags.HTTP_URL: request.get_redacted_uri(),
+                    opentracing.tags.PEER_HOST_IPV6: request.getClientIP(),
+                    "authenticated_entity": origin,
+                },
+            ):
+                if origin:
+                    with ratelimiter.ratelimit(origin) as d:
+                        yield d
+                        response = yield func(
+                            origin, content, request.args, *args, **kwargs
+                        )
+                else:
                     response = yield func(
                         origin, content, request.args, *args, **kwargs
                     )
-            else:
-                response = yield func(origin, content, request.args, *args, **kwargs)
 
             defer.returnValue(response)
 
