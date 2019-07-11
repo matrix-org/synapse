@@ -115,6 +115,36 @@ def init_tracer(config):
     tags = opentracing.tags
 
 
+##### Whitelisting
+
+
+@only_if_tracing
+def set_homeserver_whitelist(homeserver_whitelist):
+    """Sets the homeserver whitelist
+
+    Args:
+        homeserver_whitelist (iterable of strings): regex of whitelisted homeservers
+    """
+    global _homeserver_whitelist
+    if homeserver_whitelist:
+        # Makes a single regex which accepts all passed in regexes in the list
+        _homeserver_whitelist = re.compile(
+            "({})".format(")|(".join(homeserver_whitelist))
+        )
+
+
+@only_if_tracing
+def whitelisted_homeserver(destination):
+    """Checks if a destination matches the whitelist
+
+    Args:
+        destination (String)"""
+    global _homeserver_whitelist
+    if _homeserver_whitelist:
+        return _homeserver_whitelist.match(destination)
+    return False
+
+
 ##### Start spans and scopes
 
 # Could use kwargs but I want these to be explicit
@@ -272,33 +302,6 @@ def set_baggage_item(key, value):
 def set_operation_name(operation_name):
     """Sets the operation name of the active span"""
     opentracing.tracer.active_span.set_operation_name(operation_name)
-
-
-@only_if_tracing
-def set_homeserver_whitelist(homeserver_whitelist):
-    """Sets the homeserver whitelist
-
-    Args:
-        homeserver_whitelist (iterable of strings): regex of whitelisted homeservers
-    """
-    global _homeserver_whitelist
-    if homeserver_whitelist:
-        # Makes a single regex which accepts all passed in regexes in the list
-        _homeserver_whitelist = re.compile(
-            "({})".format(")|(".join(homeserver_whitelist))
-        )
-
-
-@only_if_tracing
-def whitelisted_homeserver(destination):
-    """Checks if a destination matches the whitelist
-
-    Args:
-        destination (String)"""
-    global _homeserver_whitelist
-    if _homeserver_whitelist:
-        return _homeserver_whitelist.match(destination)
-    return False
 
 
 @only_if_tracing
