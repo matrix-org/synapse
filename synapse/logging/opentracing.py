@@ -49,6 +49,12 @@ logger = logging.getLogger(__name__)
 import inspect
 
 
+# Block everything by default
+_homeserver_whitelist = None
+
+##### Util methods
+
+
 def only_if_tracing(func):
     """Executes the function only if we're tracing. Otherwise return.
     Assumes the function wrapped may return None"""
@@ -63,8 +69,13 @@ def only_if_tracing(func):
     return _only_if_tracing_inner
 
 
-# Block everything by default
-_homeserver_whitelist = None
+@contextlib.contextmanager
+def _noop_context_manager(*args, **kwargs):
+    """Does exactly what it says on the tin"""
+    yield
+
+
+##### Setup
 
 
 def init_tracer(config):
@@ -106,13 +117,6 @@ def init_tracer(config):
     # Set up tags to be opentracing's tags
     global tags
     tags = opentracing.tags
-
-
-@contextlib.contextmanager
-def _noop_context_manager(*args, **kwargs):
-    """Does absolutely nothing really well. Can be entered and exited arbitrarily.
-    Good substitute for an opentracing scope."""
-    yield
 
 
 # Could use kwargs but I want these to be explicit
