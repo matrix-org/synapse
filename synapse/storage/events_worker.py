@@ -327,7 +327,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             events (list(str)): list of event_ids to fetch
-            allow_rejected (bool): Whether to teturn events that were rejected
+            allow_rejected (bool): Whether to return events that were rejected
             update_metrics (bool): Whether to update the cache hit ratio metrics
 
         Returns:
