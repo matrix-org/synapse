@@ -45,6 +45,10 @@ class PresenceStatusRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
+        if not self.hs.config.use_presence:
+            raise AuthError(403, "Presence is disabled on this homeserver")
+
+
         if requester.user != user:
             allowed = yield self.presence_handler.is_visible(
                 observed_user=user, observer_user=requester.user
@@ -62,6 +66,9 @@ class PresenceStatusRestServlet(RestServlet):
     def on_PUT(self, request, user_id):
         requester = yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
+
+        if not self.hs.config.use_presence:
+            raise AuthError(403, "Presence is disabled on this homeserver")
 
         if requester.user != user:
             raise AuthError(403, "Can only set your own presence state")
@@ -85,8 +92,7 @@ class PresenceStatusRestServlet(RestServlet):
         except Exception:
             raise SynapseError(400, "Unable to parse state")
 
-        if self.hs.config.use_presence:
-            yield self.presence_handler.set_state(user, state)
+        yield self.presence_handler.set_state(user, state)
 
         defer.returnValue((200, {}))
 
