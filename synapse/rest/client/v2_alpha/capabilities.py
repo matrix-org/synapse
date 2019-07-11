@@ -56,6 +56,10 @@ class CapabilitiesRestServlet(RestServlet):
                     },
                 },
                 "m.change_password": {"enabled": change_password},
+                "m.presence": {
+                    "send_enabled": self.config.use_presence,
+                    "receive_enabled": self.config.use_presence
+                },
             }
         }
         defer.returnValue((200, response))
