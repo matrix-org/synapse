@@ -79,3 +79,37 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200)
         self.assertFalse(capabilities["m.change_password"]["enabled"])
+
+    def test_get_presence(self):
+        self.register_user("user", "pass")
+        access_token = self.login("user", "pass")
+
+        self.hs.get_config().use_presence = True
+        request, channel = self.make_request("GET", self.url, access_token=access_token)
+        self.render(request)
+        capabilities = channel.json_body["capabilities"]
+        self.assertEqual(channel.code, 200)
+
+        self.assertEqual(
+            True,
+            capabilities["m.presence"]["send_enabled"],
+        )
+        self.assertEqual(
+            True,
+            capabilities["m.presence"]["receive_enabled"],
+        )
+
+        self.hs.get_config().use_presence = False
+        request, channel = self.make_request("GET", self.url, access_token=access_token)
+        self.render(request)
+        capabilities = channel.json_body["capabilities"]
+        self.assertEqual(channel.code, 200)
+
+        self.assertEqual(
+            False,
+            capabilities["m.presence"]["send_enabled"],
+        )
+        self.assertEqual(
+            False,
+            capabilities["m.presence"]["receive_enabled"],
+        )
