@@ -339,6 +339,9 @@ def inject_active_span_twisted_headers(headers, destination):
         headers.addRawHeaders(key, value)
 
 
+##### Injection and extraction
+
+
 @only_if_tracing
 def inject_active_span_byte_dict(headers, destination):
     """
@@ -401,6 +404,9 @@ def span_context_from_string(carrier):
 @only_if_tracing
 def extract_text_map(carrier):
     return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
+
+
+##### Tracing decorators
 
 
 def trace_deferred(func):
@@ -549,6 +555,9 @@ def trace_servlet(servlet_name, func):
             defer.returnValue(result)
 
     return _trace_servlet_inner
+
+
+##### Helper class
 
 
 class _DummyTagNames(object):
