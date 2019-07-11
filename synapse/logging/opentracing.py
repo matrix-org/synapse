@@ -192,13 +192,6 @@ def start_active_span_follows_from(operation_name, contexts):
 
 
 @only_if_tracing
-def close_active_span():
-    """Closes the active span. This will close it's logcontext if the context
-    was made for the span"""
-    opentracing.tracer.scope_manager.active.__exit__(None, None, None)
-
-
-@only_if_tracing
 def set_tag(key, value):
     """Set's a tag on the active span"""
     opentracing.tracer.active_span.set_tag(key, value)
@@ -213,6 +206,11 @@ def log_kv(key_values, timestamp=None):
 # Note: we don't have a get baggage items because we're trying to hide all
 # scope and span state from synapse. I think this method may also be useless
 # as a result
+
+# I also thinks it's dangerous with respect to pii. If the whitelisting
+# is missconfigured or buggy span information will leak. This is no issue
+# if it's jaeger span id's but baggage can contain any arbitrary data. I would
+# suggest removing this.
 @only_if_tracing
 def set_baggage_item(key, value):
     """Attach baggage to the active span"""
