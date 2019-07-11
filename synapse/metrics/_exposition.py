@@ -14,8 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This code is based off `prometheus_client/exposition.py` from version 0.7.1.
+
+Due to the renaming of metrics in prometheus_client 0.4.0, this customised
+vendoring of the code will emit both the old versions that Synapse dashboards
+expect, and the newer "best practice" version of the up-to-date official client.
+"""
+
 import math
 import threading
+from collections import namedtuple
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from urllib.parse import parse_qs, urlparse
@@ -23,6 +32,12 @@ from urllib.parse import parse_qs, urlparse
 from prometheus_client import REGISTRY
 
 from twisted.web.resource import Resource
+
+try:
+    from prometheus_client.samples import Sample
+except ImportError:
+    Sample = namedtuple("Sample", ["name", "labels", "value", "timestamp", "exemplar"])
+
 
 CONTENT_TYPE_LATEST = str("text/plain; version=0.0.4; charset=utf-8")
 
@@ -74,7 +89,18 @@ def sample_line(line, name):
     )
 
 
-def generate_latest(registry):
+def nameify_sample(sample):
+    """
+    If we get a prometheus_client<0.4.0 sample as a tuple, transform it into a
+    namedtuple which has the names we expect.
+    """
+    if not isinstance(sample, Sample):
+        sample = Sample(*sample, None, None)
+
+    return sample
+
+
+def generate_latest(registry, emit_help=False):
     output = []
 
     for metric in registry.collect():
@@ -104,14 +130,24 @@ def generate_latest(registry):
             mtype = "untyped"
 
         # Output in the old format for compatibility.
+        if emit_help:
+            output.append(
+                "# HELP {0} {1}\n".format(
+                    mname,
+                    metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
+                )
+            )
         output.append("# TYPE {0} {1}\n".format(mname, mtype))
-        for sample in metric.samples:
+        for sample in map(nameify_sample, metric.samples):
             # Get rid of the OpenMetrics specific samples
             for suffix in ["_created", "_gsum", "_gcount"]:
                 if sample.name.endswith(suffix):
                     break
             else:
-                output.append(sample_line(sample, sample.name.replace(mnewname, mname)))
+                newname = sample.name.replace(mnewname, mname)
+                if ":" in newname and newname.endswith("_total"):
+                    newname = newname[: -len("_total")]
+                output.append(sample_line(sample, newname))
 
         # Get rid of the weird colon things while we're at it
         if mtype == "counter":
@@ -122,8 +158,15 @@ def generate_latest(registry):
             continue
 
         # Also output in the new format, if it's different.
+        if emit_help:
+            output.append(
+                "# HELP {0} {1}\n".format(
+                    mnewname,
+                    metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
+                )
+            )
         output.append("# TYPE {0} {1}\n".format(mnewname, mtype))
-        for sample in metric.samples:
+        for sample in map(nameify_sample, metric.samples):
             # Get rid of the OpenMetrics specific samples
             for suffix in ["_created", "_gsum", "_gcount"]:
                 if sample.name.endswith(suffix):
@@ -146,10 +189,14 @@ class MetricsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         registry = self.registry
         params = parse_qs(urlparse(self.path).query)
-        if "name[]" in params:
-            registry = registry.restricted_registry(params["name[]"])
+
+        if "help" in params:
+            emit_help = True
+        else:
+            emit_help = False
+
         try:
-            output = generate_latest(registry)
+            output = generate_latest(registry, emit_help=emit_help)
         except Exception:
             self.send_error(500, "error generating metric output")
             raise
