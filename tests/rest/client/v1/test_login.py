@@ -6,6 +6,7 @@ from synapse.rest.client.v2_alpha import devices
 from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
 
 from tests import unittest
+from tests.unittest import override_config
 
 LOGIN_URL = b"/_matrix/client/r0/login"
 TEST_URL = b"/_matrix/client/r0/account/whoami"
@@ -150,6 +151,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
+    @override_config({"session_lifetime": "24h"})
     def test_soft_logout(self):
         self.register_user("kermit", "monkey")
 
@@ -218,8 +220,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], False)
-
-    test_soft_logout.extra_config = {"session_lifetime": "24h"}
 
     def _delete_device(self, access_token, user_id, password, device_id):
         """Perform the UI-Auth to delete a device"""
