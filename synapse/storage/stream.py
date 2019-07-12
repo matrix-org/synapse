@@ -835,7 +835,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             as a list of _EventDictReturn and a token that points to the end
             of the result set. If no events are returned then the end of the
             stream has been reached (i.e. there are no events between
-            `from_token` and `to_token`).
+            `from_token` and `to_token`), or `limit` is zero.
         """
 
         assert int(limit) >= 0
@@ -912,12 +912,10 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 those that match the filter.
 
         Returns:
-            tuple[list[FrozenEvents], str]: Returns the results as a list of
-            dicts and a token that points to the end of the result set. The
-            dicts have the keys "event_id", "topological_ordering" and
-            "stream_ordering". If no events are returned then the end of the
-            stream has been reached (i.e. there are no events between
-            `from_key` and `to_key`).
+            tuple[list[FrozenEvent], str]: Returns the results as a list of
+            events and a token that points to the end of the result set. If no
+            events are returned then the end of the stream has been reached
+            (i.e. there are no events between `from_key` and `to_key`).
         """
 
         from_key = RoomStreamToken.parse(from_key)
