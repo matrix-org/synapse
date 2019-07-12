@@ -168,9 +168,8 @@ class HomeserverTestCase(TestCase):
     * override default_config, to return a modified configuration dictionary for use
       by setup_test_homeserver.
 
-    * On a per-test basis, you can use the @override_config decorator to give a
-      dictionary containing additional configuration settings to be added to the basic
-      config dict.
+    * On a per-test basis, you can attach an 'extra_config' attribute, with a dictionary
+      containing additional configuration settings to be added to the basic config dict.
 
     Attributes:
         servlets (list[function]): List of servlet registration function.
@@ -186,9 +185,9 @@ class HomeserverTestCase(TestCase):
     def __init__(self, methodName, *args, **kwargs):
         super().__init__(methodName, *args, **kwargs)
 
-        # see if we have any additional config for this test
+        # see if we have a custom config method for this test
         method = getattr(self, methodName)
-        self._extra_config = getattr(method, "_extra_config", None)
+        self._extra_config = getattr(method, "extra_config", None)
 
     def setUp(self):
         """
@@ -300,8 +299,8 @@ class HomeserverTestCase(TestCase):
         """
         config = default_config(name)
 
-        # apply any additional config which was specified via the override_config
-        # decorator.
+        # apply any additional config which was specified as an extra_config attribute
+        # on the test method..
         if self._extra_config is not None:
             config.update(self._extra_config)
 
@@ -563,27 +562,3 @@ class HomeserverTestCase(TestCase):
         )
         self.render(request)
         self.assertEqual(channel.code, 403, channel.result)
-
-
-def override_config(extra_config):
-    """A decorator which can be applied to test functions to give additional HS config
-
-    For use
-
-    For example:
-
-        class MyTestCase(HomeserverTestCase):
-            @override_config({"enable_registration": False, ...})
-            def test_foo(self):
-                ...
-
-    Args:
-        extra_config(dict): Additional config settings to be merged into the default
-            config dict before instantiating the test homeserver.
-    """
-
-    def decorator(func):
-        func._extra_config = extra_config
-        return func
-
-    return decorator
