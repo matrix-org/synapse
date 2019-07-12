@@ -71,6 +71,7 @@ entry. These are managed by Towncrier
 
 To create a changelog entry, make a new file in the ``changelog.d`` file named
 in the format of ``PRnumber.type``. The type can be one of the following:
+
 * ``feature``.
 * ``bugfix``.
 * ``docker`` (for updates to the Docker image).
