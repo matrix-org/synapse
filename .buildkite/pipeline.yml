@@ -179,6 +179,7 @@ steps:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
           always-pull: true
+          workdir: "/src"
     retry:
       automatic:
         - exit_status: -1
@@ -199,6 +200,7 @@ steps:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
           always-pull: true
+          workdir: "/src"
     retry:
       automatic:
         - exit_status: -1
@@ -220,6 +222,7 @@ steps:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
           always-pull: true
+          workdir: "/src"
     soft_fail: true
     retry:
       automatic:
