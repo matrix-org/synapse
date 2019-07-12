@@ -138,6 +138,7 @@ class ConsentNotGivenError(SynapseError):
     def error_dict(self):
         return cs_error(self.msg, self.errcode, consent_uri=self._consent_uri)
 
+
 class UserDeactivatedError(SynapseError):
     """The error returned to the client when the user attempted to access an
     authenticated endpoint, but the account has been deactivated.

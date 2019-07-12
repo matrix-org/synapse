@@ -832,9 +832,7 @@ class AuthHandler(BaseHandler):
         if not password_hash:
             deactivated = yield self.store.get_user_deactivated_status(user_id)
             if deactivated:
-                raise UserDeactivatedError(
-                    "This account has been deactivated"
-                )
+                raise UserDeactivatedError("This account has been deactivated")
 
         result = yield self.validate_hash(password, password_hash)
         if not result:
