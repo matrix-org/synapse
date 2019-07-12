@@ -272,7 +272,10 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             )
         else:
             yield self.hs.get_auth_handler().delete_access_tokens_for_user(user_id)
-        yield self.store.add_access_token_to_user(user_id=user_id, token=token)
+
+        yield self.store.add_access_token_to_user(
+            user_id=user_id, token=token, device_id=None, valid_until_ms=None
+        )
 
         if displayname is not None:
             # logger.info("setting user display name: %s -> %s", user_id, displayname)
