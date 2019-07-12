@@ -71,12 +71,12 @@ entry. These are managed by Towncrier
 
 To create a changelog entry, make a new file in the ``changelog.d`` file named
 in the format of ``PRnumber.type``. The type can be one of the following:
- * ``feature``.
- * ``bugfix``.
- * ``docker`` (for updates to the Docker image).
- * ``doc`` (for updates to the documentation).
- * ``removal`` (also used for deprecations).
- * ``misc`` (for internal-only changes).
+* ``feature``.
+* ``bugfix``.
+* ``docker`` (for updates to the Docker image).
+* ``doc`` (for updates to the documentation).
+* ``removal`` (also used for deprecations).
+* ``misc`` (for internal-only changes).
 
 The content of the file is your changelog entry, which should be a short
 description of your change in the same style as the rest of our `changelog
