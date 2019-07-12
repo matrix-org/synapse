@@ -286,7 +286,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             "delete_e2e_keys_by_device", delete_e2e_keys_by_device_txn
         )
 
-    def _set_e2e_device_signing_key_txn(self, txn, user_id, key_type, key):
+    def _set_e2e_cross_signing_key_txn(self, txn, user_id, key_type, key):
         """Set a user's cross-signing key.
 
         Args:
@@ -301,9 +301,23 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         # since signatures are identified by device ID.  So add an entry to the
         # device table to make sure that we don't have a collision with device
         # IDs
-        for v in key["keys"].values():
-            pubkey = v
-            break
+
+        # the 'key' dict will look something like:
+        # {
+        #   "user_id": "@alice:example.com",
+        #   "usage": ["self_signing"],
+        #   "keys": {
+        #     "ed25519:base64+self+signing+public+key": "base64+self+signing+public+key",
+        #   },
+        #   "signatures": {
+        #     "@alice:example.com": {
+        #       "ed25519:base64+master+public+key": "base64+signature"
+        #     }
+        #   }
+        # }
+        # The "keys" property must only have one entry, which will be the public
+        # key, so we just grab the first value in there
+        pubkey = next(iter(key["keys"].values()))
         self._simple_insert(
             "devices",
             values={
@@ -317,7 +331,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
 
         # and finally, store the key itself
         self._simple_insert(
-            "e2e_device_signing_keys",
+            "e2e_cross_signing_keys",
             values={
                 "user_id": user_id,
                 "keytype": key_type,
@@ -336,12 +350,12 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             key (dict): the key data
         """
         return self.runInteraction(
-            "add_e2e_device_signing_key",
-            self._set_e2e_device_signing_key_txn,
+            "add_e2e_cross_signing_key",
+            self._set_e2e_cross_signing_key_txn,
             user_id, key_type, key
         )
 
-    def _get_e2e_device_signing_key_txn(self, txn, user_id, key_type, from_user_id=None):
+    def _get_e2e_cross_signing_key_txn(self, txn, user_id, key_type, from_user_id=None):
         """Returns a user's cross-signing key.
 
         Args:
@@ -358,7 +372,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         """
         sql = (
             "SELECT keydata "
-            "  FROM e2e_device_signing_keys "
+            "  FROM e2e_cross_signing_keys "
             " WHERE user_id = ? AND keytype = ? ORDER BY ts DESC LIMIT 1"
         )
         txn.execute(sql, (user_id, key_type))
@@ -374,7 +388,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         if from_user_id is not None:
             sql = (
                 "SELECT key_id, signature "
-                "  FROM e2e_device_signatures "
+                "  FROM e2e_cross_signing_signatures "
                 " WHERE user_id = ? "
                 "   AND target_user_id = ? "
                 "   AND target_device_id = ? "
@@ -400,12 +414,12 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             dict of the key data
         """
         return self.runInteraction(
-            "get_e2e_device_signing_key",
-            self._get_e2e_device_signing_key_txn,
+            "get_e2e_cross_signing_key",
+            self._get_e2e_cross_signing_key_txn,
             user_id, key_type, from_user_id
         )
 
-    def store_e2e_device_signatures(self, user_id, signatures):
+    def store_e2e_cross_signing_signatures(self, user_id, signatures):
         """Stores cross-signing signatures.
 
         Args:
@@ -418,7 +432,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 is the signature of the device
         """
         return self._simple_insert_many(
-            "e2e_device_signatures",
+            "e2e_cross_signing_signatures",
             [{"user_id": user_id,
               "key_id": key_id,
               "target_user_id": target_user_id,

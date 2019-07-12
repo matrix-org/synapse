@@ -628,7 +628,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                 )
                 if hidden:
                     raise StoreError(
-                        400, "The device ID is reserved", Codes.FORBIDDEN
+                        400, "The device ID is in use", Codes.FORBIDDEN
                     )
             self.device_id_exists_cache.prefill(key, True)
             defer.returnValue(inserted)
