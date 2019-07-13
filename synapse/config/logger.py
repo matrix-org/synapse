@@ -153,6 +153,8 @@ def _setup_stdlib_logging(log_config):
 
 
 def _reload_stdlib_logging(*args, log_config=None):
+    logger = logging.getLogger("")
+
     if not log_config:
         logger.warn("Reloaded a blank config?")
 
