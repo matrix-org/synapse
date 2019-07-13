@@ -1,0 +1,1 @@
+Synapse will now always redirect standard I/O to the logging system.
