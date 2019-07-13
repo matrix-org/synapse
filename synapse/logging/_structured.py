@@ -107,7 +107,7 @@ def SynapseFileLogObserver(outFile):
         event["log_level"] = event["log_level"].name.upper()
         event["log_format"] = (
             "- {log_namespace} - {log_level} - {request} - "
-            + event.get("log_format", "{event_text}")
+            + event.get("log_format", "{log_text}")
         )
         return eventAsText(event, includeSystem=False) + "\n"
 
