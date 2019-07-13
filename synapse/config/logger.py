@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
 import logging.config
 import os
@@ -21,9 +22,14 @@ from string import Template
 import yaml
 
 from twisted.logger import STDLibLogObserver, globalLogBeginner
+from twisted.python.filepath import FilePath
 
 import synapse
 from synapse.app import _base as appbase
+from synapse.logging._structured import (
+    reload_structured_logging,
+    setup_structured_logging,
+)
 from synapse.logging.context import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
@@ -145,22 +151,10 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def setup_logging(config, use_worker_options=False):
-    """ Set up python logging
-
-    Args:
-        config (LoggingConfig | synapse.config.workers.WorkerConfig):
-            configuration data
-
-        use_worker_options (bool): True to use 'worker_log_config' and
-            'worker_log_file' options instead of 'log_config' and 'log_file'.
-
-        register_sighup (func | None): Function to call to register a
-            sighup handler.
+def _setup_stdlib_logging(log_config, log_file):
     """
-    log_config = config.worker_log_config if use_worker_options else config.log_config
-    log_file = config.worker_log_file if use_worker_options else config.log_file
-
+    Set up Python stdlib logging.
+    """
     log_format = (
         "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
         " - %(message)s"
@@ -189,42 +183,20 @@ def setup_logging(config, use_worker_options=False):
                 log_file, maxBytes=(1000 * 1000 * 100), backupCount=3, encoding="utf8"
             )
 
-            def sighup(signum, stack):
+            def sighup(*args):
                 logger.info("Closing log file due to SIGHUP")
                 handler.doRollover()
                 logger.info("Opened new log file due to SIGHUP")
 
+            appbase.register_sighup(sighup)
         else:
             handler = logging.StreamHandler()
 
-            def sighup(*args):
-                pass
-
         handler.setFormatter(formatter)
-
         handler.addFilter(LoggingContextFilter(request=""))
-
         logger.addHandler(handler)
     else:
-
-        def load_log_config():
-            with open(log_config, "r") as f:
-                logging.config.dictConfig(yaml.safe_load(f))
-
-        def sighup(*args):
-            # it might be better to use a file watcher or something for this.
-            load_log_config()
-            logging.info("Reloaded log config from %s due to SIGHUP", log_config)
-
-        load_log_config()
-
-    appbase.register_sighup(sighup)
-
-    # make sure that the first thing we log is a thing we can grep backwards
-    # for
-    logging.warn("***** STARTING SERVER *****")
-    logging.warn("Server %s version %s", sys.argv[0], get_version_string(synapse))
-    logging.info("Server hostname: %s", config.server_name)
+        logging.config.dictConfig(log_config)
 
     # It's critical to point twisted's internal logging somewhere, otherwise it
     # stacks up and leaks kup to 64K object;
@@ -257,3 +229,50 @@ def setup_logging(config, use_worker_options=False):
     )
     if not config.no_redirect_stdio:
         print("Redirected stdout/stderr to logs")
+
+
+def _reload_stdlib_logging(*args, log_config=None):
+    if not log_config:
+        logger.warn("Reloaded a blank config?")
+
+    logging.config.dictConfig(log_config)
+
+
+def setup_logging(config, use_worker_options=False):
+    """ Set up python logging
+
+    Args:
+        config (LoggingConfig | synapse.config.workers.WorkerConfig):
+            configuration data
+
+        use_worker_options (bool): True to use 'worker_log_config' and
+            'worker_log_file' options instead of 'log_config' and 'log_file'.
+
+        register_sighup (func | None): Function to call to register a
+            sighup handler.
+    """
+    log_config = config.worker_log_config if use_worker_options else config.log_config
+    log_file = config.worker_log_file if use_worker_options else config.log_file
+
+    def read_config(*args, callback=None):
+        log_config_body = yaml.safe_load(FilePath(log_config).getContent())
+        if args:
+            logging.info("Reloaded log config from %s due to SIGHUP", log_config)
+        if callback:
+            callback(log_config=log_config_body)
+        return log_config_body
+
+    log_config_body = read_config()
+
+    if log_config_body.get("version") == 2:
+        setup_structured_logging(log_config_body)
+        appbase.register_sighup(read_config, callback=reload_structured_logging)
+    else:
+        _setup_stdlib_logging(log_config_body, log_file)
+        appbase.register_sighup(read_config, callback=_reload_stdlib_logging)
+
+    # make sure that the first thing we log is a thing we can grep backwards
+    # for
+    logging.warn("***** STARTING SERVER *****")
+    logging.warn("Server %s version %s", sys.argv[0], get_version_string(synapse))
+    logging.info("Server hostname: %s", config.server_name)
