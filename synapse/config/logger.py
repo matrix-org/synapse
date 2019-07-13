@@ -178,4 +178,4 @@ def setup_logging(config, use_worker_options=False):
 
         return observer(event)
 
-    globalLogBeginner.beginLoggingTo([_log], redirectStandardIO=False)
+    globalLogBeginner.beginLoggingTo([_log], redirectStandardIO=True)
