@@ -134,6 +134,7 @@ def setup_logging(config, use_worker_options=False):
         handler.addFilter(LoggingContextFilter(request=""))
         logger.addHandler(handler)
     else:
+
         def load_log_config():
             with open(log_config, "r") as f:
                 logging.config.dictConfig(yaml.safe_load(f))
