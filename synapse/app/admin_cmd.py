@@ -90,14 +90,16 @@ class AdminCmdReplicationHandler(ReplicationClientHandler):
 
 
 @defer.inlineCallbacks
-def export_data_command(hs, user_id, directory):
+def export_data_command(hs, args):
     """Export data for a user.
 
     Args:
-        user_id (str)
-        directory (str|None): Directory to write output to. Will create a temp
-            directory if not specified.
+        hs (HomeServer)
+        args (argparse.Namespace)
     """
+
+    user_id = args.user_id
+    directory = args.output_directory
 
     res = yield hs.get_handlers().admin_handler.exfiltrate_user_data(
         user_id, FileExfiltrationWriter(user_id, directory=directory)
@@ -129,6 +131,7 @@ def start(config_options):
         help="The directory to store the exported data in. Must be emtpy. Defaults"
         " to creating a temp directory.",
     )
+    export_data_parser.set_defaults(func=export_data_command)
 
     try:
         config, args = HomeServerConfig.load_config_with_parser(parser, config_options)
@@ -173,12 +176,6 @@ def start(config_options):
 
     ss.setup()
 
-    if args.command == "export-data":
-        command = lambda: export_data_command(ss, args.user_id, args.output_directory)
-    else:
-        # This shouldn't happen.
-        raise ConfigError("Unknown admin command %s" % (args.command,))
-
     # We use task.react as the basic run command as it correctly handles tearing
     # down the reactor when the deferreds resolve and setting the return value.
     # We also make sure that `_base.start` gets run before we actually run the
@@ -188,7 +185,7 @@ def start(config_options):
     def run(_reactor):
         with LoggingContext("command"):
             yield _base.start(ss, [])
-            yield command()
+            yield args.func(ss, args)
 
     _base.start_worker_reactor(
         "synapse-admin-cmd", config, run_command=lambda: task.react(run)
