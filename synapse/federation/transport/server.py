@@ -18,7 +18,6 @@
 import functools
 import logging
 import re
-from typing import Tuple
 
 import synapse
 import synapse.logging.opentracing as opentracing
