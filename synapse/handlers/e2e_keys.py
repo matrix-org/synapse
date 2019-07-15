@@ -22,9 +22,9 @@ from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
 
-from synapse.api.errors import CodeMessageException, FederationDeniedError, SynapseError
+from synapse.api.errors import CodeMessageException, SynapseError
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID, get_domain_from_id
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
@@ -349,9 +349,6 @@ def _exception_to_failure(e):
 
     if isinstance(e, NotRetryingDestination):
         return {"status": 503, "message": "Not ready for retry"}
-
-    if isinstance(e, FederationDeniedError):
-        return {"status": 403, "message": "Federation Denied"}
 
     # include ConnectionRefused and other errors
     #

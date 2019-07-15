@@ -36,8 +36,8 @@ from synapse.http.federation.matrix_federation_agent import (
     _cache_period_from_headers,
 )
 from synapse.http.federation.srv_resolver import Server
+from synapse.logging.context import LoggingContext
 from synapse.util.caches.ttlcache import TTLCache
-from synapse.util.logcontext import LoggingContext
 
 from tests.http import TestServerTLSConnectionFactory, get_test_ca_cert_file
 from tests.server import FakeTransport, ThreadedMemoryReactorClock

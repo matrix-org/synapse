@@ -86,6 +86,7 @@ class LoginRestServlet(RestServlet):
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
         self.jwt_algorithm = hs.config.jwt_algorithm
+        self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
@@ -97,6 +98,9 @@ class LoginRestServlet(RestServlet):
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
+        if self.saml2_enabled:
+            flows.append({"type": LoginRestServlet.SSO_TYPE})
+            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
         if self.cas_enabled:
             flows.append({"type": LoginRestServlet.SSO_TYPE})
 
@@ -279,19 +283,7 @@ class LoginRestServlet(RestServlet):
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
 
-        device_id = login_submission.get("device_id")
-        initial_display_name = login_submission.get("initial_device_display_name")
-        device_id, access_token = yield self.registration_handler.register_device(
-            user_id, device_id, initial_display_name
-        )
-
-        result = {
-            "user_id": user_id,  # may have changed
-            "access_token": access_token,
-            "home_server": self.hs.hostname,
-            "device_id": device_id,
-        }
-
+        result = yield self._register_device_with_callback(user_id, login_submission)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -320,61 +312,61 @@ class LoginRestServlet(RestServlet):
 
         user_id = UserID(user, self.hs.hostname).to_string()
 
-        auth_handler = self.auth_handler
-        registered_user_id = yield auth_handler.check_user_exists(user_id)
-        if registered_user_id:
-            device_id = login_submission.get("device_id")
-            initial_display_name = login_submission.get("initial_device_display_name")
-            device_id, access_token = yield self.registration_handler.register_device(
-                registered_user_id, device_id, initial_display_name
+        registered_user_id = yield self.auth_handler.check_user_exists(user_id)
+        if not registered_user_id:
+            registered_user_id = yield self.registration_handler.register_user(
+                localpart=user
             )
 
-            result = {
-                "user_id": registered_user_id,
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            }
-        else:
-            user_id, access_token = (
-                yield self.registration_handler.register(localpart=user)
-            )
-
-            device_id = login_submission.get("device_id")
-            initial_display_name = login_submission.get("initial_device_display_name")
-            device_id, access_token = yield self.registration_handler.register_device(
-                registered_user_id, device_id, initial_display_name
-            )
-
-            result = {
-                "user_id": user_id,  # may have changed
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            }
-
+        result = yield self._register_device_with_callback(
+            registered_user_id, login_submission
+        )
         defer.returnValue(result)
 
 
-class CasRedirectServlet(RestServlet):
+class BaseSSORedirectServlet(RestServlet):
+    """Common base class for /login/sso/redirect impls"""
+
     PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
 
+    def on_GET(self, request):
+        args = request.args
+        if b"redirectUrl" not in args:
+            return 400, "Redirect URL not specified for SSO auth"
+        client_redirect_url = args[b"redirectUrl"][0]
+        sso_url = self.get_sso_url(client_redirect_url)
+        request.redirect(sso_url)
+        finish_request(request)
+
+    def get_sso_url(self, client_redirect_url):
+        """Get the URL to redirect to, to perform SSO auth
+
+        Args:
+            client_redirect_url (bytes): the URL that we should redirect the
+                client to when everything is done
+
+        Returns:
+            bytes: URL to redirect to
+        """
+        # to be implemented by subclasses
+        raise NotImplementedError()
+
+
+class CasRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url.encode("ascii")
         self.cas_service_url = hs.config.cas_service_url.encode("ascii")
 
-    def on_GET(self, request):
-        args = request.args
-        if b"redirectUrl" not in args:
-            return (400, "Redirect URL not specified for CAS auth")
+    def get_sso_url(self, client_redirect_url):
         client_redirect_url_param = urllib.parse.urlencode(
-            {b"redirectUrl": args[b"redirectUrl"][0]}
+            {b"redirectUrl": client_redirect_url}
         ).encode("ascii")
         hs_redirect_url = self.cas_service_url + b"/_matrix/client/r0/login/cas/ticket"
         service_param = urllib.parse.urlencode(
             {b"service": b"%s?%s" % (hs_redirect_url, client_redirect_url_param)}
         ).encode("ascii")
-        request.redirect(b"%s/login?%s" % (self.cas_server_url, service_param))
-        finish_request(request)
+        return b"%s/login?%s" % (self.cas_server_url, service_param)
 
 
 class CasTicketServlet(RestServlet):
@@ -457,6 +449,16 @@ class CasTicketServlet(RestServlet):
         return user, attributes
 
 
+class SAMLRedirectServlet(BaseSSORedirectServlet):
+    PATTERNS = client_patterns("/login/sso/redirect", v1=True)
+
+    def __init__(self, hs):
+        self._saml_handler = hs.get_saml_handler()
+
+    def get_sso_url(self, client_redirect_url):
+        return self._saml_handler.handle_redirect_request(client_redirect_url)
+
+
 class SSOAuthHandler(object):
     """
     Utility class for Resources and Servlets which handle the response from a SSO
@@ -501,12 +503,8 @@ class SSOAuthHandler(object):
         user_id = UserID(localpart, self._hostname).to_string()
         registered_user_id = yield self._auth_handler.check_user_exists(user_id)
         if not registered_user_id:
-            registered_user_id, _ = (
-                yield self._registration_handler.register(
-                    localpart=localpart,
-                    generate_token=False,
-                    default_display_name=user_display_name,
-                )
+            registered_user_id = yield self._registration_handler.register_user(
+                localpart=localpart, default_display_name=user_display_name
             )
 
         login_token = self._macaroon_gen.generate_short_term_login_token(
@@ -532,3 +530,5 @@ def register_servlets(hs, http_server):
     if hs.config.cas_enabled:
         CasRedirectServlet(hs).register(http_server)
         CasTicketServlet(hs).register(http_server)
+    elif hs.config.saml2_enabled:
+        SAMLRedirectServlet(hs).register(http_server)

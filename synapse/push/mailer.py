@@ -29,6 +29,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
+from synapse.logging.context import make_deferred_yieldable
 from synapse.push.presentable_names import (
     calculate_room_name,
     descriptor_from_member_events,
@@ -36,7 +37,6 @@ from synapse.push.presentable_names import (
 )
 from synapse.types import UserID
 from synapse.util.async_helpers import concurrently_execute
-from synapse.util.logcontext import make_deferred_yieldable
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)

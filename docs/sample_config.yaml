@@ -786,6 +786,17 @@ uploads_path: "DATADIR/uploads"
 #  renew_at: 1w
 #  renew_email_subject: "Renew your %(app)s account"
 
+# Time that a user's session remains valid for, after they log in.
+#
+# Note that this is not currently compatible with guest logins.
+#
+# Note also that this is calculated at login time: changes are not applied
+# retrospectively to users who have already logged in.
+#
+# By default, this is infinite.
+#
+#session_lifetime: 24h
+
 # The user must provide all of the below types of 3PID when registering.
 #
 #registrations_require_3pid:
@@ -997,6 +1008,12 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 # so it is not normally necessary to specify them unless you need to
 # override them.
 #
+# Once SAML support is enabled, a metadata file will be exposed at
+# https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
+# use to configure your SAML IdP with. Alternatively, you can manually configure
+# the IdP to use an ACS location of
+# https://<server>:<port>/_matrix/saml2/authn_response.
+#
 #saml2_config:
 #  sp_config:
 #    # point this to the IdP's metadata. You can use either a local file or
@@ -1006,7 +1023,15 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #      remote:
 #        - url: https://our_idp/metadata.xml
 #
-#    # The rest of sp_config is just used to generate our metadata xml, and you
+#    # By default, the user has to go to our login page first. If you'd like to
+#    # allow IdP-initiated login, set 'allow_unsolicited: True' in a
+#    # 'service.sp' section:
+#    #
+#    #service:
+#    #  sp:
+#    #    allow_unsolicited: True
+#
+#    # The examples below are just used to generate our metadata xml, and you
 #    # may well not need it, depending on your setup. Alternatively you
 #    # may need a whole lot more detail - see the pysaml2 docs!
 #
@@ -1029,6 +1054,12 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #  # separate pysaml2 configuration file:
 #  #
 #  config_path: "CONFDIR/sp_conf.py"
+#
+#  # the lifetime of a SAML session. This defines how long a user has to
+#  # complete the authentication process, if allow_unsolicited is unset.
+#  # The default is 5 minutes.
+#  #
+#  # saml_session_lifetime: 5m
 
 
 
@@ -1375,3 +1406,20 @@ password_config:
 #  module: "my_custom_project.SuperRulesSet"
 #  config:
 #    example_option: 'things'
+
+
+## Opentracing ##
+# These settings enable opentracing which implements distributed tracing
+# This allows you to observe the causal chain of events across servers
+# including requests, key lookups etc. across any server running
+# synapse or any other other services which supports opentracing.
+# (specifically those implemented with jaeger)
+
+#opentracing:
+#  # Enable / disable tracer
+#  tracer_enabled: false
+#  # The list of homeservers we wish to expose our current traces to.
+#  # The list is a list of regexes which are matched against the
+#  # servername of the homeserver
+#  homeserver_whitelist:
+#    - ".*"

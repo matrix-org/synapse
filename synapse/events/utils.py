@@ -392,7 +392,11 @@ class EventClientSerializer(object):
                     serialized_event["content"].pop("m.relates_to", None)
 
                 r = serialized_event["unsigned"].setdefault("m.relations", {})
-                r[RelationTypes.REPLACE] = {"event_id": edit.event_id}
+                r[RelationTypes.REPLACE] = {
+                    "event_id": edit.event_id,
+                    "origin_server_ts": edit.origin_server_ts,
+                    "sender": edit.sender,
+                }
 
         defer.returnValue(serialized_event)
 

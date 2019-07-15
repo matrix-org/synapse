@@ -15,6 +15,11 @@
         showcontent = true
 
     [[tool.towncrier.type]]
+        directory = "docker"
+        name = "Updates to the Docker image"
+        showcontent = true
+
+    [[tool.towncrier.type]]
         directory = "doc"
         name = "Improved Documentation"
         showcontent = true
@@ -39,6 +44,8 @@ exclude = '''
     | \.git          # root of the project
     | \.tox
     | \.venv
+    | \.env
+    | env
     | _build
     | _trial_temp.*
     | build

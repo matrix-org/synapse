@@ -460,3 +460,15 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 "error": "DNS resolution failure during URL preview generation",
             },
         )
+
+    def test_OPTIONS(self):
+        """
+        OPTIONS returns the OPTIONS.
+        """
+        request, channel = self.make_request(
+            "OPTIONS", "url_preview?url=http://example.com", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body, {})

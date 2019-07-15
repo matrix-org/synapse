@@ -18,7 +18,13 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientCredentialsError,
+    NotFoundError,
+    SynapseError,
+)
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import RoomAlias
@@ -97,7 +103,7 @@ class ClientDirectoryServer(RestServlet):
                 room_alias.to_string(),
             )
             defer.returnValue((200, {}))
-        except AuthError:
+        except InvalidClientCredentialsError:
             # fallback to default user behaviour if they aren't an AS
             pass
 

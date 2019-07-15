@@ -27,7 +27,7 @@ from twisted.protocols.tls import TLSMemoryBIOFactory
 import synapse
 from synapse.app import check_bind_error
 from synapse.crypto import context_factory
-from synapse.util import PreserveLoggingContext
+from synapse.logging.context import PreserveLoggingContext
 from synapse.util.async_helpers import Linearizer
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
@@ -103,34 +103,36 @@ def start_reactor(
     install_dns_limiter(reactor)
 
     def run():
-        # make sure that we run the reactor with the sentinel log context,
-        # otherwise other PreserveLoggingContext instances will get confused
-        # and complain when they see the logcontext arbitrarily swapping
-        # between the sentinel and `run` logcontexts.
-        with PreserveLoggingContext():
-            logger.info("Running")
+        logger.info("Running")
+        change_resource_limit(soft_file_limit)
+        if gc_thresholds:
+            gc.set_threshold(*gc_thresholds)
+        run_command()
 
-            change_resource_limit(soft_file_limit)
-            if gc_thresholds:
-                gc.set_threshold(*gc_thresholds)
+    # make sure that we run the reactor with the sentinel log context,
+    # otherwise other PreserveLoggingContext instances will get confused
+    # and complain when they see the logcontext arbitrarily swapping
+    # between the sentinel and `run` logcontexts.
+    #
+    # We also need to drop the logcontext before forking if we're daemonizing,
+    # otherwise the cputime metrics get confused about the per-thread resource usage
+    # appearing to go backwards.
+    with PreserveLoggingContext():
+        if daemonize:
+            if print_pidfile:
+                print(pid_file)
 
-            run_command()
-
-    if daemonize:
-        if print_pidfile:
-            print(pid_file)
-
-        daemon = Daemonize(
-            app=appname,
-            pid=pid_file,
-            action=run,
-            auto_close_fds=False,
-            verbose=True,
-            logger=logger,
-        )
-        daemon.start()
-    else:
-        run()
+            daemon = Daemonize(
+                app=appname,
+                pid=pid_file,
+                action=run,
+                auto_close_fds=False,
+                verbose=True,
+                logger=logger,
+            )
+            daemon.start()
+        else:
+            run()
 
 
 def quit_with_error(error_string):
@@ -250,6 +252,9 @@ def start(hs, listeners=None):
 
         # Load the certificate from disk.
         refresh_certificate(hs)
+
+        # Start the tracer
+        synapse.logging.opentracing.init_tracer(hs.config)
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)

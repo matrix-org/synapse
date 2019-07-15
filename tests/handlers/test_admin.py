@@ -55,7 +55,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
 
         writer = Mock()
 
-        self.get_success(self.admin_handler.exfiltrate_user_data(self.user2, writer))
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
 
         writer.write_events.assert_called()
 
@@ -94,7 +94,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
 
         writer = Mock()
 
-        self.get_success(self.admin_handler.exfiltrate_user_data(self.user2, writer))
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
 
         writer.write_events.assert_called()
 
@@ -127,7 +127,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
 
         writer = Mock()
 
-        self.get_success(self.admin_handler.exfiltrate_user_data(self.user2, writer))
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
 
         writer.write_events.assert_called()
 
@@ -169,7 +169,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
 
         writer = Mock()
 
-        self.get_success(self.admin_handler.exfiltrate_user_data(self.user2, writer))
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
 
         writer.write_events.assert_called_once()
 
@@ -198,7 +198,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
 
         writer = Mock()
 
-        self.get_success(self.admin_handler.exfiltrate_user_data(self.user2, writer))
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
 
         writer.write_events.assert_not_called()
         writer.write_state.assert_not_called()

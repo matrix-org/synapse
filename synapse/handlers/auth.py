@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+import time
 import unicodedata
 
 import attr
@@ -34,11 +35,12 @@ from synapse.api.errors import (
     LoginError,
     StoreError,
     SynapseError,
+    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.logging.context import defer_to_thread
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
-from synapse.util import logcontext
 from synapse.util.caches.expiringcache import ExpiringCache
 
 from ._base import BaseHandler
@@ -558,7 +560,7 @@ class AuthHandler(BaseHandler):
         return self.sessions[session_id]
 
     @defer.inlineCallbacks
-    def get_access_token_for_user_id(self, user_id, device_id=None):
+    def get_access_token_for_user_id(self, user_id, device_id, valid_until_ms):
         """
         Creates a new access token for the user with the given user ID.
 
@@ -572,14 +574,26 @@ class AuthHandler(BaseHandler):
             device_id (str|None): the device ID to associate with the tokens.
                None to leave the tokens unassociated with a device (deprecated:
                we should always have a device ID)
+            valid_until_ms (int|None): when the token is valid until. None for
+                no expiry.
         Returns:
               The access token for the user's session.
         Raises:
             StoreError if there was a problem storing the token.
         """
-        logger.info("Logging in user %s on device %s", user_id, device_id)
-        access_token = yield self.issue_access_token(user_id, device_id)
+        fmt_expiry = ""
+        if valid_until_ms is not None:
+            fmt_expiry = time.strftime(
+                " until %Y-%m-%d %H:%M:%S", time.localtime(valid_until_ms / 1000.0)
+            )
+        logger.info("Logging in user %s on device %s%s", user_id, device_id, fmt_expiry)
+
         yield self.auth.check_auth_blocking(user_id)
+
+        access_token = self.macaroon_gen.generate_access_token(user_id)
+        yield self.store.add_access_token_to_user(
+            user_id, access_token, device_id, valid_until_ms
+        )
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -610,6 +624,7 @@ class AuthHandler(BaseHandler):
         Raises:
             LimitExceededError if the ratelimiter's login requests count for this
                 user is too high too proceed.
+            UserDeactivatedError if a user is found but is deactivated.
         """
         self.ratelimit_login_per_account(user_id)
         res = yield self._find_user_id_and_pwd_hash(user_id)
@@ -825,17 +840,18 @@ class AuthHandler(BaseHandler):
         if not lookupres:
             defer.returnValue(None)
         (user_id, password_hash) = lookupres
+
+        # If the password hash is None, the account has likely been deactivated
+        if not password_hash:
+            deactivated = yield self.store.get_user_deactivated_status(user_id)
+            if deactivated:
+                raise UserDeactivatedError("This account has been deactivated")
+
         result = yield self.validate_hash(password, password_hash)
         if not result:
             logger.warn("Failed password login for user %s", user_id)
             defer.returnValue(None)
         defer.returnValue(user_id)
-
-    @defer.inlineCallbacks
-    def issue_access_token(self, user_id, device_id=None):
-        access_token = self.macaroon_gen.generate_access_token(user_id)
-        yield self.store.add_access_token_to_user(user_id, access_token, device_id)
-        defer.returnValue(access_token)
 
     @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
@@ -987,7 +1003,7 @@ class AuthHandler(BaseHandler):
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode("ascii")
 
-        return logcontext.defer_to_thread(self.hs.get_reactor(), _do_hash)
+        return defer_to_thread(self.hs.get_reactor(), _do_hash)
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
@@ -1013,7 +1029,7 @@ class AuthHandler(BaseHandler):
             if not isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.encode("ascii")
 
-            return logcontext.defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
+            return defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
 
