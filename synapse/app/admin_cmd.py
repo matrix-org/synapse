@@ -105,7 +105,7 @@ def export_data_command(hs, args):
     user_id = args.user_id
     directory = args.output_directory
 
-    res = yield hs.get_handlers().admin_handler.exfiltrate_user_data(
+    res = yield hs.get_handlers().admin_handler.export_user_data(
         user_id, FileExfiltrationWriter(user_id, directory=directory)
     )
     print(res)
