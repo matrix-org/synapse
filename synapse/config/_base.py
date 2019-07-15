@@ -284,7 +284,7 @@ class Config(object):
         Used for workers where we want to add extra flags/subcommands.
 
         Args:
-            conifg_parser (ArgumentParser)
+            config_parser (ArgumentParser)
             argv (list[str])
 
         Returns:
