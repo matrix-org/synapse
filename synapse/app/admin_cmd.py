@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import logging
 import sys
 
@@ -105,7 +106,8 @@ def export_data_command(hs, user_id, directory):
 
 
 def start(config_options):
-    parser = HomeServerConfig.create_argument_parser("Synapse Admin Command")
+    parser = argparse.ArgumentParser(description="Synapse Admin Command")
+    HomeServerConfig.add_arguments_to_parser(parser)
 
     subparser = parser.add_subparsers(
         title="Admin Commands",

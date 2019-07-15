@@ -231,27 +231,24 @@ class Config(object):
 
         Returns: Config object.
         """
-        config_parser = cls.create_argument_parser(description)
+        config_parser = argparse.ArgumentParser(description=description)
+        cls.add_arguments_to_parser(config_parser)
         obj, _ = cls.load_config_with_parser(config_parser, argv)
 
         return obj
 
     @classmethod
-    def create_argument_parser(cls, description):
-        """Create an ArgumentParser instance with all the config flags.
+    def add_arguments_to_parser(cls, config_parser):
+        """Adds all the config flags to an ArgumentParser.
 
         Doesn't support config-file-generation: used by the worker apps.
 
         Used for workers where we want to add extra flags/subcommands.
 
         Args:
-            description (str): App description
-
-        Returns:
-            ArgumentParser
+            config_parser (ArgumentParser): App description
         """
 
-        config_parser = argparse.ArgumentParser(description=description)
         config_parser.add_argument(
             "-c",
             "--config-path",
@@ -272,8 +269,6 @@ class Config(object):
         # We can only invoke `add_arguments` on an actual object, but
         # `add_arguments` should be side effect free so this is probably fine.
         cls.invoke_all_static("add_arguments", config_parser)
-
-        return config_parser
 
     @classmethod
     def load_config_with_parser(cls, config_parser, argv):
