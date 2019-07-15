@@ -177,12 +177,10 @@ def setup_logging(config, use_worker_options=False):
     log_config = config.worker_log_config if use_worker_options else config.log_config
 
     def read_config(*args, callback=None):
-        log_config_body = FilePath(log_config).getContent()
+        if log_config is None:
+            return None
 
-        if not log_config_body:
-            return
-
-        log_config_body = yaml.safe_load(log_config_body)
+        log_config_body = yaml.safe_load(FilePath(log_config).getContent())
         if args:
             logging.info("Reloaded log config from %s due to SIGHUP", log_config)
         if callback:
