@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@
 import functools
 import logging
 import re
+from typing import Tuple
 
 from twisted.internet import defer
 
@@ -215,7 +217,8 @@ class BaseFederationServlet(object):
     match against the request path (excluding the /federation/v1 prefix).
 
     The servlet should also implement one or more of on_GET, on_POST, on_PUT, to match
-    the appropriate HTTP method. These methods have the signature:
+    the appropriate HTTP method. These methods must be *asynchronous* and have the
+    signature:
 
         on_<METHOD>(self, origin, content, query, **kwargs)
 
@@ -235,7 +238,7 @@ class BaseFederationServlet(object):
                 components as specified in the path match regexp.
 
         Returns:
-            Deferred[(int, object)|None]: either (response code, response object) to
+            Optional[Tuple[int, object]]: either (response code, response object) to
                  return a JSON response, or None if the request has already been handled.
 
         Raises:
@@ -258,10 +261,9 @@ class BaseFederationServlet(object):
         authenticator = self.authenticator
         ratelimiter = self.ratelimiter
 
-        @defer.inlineCallbacks
         @functools.wraps(func)
-        def new_func(request, *args, **kwargs):
-            """ A callback which can be passed to HttpServer.RegisterPaths
+        async def new_func(request, *args, **kwargs):
+            """A callback which can be passed to HttpServer.RegisterPaths
 
             Args:
                 request (twisted.web.http.Request):
@@ -270,8 +272,8 @@ class BaseFederationServlet(object):
                     components as specified in the path match regexp.
 
             Returns:
-                Deferred[(int, object)|None]: (response code, response object) as returned
-                    by the callback method. None if the request has already been handled.
+                Tuple[int, object]|None: (response code, response object) as returned by
+                    the callback method. None if the request has already been handled.
             """
             content = None
             if request.method in [b"PUT", b"POST"]:
@@ -279,7 +281,7 @@ class BaseFederationServlet(object):
                 content = parse_json_object_from_request(request)
 
             try:
-                origin = yield authenticator.authenticate_request(request, content)
+                origin = await authenticator.authenticate_request(request, content)
             except NoAuthenticationError:
                 origin = None
                 if self.REQUIRE_AUTH:
@@ -304,16 +306,16 @@ class BaseFederationServlet(object):
             ):
                 if origin:
                     with ratelimiter.ratelimit(origin) as d:
-                        yield d
-                        response = yield func(
+                        await d
+                        response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
                 else:
-                    response = yield func(
+                    response = await func(
                         origin, content, request.args, *args, **kwargs
                     )
 
-            defer.returnValue(response)
+            return response
 
         # Extra logic that functools.wraps() doesn't finish
         new_func.__self__ = func.__self__
