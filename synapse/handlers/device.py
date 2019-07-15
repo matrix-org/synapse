@@ -649,13 +649,20 @@ class DeviceListUpdater(object):
             # eventually become consistent.
             return
         except FederationDeniedError as e:
+            opentracing.set_tag("error", True)
+            opentracing.log_kv({"reason": "FederationDeniedError"})
             logger.info(e)
             return
-        except Exception:
+        except Exception as e:
             # TODO: Remember that we are now out of sync and try again
             # later
+            opentracing.set_tag("error", True)
+            opentracing.log_kv(
+                {"message": "Exception raised by federation request", "exception": e}
+            )
             logger.exception("Failed to handle device list update for %s", user_id)
             return
+        opentracing.log_kv({"result": result})
         stream_id = result["stream_id"]
         devices = result["devices"]
 
