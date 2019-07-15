@@ -468,7 +468,7 @@ class Config(object):
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
 
-        obj.invoke_all("add_arguments", parser)
+        obj.invoke_all_static("add_arguments", parser)
         args = parser.parse_args(remaining_args)
 
         config_dict = read_config_files(config_files)
