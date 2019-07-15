@@ -154,9 +154,6 @@ class UserDeactivatedError(SynapseError):
             code=http_client.FORBIDDEN, msg=msg, errcode=Codes.UNKNOWN
         )
 
-    def error_dict(self):
-        return cs_error(self.msg, self.errcode)
-
 
 class RegistrationError(SynapseError):
     """An error raised when a registration event fails."""
