@@ -137,10 +137,40 @@ class Config(object):
             return file_stream.read()
 
     def invoke_all(self, name, *args, **kargs):
+        """Invoke all instance methods with the given name and arguments in the
+        class's MRO.
+
+        Args:
+            name (str): Name of function to invoke
+            *args
+            **kwargs
+
+        Returns:
+            list: The list of the return values from each method called
+        """
         results = []
         for cls in type(self).mro():
             if name in cls.__dict__:
                 results.append(getattr(cls, name)(self, *args, **kargs))
+        return results
+
+    @classmethod
+    def invoke_all_static(cls, name, *args, **kargs):
+        """Invoke all static methods with the given name and arguments in the
+        class's MRO.
+
+        Args:
+            name (str): Name of function to invoke
+            *args
+            **kwargs
+
+        Returns:
+            list: The list of the return values from each method called
+        """
+        results = []
+        for c in cls.mro():
+            if name in c.__dict__:
+                results.append(getattr(c, name)(*args, **kargs))
         return results
 
     def generate_config(
@@ -241,7 +271,7 @@ class Config(object):
 
         # We can only invoke `add_arguments` on an actual object, but
         # `add_arguments` should be side effect free so this is probably fine.
-        cls().invoke_all("add_arguments", config_parser)
+        cls.invoke_all_static("add_arguments", config_parser)
 
         return config_parser
 
