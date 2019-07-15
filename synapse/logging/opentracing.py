@@ -274,7 +274,7 @@ def start_active_span_from_edu(
 
 @only_if_tracing
 def set_tag(key, value):
-    """Set's a tag on the active span"""
+    """Sets a tag on the active span"""
     opentracing.tracer.active_span.set_tag(key, value)
 
 
@@ -302,6 +302,9 @@ def set_baggage_item(key, value):
 def set_operation_name(operation_name):
     """Sets the operation name of the active span"""
     opentracing.tracer.active_span.set_operation_name(operation_name)
+
+
+##### Injection and extraction
 
 
 @only_if_tracing
@@ -333,9 +336,6 @@ def inject_active_span_twisted_headers(headers, destination):
 
     for key, value in carrier.items():
         headers.addRawHeaders(key, value)
-
-
-##### Injection and extraction
 
 
 @only_if_tracing
@@ -409,33 +409,6 @@ def trace_deferred(func):
     """Decorator to trace a deferred function. Sets the operation name to that of the
     function's."""
 
-
-def trace_servlet(servlet_name, func):
-    """Decorator which traces a serlet. It starts a span with some servlet specific
-    tags such as the servlet_name and request information"""
-
-    @wraps(func)
-    @defer.inlineCallbacks
-    def _trace_servlet_inner(request, *args, **kwargs):
-        with start_active_span_from_context(
-            request.requestHeaders,
-            "incoming-client-request",
-            tags={
-                "request_id": request.get_request_id(),
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
-                tags.HTTP_METHOD: request.get_method(),
-                tags.HTTP_URL: request.get_redacted_uri(),
-                tags.PEER_HOST_IPV6: request.getClientIP(),
-                "servlet_name": servlet_name,
-            },
-        ):
-            result = yield defer.maybeDeferred(func, request, *args, **kwargs)
-        defer.returnValue(result)
-
-    return _trace_servlet_inner
-
-
-def trace_defered_function(func):
     @wraps(func)
     @defer.inlineCallbacks
     def _trace_deferred_inner(self, *args, **kwargs):
@@ -504,10 +477,10 @@ def wrap_in_span(func):
     which is a complete break from the current logcontext. This function creates
     a non active span from the current context and closes it after the function
     executes."""
-
+    global opentracing
     # I haven't use this function yet
 
-    if not TracerUtil._opentracing:
+    if not opentracing:
         return func
 
     parent_span = opentracing.tracer.active_span
@@ -528,7 +501,8 @@ def wrap_in_span(func):
 
 
 def trace_servlet(servlet_name, func):
-    """Decorator to trace a servlet"""
+    """Decorator which traces a serlet. It starts a span with some servlet specific
+    tags such as the servlet_name and request information"""
     if not opentracing:
         return func
 
