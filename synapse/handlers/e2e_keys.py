@@ -22,8 +22,14 @@ from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.api.errors import CodeMessageException, SynapseError
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.context import (
+    LoggingContext,
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+    run_in_background,
+)
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -45,6 +51,7 @@ class E2eKeysHandler(object):
             "client_keys", self.on_federation_query_client_keys
         )
 
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def query_devices(self, query_body, timeout):
         """ Handle a device key query from a client
@@ -65,6 +72,7 @@ class E2eKeysHandler(object):
             }
         }
         """
+
         device_keys_query = query_body.get("device_keys", {})
 
         # separate users by domain.
@@ -78,6 +86,9 @@ class E2eKeysHandler(object):
                 local_query[user_id] = device_ids
             else:
                 remote_queries[user_id] = device_ids
+
+        opentracing.set_tag("local_key_query", local_query)
+        opentracing.set_tag("remote_key_query", remote_queries)
 
         # First get local devices.
         failures = {}
@@ -119,9 +130,81 @@ class E2eKeysHandler(object):
                 r[user_id] = remote_queries[user_id]
 
         # Now fetch any devices that we don't have in our cache
+        @opentracing.trace_deferred
         @defer.inlineCallbacks
         def do_remote_query(destination):
             destination_query = remote_queries_not_in_cache[destination]
+
+            opentracing.set_tag("key_query", destination_query)
+
+            # We first consider whether we wish to update the dive list cache with
+            # the users device list. We want to track a user's devices when the
+            # authenticated user shares a room with the queried user and the query
+            # has not specified a particular device.
+            # If we update the cache for the queried user we remove them from further
+            # queries. We use the more efficient batched query_client_keys for all
+            # remaining users
+            user_ids_updated = []
+            for (user_id, device_list) in destination_query.items():
+                if user_id not in user_ids_updated:
+                    try:
+                        with PreserveLoggingContext(LoggingContext.current_context()):
+                            room_ids = yield self.store.get_rooms_for_user(user_id)
+                            if not device_list and room_ids:
+                                opentracing.log_kv(
+                                    {
+                                        "message": "Resyncing devices for user",
+                                        "user_id": user_id,
+                                    }
+                                )
+                                user_devices = yield self.device_handler.device_list_updater.user_device_resync(
+                                    user_id
+                                )
+                                user_devices = user_devices["devices"]
+                                opentracing.log_kv(
+                                    {
+                                        "message": "got user devices",
+                                        "user_devices": user_devices,
+                                    }
+                                )
+                                for device in user_devices:
+                                    results[user_id] = {
+                                        device["device_id"]: device["keys"]
+                                    }
+                                opentracing.log_kv(
+                                    {"adding user to user_ids_updated": user_id}
+                                )
+                                user_ids_updated.append(user_id)
+                            else:
+                                opentracing.log_kv(
+                                    {
+                                        "message": "Not resyncing devices for user",
+                                        "user_id": user_id,
+                                    }
+                                )
+                    except Exception as e:
+                        failures[destination] = failures.get(destination, []).append(
+                            _exception_to_failure(e)
+                        )
+                        opentracing.set_tag("error", True)
+                        opentracing.log_kv({"exception": e})
+
+            if len(destination_query) == len(user_ids_updated):
+                # We've updated all the users in the query and we do not need to
+                # make any further remote calls.
+                return
+
+            # Remove all the users from the query which we have updated
+            for user_id in user_ids_updated:
+                destination_query.pop(user_id)
+
+            opentracing.log_kv(
+                {
+                    "message": "Querying remote servers for keys",
+                    "destination_query": destination_query,
+                    "not querying": user_ids_updated,
+                }
+            )
             try:
                 remote_result = yield self.federation.query_client_keys(
                     destination, {"device_keys": destination_query}, timeout=timeout
@@ -132,7 +215,8 @@ class E2eKeysHandler(object):
                         results[user_id] = keys
 
             except Exception as e:
-                failures[destination] = _exception_to_failure(e)
+                failure = _exception_to_failure(e)
+                failures[destination] = failure
 
         yield make_deferred_yieldable(
             defer.gatherResults(
@@ -144,8 +228,10 @@ class E2eKeysHandler(object):
             )
         )
 
+        opentracing.log_kv({"device_keys": results, "failures": failures})
         return {"device_keys": results, "failures": failures}
 
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def query_local_devices(self, query):
         """Get E2E device keys for local users
@@ -158,6 +244,7 @@ class E2eKeysHandler(object):
             defer.Deferred: (resolves to dict[string, dict[string, dict]]):
                  map from user_id -> device_id -> device details
         """
+        opentracing.set_tag("local_query", query)
         local_query = []
 
         result_dict = {}
@@ -165,6 +252,14 @@ class E2eKeysHandler(object):
             # we use UserID.from_string to catch invalid user ids
             if not self.is_mine(UserID.from_string(user_id)):
                 logger.warning("Request for keys for non-local user %s", user_id)
+                opentracing.log_kv(
+                    {
+                        "message": "Requested a local key for a user which"
+                        + " was not local to the homeserver",
+                        "user_id": user_id,
+                    }
+                )
+                opentracing.set_tag("error", True)
                 raise SynapseError(400, "Not a user here")
 
             if not device_ids:
@@ -189,6 +284,7 @@ class E2eKeysHandler(object):
                     r["unsigned"]["device_display_name"] = display_name
                 result_dict[user_id][device_id] = r
 
+        opentracing.log_kv(results)
         return result_dict
 
     @defer.inlineCallbacks
@@ -199,6 +295,7 @@ class E2eKeysHandler(object):
         res = yield self.query_local_devices(device_keys_query)
         return {"device_keys": res}
 
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def claim_one_time_keys(self, query, timeout):
         local_query = []
@@ -213,6 +310,9 @@ class E2eKeysHandler(object):
                 domain = get_domain_from_id(user_id)
                 remote_queries.setdefault(domain, {})[user_id] = device_keys
 
+        opentracing.set_tag("local_key_query", local_query)
+        opentracing.set_tag("remote_key_query", remote_queries)
+
         results = yield self.store.claim_e2e_one_time_keys(local_query)
 
         json_result = {}
@@ -224,8 +324,10 @@ class E2eKeysHandler(object):
                         key_id: json.loads(json_bytes)
                     }
 
+        @opentracing.trace_deferred
         @defer.inlineCallbacks
         def claim_client_keys(destination):
+            opentracing.set_tag("destination", destination)
             device_keys = remote_queries[destination]
             try:
                 remote_result = yield self.federation.claim_client_keys(
@@ -234,8 +336,12 @@ class E2eKeysHandler(object):
                 for user_id, keys in remote_result["one_time_keys"].items():
                     if user_id in device_keys:
                         json_result[user_id] = keys
+
             except Exception as e:
-                failures[destination] = _exception_to_failure(e)
+                failure = _exception_to_failure(e)
+                failures[destination] = failure
+                opentracing.set_tag("error", True)
+                opentracing.set_tag("reason", failure)
 
         yield make_deferred_yieldable(
             defer.gatherResults(
@@ -259,20 +365,34 @@ class E2eKeysHandler(object):
             ),
         )
 
+        opentracing.log_kv({"one_time_keys": json_result, "failures": failures})
+
         return {"one_time_keys": json_result, "failures": failures}
 
+    @opentracing.trace_deferred
+    @opentracing.tag_args
     @defer.inlineCallbacks
+    @opentracing.tag_args
     def upload_keys_for_user(self, user_id, device_id, keys):
+
         time_now = self.clock.time_msec()
 
         # TODO: Validate the JSON to make sure it has the right keys.
         device_keys = keys.get("device_keys", None)
+        opentracing.set_tag("device_keys", device_keys)
         if device_keys:
             logger.info(
                 "Updating device_keys for device %r for user %s at %d",
                 device_id,
                 user_id,
                 time_now,
+            )
+            opentracing.log_kv(
+                {
+                    "message": "Updating device_keys for user.",
+                    "user_id": user_id,
+                    "device_id": device_id,
+                }
             )
             # TODO: Sign the JSON with the server key
             changed = yield self.store.set_e2e_device_keys(
@@ -281,11 +401,26 @@ class E2eKeysHandler(object):
             if changed:
                 # Only notify about device updates *if* the keys actually changed
                 yield self.device_handler.notify_device_update(user_id, [device_id])
-
+        else:
+            opentracing.log_kv(
+                {"message": "Not updating device_keys for user", "user_id": user_id}
+            )
         one_time_keys = keys.get("one_time_keys", None)
+        opentracing.set_tag("one_time_keys", one_time_keys)
         if one_time_keys:
+            opentracing.log_kv(
+                {
+                    "message": "Updating one_time_keys for device.",
+                    "user_id": user_id,
+                    "device_id": device_id,
+                }
+            )
             yield self._upload_one_time_keys_for_user(
                 user_id, device_id, time_now, one_time_keys
+            )
+        else:
+            opentracing.log_kv(
+                {"message": "Did not update one_time_keys", "reason": "no keys given"}
             )
 
         # the device should have been registered already, but it may have been
@@ -297,6 +432,7 @@ class E2eKeysHandler(object):
 
         result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
 
+        opentracing.set_tag("one_time_key_counts", result)
         return {"one_time_key_counts": result}
 
     @defer.inlineCallbacks
@@ -340,6 +476,9 @@ class E2eKeysHandler(object):
                     (algorithm, key_id, encode_canonical_json(key).decode("ascii"))
                 )
 
+        opentracing.log_kv(
+            {"message": "Inserting new one_time_keys.", "keys": new_keys}
+        )
         yield self.store.add_e2e_one_time_keys(user_id, device_id, time_now, new_keys)
 
 
