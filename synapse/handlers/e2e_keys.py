@@ -344,9 +344,8 @@ class E2eKeysHandler(object):
         return {"one_time_keys": json_result, "failures": failures}
 
     @defer.inlineCallbacks
+    @opentracing.tag_args
     def upload_keys_for_user(self, user_id, device_id, keys):
-        opentracing.set_tag("user_id", user_id)
-        opentracing.set_tag("device_id", device_id)
 
         time_now = self.clock.time_msec()
 
