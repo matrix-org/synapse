@@ -148,6 +148,17 @@ class StatsHandler(StateDeltasHandler):
             # quantise time to the nearest bucket
             now = (now // 1000 // self.stats_bucket_size) * self.stats_bucket_size
 
+            yield self.store.update_stats_delta(
+                now, "room", room_id, "state_events", +1
+            )
+
+            if prev_event_id is None:
+                # this state event doesn't overwrite another,
+                # so it is a new effective/current state event
+                yield self.store.update_stats_delta(
+                    now, "room", room_id, "current_state_events", +1
+                )
+
             if typ == EventTypes.Member:
                 # we could use _get_key_change here but it's a bit inefficient
                 # given we're not testing for a specific result; might as well
