@@ -1,0 +1,1 @@
+Fix improper or missing room_stats updates when handling state events (deltas).
