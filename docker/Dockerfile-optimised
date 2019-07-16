@@ -21,7 +21,7 @@ FROM matrixdotorg/optimised-python:${PYTHON_VERSION}-optimized-lto-${MARCH} as b
 
 # install the OS build deps
 
-RUN apt-get update && apt-get install -y build-essential libpq5-dev libffi-dev libexpat1-dev libxml2-dev libxslt-dev
+RUN apt-get update && apt-get install -y build-essential libpq-dev libffi-dev libexpat1-dev libxml2-dev libxslt-dev
 
 # build things which have slow build steps, before we copy synapse, so that
 # the layer can be cached.
