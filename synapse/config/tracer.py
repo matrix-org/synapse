@@ -23,6 +23,12 @@ class TracerConfig(Config):
             opentracing_config = {}
 
         self.opentracer_enabled = opentracing_config.get("enabled", False)
+
+        self.jaeger_config = config.tracer_config.get(
+            "jaeger_config",
+            {"sampler": {"type": "const", "param": 1}, "logging": False},
+        )
+
         if not self.opentracer_enabled:
             return
 
@@ -66,4 +72,19 @@ class TracerConfig(Config):
             #
             #homeserver_whitelist:
             #  - ".*"
+
+            # Jaeger can be configured to sample traces at different rates.
+            # All configuration options provided by Jaeger can be set here.
+            # Jaeger's configuration mostly related to sampling which is documented here:
+            # https://www.jaegertracing.io/docs/1.13/sampling/.
+            #
+            #jaeger_config:
+            #  sampler:
+            #    type: const
+            #    param: 1
+
+            #  Logging whether spans were started and reported
+            #
+            #  logging:
+            #    false
         """
