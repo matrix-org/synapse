@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
 import logging.config
 import os
@@ -76,6 +77,7 @@ root:
 class LoggingConfig(Config):
     def read_config(self, config, **kwargs):
         self.log_config = self.abspath(config.get("log_config"))
+        self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
@@ -88,6 +90,20 @@ class LoggingConfig(Config):
         log_config: "%(log_config)s"
         """
             % locals()
+        )
+
+    def read_arguments(self, args):
+        if args.no_redirect_stdio is not None:
+            self.no_redirect_stdio = args.no_redirect_stdio
+
+    def add_arguments(cls, parser):
+        logging_group = parser.add_argument_group("logging")
+        logging_group.add_argument(
+            "-n",
+            "--no-redirect-stdio",
+            action="store_true",
+            default=None,
+            help="Do not redirect stdout/stderr to the log",
         )
 
     def generate_files(self, config, config_dir_path):
@@ -179,4 +195,8 @@ def setup_logging(config, use_worker_options=False):
 
         return observer(event)
 
-    globalLogBeginner.beginLoggingTo([_log], redirectStandardIO=True)
+    globalLogBeginner.beginLoggingTo(
+        [_log], redirectStandardIO=not self.no_redirect_stdio
+    )
+    if not config.no_redirect_stdio:
+        print("Redirected stdout/stderr to logs")
