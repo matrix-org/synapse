@@ -249,6 +249,11 @@ class EventsWorkerStore(SQLBaseStore):
             if not entry:
                 continue
 
+            if not allow_rejected:
+                assert (
+                    not entry.event.rejected_reason
+                ), "rejected event returned despite allow_rejected=False"
+
             # Starting in room version v3, some redactions need to be rechecked if we
             # didn't have the redacted event at the time, so we recheck on read
             # instead.
@@ -297,25 +302,24 @@ class EventsWorkerStore(SQLBaseStore):
                         # it anyway, since we have this redaction)
                         continue
 
-            if allow_rejected or not entry.event.rejected_reason:
-                if check_redacted and entry.redacted_event:
-                    event = entry.redacted_event
-                else:
-                    event = entry.event
+            if check_redacted and entry.redacted_event:
+                event = entry.redacted_event
+            else:
+                event = entry.event
 
-                events.append(event)
+            events.append(event)
 
-                if get_prev_content:
-                    if "replaces_state" in event.unsigned:
-                        prev = yield self.get_event(
-                            event.unsigned["replaces_state"],
-                            get_prev_content=False,
-                            allow_none=True,
-                        )
-                        if prev:
-                            event.unsigned = dict(event.unsigned)
-                            event.unsigned["prev_content"] = prev.content
-                            event.unsigned["prev_sender"] = prev.sender
+            if get_prev_content:
+                if "replaces_state" in event.unsigned:
+                    prev = yield self.get_event(
+                        event.unsigned["replaces_state"],
+                        get_prev_content=False,
+                        allow_none=True,
+                    )
+                    if prev:
+                        event.unsigned = dict(event.unsigned)
+                        event.unsigned["prev_content"] = prev.content
+                        event.unsigned["prev_sender"] = prev.sender
 
         defer.returnValue(events)
 
