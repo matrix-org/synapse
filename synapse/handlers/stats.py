@@ -153,21 +153,28 @@ class StatsHandler(StateDeltasHandler):
                 # given we're not testing for a specific result; might as well
                 # just grab the prev_membership and membership strings and
                 # compare them.
-                prev_event_content = {}
+                # We take None rather than leave as a previous membership
+                # in the absence of a previous event because we do not want to
+                # reduce the leave count when a new-to-the-room user joins.
+                prev_membership = None
                 if prev_event_id is not None:
                     prev_event = yield self.store.get_event(
                         prev_event_id, allow_none=True
                     )
                     if prev_event:
                         prev_event_content = prev_event.content
+                        prev_membership = prev_event_content.get(
+                            "membership", Membership.LEAVE
+                        )
 
                 membership = event_content.get("membership", Membership.LEAVE)
-                prev_membership = prev_event_content.get("membership", Membership.LEAVE)
 
                 if prev_membership == membership:
                     continue
 
-                if prev_membership == Membership.JOIN:
+                if prev_membership is None:
+                    logger.debug("No previous membership for this user.")
+                elif prev_membership == Membership.JOIN:
                     yield self.store.update_stats_delta(
                         now, "room", room_id, "joined_members", -1
                     )
