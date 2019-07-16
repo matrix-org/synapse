@@ -31,7 +31,7 @@ steps:
       - "python -m pip install tox"
       - "scripts-dev/check-newsfragment"
     label: ":newspaper: Newsfile"
-    branches: "!master !develop !release-*"
+    branches: "!master !develop !release-* !shhs-v*"
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
@@ -137,6 +137,7 @@ steps:
           limit: 2
 
   - label: ":python: 3.7 / :postgres: 9.5"
+    branches: "!shhs !shhs-*"
     env:
       TRIAL_FLAGS: "-j 4"
     command:
@@ -233,14 +234,12 @@ steps:
         - exit_status: 2
           limit: 2
 
-  - wait
-
   - label: "Docker Build -- Optimised Skylake-AVX512"
     agents:
       queue: "release"
     branches: "shhs-*"
     command:
-      - "docker build -f docker/Dockerfile-optimised --build-arg PYTHON_VERSION=3.6 --build-arg MARCH=skylake-avx512 . -t matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512"
+      - "docker build -f docker/Dockerfile-optimised --build-arg PYTHON_VERSION=3.7.4 --build-arg MARCH=skylake-avx512 . -t matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512"
       - "docker docker save matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512 | gzip -9 > docker.tar.gz"
     artifact_paths:
       - "docker.tar.gz"
