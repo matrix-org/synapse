@@ -36,6 +36,7 @@ except ImportError:
     LogContextScopeManager = None
 
 import contextlib
+import inspect
 import logging
 import re
 from functools import wraps
@@ -467,7 +468,10 @@ def trace_using_operation_name(operation_name):
 def tag_args(func):
     @wraps(func)
     def _tag_args_inner(self, *args, **kwargs):
-        set_tag("args", args)
+        argspec = inspect.getargspec(func)
+        for i, arg in enumerate(argspec.args[1:]):
+            set_tag("ARG_" + arg, args[i])
+        set_tag("args", args[len(argspec.args) :])
         set_tag("kwargs", kwargs)
         return func(self, *args, **kwargs)
 
