@@ -246,6 +246,23 @@ class StatsHandler(StateDeltasHandler):
                     },
                 )
 
+                # Also add room stats with just the one state event
+                # (the room creation state event)
+                yield self.store.update_stats(
+                    "room",
+                    room_id,
+                    now,
+                    {
+                        "bucket_size": self.stats_bucket_size,
+                        "current_state_events": 1,
+                        "joined_members": 0,
+                        "invited_members": 0,
+                        "left_members": 0,
+                        "banned_members": 0,
+                        "state_events": 1,
+                    },
+                )
+
             elif typ == EventTypes.JoinRules:
                 yield self.store.update_room_state(
                     room_id, {"join_rules": event_content.get("join_rule")}
