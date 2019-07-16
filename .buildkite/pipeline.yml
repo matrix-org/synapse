@@ -47,11 +47,11 @@ steps:
 
   - wait
 
-
   - command:
       - "python -m pip install tox"
       - "tox -e py35-old,codecov"
     label: ":python: 3.5 / SQLite / Old Deps"
+    branches: "!shhs !shhs-*"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
@@ -69,6 +69,7 @@ steps:
       - "python -m pip install tox"
       - "tox -e py35,codecov"
     label: ":python: 3.5 / SQLite"
+    branches: "!shhs !shhs-*"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
@@ -86,6 +87,7 @@ steps:
       - "python -m pip install tox"
       - "tox -e py36,codecov"
     label: ":python: 3.6 / SQLite"
+    branches: "!shhs !shhs-*"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
@@ -117,6 +119,7 @@ steps:
           limit: 2
 
   - label: ":python: 3.5 / :postgres: 9.5"
+    branches: "!shhs !shhs-*"
     env:
       TRIAL_FLAGS: "-j 4"
     command:
@@ -169,6 +172,7 @@ steps:
 
 
   - label: "SyTest - :python: 3.5 / SQLite / Monolith"
+    branches: "!shhs !shhs-*"
     agents:
       queue: "medium"
     command:
@@ -207,6 +211,7 @@ steps:
           limit: 2
 
   - label: "SyTest - :python: 3.5 / :postgres: 9.6 / Workers"
+    branches: "!shhs !shhs-*"
     agents:
       queue: "medium"
     env:
@@ -227,3 +232,15 @@ steps:
           limit: 2
         - exit_status: 2
           limit: 2
+
+  - wait
+
+  - label: "Docker Build -- Optimised Skylake-AVX512"
+    agents:
+      queue: "release"
+    branches: "shhs shhs-*"
+    command:
+      - "docker build -f docker/Dockerfile-optimised --build-arg PYTHON_VERSION=3.6 --build-arg MARCH=skylake-avx512 . -t matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512"
+      - "docker docker save matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512 | gzip -9 > docker.tar.gz"
+    artifact_paths:
+      - "docker.tar.gz"
