@@ -238,9 +238,9 @@ steps:
   - label: "Docker Build -- Optimised Skylake-AVX512"
     agents:
       queue: "release"
-    branches: "shhs shhs-*"
+    branches: "shhs-*"
     command:
-      - "docker build -f docker/Dockerfile-optimised --build-arg PYTHON_VERSION=3.6 --build-arg MARCH=skylake-avx512 . -t matrixdotorg/synapse:${BUILDKITE_TAG}${BUILDKITE_BRANCH}-skylake-avx512"
-      - "docker docker save matrixdotorg/synapse:${BUILDKITE_TAG}${BUILDKITE_BRANCH}-skylake-avx512 | gzip -9 > docker.tar.gz"
+      - "docker build -f docker/Dockerfile-optimised --build-arg PYTHON_VERSION=3.6 --build-arg MARCH=skylake-avx512 . -t matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512"
+      - "docker docker save matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512 | gzip -9 > docker.tar.gz"
     artifact_paths:
       - "docker.tar.gz"
