@@ -181,7 +181,6 @@ def start(config_options):
 
     subparser = parser.add_subparsers(
         title="Admin Commands",
-        description="Choose an admin command to perform.",
         required=True,
         dest="command",
         metavar="<admin_command>",
