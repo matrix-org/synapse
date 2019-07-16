@@ -240,6 +240,6 @@ steps:
     branches: "shhs-*"
     command:
       - "docker build -f docker/Dockerfile-optimised --build-arg PYTHON_VERSION=3.7.4 --build-arg MARCH=skylake-avx512 . -t matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512"
-      - "docker docker save matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512 | gzip -9 > docker.tar.gz"
+      - "docker save matrixdotorg/synapse:${BUILDKITE_TAG}-skylake-avx512 | gzip -9 > docker.tar.gz"
     artifact_paths:
       - "docker.tar.gz"
