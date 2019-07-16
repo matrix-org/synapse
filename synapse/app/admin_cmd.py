@@ -196,7 +196,7 @@ def start(config_options):
         action="store",
         metavar="DIRECTORY",
         required=False,
-        help="The directory to store the exported data in. Must be emtpy. Defaults"
+        help="The directory to store the exported data in. Must be empty. Defaults"
         " to creating a temp directory.",
     )
     export_data_parser.set_defaults(func=export_data_command)
