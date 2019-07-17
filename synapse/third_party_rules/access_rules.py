@@ -454,5 +454,11 @@ class RoomAccessRules(object):
              invite (EventBase): The m.room.member event with "invite" membership.
              threepid_invite_token (str): The state key from the 3PID invite.
         """
-        token = invite.content.get("third_party_signed", {}).get("token", "")
+        if "third_party_signed" in invite.content:
+            token = invite.content.get("third_party_signed", {}).get("token", "")
+        else:
+            token = invite.content.get(
+                "third_party_invite", {},
+            ).get("signed", {}).get("token", "")
+
         return token == threepid_invite_token
