@@ -249,7 +249,6 @@ def start_active_span_from_edu(
     """
 
     if opentracing is None:
-        logger.info("++++++++++++++++++++ opentracing is None")
         return _noop_context_manager()
 
     carrier = json.loads(edu_content.get("context", "{}")).get("opentracing", {})
