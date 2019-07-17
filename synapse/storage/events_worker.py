@@ -236,37 +236,47 @@ class EventsWorkerStore(SQLBaseStore):
                     "allow_rejected=False"
                 )
 
-            # Starting in room version v3, some redactions need to be rechecked if we
-            # didn't have the redacted event at the time, so we recheck on read
-            # instead.
-            if not allow_rejected and entry.event.type == EventTypes.Redaction:
-                if entry.event.internal_metadata.need_to_check_redaction():
-                    # XXX: we should probably use _get_events_from_cache_or_db here,
-                    # so that we can benefit from caching.
-                    orig_sender = yield self._simple_select_one_onecol(
-                        table="events",
-                        keyvalues={"event_id": entry.event.redacts},
-                        retcol="sender",
-                        allow_none=True,
-                    )
+            # We may not have had the original event when we received a redaction, so
+            # we have to recheck auth now.
 
-                    expected_domain = get_domain_from_id(entry.event.sender)
-                    if (
-                        orig_sender
-                        and get_domain_from_id(orig_sender) == expected_domain
-                    ):
-                        # This redaction event is allowed. Mark as not needing a
-                        # recheck.
-                        entry.event.internal_metadata.recheck_redaction = False
-                    else:
-                        # We either don't have the event that is being redacted (so we
-                        # assume that the event isn't authorised for now), or the
-                        # senders don't match (so it will never be authorised). Either
-                        # way, we shouldn't return it.
-                        #
-                        # (If we later receive the event, then we will redact it anyway,
-                        # since we have this redaction)
+            if not allow_rejected and entry.event.type == EventTypes.Redaction:
+                redacted_event_id = entry.event.redacts
+                event_map = yield self._get_events_from_cache_or_db([redacted_event_id])
+                original_event_entry = event_map.get(redacted_event_id)
+                if not original_event_entry:
+                    # we don't have the redacted event (or it was rejected).
+                    #
+                    # We assume that the redaction isn't authorized for now; if the
+                    # redacted event later turns up, the redaction will be re-checked,
+                    # and if it is found valid, the original will get redacted before it
+                    # is served to the client.
+                    logger.debug(
+                        "Withholding redaction event %s since we don't (yet) have the "
+                        "original %s",
+                        event_id,
+                        redacted_event_id,
+                    )
+                    continue
+
+                original_event = original_event_entry.event
+
+                if entry.event.internal_metadata.need_to_check_redaction():
+                    original_domain = get_domain_from_id(original_event.sender)
+                    redaction_domain = get_domain_from_id(entry.event.sender)
+                    if original_domain != redaction_domain:
+                        # the senders don't match, so this is forbidden
+                        logger.info(
+                            "Withholding redaction %s whose sender domain %s doesn't "
+                            "match that of redacted event %s %s",
+                            event_id,
+                            redaction_domain,
+                            redacted_event_id,
+                            original_domain,
+                        )
                         continue
+
+                    # Update the cache to save doing the checks again.
+                    entry.event.internal_metadata.recheck_redaction = False
 
             if check_redacted and entry.redacted_event:
                 event = entry.redacted_event
