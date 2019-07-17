@@ -39,14 +39,12 @@ import contextlib
 import logging
 import re
 from functools import wraps
-from twisted.internet import defer
 
 from canonicaljson import json
 
 from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
-import inspect
 
 
 # Block everything by default
