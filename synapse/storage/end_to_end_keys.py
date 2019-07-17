@@ -25,7 +25,7 @@ from ._base import SQLBaseStore, db_to_json
 
 
 class EndToEndKeyWorkerStore(SQLBaseStore):
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def get_e2e_device_keys(
         self, query_list, include_all_devices=False, include_deleted_devices=False
@@ -60,7 +60,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         defer.returnValue(results)
 
-    @opentracing.trace_function
+    @opentracing.trace
     def _get_e2e_device_keys_txn(
         self, txn, query_list, include_all_devices=False, include_deleted_devices=False
     ):
@@ -251,7 +251,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
     def claim_e2e_one_time_keys(self, query_list):
         """Take a list of one time keys out of the database"""
 
-        @opentracing.trace_function
+        @opentracing.trace
         def _claim_e2e_one_time_keys(txn):
             sql = (
                 "SELECT key_id, key_json FROM e2e_one_time_keys_json"

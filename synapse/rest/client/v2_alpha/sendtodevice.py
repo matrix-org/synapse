@@ -43,7 +43,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.txns = HttpTransactionCache(hs)
         self.device_message_handler = hs.get_device_message_handler()
 
-    @opentracing.trace_defered_function_using_operation_name("sendToDevice")
+    @opentracing.trace_deferred_using_operation_name("sendToDevice")
     def on_PUT(self, request, message_type, txn_id):
         opentracing.set_tag("message_type", message_type)
         opentracing.set_tag("txn_id", txn_id)

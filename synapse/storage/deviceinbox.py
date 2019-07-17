@@ -73,7 +73,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             "get_new_messages_for_device", get_new_messages_for_device_txn
         )
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def delete_messages_for_device(self, user_id, device_id, up_to_stream_id):
         """
@@ -127,7 +127,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         defer.returnValue(count)
 
-    @opentracing.trace_function
+    @opentracing.trace
     def get_new_device_msgs_for_remote(
         self, destination, last_stream_id, current_stream_id, limit
     ):
@@ -159,7 +159,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             # This can happen if we run out of room for EDUs in the transaction.
             return defer.succeed(([], last_stream_id))
 
-        @opentracing.trace_function
+        @opentracing.trace
         def get_new_messages_for_remote_destination_txn(txn):
             sql = (
                 "SELECT stream_id, messages_json FROM device_federation_outbox"
@@ -185,7 +185,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             get_new_messages_for_remote_destination_txn,
         )
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     def delete_device_msgs_for_remote(self, destination, up_to_stream_id):
         """Used to delete messages when the remote destination acknowledges
         their receipt.
@@ -236,7 +236,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, BackgroundUpdateStore):
             expiry_ms=30 * 60 * 1000,
         )
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def add_messages_to_device_inbox(
         self, local_messages_by_user_then_device, remote_messages_by_destination
