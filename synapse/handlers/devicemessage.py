@@ -117,7 +117,7 @@ class DeviceMessageHandler(object):
                     "message_id": message_id,
                     "context": json.dumps(context)
                     if opentracing.whitelisted_homeserver(destination)
-                    else "",
+                    else "{}",
                 }
 
         stream_id = yield self.store.add_messages_to_device_inbox(
