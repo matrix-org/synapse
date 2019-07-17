@@ -17,8 +17,8 @@ import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError
 import synapse.logging.opentracing as opentracing
+from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
 

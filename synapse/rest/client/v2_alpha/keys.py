@@ -17,6 +17,7 @@ import logging
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
     RestServlet,
@@ -25,7 +26,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.types import StreamToken
-import synapse.logging.opentracing as opentracing
+
 from ._base import client_patterns
 
 logger = logging.getLogger(__name__)

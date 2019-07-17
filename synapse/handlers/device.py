@@ -18,6 +18,7 @@ from six import iteritems, itervalues
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.api import errors
 from synapse.api.constants import EventTypes
 from synapse.api.errors import (
@@ -31,7 +32,6 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination
-import synapse.logging.opentracing as opentracing
 
 from ._base import BaseHandler
 
