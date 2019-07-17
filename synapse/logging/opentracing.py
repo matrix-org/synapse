@@ -387,13 +387,11 @@ def inject_active_span_text_map(carrier, destination=None):
 
 
 def active_span_context_as_string():
-    if not opentracing:
-        return None
-
     carrier = {}
-    opentracing.tracer.inject(
-        opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
-    )
+    if opentracing:
+        opentracing.tracer.inject(
+            opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
+        )
     return json.dumps(carrier)
 
 
