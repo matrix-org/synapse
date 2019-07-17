@@ -18,7 +18,6 @@ from six import iteritems, itervalues
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
 from synapse.api import errors
 from synapse.api.constants import EventTypes
 from synapse.api.errors import (
@@ -568,7 +567,6 @@ class DeviceListUpdater(object):
 
         return False
 
-    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def user_device_resync(self, user_id):
         """Fetches all devices for a user and updates the device cache with them.
@@ -580,7 +578,6 @@ class DeviceListUpdater(object):
             request:
             https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
         """
-        opentracing.log_kv({"message": "Doing resync to update device list."})
         # Fetch all devices for the user.
         origin = get_domain_from_id(user_id)
         try:
@@ -597,20 +594,13 @@ class DeviceListUpdater(object):
             # eventually become consistent.
             return
         except FederationDeniedError as e:
-            opentracing.set_tag("error", True)
-            opentracing.log_kv({"reason": "FederationDeniedError"})
             logger.info(e)
             return
-        except Exception as e:
+        except Exception:
             # TODO: Remember that we are now out of sync and try again
             # later
-            opentracing.set_tag("error", True)
-            opentracing.log_kv(
-                {"message": "Exception raised by federation request", "exception": e}
-            )
             logger.exception("Failed to handle device list update for %s", user_id)
             return
-        opentracing.log_kv({"result": result})
         stream_id = result["stream_id"]
         devices = result["devices"]
 
