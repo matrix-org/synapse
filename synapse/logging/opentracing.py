@@ -49,7 +49,6 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
-import inspect
 
 
 # Block everything by default
