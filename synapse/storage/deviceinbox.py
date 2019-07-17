@@ -19,10 +19,10 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.util.caches.expiringcache import ExpiringCache
-import synapse.logging.opentracing as opentracing
 
 logger = logging.getLogger(__name__)
 

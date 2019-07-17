@@ -19,6 +19,7 @@ from six import iteritems
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.api.errors import (
     Codes,
     NotFoundError,
@@ -27,7 +28,6 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.util.async_helpers import Linearizer
-import synapse.logging.opentracing as opentracing
 
 logger = logging.getLogger(__name__)
 

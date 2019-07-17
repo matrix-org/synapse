@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import logging
-import synapse.logging.opentracing as opentracing
 
 from six import iteritems
 
@@ -23,6 +22,7 @@ from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.api.errors import CodeMessageException, SynapseError
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID, get_domain_from_id
