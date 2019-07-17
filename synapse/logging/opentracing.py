@@ -11,7 +11,7 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.import opentracing
+# limitations under the License.
 
 
 # NOTE
@@ -41,6 +41,7 @@ import re
 from functools import wraps
 from twisted.internet import defer
 
+from canonicaljson import json
 
 from twisted.internet import defer
 
@@ -181,6 +182,15 @@ def start_active_span(
         )
 
 
+def start_active_span_follows_from(operation_name, contexts):
+    if opentracing is None:
+        return _noop_context_manager()
+    else:
+        references = [opentracing.follows_from(context) for context in contexts]
+        scope = start_active_span(operation_name, references=references)
+        return scope
+
+
 @only_if_tracing
 def close_active_span():
     """Closes the active span. This will close it's logcontext if the context
@@ -278,6 +288,50 @@ def start_active_span_from_context(
 
 
 @only_if_tracing
+def start_active_span_from_edu(
+    edu_content,
+    operation_name,
+    references=[],
+    tags=None,
+    start_time=None,
+    ignore_active_span=False,
+    finish_on_close=True,
+):
+    """
+    Extracts a span context from an edu and uses it to start a new active span
+
+    Args:
+      edu_content (Dict): and edu_content with a `context` field whose value is
+      canonical json for a dict which contains opentracing information.
+    """
+    carrier = json.loads(edu_content.get("context", "{}")).get("opentracing", {})
+    context = opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
+    _references = [
+        opentracing.child_of(span_context_from_string(x))
+        for x in carrier.get("references", [])
+    ]
+
+    # For some reason jaeger decided not to support the visualisation of multiple parent
+    # spans or explicitely show references. I include the span context as a tag here as
+    # an aid to people debugging but it's really not an ideal solution.
+
+    references += _references
+
+    scope = opentracing.tracer.start_active_span(
+        operation_name,
+        child_of=context,
+        references=references,
+        tags=tags,
+        start_time=start_time,
+        ignore_active_span=ignore_active_span,
+        finish_on_close=finish_on_close,
+    )
+
+    scope.span.set_tag("references", carrier.get("references", []))
+    return scope
+
+
+@only_if_tracing
 def inject_active_span_twisted_headers(headers, destination):
     """
     Injects a span context into twisted headers inplace
@@ -338,6 +392,43 @@ def inject_active_span_byte_dict(headers, destination):
 
     for key, value in carrier.items():
         headers[key.encode()] = [value.encode()]
+
+
+@only_if_tracing
+def inject_active_span_text_map(carrier, destination=None):
+    if destination and not whitelisted_homeserver(destination):
+        return
+
+    opentracing.tracer.inject(
+        opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
+    )
+
+
+def active_span_context_as_string():
+    if not opentracing:
+        return None
+
+    carrier = {}
+    opentracing.tracer.inject(
+        opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
+    )
+    return json.dumps(carrier)
+
+
+@only_if_tracing
+def span_context_from_string(carrier):
+    carrier = json.loads(carrier)
+    return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
+
+
+@only_if_tracing
+def extract_text_map(carrier):
+    return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
+
+
+def trace_defered_function(func):
+    """Decorator to trace a defered function. Sets the operation name to that of the
+    function's."""
 
 
 def trace_servlet(servlet_name, func):
