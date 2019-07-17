@@ -222,7 +222,7 @@ class DeviceWorkerStore(SQLBaseStore):
                     "stream_id": stream_id,
                     "context": query_map[(user_id, device_id)][1]
                     if opentracing.whitelisted_homeserver(destination)
-                    else "",
+                    else "{}",
                 }
 
                 prev_id = stream_id
@@ -841,7 +841,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "ts": now,
                     "context": json.dumps(context)
                     if opentracing.whitelisted_homeserver(destination)
-                    else "",
+                    else "{}",
                 }
                 for destination in hosts
                 for device_id in device_ids
