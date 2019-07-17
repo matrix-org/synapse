@@ -764,6 +764,10 @@ class PublicRoomList(BaseFederationServlet):
         else:
             network_tuple = ThirdPartyInstanceID(None, None)
 
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
+
         data = yield self.handler.get_local_public_room_list(
             limit, since_token, network_tuple=network_tuple, from_federation=True
         )

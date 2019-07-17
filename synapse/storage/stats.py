@@ -68,6 +68,9 @@ class StatsStore(StateDeltasStore):
             yield self._end_background_update("populate_stats_createtables")
             defer.returnValue(1)
 
+        # TODO dev only
+        yield self.delete_all_stats()
+
         # Get all the rooms that we want to process.
         def _make_staging_area(txn):
             # Create the temporary tables
