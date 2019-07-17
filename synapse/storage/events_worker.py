@@ -29,14 +29,14 @@ from synapse.api.room_versions import EventFormatVersions
 from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
-from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import get_domain_from_id
-from synapse.util.logcontext import (
+from synapse.logging.context import (
     LoggingContext,
     PreserveLoggingContext,
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import get_domain_from_id
 from synapse.util.metrics import Measure
 
 from ._base import SQLBaseStore
@@ -327,7 +327,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             events (list(str)): list of event_ids to fetch
-            allow_rejected (bool): Whether to teturn events that were rejected
+            allow_rejected (bool): Whether to return events that were rejected
             update_metrics (bool): Whether to update the cache hit ratio metrics
 
         Returns:

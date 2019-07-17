@@ -71,9 +71,8 @@ class RegistrationConfig(Config):
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
-        self.invite_3pid_guest = self.allow_guest_access and config.get(
-            "invite_3pid_guest", False
-        )
+        if config.get("invite_3pid_guest", False):
+            raise ConfigError("invite_3pid_guest is no longer supported")
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
         for room_alias in self.auto_join_rooms:
@@ -84,6 +83,11 @@ class RegistrationConfig(Config):
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False
         )
+
+        session_lifetime = config.get("session_lifetime")
+        if session_lifetime is not None:
+            session_lifetime = self.parse_duration(session_lifetime)
+        self.session_lifetime = session_lifetime
 
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
@@ -141,6 +145,17 @@ class RegistrationConfig(Config):
         #  period: 6w
         #  renew_at: 1w
         #  renew_email_subject: "Renew your %%(app)s account"
+
+        # Time that a user's session remains valid for, after they log in.
+        #
+        # Note that this is not currently compatible with guest logins.
+        #
+        # Note also that this is calculated at login time: changes are not applied
+        # retrospectively to users who have already logged in.
+        #
+        # By default, this is infinite.
+        #
+        #session_lifetime: 24h
 
         # The user must provide all of the below types of 3PID when registering.
         #
@@ -222,7 +237,8 @@ class RegistrationConfig(Config):
             % locals()
         )
 
-    def add_arguments(self, parser):
+    @staticmethod
+    def add_arguments(parser):
         reg_group = parser.add_argument_group("registration")
         reg_group.add_argument(
             "--enable-registration",

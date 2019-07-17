@@ -1,0 +1,1 @@
+Remove access-token support from `RegistrationStore.register`, and rename it.

@@ -41,12 +41,12 @@ from six.moves import range
 
 from twisted.internet import defer
 
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.events_worker import EventsWorkerStore
 from synapse.types import RoomStreamToken
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
 
@@ -833,7 +833,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             Deferred[tuple[list[_EventDictReturn], str]]: Returns the results
             as a list of _EventDictReturn and a token that points to the end
-            of the result set.
+            of the result set. If no events are returned then the end of the
+            stream has been reached (i.e. there are no events between
+            `from_token` and `to_token`), or `limit` is zero.
         """
 
         assert int(limit) >= 0
@@ -905,15 +907,15 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 only those before
             direction(char): Either 'b' or 'f' to indicate whether we are
                 paginating forwards or backwards from `from_key`.
-            limit (int): The maximum number of events to return. Zero or less
-                means no limit.
+            limit (int): The maximum number of events to return.
             event_filter (Filter|None): If provided filters the events to
                 those that match the filter.
 
         Returns:
-            tuple[list[dict], str]: Returns the results as a list of dicts and
-            a token that points to the end of the result set. The dicts have
-            the keys "event_id", "topological_ordering" and "stream_orderign".
+            tuple[list[FrozenEvent], str]: Returns the results as a list of
+            events and a token that points to the end of the result set. If no
+            events are returned then the end of the stream has been reached
+            (i.e. there are no events between `from_key` and `to_key`).
         """
 
         from_key = RoomStreamToken.parse(from_key)

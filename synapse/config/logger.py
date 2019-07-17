@@ -24,7 +24,7 @@ from twisted.logger import STDLibLogObserver, globalLogBeginner
 
 import synapse
 from synapse.app import _base as appbase
-from synapse.util.logcontext import LoggingContextFilter
+from synapse.logging.context import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config
@@ -40,7 +40,7 @@ formatters:
 
 filters:
     context:
-        (): synapse.util.logcontext.LoggingContextFilter
+        (): synapse.logging.context.LoggingContextFilter
         request: ""
 
 handlers:
@@ -103,7 +103,8 @@ class LoggingConfig(Config):
         if args.log_file is not None:
             self.log_file = args.log_file
 
-    def add_arguments(cls, parser):
+    @staticmethod
+    def add_arguments(parser):
         logging_group = parser.add_argument_group("logging")
         logging_group.add_argument(
             "-v",

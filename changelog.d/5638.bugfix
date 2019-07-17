@@ -1,0 +1,1 @@
+Fix requests to the `/store_invite` endpoint of identity servers being sent in the wrong format.

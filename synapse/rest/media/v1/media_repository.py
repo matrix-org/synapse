@@ -33,8 +33,8 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util import logcontext
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import random_string
@@ -463,7 +463,7 @@ class MediaRepository(object):
         )
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield logcontext.defer_to_thread(
+        t_byte_source = yield defer_to_thread(
             self.hs.get_reactor(),
             self._generate_thumbnail,
             thumbnailer,
@@ -511,7 +511,7 @@ class MediaRepository(object):
         )
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield logcontext.defer_to_thread(
+        t_byte_source = yield defer_to_thread(
             self.hs.get_reactor(),
             self._generate_thumbnail,
             thumbnailer,
@@ -596,7 +596,7 @@ class MediaRepository(object):
             return
 
         if thumbnailer.transpose_method is not None:
-            m_width, m_height = yield logcontext.defer_to_thread(
+            m_width, m_height = yield defer_to_thread(
                 self.hs.get_reactor(), thumbnailer.transpose
             )
 
@@ -616,11 +616,11 @@ class MediaRepository(object):
         for (t_width, t_height, t_type), t_method in iteritems(thumbnails):
             # Generate the thumbnail
             if t_method == "crop":
-                t_byte_source = yield logcontext.defer_to_thread(
+                t_byte_source = yield defer_to_thread(
                     self.hs.get_reactor(), thumbnailer.crop, t_width, t_height, t_type
                 )
             elif t_method == "scale":
-                t_byte_source = yield logcontext.defer_to_thread(
+                t_byte_source = yield defer_to_thread(
                     self.hs.get_reactor(), thumbnailer.scale, t_width, t_height, t_type
                 )
             else:

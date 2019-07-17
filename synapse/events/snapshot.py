@@ -19,7 +19,7 @@ from frozendict import frozendict
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 
 
 class EventContext(object):

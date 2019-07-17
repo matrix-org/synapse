@@ -29,7 +29,7 @@ from twisted.internet import defer
 import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, HttpResponseException, SynapseError
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -116,24 +116,6 @@ class RoomMemberHandler(object):
         Returns:
             Deferred[dict]: A dictionary to be returned to the client, may
             include event_id etc, or nothing if we locally rejected
-        """
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def get_or_register_3pid_guest(self, requester, medium, address, inviter_user_id):
-        """Get a guest access token for a 3PID, creating a guest account if
-        one doesn't already exist.
-
-        Args:
-            requester (Requester)
-            medium (str)
-            address (str)
-            inviter_user_id (str): The user ID who is trying to invite the
-                3PID
-
-        Returns:
-            Deferred[(str, str)]: A 2-tuple of `(user_id, access_token)` of the
-            3PID guest account.
         """
         raise NotImplementedError()
 
@@ -910,24 +892,23 @@ class RoomMemberHandler(object):
             "sender_avatar_url": inviter_avatar_url,
         }
 
-        if self.config.invite_3pid_guest:
-            guest_user_id, guest_access_token = yield self.get_or_register_3pid_guest(
-                requester=requester,
-                medium=medium,
-                address=address,
-                inviter_user_id=inviter_user_id,
+        try:
+            data = yield self.simple_http_client.post_json_get_json(
+                is_url, invite_config
+            )
+        except HttpResponseException as e:
+            # Some identity servers may only support application/x-www-form-urlencoded
+            # types. This is especially true with old instances of Sydent, see
+            # https://github.com/matrix-org/sydent/pull/170
+            logger.info(
+                "Failed to POST %s with JSON, falling back to urlencoded form: %s",
+                is_url,
+                e,
+            )
+            data = yield self.simple_http_client.post_urlencoded_get_json(
+                is_url, invite_config
             )
 
-            invite_config.update(
-                {
-                    "guest_access_token": guest_access_token,
-                    "guest_user_id": guest_user_id,
-                }
-            )
-
-        data = yield self.simple_http_client.post_urlencoded_get_json(
-            is_url, invite_config
-        )
         # TODO: Check for success
         token = data["token"]
         public_keys = data.get("public_keys", [])
@@ -1029,12 +1010,6 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
             yield self.store.locally_reject_invite(target.to_string(), room_id)
             defer.returnValue({})
-
-    def get_or_register_3pid_guest(self, requester, medium, address, inviter_user_id):
-        """Implements RoomMemberHandler.get_or_register_3pid_guest
-        """
-        rg = self.registration_handler
-        return rg.get_or_register_3pid_guest(medium, address, inviter_user_id)
 
     def _user_joined_room(self, target, room_id):
         """Implements RoomMemberHandler._user_joined_room

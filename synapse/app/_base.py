@@ -27,7 +27,7 @@ from twisted.protocols.tls import TLSMemoryBIOFactory
 import synapse
 from synapse.app import check_bind_error
 from synapse.crypto import context_factory
-from synapse.util import PreserveLoggingContext
+from synapse.logging.context import PreserveLoggingContext
 from synapse.util.async_helpers import Linearizer
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
@@ -48,7 +48,7 @@ def register_sighup(func):
     _sighup_callbacks.append(func)
 
 
-def start_worker_reactor(appname, config):
+def start_worker_reactor(appname, config, run_command=reactor.run):
     """ Run the reactor in the main process
 
     Daemonizes if necessary, and then configures some resources, before starting
@@ -57,6 +57,7 @@ def start_worker_reactor(appname, config):
     Args:
         appname (str): application name which will be sent to syslog
         config (synapse.config.Config): config object
+        run_command (Callable[]): callable that actually runs the reactor
     """
 
     logger = logging.getLogger(config.worker_app)
@@ -69,11 +70,19 @@ def start_worker_reactor(appname, config):
         daemonize=config.worker_daemonize,
         print_pidfile=config.print_pidfile,
         logger=logger,
+        run_command=run_command,
     )
 
 
 def start_reactor(
-    appname, soft_file_limit, gc_thresholds, pid_file, daemonize, print_pidfile, logger
+    appname,
+    soft_file_limit,
+    gc_thresholds,
+    pid_file,
+    daemonize,
+    print_pidfile,
+    logger,
+    run_command=reactor.run,
 ):
     """ Run the reactor in the main process
 
@@ -88,38 +97,42 @@ def start_reactor(
         daemonize (bool): true to run the reactor in a background process
         print_pidfile (bool): whether to print the pid file, if daemonize is True
         logger (logging.Logger): logger instance to pass to Daemonize
+        run_command (Callable[]): callable that actually runs the reactor
     """
 
     install_dns_limiter(reactor)
 
     def run():
-        # make sure that we run the reactor with the sentinel log context,
-        # otherwise other PreserveLoggingContext instances will get confused
-        # and complain when they see the logcontext arbitrarily swapping
-        # between the sentinel and `run` logcontexts.
-        with PreserveLoggingContext():
-            logger.info("Running")
+        logger.info("Running")
+        change_resource_limit(soft_file_limit)
+        if gc_thresholds:
+            gc.set_threshold(*gc_thresholds)
+        run_command()
 
-            change_resource_limit(soft_file_limit)
-            if gc_thresholds:
-                gc.set_threshold(*gc_thresholds)
-            reactor.run()
+    # make sure that we run the reactor with the sentinel log context,
+    # otherwise other PreserveLoggingContext instances will get confused
+    # and complain when they see the logcontext arbitrarily swapping
+    # between the sentinel and `run` logcontexts.
+    #
+    # We also need to drop the logcontext before forking if we're daemonizing,
+    # otherwise the cputime metrics get confused about the per-thread resource usage
+    # appearing to go backwards.
+    with PreserveLoggingContext():
+        if daemonize:
+            if print_pidfile:
+                print(pid_file)
 
-    if daemonize:
-        if print_pidfile:
-            print(pid_file)
-
-        daemon = Daemonize(
-            app=appname,
-            pid=pid_file,
-            action=run,
-            auto_close_fds=False,
-            verbose=True,
-            logger=logger,
-        )
-        daemon.start()
-    else:
-        run()
+            daemon = Daemonize(
+                app=appname,
+                pid=pid_file,
+                action=run,
+                auto_close_fds=False,
+                verbose=True,
+                logger=logger,
+            )
+            daemon.start()
+        else:
+            run()
 
 
 def quit_with_error(error_string):
@@ -239,6 +252,9 @@ def start(hs, listeners=None):
 
         # Load the certificate from disk.
         refresh_certificate(hs)
+
+        # Start the tracer
+        synapse.logging.opentracing.init_tracer(hs.config)
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)

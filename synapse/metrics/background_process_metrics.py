@@ -22,7 +22,7 @@ from prometheus_client.core import REGISTRY, Counter, GaugeMetricFamily
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.logging.context import LoggingContext, PreserveLoggingContext
 
 logger = logging.getLogger(__name__)
 

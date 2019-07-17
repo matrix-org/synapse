@@ -464,11 +464,10 @@ class RegisterRestServlet(RestServlet):
                                 Codes.THREEPID_IN_USE,
                             )
 
-            (registered_user_id, _) = yield self.registration_handler.register(
+            registered_user_id = yield self.registration_handler.register_user(
                 localpart=desired_username,
                 password=new_password,
                 guest_access_token=guest_access_token,
-                generate_token=False,
                 threepid=threepid,
                 address=client_addr,
             )
@@ -542,8 +541,8 @@ class RegisterRestServlet(RestServlet):
         if not compare_digest(want_mac, got_mac):
             raise SynapseError(403, "HMAC incorrect")
 
-        (user_id, _) = yield self.registration_handler.register(
-            localpart=username, password=password, generate_token=False
+        user_id = yield self.registration_handler.register_user(
+            localpart=username, password=password
         )
 
         result = yield self._create_registration_details(user_id, body)
@@ -577,8 +576,8 @@ class RegisterRestServlet(RestServlet):
     def _do_guest_registration(self, params, address=None):
         if not self.hs.config.allow_guest_access:
             raise SynapseError(403, "Guest access is disabled")
-        user_id, _ = yield self.registration_handler.register(
-            generate_token=False, make_guest=True, address=address
+        user_id = yield self.registration_handler.register_user(
+            make_guest=True, address=address
         )
 
         # we don't allow guests to specify their own device_id, because

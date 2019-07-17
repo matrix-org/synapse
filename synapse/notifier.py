@@ -23,12 +23,12 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
 from synapse.handlers.presence import format_user_presence_state
+from synapse.logging.context import PreserveLoggingContext
+from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import StreamToken
 from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
-from synapse.util.logcontext import PreserveLoggingContext
-from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.visibility import filter_events_for_client
 
