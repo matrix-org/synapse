@@ -1,0 +1,1 @@
+Fix newly-registered users not being able to lookup their own profile without joining a room.

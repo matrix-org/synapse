@@ -462,6 +462,10 @@ class BaseProfileHandler(BaseHandler):
         if not self.hs.config.require_auth_for_profile_requests or not requester:
             return
 
+        # Always allow the user to query their own profile.
+        if target_user.to_string() == requester.to_string():
+            return
+
         try:
             requester_rooms = yield self.store.get_rooms_for_user(
                 requester.to_string()
