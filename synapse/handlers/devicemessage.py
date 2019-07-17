@@ -118,7 +118,7 @@ class DeviceMessageHandler(object):
                     "message_id": message_id,
                     "context": json.dumps(context)
                     if opentracing.whitelisted_homeserver(destination)
-                    else "",
+                    else "{}",
                 }
 
         opentracing.log_kv({"local_messages": local_messages})
