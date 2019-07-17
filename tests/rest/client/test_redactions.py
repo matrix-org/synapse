@@ -162,8 +162,7 @@ class RedactionsTestCase(HomeserverTestCase):
         # control case: an existing event
         b = self.helper.send(room_id=self.room_id, tok=self.mod_access_token)
         msg_id = b["event_id"]
-        b = self._redact_event(self.mod_access_token, self.room_id, msg_id)
-        redaction_id = b["event_id"]
+        self._redact_event(self.mod_access_token, self.room_id, msg_id)
 
         # sync the room, to get the id of the create event
         timeline = self._sync_room_timeline(self.other_access_token, self.room_id)
