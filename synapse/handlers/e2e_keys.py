@@ -46,7 +46,7 @@ class E2eKeysHandler(object):
             "client_keys", self.on_federation_query_client_keys
         )
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def query_devices(self, query_body, timeout):
         """ Handle a device key query from a client
@@ -125,7 +125,7 @@ class E2eKeysHandler(object):
                 r[user_id] = remote_queries[user_id]
 
         # Now fetch any devices that we don't have in our cache
-        @opentracing.trace_defered_function
+        @opentracing.trace_deferred
         @defer.inlineCallbacks
         def do_remote_query(destination):
             destination_query = remote_queries_not_in_cache[destination]
@@ -158,7 +158,7 @@ class E2eKeysHandler(object):
 
         return {"device_keys": results, "failures": failures}
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def query_local_devices(self, query):
         """Get E2E device keys for local users
@@ -222,7 +222,7 @@ class E2eKeysHandler(object):
         res = yield self.query_local_devices(device_keys_query)
         return {"device_keys": res}
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def claim_one_time_keys(self, query, timeout):
         local_query = []
@@ -251,7 +251,7 @@ class E2eKeysHandler(object):
                         key_id: json.loads(json_bytes)
                     }
 
-        @opentracing.trace_defered_function
+        @opentracing.trace_deferred
         @defer.inlineCallbacks
         def claim_client_keys(destination):
             opentracing.set_tag("destination", destination)

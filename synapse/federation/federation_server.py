@@ -508,7 +508,7 @@ class FederationServer(FederationBase):
     def on_query_user_devices(self, origin, user_id):
         return self.on_query_request("user_devices", user_id)
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     @log_function
     def on_claim_client_keys(self, origin, content):

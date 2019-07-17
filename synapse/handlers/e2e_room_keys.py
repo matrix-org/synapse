@@ -50,7 +50,7 @@ class E2eRoomKeysHandler(object):
         # changed.
         self._upload_linearizer = Linearizer("upload_room_keys_lock")
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def get_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk get the E2E room keys for a given backup, optionally filtered to a given
@@ -89,7 +89,7 @@ class E2eRoomKeysHandler(object):
             opentracing.log_kv(results)
             return results
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def delete_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
@@ -111,7 +111,7 @@ class E2eRoomKeysHandler(object):
         with (yield self._upload_linearizer.queue(user_id)):
             yield self.store.delete_e2e_room_keys(user_id, version, room_id, session_id)
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def upload_room_keys(self, user_id, version, room_keys):
         """Bulk upload a list of room keys into a given backup version, asserting
@@ -257,7 +257,7 @@ class E2eRoomKeysHandler(object):
                 return False
         return True
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def create_version(self, user_id, version_info):
         """Create a new backup version.  This automatically becomes the new
@@ -316,7 +316,7 @@ class E2eRoomKeysHandler(object):
                     raise
             return res
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def delete_version(self, user_id, version=None):
         """Deletes a given version of the user's e2e_room_keys backup
@@ -337,7 +337,7 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
 
-    @opentracing.trace_defered_function
+    @opentracing.trace_deferred
     @defer.inlineCallbacks
     def update_version(self, user_id, version, version_info):
         """Update the info about a given version of the user's backup
