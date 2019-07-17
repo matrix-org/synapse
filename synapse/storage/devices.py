@@ -140,7 +140,17 @@ class DeviceWorkerStore(SQLBaseStore):
                 break
 
             key = (update[0], update[1])
-            query_map[key] = (max(query_map.get(key, 0), update[2]), update[3])
+            logger.info("++++++++++++++++++++++++ update-0 %s", update[0])
+            logger.info("++++++++++++++++++++++++ update-1 %s", update[1])
+            logger.info("++++++++++++++++++++++++ update-2 %s", update[2])
+            logger.info("++++++++++++++++++++++++ update-3 %s", update[3])
+            logger.info(
+                "+++++++++++++++++++++++++++ %s", (query_map.get(key, 0), update[2])
+            )
+            query_map[key] = (
+                max(query_map.get(key, (0, None))[0], update[2]),
+                update[3],
+            )
 
         # If we didn't find any updates with a stream_id lower than the cutoff, it
         # means that there are more than limit updates all of which have the same
