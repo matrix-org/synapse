@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 # Block everything by default
 _homeserver_whitelist = None
 
-##### Util methods
+# Util methods
 
 
 def only_if_tracing(func):
@@ -77,7 +77,7 @@ def _noop_context_manager(*args, **kwargs):
     yield
 
 
-##### Setup
+# Setup
 
 
 def init_tracer(config):
@@ -114,7 +114,7 @@ def init_tracer(config):
     tags = opentracing.tags
 
 
-##### Whitelisting
+# Whitelisting
 
 
 @only_if_tracing
@@ -144,7 +144,7 @@ def whitelisted_homeserver(destination):
     return False
 
 
-##### Start spans and scopes
+# Start spans and scopes
 
 # Could use kwargs but I want these to be explicit
 def start_active_span(
@@ -268,7 +268,7 @@ def start_active_span_from_edu(
     return scope
 
 
-###### Opentracing setters for tags, logs, etc
+# Opentracing setters for tags, logs, etc
 
 
 @only_if_tracing
@@ -303,7 +303,7 @@ def set_operation_name(operation_name):
     opentracing.tracer.active_span.set_operation_name(operation_name)
 
 
-##### Injection and extraction
+# Injection and extraction
 
 
 @only_if_tracing
@@ -401,7 +401,7 @@ def extract_text_map(carrier):
     return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
 
 
-##### Tracing decorators
+# Tracing decorators
 
 
 def trace_deferred(func):
@@ -526,7 +526,7 @@ def trace_servlet(servlet_name, func):
     return _trace_servlet_inner
 
 
-##### Helper class
+# Helper class
 
 
 class _DummyTagNames(object):
