@@ -224,7 +224,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         results = []
         if membership_list:
             where_clause = "user_id = ? AND (%s) AND forgotten = 0" % (
-                " OR ".join(["membership = ?" for _ in membership_list]),
+                " OR ".join(["m.membership = ?" for _ in membership_list]),
             )
 
             args = [user_id]
@@ -453,8 +453,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         sql = """
             SELECT state_key FROM current_state_events AS c
-            INNER JOIN room_memberships USING (event_id)
-            WHERE membership = 'join'
+            INNER JOIN room_memberships AS m USING (event_id)
+            WHERE m.membership = 'join'
                 AND type = 'm.room.member'
                 AND c.room_id = ?
                 AND state_key LIKE ?
