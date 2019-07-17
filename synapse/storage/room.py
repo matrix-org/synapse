@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -160,6 +161,167 @@ class RoomWorkerStore(SQLBaseStore):
         return self.runInteraction(
             "get_public_room_changes", get_public_room_changes_txn
         )
+
+    def count_public_rooms(self):
+        """
+        Counts the number of public rooms as tracked in the room_stats and room_state
+        table.
+        A public room is one who has is_public set
+        AND is publicly-joinable and/or world-readable.
+        Returns:
+            number of public rooms on this homeserver's room directory
+
+        """
+
+        def _count_public_rooms_txn(txn):
+            sql = """
+                SELECT COUNT(*)
+                FROM room_stats
+                    JOIN room_state USING (room_id)
+                    JOIN rooms USING (room_id)
+                WHERE
+                    is_public
+                    AND (
+                        join_rules = 'public'
+                        OR history_visibility = 'world_readable'
+                    )
+            """
+            txn.execute(sql)
+            return txn.fetchone()[0]
+
+        return self.runInteraction("count_public_rooms", _count_public_rooms_txn)
+
+    @defer.inlineCallbacks
+    def get_largest_public_rooms(
+        self, network_tuple, search_filter, limit, pagination_token, forwards
+    ):
+        """TODO doc this
+
+        Args:
+            network_tuple (ThirdPartyInstanceID|None):
+            search_filter (dict|None):
+            limit (int|None): Maxmimum number of rows to return, unlimited otherwise.
+            pagination_token (str|None): if present, a room ID which is to be
+                the (first/last) included in the results.
+            forwards (bool): true iff going forwards, going backwards otherwise
+
+        Returns:
+            Rooms in order: biggest number of joined users first.
+            We then arbitrarily use the room_id as a tie breaker.
+
+        """
+
+        # TODO probably want to use ts_… on Postgres?
+
+        sql = """
+            SELECT
+                room_id, name, topic, canonical_alias, joined_members,
+                avatar, history_visibility, joined_members
+            FROM
+                room_stats
+                JOIN room_state USING (room_id)
+                JOIN rooms USING (room_id)
+        """
+        query_args = []
+
+        if network_tuple:
+            sql += """
+                LEFT JOIN appservice_room_list arl USING (room_id)
+            """
+
+        sql += """
+            WHERE
+                is_public
+                AND (
+                    join_rules = 'public'
+                    OR history_visibility = 'world_readable'
+                )
+        """
+
+        if pagination_token:
+            pt_joined = yield self._simple_select_one_onecol(
+                table="room_stats",
+                keyvalues={"room_id": pagination_token},
+                retcol="joined_members",
+                desc="get_largest_public_rooms",
+            )
+
+            if forwards:
+                sql += """
+                    AND (
+                        (joined_members < ?)
+                        OR (joined_members = ? AND room_id >= ?)
+                    )
+                """
+            else:
+                sql += """
+                    AND (
+                        (joined_members > ?)
+                        OR (joined_members = ? AND room_id <= ?)
+                    )
+                """
+            query_args += [pt_joined, pt_joined, pagination_token]
+
+        if search_filter and search_filter.get("generic_search_term", None):
+            search_term = "%" + search_filter["generic_search_term"] + "%"
+            sql += """
+                AND (
+                    name LIKE ?
+                    OR topic LIKE ?
+                    OR canonical_alias LIKE ?
+                )
+            """
+            query_args += [search_term, search_term, search_term]
+
+        if network_tuple:
+            sql += "AND ("
+            if network_tuple.appservice_id:
+                sql += "appservice_id = ? AND "
+                query_args.append(network_tuple.appservice_id)
+            else:
+                sql += "appservice_id IS NULL AND "
+
+            if network_tuple.network_id:
+                sql += "network_id = ?)"
+                query_args.append(network_tuple.network_id)
+            else:
+                sql += "network_id IS NULL)"
+
+        if forwards:
+            sql += """
+                ORDER BY
+                    joined_members DESC, room_id ASC
+            """
+        else:
+            sql += """
+                ORDER BY
+                    joined_members ASC, room_id DESC
+            """
+
+        if limit is not None:
+            # be cautious about SQL injection
+            assert isinstance(limit, int)
+
+            sql += """
+                LIMIT %d
+            """ % (
+                limit,
+            )
+
+        def _get_largest_public_rooms_txn(txn):
+            txn.execute(sql, query_args)
+
+            results = self.cursor_to_dict(txn)
+
+            if not forwards:
+                results.reverse()
+
+            return results
+
+        ret_val = yield self.runInteraction(
+            "get_largest_public_rooms", _get_largest_public_rooms_txn
+        )
+        defer.returnValue(ret_val)
 
     @cached(max_entries=10000)
     def is_room_blocked(self, room_id):
