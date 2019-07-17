@@ -259,6 +259,14 @@ class EventsWorkerStore(SQLBaseStore):
                     continue
 
                 original_event = original_event_entry.event
+                if original_event.type == EventTypes.Create:
+                    # we never serve redactions of Creates to clients.
+                    logger.info(
+                        "Withholding redaction %s of create event %s",
+                        event_id,
+                        redacted_event_id,
+                    )
+                    continue
 
                 if entry.event.internal_metadata.need_to_check_redaction():
                     original_domain = get_domain_from_id(original_event.sender)
@@ -617,6 +625,10 @@ class EventsWorkerStore(SQLBaseStore):
             Deferred[EventBase|None]: if the event should be redacted, a pruned
                 event object. Otherwise, None.
         """
+        if original_ev.type == "m.room.create":
+            # we choose to ignore redactions of m.room.create events.
+            return None
+
         redaction_map = yield self._get_events_from_cache_or_db(redactions)
 
         for redaction_id in redactions:
