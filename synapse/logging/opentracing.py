@@ -168,8 +168,10 @@ def start_active_span(
     Returns:
         scope (Scope) or noop_context_manager
     """
+
     if opentracing is None:
         return _noop_context_manager()
+
     else:
         # We need to enter the scope here for the logcontext to become active
         return opentracing.tracer.start_active_span(
@@ -211,6 +213,7 @@ def start_active_span_from_context(
     # Twisted encodes the values as lists whereas opentracing doesn't.
     # So, we take the first item in the list.
     # Also, twisted uses byte arrays while opentracing expects strings.
+
     if opentracing is None:
         return _noop_context_manager()
 
@@ -228,7 +231,6 @@ def start_active_span_from_context(
     )
 
 
-@only_if_tracing
 def start_active_span_from_edu(
     edu_content,
     operation_name,
@@ -245,6 +247,11 @@ def start_active_span_from_edu(
       edu_content (Dict): and edu_content with a `context` field whose value is
       canonical json for a dict which contains opentracing information.
     """
+
+    if opentracing is None:
+        logger.info("++++++++++++++++++++ opentracing is None")
+        return _noop_context_manager()
+
     carrier = json.loads(edu_content.get("context", "{}")).get("opentracing", {})
     context = opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
     _references = [
@@ -412,6 +419,9 @@ def trace_deferred(func):
     """Decorator to trace a deferred function. Sets the operation name to that of the
     function's."""
 
+    if not opentracing:
+        return func
+
     @wraps(func)
     @defer.inlineCallbacks
     def _trace_deferred_inner(self, *args, **kwargs):
@@ -426,6 +436,10 @@ def trace_deferred_using_operation_name(name):
     """Decorator to trace a deferred function. Explicitely sets the operation_name."""
 
     def trace_deferred(func):
+
+        if not opentracing:
+            return func
+
         @wraps(func)
         @defer.inlineCallbacks
         def _trace_deferred_inner(self, *args, **kwargs):
@@ -443,6 +457,9 @@ def trace(func):
     """Decorator to trace a normal function. Sets the operation name to that of the
     function's."""
 
+    if not opentracing:
+        return func
+
     @wraps(func)
     def _trace_inner(self, *args, **kwargs):
         with start_active_span(func.__name__):
@@ -455,6 +472,10 @@ def trace_using_operation_name(operation_name):
     """Decorator to trace a function. Explicitely sets the operation_name."""
 
     def trace(func):
+
+        if not opentracing:
+            return func
+
         @wraps(func)
         def _trace_inner(self, *args, **kwargs):
             with start_active_span(operation_name):
@@ -466,6 +487,10 @@ def trace_using_operation_name(operation_name):
 
 
 def tag_args(func):
+
+    if not opentracing:
+        return func
+
     @wraps(func)
     def _tag_args_inner(self, *args, **kwargs):
         argspec = inspect.getargspec(func)
