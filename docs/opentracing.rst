@@ -116,13 +116,13 @@ function becomes the operation name for the span.
 .. code-block:: python
 
    # Start a span using 'normal_function' as the operation name
-   @trace_function
+   @trace
    def normal_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
 
    # Start a span using 'deferred_function' as the operation name
-   @trace_defered_function
+   @trace_deferred
    # Yes, there is a typo in the lib. I will fix this
    def deferred_function(*args, **kwargs):
        # We start
@@ -131,17 +131,17 @@ function becomes the operation name for the span.
        defer.returnValue(something_usual_and_useful)
 
 Operation names can be explicitely set for functions by using
-``trace_function_using_operation_name`` and
-``trace_defered_function_using_operation_name``
+``trace_using_operation_name`` and
+``trace_deferred_using_operation_name``
 
 .. code-block:: python
 
-   @trace_function_using_operation_name("A *much* better operation name")
+   @trace_using_operation_name("A *much* better operation name")
    def normal_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
 
-   @trace_defered_function_using_operation_name("An operation name that fixes the typo!")
+   @trace_deferred_using_operation_name("An operation name that fixes the typo!")
    # Yes, there is a typo in the lib. I will fix this
    def deferred_function(*args, **kwargs):
        # We start
