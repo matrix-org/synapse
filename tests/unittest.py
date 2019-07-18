@@ -447,6 +447,7 @@ class HomeserverTestCase(TestCase):
         # Create the user
         request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
         self.render(request)
+        self.assertEqual(channel.code, 200)
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
@@ -472,7 +473,7 @@ class HomeserverTestCase(TestCase):
             "POST", "/_matrix/client/r0/admin/register", body.encode("utf8")
         )
         self.render(request)
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
         return user_id

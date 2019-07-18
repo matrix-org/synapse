@@ -319,6 +319,17 @@ class Auth(object):
             # first look in the database
             r = yield self._look_up_user_by_access_token(token)
             if r:
+                valid_until_ms = r["valid_until_ms"]
+                if (
+                    valid_until_ms is not None
+                    and valid_until_ms < self.clock.time_msec()
+                ):
+                    # there was a valid access token, but it has expired.
+                    # soft-logout the user.
+                    raise InvalidClientTokenError(
+                        msg="Access token has expired", soft_logout=True
+                    )
+
                 defer.returnValue(r)
 
         # otherwise it needs to be a valid macaroon
@@ -505,6 +516,7 @@ class Auth(object):
             "token_id": ret.get("token_id", None),
             "is_guest": False,
             "device_id": ret.get("device_id"),
+            "valid_until_ms": ret.get("valid_until_ms"),
         }
         defer.returnValue(user_info)
 
@@ -593,21 +605,6 @@ class Auth(object):
                 auth_ids.append(member_event.event_id)
 
         defer.returnValue(auth_ids)
-
-    def check_redaction(self, room_version, event, auth_events):
-        """Check whether the event sender is allowed to redact the target event.
-
-        Returns:
-            True if the the sender is allowed to redact the target event if the
-                target event was created by them.
-            False if the sender is allowed to redact the target event with no
-                further checks.
-
-        Raises:
-            AuthError if the event sender is definitely not allowed to redact
-                the target event.
-        """
-        return event_auth.check_redaction(room_version, event, auth_events)
 
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id, user):

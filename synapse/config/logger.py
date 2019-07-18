@@ -108,10 +108,21 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(log_config):
+def setup_logging(config, use_worker_options=False):
+    """ Set up python logging
+
+    Args:
+        config (LoggingConfig | synapse.config.workers.WorkerConfig):
+            configuration data
+
+        use_worker_options (bool): True to use the 'worker_log_config' option
+            instead of 'log_config'.
+
+        register_sighup (func | None): Function to call to register a
+            sighup handler.
     """
-    Set up Python stdlib logging.
-    """
+    log_config = config.worker_log_config if use_worker_options else config.log_config
+
     if log_config is None:
         log_format = (
             "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"

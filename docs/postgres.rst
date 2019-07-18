@@ -11,7 +11,9 @@ a postgres database.
 
 * If you are using the `matrix.org debian/ubuntu
   packages <../INSTALL.md#matrixorg-packages>`_,
-  the necessary libraries will already be installed.
+  the necessary python library will already be installed, but you will need to
+  ensure the low-level postgres library is installed, which you can do with
+  ``apt install libpq5``.
 
 * For other pre-built packages, please consult the documentation from the
   relevant package.
@@ -34,7 +36,7 @@ Assuming your PostgreSQL database user is called ``postgres``, create a user
    su - postgres
    createuser --pwprompt synapse_user
 
-Before you can authenticate with the ``synapse_user``, you must create a 
+Before you can authenticate with the ``synapse_user``, you must create a
 database that it can access. To create a database, first connect to the database
 with your database user::
 
@@ -53,7 +55,7 @@ and then run::
 This would create an appropriate database named ``synapse`` owned by the
 ``synapse_user`` user (which must already have been created as above).
 
-Note that the PostgreSQL database *must* have the correct encoding set (as 
+Note that the PostgreSQL database *must* have the correct encoding set (as
 shown above), otherwise it will not be able to store UTF8 strings.
 
 You may need to enable password authentication so ``synapse_user`` can connect

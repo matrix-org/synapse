@@ -84,6 +84,8 @@ class RegistrationHandler(BaseHandler):
             self.device_handler = hs.get_device_handler()
             self.pusher_pool = hs.get_pusherpool()
 
+        self.session_lifetime = hs.config.session_lifetime
+
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None, assigned_user_id=None):
         if types.contains_invalid_mxid_characters(localpart):
@@ -599,6 +601,8 @@ class RegistrationHandler(BaseHandler):
     def register_device(self, user_id, device_id, initial_display_name, is_guest=False):
         """Register a device for a user and generate an access token.
 
+        The access token will be limited by the homeserver's session_lifetime config.
+
         Args:
             user_id (str): full canonical @user:id
             device_id (str|None): The device ID to check, or None to generate
@@ -619,20 +623,29 @@ class RegistrationHandler(BaseHandler):
                 is_guest=is_guest,
             )
             defer.returnValue((r["device_id"], r["access_token"]))
-        else:
-            device_id = yield self.device_handler.check_device_registered(
-                user_id, device_id, initial_display_name
-            )
-            if is_guest:
-                access_token = self.macaroon_gen.generate_access_token(
-                    user_id, ["guest = true"]
-                )
-            else:
-                access_token = yield self._auth_handler.get_access_token_for_user_id(
-                    user_id, device_id=device_id
-                )
 
-            defer.returnValue((device_id, access_token))
+        valid_until_ms = None
+        if self.session_lifetime is not None:
+            if is_guest:
+                raise Exception(
+                    "session_lifetime is not currently implemented for guest access"
+                )
+            valid_until_ms = self.clock.time_msec() + self.session_lifetime
+
+        device_id = yield self.device_handler.check_device_registered(
+            user_id, device_id, initial_display_name
+        )
+        if is_guest:
+            assert valid_until_ms is None
+            access_token = self.macaroon_gen.generate_access_token(
+                user_id, ["guest = true"]
+            )
+        else:
+            access_token = yield self._auth_handler.get_access_token_for_user_id(
+                user_id, device_id=device_id, valid_until_ms=valid_until_ms
+            )
+
+        defer.returnValue((device_id, access_token))
 
     @defer.inlineCallbacks
     def post_registration_actions(

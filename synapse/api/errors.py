@@ -139,6 +139,22 @@ class ConsentNotGivenError(SynapseError):
         return cs_error(self.msg, self.errcode, consent_uri=self._consent_uri)
 
 
+class UserDeactivatedError(SynapseError):
+    """The error returned to the client when the user attempted to access an
+    authenticated endpoint, but the account has been deactivated.
+    """
+
+    def __init__(self, msg):
+        """Constructs a UserDeactivatedError
+
+        Args:
+            msg (str): The human-readable error message
+        """
+        super(UserDeactivatedError, self).__init__(
+            code=http_client.FORBIDDEN, msg=msg, errcode=Codes.UNKNOWN
+        )
+
+
 class RegistrationError(SynapseError):
     """An error raised when a registration event fails."""
 
@@ -245,8 +261,14 @@ class MissingClientTokenError(InvalidClientCredentialsError):
 class InvalidClientTokenError(InvalidClientCredentialsError):
     """Raised when we didn't understand the access token in a request"""
 
-    def __init__(self, msg="Unrecognised access token"):
+    def __init__(self, msg="Unrecognised access token", soft_logout=False):
         super().__init__(msg=msg, errcode="M_UNKNOWN_TOKEN")
+        self._soft_logout = soft_logout
+
+    def error_dict(self):
+        d = super().error_dict()
+        d["soft_logout"] = self._soft_logout
+        return d
 
 
 class ResourceLimitError(SynapseError):

@@ -59,6 +59,108 @@ How to monitor Synapse metrics using Prometheus
    Restart Prometheus.
 
 
+Renaming of metrics & deprecation of old names in 1.2
+-----------------------------------------------------
+
+Synapse 1.2 updates the Prometheus metrics to match the naming convention of the
+upstream ``prometheus_client``. The old names are considered deprecated and will
+be removed in a future version of Synapse.
+
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+|                                  New Name                                   |                               Old Name                                |
++=============================================================================+=======================================================================+
+| python_gc_objects_collected_total                                           | python_gc_objects_collected                                           |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| python_gc_objects_uncollectable_total                                       | python_gc_objects_uncollectable                                       |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| python_gc_collections_total                                                 | python_gc_collections                                                 |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| process_cpu_seconds_total                                                   | process_cpu_seconds                                                   |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_federation_client_sent_transactions_total                           | synapse_federation_client_sent_transactions                           |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_federation_client_events_processed_total                            | synapse_federation_client_events_processed                            |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_event_processing_loop_count_total                                   | synapse_event_processing_loop_count                                   |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_event_processing_loop_room_count_total                              | synapse_event_processing_loop_room_count                              |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_util_metrics_block_count_total                                      | synapse_util_metrics_block_count                                      |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_util_metrics_block_time_seconds_total                               | synapse_util_metrics_block_time_seconds                               |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_util_metrics_block_ru_utime_seconds_total                           | synapse_util_metrics_block_ru_utime_seconds                           |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_util_metrics_block_ru_stime_seconds_total                           | synapse_util_metrics_block_ru_stime_seconds                           |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_util_metrics_block_db_txn_count_total                               | synapse_util_metrics_block_db_txn_count                               |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_util_metrics_block_db_txn_duration_seconds_total                    | synapse_util_metrics_block_db_txn_duration_seconds                    |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_util_metrics_block_db_sched_duration_seconds_total                  | synapse_util_metrics_block_db_sched_duration_seconds                  |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_background_process_start_count_total                                | synapse_background_process_start_count                                |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_background_process_ru_utime_seconds_total                           | synapse_background_process_ru_utime_seconds                           |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_background_process_ru_stime_seconds_total                           | synapse_background_process_ru_stime_seconds                           |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_background_process_db_txn_count_total                               | synapse_background_process_db_txn_count                               |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_background_process_db_txn_duration_seconds_total                    | synapse_background_process_db_txn_duration_seconds                    |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_background_process_db_sched_duration_seconds_total                  | synapse_background_process_db_sched_duration_seconds                  |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_storage_events_persisted_events_total                               | synapse_storage_events_persisted_events                               |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_storage_events_persisted_events_sep_total                           | synapse_storage_events_persisted_events_sep                           |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_storage_events_state_delta_total                                    | synapse_storage_events_state_delta                                    |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_storage_events_state_delta_single_event_total                       | synapse_storage_events_state_delta_single_event                       |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_storage_events_state_delta_reuse_delta_total                        | synapse_storage_events_state_delta_reuse_delta                        |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_federation_server_received_pdus_total                               | synapse_federation_server_received_pdus                               |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_federation_server_received_edus_total                               | synapse_federation_server_received_edus                               |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_handler_presence_notified_presence_total                            | synapse_handler_presence_notified_presence                            |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_handler_presence_federation_presence_out_total                      | synapse_handler_presence_federation_presence_out                      |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_handler_presence_presence_updates_total                             | synapse_handler_presence_presence_updates                             |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_handler_presence_timers_fired_total                                 | synapse_handler_presence_timers_fired                                 |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_handler_presence_federation_presence_total                          | synapse_handler_presence_federation_presence                          |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_handler_presence_bump_active_time_total                             | synapse_handler_presence_bump_active_time                             |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_federation_client_sent_edus_total                                   | synapse_federation_client_sent_edus                                   |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_federation_client_sent_pdu_destinations_count_total                 | synapse_federation_client_sent_pdu_destinations:count                 |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_federation_client_sent_pdu_destinations_total                       | synapse_federation_client_sent_pdu_destinations:total                 |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_handlers_appservice_events_processed_total                          | synapse_handlers_appservice_events_processed                          |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_notifier_notified_events_total                                      | synapse_notifier_notified_events                                      |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter_total | synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter_total   | synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter   |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_http_httppusher_http_pushes_processed_total                         | synapse_http_httppusher_http_pushes_processed                         |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_http_httppusher_http_pushes_failed_total                            | synapse_http_httppusher_http_pushes_failed                            |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_http_httppusher_badge_updates_processed_total                       | synapse_http_httppusher_badge_updates_processed                       |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+| synapse_http_httppusher_badge_updates_failed_total                          | synapse_http_httppusher_badge_updates_failed                          |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------+
+
+
 Removal of deprecated metrics & time based counters becoming histograms in 0.31.0
 ---------------------------------------------------------------------------------
 
