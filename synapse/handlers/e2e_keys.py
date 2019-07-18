@@ -133,6 +133,12 @@ class E2eKeysHandler(object):
         @opentracing.trace_deferred
         @defer.inlineCallbacks
         def do_remote_query(destination):
+            """This is called when we are querying the device list of a user on
+            a remote homeserver and their device list is not in the device list
+            cache. If we share a room with this user and we're not querying for
+            specific user we will update the cache
+            with their device list."""
+
             destination_query = remote_queries_not_in_cache[destination]
 
             opentracing.set_tag("key_query", destination_query)
@@ -149,39 +155,43 @@ class E2eKeysHandler(object):
                 if user_id not in user_ids_updated:
                     try:
                         with PreserveLoggingContext(LoggingContext.current_context()):
-                            room_ids = yield self.store.get_rooms_for_user(user_id)
-                            if not device_list and room_ids:
-                                opentracing.log_kv(
-                                    {
-                                        "message": "Resyncing devices for user",
-                                        "user_id": user_id,
-                                    }
-                                )
-                                user_devices = yield self.device_handler.device_list_updater.user_device_resync(
-                                    user_id
-                                )
-                                user_devices = user_devices["devices"]
-                                opentracing.log_kv(
-                                    {
-                                        "message": "got user devices",
-                                        "user_devices": user_devices,
-                                    }
-                                )
-                                for device in user_devices:
-                                    results[user_id] = {
-                                        device["device_id"]: device["keys"]
-                                    }
-                                opentracing.log_kv(
-                                    {"adding user to user_ids_updated": user_id}
-                                )
-                                user_ids_updated.append(user_id)
-                            else:
-                                opentracing.log_kv(
-                                    {
-                                        "message": "Not resyncing devices for user",
-                                        "user_id": user_id,
-                                    }
-                                )
+                            if not device_list:
+                                room_ids = yield self.store.get_rooms_for_user(user_id)
+                                if room_ids:
+                                    # We've decided we're sharing a room with this user and should
+                                    # probably be tracking their device lists. However, we haven't
+                                    # done an initial sync on the device list so we do it now.
+                                    opentracing.log_kv(
+                                        {
+                                            "message": "Resyncing devices for user",
+                                            "user_id": user_id,
+                                        }
+                                    )
+                                    user_devices = yield self.device_handler.device_list_updater.user_device_resync(
+                                        user_id
+                                    )
+                                    user_devices = user_devices["devices"]
+                                    opentracing.log_kv(
+                                        {
+                                            "message": "got user devices",
+                                            "user_devices": user_devices,
+                                        }
+                                    )
+                                    for device in user_devices:
+                                        results[user_id] = {
+                                            device["device_id"]: device["keys"]
+                                        }
+                                    opentracing.log_kv(
+                                        {"adding user to user_ids_updated": user_id}
+                                    )
+                                    user_ids_updated.append(user_id)
+                                else:
+                                    opentracing.log_kv(
+                                        {
+                                            "message": "Not resyncing devices for user",
+                                            "user_id": user_id,
+                                        }
+                                    )
                     except Exception as e:
                         failures[destination] = failures.get(destination, []).append(
                             _exception_to_failure(e)
