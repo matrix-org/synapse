@@ -117,8 +117,6 @@ steps:
           limit: 2
 
   - label: ":python: 3.5 / :postgres: 9.5"
-    agents:
-      queue: "medium"
     env:
       TRIAL_FLAGS: "-j 8"
     command:
@@ -136,8 +134,6 @@ steps:
           limit: 2
 
   - label: ":python: 3.7 / :postgres: 9.5"
-    agents:
-      queue: "medium"
     env:
       TRIAL_FLAGS: "-j 8"
     command:
@@ -155,8 +151,6 @@ steps:
           limit: 2
 
   - label: ":python: 3.7 / :postgres: 11"
-    agents:
-      queue: "medium"
     env:
       TRIAL_FLAGS: "-j 8"
     command:
