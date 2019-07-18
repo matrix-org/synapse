@@ -129,7 +129,7 @@ class E2eKeysHandler(object):
         def do_remote_query(destination):
             destination_query = remote_queries_not_in_cache[destination]
 
-            # We first consider whether we wish to update the dive list cache with
+            # We first consider whether we wish to update the device list cache with
             # the users device list. We want to track a user's devices when the
             # authenticated user shares a room with the queried user and the query
             # has not specified a particular device.
