@@ -34,8 +34,8 @@ from synapse.http.servlet import (
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.relations import (
     AggregationPaginationToken,
-    RelationPaginationToken,
     PaginationChunk,
+    RelationPaginationToken,
 )
 
 from ._base import client_patterns
@@ -264,26 +264,18 @@ class RelationAggregationPaginationServlet(RestServlet):
             if to_token:
                 to_token = RelationPaginationToken.from_string(to_token)
 
-            pagination_chunk = yield self.store.get_relations_for_event(
+            pagination_chunk = yield self.store.get_aggregation_groups_for_event(
                 event_id=parent_id,
-                relation_type=relation_type,
                 event_type=event_type,
                 limit=limit,
                 from_token=from_token,
                 to_token=to_token,
             )
+
         else:
             pagination_chunk = PaginationChunk(chunk=[])
 
-        res = yield self.store.get_aggregation_groups_for_event(
-            event_id=parent_id,
-            event_type=event_type,
-            limit=limit,
-            from_token=from_token,
-            to_token=to_token,
-        )
-
-        defer.returnValue((200, res.to_dict()))
+        defer.returnValue((200, pagination_chunk.to_dict()))
 
 
 class RelationAggregationGroupPaginationServlet(RestServlet):

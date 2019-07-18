@@ -368,9 +368,8 @@ class EventClientSerializer(object):
         # If MSC1849 is enabled then we need to look if there are any relations
         # we need to bundle in with the event.
         # Do not bundle relations if the event has been redacted
-        if (
-            not event.internal_metadata.is_redacted() and
-            (self.experimental_msc1849_support_enabled and bundle_aggregations)
+        if not event.internal_metadata.is_redacted() and (
+            self.experimental_msc1849_support_enabled and bundle_aggregations
         ):
             annotations = yield self.store.get_aggregation_groups_for_event(event_id)
             references = yield self.store.get_relations_for_event(
