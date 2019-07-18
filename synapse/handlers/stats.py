@@ -148,10 +148,6 @@ class StatsHandler(StateDeltasHandler):
             # quantise time to the nearest bucket
             now = (now // 1000 // self.stats_bucket_size) * self.stats_bucket_size
 
-            yield self.store.update_stats_delta(
-                now, "room", room_id, "state_events", +1
-            )
-
             if prev_event_id is None:
                 # this state event doesn't overwrite another,
                 # so it is a new effective/current state event
@@ -277,7 +273,9 @@ class StatsHandler(StateDeltasHandler):
                         "invited_members": 0,
                         "left_members": 0,
                         "banned_members": 0,
-                        "state_events": 1,
+                        # this column is disused but not yet removed from the
+                        # schema, so fill with -1.
+                        "state_events": -1,
                     },
                 )
 

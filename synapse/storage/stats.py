@@ -258,10 +258,6 @@ class StatsStore(StateDeltasStore):
 
                 membership_counts = self._get_user_counts_in_room_txn(txn, room_id)
 
-                total_state_events = self._get_total_state_event_counts_txn(
-                    txn, room_id
-                )
-
                 self._update_stats_txn(
                     txn,
                     "room",
@@ -274,7 +270,9 @@ class StatsStore(StateDeltasStore):
                         "invited_members": membership_counts.get(Membership.INVITE, 0),
                         "left_members": membership_counts.get(Membership.LEAVE, 0),
                         "banned_members": membership_counts.get(Membership.BAN, 0),
-                        "state_events": total_state_events,
+                        # this column is disused but not (yet) removed from the
+                        # schema, so we fill it with -1.
+                        "state_events": -1,
                     },
                 )
                 self._simple_insert_txn(
