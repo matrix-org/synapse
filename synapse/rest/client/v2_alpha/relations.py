@@ -35,6 +35,7 @@ from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.relations import (
     AggregationPaginationToken,
     RelationPaginationToken,
+    PaginationChunk,
 )
 
 from ._base import client_patterns
@@ -153,29 +154,28 @@ class RelationPaginationServlet(RestServlet):
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
 
-        # Check if the event is redacted, and if so return an empty chunk
-        # list and zero tokens
-        if event.internal_metadata.is_redacted():
-            res = {"chunk": []}
-            defer.returnValue((200, res))
+        # Check if the event is redacted
+        # If not, return the relations, otherwise return an list
+        if not event.internal_metadata.is_redacted():
+            if from_token:
+                from_token = RelationPaginationToken.from_string(from_token)
 
-        if from_token:
-            from_token = RelationPaginationToken.from_string(from_token)
+            if to_token:
+                to_token = RelationPaginationToken.from_string(to_token)
 
-        if to_token:
-            to_token = RelationPaginationToken.from_string(to_token)
-
-        result = yield self.store.get_relations_for_event(
-            event_id=parent_id,
-            relation_type=relation_type,
-            event_type=event_type,
-            limit=limit,
-            from_token=from_token,
-            to_token=to_token,
-        )
+            pagination_chunk = yield self.store.get_relations_for_event(
+                event_id=parent_id,
+                relation_type=relation_type,
+                event_type=event_type,
+                limit=limit,
+                from_token=from_token,
+                to_token=to_token,
+            )
+        else:
+            pagination_chunk = PaginationChunk(chunk=[])
 
         events = yield self.store.get_events_as_list(
-            [c["event_id"] for c in result.chunk]
+            [c["event_id"] for c in pagination_chunk.chunk]
         )
 
         now = self.clock.time_msec()
@@ -192,7 +192,7 @@ class RelationPaginationServlet(RestServlet):
             events, now, bundle_aggregations=False
         )
 
-        return_value = result.to_dict()
+        return_value = pagination_chunk.to_dict()
         return_value["chunk"] = events
         return_value["original_event"] = original_event
 
@@ -249,17 +249,31 @@ class RelationAggregationPaginationServlet(RestServlet):
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
 
-        # Check if the event is redacted, and if so return an empty chunk
-        # list and zero tokens
-        if event.internal_metadata.is_redacted():
-            res = {"chunk": []}
-            defer.returnValue((200, res))
-
         if from_token:
             from_token = AggregationPaginationToken.from_string(from_token)
 
         if to_token:
             to_token = AggregationPaginationToken.from_string(to_token)
+
+        # Check if the event is redacted
+        # If not, return the relations, otherwise return an list
+        if not event.internal_metadata.is_redacted():
+            if from_token:
+                from_token = RelationPaginationToken.from_string(from_token)
+
+            if to_token:
+                to_token = RelationPaginationToken.from_string(to_token)
+
+            pagination_chunk = yield self.store.get_relations_for_event(
+                event_id=parent_id,
+                relation_type=relation_type,
+                event_type=event_type,
+                limit=limit,
+                from_token=from_token,
+                to_token=to_token,
+            )
+        else:
+            pagination_chunk = PaginationChunk(chunk=[])
 
         res = yield self.store.get_aggregation_groups_for_event(
             event_id=parent_id,
