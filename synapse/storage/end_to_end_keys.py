@@ -132,7 +132,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         # get signatures on the device
         signature_sql = (
             "SELECT * "
-            "  FROM e2e_device_signatures "
+            "  FROM e2e_cross_signing_signatures "
             " WHERE %s"
         ) % (
             " OR ".join("(" + q + ")" for q in signature_query_clauses)

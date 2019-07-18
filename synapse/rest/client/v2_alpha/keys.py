@@ -303,7 +303,7 @@ class SignaturesUploadServlet(RestServlet):
       }
     }
     """
-    PATTERNS = client_v2_patterns("/keys/signatures/upload$")
+    PATTERNS = client_patterns("/keys/signatures/upload$")
 
     def __init__(self, hs):
         """
