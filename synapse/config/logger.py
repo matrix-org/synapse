@@ -211,10 +211,10 @@ def setup_logging(config, use_worker_options=False):
     log_config_body = read_config()
 
     if log_config_body and log_config_body.get("version") == 2:
-        setup_structured_logging(log_config_body)
+        setup_structured_logging(config, log_config_body)
         appbase.register_sighup(read_config, callback=reload_structured_logging)
     else:
-        _setup_stdlib_logging(log_config_body)
+        _setup_stdlib_logging(config, log_config_body)
         appbase.register_sighup(read_config, callback=_reload_stdlib_logging)
 
     # make sure that the first thing we log is a thing we can grep backwards
