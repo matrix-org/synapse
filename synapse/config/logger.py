@@ -82,6 +82,7 @@ root:
 class LoggingConfig(Config):
     def read_config(self, config, **kwargs):
         self.log_config = self.abspath(config.get("log_config"))
+        self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
@@ -96,6 +97,21 @@ class LoggingConfig(Config):
             % locals()
         )
 
+    def read_arguments(self, args):
+        if args.no_redirect_stdio is not None:
+            self.no_redirect_stdio = args.no_redirect_stdio
+
+    @staticmethod
+    def add_arguments(parser):
+        logging_group = parser.add_argument_group("logging")
+        logging_group.add_argument(
+            "-n",
+            "--no-redirect-stdio",
+            action="store_true",
+            default=None,
+            help="Do not redirect stdout/stderr to the log",
+        )
+
     def generate_files(self, config, config_dir_path):
         log_config = config.get("log_config")
         if log_config and not os.path.exists(log_config):
@@ -108,21 +124,10 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def setup_logging(config, use_worker_options=False):
-    """ Set up python logging
-
-    Args:
-        config (LoggingConfig | synapse.config.workers.WorkerConfig):
-            configuration data
-
-        use_worker_options (bool): True to use the 'worker_log_config' option
-            instead of 'log_config'.
-
-        register_sighup (func | None): Function to call to register a
-            sighup handler.
+def _setup_stdlib_logging(log_config):
     """
-    log_config = config.worker_log_config if use_worker_options else config.log_config
-
+    Set up Python stdlib logging.
+    """
     if log_config is None:
         log_format = (
             "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
