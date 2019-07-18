@@ -178,7 +178,8 @@ def _reload_stdlib_logging(*args, log_config=None):
 
 
 def setup_logging(config, use_worker_options=False):
-    """ Set up python logging
+    """
+    Set up the logging subsystem.
 
     Args:
         config (LoggingConfig | synapse.config.workers.WorkerConfig):
