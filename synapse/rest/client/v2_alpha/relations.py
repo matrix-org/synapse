@@ -155,7 +155,7 @@ class RelationPaginationServlet(RestServlet):
         to_token = parse_string(request, "to")
 
         # Check if the event is redacted
-        # If not, return the relations, otherwise return an list
+        # If not, return the relations, otherwise return an empty list
         if not event.internal_metadata.is_redacted():
             if from_token:
                 from_token = RelationPaginationToken.from_string(from_token)
@@ -256,7 +256,7 @@ class RelationAggregationPaginationServlet(RestServlet):
             to_token = AggregationPaginationToken.from_string(to_token)
 
         # Check if the event is redacted
-        # If not, return the relations, otherwise return an list
+        # If not, return the relations, otherwise return an empty list
         if not event.internal_metadata.is_redacted():
             if from_token:
                 from_token = RelationPaginationToken.from_string(from_token)
