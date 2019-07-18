@@ -136,7 +136,7 @@ class ServerConfig(Config):
 
         # Whether to enable experimental MSC1849 (aka relations) support
         self.experimental_msc1849_support_enabled = config.get(
-            "experimental_msc1849_support_enabled", False
+            "experimental_msc1849_support_enabled", True
         )
 
         # Options to control access by tracking MAU
