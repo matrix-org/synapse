@@ -23,6 +23,7 @@ from canonicaljson import encode_canonical_json, json
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
+from synapse import event_auth
 from synapse.api.constants import EventTypes, Membership, RelationTypes
 from synapse.api.errors import (
     AuthError,
@@ -784,6 +785,20 @@ class EventCreationHandler(object):
                     event.signatures.update(returned_invite.signatures)
 
         if event.type == EventTypes.Redaction:
+            original_event = yield self.store.get_event(
+                event.redacts,
+                check_redacted=False,
+                get_prev_content=False,
+                allow_rejected=False,
+                allow_none=True,
+                check_room_id=event.room_id,
+            )
+
+            # we can make some additional checks now if we have the original event.
+            if original_event:
+                if original_event.type == EventTypes.Create:
+                    raise AuthError(403, "Redacting create events is not permitted")
+
             prev_state_ids = yield context.get_prev_state_ids(self.store)
             auth_events_ids = yield self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=True
@@ -791,18 +806,18 @@ class EventCreationHandler(object):
             auth_events = yield self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
             room_version = yield self.store.get_room_version(event.room_id)
-            if self.auth.check_redaction(room_version, event, auth_events=auth_events):
-                original_event = yield self.store.get_event(
-                    event.redacts,
-                    check_redacted=False,
-                    get_prev_content=False,
-                    allow_rejected=False,
-                    allow_none=False,
-                )
+
+            if event_auth.check_redaction(room_version, event, auth_events=auth_events):
+                # this user doesn't have 'redact' rights, so we need to do some more
+                # checks on the original event. Let's start by checking the original
+                # event exists.
+                if not original_event:
+                    raise NotFoundError("Could not find event %s" % (event.redacts,))
+
                 if event.user_id != original_event.user_id:
                     raise AuthError(403, "You don't have permission to redact events")
 
-                # We've already checked.
+                # all the checks are done.
                 event.internal_metadata.recheck_redaction = False
 
         if event.type == EventTypes.Create:

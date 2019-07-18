@@ -606,21 +606,6 @@ class Auth(object):
 
         defer.returnValue(auth_ids)
 
-    def check_redaction(self, room_version, event, auth_events):
-        """Check whether the event sender is allowed to redact the target event.
-
-        Returns:
-            True if the the sender is allowed to redact the target event if the
-                target event was created by them.
-            False if the sender is allowed to redact the target event with no
-                further checks.
-
-        Raises:
-            AuthError if the event sender is definitely not allowed to redact
-                the target event.
-        """
-        return event_auth.check_redaction(room_version, event, auth_events)
-
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id, user):
         """Check if the user is allowed to edit the room's entry in the
