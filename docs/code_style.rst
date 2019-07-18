@@ -111,42 +111,43 @@ includes following a consistent format.
 
 Some guidelines follow:
 
- * Sections should be separated with a heading consisting of a single line
-   prefixed and suffixed with ``##``. There should be **two** blank lines
-   before the section header, and **one** after.
+* Sections should be separated with a heading consisting of a single line
+  prefixed and suffixed with ``##``. There should be **two** blank lines
+  before the section header, and **one** after.
 
- * Each option should be listed in the file with the following format:
-     * A comment describing the setting. Each line of this comment should be
-       prefixed with a hash (``#``) and a space.
+* Each option should be listed in the file with the following format:
 
-       The comment should describe the default behaviour (ie, what happens if
-       the setting is omitted), as well as what the effect will be if the
-       setting is changed.
+  * A comment describing the setting. Each line of this comment should be
+    prefixed with a hash (``#``) and a space.
 
-       Often, the comment end with something like "uncomment the
-       following to \<do action>".
+    The comment should describe the default behaviour (ie, what happens if
+    the setting is omitted), as well as what the effect will be if the
+    setting is changed.
 
-     * A line consisting of only ``#``.
+    Often, the comment end with something like "uncomment the
+    following to \<do action>".
 
-     * A commented-out example setting, prefixed with only ``#``.
+  * A line consisting of only ``#``.
 
-       For boolean (on/off) options, convention is that this example should be
-       the *opposite* to the default (so the comment will end with "Uncomment
-       the following to enable [or disable] \<feature\>." For other options,
-       the example should give some non-default value which is likely to be
-       useful to the reader.
+  * A commented-out example setting, prefixed with only ``#``.
 
-  * There should be a blank line between each option.
+    For boolean (on/off) options, convention is that this example should be
+    the *opposite* to the default (so the comment will end with "Uncomment
+    the following to enable [or disable] \<feature\>." For other options,
+    the example should give some non-default value which is likely to be
+    useful to the reader.
 
-  * Where several settings are grouped into a single dict, *avoid* the
-    convention where the whole block is commented out, resulting in comment
-    lines starting ``# #``, as this is hard to read and confusing to
-    edit. Instead, leave the top-level config option uncommented, and follow
-    the conventions above for sub-options. Ensure that your code correctly
-    handles the top-level option being set to ``None`` (as it will be if no
-    sub-options are enabled).
+* There should be a blank line between each option.
 
-  * Lines should be wrapped at 80 characters.
+* Where several settings are grouped into a single dict, *avoid* the
+  convention where the whole block is commented out, resulting in comment
+  lines starting ``# #``, as this is hard to read and confusing to
+  edit. Instead, leave the top-level config option uncommented, and follow
+  the conventions above for sub-options. Ensure that your code correctly
+  handles the top-level option being set to ``None`` (as it will be if no
+  sub-options are enabled).
+
+* Lines should be wrapped at 80 characters.
 
 Example::
 
