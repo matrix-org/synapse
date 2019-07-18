@@ -639,7 +639,8 @@ class ServerConfig(Config):
         if args.print_pidfile is not None:
             self.print_pidfile = args.print_pidfile
 
-    def add_arguments(self, parser):
+    @staticmethod
+    def add_arguments(parser):
         server_group = parser.add_argument_group("server")
         server_group.add_argument(
             "-D",

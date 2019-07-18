@@ -84,6 +84,8 @@ class RegistrationHandler(BaseHandler):
             self.device_handler = hs.get_device_handler()
             self.pusher_pool = hs.get_pusherpool()
 
+        self.session_lifetime = hs.config.session_lifetime
+
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None, assigned_user_id=None):
         if types.contains_invalid_mxid_characters(localpart):
@@ -138,11 +140,10 @@ class RegistrationHandler(BaseHandler):
                 )
 
     @defer.inlineCallbacks
-    def register(
+    def register_user(
         self,
         localpart=None,
         password=None,
-        generate_token=True,
         guest_access_token=None,
         make_guest=False,
         admin=False,
@@ -160,11 +161,6 @@ class RegistrationHandler(BaseHandler):
             password (unicode) : The password to assign to this user so they can
               login again. This can be None which means they cannot login again
               via a password (e.g. the user is an application service user).
-            generate_token (bool): Whether a new access token should be
-              generated. Having this be True should be considered deprecated,
-              since it offers no means of associating a device_id with the
-              access_token. Instead you should call auth_handler.issue_access_token
-              after registration.
             user_type (str|None): type of user. One of the values from
               api.constants.UserTypes, or None for a normal user.
             default_display_name (unicode|None): if set, the new user's displayname
@@ -172,7 +168,7 @@ class RegistrationHandler(BaseHandler):
             address (str|None): the IP address used to perform the registration.
             bind_emails (List[str]): list of emails to bind to this account.
         Returns:
-            A tuple of (user_id, access_token).
+            Deferred[str]: user_id
         Raises:
             RegistrationError if there was a problem registering.
         """
@@ -206,12 +202,8 @@ class RegistrationHandler(BaseHandler):
             elif default_display_name is None:
                 default_display_name = localpart
 
-            token = None
-            if generate_token:
-                token = self.macaroon_gen.generate_access_token(user_id)
             yield self.register_with_store(
                 user_id=user_id,
-                token=token,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
@@ -230,21 +222,17 @@ class RegistrationHandler(BaseHandler):
         else:
             # autogen a sequential user ID
             attempts = 0
-            token = None
             user = None
             while not user:
                 localpart = yield self._generate_user_id(attempts > 0)
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 yield self.check_user_id_not_appservice_exclusive(user_id)
-                if generate_token:
-                    token = self.macaroon_gen.generate_access_token(user_id)
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
                     yield self.register_with_store(
                         user_id=user_id,
-                        token=token,
                         password_hash=password_hash,
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
@@ -254,10 +242,15 @@ class RegistrationHandler(BaseHandler):
                     # if user id is taken, just generate another
                     user = None
                     user_id = None
-                    token = None
                     attempts += 1
+
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
+        else:
+            logger.info(
+                "Skipping auto-join for %s because consent is required at registration",
+                user_id,
+            )
 
         # Bind any specified emails to this account
         current_time = self.hs.get_clock().time_msec()
@@ -272,7 +265,7 @@ class RegistrationHandler(BaseHandler):
             # Bind email to new account
             yield self._register_email_threepid(user_id, threepid_dict, None, False)
 
-        defer.returnValue((user_id, token))
+        defer.returnValue(user_id)
 
     @defer.inlineCallbacks
     def _auto_join_rooms(self, user_id):
@@ -298,6 +291,7 @@ class RegistrationHandler(BaseHandler):
             count = yield self.store.count_all_users()
             should_auto_create_rooms = count == 1
         for r in self.hs.config.auto_join_rooms:
+            logger.info("Auto-joining %s to %s", user_id, r)
             try:
                 if should_auto_create_rooms:
                     room_alias = RoomAlias.from_string(r)
@@ -534,7 +528,6 @@ class RegistrationHandler(BaseHandler):
     def register_with_store(
         self,
         user_id,
-        token=None,
         password_hash=None,
         was_guest=False,
         make_guest=False,
@@ -548,9 +541,6 @@ class RegistrationHandler(BaseHandler):
 
         Args:
             user_id (str): The desired user ID to register.
-            token (str): The desired access token to use for this user. If this
-                is not None, the given access token is associated with the user
-                id.
             password_hash (str|None): Optional. The password hash for this user.
             was_guest (bool): Optional. Whether this is a guest account being
                 upgraded to a non-guest account.
@@ -586,7 +576,6 @@ class RegistrationHandler(BaseHandler):
         if self.hs.config.worker_app:
             return self._register_client(
                 user_id=user_id,
-                token=token,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
@@ -597,9 +586,8 @@ class RegistrationHandler(BaseHandler):
                 address=address,
             )
         else:
-            return self.store.register(
+            return self.store.register_user(
                 user_id=user_id,
-                token=token,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
@@ -612,6 +600,8 @@ class RegistrationHandler(BaseHandler):
     @defer.inlineCallbacks
     def register_device(self, user_id, device_id, initial_display_name, is_guest=False):
         """Register a device for a user and generate an access token.
+
+        The access token will be limited by the homeserver's session_lifetime config.
 
         Args:
             user_id (str): full canonical @user:id
@@ -633,20 +623,29 @@ class RegistrationHandler(BaseHandler):
                 is_guest=is_guest,
             )
             defer.returnValue((r["device_id"], r["access_token"]))
-        else:
-            device_id = yield self.device_handler.check_device_registered(
-                user_id, device_id, initial_display_name
-            )
-            if is_guest:
-                access_token = self.macaroon_gen.generate_access_token(
-                    user_id, ["guest = true"]
-                )
-            else:
-                access_token = yield self._auth_handler.get_access_token_for_user_id(
-                    user_id, device_id=device_id
-                )
 
-            defer.returnValue((device_id, access_token))
+        valid_until_ms = None
+        if self.session_lifetime is not None:
+            if is_guest:
+                raise Exception(
+                    "session_lifetime is not currently implemented for guest access"
+                )
+            valid_until_ms = self.clock.time_msec() + self.session_lifetime
+
+        device_id = yield self.device_handler.check_device_registered(
+            user_id, device_id, initial_display_name
+        )
+        if is_guest:
+            assert valid_until_ms is None
+            access_token = self.macaroon_gen.generate_access_token(
+                user_id, ["guest = true"]
+            )
+        else:
+            access_token = yield self._auth_handler.get_access_token_for_user_id(
+                user_id, device_id=device_id, valid_until_ms=valid_until_ms
+            )
+
+        defer.returnValue((device_id, access_token))
 
     @defer.inlineCallbacks
     def post_registration_actions(
