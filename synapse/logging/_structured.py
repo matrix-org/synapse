@@ -176,15 +176,20 @@ def parse_handler_configs(config):
             raise ConfigError("Handlers need to have either a 'type' or 'class' key.")
 
 
-def setup_structured_logging(config):
+def setup_structured_logging(config, log_config):
     """
-    Set up Twisted's structured logging system to output.
+    Set up Twisted's structured logging system.
     """
+    if config.no_redirect_stdio:
+        raise ConfigError(
+            "no_redirect_stdio cannot be defined using log_config version 2."
+        )
+
     logger = Logger()
 
     observers = []
 
-    for observer in parse_handler_configs(config):
+    for observer in parse_handler_configs(log_config):
         if observer.type == LoggingOutputType.CONSOLE:
             logger.debug("Starting up the {name} console logger", name=observer.name)
             observers.append(SynapseFileLogObserver(observer.location))
@@ -195,9 +200,9 @@ def setup_structured_logging(config):
     publisher = LogPublisher(*observers)
     log_filter = LogLevelFilterPredicate()
 
-    for namespace, config in config.get("loggers", {}).items():
+    for namespace, config in log_config.get("loggers", {}).items():
         log_filter.setLogLevelForNamespace(
-            namespace, stdlib_log_level_to_twisted(config.get("level", "INFO"))
+            namespace, stdlib_log_level_to_twisted(log_config.get("level", "INFO"))
         )
 
     f = FilteringLogObserver(publisher, [log_filter])

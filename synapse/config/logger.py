@@ -124,7 +124,7 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(log_config):
+def _setup_stdlib_logging(config, log_config):
     """
     Set up Python stdlib logging.
     """
@@ -165,7 +165,11 @@ def _setup_stdlib_logging(log_config):
 
         return observer(event)
 
-    globalLogBeginner.beginLoggingTo([_log], redirectStandardIO=True)
+    globalLogBeginner.beginLoggingTo(
+        [_log], redirectStandardIO=not config.no_redirect_stdio
+    )
+    if not config.no_redirect_stdio:
+        print("Redirected stdout/stderr to logs")
 
 
 def _reload_stdlib_logging(*args, log_config=None):
