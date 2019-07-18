@@ -154,9 +154,11 @@ class RelationPaginationServlet(RestServlet):
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
 
-        # Check if the event is redacted
-        # If not, return the relations, otherwise return an empty list
-        if not event.internal_metadata.is_redacted():
+        if event.internal_metadata.is_redacted():
+            # If the event is redacted, return an empty list of relations
+            pagination_chunk = PaginationChunk(chunk=[])
+        else:
+            # Return the relations
             if from_token:
                 from_token = RelationPaginationToken.from_string(from_token)
 
@@ -171,8 +173,6 @@ class RelationPaginationServlet(RestServlet):
                 from_token=from_token,
                 to_token=to_token,
             )
-        else:
-            pagination_chunk = PaginationChunk(chunk=[])
 
         events = yield self.store.get_events_as_list(
             [c["event_id"] for c in pagination_chunk.chunk]
@@ -249,9 +249,11 @@ class RelationAggregationPaginationServlet(RestServlet):
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
 
-        # Check if the event is redacted
-        # If not, return the relations, otherwise return an empty list
-        if not event.internal_metadata.is_redacted():
+        if event.internal_metadata.is_redacted():
+            # If the event is redacted, return an empty list of relations
+            pagination_chunk = PaginationChunk(chunk=[])
+        else:
+            # Return the relations
             if from_token:
                 from_token = AggregationPaginationToken.from_string(from_token)
 
@@ -265,9 +267,6 @@ class RelationAggregationPaginationServlet(RestServlet):
                 from_token=from_token,
                 to_token=to_token,
             )
-
-        else:
-            pagination_chunk = PaginationChunk(chunk=[])
 
         defer.returnValue((200, pagination_chunk.to_dict()))
 
