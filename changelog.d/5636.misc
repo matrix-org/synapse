@@ -1,1 +1,1 @@
-Synapse now requires prometheus_client 0.4.0 or greater.
+Some counter metrics exposed over Prometheus have been renamed, with the old names preserved for backwards compatibility and deprecated. See `docs/metrics-howto.rst` for details.
