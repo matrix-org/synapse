@@ -718,7 +718,6 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
 
     def register(self, http_server):
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)"
@@ -741,7 +740,6 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
             txn_id=txn_id,
         )
 
-        # Return the event_id of the original event's redaction
         defer.returnValue((200, {"event_id": event.event_id}))
 
     def on_PUT(self, request, room_id, event_id, txn_id):
