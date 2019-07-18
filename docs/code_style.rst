@@ -99,3 +99,81 @@ General rules
 
   - Avoid wildcard imports (``from synapse.types import *``) and relative
     imports (``from .types import UserID``).
+
+Configuration file format
+-------------------------
+
+The `sample configuration file <./sample_config.yaml>`_ acts as a reference to
+Synapse's configuration options for server administrators. Remember that many
+readers will be unfamiliar with YAML and server administration in general, so
+that it is important that the file be as easy to understand as possible, which
+includes following a consistent format.
+
+Some guidelines follow:
+
+ * Sections should be separated with a heading consisting of a single line
+   prefixed and suffixed with ``##``. There should be **two** blank lines
+   before the section header, and **one** after.
+
+ * Each option should be listed in the file with the following format:
+     * A comment describing the setting. Each line of this comment should be
+       prefixed with a hash (``#``) and a space.
+
+       The comment should describe the default behaviour (ie, what happens if
+       the setting is omitted), as well as what the effect will be if the
+       setting is changed.
+
+       Often, the comment end with something like "uncomment the
+       following to \<do action>".
+
+     * A line consisting of only ``#``.
+
+     * A commented-out example setting, prefixed with only ``#``.
+
+       For boolean (on/off) options, convention is that this example should be
+       the *opposite* to the default (so the comment will end with "Uncomment
+       the following to enable [or disable] \<feature\>." For other options,
+       the example should give some non-default value which is likely to be
+       useful to the reader.
+
+  * There should be a blank line between each option.
+
+  * Where several settings are grouped into a single dict, *avoid* the
+    convention where the whole block is commented out, resulting in comment
+    lines starting ``# #``, as this is hard to read and confusing to
+    edit. Instead, leave the top-level config option uncommented, and follow
+    the conventions above for sub-options. Ensure that your code correctly
+    handles the top-level option being set to ``None`` (as it will be if no
+    sub-options are enabled).
+
+  * Lines should be wrapped at 80 characters.
+
+Example::
+
+    ## Frobnication ##
+
+    # The frobnicator will ensure that all requests are fully frobnicated.
+    # To enable it, uncomment the following.
+    #
+    #frobnicator_enabled: true
+
+    # By default, the frobnicator will frobnicate with the default frobber.
+    # The following will make it use an alternative frobber.
+    #
+    #frobincator_frobber: special_frobber
+
+    # Settings for the frobber
+    #
+    frobber:
+       # frobbing speed. Defaults to 1.
+       #
+       #speed: 10
+
+       # frobbing distance. Defaults to 1000.
+       #
+       #distance: 100
+
+Note that the sample configuration is generated from the synapse code and is
+maintained by a script, ``scripts-dev/generate_sample_config``. Making sure
+that the output from this script matches the desired format is left as an
+exercise for the reader!
