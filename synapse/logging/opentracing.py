@@ -25,10 +25,10 @@
 # be a matter of few regexes to move over to opentracing's access patterns proper.
 
 import contextlib
+import inspect
 import logging
 import re
 from functools import wraps
-from twisted.internet import defer
 
 from canonicaljson import json
 
@@ -52,6 +52,8 @@ logger = logging.getLogger(__name__)
 
 
 # Block everything by default
+# A regex which matches the server_names to expose traces for.
+# None means 'block everything'.
 _homeserver_whitelist = None
 
 # Util methods
