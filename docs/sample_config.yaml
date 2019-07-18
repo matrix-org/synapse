@@ -1409,17 +1409,24 @@ password_config:
 
 
 ## Opentracing ##
-# These settings enable opentracing which implements distributed tracing
-# This allows you to observe the causal chain of events across servers
-# including requests, key lookups etc. across any server running
-# synapse or any other other services which supports opentracing.
-# (specifically those implemented with jaeger)
 
-#opentracing:
-#  # Enable / disable tracer
-#  tracer_enabled: false
-#  # The list of homeservers we wish to expose our current traces to.
-#  # The list is a list of regexes which are matched against the
-#  # servername of the homeserver
-#  homeserver_whitelist:
-#    - ".*"
+# These settings enable opentracing, which implements distributed tracing.
+# This allows you to observe the causal chains of events across servers
+# including requests, key lookups etc., across any server running
+# synapse or any other other services which supports opentracing
+# (specifically those implemented with Jaeger).
+#
+opentracing:
+    # tracing is disabled by default. Uncomment the following line to enable it.
+    #
+    #enabled: true
+
+    # The list of homeservers we wish to expose our current traces to.
+    # XXX this is unclear
+    # This a list of regexes which are matched against the server_name of the
+    # homeserver.
+    #
+    # By defult, it is empty, so no servers are matched.
+    #
+    #homeserver_whitelist:
+    #  - ".*"

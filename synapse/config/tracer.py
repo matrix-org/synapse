@@ -18,33 +18,42 @@ from ._base import Config, ConfigError
 
 class TracerConfig(Config):
     def read_config(self, config, **kwargs):
-        self.tracer_config = config.get("opentracing")
+        opentracing_config = config.get("opentracing")
+        if opentracing_config is None:
+            opentracing_config = {}
 
-        self.tracer_config = config.get("opentracing", {"tracer_enabled": False})
+        self.opentracer_enabled = opentracing_config.get("enabled", False)
+        if not self.opentracer_enabled:
+            return
 
-        if self.tracer_config.get("tracer_enabled", False):
-            # The tracer is enabled so sanitize the config
-            # If no whitelists are given
-            self.tracer_config.setdefault("homeserver_whitelist", [])
+        # The tracer is enabled so sanitize the config
 
-            if not isinstance(self.tracer_config.get("homeserver_whitelist"), list):
-                raise ConfigError("Tracer homesererver_whitelist config is malformed")
+        self.opentracer_whitelist = opentracing_config.get("homeserver_whitelist", [])
+        if not isinstance(self.opentracer_whitelist, list):
+            raise ConfigError("Tracer homeserver_whitelist config is malformed")
 
     def generate_config_section(cls, **kwargs):
         return """\
         ## Opentracing ##
-        # These settings enable opentracing which implements distributed tracing
-        # This allows you to observe the causal chain of events across servers
-        # including requests, key lookups etc. across any server running
-        # synapse or any other other services which supports opentracing.
-        # (specifically those implemented with jaeger)
 
-        #opentracing:
-        #  # Enable / disable tracer
-        #  tracer_enabled: false
-        #  # The list of homeservers we wish to expose our current traces to.
-        #  # The list is a list of regexes which are matched against the
-        #  # servername of the homeserver
-        #  homeserver_whitelist:
-        #    - ".*"
+        # These settings enable opentracing, which implements distributed tracing.
+        # This allows you to observe the causal chains of events across servers
+        # including requests, key lookups etc., across any server running
+        # synapse or any other other services which supports opentracing
+        # (specifically those implemented with Jaeger).
+        #
+        opentracing:
+            # tracing is disabled by default. Uncomment the following line to enable it.
+            #
+            #enabled: true
+
+            # The list of homeservers we wish to expose our current traces to.
+            # XXX this is unclear
+            # This a list of regexes which are matched against the server_name of the
+            # homeserver.
+            #
+            # By defult, it is empty, so no servers are matched.
+            #
+            #homeserver_whitelist:
+            #  - ".*"
         """
