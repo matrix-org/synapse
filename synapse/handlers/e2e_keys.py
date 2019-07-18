@@ -23,12 +23,7 @@ from canonicaljson import encode_canonical_json, json
 from twisted.internet import defer
 
 from synapse.api.errors import CodeMessageException, SynapseError
-from synapse.logging.context import (
-    LoggingContext,
-    PreserveLoggingContext,
-    make_deferred_yieldable,
-    run_in_background,
-)
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -127,6 +122,12 @@ class E2eKeysHandler(object):
         # Now fetch any devices that we don't have in our cache
         @defer.inlineCallbacks
         def do_remote_query(destination):
+            """This is called when we are querying the device list of a user on
+            a remote homeserver and their device list is not in the device list
+            cache. If we share a room with this user and we're not querying for
+            specific user we will update the cache
+            with their device list."""
+
             destination_query = remote_queries_not_in_cache[destination]
 
             # We first consider whether we wish to update the device list cache with
@@ -140,9 +141,12 @@ class E2eKeysHandler(object):
             for (user_id, device_list) in destination_query.items():
                 if user_id not in user_ids_updated:
                     try:
-                        with PreserveLoggingContext(LoggingContext.current_context()):
+                        if not device_list:
                             room_ids = yield self.store.get_rooms_for_user(user_id)
-                            if not device_list and room_ids:
+                            if room_ids:
+                                # We've decided we're sharing a room with this user and should
+                                # probably be tracking their device lists. However, we haven't
+                                # done an initial sync on the device list so we do it now.
                                 user_devices = yield self.device_handler.device_list_updater.user_device_resync(
                                     user_id
                                 )
