@@ -24,12 +24,7 @@ from signedjson.sign import SignatureVerifyException, verify_signed_json
 
 from twisted.internet import defer
 
-from synapse.api.errors import (
-    CodeMessageException,
-    Codes,
-    FederationDeniedError,
-    SynapseError,
-)
+from synapse.api.errors import CodeMessageException, Codes, SynapseError
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import (
     UserID,
@@ -553,9 +548,6 @@ def _exception_to_failure(e):
 
     if isinstance(e, NotRetryingDestination):
         return {"status": 503, "message": "Not ready for retry"}
-
-    if isinstance(e, FederationDeniedError):
-        return {"status": 403, "message": "Federation Denied"}
 
     # include ConnectionRefused and other errors
     #

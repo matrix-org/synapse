@@ -34,6 +34,7 @@ from synapse.http.servlet import (
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.relations import (
     AggregationPaginationToken,
+    PaginationChunk,
     RelationPaginationToken,
 )
 
@@ -145,38 +146,55 @@ class RelationPaginationServlet(RestServlet):
             room_id, requester.user.to_string()
         )
 
-        # This checks that a) the event exists and b) the user is allowed to
-        # view it.
-        yield self.event_handler.get_event(requester.user, room_id, parent_id)
+        # This gets the original event and checks that a) the event exists and
+        # b) the user is allowed to view it.
+        event = yield self.event_handler.get_event(requester.user, room_id, parent_id)
 
         limit = parse_integer(request, "limit", default=5)
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
 
-        if from_token:
-            from_token = RelationPaginationToken.from_string(from_token)
+        if event.internal_metadata.is_redacted():
+            # If the event is redacted, return an empty list of relations
+            pagination_chunk = PaginationChunk(chunk=[])
+        else:
+            # Return the relations
+            if from_token:
+                from_token = RelationPaginationToken.from_string(from_token)
 
-        if to_token:
-            to_token = RelationPaginationToken.from_string(to_token)
+            if to_token:
+                to_token = RelationPaginationToken.from_string(to_token)
 
-        result = yield self.store.get_relations_for_event(
-            event_id=parent_id,
-            relation_type=relation_type,
-            event_type=event_type,
-            limit=limit,
-            from_token=from_token,
-            to_token=to_token,
-        )
+            pagination_chunk = yield self.store.get_relations_for_event(
+                event_id=parent_id,
+                relation_type=relation_type,
+                event_type=event_type,
+                limit=limit,
+                from_token=from_token,
+                to_token=to_token,
+            )
 
         events = yield self.store.get_events_as_list(
-            [c["event_id"] for c in result.chunk]
+            [c["event_id"] for c in pagination_chunk.chunk]
         )
 
         now = self.clock.time_msec()
-        events = yield self._event_serializer.serialize_events(events, now)
+        # We set bundle_aggregations to False when retrieving the original
+        # event because we want the content before relations were applied to
+        # it.
+        original_event = yield self._event_serializer.serialize_event(
+            event, now, bundle_aggregations=False
+        )
+        # Similarly, we don't allow relations to be applied to relations, so we
+        # return the original relations without any aggregations on top of them
+        # here.
+        events = yield self._event_serializer.serialize_events(
+            events, now, bundle_aggregations=False
+        )
 
-        return_value = result.to_dict()
+        return_value = pagination_chunk.to_dict()
         return_value["chunk"] = events
+        return_value["original_event"] = original_event
 
         defer.returnValue((200, return_value))
 
@@ -222,7 +240,7 @@ class RelationAggregationPaginationServlet(RestServlet):
 
         # This checks that a) the event exists and b) the user is allowed to
         # view it.
-        yield self.event_handler.get_event(requester.user, room_id, parent_id)
+        event = yield self.event_handler.get_event(requester.user, room_id, parent_id)
 
         if relation_type not in (RelationTypes.ANNOTATION, None):
             raise SynapseError(400, "Relation type must be 'annotation'")
@@ -231,21 +249,26 @@ class RelationAggregationPaginationServlet(RestServlet):
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
 
-        if from_token:
-            from_token = AggregationPaginationToken.from_string(from_token)
+        if event.internal_metadata.is_redacted():
+            # If the event is redacted, return an empty list of relations
+            pagination_chunk = PaginationChunk(chunk=[])
+        else:
+            # Return the relations
+            if from_token:
+                from_token = AggregationPaginationToken.from_string(from_token)
 
-        if to_token:
-            to_token = AggregationPaginationToken.from_string(to_token)
+            if to_token:
+                to_token = AggregationPaginationToken.from_string(to_token)
 
-        res = yield self.store.get_aggregation_groups_for_event(
-            event_id=parent_id,
-            event_type=event_type,
-            limit=limit,
-            from_token=from_token,
-            to_token=to_token,
-        )
+            pagination_chunk = yield self.store.get_aggregation_groups_for_event(
+                event_id=parent_id,
+                event_type=event_type,
+                limit=limit,
+                from_token=from_token,
+                to_token=to_token,
+            )
 
-        defer.returnValue((200, res.to_dict()))
+        defer.returnValue((200, pagination_chunk.to_dict()))
 
 
 class RelationAggregationGroupPaginationServlet(RestServlet):

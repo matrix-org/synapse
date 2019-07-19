@@ -140,6 +140,22 @@ class ConsentNotGivenError(SynapseError):
         return cs_error(self.msg, self.errcode, consent_uri=self._consent_uri)
 
 
+class UserDeactivatedError(SynapseError):
+    """The error returned to the client when the user attempted to access an
+    authenticated endpoint, but the account has been deactivated.
+    """
+
+    def __init__(self, msg):
+        """Constructs a UserDeactivatedError
+
+        Args:
+            msg (str): The human-readable error message
+        """
+        super(UserDeactivatedError, self).__init__(
+            code=http_client.FORBIDDEN, msg=msg, errcode=Codes.UNKNOWN
+        )
+
+
 class RegistrationError(SynapseError):
     """An error raised when a registration event fails."""
 
@@ -211,12 +227,49 @@ class NotFoundError(SynapseError):
 
 
 class AuthError(SynapseError):
-    """An error raised when there was a problem authorising an event."""
+    """An error raised when there was a problem authorising an event, and at various
+    other poorly-defined times.
+    """
 
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.FORBIDDEN
         super(AuthError, self).__init__(*args, **kwargs)
+
+
+class InvalidClientCredentialsError(SynapseError):
+    """An error raised when there was a problem with the authorisation credentials
+    in a client request.
+
+    https://matrix.org/docs/spec/client_server/r0.5.0#using-access-tokens:
+
+    When credentials are required but missing or invalid, the HTTP call will
+    return with a status of 401 and the error code, M_MISSING_TOKEN or
+    M_UNKNOWN_TOKEN respectively.
+    """
+
+    def __init__(self, msg, errcode):
+        super().__init__(code=401, msg=msg, errcode=errcode)
+
+
+class MissingClientTokenError(InvalidClientCredentialsError):
+    """Raised when we couldn't find the access token in a request"""
+
+    def __init__(self, msg="Missing access token"):
+        super().__init__(msg=msg, errcode="M_MISSING_TOKEN")
+
+
+class InvalidClientTokenError(InvalidClientCredentialsError):
+    """Raised when we didn't understand the access token in a request"""
+
+    def __init__(self, msg="Unrecognised access token", soft_logout=False):
+        super().__init__(msg=msg, errcode="M_UNKNOWN_TOKEN")
+        self._soft_logout = soft_logout
+
+    def error_dict(self):
+        d = super().error_dict()
+        d["soft_logout"] = self._soft_logout
+        return d
 
 
 class ResourceLimitError(SynapseError):

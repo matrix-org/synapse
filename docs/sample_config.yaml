@@ -786,6 +786,17 @@ uploads_path: "DATADIR/uploads"
 #  renew_at: 1w
 #  renew_email_subject: "Renew your %(app)s account"
 
+# Time that a user's session remains valid for, after they log in.
+#
+# Note that this is not currently compatible with guest logins.
+#
+# Note also that this is calculated at login time: changes are not applied
+# retrospectively to users who have already logged in.
+#
+# By default, this is infinite.
+#
+#session_lifetime: 24h
+
 # The user must provide all of the below types of 3PID when registering.
 #
 #registrations_require_3pid:
@@ -1395,3 +1406,37 @@ password_config:
 #  module: "my_custom_project.SuperRulesSet"
 #  config:
 #    example_option: 'things'
+
+
+## Opentracing ##
+
+# These settings enable opentracing, which implements distributed tracing.
+# This allows you to observe the causal chains of events across servers
+# including requests, key lookups etc., across any server running
+# synapse or any other other services which supports opentracing
+# (specifically those implemented with Jaeger).
+#
+opentracing:
+    # tracing is disabled by default. Uncomment the following line to enable it.
+    #
+    #enabled: true
+
+    # The list of homeservers we wish to send and receive span contexts and span baggage.
+    #
+    # Though it's mostly safe to send and receive span contexts to and from
+    # untrusted users since span contexts are usually opaque ids it can lead to
+    # two problems, namely:
+    # - If the span context is marked as sampled by the sending homeserver the receiver will
+    # sample it. Therefore two homeservers with wildly disparaging sampling policies
+    # could incur higher sampling counts than intended.
+    # - Span baggage can be arbitrary data. For safety this has been disabled in synapse
+    # but that doesn't prevent another server sending you baggage which will be logged
+    # to opentracing logs.
+    #
+    # This a list of regexes which are matched against the server_name of the
+    # homeserver.
+    #
+    # By defult, it is empty, so no servers are matched.
+    #
+    #homeserver_whitelist:
+    #  - ".*"

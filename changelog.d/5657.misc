@@ -1,0 +1,1 @@
+Add a mechanism for per-test homeserver configuration in the unit tests.

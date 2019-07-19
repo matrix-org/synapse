@@ -77,11 +77,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         store = self.hs.get_datastore()
         frank = UserID.from_string("@frank:test")
         self.get_success(
-            store.register(
-                user_id=frank.to_string(),
-                token="jkv;g498752-43gj['eamb!-5",
-                password_hash=None,
-            )
+            store.register_user(user_id=frank.to_string(), password_hash=None)
         )
         local_part = frank.localpart
         user_id = frank.to_string()
@@ -276,7 +272,10 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             )
         else:
             yield self.hs.get_auth_handler().delete_access_tokens_for_user(user_id)
-        yield self.store.add_access_token_to_user(user_id=user_id, token=token)
+
+        yield self.store.add_access_token_to_user(
+            user_id=user_id, token=token, device_id=None, valid_until_ms=None
+        )
 
         if displayname is not None:
             # logger.info("setting user display name: %s -> %s", user_id, displayname)
