@@ -74,7 +74,7 @@ Functions can be easily traced using decorators. There is a decorator for
 the function becomes the operation name for the span.
 
 .. code-block:: python
-    
+
    from synapse.logging.opentracing import trace, trace_deferred
 
    # Start a span using 'normal_function' as the operation name
