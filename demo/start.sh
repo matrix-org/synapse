@@ -29,7 +29,7 @@ for port in 8080 8081 8082; do
 
     if ! grep -F "Customisation made by demo/start.sh" -q  $DIR/etc/$port.config; then
         printf '\n\n# Customisation made by demo/start.sh\n' >> $DIR/etc/$port.config
-
+        
         echo 'enable_registration: true' >> $DIR/etc/$port.config
 
         # Warning, this heredoc depends on the interaction of tabs and spaces. Please don't
@@ -43,7 +43,7 @@ for port in 8080 8081 8082; do
 		    tls: true
 		    resources:
 		      - names: [client, federation]
-
+		
 		  - port: $port
 		    tls: false
 		    bind_addresses: ['::1', '127.0.0.1']
@@ -68,7 +68,7 @@ for port in 8080 8081 8082; do
 
         # Generate tls keys
         openssl req -x509 -newkey rsa:4096 -keyout $DIR/etc/localhost\:$https_port.tls.key -out $DIR/etc/localhost\:$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
-
+        
         # Ignore keys from the trusted keys server
         echo '# Ignore keys from the trusted keys server' >> $DIR/etc/$port.config
         echo 'trusted_key_servers:' >> $DIR/etc/$port.config
@@ -120,6 +120,7 @@ for port in 8080 8081 8082; do
     python3 -m synapse.app.homeserver \
         --config-path "$DIR/etc/$port.config" \
         -D \
+        -vv \
 
     popd
 done
