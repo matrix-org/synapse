@@ -24,6 +24,132 @@
 # this move the methods have work very similarly to opentracing's and it should only
 # be a matter of few regexes to move over to opentracing's access patterns proper.
 
+"""
+============================
+Using OpenTracing in Synapse
+============================
+
+Python-specific tracing concepts are at https://opentracing.io/guides/python/.
+Note that Synapse wraps OpenTracing in a small module in order to make the
+OpenTracing dependency optional. That means that the access patterns are
+different to those demonstrated in the OpenTracing guides. However, it is
+still useful to know, especially if OpenTracing is included as a full dependency
+in the future or if you are modifying Synapse's `opentracing` module.
+
+
+Access to the OpenTracing API is mediated through the
+``logging/opentracing.py`` module. OpenTracing is encapsulated so that
+no span objects from OpenTracing are exposed in Synapses code. This allows
+OpenTracing to be easily disabled in Synapse and thereby have OpenTracing as
+an optional dependency. This does however limit the number of modifiable spans
+at any point in the code to one. From here out references to `opentracing`
+in the code snippets refer to the Synapses module.
+
+Tracing
+-------
+
+In Synapse it is not possible to start a non-active span. Spans can be started
+using the ``start_active_span`` method. This returns a scope (see
+OpenTracing docs) which is a context manager that needs to be entered and
+exited. This is usually done by using ``with``.
+
+.. code-block:: python
+
+   from synapse.logging.opentracing import start_active_span
+
+   with start_active_span("operation name"):
+       # Do something we want to tracer
+
+Forgetting to enter or exit a scope will result in some mysterious and grievous log
+context errors.
+
+At anytime where there is an active span ``opentracing.set_tag`` can be used to
+set a tag on the current active span.
+
+Tracing functions
+-----------------
+
+Functions can be easily traced using decorators. There is a decorator for
+'normal' function and for functions which are actually deferreds. The name of
+the function becomes the operation name for the span.
+
+.. code-block:: python
+    
+   from synapse.logging.opentracing import trace, trace_deferred
+
+   # Start a span using 'normal_function' as the operation name
+   @trace
+   def normal_function(*args, **kwargs):
+       # Does all kinds of cool and expected things
+       return something_usual_and_useful
+
+   # Start a span using 'deferred_function' as the operation name
+   @trace_deferred
+   @defer.inlineCallbacks
+   def deferred_function(*args, **kwargs):
+       # We start
+       yield we_wait
+       # we finish
+       defer.returnValue(something_usual_and_useful)
+
+Operation names can be explicitly set for functions by using
+``trace_using_operation_name`` and
+``trace_deferred_using_operation_name``
+
+.. code-block:: python
+
+   from synapse.logging.opentracing import (
+       trace_using_operation_name,
+       trace_deferred_using_operation_name
+   )
+
+   @trace_using_operation_name("A *much* better operation name")
+   def normal_function(*args, **kwargs):
+       # Does all kinds of cool and expected things
+       return something_usual_and_useful
+
+   @trace_deferred_using_operation_name("Another exciting operation name!")
+   @defer.inlineCallbacks
+   def deferred_function(*args, **kwargs):
+       # We start
+       yield we_wait
+       # we finish
+       defer.returnValue(something_usual_and_useful)
+
+Contexts and carriers
+---------------------
+
+There are a selection of wrappers for injecting and extracting contexts from
+carriers provided. Unfortunately OpenTracing's three context injection
+techniques are not adequate for our inject of OpenTracing span-contexts into
+Twisted's http headers, EDU contents and our database tables. Also note that
+the binary encoding format mandated by OpenTracing is not actually implemented
+by jaeger_client v4.0.0 - it will silently noop.
+Please refer to the end of ``logging/opentracing.py`` for the available
+injection and extraction methods.
+
+Homeserver whitelisting
+-----------------------
+
+Most of the whitelist checks are encapsulated in the modules's injection
+and extraction method but be aware that using custom carriers or crossing
+unchartered waters will require the enforcement of the whitelist.
+``logging/opentracing.py`` has a ``whitelisted_homeserver`` method which takes
+in a destination and compares it to the whitelist.
+
+=======
+Gotchas
+=======
+
+- Checking whitelists on span propagation
+- Inserting pii
+- Forgetting to enter or exit a scope
+- Span source: make sure that the span you expect to be active across a
+  function call really will be that one. Does the current function have more
+  than one caller? Will all of those calling functions have be in a context
+  with an active span?
+"""
+
 import contextlib
 import logging
 import re
