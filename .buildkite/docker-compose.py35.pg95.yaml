@@ -6,6 +6,8 @@ services:
     image: postgres:9.5
     environment:
       POSTGRES_PASSWORD: postgres
+    tmpfs:
+      - /var/lib/postgresql
 
   testenv:
     image: python:3.5
