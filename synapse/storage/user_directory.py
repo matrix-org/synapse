@@ -618,15 +618,15 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
         sql = """
             SELECT room_id FROM (
                 SELECT c.room_id FROM current_state_events AS c
-                INNER JOIN room_memberships USING (event_id)
+                INNER JOIN room_memberships AS m USING (event_id)
                 WHERE type = 'm.room.member'
-                    AND membership = 'join'
+                    AND m.membership = 'join'
                     AND state_key = ?
             ) AS f1 INNER JOIN (
                 SELECT c.room_id FROM current_state_events AS c
-                INNER JOIN room_memberships USING (event_id)
+                INNER JOIN room_memberships AS m USING (event_id)
                 WHERE type = 'm.room.member'
-                    AND membership = 'join'
+                    AND m.membership = 'join'
                     AND state_key = ?
             ) f2 USING (room_id)
         """
