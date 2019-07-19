@@ -70,8 +70,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             db_conn.cursor(),
             name="_check_safe_current_state_events_membership_updated",
             database_engine=self.database_engine,
-            after_callbacks=[],
-            exception_callbacks=[],
         )
         self._check_safe_current_state_events_membership_updated_txn(txn)
         txn.close()
