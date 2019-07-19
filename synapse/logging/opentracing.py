@@ -420,7 +420,7 @@ def extract_text_map(carrier):
     return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
 
 
-def trace_defered_function(func):
+def trace_deferred(func):
     """Decorator to trace a defered function. Sets the operation name to that of the
     function's."""
 
@@ -453,50 +453,55 @@ def trace_servlet(servlet_name, func):
 def trace_defered_function(func):
     @wraps(func)
     @defer.inlineCallbacks
-    def _trace_defered_function_inner(self, *args, **kwargs):
+    def _trace_deferred_inner(self, *args, **kwargs):
         with start_active_span(func.__name__):
             r = yield func(self, *args, **kwargs)
             defer.returnValue(r)
 
-    return _trace_defered_function_inner
+    return _trace_deferred_inner
 
 
-def trace_defered_function_using_operation_name(name):
-    def trace_defered_function(func):
+def trace_deferred_using_operation_name(name):
+    """Decorator to trace a defered function. Explicitely sets the operation_name to name"""
+
+    def trace_deferred(func):
         @wraps(func)
         @defer.inlineCallbacks
-        def _trace_defered_function_inner(self, *args, **kwargs):
+        def _trace_deferred_inner(self, *args, **kwargs):
             # Start scope
             with start_active_span(name):
                 r = yield func(self, *args, **kwargs)
                 defer.returnValue(r)
 
-        return _trace_defered_function_inner
+        return _trace_deferred_inner
 
-    return trace_defered_function
+    return trace_deferred
 
 
-def trace_function(func):
+def trace(func):
+    """Decorator to trace a normal function. Sets the operation name to that of the
+    function's."""
+
     @wraps(func)
-    def _trace_function_inner(self, *args, **kwargs):
+    def _trace_inner(self, *args, **kwargs):
         with start_active_span(func.__name__):
             return func(self, *args, **kwargs)
 
-    return _trace_function_inner
+    return _trace_inner
 
 
-def trace_function_using_operation_name(operation_name):
+def trace_using_operation_name(operation_name):
     """Decorator to trace a function. Explicitely sets the operation_name to name"""
 
-    def trace_function(func):
+    def trace(func):
         @wraps(func)
-        def _trace_function_inner(self, *args, **kwargs):
+        def _trace_inner(self, *args, **kwargs):
             with start_active_span(operation_name):
                 return func(self, *args, **kwargs)
 
-        return _trace_function_inner
+        return _trace_inner
 
-    return trace_function
+    return trace
 
 
 def tag_args(func):
