@@ -259,6 +259,10 @@ class Keyring(object):
 
             # When we've finished fetching all the keys for a given server_name,
             # drop the lock by resolving the deferred in key_downloads.
+            def drop_server_lock(server_name):
+                d = self.key_downloads.pop(server_name)
+                d.callback(None)
+
             def lookup_done(res, verify_request):
                 server_name = verify_request.server_name
                 server_requests = server_to_request_ids[server_name]
@@ -269,8 +273,10 @@ class Keyring(object):
                     with PreserveLoggingContext(ctx):
                         logger.debug("Releasing key lookup lock on %s", server_name)
 
-                    d = self.key_downloads.pop(server_name)
-                    d.callback(None)
+                    # ... but not immediately, as that can cause stack explosions if
+                    # we get a long queue of lookups.
+                    self.clock.call_later(0, drop_server_lock, server_name)
+
                 return res
 
             for verify_request in verify_requests:
