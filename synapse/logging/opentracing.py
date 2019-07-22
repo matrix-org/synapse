@@ -30,16 +30,15 @@ Using OpenTracing in Synapse
 ============================
 
 Python-specific tracing concepts are at https://opentracing.io/guides/python/.
-Note that Synapse wraps OpenTracing in a small module in order to make the
+Note that Synapse wraps OpenTracing in a small module (this one) in order to make the
 OpenTracing dependency optional. That means that the access patterns are
 different to those demonstrated in the OpenTracing guides. However, it is
 still useful to know, especially if OpenTracing is included as a full dependency
-in the future or if you are modifying Synapse's `opentracing` module.
+in the future or if you are modifying this module.
 
 
-Access to the OpenTracing API is mediated through the
-``logging/opentracing.py`` module. OpenTracing is encapsulated so that
-no span objects from OpenTracing are exposed in Synapses code. This allows
+OpenTracing is encapsulated so that
+no span objects from OpenTracing are exposed in Synapse's code. This allows
 OpenTracing to be easily disabled in Synapse and thereby have OpenTracing as
 an optional dependency. This does however limit the number of modifiable spans
 at any point in the code to one. From here out references to `opentracing`

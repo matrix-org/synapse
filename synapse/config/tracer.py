@@ -48,8 +48,8 @@ class TracerConfig(Config):
             #enabled: true
 
             # The list of homeservers we wish to send and receive span contexts and span baggage.
-            #
-            # This a list of regexes which are matched against the server_name of the
+            # See docs/opentracing.rst
+            # This is a list of regexes which are matched against the server_name of the
             # homeserver.
             #
             # By defult, it is empty, so no servers are matched.

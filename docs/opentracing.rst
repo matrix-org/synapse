@@ -13,7 +13,7 @@ Our current selected implementation is Jaeger.
 
 OpenTracing is a tool which gives an insight into the causal relationship of
 work done in and between servers. The servers each track events and report them
-to a centralised server - in our Synapse's case: Jaeger. The basic unit used to
+to a centralised server - in Synapse's case: Jaeger. The basic unit used to
 represent events is the span. The span roughly represents a single piece of work
 that was done and the time at which it occurred. A span can have child spans,
 meaning that the work of the child had to be completed for the parent span to
@@ -59,12 +59,12 @@ Latest documentation is probably at
 https://www.jaegertracing.io/docs/1.13/getting-started/
 
 
-Enable opentracing in Synapse
+Enable OpenTracing in Synapse
 -----------------------------
 
-Opentracing is not enabled by default. It must be enabled in the homeserver
+OpenTracing is not enabled by default. It must be enabled in the homeserver
 config by uncommenting the config options under ``opentracing`` as shown in
-the [sample config](./sample_config.yaml). For example:
+the `sample config <./sample_config.yaml>`_. For example:
 
 .. code-block:: yaml
 
@@ -77,7 +77,7 @@ the [sample config](./sample_config.yaml). For example:
 Homeserver whitelisting
 -----------------------
 
-The homeserver whitelist is configured using regular expression. A list of regular
+The homeserver whitelist is configured using regular expressions. A list of regular
 expressions can be given and their union will be compared when propagating any
 spans contexts to another homeserver. 
 
@@ -86,9 +86,9 @@ untrusted users since span contexts are usually opaque ids it can lead to
 two problems, namely:
 
 - If the span context is marked as sampled by the sending homeserver the receiver will
-  sample it. Therefore two homeservers with wildly disparaging sampling policies
+  sample it. Therefore two homeservers with wildly different sampling policies
   could incur higher sampling counts than intended.
-- Span baggage can be arbitrary data. For safety this has been disabled in Synapse
+- Sending servers can attach arbitrary data to spans, known as 'baggage'. For safety this has been disabled in Synapse
   but that doesn't prevent another server sending you baggage which will be logged
   to OpenTracing's logs.
 
