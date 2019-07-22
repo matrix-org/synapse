@@ -454,17 +454,15 @@ class SearchStore(BackgroundUpdateStore):
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 
-        return (
-            {
-                "results": [
-                    {"event": event_map[r["event_id"]], "rank": r["rank"]}
-                    for r in results
-                    if r["event_id"] in event_map
-                ],
-                "highlights": highlights,
-                "count": count,
-            }
-        )
+        return {
+            "results": [
+                {"event": event_map[r["event_id"]], "rank": r["rank"]}
+                for r in results
+                if r["event_id"] in event_map
+            ],
+            "highlights": highlights,
+            "count": count,
+        }
 
     @defer.inlineCallbacks
     def search_rooms(self, room_ids, search_term, keys, limit, pagination_token=None):
@@ -599,22 +597,20 @@ class SearchStore(BackgroundUpdateStore):
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 
-        return (
-            {
-                "results": [
-                    {
-                        "event": event_map[r["event_id"]],
-                        "rank": r["rank"],
-                        "pagination_token": "%s,%s"
-                        % (r["origin_server_ts"], r["stream_ordering"]),
-                    }
-                    for r in results
-                    if r["event_id"] in event_map
-                ],
-                "highlights": highlights,
-                "count": count,
-            }
-        )
+        return {
+            "results": [
+                {
+                    "event": event_map[r["event_id"]],
+                    "rank": r["rank"],
+                    "pagination_token": "%s,%s"
+                    % (r["origin_server_ts"], r["stream_ordering"]),
+                }
+                for r in results
+                if r["event_id"] in event_map
+            ],
+            "highlights": highlights,
+            "count": count,
+        }
 
     def _find_highlights_in_postgres(self, search_query, events):
         """Given a list of events and a search term, return a list of words

@@ -151,22 +151,20 @@ class GroupsServerHandler(object):
             group_id, requester_user_id
         )
 
-        return (
-            {
-                "profile": profile,
-                "users_section": {
-                    "users": users,
-                    "roles": roles,
-                    "total_user_count_estimate": 0,  # TODO
-                },
-                "rooms_section": {
-                    "rooms": rooms,
-                    "categories": categories,
-                    "total_room_count_estimate": 0,  # TODO
-                },
-                "user": membership_info,
-            }
-        )
+        return {
+            "profile": profile,
+            "users_section": {
+                "users": users,
+                "roles": roles,
+                "total_user_count_estimate": 0,  # TODO
+            },
+            "rooms_section": {
+                "rooms": rooms,
+                "categories": categories,
+                "total_room_count_estimate": 0,  # TODO
+            },
+            "user": membership_info,
+        }
 
     @defer.inlineCallbacks
     def update_group_summary_room(
@@ -461,9 +459,7 @@ class GroupsServerHandler(object):
 
         # TODO: If admin add lists of users whose attestations have timed out
 
-        return (
-            {"chunk": chunk, "total_user_count_estimate": len(user_results)}
-        )
+        return {"chunk": chunk, "total_user_count_estimate": len(user_results)}
 
     @defer.inlineCallbacks
     def get_invited_users_in_group(self, group_id, requester_user_id):
@@ -494,9 +490,7 @@ class GroupsServerHandler(object):
                 logger.warn("Error getting profile for %s: %s", user_id, e)
             user_profiles.append(user_profile)
 
-        return (
-            {"chunk": user_profiles, "total_user_count_estimate": len(invited_users)}
-        )
+        return {"chunk": user_profiles, "total_user_count_estimate": len(invited_users)}
 
     @defer.inlineCallbacks
     def get_rooms_in_group(self, group_id, requester_user_id):
@@ -533,9 +527,7 @@ class GroupsServerHandler(object):
 
         chunk.sort(key=lambda e: -e["num_joined_members"])
 
-        return (
-            {"chunk": chunk, "total_room_count_estimate": len(room_results)}
-        )
+        return {"chunk": chunk, "total_room_count_estimate": len(room_results)}
 
     @defer.inlineCallbacks
     def add_room_to_group(self, group_id, requester_user_id, room_id, content):

@@ -39,10 +39,8 @@ class ProfileWorkerStore(SQLBaseStore):
             else:
                 raise
 
-        return (
-            ProfileInfo(
-                avatar_url=profile["avatar_url"], display_name=profile["displayname"]
-            )
+        return ProfileInfo(
+            avatar_url=profile["avatar_url"], display_name=profile["displayname"]
         )
 
     def get_profile_displayname(self, user_localpart):

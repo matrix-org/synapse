@@ -461,14 +461,12 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             ((row["access_token"], row["ip"]), (row["user_agent"], row["last_seen"]))
             for row in rows
         )
-        return (
-            list(
-                {
-                    "access_token": access_token,
-                    "ip": ip,
-                    "user_agent": user_agent,
-                    "last_seen": last_seen,
-                }
-                for (access_token, ip), (user_agent, last_seen) in iteritems(results)
-            )
+        return list(
+            {
+                "access_token": access_token,
+                "ip": ip,
+                "user_agent": user_agent,
+                "last_seen": last_seen,
+            }
+            for (access_token, ip), (user_agent, last_seen) in iteritems(results)
         )

@@ -130,9 +130,7 @@ class PushRulesWorkerStore(
             retcols=("user_name", "rule_id", "enabled"),
             desc="get_push_rules_enabled_for_user",
         )
-        return (
-            {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
-        )
+        return {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
 
     def have_push_rules_changed_for_user(self, user_id, last_id):
         if not self.push_rules_stream_cache.has_entity_changed(user_id, last_id):

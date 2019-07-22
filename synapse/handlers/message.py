@@ -213,15 +213,13 @@ class MessageHandler(object):
                 # Loop fell through, AS has no interested users in room
                 raise AuthError(403, "Appservice not in room")
 
-        return (
-            {
-                user_id: {
-                    "avatar_url": profile.avatar_url,
-                    "display_name": profile.display_name,
-                }
-                for user_id, profile in iteritems(users_with_profile)
+        return {
+            user_id: {
+                "avatar_url": profile.avatar_url,
+                "display_name": profile.display_name,
             }
-        )
+            for user_id, profile in iteritems(users_with_profile)
+        }
 
 
 class EventCreationHandler(object):

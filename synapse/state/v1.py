@@ -97,10 +97,8 @@ def resolve_events_with_store(state_sets, event_map, state_map_factory):
     state_map_new = yield state_map_factory(new_needed_events)
     state_map.update(state_map_new)
 
-    return (
-        _resolve_with_state(
-            unconflicted_state, conflicted_state, auth_events, state_map
-        )
+    return _resolve_with_state(
+        unconflicted_state, conflicted_state, auth_events, state_map
     )
 
 

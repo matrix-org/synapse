@@ -266,9 +266,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         if not ignored_account_data:
             return False
 
-        return (
-            ignored_user_id in ignored_account_data.get("ignored_users", {})
-        )
+        return ignored_user_id in ignored_account_data.get("ignored_users", {})
 
 
 class AccountDataStore(AccountDataWorkerStore):

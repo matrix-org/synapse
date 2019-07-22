@@ -90,9 +90,7 @@ class PresenceStore(SQLBaseStore):
                 presence_states,
             )
 
-        return (
-            (stream_orderings[-1], self._presence_id_gen.get_current_token())
-        )
+        return (stream_orderings[-1], self._presence_id_gen.get_current_token())
 
     def _update_presence_txn(self, txn, stream_orderings, presence_states):
         for stream_id, state in zip(stream_orderings, presence_states):

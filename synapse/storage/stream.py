@@ -674,14 +674,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             [e for e in results["after"]["event_ids"]], get_prev_content=True
         )
 
-        return (
-            {
-                "events_before": events_before,
-                "events_after": events_after,
-                "start": results["before"]["token"],
-                "end": results["after"]["token"],
-            }
-        )
+        return {
+            "events_before": events_before,
+            "events_after": events_after,
+            "start": results["before"]["token"],
+            "end": results["after"]["token"],
+        }
 
     def _get_events_around_txn(
         self, txn, room_id, event_id, before_limit, after_limit, event_filter

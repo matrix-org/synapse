@@ -546,12 +546,10 @@ class SimpleHttpClient(object):
             raise_from(SynapseError(502, ("Failed to download remote body: %s" % e)), e)
 
         return (
-            (
-                length,
-                resp_headers,
-                response.request.absoluteURI.decode("ascii"),
-                response.code,
-            )
+            length,
+            resp_headers,
+            response.request.absoluteURI.decode("ascii"),
+            response.code,
         )
 
 

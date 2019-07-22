@@ -133,19 +133,17 @@ class EventContext(object):
         else:
             prev_state_id = None
 
-        return (
-            {
-                "prev_state_id": prev_state_id,
-                "event_type": event.type,
-                "event_state_key": event.state_key if event.is_state() else None,
-                "state_group": self.state_group,
-                "rejected": self.rejected,
-                "prev_group": self.prev_group,
-                "delta_ids": _encode_state_dict(self.delta_ids),
-                "prev_state_events": self.prev_state_events,
-                "app_service_id": self.app_service.id if self.app_service else None,
-            }
-        )
+        return {
+            "prev_state_id": prev_state_id,
+            "event_type": event.type,
+            "event_state_key": event.state_key if event.is_state() else None,
+            "state_group": self.state_group,
+            "rejected": self.rejected,
+            "prev_group": self.prev_group,
+            "delta_ids": _encode_state_dict(self.delta_ids),
+            "prev_state_events": self.prev_state_events,
+            "app_service_id": self.app_service.id if self.app_service else None,
+        }
 
     @staticmethod
     def deserialize(store, input):

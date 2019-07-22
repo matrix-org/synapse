@@ -104,9 +104,8 @@ def calculate_room_name(
             )
             if inviter_member_event:
                 if fallback_to_single_member:
-                    return (
-                        "Invite from %s"
-                        % (name_from_member_event(inviter_member_event),)
+                    return "Invite from %s" % (
+                        name_from_member_event(inviter_member_event),
                     )
                 else:
                     return

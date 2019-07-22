@@ -330,28 +330,24 @@ class InitialSyncHandler(BaseHandler):
 
         time_now = self.clock.time_msec()
 
-        return (
-            {
-                "membership": membership,
-                "room_id": room_id,
-                "messages": {
-                    "chunk": (
-                        yield self._event_serializer.serialize_events(
-                            messages, time_now
-                        )
-                    ),
-                    "start": start_token.to_string(),
-                    "end": end_token.to_string(),
-                },
-                "state": (
-                    yield self._event_serializer.serialize_events(
-                        room_state.values(), time_now
-                    )
+        return {
+            "membership": membership,
+            "room_id": room_id,
+            "messages": {
+                "chunk": (
+                    yield self._event_serializer.serialize_events(messages, time_now)
                 ),
-                "presence": [],
-                "receipts": [],
-            }
-        )
+                "start": start_token.to_string(),
+                "end": end_token.to_string(),
+            },
+            "state": (
+                yield self._event_serializer.serialize_events(
+                    room_state.values(), time_now
+                )
+            ),
+            "presence": [],
+            "receipts": [],
+        }
 
     @defer.inlineCallbacks
     def _room_initial_sync_joined(

@@ -282,7 +282,7 @@ class RegisterRestServlet(RestServlet):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
-            return ((200, result))  # we throw for non 200 responses
+            return (200, result)  # we throw for non 200 responses
             return
 
         # for either shared secret or regular registration, downcase the
@@ -301,7 +301,7 @@ class RegisterRestServlet(RestServlet):
             result = yield self._do_shared_secret_registration(
                 desired_username, desired_password, body
             )
-            return ((200, result))  # we throw for non 200 responses
+            return (200, result)  # we throw for non 200 responses
             return
 
         # == Normal User Registration == (everyone else)
@@ -589,15 +589,13 @@ class RegisterRestServlet(RestServlet):
         )
 
         return (
-            (
-                200,
-                {
-                    "user_id": user_id,
-                    "device_id": device_id,
-                    "access_token": access_token,
-                    "home_server": self.hs.hostname,
-                },
-            )
+            200,
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+            },
         )
 
 

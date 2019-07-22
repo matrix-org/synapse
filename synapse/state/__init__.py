@@ -374,13 +374,11 @@ class StateHandler(object):
 
             prev_group, delta_ids = yield self.store.get_state_group_delta(name)
 
-            return (
-                _StateCacheEntry(
-                    state=state_list,
-                    state_group=name,
-                    prev_group=prev_group,
-                    delta_ids=delta_ids,
-                )
+            return _StateCacheEntry(
+                state=state_list,
+                state_group=name,
+                prev_group=prev_group,
+                delta_ids=delta_ids,
             )
 
         room_version = yield self.store.get_room_version(room_id)

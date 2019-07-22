@@ -658,16 +658,14 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             get_prev_content=False,
         )
 
-        return (
-            {
-                group: [
-                    state_event_map[v]
-                    for v in itervalues(event_id_map)
-                    if v in state_event_map
-                ]
-                for group, event_id_map in iteritems(group_to_ids)
-            }
-        )
+        return {
+            group: [
+                state_event_map[v]
+                for v in itervalues(event_id_map)
+                if v in state_event_map
+            ]
+            for group, event_id_map in iteritems(group_to_ids)
+        }
 
     @defer.inlineCallbacks
     def _get_state_groups_from_groups(self, groups, state_filter):

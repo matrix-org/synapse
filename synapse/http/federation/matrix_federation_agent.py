@@ -205,24 +205,20 @@ class MatrixFederationAgent(object):
             port = parsed_uri.port
             if port == -1:
                 port = 8448
-            return (
-                _RoutingResult(
-                    host_header=parsed_uri.netloc,
-                    tls_server_name=parsed_uri.host,
-                    target_host=parsed_uri.host,
-                    target_port=port,
-                )
+            return _RoutingResult(
+                host_header=parsed_uri.netloc,
+                tls_server_name=parsed_uri.host,
+                target_host=parsed_uri.host,
+                target_port=port,
             )
 
         if parsed_uri.port != -1:
             # there is an explicit port
-            return (
-                _RoutingResult(
-                    host_header=parsed_uri.netloc,
-                    tls_server_name=parsed_uri.host,
-                    target_host=parsed_uri.host,
-                    target_port=parsed_uri.port,
-                )
+            return _RoutingResult(
+                host_header=parsed_uri.netloc,
+                tls_server_name=parsed_uri.host,
+                target_host=parsed_uri.host,
+                target_port=parsed_uri.port,
             )
 
         if lookup_well_known:
@@ -283,13 +279,11 @@ class MatrixFederationAgent(object):
                 parsed_uri.host.decode("ascii"),
             )
 
-        return (
-            _RoutingResult(
-                host_header=parsed_uri.netloc,
-                tls_server_name=parsed_uri.host,
-                target_host=target_host,
-                target_port=port,
-            )
+        return _RoutingResult(
+            host_header=parsed_uri.netloc,
+            tls_server_name=parsed_uri.host,
+            target_host=target_host,
+            target_port=port,
         )
 
     @defer.inlineCallbacks

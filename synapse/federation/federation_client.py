@@ -728,13 +728,11 @@ class FederationClient(FederationBase):
 
             check_authchain_validity(signed_auth)
 
-            return (
-                {
-                    "state": signed_state,
-                    "auth_chain": signed_auth,
-                    "origin": destination,
-                }
-            )
+            return {
+                "state": signed_state,
+                "auth_chain": signed_auth,
+                "origin": destination,
+            }
 
         return self._try_destination_list("send_join", destinations, send_request)
 

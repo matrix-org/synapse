@@ -136,9 +136,7 @@ class ClientDirectoryListServer(RestServlet):
         if room is None:
             raise NotFoundError("Unknown room")
 
-        return (
-            (200, {"visibility": "public" if room["is_public"] else "private"})
-        )
+        return (200, {"visibility": "public" if room["is_public"] else "private"})
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id):

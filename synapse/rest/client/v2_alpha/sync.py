@@ -205,27 +205,23 @@ class SyncRestServlet(RestServlet):
             event_formatter,
         )
 
-        return (
-            {
-                "account_data": {"events": sync_result.account_data},
-                "to_device": {"events": sync_result.to_device},
-                "device_lists": {
-                    "changed": list(sync_result.device_lists.changed),
-                    "left": list(sync_result.device_lists.left),
-                },
-                "presence": SyncRestServlet.encode_presence(
-                    sync_result.presence, time_now
-                ),
-                "rooms": {"join": joined, "invite": invited, "leave": archived},
-                "groups": {
-                    "join": sync_result.groups.join,
-                    "invite": sync_result.groups.invite,
-                    "leave": sync_result.groups.leave,
-                },
-                "device_one_time_keys_count": sync_result.device_one_time_keys_count,
-                "next_batch": sync_result.next_batch.to_string(),
-            }
-        )
+        return {
+            "account_data": {"events": sync_result.account_data},
+            "to_device": {"events": sync_result.to_device},
+            "device_lists": {
+                "changed": list(sync_result.device_lists.changed),
+                "left": list(sync_result.device_lists.left),
+            },
+            "presence": SyncRestServlet.encode_presence(sync_result.presence, time_now),
+            "rooms": {"join": joined, "invite": invited, "leave": archived},
+            "groups": {
+                "join": sync_result.groups.join,
+                "invite": sync_result.groups.invite,
+                "leave": sync_result.groups.leave,
+            },
+            "device_one_time_keys_count": sync_result.device_one_time_keys_count,
+            "next_batch": sync_result.next_batch.to_string(),
+        }
 
     @staticmethod
     def encode_presence(events, time_now):

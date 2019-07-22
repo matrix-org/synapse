@@ -265,7 +265,7 @@ class HttpPusher(object):
 
         event = yield self.store.get_event(push_action["event_id"], allow_none=True)
         if event is None:
-            return (True)  # It's been redacted
+            return True  # It's been redacted
         rejected = yield self.dispatch_push(event, tweaks, badge)
         if rejected is False:
             return False

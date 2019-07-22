@@ -347,11 +347,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         rooms = yield self.get_rooms_for_user_where_membership_is(
             user_id, membership_list=[Membership.JOIN]
         )
-        return (
-            frozenset(
-                GetRoomsForUserWithStreamOrdering(r.room_id, r.stream_ordering)
-                for r in rooms
-            )
+        return frozenset(
+            GetRoomsForUserWithStreamOrdering(r.room_id, r.stream_ordering)
+            for r in rooms
         )
 
     @defer.inlineCallbacks

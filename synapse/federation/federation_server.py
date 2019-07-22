@@ -315,9 +315,7 @@ class FederationServer(FederationBase):
         state_ids = yield self.handler.get_state_ids_for_pdu(room_id, event_id)
         auth_chain_ids = yield self.store.get_auth_chain_ids(state_ids)
 
-        return (
-            (200, {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids})
-        )
+        return (200, {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids})
 
     @defer.inlineCallbacks
     def _on_context_state_request_compute(self, room_id, event_id):
@@ -336,12 +334,10 @@ class FederationServer(FederationBase):
                     )
                 )
 
-        return (
-            {
-                "pdus": [pdu.get_pdu_json() for pdu in pdus],
-                "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
-            }
-        )
+        return {
+            "pdus": [pdu.get_pdu_json() for pdu in pdus],
+            "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
+        }
 
     @defer.inlineCallbacks
     @log_function
@@ -371,9 +367,7 @@ class FederationServer(FederationBase):
 
         pdu = yield self.handler.on_make_join_request(room_id, user_id)
         time_now = self._clock.time_msec()
-        return (
-            {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
-        )
+        return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content, room_version):
@@ -408,15 +402,13 @@ class FederationServer(FederationBase):
         res_pdus = yield self.handler.on_send_join_request(origin, pdu)
         time_now = self._clock.time_msec()
         return (
-            (
-                200,
-                {
-                    "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
-                    "auth_chain": [
-                        p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]
-                    ],
-                },
-            )
+            200,
+            {
+                "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
+                "auth_chain": [
+                    p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]
+                ],
+            },
         )
 
     @defer.inlineCallbacks
@@ -428,9 +420,7 @@ class FederationServer(FederationBase):
         room_version = yield self.store.get_room_version(room_id)
 
         time_now = self._clock.time_msec()
-        return (
-            {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
-        )
+        return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
     @defer.inlineCallbacks
     def on_send_leave_request(self, origin, content, room_id):
@@ -580,9 +570,7 @@ class FederationServer(FederationBase):
 
             time_now = self._clock.time_msec()
 
-        return (
-            {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
-        )
+        return {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
 
     @log_function
     def on_openid_userinfo(self, token):

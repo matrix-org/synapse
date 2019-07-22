@@ -307,15 +307,13 @@ class GroupServerStore(SQLBaseStore):
             desc="get_group_categories",
         )
 
-        return (
-            {
-                row["category_id"]: {
-                    "is_public": row["is_public"],
-                    "profile": json.loads(row["profile"]),
-                }
-                for row in rows
+        return {
+            row["category_id"]: {
+                "is_public": row["is_public"],
+                "profile": json.loads(row["profile"]),
             }
-        )
+            for row in rows
+        }
 
     @defer.inlineCallbacks
     def get_group_category(self, group_id, category_id):
@@ -370,15 +368,13 @@ class GroupServerStore(SQLBaseStore):
             desc="get_group_roles",
         )
 
-        return (
-            {
-                row["role_id"]: {
-                    "is_public": row["is_public"],
-                    "profile": json.loads(row["profile"]),
-                }
-                for row in rows
+        return {
+            row["role_id"]: {
+                "is_public": row["is_public"],
+                "profile": json.loads(row["profile"]),
             }
-        )
+            for row in rows
+        }
 
     @defer.inlineCallbacks
     def get_group_role(self, group_id, role_id):

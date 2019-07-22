@@ -2418,16 +2418,14 @@ class FederationHandler(BaseHandler):
 
         logger.debug("construct_auth_difference returning")
 
-        return (
-            {
-                "auth_chain": local_auth,
-                "rejects": {
-                    e.event_id: {"reason": reason_map[e.event_id], "proof": None}
-                    for e in base_remote_rejected
-                },
-                "missing": [e.event_id for e in missing_locals],
-            }
-        )
+        return {
+            "auth_chain": local_auth,
+            "rejects": {
+                e.event_id: {"reason": reason_map[e.event_id], "proof": None}
+                for e in base_remote_rejected
+            },
+            "missing": [e.event_id for e in missing_locals],
+        }
 
     @defer.inlineCallbacks
     @log_function

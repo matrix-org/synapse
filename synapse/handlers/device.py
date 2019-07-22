@@ -200,9 +200,7 @@ class DeviceWorkerHandler(BaseHandler):
             possibly_joined = []
             possibly_left = []
 
-        return (
-            {"changed": list(possibly_joined), "left": list(possibly_left)}
-        )
+        return {"changed": list(possibly_joined), "left": list(possibly_left)}
 
 
 class DeviceHandler(DeviceWorkerHandler):
@@ -411,9 +409,7 @@ class DeviceHandler(DeviceWorkerHandler):
     @defer.inlineCallbacks
     def on_federation_query_user_devices(self, user_id):
         stream_id, devices = yield self.store.get_devices_with_keys_by_user(user_id)
-        return (
-            {"user_id": user_id, "stream_id": stream_id, "devices": devices}
-        )
+        return {"user_id": user_id, "stream_id": stream_id, "devices": devices}
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):

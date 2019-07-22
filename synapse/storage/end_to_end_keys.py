@@ -130,9 +130,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             desc="add_e2e_one_time_keys_check",
         )
 
-        return (
-            {(row["algorithm"], row["key_id"]): row["key_json"] for row in rows}
-        )
+        return {(row["algorithm"], row["key_id"]): row["key_json"] for row in rows}
 
     @defer.inlineCallbacks
     def add_e2e_one_time_keys(self, user_id, device_id, time_now, new_keys):

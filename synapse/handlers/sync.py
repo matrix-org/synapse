@@ -426,8 +426,8 @@ class SyncHandler(object):
                 recents = []
 
             if not limited or block_all_timeline:
-                return (
-                    TimelineBatch(events=recents, prev_batch=now_token, limited=False)
+                return TimelineBatch(
+                    events=recents, prev_batch=now_token, limited=False
                 )
 
             filtering_factor = 2
@@ -490,12 +490,10 @@ class SyncHandler(object):
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
-        return (
-            TimelineBatch(
-                events=recents,
-                prev_batch=prev_batch_token,
-                limited=limited or newly_joined_room,
-            )
+        return TimelineBatch(
+            events=recents,
+            prev_batch=prev_batch_token,
+            limited=limited or newly_joined_room,
         )
 
     @defer.inlineCallbacks
@@ -871,14 +869,12 @@ class SyncHandler(object):
         if state_ids:
             state = yield self.store.get_events(list(state_ids.values()))
 
-        return (
-            {
-                (e.type, e.state_key): e
-                for e in sync_config.filter_collection.filter_room_state(
-                    list(state.values())
-                )
-            }
-        )
+        return {
+            (e.type, e.state_key): e
+            for e in sync_config.filter_collection.filter_room_state(
+                list(state.values())
+            )
+        }
 
     @defer.inlineCallbacks
     def unread_notifs_for_room_id(self, room_id, sync_config):
@@ -989,19 +985,17 @@ class SyncHandler(object):
                     "Sync result for newly joined room %s: %r", room_id, joined_room
                 )
 
-        return (
-            SyncResult(
-                presence=sync_result_builder.presence,
-                account_data=sync_result_builder.account_data,
-                joined=sync_result_builder.joined,
-                invited=sync_result_builder.invited,
-                archived=sync_result_builder.archived,
-                to_device=sync_result_builder.to_device,
-                device_lists=device_lists,
-                groups=sync_result_builder.groups,
-                device_one_time_keys_count=one_time_key_counts,
-                next_batch=sync_result_builder.now_token,
-            )
+        return SyncResult(
+            presence=sync_result_builder.presence,
+            account_data=sync_result_builder.account_data,
+            joined=sync_result_builder.joined,
+            invited=sync_result_builder.invited,
+            archived=sync_result_builder.archived,
+            to_device=sync_result_builder.to_device,
+            device_lists=device_lists,
+            groups=sync_result_builder.groups,
+            device_one_time_keys_count=one_time_key_counts,
+            next_batch=sync_result_builder.now_token,
         )
 
     @measure_func("_generate_sync_entry_for_groups")
@@ -1124,9 +1118,7 @@ class SyncHandler(object):
             # Remove any users that we still share a room with.
             newly_left_users -= users_who_share_room
 
-            return (
-                DeviceLists(changed=users_that_have_changed, left=newly_left_users)
-            )
+            return DeviceLists(changed=users_that_have_changed, left=newly_left_users)
         else:
             return DeviceLists(changed=[], left=[])
 
@@ -1389,12 +1381,10 @@ class SyncHandler(object):
         newly_left_users -= newly_joined_or_invited_users
 
         return (
-            (
-                newly_joined_rooms,
-                newly_joined_or_invited_users,
-                newly_left_rooms,
-                newly_left_users,
-            )
+            newly_joined_rooms,
+            newly_joined_or_invited_users,
+            newly_left_rooms,
+            newly_left_users,
         )
 
     @defer.inlineCallbacks

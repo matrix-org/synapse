@@ -110,16 +110,14 @@ class ReceiptsWorkerStore(SQLBaseStore):
             return txn.fetchall()
 
         rows = yield self.runInteraction("get_receipts_for_user_with_orderings", f)
-        return (
-            {
-                row[0]: {
-                    "event_id": row[1],
-                    "topological_ordering": row[2],
-                    "stream_ordering": row[3],
-                }
-                for row in rows
+        return {
+            row[0]: {
+                "event_id": row[1],
+                "topological_ordering": row[2],
+                "stream_ordering": row[3],
             }
-        )
+            for row in rows
+        }
 
     @defer.inlineCallbacks
     def get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
@@ -205,9 +203,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 row["user_id"]
             ] = json.loads(row["data"])
 
-        return (
-            [{"type": "m.receipt", "room_id": room_id, "content": content}]
-        )
+        return [{"type": "m.receipt", "room_id": room_id, "content": content}]
 
     @cachedList(
         cached_method_name="_get_linearized_receipts_for_room",

@@ -703,15 +703,13 @@ class PresenceHandler(object):
 
         now = self.clock.time_msec()
         if as_event:
-            return (
-                [
-                    {
-                        "type": "m.presence",
-                        "content": format_user_presence_state(state, now),
-                    }
-                    for state in updates
-                ]
-            )
+            return [
+                {
+                    "type": "m.presence",
+                    "content": format_user_presence_state(state, now),
+                }
+                for state in updates
+            ]
         else:
             return updates
 
@@ -1071,14 +1069,8 @@ class PresenceEventSource(object):
             return (list(updates.values()), max_token)
         else:
             return (
-                (
-                    [
-                        s
-                        for s in itervalues(updates)
-                        if s.state != PresenceState.OFFLINE
-                    ],
-                    max_token,
-                )
+                [s for s in itervalues(updates) if s.state != PresenceState.OFFLINE],
+                max_token,
             )
 
     def get_current_key(self):

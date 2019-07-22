@@ -186,13 +186,11 @@ class SearchHandler(BaseHandler):
             room_ids.intersection_update({batch_group_key})
 
         if not room_ids:
-            return (
-                {
-                    "search_categories": {
-                        "room_events": {"results": [], "count": 0, "highlights": []}
-                    }
+            return {
+                "search_categories": {
+                    "room_events": {"results": [], "count": 0, "highlights": []}
                 }
-            )
+            }
 
         rank_map = {}  # event_id -> rank of event
         allowed_events = []

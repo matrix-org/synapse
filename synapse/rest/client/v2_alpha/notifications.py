@@ -88,9 +88,7 @@ class NotificationsServlet(RestServlet):
             returned_push_actions.append(returned_pa)
             next_token = str(pa["stream_ordering"])
 
-        return (
-            (200, {"notifications": returned_push_actions, "next_token": next_token})
-        )
+        return (200, {"notifications": returned_push_actions, "next_token": next_token})
 
 
 def register_servlets(hs, http_server):

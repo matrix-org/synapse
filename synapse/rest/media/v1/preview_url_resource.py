@@ -354,22 +354,20 @@ class PreviewUrlResource(DirectServeResource):
             # therefore not expire it.
             raise
 
-        return (
-            {
-                "media_type": media_type,
-                "media_length": length,
-                "download_name": download_name,
-                "created_ts": time_now_ms,
-                "filesystem_id": file_id,
-                "filename": fname,
-                "uri": uri,
-                "response_code": code,
-                # FIXME: we should calculate a proper expiration based on the
-                # Cache-Control and Expire headers.  But for now, assume 1 hour.
-                "expires": 60 * 60 * 1000,
-                "etag": headers["ETag"][0] if "ETag" in headers else None,
-            }
-        )
+        return {
+            "media_type": media_type,
+            "media_length": length,
+            "download_name": download_name,
+            "created_ts": time_now_ms,
+            "filesystem_id": file_id,
+            "filename": fname,
+            "uri": uri,
+            "response_code": code,
+            # FIXME: we should calculate a proper expiration based on the
+            # Cache-Control and Expire headers.  But for now, assume 1 hour.
+            "expires": 60 * 60 * 1000,
+            "etag": headers["ETag"][0] if "ETag" in headers else None,
+        }
 
     def _start_expire_url_cache_data(self):
         return run_as_background_process(
