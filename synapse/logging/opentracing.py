@@ -141,7 +141,7 @@ def whitelisted_homeserver(destination):
     Args:
         destination (str)
         """
-    global _homeserver_whitelist
+    _homeserver_whitelist
     if _homeserver_whitelist:
         return _homeserver_whitelist.match(destination)
     return False
