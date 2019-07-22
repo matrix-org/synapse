@@ -225,20 +225,11 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             "user_id": local_user,
             "device_id": device_id,
             "algorithms": ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
-            "keys": {
-                "curve25519:xyz": "curve25519+key",
-                "ed25519:xyz": device_pubkey
-            },
-            "signatures": {
-                local_user: {
-                    "ed25519:xyz": "something"
-                }
-            }
+            "keys": {"curve25519:xyz": "curve25519+key", "ed25519:xyz": device_pubkey},
+            "signatures": {local_user: {"ed25519:xyz": "something"}},
         }
         device_signing_key = key.decode_signing_key_base64(
-            "ed25519",
-            "xyz",
-            "OMkooTr76ega06xNvXIGPbgvvxAOzmQncN8VObS7aBA"
+            "ed25519", "xyz", "OMkooTr76ega06xNvXIGPbgvvxAOzmQncN8VObS7aBA"
         )
 
         yield self.handler.upload_keys_for_user(
@@ -250,26 +241,20 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         master_key = {
             "user_id": local_user,
             "usage": ["master"],
-            "keys": {
-                "ed25519:" + master_pubkey: master_pubkey
-            }
+            "keys": {"ed25519:" + master_pubkey: master_pubkey},
         }
         master_signing_key = key.decode_signing_key_base64(
-            "ed25519", master_pubkey,
-            "2lonYOM6xYKdEsO+6KrC766xBcHnYnim1x/4LFGF8B0"
+            "ed25519", master_pubkey, "2lonYOM6xYKdEsO+6KrC766xBcHnYnim1x/4LFGF8B0"
         )
         usersigning_pubkey = "Hq6gL+utB4ET+UvD5ci0kgAwsX6qP/zvf8v6OInU5iw"
         usersigning_key = {
             # private key: 4TL4AjRYwDVwD3pqQzcor+ez/euOB1/q78aTJ+czDNs
             "user_id": local_user,
             "usage": ["user_signing"],
-            "keys": {
-                "ed25519:" + usersigning_pubkey: usersigning_pubkey,
-            }
+            "keys": {"ed25519:" + usersigning_pubkey: usersigning_pubkey},
         }
         usersigning_signing_key = key.decode_signing_key_base64(
-            "ed25519", usersigning_pubkey,
-            "4TL4AjRYwDVwD3pqQzcor+ez/euOB1/q78aTJ+czDNs"
+            "ed25519", usersigning_pubkey, "4TL4AjRYwDVwD3pqQzcor+ez/euOB1/q78aTJ+czDNs"
         )
         sign.sign_json(usersigning_key, local_user, master_signing_key)
         # private key: HvQBbU+hc2Zr+JP1sE0XwBe1pfZZEYtJNPJLZJtS+F8
@@ -277,13 +262,10 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         selfsigning_key = {
             "user_id": local_user,
             "usage": ["self_signing"],
-            "keys": {
-                "ed25519:" + selfsigning_pubkey: selfsigning_pubkey,
-            }
+            "keys": {"ed25519:" + selfsigning_pubkey: selfsigning_pubkey},
         }
         selfsigning_signing_key = key.decode_signing_key_base64(
-            "ed25519", selfsigning_pubkey,
-            "HvQBbU+hc2Zr+JP1sE0XwBe1pfZZEYtJNPJLZJtS+F8"
+            "ed25519", selfsigning_pubkey, "HvQBbU+hc2Zr+JP1sE0XwBe1pfZZEYtJNPJLZJtS+F8"
         )
         sign.sign_json(selfsigning_key, local_user, master_signing_key)
         cross_signing_keys = {
@@ -301,13 +283,11 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             # private key: oyw2ZUx0O4GifbfFYM0nQvj9CL0b8B7cyN4FprtK8OI
             "user_id": other_user,
             "usage": ["master"],
-            "keys": {
-                "ed25519:" + other_master_pubkey: other_master_pubkey
-            }
+            "keys": {"ed25519:" + other_master_pubkey: other_master_pubkey},
         }
-        yield self.handler.upload_signing_keys_for_user(other_user, {
-            "master_key": other_master_key
-        })
+        yield self.handler.upload_signing_keys_for_user(
+            other_user, {"master_key": other_master_key}
+        )
 
         # test various signature failures (see below)
         ret = yield self.handler.upload_signatures_for_device_keys(
@@ -319,17 +299,18 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                     device_id: {
                         "user_id": local_user,
                         "device_id": device_id,
-                        "algorithms": ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+                        "algorithms": [
+                            "m.olm.curve25519-aes-sha256",
+                            "m.megolm.v1.aes-sha",
+                        ],
                         "keys": {
                             "curve25519:xyz": "curve25519+key",
                             # private key: OMkooTr76ega06xNvXIGPbgvvxAOzmQncN8VObS7aBA
-                            "ed25519:xyz": device_pubkey
+                            "ed25519:xyz": device_pubkey,
                         },
                         "signatures": {
-                            local_user: {
-                                "ed25519:" + selfsigning_pubkey: "something",
-                            }
-                        }
+                            local_user: {"ed25519:" + selfsigning_pubkey: "something"}
+                        },
                     },
                     # fails because device is unknown
                     # should fail with NOT_FOUND
@@ -337,25 +318,19 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                         "user_id": local_user,
                         "device_id": "unknown",
                         "signatures": {
-                            local_user: {
-                                "ed25519:" + selfsigning_pubkey: "something",
-                            }
-                        }
+                            local_user: {"ed25519:" + selfsigning_pubkey: "something"}
+                        },
                     },
                     # fails because the signature is invalid
                     # should fail with INVALID_SIGNATURE
                     master_pubkey: {
                         "user_id": local_user,
                         "usage": ["master"],
-                        "keys": {
-                            "ed25519:" + master_pubkey: master_pubkey
-                        },
+                        "keys": {"ed25519:" + master_pubkey: master_pubkey},
                         "signatures": {
-                            local_user: {
-                                "ed25519:" + device_pubkey: "something",
-                            }
-                        }
-                    }
+                            local_user: {"ed25519:" + device_pubkey: "something"}
+                        },
+                    },
                 },
                 other_user: {
                     # fails because the device is not the user's master-signing key
@@ -364,38 +339,40 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                         "user_id": other_user,
                         "device_id": "unknown",
                         "signatures": {
-                            local_user: {
-                                "ed25519:" + usersigning_pubkey: "something",
-                            }
-                        }
+                            local_user: {"ed25519:" + usersigning_pubkey: "something"}
+                        },
                     },
                     other_master_pubkey: {
                         # fails because the key doesn't match what the server has
                         # should fail with UNKNOWN
                         "user_id": other_user,
                         "usage": ["master"],
-                        "keys": {
-                            "ed25519:" + other_master_pubkey: other_master_pubkey
-                        },
+                        "keys": {"ed25519:" + other_master_pubkey: other_master_pubkey},
                         "something": "random",
                         "signatures": {
-                            local_user: {
-                                "ed25519:" + usersigning_pubkey: "something",
-                            }
-                        }
-                    }
-                }
-            }
+                            local_user: {"ed25519:" + usersigning_pubkey: "something"}
+                        },
+                    },
+                },
+            },
         )
 
         user_failures = ret["failures"][local_user]
-        self.assertEqual(user_failures[device_id]["errcode"], errors.Codes.INVALID_SIGNATURE)
-        self.assertEqual(user_failures[master_pubkey]["errcode"], errors.Codes.INVALID_SIGNATURE)
+        self.assertEqual(
+            user_failures[device_id]["errcode"], errors.Codes.INVALID_SIGNATURE
+        )
+        self.assertEqual(
+            user_failures[master_pubkey]["errcode"], errors.Codes.INVALID_SIGNATURE
+        )
         self.assertEqual(user_failures["unknown"]["errcode"], errors.Codes.NOT_FOUND)
 
         other_user_failures = ret["failures"][other_user]
-        self.assertEqual(other_user_failures["unknown"]["errcode"], errors.Codes.NOT_FOUND)
-        self.assertEqual(other_user_failures[other_master_pubkey]["errcode"], errors.Codes.UNKNOWN)
+        self.assertEqual(
+            other_user_failures["unknown"]["errcode"], errors.Codes.NOT_FOUND
+        )
+        self.assertEqual(
+            other_user_failures[other_master_pubkey]["errcode"], errors.Codes.UNKNOWN
+        )
 
         # test successful signatures
         del device_key["signatures"]
@@ -405,33 +382,33 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         ret = yield self.handler.upload_signatures_for_device_keys(
             local_user,
             {
-                local_user: {
-                    device_id: device_key,
-                    master_pubkey: master_key
-                },
-                other_user: {
-                    other_master_pubkey: other_master_key
-                }
-            }
+                local_user: {device_id: device_key, master_pubkey: master_key},
+                other_user: {other_master_pubkey: other_master_key},
+            },
         )
 
         self.assertEqual(ret["failures"], {})
 
         # fetch the signed keys/devices and make sure that the signatures are there
         ret = yield self.handler.query_devices(
-            {"device_keys": {local_user: [], other_user: []}},
-            0, local_user
+            {"device_keys": {local_user: [], other_user: []}}, 0, local_user
         )
 
         self.assertEqual(
-            ret["device_keys"][local_user]["xyz"]["signatures"][local_user]["ed25519:" + selfsigning_pubkey],
-            device_key["signatures"][local_user]["ed25519:" + selfsigning_pubkey]
+            ret["device_keys"][local_user]["xyz"]["signatures"][local_user][
+                "ed25519:" + selfsigning_pubkey
+            ],
+            device_key["signatures"][local_user]["ed25519:" + selfsigning_pubkey],
         )
         self.assertEqual(
-            ret["master_keys"][local_user]["signatures"][local_user]["ed25519:" + device_id],
-            master_key["signatures"][local_user]["ed25519:" + device_id]
+            ret["master_keys"][local_user]["signatures"][local_user][
+                "ed25519:" + device_id
+            ],
+            master_key["signatures"][local_user]["ed25519:" + device_id],
         )
         self.assertEqual(
-            ret["master_keys"][other_user]["signatures"][local_user]["ed25519:" + usersigning_pubkey],
-            other_master_key["signatures"][local_user]["ed25519:" + usersigning_pubkey]
+            ret["master_keys"][other_user]["signatures"][local_user][
+                "ed25519:" + usersigning_pubkey
+            ],
+            other_master_key["signatures"][local_user]["ed25519:" + usersigning_pubkey],
         )
