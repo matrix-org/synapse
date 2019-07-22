@@ -12,3 +12,7 @@ Can re-join room if re-invited
 The only membership state included in an initial sync is for all the senders in the timeline
 
 Local device key changes get to remote servers
+
+If remote user leaves room we no longer receive device updates
+
+Forgotten room messages cannot be paginated
