@@ -184,6 +184,94 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
     @defer.inlineCallbacks
+    def test_reupload_signatures(self):
+        """re-uploading a signature should not fail"""
+        local_user = "@boris:" + self.hs.hostname
+        keys1 = {
+            "master_key": {
+                # private key: HvQBbU+hc2Zr+JP1sE0XwBe1pfZZEYtJNPJLZJtS+F8
+                "user_id": local_user,
+                "usage": ["master"],
+                "keys": {
+                    "ed25519:EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ": "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ"
+                },
+            },
+            "self_signing_key": {
+                # private key: 2lonYOM6xYKdEsO+6KrC766xBcHnYnim1x/4LFGF8B0
+                "user_id": local_user,
+                "usage": ["self_signing"],
+                "keys": {
+                    "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk": "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
+                },
+            },
+        }
+        master_signing_key = key.decode_signing_key_base64(
+            "ed25519",
+            "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
+            "HvQBbU+hc2Zr+JP1sE0XwBe1pfZZEYtJNPJLZJtS+F8",
+        )
+        sign.sign_json(keys1["self_signing_key"], local_user, master_signing_key)
+        signing_key = key.decode_signing_key_base64(
+            "ed25519",
+            "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+            "2lonYOM6xYKdEsO+6KrC766xBcHnYnim1x/4LFGF8B0",
+        )
+        yield self.handler.upload_signing_keys_for_user(local_user, keys1)
+
+        # upload two device keys, which will be signed later by the self-signing key
+        device_key_1 = {
+            "user_id": local_user,
+            "device_id": "abc",
+            "algorithms": ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+            "keys": {
+                "ed25519:abc": "base64+ed25519+key",
+                "curve25519:abc": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:abc": "base64+signature"}},
+        }
+        device_key_2 = {
+            "user_id": local_user,
+            "device_id": "def",
+            "algorithms": ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+            "keys": {
+                "ed25519:def": "base64+ed25519+key",
+                "curve25519:def": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:def": "base64+signature"}},
+        }
+
+        yield self.handler.upload_keys_for_user(
+            local_user, "abc", {"device_keys": device_key_1}
+        )
+        yield self.handler.upload_keys_for_user(
+            local_user, "def", {"device_keys": device_key_2}
+        )
+
+        # sign the first device key and upload it
+        del device_key_1["signatures"]
+        sign.sign_json(device_key_1, local_user, signing_key)
+        yield self.handler.upload_signatures_for_device_keys(
+            local_user, {local_user: {"abc": device_key_1}}
+        )
+
+        # sign the second device key and upload both device keys.  The server
+        # should ignore the first device key since it already has a valid
+        # signature for it
+        del device_key_2["signatures"]
+        sign.sign_json(device_key_2, local_user, signing_key)
+        yield self.handler.upload_signatures_for_device_keys(
+            local_user, {local_user: {"abc": device_key_1, "def": device_key_2}}
+        )
+
+        device_key_1["signatures"][local_user]["ed25519:abc"] = "base64+signature"
+        device_key_2["signatures"][local_user]["ed25519:def"] = "base64+signature"
+        devices = yield self.handler.query_devices({"device_keys": {local_user: []}}, 0)
+        del devices["device_keys"][local_user]["abc"]["unsigned"]
+        del devices["device_keys"][local_user]["def"]["unsigned"]
+        self.assertDictEqual(devices["device_keys"][local_user]["abc"], device_key_1)
+        self.assertDictEqual(devices["device_keys"][local_user]["def"], device_key_2)
+
+    @defer.inlineCallbacks
     def test_self_signing_key_doesnt_show_up_as_device(self):
         """signing keys should be hidden when fetching a user's devices"""
         local_user = "@boris:" + self.hs.hostname
