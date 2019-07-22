@@ -124,7 +124,7 @@ def set_homeserver_whitelist(homeserver_whitelist):
     """Sets the homeserver whitelist
 
     Args:
-        homeserver_whitelist (iterable of strings): regex of whitelisted homeservers
+        homeserver_whitelist (Iterable[str]): regex of whitelisted homeservers
     """
     global _homeserver_whitelist
     if homeserver_whitelist:
@@ -139,7 +139,8 @@ def whitelisted_homeserver(destination):
     """Checks if a destination matches the whitelist
 
     Args:
-        destination (String)"""
+        destination (str)
+        """
     global _homeserver_whitelist
     if _homeserver_whitelist:
         return _homeserver_whitelist.match(destination)
@@ -205,6 +206,9 @@ def start_active_span_from_context(
     Extracts a span context from Twisted Headers.
     args:
         headers (twisted.web.http_headers.Headers)
+
+        For the other args see opentracing.tracer
+
     returns:
         span_context (opentracing.span.SpanContext)
     """
@@ -242,8 +246,10 @@ def start_active_span_from_edu(
     Extracts a span context from an edu and uses it to start a new active span
 
     Args:
-      edu_content (Dict): and edu_content with a `context` field whose value is
-      canonical json for a dict which contains opentracing information.
+        edu_content (dict): and edu_content with a `context` field whose value is
+        canonical json for a dict which contains opentracing information.
+
+        For the other args see opentracing.tracer
     """
 
     if opentracing is None:
@@ -317,14 +323,14 @@ def set_operation_name(operation_name):
 @only_if_tracing
 def inject_active_span_twisted_headers(headers, destination):
     """
-    Injects a span context into twisted headers inplace
+    Injects a span context into twisted headers in-place
 
     Args:
         headers (twisted.web.http_headers.Headers)
         span (opentracing.Span)
 
     Returns:
-        Inplace modification of headers
+        In-place modification of headers
 
     Note:
         The headers set by the tracer are custom to the tracer implementation which
@@ -356,7 +362,7 @@ def inject_active_span_byte_dict(headers, destination):
         span (opentracing.Span)
 
     Returns:
-        Inplace modification of headers
+        In-place modification of headers
 
     Note:
         The headers set by the tracer are custom to the tracer implementation which
@@ -379,6 +385,26 @@ def inject_active_span_byte_dict(headers, destination):
 
 @only_if_tracing
 def inject_active_span_text_map(carrier, destination=None):
+    """
+    Injects a span context into a dict
+
+    Args:
+        carrier (dict)
+        destination (str): the name of the remote server. The span context
+        will only be injected if the destination matches the homeserver_whitelist
+        or destination is None.
+
+    Returns:
+        In-place modification of carrier
+
+    Note:
+        The headers set by the tracer are custom to the tracer implementation which
+        should be unique enough that they don't interfere with any headers set by
+        synapse or twisted. If we're still using jaeger these headers would be those
+        here:
+        https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
+    """
+
     if destination and not whitelisted_homeserver(destination):
         return
 
@@ -388,6 +414,10 @@ def inject_active_span_text_map(carrier, destination=None):
 
 
 def active_span_context_as_string():
+    """
+    Returns:
+        The active span context encoded as a string.
+    """
     carrier = {}
     if opentracing:
         opentracing.tracer.inject(
@@ -398,12 +428,24 @@ def active_span_context_as_string():
 
 @only_if_tracing
 def span_context_from_string(carrier):
+    """
+    Returns:
+        The active span context decoded from a string.
+    """
     carrier = json.loads(carrier)
     return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
 
 
 @only_if_tracing
 def extract_text_map(carrier):
+    """
+    Wrapper method for opentracing's tracer.extract for TEXT_MAP.
+    Args:
+        carrier (dict): a dict possibly containing a span context.
+
+    Returns:
+        The active span context extracted from carrier.
+    """
     return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
 
 
@@ -482,6 +524,9 @@ def trace_using_operation_name(operation_name):
 
 
 def tag_args(func):
+    """
+    Tags all of the args to the active span.
+    """
 
     if not opentracing:
         return func
