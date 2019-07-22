@@ -24,3 +24,5 @@ Inbound federation can get public room list
 Members from the gap are included in gappy incr LL sync
 
 Leaves are present in non-gapped incremental syncs
+
+Old leaves are present in gapped incremental syncs
