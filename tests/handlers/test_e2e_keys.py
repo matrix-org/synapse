@@ -158,9 +158,8 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                 "user_id": local_user,
                 "usage": ["master"],
                 "keys": {
-                    "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
-                    "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
-                }
+                    "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk": "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
+                },
             }
         }
         yield self.handler.upload_signing_keys_for_user(local_user, keys1)
@@ -171,22 +170,14 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                 "user_id": local_user,
                 "usage": ["master"],
                 "keys": {
-                    "ed25519:Hq6gL+utB4ET+UvD5ci0kgAwsX6qP/zvf8v6OInU5iw":
-                    "Hq6gL+utB4ET+UvD5ci0kgAwsX6qP/zvf8v6OInU5iw"
-                }
+                    "ed25519:Hq6gL+utB4ET+UvD5ci0kgAwsX6qP/zvf8v6OInU5iw": "Hq6gL+utB4ET+UvD5ci0kgAwsX6qP/zvf8v6OInU5iw"
+                },
             }
         }
         yield self.handler.upload_signing_keys_for_user(local_user, keys2)
 
-        devices = yield self.handler.query_devices(
-            {"device_keys": {local_user: []}}, 0
-        )
-        self.assertDictEqual(
-            devices["master_keys"],
-            {
-                local_user: keys2["master_key"]
-            },
-        )
+        devices = yield self.handler.query_devices({"device_keys": {local_user: []}}, 0)
+        self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
     @defer.inlineCallbacks
     def test_self_signing_key_doesnt_show_up_as_device(self):
@@ -198,9 +189,8 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                 "user_id": local_user,
                 "usage": ["master"],
                 "keys": {
-                    "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
-                    "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
-                }
+                    "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk": "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
+                },
             }
         }
         yield self.handler.upload_signing_keys_for_user(local_user, keys1)

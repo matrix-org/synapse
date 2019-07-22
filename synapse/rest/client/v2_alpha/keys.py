@@ -237,6 +237,7 @@ class SigningKeyUploadServlet(RestServlet):
     {
     }
     """
+
     PATTERNS = client_patterns("/keys/device_signing/upload$")
 
     def __init__(self, hs):
@@ -258,12 +259,10 @@ class SigningKeyUploadServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         yield self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request),
+            requester, body, self.hs.get_ip_from_request(request)
         )
 
-        result = yield self.e2e_keys_handler.upload_signing_keys_for_user(
-            user_id, body
-        )
+        result = yield self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)
         defer.returnValue((200, result))
 
 

@@ -314,15 +314,19 @@ class DeviceWorkerStore(SQLBaseStore):
 
         with self._device_list_id_gen.get_next() as stream_id:
             yield self.runInteraction(
-                "add_user_sig_change_to_streams", self._add_user_signature_change_txn,
-                from_user_id, user_ids, stream_id,
+                "add_user_sig_change_to_streams",
+                self._add_user_signature_change_txn,
+                from_user_id,
+                user_ids,
+                stream_id,
             )
         defer.returnValue(stream_id)
 
     def _add_user_signature_change_txn(self, txn, from_user_id, user_ids, stream_id):
         txn.call_after(
             self._user_signature_stream_cache.entity_has_changed,
-            from_user_id, stream_id,
+            from_user_id,
+            stream_id,
         )
         self._simple_insert_txn(
             txn,
@@ -614,7 +618,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "user_id": user_id,
                     "device_id": device_id,
                     "display_name": initial_device_display_name,
-                    "hidden": False
+                    "hidden": False,
                 },
                 desc="store_device",
                 or_ignore=True,
@@ -624,16 +628,11 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                 # if the device ID is reserved by something else
                 hidden = yield self._simple_select_one_onecol(
                     "devices",
-                    keyvalues={
-                        "user_id": user_id,
-                        "device_id": device_id
-                    },
-                    retcol="hidden"
+                    keyvalues={"user_id": user_id, "device_id": device_id},
+                    retcol="hidden",
                 )
                 if hidden:
-                    raise StoreError(
-                        400, "The device ID is in use", Codes.FORBIDDEN
-                    )
+                    raise StoreError(400, "The device ID is in use", Codes.FORBIDDEN)
             self.device_id_exists_cache.prefill(key, True)
             defer.returnValue(inserted)
         except StoreError as e:
@@ -686,7 +685,9 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         sql = """
             DELETE FROM devices
             WHERE user_id = ? AND device_id IN (%s) AND NOT COALESCE(hidden, ?)
-        """ % (",".join("?" for _ in device_ids))
+        """ % (
+            ",".join("?" for _ in device_ids)
+        )
         values = [user_id]
         values.extend(device_ids)
         values.append(False)

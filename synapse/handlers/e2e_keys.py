@@ -227,16 +227,22 @@ class E2eKeysHandler(object):
                 except Exception:
                     pass
 
-        yield make_deferred_yieldable(defer.gatherResults([
-            run_in_background(get_cross_signing_key, user_id)
-            for user_id in query.keys()
-        ]))
+        yield make_deferred_yieldable(
+            defer.gatherResults(
+                [
+                    run_in_background(get_cross_signing_key, user_id)
+                    for user_id in query.keys()
+                ]
+            )
+        )
 
-        defer.returnValue({
-            "master": master_keys,
-            "self_signing": self_signing_keys,
-            "user_signing": user_signing_keys,
-        })
+        defer.returnValue(
+            {
+                "master": master_keys,
+                "self_signing": self_signing_keys,
+                "user_signing": user_signing_keys,
+            }
+        )
 
     @defer.inlineCallbacks
     def query_local_devices(self, query):
@@ -455,11 +461,7 @@ class E2eKeysHandler(object):
         # if there is no master key, then we can't do anything, because all the
         # other cross-signing keys need to be signed by the master key
         if not master_key:
-            raise SynapseError(
-                400,
-                "No master key available",
-                Codes.MISSING_PARAM
-            )
+            raise SynapseError(400, "No master key available", Codes.MISSING_PARAM)
 
         master_key_id, master_verify_key = get_verify_key_from_cross_signing_key(
             master_key
@@ -484,9 +486,7 @@ class E2eKeysHandler(object):
         # if everything checks out, then store the keys and send notifications
         deviceids = []
         if "master_key" in keys:
-            yield self.store.set_e2e_cross_signing_key(
-                user_id, "master", master_key
-            )
+            yield self.store.set_e2e_cross_signing_key(user_id, "master", master_key)
             deviceids.append(master_verify_key.version)
         if "self_signing_key" in keys:
             yield self.store.set_e2e_cross_signing_key(
@@ -523,22 +523,20 @@ def _check_cross_signing_key(key, user_id, key_type, signing_key=None):
         signing_key (VerifyKey): (optional) the signing key that the key should
             be signed with.  If omitted, signatures will not be checked.
     """
-    if "user_id" not in key or key["user_id"] != user_id \
-       or "usage" not in key or key_type not in key["usage"]:
-        raise SynapseError(
-            400,
-            ("Invalid %s key" % key_type),
-            Codes.INVALID_PARAM
-        )
+    if (
+        "user_id" not in key
+        or key["user_id"] != user_id
+        or "usage" not in key
+        or key_type not in key["usage"]
+    ):
+        raise SynapseError(400, ("Invalid %s key" % key_type), Codes.INVALID_PARAM)
 
     if signing_key:
         try:
             verify_signed_json(key, user_id, signing_key)
         except SignatureVerifyException:
             raise SynapseError(
-                400,
-                ("Invalid signature or %s key" % key_type),
-                Codes.INVALID_SIGNATURE
+                400, ("Invalid signature or %s key" % key_type), Codes.INVALID_SIGNATURE
             )
 
 

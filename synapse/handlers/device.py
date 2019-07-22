@@ -423,9 +423,7 @@ class DeviceHandler(DeviceWorkerHandler):
             from_user_id, user_ids
         )
 
-        self.notifier.on_new_event(
-            "device_list_key", position, users=[from_user_id],
-        )
+        self.notifier.on_new_event("device_list_key", position, users=[from_user_id])
 
     @defer.inlineCallbacks
     def on_federation_query_user_devices(self, user_id):

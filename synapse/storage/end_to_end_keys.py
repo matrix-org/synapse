@@ -325,9 +325,9 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 "user_id": user_id,
                 "device_id": pubkey,
                 "display_name": key_type + " signing key",
-                "hidden": True
+                "hidden": True,
             },
-            desc="store_master_key_device"
+            desc="store_master_key_device",
         )
 
         # and finally, store the key itself
@@ -337,9 +337,9 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 "user_id": user_id,
                 "keytype": key_type,
                 "keydata": json.dumps(key),
-                "ts": time.time() * 1000
+                "ts": time.time() * 1000,
             },
-            desc="store_master_key"
+            desc="store_master_key",
         )
 
     def set_e2e_cross_signing_key(self, user_id, key_type, key):
@@ -353,7 +353,9 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         return self.runInteraction(
             "add_e2e_cross_signing_key",
             self._set_e2e_cross_signing_key_txn,
-            user_id, key_type, key
+            user_id,
+            key_type,
+            key,
         )
 
     def _get_e2e_cross_signing_key_txn(self, txn, user_id, key_type, from_user_id=None):
@@ -397,8 +399,9 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             txn.execute(sql, (from_user_id, user_id, device_id))
             row = txn.fetchone()
             if row:
-                key.setdefault("signatures", {}) \
-                   .setdefault(from_user_id, {})[row[0]] = row[1]
+                key.setdefault("signatures", {}).setdefault(from_user_id, {})[
+                    row[0]
+                ] = row[1]
 
         return key
 
@@ -417,7 +420,9 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         return self.runInteraction(
             "get_e2e_cross_signing_key",
             self._get_e2e_cross_signing_key_txn,
-            user_id, key_type, from_user_id
+            user_id,
+            key_type,
+            from_user_id,
         )
 
     def store_e2e_cross_signing_signatures(self, user_id, signatures):
@@ -434,11 +439,15 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         """
         return self._simple_insert_many(
             "e2e_cross_signing_signatures",
-            [{"user_id": user_id,
-              "key_id": key_id,
-              "target_user_id": target_user_id,
-              "target_device_id": target_device_id,
-              "signature": signature}
-             for (key_id, target_user_id, target_device_id, signature) in signatures],
-            "add_e2e_signing_key"
+            [
+                {
+                    "user_id": user_id,
+                    "key_id": key_id,
+                    "target_user_id": target_user_id,
+                    "target_device_id": target_device_id,
+                    "signature": signature,
+                }
+                for (key_id, target_user_id, target_device_id, signature) in signatures
+            ],
+            "add_e2e_signing_key",
         )

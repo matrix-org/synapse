@@ -208,7 +208,7 @@ class DataStore(
             "DeviceListStreamChangeCache", device_list_max
         )
         self._user_signature_stream_cache = StreamChangeCache(
-            "UserSignatureStreamChangeCache", device_list_max,
+            "UserSignatureStreamChangeCache", device_list_max
         )
         self._device_list_federation_stream_cache = StreamChangeCache(
             "DeviceListFederationStreamChangeCache", device_list_max
