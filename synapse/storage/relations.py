@@ -17,8 +17,6 @@ import logging
 
 import attr
 
-from twisted.internet import defer
-
 from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore

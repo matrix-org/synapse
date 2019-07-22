@@ -15,8 +15,6 @@
 
 from canonicaljson import encode_canonical_json
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
