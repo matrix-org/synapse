@@ -54,18 +54,8 @@ class TracerConfig(Config):
             #enabled: true
 
             # The list of homeservers we wish to send and receive span contexts and span baggage.
-            #
-            # Though it's mostly safe to send and receive span contexts to and from
-            # untrusted users since span contexts are usually opaque ids it can lead to
-            # two problems, namely:
-            # - If the span context is marked as sampled by the sending homeserver the receiver will
-            # sample it. Therefore two homeservers with wildly disparaging sampling policies
-            # could incur higher sampling counts than intended.
-            # - Span baggage can be arbitrary data. For safety this has been disabled in synapse
-            # but that doesn't prevent another server sending you baggage which will be logged
-            # to opentracing logs.
-            #
-            # This a list of regexes which are matched against the server_name of the
+            # See docs/opentracing.rst
+            # This is a list of regexes which are matched against the server_name of the
             # homeserver.
             #
             # By defult, it is empty, so no servers are matched.
