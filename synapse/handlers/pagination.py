@@ -286,4 +286,4 @@ class PaginationHandler(object):
                 )
             )
 
-        defer.returnValue(chunk)
+        return chunk

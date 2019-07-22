@@ -64,7 +64,7 @@ class DeviceWorkerHandler(BaseHandler):
         for device in devices:
             _update_device_from_client_ips(device, ips)
 
-        defer.returnValue(devices)
+        return devices
 
     @defer.inlineCallbacks
     def get_device(self, user_id, device_id):
@@ -85,7 +85,7 @@ class DeviceWorkerHandler(BaseHandler):
             raise errors.NotFoundError
         ips = yield self.store.get_last_client_ip_by_device(user_id, device_id)
         _update_device_from_client_ips(device, ips)
-        defer.returnValue(device)
+        return device
 
     @measure_func("device.get_user_ids_changed")
     @defer.inlineCallbacks
@@ -250,7 +250,7 @@ class DeviceHandler(DeviceWorkerHandler):
             )
             if new_device:
                 yield self.notify_device_update(user_id, [device_id])
-            defer.returnValue(device_id)
+            return device_id
 
         # if the device id is not specified, we'll autogen one, but loop a few
         # times in case of a clash.
@@ -264,7 +264,7 @@ class DeviceHandler(DeviceWorkerHandler):
             )
             if new_device:
                 yield self.notify_device_update(user_id, [device_id])
-                defer.returnValue(device_id)
+                return device_id
             attempts += 1
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
@@ -623,7 +623,7 @@ class DeviceListEduUpdater(object):
         for _, stream_id, prev_ids, _ in updates:
             if not prev_ids:
                 # We always do a resync if there are no previous IDs
-                defer.returnValue(True)
+                return True
 
             for prev_id in prev_ids:
                 if prev_id == extremity:
@@ -633,8 +633,8 @@ class DeviceListEduUpdater(object):
                 elif prev_id in stream_id_in_updates:
                     continue
                 else:
-                    defer.returnValue(True)
+                    return True
 
             stream_id_in_updates.add(stream_id)
 
-        defer.returnValue(False)
+        return False

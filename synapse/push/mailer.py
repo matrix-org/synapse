@@ -316,7 +316,7 @@ class Mailer(object):
                 if not merge:
                     room_vars["notifs"].append(notifvars)
 
-        defer.returnValue(room_vars)
+        return room_vars
 
     @defer.inlineCallbacks
     def get_notif_vars(self, notif, user_id, notif_event, room_state_ids):
@@ -343,7 +343,7 @@ class Mailer(object):
             if messagevars is not None:
                 ret["messages"].append(messagevars)
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def get_message_vars(self, notif, event, room_state_ids):
@@ -379,7 +379,7 @@ class Mailer(object):
         if "body" in event.content:
             ret["body_text_plain"] = event.content["body"]
 
-        defer.returnValue(ret)
+        return ret
 
     def add_text_message_vars(self, messagevars, event):
         msgformat = event.content.get("format")

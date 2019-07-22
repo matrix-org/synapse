@@ -177,7 +177,7 @@ class MatrixFederationAgent(object):
         res = yield make_deferred_yieldable(
             agent.request(method, uri, headers, bodyProducer)
         )
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def _route_matrix_uri(self, parsed_uri, lookup_well_known=True):
@@ -259,7 +259,7 @@ class MatrixFederationAgent(object):
                 )
 
                 res = yield self._route_matrix_uri(new_uri, lookup_well_known=False)
-                defer.returnValue(res)
+                return res
 
         # try a SRV lookup
         service_name = b"_matrix._tcp.%s" % (parsed_uri.host,)
@@ -314,7 +314,7 @@ class MatrixFederationAgent(object):
             if cache_period > 0:
                 self._well_known_cache.set(server_name, result, cache_period)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _do_get_well_known(self, server_name):
@@ -354,7 +354,7 @@ class MatrixFederationAgent(object):
             # after startup
             cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
             cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
-            defer.returnValue((None, cache_period))
+            return (None, cache_period)
 
         result = parsed_body["m.server"].encode("ascii")
 
@@ -369,7 +369,7 @@ class MatrixFederationAgent(object):
         else:
             cache_period = min(cache_period, WELL_KNOWN_MAX_CACHE_PERIOD)
 
-        defer.returnValue((result, cache_period))
+        return (result, cache_period)
 
 
 @implementer(IStreamClientEndpoint)

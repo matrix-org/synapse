@@ -87,7 +87,7 @@ class MessageHandler(object):
             )
             data = room_state[membership_event_id].get(key)
 
-        defer.returnValue(data)
+        return data
 
     @defer.inlineCallbacks
     def get_state_events(
@@ -174,7 +174,7 @@ class MessageHandler(object):
             # events, as clients won't use them.
             bundle_aggregations=False,
         )
-        defer.returnValue(events)
+        return events
 
     @defer.inlineCallbacks
     def get_joined_members(self, requester, room_id):
@@ -398,7 +398,7 @@ class EventCreationHandler(object):
 
         self.validator.validate_new(event)
 
-        defer.returnValue((event, context))
+        return (event, context)
 
     def _is_exempt_from_privacy_policy(self, builder, requester):
         """"Determine if an event to be sent is exempt from having to consent
@@ -425,9 +425,9 @@ class EventCreationHandler(object):
     @defer.inlineCallbacks
     def _is_server_notices_room(self, room_id):
         if self.config.server_notices_mxid is None:
-            defer.returnValue(False)
+            return False
         user_ids = yield self.store.get_users_in_room(room_id)
-        defer.returnValue(self.config.server_notices_mxid in user_ids)
+        return self.config.server_notices_mxid in user_ids
 
     @defer.inlineCallbacks
     def assert_accepted_privacy_policy(self, requester):
@@ -507,7 +507,7 @@ class EventCreationHandler(object):
                     event.event_id,
                     prev_state.event_id,
                 )
-                defer.returnValue(prev_state)
+                return prev_state
 
         yield self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
@@ -531,7 +531,7 @@ class EventCreationHandler(object):
             prev_content = encode_canonical_json(prev_event.content)
             next_content = encode_canonical_json(event.content)
             if prev_content == next_content:
-                defer.returnValue(prev_event)
+                return prev_event
         return
 
     @defer.inlineCallbacks
@@ -563,7 +563,7 @@ class EventCreationHandler(object):
             yield self.send_nonmember_event(
                 requester, event, context, ratelimit=ratelimit
             )
-        defer.returnValue(event)
+        return event
 
     @measure_func("create_new_client_event")
     @defer.inlineCallbacks
@@ -626,7 +626,7 @@ class EventCreationHandler(object):
 
         logger.debug("Created event %s", event.event_id)
 
-        defer.returnValue((event, context))
+        return (event, context)
 
     @measure_func("handle_new_client_event")
     @defer.inlineCallbacks

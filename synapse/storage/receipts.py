@@ -58,7 +58,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cachedInlineCallbacks()
     def get_users_with_read_receipts_in_room(self, room_id):
         receipts = yield self.get_receipts_for_room(room_id, "m.read")
-        defer.returnValue(set(r["user_id"] for r in receipts))
+        return set(r["user_id"] for r in receipts)
 
     @cached(num_args=2)
     def get_receipts_for_room(self, room_id, receipt_type):
@@ -92,7 +92,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             desc="get_receipts_for_user",
         )
 
-        defer.returnValue({row["room_id"]: row["event_id"] for row in rows})
+        return {row["room_id"]: row["event_id"] for row in rows}
 
     @defer.inlineCallbacks
     def get_receipts_for_user_with_orderings(self, user_id, receipt_type):
@@ -147,7 +147,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             room_ids, to_key, from_key=from_key
         )
 
-        defer.returnValue([ev for res in results.values() for ev in res])
+        return [ev for res in results.values() for ev in res]
 
     def get_linearized_receipts_for_room(self, room_id, to_key, from_key=None):
         """Get receipts for a single room for sending to clients.
@@ -197,7 +197,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         rows = yield self.runInteraction("get_linearized_receipts_for_room", f)
 
         if not rows:
-            defer.returnValue([])
+            return []
 
         content = {}
         for row in rows:
@@ -217,7 +217,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     )
     def _get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
         if not room_ids:
-            defer.returnValue({})
+            return {}
 
         def f(txn):
             if from_key:
@@ -264,7 +264,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             room_id: [results[room_id]] if room_id in results else []
             for room_id in room_ids
         }
-        defer.returnValue(results)
+        return results
 
     def get_all_updated_receipts(self, last_id, current_id, limit=None):
         if last_id == current_id:
@@ -468,7 +468,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             )
 
         if event_ts is None:
-            defer.returnValue(None)
+            return None
 
         now = self._clock.time_msec()
         logger.debug(
@@ -482,7 +482,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
 
         max_persisted_id = self._receipts_id_gen.get_current_token()
 
-        defer.returnValue((stream_id, max_persisted_id))
+        return (stream_id, max_persisted_id)
 
     def insert_graph_receipt(self, room_id, receipt_type, user_id, event_ids, data):
         return self.runInteraction(

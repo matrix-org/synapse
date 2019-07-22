@@ -328,7 +328,7 @@ class GroupServerStore(SQLBaseStore):
 
         category["profile"] = json.loads(category["profile"])
 
-        defer.returnValue(category)
+        return category
 
     def upsert_group_category(self, group_id, category_id, profile, is_public):
         """Add/update room category for group
@@ -391,7 +391,7 @@ class GroupServerStore(SQLBaseStore):
 
         role["profile"] = json.loads(role["profile"])
 
-        defer.returnValue(role)
+        return role
 
     def upsert_group_role(self, group_id, role_id, profile, is_public):
         """Add/remove user role
@@ -960,7 +960,7 @@ class GroupServerStore(SQLBaseStore):
                 _register_user_group_membership_txn,
                 next_id,
             )
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def create_group(
@@ -1057,9 +1057,9 @@ class GroupServerStore(SQLBaseStore):
 
         now = int(self._clock.time_msec())
         if row and now < row["valid_until_ms"]:
-            defer.returnValue(json.loads(row["attestation_json"]))
+            return json.loads(row["attestation_json"])
 
-        defer.returnValue(None)
+        return None
 
     def get_joined_groups(self, user_id):
         return self._simple_select_onecol(

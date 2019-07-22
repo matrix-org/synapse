@@ -55,7 +55,7 @@ def calculate_room_name(
             room_state_ids[("m.room.name", "")], allow_none=True
         )
         if m_room_name and m_room_name.content and m_room_name.content["name"]:
-            defer.returnValue(m_room_name.content["name"])
+            return m_room_name.content["name"]
 
     # does it have a canonical alias?
     if ("m.room.canonical_alias", "") in room_state_ids:
@@ -68,7 +68,7 @@ def calculate_room_name(
             and canon_alias.content["alias"]
             and _looks_like_an_alias(canon_alias.content["alias"])
         ):
-            defer.returnValue(canon_alias.content["alias"])
+            return canon_alias.content["alias"]
 
     # at this point we're going to need to search the state by all state keys
     # for an event type, so rearrange the data structure
@@ -82,10 +82,10 @@ def calculate_room_name(
             if alias_event and alias_event.content.get("aliases"):
                 the_aliases = alias_event.content["aliases"]
                 if len(the_aliases) > 0 and _looks_like_an_alias(the_aliases[0]):
-                    defer.returnValue(the_aliases[0])
+                    return the_aliases[0]
 
     if not fallback_to_members:
-        defer.returnValue(None)
+        return None
 
     my_member_event = None
     if ("m.room.member", user_id) in room_state_ids:
@@ -111,7 +111,7 @@ def calculate_room_name(
                 else:
                     return
         else:
-            defer.returnValue("Room Invite")
+            return "Room Invite"
 
     # we're going to have to generate a name based on who's in the room,
     # so find out who is in the room that isn't the user.
@@ -154,17 +154,17 @@ def calculate_room_name(
                         # return "Inviting %s" % (
                         #     descriptor_from_member_events(third_party_invites)
                         # )
-                        defer.returnValue("Inviting email address")
+                        return "Inviting email address"
                     else:
-                        defer.returnValue(ALL_ALONE)
+                        return ALL_ALONE
             else:
-                defer.returnValue(name_from_member_event(all_members[0]))
+                return name_from_member_event(all_members[0])
         else:
-            defer.returnValue(ALL_ALONE)
+            return ALL_ALONE
     elif len(other_members) == 1 and not fallback_to_single_member:
         return
     else:
-        defer.returnValue(descriptor_from_member_events(other_members))
+        return descriptor_from_member_events(other_members)
 
 
 def descriptor_from_member_events(member_events):

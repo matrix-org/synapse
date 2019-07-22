@@ -145,7 +145,7 @@ class ApplicationServiceTransactionWorkerStore(
             for service in as_list:
                 if service.id == res["as_id"]:
                     services.append(service)
-        defer.returnValue(services)
+        return services
 
     @defer.inlineCallbacks
     def get_appservice_state(self, service):
@@ -164,9 +164,9 @@ class ApplicationServiceTransactionWorkerStore(
             desc="get_appservice_state",
         )
         if result:
-            defer.returnValue(result.get("state"))
+            return result.get("state")
             return
-        defer.returnValue(None)
+        return None
 
     def set_appservice_state(self, service, state):
         """Set the application service state.
@@ -298,7 +298,7 @@ class ApplicationServiceTransactionWorkerStore(
         )
 
         if not entry:
-            defer.returnValue(None)
+            return None
 
         event_ids = json.loads(entry["event_ids"])
 
@@ -360,7 +360,7 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = yield self.get_events_as_list(event_ids)
 
-        defer.returnValue((upper_bound, events))
+        return (upper_bound, events)
 
 
 class ApplicationServiceTransactionStore(ApplicationServiceTransactionWorkerStore):

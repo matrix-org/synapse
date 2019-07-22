@@ -34,7 +34,7 @@ class ProfileWorkerStore(SQLBaseStore):
         except StoreError as e:
             if e.code == 404:
                 # no match
-                defer.returnValue(ProfileInfo(None, None))
+                return ProfileInfo(None, None)
                 return
             else:
                 raise
@@ -168,7 +168,7 @@ class ProfileStore(ProfileWorkerStore):
         )
 
         if res:
-            defer.returnValue(True)
+            return True
 
         res = yield self._simple_select_one_onecol(
             table="group_invites",
@@ -179,4 +179,4 @@ class ProfileStore(ProfileWorkerStore):
         )
 
         if res:
-            defer.returnValue(True)
+            return True

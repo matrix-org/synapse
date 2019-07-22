@@ -180,7 +180,7 @@ class PresenceStore(SQLBaseStore):
         for row in rows:
             row["currently_active"] = bool(row["currently_active"])
 
-        defer.returnValue({row["user_id"]: UserPresenceState(**row) for row in rows})
+        return {row["user_id"]: UserPresenceState(**row) for row in rows}
 
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()

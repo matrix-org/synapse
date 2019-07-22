@@ -95,7 +95,7 @@ class KeyUploadServlet(RestServlet):
         result = yield self.e2e_keys_handler.upload_keys_for_user(
             user_id, device_id, body
         )
-        defer.returnValue((200, result))
+        return (200, result)
 
 
 class KeyQueryServlet(RestServlet):
@@ -149,7 +149,7 @@ class KeyQueryServlet(RestServlet):
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
         result = yield self.e2e_keys_handler.query_devices(body, timeout)
-        defer.returnValue((200, result))
+        return (200, result)
 
 
 class KeyChangesServlet(RestServlet):
@@ -189,7 +189,7 @@ class KeyChangesServlet(RestServlet):
 
         results = yield self.device_handler.get_user_ids_changed(user_id, from_token)
 
-        defer.returnValue((200, results))
+        return (200, results)
 
 
 class OneTimeKeyServlet(RestServlet):
@@ -224,7 +224,7 @@ class OneTimeKeyServlet(RestServlet):
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
         result = yield self.e2e_keys_handler.claim_one_time_keys(body, timeout)
-        defer.returnValue((200, result))
+        return (200, result)
 
 
 def register_servlets(hs, http_server):

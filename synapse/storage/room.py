@@ -200,7 +200,7 @@ class RoomWorkerStore(SQLBaseStore):
                 )
             )
         else:
-            defer.returnValue(None)
+            return None
 
 
 class RoomStore(RoomWorkerStore, SearchStore):

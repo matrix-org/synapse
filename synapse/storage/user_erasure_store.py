@@ -67,7 +67,7 @@ class UserErasureWorkerStore(SQLBaseStore):
 
         erased_users = yield self.runInteraction("are_users_erased", _get_erased_users)
         res = dict((u, u in erased_users) for u in user_ids)
-        defer.returnValue(res)
+        return res
 
 
 class UserErasureStore(UserErasureWorkerStore):

@@ -104,7 +104,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         yield self.runWithConnection(f)
         yield self._end_background_update("user_ips_drop_nonunique_index")
-        defer.returnValue(1)
+        return 1
 
     @defer.inlineCallbacks
     def _analyze_user_ip(self, progress, batch_size):
@@ -121,7 +121,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         yield self._end_background_update("user_ips_analyze")
 
-        defer.returnValue(1)
+        return 1
 
     @defer.inlineCallbacks
     def _remove_user_ip_dupes(self, progress, batch_size):
@@ -291,7 +291,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         if last:
             yield self._end_background_update("user_ips_remove_dupes")
 
-        defer.returnValue(batch_size)
+        return batch_size
 
     @defer.inlineCallbacks
     def insert_client_ip(
@@ -401,7 +401,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                         "device_id": did,
                         "last_seen": last_seen,
                     }
-        defer.returnValue(ret)
+        return ret
 
     @classmethod
     def _get_last_client_ip_by_device_txn(cls, txn, user_id, device_id, retcols):

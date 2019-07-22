@@ -182,7 +182,7 @@ class PreviewUrlResource(DirectServeResource):
             og = cache_result["og"]
             if isinstance(og, six.text_type):
                 og = og.encode("utf8")
-            defer.returnValue(og)
+            return og
             return
 
         media_info = yield self._download_url(url, user)
@@ -284,7 +284,7 @@ class PreviewUrlResource(DirectServeResource):
             media_info["created_ts"],
         )
 
-        defer.returnValue(jsonog)
+        return jsonog
 
     @defer.inlineCallbacks
     def _download_url(self, url, user):

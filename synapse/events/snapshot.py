@@ -202,7 +202,7 @@ class EventContext(object):
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
-        defer.returnValue(self._current_state_ids)
+        return self._current_state_ids
 
     @defer.inlineCallbacks
     def get_prev_state_ids(self, store):
@@ -222,7 +222,7 @@ class EventContext(object):
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
-        defer.returnValue(self._prev_state_ids)
+        return self._prev_state_ids
 
     def get_cached_current_state_ids(self):
         """Gets the current state IDs if we have them already cached.

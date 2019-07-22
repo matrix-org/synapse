@@ -193,4 +193,4 @@ class ResourceLimitsServerNotices(object):
                 if event_id in referenced_events:
                     referenced_events.remove(event.event_id)
 
-        defer.returnValue((currently_blocked, referenced_events))
+        return (currently_blocked, referenced_events)

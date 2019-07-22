@@ -157,7 +157,7 @@ class EventsWorkerStore(SQLBaseStore):
         if event is None and not allow_none:
             raise NotFoundError("Could not find event %s" % (event_id,))
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def get_events(
@@ -187,7 +187,7 @@ class EventsWorkerStore(SQLBaseStore):
             allow_rejected=allow_rejected,
         )
 
-        defer.returnValue({e.event_id: e for e in events})
+        return {e.event_id: e for e in events}
 
     @defer.inlineCallbacks
     def get_events_as_list(
@@ -217,7 +217,7 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         if not event_ids:
-            defer.returnValue([])
+            return []
 
         # there may be duplicates so we cast the list to a set
         event_entry_map = yield self._get_events_from_cache_or_db(
@@ -305,7 +305,7 @@ class EventsWorkerStore(SQLBaseStore):
                         event.unsigned["prev_content"] = prev.content
                         event.unsigned["prev_sender"] = prev.sender
 
-        defer.returnValue(events)
+        return events
 
     @defer.inlineCallbacks
     def _get_events_from_cache_or_db(self, event_ids, allow_rejected=False):
@@ -452,7 +452,7 @@ class EventsWorkerStore(SQLBaseStore):
         without having to create a new transaction for each request for events.
         """
         if not events:
-            defer.returnValue({})
+            return {}
 
         events_d = defer.Deferred()
         with self._event_fetch_lock:
@@ -496,7 +496,7 @@ class EventsWorkerStore(SQLBaseStore):
             )
         )
 
-        defer.returnValue({e.event.event_id: e for e in res if e})
+        return {e.event.event_id: e for e in res if e}
 
     def _fetch_event_rows(self, txn, event_ids):
         """Fetch event rows from the database
@@ -609,7 +609,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             self._get_event_cache.prefill((original_ev.event_id,), cache_entry)
 
-        defer.returnValue(cache_entry)
+        return cache_entry
 
     @defer.inlineCallbacks
     def _maybe_redact_event_row(self, original_ev, redactions):
@@ -679,7 +679,7 @@ class EventsWorkerStore(SQLBaseStore):
             desc="have_events_in_timeline",
         )
 
-        defer.returnValue(set(r["event_id"] for r in rows))
+        return set(r["event_id"] for r in rows)
 
     @defer.inlineCallbacks
     def have_seen_events(self, event_ids):
@@ -705,7 +705,7 @@ class EventsWorkerStore(SQLBaseStore):
         input_iterator = iter(event_ids)
         for chunk in iter(lambda: list(itertools.islice(input_iterator, 100)), []):
             yield self.runInteraction("have_seen_events", have_seen_events_txn, chunk)
-        defer.returnValue(results)
+        return results
 
     def get_seen_events_with_rejections(self, event_ids):
         """Given a list of event ids, check if we rejected them.
@@ -816,4 +816,4 @@ class EventsWorkerStore(SQLBaseStore):
         # it.
         complexity_v1 = round(state_events / 500, 2)
 
-        defer.returnValue({"v1": complexity_v1})
+        return {"v1": complexity_v1}

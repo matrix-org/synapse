@@ -55,7 +55,7 @@ def resolve_events_with_store(state_sets, event_map, state_map_factory):
             a map from (type, state_key) to event_id.
     """
     if len(state_sets) == 1:
-        defer.returnValue(state_sets[0])
+        return state_sets[0]
 
     unconflicted_state, conflicted_state = _seperate(state_sets)
 

@@ -294,7 +294,7 @@ class SimpleHttpClient(object):
             logger.info(
                 "Received response to %s %s: %s", method, redact_uri(uri), response.code
             )
-            defer.returnValue(response)
+            return response
         except Exception as e:
             incoming_responses_counter.labels(method, "ERR").inc()
             logger.info(
@@ -345,7 +345,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            defer.returnValue(json.loads(body))
+            return json.loads(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -385,7 +385,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            defer.returnValue(json.loads(body))
+            return json.loads(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -410,7 +410,7 @@ class SimpleHttpClient(object):
             ValueError: if the response was not JSON
         """
         body = yield self.get_raw(uri, args, headers=headers)
-        defer.returnValue(json.loads(body))
+        return json.loads(body)
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}, headers=None):
@@ -453,7 +453,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            defer.returnValue(json.loads(body))
+            return json.loads(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -488,7 +488,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            defer.returnValue(body)
+            return body
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -627,10 +627,10 @@ class CaptchaServerHttpClient(SimpleHttpClient):
 
         try:
             body = yield make_deferred_yieldable(readBody(response))
-            defer.returnValue(body)
+            return body
         except PartialDownloadError as e:
             # twisted dislikes google's response, no content length.
-            defer.returnValue(e.response)
+            return e.response
 
 
 def encode_urlencode_args(args):

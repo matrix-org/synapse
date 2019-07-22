@@ -462,7 +462,7 @@ class StoreKeyFetcher(KeyFetcher):
         keys = {}
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
-        defer.returnValue(keys)
+        return keys
 
 
 class BaseV2KeyFetcher(object):
@@ -566,7 +566,7 @@ class BaseV2KeyFetcher(object):
             ).addErrback(unwrapFirstError)
         )
 
-        defer.returnValue(verify_keys)
+        return verify_keys
 
 
 class PerspectivesKeyFetcher(BaseV2KeyFetcher):
@@ -588,7 +588,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 result = yield self.get_server_verify_key_v2_indirect(
                     keys_to_fetch, key_server
                 )
-                defer.returnValue(result)
+                return result
             except KeyLookupError as e:
                 logger.warning(
                     "Key lookup failed from %r: %s", key_server.server_name, e
@@ -601,7 +601,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                     str(e),
                 )
 
-            defer.returnValue({})
+            return {}
 
         results = yield make_deferred_yieldable(
             defer.gatherResults(
@@ -615,7 +615,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             for server_name, keys in result.items():
                 union_of_keys.setdefault(server_name, {}).update(keys)
 
-        defer.returnValue(union_of_keys)
+        return union_of_keys
 
     @defer.inlineCallbacks
     def get_server_verify_key_v2_indirect(self, keys_to_fetch, key_server):
@@ -701,7 +701,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             perspective_name, time_now_ms, added_keys
         )
 
-        defer.returnValue(keys)
+        return keys
 
     def _validate_perspectives_response(self, key_server, response):
         """Optionally check the signature on the result of a /key/query request
@@ -843,7 +843,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
             )
             keys.update(response_keys)
 
-        defer.returnValue(keys)
+        return keys
 
 
 @defer.inlineCallbacks

@@ -108,7 +108,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             room_id, on_invalidate=cache_context.invalidate
         )
         hosts = frozenset(get_domain_from_id(user_id) for user_id in user_ids)
-        defer.returnValue(hosts)
+        return hosts
 
     @cached(max_entries=100000, iterable=True)
     def get_users_in_room(self, room_id):
@@ -253,8 +253,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         invites = yield self.get_invited_rooms_for_user(user_id)
         for invite in invites:
             if invite.room_id == room_id:
-                defer.returnValue(invite)
-        defer.returnValue(None)
+                return invite
+        return None
 
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user
@@ -361,7 +361,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         rooms = yield self.get_rooms_for_user_with_stream_ordering(
             user_id, on_invalidate=on_invalidate
         )
-        defer.returnValue(frozenset(r.room_id for r in rooms))
+        return frozenset(r.room_id for r in rooms)
 
     @cachedInlineCallbacks(max_entries=500000, cache_context=True, iterable=True)
     def get_users_who_share_room_with_user(self, user_id, cache_context):
@@ -378,7 +378,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             )
             user_who_share_room.update(user_ids)
 
-        defer.returnValue(user_who_share_room)
+        return user_who_share_room
 
     @defer.inlineCallbacks
     def get_joined_users_from_context(self, event, context):
@@ -394,7 +394,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         result = yield self._get_joined_users_from_context(
             event.room_id, state_group, current_state_ids, event=event, context=context
         )
-        defer.returnValue(result)
+        return result
 
     def get_joined_users_from_state(self, room_id, state_entry):
         state_group = state_entry.state_group
@@ -508,7 +508,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                         avatar_url=to_ascii(event.content.get("avatar_url", None)),
                     )
 
-        defer.returnValue(users_in_room)
+        return users_in_room
 
     @cachedInlineCallbacks(max_entries=10000)
     def is_host_joined(self, room_id, host):
@@ -533,14 +533,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         rows = yield self._execute("is_host_joined", None, sql, room_id, like_clause)
 
         if not rows:
-            defer.returnValue(False)
+            return False
 
         user_id = rows[0][0]
         if get_domain_from_id(user_id) != host:
             # This can only happen if the host name has something funky in it
             raise Exception("Invalid host name")
 
-        defer.returnValue(True)
+        return True
 
     @cachedInlineCallbacks()
     def was_host_joined(self, room_id, host):
@@ -573,14 +573,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         rows = yield self._execute("was_host_joined", None, sql, room_id, like_clause)
 
         if not rows:
-            defer.returnValue(False)
+            return False
 
         user_id = rows[0][0]
         if get_domain_from_id(user_id) != host:
             # This can only happen if the host name has something funky in it
             raise Exception("Invalid host name")
 
-        defer.returnValue(True)
+        return True
 
     def get_joined_hosts(self, room_id, state_entry):
         state_group = state_entry.state_group
@@ -607,7 +607,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         cache = self._get_joined_hosts_cache(room_id)
         joined_hosts = yield cache.get_destinations(state_entry)
 
-        defer.returnValue(joined_hosts)
+        return joined_hosts
 
     @cached(max_entries=10000)
     def _get_joined_hosts_cache(self, room_id):
@@ -637,7 +637,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             return rows[0][0]
 
         count = yield self.runInteraction("did_forget_membership", f)
-        defer.returnValue(count == 0)
+        return count == 0
 
     @defer.inlineCallbacks
     def get_rooms_user_has_been_in(self, user_id):
@@ -847,7 +847,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
         if not result:
             yield self._end_background_update(_MEMBERSHIP_PROFILE_UPDATE_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _background_current_state_membership(self, progress, batch_size):
@@ -893,7 +893,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
         if not rooms:
             yield self._end_background_update(_CURRENT_STATE_MEMBERSHIP_UPDATE_NAME)
 
-        defer.returnValue(result)
+        return result
 
 
 class _JoinedHostsCache(object):
@@ -921,7 +921,7 @@ class _JoinedHostsCache(object):
             state_entry(synapse.state._StateCacheEntry)
         """
         if state_entry.state_group == self.state_group:
-            defer.returnValue(frozenset(self.hosts_to_joined_users))
+            return frozenset(self.hosts_to_joined_users)
 
         with (yield self.linearizer.queue(())):
             if state_entry.state_group == self.state_group:
@@ -958,7 +958,7 @@ class _JoinedHostsCache(object):
             else:
                 self.state_group = object()
             self._len = sum(len(v) for v in itervalues(self.hosts_to_joined_users))
-        defer.returnValue(frozenset(self.hosts_to_joined_users))
+        return frozenset(self.hosts_to_joined_users)
 
     def __len__(self):
         return self._len

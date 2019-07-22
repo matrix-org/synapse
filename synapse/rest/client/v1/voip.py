@@ -60,7 +60,7 @@ class VoipRestServlet(RestServlet):
             password = turnPassword
 
         else:
-            defer.returnValue((200, {}))
+            return (200, {})
 
         defer.returnValue(
             (

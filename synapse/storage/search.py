@@ -166,7 +166,7 @@ class SearchStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _background_reindex_gin_search(self, progress, batch_size):
@@ -209,7 +209,7 @@ class SearchStore(BackgroundUpdateStore):
             yield self.runWithConnection(create_index)
 
         yield self._end_background_update(self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME)
-        defer.returnValue(1)
+        return 1
 
     @defer.inlineCallbacks
     def _background_reindex_search_order(self, progress, batch_size):
@@ -287,7 +287,7 @@ class SearchStore(BackgroundUpdateStore):
         if not finished:
             yield self._end_background_update(self.EVENT_SEARCH_ORDER_UPDATE_NAME)
 
-        defer.returnValue(num_rows)
+        return num_rows
 
     def store_event_search_txn(self, txn, event, key, value):
         """Add event to the search table
