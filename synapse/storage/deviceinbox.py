@@ -73,7 +73,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             "get_new_messages_for_device", get_new_messages_for_device_txn
         )
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def delete_messages_for_device(self, user_id, device_id, up_to_stream_id):
         """
@@ -185,7 +185,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             get_new_messages_for_remote_destination_txn,
         )
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     def delete_device_msgs_for_remote(self, destination, up_to_stream_id):
         """Used to delete messages when the remote destination acknowledges
         their receipt.
@@ -236,7 +236,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, BackgroundUpdateStore):
             expiry_ms=30 * 60 * 1000,
         )
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def add_messages_to_device_inbox(
         self, local_messages_by_user_then_device, remote_messages_by_destination
