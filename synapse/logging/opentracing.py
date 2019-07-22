@@ -297,20 +297,6 @@ def log_kv(key_values, timestamp=None):
     opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
 
-# Note: we don't have a get baggage items because we're trying to hide all
-# scope and span state from synapse. I think this method may also be useless
-# as a result
-
-# I also thinks it's dangerous with respect to pii. If the whitelisting
-# is missconfigured or buggy span information will leak. This is no issue
-# if it's jaeger span id's but baggage can contain any arbitrary data. I would
-# suggest removing this.
-@only_if_tracing
-def set_baggage_item(key, value):
-    """Attach baggage to the active span"""
-    opentracing.tracer.active_span.set_baggage_item(key, value)
-
-
 @only_if_tracing
 def set_operation_name(operation_name):
     """Sets the operation name of the active span"""
@@ -541,34 +527,6 @@ def tag_args(func):
         return func(self, *args, **kwargs)
 
     return _tag_args_inner
-
-
-def wrap_in_span(func):
-    """Its purpose is to wrap a function that is being passed into a context
-    which is a complete break from the current logcontext. This function creates
-    a non active span from the current context and closes it after the function
-    executes."""
-    global opentracing
-    # I haven't use this function yet
-
-    if not opentracing:
-        return func
-
-    parent_span = opentracing.tracer.active_span
-
-    @wraps(func)
-    def _wrap_in_span_inner(self, *args, **kwargs):
-        span = opentracing.tracer.start_span(func.__name__, child_of=parent_span)
-        try:
-            return func(self, *args, **kwargs)
-        except Exception as e:
-            span.set_tag("error", True)
-            span.log_kv({"exception", e})
-            raise
-        finally:
-            span.finish()
-
-    return _wrap_in_span_inner
 
 
 def trace_servlet(servlet_name, func):
