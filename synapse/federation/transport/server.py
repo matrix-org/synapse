@@ -325,7 +325,7 @@ class BaseFederationServlet(object):
             if code is None:
                 continue
 
-            server.register_paths(method, (pattern,), self._wrap(code))
+            server.register_paths(method, (pattern,), self._wrap(code), self.__class__.__name__)
 
 
 class FederationSendServlet(BaseFederationServlet):

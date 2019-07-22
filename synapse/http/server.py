@@ -245,7 +245,9 @@ class JsonResource(HttpServer, resource.Resource):
 
     isLeaf = True
 
-    _PathEntry = collections.namedtuple("_PathEntry", ["pattern", "callback"])
+    _PathEntry = collections.namedtuple(
+        "_PathEntry", ["pattern", "callback", "servlet_classname"]
+    )
 
     def __init__(self, hs, canonical_json=True):
         resource.Resource.__init__(self)
@@ -255,12 +257,12 @@ class JsonResource(HttpServer, resource.Resource):
         self.path_regexs = {}
         self.hs = hs
 
-    def register_paths(self, method, path_patterns, callback):
+    def register_paths(self, method, path_patterns, callback, servlet_classname):
         method = method.encode("utf-8")  # method is bytes on py3
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
-                self._PathEntry(path_pattern, callback)
+                self._PathEntry(path_pattern, callback, servlet_classname)
             )
 
     def render(self, request):
@@ -275,12 +277,9 @@ class JsonResource(HttpServer, resource.Resource):
             This checks if anyone has registered a callback for that method and
             path.
         """
-        callback, group_dict = self._get_handler_for_request(request)
+        callback, servlet_classname, group_dict = self._get_handler_for_request(request)
 
-        servlet_instance = getattr(callback, "__self__", None)
-        if servlet_instance is not None:
-            servlet_classname = servlet_instance.__class__.__name__
-        else:
+        if servlet_classname is None:
             servlet_classname = "%r" % callback
         request.request_metrics.name = servlet_classname
 
@@ -328,7 +327,7 @@ class JsonResource(HttpServer, resource.Resource):
             m = path_entry.pattern.match(request.path.decode("ascii"))
             if m:
                 # We found a match!
-                return path_entry.callback, m.groupdict()
+                return path_entry.callback, path_entry.servlet_classname, m.groupdict()
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
         return _unrecognised_request_handler, {}
