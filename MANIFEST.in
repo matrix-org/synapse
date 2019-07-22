@@ -8,7 +8,6 @@ include demo/demo.tls.dh
 include demo/*.py
 include demo/*.sh
 include sytest-blacklist
-include worker-blacklist
 
 recursive-include synapse/storage/schema *.sql
 recursive-include synapse/storage/schema *.sql.postgres
