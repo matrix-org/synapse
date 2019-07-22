@@ -7,7 +7,6 @@ include demo/README
 include demo/demo.tls.dh
 include demo/*.py
 include demo/*.sh
-include sytest-blacklist
 
 recursive-include synapse/storage/schema *.sql
 recursive-include synapse/storage/schema *.sql.postgres
@@ -34,6 +33,7 @@ exclude Dockerfile
 exclude .dockerignore
 exclude test_postgresql.sh
 exclude .editorconfig
+exclude sytest-blacklist
 
 include pyproject.toml
 recursive-include changelog.d *
