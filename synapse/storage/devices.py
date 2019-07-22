@@ -37,6 +37,7 @@ from synapse.storage._base import (
     make_in_list_sql_clause,
 )
 from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.types import get_verify_key_from_cross_signing_key
 from synapse.util import batch_iter
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 
@@ -142,17 +143,19 @@ class DeviceWorkerStore(SQLBaseStore):
                 )
                 master_key_by_user[user] = {
                     "key_info": cross_signing_key,
-                    "pubkey": verify_key.version
+                    "pubkey": verify_key.version,
                 }
 
-            cross_signing_key = yield self.get_e2e_cross_signing_key(user, "self_signing")
+            cross_signing_key = yield self.get_e2e_cross_signing_key(
+                user, "self_signing"
+            )
             if cross_signing_key:
                 key_id, verify_key = get_verify_key_from_cross_signing_key(
                     cross_signing_key
                 )
                 self_signing_key_by_user[user] = {
                     "key_info": cross_signing_key,
-                    "pubkey": verify_key.version
+                    "pubkey": verify_key.version,
                 }
 
         # if we have exceeded the limit, we need to exclude any results with the
@@ -185,10 +188,13 @@ class DeviceWorkerStore(SQLBaseStore):
                 break
 
             # skip over cross-signing keys
-            if (update[0] in master_key_by_user
-                    and update[1] == master_key_by_user[update[0]]["pubkey"]) \
-                or (update[0] in master_key_by_user
-                    and update[1] == self_signing_key_by_user[update[0]]["pubkey"]):
+            if (
+                update[0] in master_key_by_user
+                and update[1] == master_key_by_user[update[0]]["pubkey"]
+            ) or (
+                update[0] in master_key_by_user
+                and update[1] == self_signing_key_by_user[update[0]]["pubkey"]
+            ):
                 continue
 
             key = (update[0], update[1])
@@ -209,16 +215,16 @@ class DeviceWorkerStore(SQLBaseStore):
         # update list with the master/self-signing key by user maps
         cross_signing_keys_by_user = {}
         for user_id, device_id, stream in updates:
-            if device_id == master_key_by_user.get(user_id, {}) \
-                                              .get("pubkey", None):
+            if device_id == master_key_by_user.get(user_id, {}).get("pubkey", None):
                 result = cross_signing_keys_by_user.setdefault(user_id, {})
-                result["master_key"] = \
-                    master_key_by_user[user_id]["key_info"]
-            elif device_id == self_signing_key_by_user.get(user_id, {}) \
-                                                      .get("pubkey", None):
+                result["master_key"] = master_key_by_user[user_id]["key_info"]
+            elif device_id == self_signing_key_by_user.get(user_id, {}).get(
+                "pubkey", None
+            ):
                 result = cross_signing_keys_by_user.setdefault(user_id, {})
-                result["self_signing_key"] = \
-                    self_signing_key_by_user[user_id]["key_info"]
+                result["self_signing_key"] = self_signing_key_by_user[user_id][
+                    "key_info"
+                ]
 
         cross_signing_results = []
 
@@ -282,13 +288,17 @@ class DeviceWorkerStore(SQLBaseStore):
             List[Dict]: List of objects representing an device update EDU
 
         """
-        devices = yield self.runInteraction(
-            "_get_e2e_device_keys_txn",
-            self._get_e2e_device_keys_txn,
-            query_map.keys(),
-            include_all_devices=True,
-            include_deleted_devices=True,
-        ) if query_map else {}
+        devices = (
+            yield self.runInteraction(
+                "_get_e2e_device_keys_txn",
+                self._get_e2e_device_keys_txn,
+                query_map.keys(),
+                include_all_devices=True,
+                include_deleted_devices=True,
+            )
+            if query_map
+            else {}
+        )
 
         results = []
         for user_id, user_devices in iteritems(devices):
