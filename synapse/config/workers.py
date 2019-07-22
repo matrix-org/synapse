@@ -31,8 +31,6 @@ class WorkerConfig(Config):
         self.worker_listeners = config.get("worker_listeners", [])
         self.worker_daemonize = config.get("worker_daemonize")
         self.worker_pid_file = config.get("worker_pid_file")
-        self.worker_log_file = config.get("worker_log_file")
-        self.worker_log_config = config.get("worker_log_config")
 
         # The host used to connect to the main synapse
         self.worker_replication_host = config.get("worker_replication_host", None)
@@ -78,9 +76,5 @@ class WorkerConfig(Config):
 
         if args.daemonize is not None:
             self.worker_daemonize = args.daemonize
-        if args.log_config is not None:
-            self.worker_log_config = args.log_config
-        if args.log_file is not None:
-            self.worker_log_file = args.log_file
         if args.manhole is not None:
             self.worker_manhole = args.worker_manhole

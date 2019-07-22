@@ -340,8 +340,7 @@ def trace_servlet(servlet_name, func):
     @wraps(func)
     @defer.inlineCallbacks
     def _trace_servlet_inner(request, *args, **kwargs):
-        with start_active_span_from_context(
-            request.requestHeaders,
+        with start_active_span(
             "incoming-client-request",
             tags={
                 "request_id": request.get_request_id(),
