@@ -251,12 +251,12 @@ def init_tracer(config):
     # See https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/config.py
 
     set_homeserver_whitelist(config.opentracer_whitelist)
-    jaeger_config = JaegerConfig(
+
+    JaegerConfig(
         config=config.jaeger_config,
         service_name="{} {}".format(config.server_name, name),
         scope_manager=LogContextScopeManager(config),
-    )
-    jaeger_config.initialize_tracer()
+    ).initialize_tracer()
 
     # Set up tags to be opentracing's tags
     global tags
