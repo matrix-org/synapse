@@ -438,55 +438,45 @@ def extract_text_map(carrier):
 # Tracing decorators
 
 
-def trace_deferred(func):
-    """Decorator to trace a deferred function. Sets the operation name to that of the
-    function's."""
-
-    if not opentracing:
-        return func
-
-    @wraps(func)
-    @defer.inlineCallbacks
-    def _trace_deferred_inner(self, *args, **kwargs):
-        with start_active_span(func.__name__):
-            r = yield func(self, *args, **kwargs)
-            defer.returnValue(r)
-
-    return _trace_deferred_inner
-
-
-def trace_deferred_using_operation_name(name):
-    """Decorator to trace a deferred function. Explicitely sets the operation_name."""
-
-    def trace_deferred(func):
-
-        if not opentracing:
-            return func
-
-        @wraps(func)
-        @defer.inlineCallbacks
-        def _trace_deferred_inner(self, *args, **kwargs):
-            # Start scope
-            with start_active_span(name):
-                r = yield func(self, *args, **kwargs)
-                defer.returnValue(r)
-
-        return _trace_deferred_inner
-
-    return trace_deferred
-
-
 def trace(func):
-    """Decorator to trace a normal function. Sets the operation name to that of the
-    function's."""
-
-    if not opentracing:
+    """
+    Decorator to trace a function.
+    Sets the operation name to that of the function's.
+    """
+    if opentracing is None:
         return func
 
     @wraps(func)
     def _trace_inner(self, *args, **kwargs):
-        with start_active_span(func.__name__):
+        if opentracing is None:
             return func(self, *args, **kwargs)
+
+        scope = start_active_span(func.__name__)
+        scope.__enter__()
+
+        try:
+            result = func(self, *args, **kwargs)
+            if isinstance(result, defer.Deferred):
+
+                def call_back(result):
+                    scope.__exit__(None, None, None)
+                    return result
+
+                def err_back(result):
+                    scope.span.set_tag(tags.ERROR, True)
+                    scope.__exit__(None, None, None)
+                    return result
+
+                result.addCallbacks(call_back, err_back)
+
+            else:
+                scope.__exit__(None, None, None)
+
+            return result
+
+        except Exception as e:
+            scope.__exit__(type(e), None, e.__traceback__)
+            raise
 
     return _trace_inner
 
@@ -495,14 +485,43 @@ def trace_using_operation_name(operation_name):
     """Decorator to trace a function. Explicitely sets the operation_name."""
 
     def trace(func):
-
-        if not opentracing:
+        """
+        Decorator to trace a function.
+        Sets the operation name to that of the function's.
+        """
+        if opentracing is None:
             return func
 
         @wraps(func)
         def _trace_inner(self, *args, **kwargs):
-            with start_active_span(operation_name):
+            if opentracing is None:
                 return func(self, *args, **kwargs)
+
+            scope = start_active_span(operation_name)
+            scope.__enter__()
+
+            try:
+                result = func(self, *args, **kwargs)
+                if isinstance(result, defer.Deferred):
+
+                    def call_back(result):
+                        scope.__exit__(None, None, None)
+                        return result
+
+                    def err_back(result):
+                        scope.span.set_tag(tags.ERROR, True)
+                        scope.__exit__(None, None, None)
+                        return result
+
+                    result.addCallbacks(call_back, err_back)
+                else:
+                    scope.__exit__(None, None, None)
+
+                return result
+
+            except Exception as e:
+                scope.__exit__(type(e), None, e.__traceback__)
+                raise
 
         return _trace_inner
 
