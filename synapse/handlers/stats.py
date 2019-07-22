@@ -88,20 +88,42 @@ class StatsHandler(StateDeltasHandler):
         if self.pos is None:
             defer.returnValue(None)
 
-        # Loop round handling deltas until we're up to date
-        while True:
-            with Measure(self.clock, "stats_delta"):
-                deltas = yield self.store.get_current_state_deltas(self.pos)
+        max_pos = yield self.store.get_room_max_stream_ordering()
+
+        if max_pos == self.pos:
+            return
+
+        pos_of_delta = self.pos
+        with Measure(self.clock, "stats_delta"):
+            # Loop round handling deltas until we're up to date with deltas
+            while True:
+                # note that get_current_state_deltas isn't greedy –
+                # it is limited
+                deltas = yield self.store.get_current_state_deltas(pos_of_delta)
+
                 if not deltas:
-                    return
+                    break
 
                 logger.info("Handling %d state deltas", len(deltas))
                 yield self._handle_deltas(deltas)
 
-                self.pos = deltas[-1]["stream_id"]
-                yield self.store.update_stats_stream_pos(self.pos)
+                pos_of_delta = deltas[-1]["stream_id"]
 
-                event_processing_positions.labels("stats").set(self.pos)
+        if pos_of_delta > self.pos:
+            new_pos = max(pos_of_delta, max_pos)
+        else:
+            new_pos = max_pos
+
+        with Measure(self.clock, "stats_total_events"):
+            yield self.store.update_total_event_count_between(
+                old_pos=self.pos, new_pos=new_pos
+            )
+
+        self.pos = new_pos
+
+        yield self.store.update_stats_stream_pos(self.pos)
+
+        event_processing_positions.labels("stats").set(self.pos)
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
@@ -268,12 +290,15 @@ class StatsHandler(StateDeltasHandler):
                     now,
                     {
                         "bucket_size": self.stats_bucket_size,
+                        # This m.room.create state event is indeed a state event
+                        # so we count it as one.
                         "current_state_events": 1,
                         "joined_members": 0,
                         "invited_members": 0,
                         "left_members": 0,
                         "banned_members": 0,
-                        # this column is disused but not yet removed from the
+                        "total_events": 0,
+                        # This column is disused but not yet removed from the
                         # schema, so fill with -1.
                         "state_events": -1,
                     },
