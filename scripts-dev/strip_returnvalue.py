@@ -7,7 +7,7 @@ r = re.compile(rb"defer\.returnValue\((.*)\)$", re.MULTILINE)
 r2 = re.compile(rb"defer\.returnValue\(", re.MULTILINE)
 
 
-for dirpath, subdirs, files in os.walk("synapse"):
+for dirpath, subdirs, files in os.walk("tests"):
     for x in files:
         x = os.path.join(dirpath, x)
         print(x)
