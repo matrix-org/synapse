@@ -465,20 +465,12 @@ class StatsStore(StateDeltasStore):
                 self._simple_insert_txn(txn, table=table, values=values)
 
             # actually update the new value
-            if stats_type in ABSOLUTE_STATS_FIELDS[stats_type]:
-                self._simple_update_txn(
-                    txn,
-                    table=table,
-                    keyvalues={id_col: stats_id, "ts": current_ts},
-                    updatevalues={field: value},
-                )
-            else:
-                sql = ("UPDATE %s SET %s=%s+? WHERE %s=? AND ts=?") % (
-                    table,
-                    field,
-                    field,
-                    id_col,
-                )
-                txn.execute(sql, (value, stats_id, current_ts))
+            sql = ("UPDATE %s SET %s=%s+? WHERE %s=? AND ts=?") % (
+                table,
+                field,
+                field,
+                id_col,
+            )
+            txn.execute(sql, (value, stats_id, current_ts))
 
         return self.runInteraction("update_stats_delta", _update_stats_delta)
