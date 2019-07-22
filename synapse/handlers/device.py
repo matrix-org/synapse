@@ -46,7 +46,7 @@ class DeviceWorkerHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self._auth_handler = hs.get_auth_handler()
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
         """
@@ -70,7 +70,7 @@ class DeviceWorkerHandler(BaseHandler):
         opentracing.log_kv(device_map)
         return devices
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def get_device(self, user_id, device_id):
         """ Retrieve the given device
@@ -97,7 +97,7 @@ class DeviceWorkerHandler(BaseHandler):
         return device
 
     @measure_func("device.get_user_ids_changed")
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def get_user_ids_changed(self, user_id, from_token):
         """Get list of users that have had the devices updated, or have newly
@@ -287,7 +287,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def delete_device(self, user_id, device_id):
         """ Delete the given device
@@ -321,7 +321,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         yield self.notify_device_update(user_id, [device_id])
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def delete_all_devices_for_user(self, user_id, except_device_id=None):
         """Delete all of the user's devices
@@ -399,7 +399,7 @@ class DeviceHandler(DeviceWorkerHandler):
             else:
                 raise
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @measure_func("notify_device_update")
     @defer.inlineCallbacks
     def notify_device_update(self, user_id, device_ids):
@@ -485,7 +485,7 @@ class DeviceListEduUpdater(object):
             iterable=True,
         )
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def incoming_device_list_update(self, origin, edu_content):
         """Called on incoming device list update from federation. Responsible

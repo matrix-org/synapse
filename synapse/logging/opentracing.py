@@ -157,7 +157,7 @@ from functools import wraps
 
 from canonicaljson import json
 
-from twisted.internet import defer,
+from twisted.internet import defer
 
 from synapse.config import ConfigError
 

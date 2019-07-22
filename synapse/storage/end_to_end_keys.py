@@ -25,7 +25,7 @@ from ._base import SQLBaseStore, db_to_json
 
 
 class EndToEndKeyWorkerStore(SQLBaseStore):
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def get_e2e_device_keys(
         self, query_list, include_all_devices=False, include_deleted_devices=False
