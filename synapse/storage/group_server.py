@@ -307,7 +307,7 @@ class GroupServerStore(SQLBaseStore):
             desc="get_group_categories",
         )
 
-        defer.returnValue(
+        return (
             {
                 row["category_id"]: {
                     "is_public": row["is_public"],
@@ -370,7 +370,7 @@ class GroupServerStore(SQLBaseStore):
             desc="get_group_roles",
         )
 
-        defer.returnValue(
+        return (
             {
                 row["role_id"]: {
                     "is_public": row["is_public"],

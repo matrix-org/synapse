@@ -374,7 +374,7 @@ class StateHandler(object):
 
             prev_group, delta_ids = yield self.store.get_state_group_delta(name)
 
-            defer.returnValue(
+            return (
                 _StateCacheEntry(
                     state=state_list,
                     state_group=name,

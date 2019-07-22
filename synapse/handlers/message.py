@@ -213,7 +213,7 @@ class MessageHandler(object):
                 # Loop fell through, AS has no interested users in room
                 raise AuthError(403, "Appservice not in room")
 
-        defer.returnValue(
+        return (
             {
                 user_id: {
                     "avatar_url": profile.avatar_url,

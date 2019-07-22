@@ -144,7 +144,7 @@ class EventBuilder(object):
         if self._origin_server_ts is not None:
             event_dict["origin_server_ts"] = self._origin_server_ts
 
-        defer.returnValue(
+        return (
             create_local_event_from_event_dict(
                 clock=self._clock,
                 hostname=self._hostname,

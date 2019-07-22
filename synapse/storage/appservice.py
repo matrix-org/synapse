@@ -304,7 +304,7 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = yield self.get_events_as_list(event_ids)
 
-        defer.returnValue(
+        return (
             AppServiceTransaction(service=service, id=entry["txn_id"], events=events)
         )
 

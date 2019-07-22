@@ -315,7 +315,7 @@ class FederationServer(FederationBase):
         state_ids = yield self.handler.get_state_ids_for_pdu(room_id, event_id)
         auth_chain_ids = yield self.store.get_auth_chain_ids(state_ids)
 
-        defer.returnValue(
+        return (
             (200, {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids})
         )
 
@@ -336,7 +336,7 @@ class FederationServer(FederationBase):
                     )
                 )
 
-        defer.returnValue(
+        return (
             {
                 "pdus": [pdu.get_pdu_json() for pdu in pdus],
                 "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
@@ -371,7 +371,7 @@ class FederationServer(FederationBase):
 
         pdu = yield self.handler.on_make_join_request(room_id, user_id)
         time_now = self._clock.time_msec()
-        defer.returnValue(
+        return (
             {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
         )
 
@@ -407,7 +407,7 @@ class FederationServer(FederationBase):
         logger.debug("on_send_join_request: pdu sigs: %s", pdu.signatures)
         res_pdus = yield self.handler.on_send_join_request(origin, pdu)
         time_now = self._clock.time_msec()
-        defer.returnValue(
+        return (
             (
                 200,
                 {
@@ -428,7 +428,7 @@ class FederationServer(FederationBase):
         room_version = yield self.store.get_room_version(room_id)
 
         time_now = self._clock.time_msec()
-        defer.returnValue(
+        return (
             {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
         )
 
@@ -580,7 +580,7 @@ class FederationServer(FederationBase):
 
             time_now = self._clock.time_msec()
 
-        defer.returnValue(
+        return (
             {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
         )
 

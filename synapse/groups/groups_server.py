@@ -151,7 +151,7 @@ class GroupsServerHandler(object):
             group_id, requester_user_id
         )
 
-        defer.returnValue(
+        return (
             {
                 "profile": profile,
                 "users_section": {
@@ -461,7 +461,7 @@ class GroupsServerHandler(object):
 
         # TODO: If admin add lists of users whose attestations have timed out
 
-        defer.returnValue(
+        return (
             {"chunk": chunk, "total_user_count_estimate": len(user_results)}
         )
 
@@ -494,7 +494,7 @@ class GroupsServerHandler(object):
                 logger.warn("Error getting profile for %s: %s", user_id, e)
             user_profiles.append(user_profile)
 
-        defer.returnValue(
+        return (
             {"chunk": user_profiles, "total_user_count_estimate": len(invited_users)}
         )
 
@@ -533,7 +533,7 @@ class GroupsServerHandler(object):
 
         chunk.sort(key=lambda e: -e["num_joined_members"])
 
-        defer.returnValue(
+        return (
             {"chunk": chunk, "total_room_count_estimate": len(room_results)}
         )
 

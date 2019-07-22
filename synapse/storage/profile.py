@@ -39,7 +39,7 @@ class ProfileWorkerStore(SQLBaseStore):
             else:
                 raise
 
-        defer.returnValue(
+        return (
             ProfileInfo(
                 avatar_url=profile["avatar_url"], display_name=profile["displayname"]
             )

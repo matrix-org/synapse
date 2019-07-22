@@ -90,7 +90,7 @@ class PresenceStore(SQLBaseStore):
                 presence_states,
             )
 
-        defer.returnValue(
+        return (
             (stream_orderings[-1], self._presence_id_gen.get_current_token())
         )
 

@@ -282,7 +282,7 @@ class RegisterRestServlet(RestServlet):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
-            defer.returnValue((200, result))  # we throw for non 200 responses
+            return ((200, result))  # we throw for non 200 responses
             return
 
         # for either shared secret or regular registration, downcase the
@@ -301,7 +301,7 @@ class RegisterRestServlet(RestServlet):
             result = yield self._do_shared_secret_registration(
                 desired_username, desired_password, body
             )
-            defer.returnValue((200, result))  # we throw for non 200 responses
+            return ((200, result))  # we throw for non 200 responses
             return
 
         # == Normal User Registration == (everyone else)
@@ -588,7 +588,7 @@ class RegisterRestServlet(RestServlet):
             user_id, device_id, initial_display_name, is_guest=True
         )
 
-        defer.returnValue(
+        return (
             (
                 200,
                 {

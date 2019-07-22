@@ -95,7 +95,7 @@ def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs)
     # maximum backoff even though it might only have been down briefly
     backoff_on_failure = not ignore_backoff
 
-    defer.returnValue(
+    return (
         RetryDestinationLimiter(
             destination,
             clock,

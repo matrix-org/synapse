@@ -83,7 +83,7 @@ class IdTokenServlet(RestServlet):
 
         yield self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
 
-        defer.returnValue(
+        return (
             (
                 200,
                 {

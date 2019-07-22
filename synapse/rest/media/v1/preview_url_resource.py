@@ -354,7 +354,7 @@ class PreviewUrlResource(DirectServeResource):
             # therefore not expire it.
             raise
 
-        defer.returnValue(
+        return (
             {
                 "media_type": media_type,
                 "media_length": length,

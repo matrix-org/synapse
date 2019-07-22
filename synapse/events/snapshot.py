@@ -133,7 +133,7 @@ class EventContext(object):
         else:
             prev_state_id = None
 
-        defer.returnValue(
+        return (
             {
                 "prev_state_id": prev_state_id,
                 "event_type": event.type,

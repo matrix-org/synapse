@@ -130,7 +130,7 @@ class PushRulesWorkerStore(
             retcols=("user_name", "rule_id", "enabled"),
             desc="get_push_rules_enabled_for_user",
         )
-        defer.returnValue(
+        return (
             {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
         )
 

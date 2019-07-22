@@ -330,7 +330,7 @@ class InitialSyncHandler(BaseHandler):
 
         time_now = self.clock.time_msec()
 
-        defer.returnValue(
+        return (
             {
                 "membership": membership,
                 "room_id": room_id,

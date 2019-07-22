@@ -600,7 +600,7 @@ class RoomMemberHandler(object):
 
         guest_access = yield self.store.get_event(guest_access_id)
 
-        defer.returnValue(
+        return (
             guest_access
             and guest_access.content
             and "guest_access" in guest_access.content

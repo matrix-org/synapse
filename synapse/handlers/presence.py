@@ -703,7 +703,7 @@ class PresenceHandler(object):
 
         now = self.clock.time_msec()
         if as_event:
-            defer.returnValue(
+            return (
                 [
                     {
                         "type": "m.presence",
@@ -1070,7 +1070,7 @@ class PresenceEventSource(object):
         if include_offline:
             return (list(updates.values()), max_token)
         else:
-            defer.returnValue(
+            return (
                 (
                     [
                         s

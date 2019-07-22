@@ -205,7 +205,7 @@ class MatrixFederationAgent(object):
             port = parsed_uri.port
             if port == -1:
                 port = 8448
-            defer.returnValue(
+            return (
                 _RoutingResult(
                     host_header=parsed_uri.netloc,
                     tls_server_name=parsed_uri.host,
@@ -216,7 +216,7 @@ class MatrixFederationAgent(object):
 
         if parsed_uri.port != -1:
             # there is an explicit port
-            defer.returnValue(
+            return (
                 _RoutingResult(
                     host_header=parsed_uri.netloc,
                     tls_server_name=parsed_uri.host,
@@ -283,7 +283,7 @@ class MatrixFederationAgent(object):
                 parsed_uri.host.decode("ascii"),
             )
 
-        defer.returnValue(
+        return (
             _RoutingResult(
                 host_header=parsed_uri.netloc,
                 tls_server_name=parsed_uri.host,

@@ -426,7 +426,7 @@ class SyncHandler(object):
                 recents = []
 
             if not limited or block_all_timeline:
-                defer.returnValue(
+                return (
                     TimelineBatch(events=recents, prev_batch=now_token, limited=False)
                 )
 
@@ -490,7 +490,7 @@ class SyncHandler(object):
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
-        defer.returnValue(
+        return (
             TimelineBatch(
                 events=recents,
                 prev_batch=prev_batch_token,
@@ -871,7 +871,7 @@ class SyncHandler(object):
         if state_ids:
             state = yield self.store.get_events(list(state_ids.values()))
 
-        defer.returnValue(
+        return (
             {
                 (e.type, e.state_key): e
                 for e in sync_config.filter_collection.filter_room_state(
@@ -989,7 +989,7 @@ class SyncHandler(object):
                     "Sync result for newly joined room %s: %r", room_id, joined_room
                 )
 
-        defer.returnValue(
+        return (
             SyncResult(
                 presence=sync_result_builder.presence,
                 account_data=sync_result_builder.account_data,
@@ -1124,7 +1124,7 @@ class SyncHandler(object):
             # Remove any users that we still share a room with.
             newly_left_users -= users_who_share_room
 
-            defer.returnValue(
+            return (
                 DeviceLists(changed=users_that_have_changed, left=newly_left_users)
             )
         else:
@@ -1388,7 +1388,7 @@ class SyncHandler(object):
 
         newly_left_users -= newly_joined_or_invited_users
 
-        defer.returnValue(
+        return (
             (
                 newly_joined_rooms,
                 newly_joined_or_invited_users,

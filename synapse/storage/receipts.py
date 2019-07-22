@@ -110,7 +110,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             return txn.fetchall()
 
         rows = yield self.runInteraction("get_receipts_for_user_with_orderings", f)
-        defer.returnValue(
+        return (
             {
                 row[0]: {
                     "event_id": row[1],
@@ -205,7 +205,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 row["user_id"]
             ] = json.loads(row["data"])
 
-        defer.returnValue(
+        return (
             [{"type": "m.receipt", "room_id": room_id, "content": content}]
         )
 

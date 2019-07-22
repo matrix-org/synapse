@@ -130,7 +130,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             desc="add_e2e_one_time_keys_check",
         )
 
-        defer.returnValue(
+        return (
             {(row["algorithm"], row["key_id"]): row["key_json"] for row in rows}
         )
 

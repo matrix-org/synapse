@@ -186,7 +186,7 @@ class SearchHandler(BaseHandler):
             room_ids.intersection_update({batch_group_key})
 
         if not room_ids:
-            defer.returnValue(
+            return (
                 {
                     "search_categories": {
                         "room_events": {"results": [], "count": 0, "highlights": []}

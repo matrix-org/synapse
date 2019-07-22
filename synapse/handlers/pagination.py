@@ -242,7 +242,7 @@ class PaginationHandler(object):
             )
 
         if not events:
-            defer.returnValue(
+            return (
                 {
                     "chunk": [],
                     "start": pagin_config.from_token.to_string(),

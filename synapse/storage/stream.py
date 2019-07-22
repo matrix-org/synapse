@@ -674,7 +674,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             [e for e in results["after"]["event_ids"]], get_prev_content=True
         )
 
-        defer.returnValue(
+        return (
             {
                 "events_before": events_before,
                 "events_after": events_after,

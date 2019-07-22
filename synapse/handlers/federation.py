@@ -2418,7 +2418,7 @@ class FederationHandler(BaseHandler):
 
         logger.debug("construct_auth_difference returning")
 
-        defer.returnValue(
+        return (
             {
                 "auth_chain": local_auth,
                 "rejects": {

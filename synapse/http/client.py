@@ -545,7 +545,7 @@ class SimpleHttpClient(object):
         except Exception as e:
             raise_from(SynapseError(502, ("Failed to download remote body: %s" % e)), e)
 
-        defer.returnValue(
+        return (
             (
                 length,
                 resp_headers,

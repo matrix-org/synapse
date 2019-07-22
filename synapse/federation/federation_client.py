@@ -728,7 +728,7 @@ class FederationClient(FederationBase):
 
             check_authchain_validity(signed_auth)
 
-            defer.returnValue(
+            return (
                 {
                     "state": signed_state,
                     "auth_chain": signed_auth,

@@ -219,7 +219,7 @@ class Auth(object):
                         device_id="dummy-device",  # stubbed
                     )
 
-                defer.returnValue(
+                return (
                     synapse.types.create_requester(user_id, app_service=app_service)
                 )
 
@@ -262,7 +262,7 @@ class Auth(object):
 
             request.authenticated_entity = user.to_string()
 
-            defer.returnValue(
+            return (
                 synapse.types.create_requester(
                     user, token_id, is_guest, device_id, app_service=app_service
                 )

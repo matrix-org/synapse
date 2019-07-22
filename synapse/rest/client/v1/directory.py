@@ -136,7 +136,7 @@ class ClientDirectoryListServer(RestServlet):
         if room is None:
             raise NotFoundError("Unknown room")
 
-        defer.returnValue(
+        return (
             (200, {"visibility": "public" if room["is_public"] else "private"})
         )
 

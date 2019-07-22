@@ -350,7 +350,7 @@ class DeviceWorkerStore(SQLBaseStore):
             retcols=("device_id", "content"),
             desc="_get_cached_devices_for_user",
         )
-        defer.returnValue(
+        return (
             {device["device_id"]: db_to_json(device["content"]) for device in devices}
         )
 

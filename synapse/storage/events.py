@@ -2197,7 +2197,7 @@ class EventsStore(
         if not res:
             raise SynapseError(404, "Could not find event %s" % (event_id,))
 
-        defer.returnValue(
+        return (
             (int(res["topological_ordering"]), int(res["stream_ordering"]))
         )
 

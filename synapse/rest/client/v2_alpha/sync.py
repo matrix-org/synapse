@@ -205,7 +205,7 @@ class SyncRestServlet(RestServlet):
             event_formatter,
         )
 
-        defer.returnValue(
+        return (
             {
                 "account_data": {"events": sync_result.account_data},
                 "to_device": {"events": sync_result.to_device},

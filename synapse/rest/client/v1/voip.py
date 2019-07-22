@@ -62,7 +62,7 @@ class VoipRestServlet(RestServlet):
         else:
             return (200, {})
 
-        defer.returnValue(
+        return (
             (
                 200,
                 {

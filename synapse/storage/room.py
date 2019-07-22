@@ -193,7 +193,7 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
         if row:
-            defer.returnValue(
+            return (
                 RatelimitOverride(
                     messages_per_second=row["messages_per_second"],
                     burst_count=row["burst_count"],

@@ -454,7 +454,7 @@ class SearchStore(BackgroundUpdateStore):
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 
-        defer.returnValue(
+        return (
             {
                 "results": [
                     {"event": event_map[r["event_id"]], "rank": r["rank"]}
@@ -599,7 +599,7 @@ class SearchStore(BackgroundUpdateStore):
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 
-        defer.returnValue(
+        return (
             {
                 "results": [
                     {

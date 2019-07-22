@@ -658,7 +658,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             get_prev_content=False,
         )
 
-        defer.returnValue(
+        return (
             {
                 group: [
                     state_event_map[v]

@@ -428,12 +428,12 @@ class Mailer(object):
                 inviter_name = name_from_member_event(inviter_member_event)
 
                 if room_name is None:
-                    defer.returnValue(
+                    return (
                         INVITE_FROM_PERSON
                         % {"person": inviter_name, "app": self.app_name}
                     )
                 else:
-                    defer.returnValue(
+                    return (
                         INVITE_FROM_PERSON_TO_ROOM
                         % {
                             "person": inviter_name,
@@ -454,7 +454,7 @@ class Mailer(object):
                     sender_name = name_from_member_event(state_event)
 
                 if sender_name is not None and room_name is not None:
-                    defer.returnValue(
+                    return (
                         MESSAGE_FROM_PERSON_IN_ROOM
                         % {
                             "person": sender_name,
@@ -463,7 +463,7 @@ class Mailer(object):
                         }
                     )
                 elif sender_name is not None:
-                    defer.returnValue(
+                    return (
                         MESSAGE_FROM_PERSON
                         % {"person": sender_name, "app": self.app_name}
                     )
@@ -471,7 +471,7 @@ class Mailer(object):
                 # There's more than one notification for this room, so just
                 # say there are several
                 if room_name is not None:
-                    defer.returnValue(
+                    return (
                         MESSAGES_IN_ROOM % {"room": room_name, "app": self.app_name}
                     )
                 else:
@@ -493,7 +493,7 @@ class Mailer(object):
                         ]
                     )
 
-                    defer.returnValue(
+                    return (
                         MESSAGES_FROM_PERSON
                         % {
                             "person": descriptor_from_member_events(
@@ -507,7 +507,7 @@ class Mailer(object):
 
             # ...but we still refer to the 'reason' room which triggered the mail
             if reason["room_name"] is not None:
-                defer.returnValue(
+                return (
                     MESSAGES_IN_ROOM_AND_OTHERS
                     % {"room": reason["room_name"], "app": self.app_name}
                 )
@@ -527,7 +527,7 @@ class Mailer(object):
                     [room_state_ids[room_id][("m.room.member", s)] for s in sender_ids]
                 )
 
-                defer.returnValue(
+                return (
                     MESSAGES_FROM_PERSON_AND_OTHERS
                     % {
                         "person": descriptor_from_member_events(member_events.values()),

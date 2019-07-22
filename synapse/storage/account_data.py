@@ -266,7 +266,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         if not ignored_account_data:
             return False
 
-        defer.returnValue(
+        return (
             ignored_user_id in ignored_account_data.get("ignored_users", {})
         )
 

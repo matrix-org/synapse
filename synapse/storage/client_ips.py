@@ -461,7 +461,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             ((row["access_token"], row["ip"]), (row["user_agent"], row["last_seen"]))
             for row in rows
         )
-        defer.returnValue(
+        return (
             list(
                 {
                     "access_token": access_token,

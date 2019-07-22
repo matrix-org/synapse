@@ -531,7 +531,7 @@ class ShutdownRoomRestServlet(RestServlet):
             room_id, new_room_id, requester_user_id
         )
 
-        defer.returnValue(
+        return (
             (
                 200,
                 {
