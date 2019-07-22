@@ -19,6 +19,7 @@ import mock
 
 import signedjson.key as key
 import signedjson.sign as sign
+
 from twisted.internet import defer
 
 import synapse.handlers.e2e_keys
