@@ -223,7 +223,7 @@ steps:
       BLACKLIST: "synapse-blacklist-with-workers"
     command:
       - "bash .buildkite/merge_base_branch.sh"
-      - "bash -c 'cat /src/synapse-blacklist /src/worker-blacklist > /src/synapse-blacklist-with-workers'"
+      - "bash -c 'cat /src/sytest-blacklist /src/worker-blacklist > /src/synapse-blacklist-with-workers'"
       - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
