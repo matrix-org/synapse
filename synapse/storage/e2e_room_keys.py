@@ -104,7 +104,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             }
         )
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def get_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk get the E2E room keys for a given backup, optionally filtered to a given
@@ -163,7 +163,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         return sessions
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def delete_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
@@ -247,7 +247,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "get_e2e_room_keys_version_info", _get_e2e_room_keys_version_info_txn
         )
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     def create_e2e_room_keys_version(self, user_id, info):
         """Atomically creates a new version of this user's e2e_room_keys store
         with the given version info.
@@ -288,7 +288,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     def update_e2e_room_keys_version(self, user_id, version, info):
         """Update a given backup version
 
@@ -305,7 +305,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="update_e2e_room_keys_version",
         )
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     def delete_e2e_room_keys_version(self, user_id, version=None):
         """Delete a given backup version of the user's room keys.
         Doesn't delete their actual key data.
