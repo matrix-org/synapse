@@ -191,9 +191,6 @@ def setup_logging(config, use_worker_options=False):
 
         use_worker_options (bool): True to use the 'worker_log_config' option
             instead of 'log_config'.
-
-        register_sighup (func | None): Function to call to register a
-            sighup handler.
     """
     log_config = config.worker_log_config if use_worker_options else config.log_config
 
@@ -202,10 +199,10 @@ def setup_logging(config, use_worker_options=False):
             return None
 
         log_config_body = yaml.safe_load(FilePath(log_config).getContent())
-        if args:
-            logging.info("Reloaded log config from %s due to SIGHUP", log_config)
         if callback:
             callback(log_config=log_config_body)
+            logging.info("Reloaded log config from %s due to SIGHUP", log_config)
+
         return log_config_body
 
     log_config_body = read_config()

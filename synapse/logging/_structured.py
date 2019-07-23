@@ -48,10 +48,22 @@ def stdlib_log_level_to_twisted(level):
 @attr.s
 @implementer(ILogObserver)
 class LogContextObserver(object):
+    """
+    An ILogObserver which adds Synapse-specific log context information.
+
+    Attributes:
+        observer (ILogObserver): The target parent observer.
+    """
     observer = attr.ib()
 
     def __call__(self, event):
+        """
+        Consume a log event and emit it to the parent observer after filtering
+        and adding log context information.
 
+        Args:
+            event (dict)
+        """
         # Filter out some useless events that Twisted outputs
         if "log_text" in event:
             if event["log_text"].startswith("DNSDatagramProtocol starting on "):
@@ -63,13 +75,17 @@ class LogContextObserver(object):
             if event["log_text"].startswith("Timing out client"):
                 return
 
-        event["request"] = "None"
-        event["scope"] = None
-
         context = LoggingContext.current_context()
-        if context is not None and isinstance(context, LoggingContext):
-            event["request"] = context.request
-            event["scope"] = context.scope
+
+        # Copy the context information to the log event.
+        if context is not None:
+            context.copy_to_twisted_log_entry(event)
+        else:
+            # If there's no logging context, not even the root one, we might be
+            # starting up or it might be from non-Synapse code. Log it as if it
+            # came from the root logger.
+            event["request"] = None
+            event["scope"] = None
 
         return self.observer(event)
 
@@ -80,10 +96,21 @@ class PythonStdlibToTwistedLogger(logging.Handler):
     """
 
     def __init__(self, observer, *args, **kwargs):
+        """
+        Args:
+            observer (ILogObserver): A Twisted logging observer.
+            *args, **kwargs: Args/kwargs to be passed to logging.Handler.
+        """
         self.observer = observer
         super().__init__(*args, **kwargs)
 
     def emit(self, record):
+        """
+        Emit a record to Twisted's observer.
+
+        Args:
+            record (logging.LogRecord)
+        """
 
         self.observer(
             {
@@ -98,8 +125,11 @@ class PythonStdlibToTwistedLogger(logging.Handler):
 
 def SynapseFileLogObserver(outFile):
     """
-    A log observer that formats events like Synapse wants and sends them to
-    `outFile`.
+    A log observer that formats events like the traditional log formatter and
+    sends them to `outFile`.
+
+    Args:
+        outFile (file object): The file object to write to.
     """
 
     def formatEvent(_event):
@@ -135,6 +165,15 @@ class HandlerConfiguration(object):
 def parse_handler_configs(config):
     """
     Parse the logging format version 2 handler section.
+
+    Args:
+        config (dict): A logging format v2 dictionary.
+
+    Yields:
+        HandlerConfiguration instances.
+
+    Raises:
+        ConfigError: If any of the handler configuration items are invalid.
     """
     for name, config in config.get("handlers").items():
         logging_type = None
@@ -179,6 +218,10 @@ def parse_handler_configs(config):
 def setup_structured_logging(config, log_config):
     """
     Set up Twisted's structured logging system.
+
+    Args:
+        config (HomeserverConfig): The configuration of the Synapse homeserver.
+        log_config (dict): The log configuration to use.
     """
     if config.no_redirect_stdio:
         raise ConfigError(
@@ -219,4 +262,6 @@ def setup_structured_logging(config, log_config):
 
 
 def reload_structured_logging(*args, log_config=None):
+    # TODO: Reload the structured logging system. Since we don't implement any
+    # sort of file rotation, we don't need to worry about doing that here.
     pass

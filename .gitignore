@@ -19,9 +19,9 @@ _trial_temp*/
 /*.signing.key
 /env/
 /homeserver*.yaml
+/logs
 /media_store/
 /uploads
-/logs
 
 # IDEs
 /.idea/
