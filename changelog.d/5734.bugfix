@@ -1,1 +1,3 @@
-Fix servlet metric names.
+The decorated servlets were producing cryptic names in prometheus after the
+basic opentracing support was introduced in #5544. This restores the classname
+of the servlet as the name used in prometheus.
