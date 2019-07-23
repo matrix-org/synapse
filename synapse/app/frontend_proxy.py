@@ -247,7 +247,9 @@ def start(config_options):
     )
 
     ss.setup()
-    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ss, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-frontend-proxy", config)
 

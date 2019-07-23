@@ -447,7 +447,7 @@ def setup(config_options):
                 reactor.stop()
             sys.exit(1)
 
-    reactor.callWhenRunning(start)
+    reactor.addSystemEventTrigger("before", "startup", start)
 
     return hs
 
