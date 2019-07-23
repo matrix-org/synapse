@@ -17,7 +17,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.handlers._base import BaseHandler
-from synapse.types import ReadReceipt
+from synapse.types import ReadReceipt, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
@@ -40,18 +40,27 @@ class ReceiptsHandler(BaseHandler):
     def _received_remote_receipt(self, origin, content):
         """Called when we receive an EDU of type m.receipt from a remote HS.
         """
-        receipts = [
-            ReadReceipt(
-                room_id=room_id,
-                receipt_type=receipt_type,
-                user_id=user_id,
-                event_ids=user_values["event_ids"],
-                data=user_values.get("data", {}),
-            )
-            for room_id, room_values in content.items()
-            for receipt_type, users in room_values.items()
-            for user_id, user_values in users.items()
-        ]
+        receipts = []
+        for room_id, room_values in content.items():
+            for receipt_type, users in room_values.items():
+                for user_id, user_values in users.items():
+                    if get_domain_from_id(user_id) != origin:
+                        logger.info(
+                            "Received receipt for user %r from server %s, ignoring",
+                            user_id,
+                            origin,
+                        )
+                        continue
+
+                    receipts.append(
+                        ReadReceipt(
+                            room_id=room_id,
+                            receipt_type=receipt_type,
+                            user_id=user_id,
+                            event_ids=user_values["event_ids"],
+                            data=user_values.get("data", {}),
+                        )
+                    )
 
         yield self._handle_new_receipts(receipts)
 
