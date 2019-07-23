@@ -22,7 +22,6 @@ from string import Template
 import yaml
 
 from twisted.logger import STDLibLogObserver, globalLogBeginner
-from twisted.python.filepath import FilePath
 
 import synapse
 from synapse.app import _base as appbase
@@ -198,7 +197,9 @@ def setup_logging(config, use_worker_options=False):
         if log_config is None:
             return None
 
-        log_config_body = yaml.safe_load(FilePath(log_config).getContent())
+        with open(log_config, "rb") as f:
+            log_config_body = yaml.safe_load(f.read())
+
         if callback:
             callback(log_config=log_config_body)
             logging.info("Reloaded log config from %s due to SIGHUP", log_config)
