@@ -54,6 +54,7 @@ class LogContextObserver(object):
     Attributes:
         observer (ILogObserver): The target parent observer.
     """
+
     observer = attr.ib()
 
     def __call__(self, event):
