@@ -90,9 +90,7 @@ class PresenceStore(SQLBaseStore):
                 presence_states,
             )
 
-        defer.returnValue(
-            (stream_orderings[-1], self._presence_id_gen.get_current_token())
-        )
+        return (stream_orderings[-1], self._presence_id_gen.get_current_token())
 
     def _update_presence_txn(self, txn, stream_orderings, presence_states):
         for stream_id, state in zip(stream_orderings, presence_states):
@@ -180,7 +178,7 @@ class PresenceStore(SQLBaseStore):
         for row in rows:
             row["currently_active"] = bool(row["currently_active"])
 
-        defer.returnValue({row["user_id"]: UserPresenceState(**row) for row in rows})
+        return {row["user_id"]: UserPresenceState(**row) for row in rows}
 
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()

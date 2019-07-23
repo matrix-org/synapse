@@ -250,7 +250,7 @@ class InitialSyncHandler(BaseHandler):
             "end": now_token.to_string(),
         }
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def room_initial_sync(self, requester, room_id, pagin_config=None):
@@ -301,7 +301,7 @@ class InitialSyncHandler(BaseHandler):
 
         result["account_data"] = account_data_events
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _room_initial_sync_parted(
@@ -330,28 +330,24 @@ class InitialSyncHandler(BaseHandler):
 
         time_now = self.clock.time_msec()
 
-        defer.returnValue(
-            {
-                "membership": membership,
-                "room_id": room_id,
-                "messages": {
-                    "chunk": (
-                        yield self._event_serializer.serialize_events(
-                            messages, time_now
-                        )
-                    ),
-                    "start": start_token.to_string(),
-                    "end": end_token.to_string(),
-                },
-                "state": (
-                    yield self._event_serializer.serialize_events(
-                        room_state.values(), time_now
-                    )
+        return {
+            "membership": membership,
+            "room_id": room_id,
+            "messages": {
+                "chunk": (
+                    yield self._event_serializer.serialize_events(messages, time_now)
                 ),
-                "presence": [],
-                "receipts": [],
-            }
-        )
+                "start": start_token.to_string(),
+                "end": end_token.to_string(),
+            },
+            "state": (
+                yield self._event_serializer.serialize_events(
+                    room_state.values(), time_now
+                )
+            ),
+            "presence": [],
+            "receipts": [],
+        }
 
     @defer.inlineCallbacks
     def _room_initial_sync_joined(
@@ -384,13 +380,13 @@ class InitialSyncHandler(BaseHandler):
         def get_presence():
             # If presence is disabled, return an empty list
             if not self.hs.config.use_presence:
-                defer.returnValue([])
+                return []
 
             states = yield presence_handler.get_states(
                 [m.user_id for m in room_members], as_event=True
             )
 
-            defer.returnValue(states)
+            return states
 
         @defer.inlineCallbacks
         def get_receipts():
@@ -399,7 +395,7 @@ class InitialSyncHandler(BaseHandler):
             )
             if not receipts:
                 receipts = []
-            defer.returnValue(receipts)
+            return receipts
 
         presence, receipts, (messages, token) = yield make_deferred_yieldable(
             defer.gatherResults(
@@ -442,7 +438,7 @@ class InitialSyncHandler(BaseHandler):
         if not is_peeking:
             ret["membership"] = membership
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def _check_in_room_or_world_readable(self, room_id, user_id):
@@ -453,7 +449,7 @@ class InitialSyncHandler(BaseHandler):
             #  * The user is a guest user, and has joined the room
             # else it will throw.
             member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
-            defer.returnValue((member_event.membership, member_event.event_id))
+            return (member_event.membership, member_event.event_id)
             return
         except AuthError:
             visibility = yield self.state_handler.get_current_state(
@@ -463,7 +459,7 @@ class InitialSyncHandler(BaseHandler):
                 visibility
                 and visibility.content["history_visibility"] == "world_readable"
             ):
-                defer.returnValue((Membership.JOIN, None))
+                return (Membership.JOIN, None)
                 return
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
