@@ -348,7 +348,7 @@ class JsonResource(HttpServer, resource.Resource):
                 return path_entry.callback, path_entry.servlet_classname, m.groupdict()
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        return _unrecognised_request_handler, "unrecognised_request_handler" {}
+        return _unrecognised_request_handler, "unrecognised_request_handler", {}
 
     def _send_response(
         self, request, code, response_json_object, response_code_message=None
