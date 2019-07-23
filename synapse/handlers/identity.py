@@ -82,7 +82,7 @@ class IdentityHandler(BaseHandler):
                 "%s is not a trusted ID server: rejecting 3pid " + "credentials",
                 id_server,
             )
-            defer.returnValue(None)
+            return None
 
         try:
             data = yield self.http_client.get_json(
@@ -95,8 +95,8 @@ class IdentityHandler(BaseHandler):
             raise e.to_synapse_error()
 
         if "medium" in data:
-            defer.returnValue(data)
-        defer.returnValue(None)
+            return data
+        return None
 
     @defer.inlineCallbacks
     def bind_threepid(self, creds, mxid):
@@ -133,7 +133,7 @@ class IdentityHandler(BaseHandler):
             )
         except CodeMessageException as e:
             data = json.loads(e.msg)  # XXX WAT?
-        defer.returnValue(data)
+        return data
 
     @defer.inlineCallbacks
     def try_unbind_threepid(self, mxid, threepid):
@@ -161,7 +161,7 @@ class IdentityHandler(BaseHandler):
 
         # We don't know where to unbind, so we don't have a choice but to return
         if not id_servers:
-            defer.returnValue(False)
+            return False
 
         changed = True
         for id_server in id_servers:
@@ -169,7 +169,7 @@ class IdentityHandler(BaseHandler):
                 mxid, threepid, id_server
             )
 
-        defer.returnValue(changed)
+        return changed
 
     @defer.inlineCallbacks
     def try_unbind_threepid_with_id_server(self, mxid, threepid, id_server):
@@ -224,7 +224,7 @@ class IdentityHandler(BaseHandler):
             id_server=id_server,
         )
 
-        defer.returnValue(changed)
+        return changed
 
     @defer.inlineCallbacks
     def requestEmailToken(
@@ -250,7 +250,7 @@ class IdentityHandler(BaseHandler):
                 % (id_server, "/_matrix/identity/api/v1/validate/email/requestToken"),
                 params,
             )
-            defer.returnValue(data)
+            return data
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
@@ -278,7 +278,7 @@ class IdentityHandler(BaseHandler):
                 % (id_server, "/_matrix/identity/api/v1/validate/msisdn/requestToken"),
                 params,
             )
-            defer.returnValue(data)
+            return data
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()

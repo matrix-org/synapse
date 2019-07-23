@@ -162,7 +162,7 @@ class GroupsLocalHandler(object):
 
         res.setdefault("user", {})["is_publicised"] = is_publicised
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def create_group(self, group_id, user_id, content):
@@ -207,7 +207,7 @@ class GroupsLocalHandler(object):
         )
         self.notifier.on_new_event("groups_key", token, users=[user_id])
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def get_users_in_group(self, group_id, requester_user_id):
@@ -217,7 +217,7 @@ class GroupsLocalHandler(object):
             res = yield self.groups_server_handler.get_users_in_group(
                 group_id, requester_user_id
             )
-            defer.returnValue(res)
+            return res
 
         group_server_name = get_domain_from_id(group_id)
 
@@ -244,7 +244,7 @@ class GroupsLocalHandler(object):
 
         res["chunk"] = valid_entries
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def join_group(self, group_id, user_id, content):
@@ -285,7 +285,7 @@ class GroupsLocalHandler(object):
         )
         self.notifier.on_new_event("groups_key", token, users=[user_id])
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def accept_invite(self, group_id, user_id, content):
@@ -326,7 +326,7 @@ class GroupsLocalHandler(object):
         )
         self.notifier.on_new_event("groups_key", token, users=[user_id])
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def invite(self, group_id, user_id, requester_user_id, config):
@@ -346,7 +346,7 @@ class GroupsLocalHandler(object):
                 content,
             )
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def on_invite(self, group_id, user_id, content):
@@ -377,7 +377,7 @@ class GroupsLocalHandler(object):
             logger.warn("No profile for user %s: %s", user_id, e)
             user_profile = {}
 
-        defer.returnValue({"state": "invite", "user_profile": user_profile})
+        return {"state": "invite", "user_profile": user_profile}
 
     @defer.inlineCallbacks
     def remove_user_from_group(self, group_id, user_id, requester_user_id, content):
@@ -406,7 +406,7 @@ class GroupsLocalHandler(object):
                 content,
             )
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def user_removed_from_group(self, group_id, user_id, content):
@@ -421,7 +421,7 @@ class GroupsLocalHandler(object):
     @defer.inlineCallbacks
     def get_joined_groups(self, user_id):
         group_ids = yield self.store.get_joined_groups(user_id)
-        defer.returnValue({"groups": group_ids})
+        return {"groups": group_ids}
 
     @defer.inlineCallbacks
     def get_publicised_groups_for_user(self, user_id):
@@ -433,14 +433,14 @@ class GroupsLocalHandler(object):
             for app_service in self.store.get_app_services():
                 result.extend(app_service.get_groups_for_user(user_id))
 
-            defer.returnValue({"groups": result})
+            return {"groups": result}
         else:
             bulk_result = yield self.transport_client.bulk_get_publicised_groups(
                 get_domain_from_id(user_id), [user_id]
             )
             result = bulk_result.get("users", {}).get(user_id)
             # TODO: Verify attestations
-            defer.returnValue({"groups": result})
+            return {"groups": result}
 
     @defer.inlineCallbacks
     def bulk_get_publicised_groups(self, user_ids, proxy=True):
@@ -475,4 +475,4 @@ class GroupsLocalHandler(object):
             for app_service in self.store.get_app_services():
                 results[uid].extend(app_service.get_groups_for_user(uid))
 
-        defer.returnValue({"users": results})
+        return {"users": results}

@@ -53,7 +53,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
         yield self._user_joined_room(user, room_id)
 
-        defer.returnValue(ret)
+        return ret
 
     def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
         """Implements RoomMemberHandler._remote_reject_invite

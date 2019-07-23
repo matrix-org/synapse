@@ -155,7 +155,7 @@ class AuthHandler(BaseHandler):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Invalid auth")
 
-        defer.returnValue(params)
+        return params
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip, password_servlet=False):
@@ -280,7 +280,7 @@ class AuthHandler(BaseHandler):
                     creds,
                     list(clientdict),
                 )
-                defer.returnValue((creds, clientdict, session["id"]))
+                return (creds, clientdict, session["id"])
 
         ret = self._auth_dict_for_flows(flows, session)
         ret["completed"] = list(creds)
@@ -307,8 +307,8 @@ class AuthHandler(BaseHandler):
         if result:
             creds[stagetype] = result
             self._save_session(sess)
-            defer.returnValue(True)
-        defer.returnValue(False)
+            return True
+        return False
 
     def get_session_id(self, clientdict):
         """
@@ -379,7 +379,7 @@ class AuthHandler(BaseHandler):
             res = yield checker(
                 authdict, clientip=clientip, password_servlet=password_servlet
             )
-            defer.returnValue(res)
+            return res
 
         # build a v1-login-style dict out of the authdict and fall back to the
         # v1 code
@@ -389,7 +389,7 @@ class AuthHandler(BaseHandler):
             raise SynapseError(400, "", Codes.MISSING_PARAM)
 
         (canonical_id, callback) = yield self.validate_login(user_id, authdict)
-        defer.returnValue(canonical_id)
+        return canonical_id
 
     @defer.inlineCallbacks
     def _check_recaptcha(self, authdict, clientip, **kwargs):
@@ -433,7 +433,7 @@ class AuthHandler(BaseHandler):
                 resp_body.get("hostname"),
             )
             if resp_body["success"]:
-                defer.returnValue(True)
+                return True
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
     def _check_email_identity(self, authdict, **kwargs):
@@ -502,7 +502,7 @@ class AuthHandler(BaseHandler):
 
         threepid["threepid_creds"] = authdict["threepid_creds"]
 
-        defer.returnValue(threepid)
+        return threepid
 
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}
@@ -606,7 +606,7 @@ class AuthHandler(BaseHandler):
                 yield self.store.delete_access_token(access_token)
                 raise StoreError(400, "Login raced against device deletion")
 
-        defer.returnValue(access_token)
+        return access_token
 
     @defer.inlineCallbacks
     def check_user_exists(self, user_id):
@@ -629,8 +629,8 @@ class AuthHandler(BaseHandler):
         self.ratelimit_login_per_account(user_id)
         res = yield self._find_user_id_and_pwd_hash(user_id)
         if res is not None:
-            defer.returnValue(res[0])
-        defer.returnValue(None)
+            return res[0]
+        return None
 
     @defer.inlineCallbacks
     def _find_user_id_and_pwd_hash(self, user_id):
@@ -661,7 +661,7 @@ class AuthHandler(BaseHandler):
                 user_id,
                 user_infos.keys(),
             )
-        defer.returnValue(result)
+        return result
 
     def get_supported_login_types(self):
         """Get a the login types supported for the /login API
@@ -722,7 +722,7 @@ class AuthHandler(BaseHandler):
                 known_login_type = True
                 is_valid = yield provider.check_password(qualified_user_id, password)
                 if is_valid:
-                    defer.returnValue((qualified_user_id, None))
+                    return (qualified_user_id, None)
 
             if not hasattr(provider, "get_supported_login_types") or not hasattr(
                 provider, "check_auth"
@@ -756,7 +756,7 @@ class AuthHandler(BaseHandler):
             if result:
                 if isinstance(result, str):
                     result = (result, None)
-                defer.returnValue(result)
+                return result
 
         if login_type == LoginType.PASSWORD and self.hs.config.password_localdb_enabled:
             known_login_type = True
@@ -766,7 +766,7 @@ class AuthHandler(BaseHandler):
             )
 
             if canonical_user_id:
-                defer.returnValue((canonical_user_id, None))
+                return (canonical_user_id, None)
 
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
@@ -814,9 +814,9 @@ class AuthHandler(BaseHandler):
                     if isinstance(result, str):
                         # If it's a str, set callback function to None
                         result = (result, None)
-                    defer.returnValue(result)
+                    return result
 
-        defer.returnValue((None, None))
+        return (None, None)
 
     @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):
@@ -838,7 +838,7 @@ class AuthHandler(BaseHandler):
         """
         lookupres = yield self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
-            defer.returnValue(None)
+            return None
         (user_id, password_hash) = lookupres
 
         # If the password hash is None, the account has likely been deactivated
@@ -850,8 +850,8 @@ class AuthHandler(BaseHandler):
         result = yield self.validate_hash(password, password_hash)
         if not result:
             logger.warn("Failed password login for user %s", user_id)
-            defer.returnValue(None)
-        defer.returnValue(user_id)
+            return None
+        return user_id
 
     @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
@@ -865,7 +865,7 @@ class AuthHandler(BaseHandler):
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
         self.ratelimit_login_per_account(user_id)
         yield self.auth.check_auth_blocking(user_id)
-        defer.returnValue(user_id)
+        return user_id
 
     @defer.inlineCallbacks
     def delete_access_token(self, access_token):
@@ -976,7 +976,7 @@ class AuthHandler(BaseHandler):
         )
 
         yield self.store.user_delete_threepid(user_id, medium, address)
-        defer.returnValue(result)
+        return result
 
     def _save_session(self, session):
         # TODO: Persistent storage

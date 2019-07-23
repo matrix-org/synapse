@@ -128,7 +128,7 @@ class Auth(object):
             )
 
         self._check_joined_room(member, user_id, room_id)
-        defer.returnValue(member)
+        return member
 
     @defer.inlineCallbacks
     def check_user_was_in_room(self, room_id, user_id):
@@ -156,13 +156,13 @@ class Auth(object):
             if forgot:
                 raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
 
-        defer.returnValue(member)
+        return member
 
     @defer.inlineCallbacks
     def check_host_in_room(self, room_id, host):
         with Measure(self.clock, "check_host_in_room"):
             latest_event_ids = yield self.store.is_host_joined(room_id, host)
-            defer.returnValue(latest_event_ids)
+            return latest_event_ids
 
     def _check_joined_room(self, member, user_id, room_id):
         if not member or member.membership != Membership.JOIN:
@@ -219,9 +219,7 @@ class Auth(object):
                         device_id="dummy-device",  # stubbed
                     )
 
-                defer.returnValue(
-                    synapse.types.create_requester(user_id, app_service=app_service)
-                )
+                return synapse.types.create_requester(user_id, app_service=app_service)
 
             user_info = yield self.get_user_by_access_token(access_token, rights)
             user = user_info["user"]
@@ -262,10 +260,8 @@ class Auth(object):
 
             request.authenticated_entity = user.to_string()
 
-            defer.returnValue(
-                synapse.types.create_requester(
-                    user, token_id, is_guest, device_id, app_service=app_service
-                )
+            return synapse.types.create_requester(
+                user, token_id, is_guest, device_id, app_service=app_service
             )
         except KeyError:
             raise MissingClientTokenError()
@@ -276,25 +272,25 @@ class Auth(object):
             self.get_access_token_from_request(request)
         )
         if app_service is None:
-            defer.returnValue((None, None))
+            return (None, None)
 
         if app_service.ip_range_whitelist:
             ip_address = IPAddress(self.hs.get_ip_from_request(request))
             if ip_address not in app_service.ip_range_whitelist:
-                defer.returnValue((None, None))
+                return (None, None)
 
         if b"user_id" not in request.args:
-            defer.returnValue((app_service.sender, app_service))
+            return (app_service.sender, app_service)
 
         user_id = request.args[b"user_id"][0].decode("utf8")
         if app_service.sender == user_id:
-            defer.returnValue((app_service.sender, app_service))
+            return (app_service.sender, app_service)
 
         if not app_service.is_interested_in_user(user_id):
             raise AuthError(403, "Application service cannot masquerade as this user.")
         if not (yield self.store.get_user_by_id(user_id)):
             raise AuthError(403, "Application service has not registered this user")
-        defer.returnValue((user_id, app_service))
+        return (user_id, app_service)
 
     @defer.inlineCallbacks
     def get_user_by_access_token(self, token, rights="access"):
@@ -330,7 +326,7 @@ class Auth(object):
                         msg="Access token has expired", soft_logout=True
                     )
 
-                defer.returnValue(r)
+                return r
 
         # otherwise it needs to be a valid macaroon
         try:
@@ -378,7 +374,7 @@ class Auth(object):
                 }
             else:
                 raise RuntimeError("Unknown rights setting %s", rights)
-            defer.returnValue(ret)
+            return ret
         except (
             _InvalidMacaroonException,
             pymacaroons.exceptions.MacaroonException,
@@ -506,7 +502,7 @@ class Auth(object):
     def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
-            defer.returnValue(None)
+            return None
 
         # we use ret.get() below because *lots* of unit tests stub out
         # get_user_by_access_token in a way where it only returns a couple of
@@ -518,7 +514,7 @@ class Auth(object):
             "device_id": ret.get("device_id"),
             "valid_until_ms": ret.get("valid_until_ms"),
         }
-        defer.returnValue(user_info)
+        return user_info
 
     def get_appservice_by_req(self, request):
         token = self.get_access_token_from_request(request)
@@ -543,7 +539,7 @@ class Auth(object):
     @defer.inlineCallbacks
     def compute_auth_events(self, event, current_state_ids, for_verification=False):
         if event.type == EventTypes.Create:
-            defer.returnValue([])
+            return []
 
         auth_ids = []
 
@@ -604,7 +600,7 @@ class Auth(object):
             if member_event.content["membership"] == Membership.JOIN:
                 auth_ids.append(member_event.event_id)
 
-        defer.returnValue(auth_ids)
+        return auth_ids
 
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id, user):
@@ -618,7 +614,7 @@ class Auth(object):
 
         is_admin = yield self.is_server_admin(user)
         if is_admin:
-            defer.returnValue(True)
+            return True
 
         user_id = user.to_string()
         yield self.check_joined_room(room_id, user_id)
@@ -712,7 +708,7 @@ class Auth(object):
             #  * The user is a guest user, and has joined the room
             # else it will throw.
             member_event = yield self.check_user_was_in_room(room_id, user_id)
-            defer.returnValue((member_event.membership, member_event.event_id))
+            return (member_event.membership, member_event.event_id)
         except AuthError:
             visibility = yield self.state.get_current_state(
                 room_id, EventTypes.RoomHistoryVisibility, ""
@@ -721,7 +717,7 @@ class Auth(object):
                 visibility
                 and visibility.content["history_visibility"] == "world_readable"
             ):
-                defer.returnValue((Membership.JOIN, None))
+                return (Membership.JOIN, None)
                 return
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN

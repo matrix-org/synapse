@@ -49,7 +49,7 @@ class Clock(object):
         with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
             res = yield d
-        defer.returnValue(res)
+        return res
 
     def time(self):
         """Returns the current system time in seconds since epoch."""
