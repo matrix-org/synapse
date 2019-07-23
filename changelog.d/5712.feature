@@ -1,2 +1,0 @@
-Add support for opentracing.
-

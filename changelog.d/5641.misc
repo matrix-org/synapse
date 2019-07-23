@@ -1,1 +1,0 @@
-Remove access-token support from RegistrationHandler.register, and rename it.
