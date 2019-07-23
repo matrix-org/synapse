@@ -258,6 +258,22 @@ class JsonResource(HttpServer, resource.Resource):
         self.hs = hs
 
     def register_paths(self, method, path_patterns, callback, servlet_classname):
+        """
+        Registers a request handler against a regular expression. Later request URLs are
+        checked against these regular expressions in order to identify an appropriate
+        handler for that request.
+
+        Args:
+            method (str): GET, POST etc
+
+            path_patterns (Iterable[str]): A list of regular expressions to which
+                the request URLs are compared.
+
+            callback (function): The handler for the request. Usually a Servlet
+
+            servlet_classname (str): The name of the handler to be used in prometheus
+                and opentracing logs.
+        """
         method = method.encode("utf-8")  # method is bytes on py3
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
@@ -310,7 +326,8 @@ class JsonResource(HttpServer, resource.Resource):
             request (twisted.web.http.Request):
 
         Returns:
-            Tuple[Callable, dict[unicode, unicode]]: callback method, and the
+            Tuple[Callable, str, dict[unicode, unicode]]: callback method, the
+                prefferred name to use for that method in prometheus and the
                 dict mapping keys to path components as specified in the
                 handler's path match regexp.
 
