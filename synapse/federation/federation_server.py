@@ -148,7 +148,6 @@ class FederationServer(FederationBase):
                 transaction.transaction_id,
             )
             return response
-            return
 
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
