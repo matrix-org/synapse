@@ -1,3 +1,29 @@
+Create Account
+==============
+
+This API allows an administrator to create a new user account.
+
+This api is::
+
+    POST /_synapse/admin/v1/users
+
+with a body of:
+
+.. code:: json
+
+    {
+        "username": "user_id",
+        "password": "user_password",
+        "displayname": "User",
+        "admin": false
+    }
+
+including an ``access_token`` of a server admin.
+
+The parameter ``displayname`` is optional and defaults to ``username``.
+The parameter ``admin`` is optional and defaults to 'false'.
+
+
 List Accounts
 =============
 

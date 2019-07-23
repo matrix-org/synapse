@@ -561,3 +561,81 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         return channel.json_body["groups"]
+
+
+class UserCreateTestCase(unittest.HomeserverTestCase):
+
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
+
+    def make_homeserver(self, reactor, clock):
+
+        self.url = "/_matrix/client/v1/admin/users"
+
+        self.registration_handler = Mock()
+        self.identity_handler = Mock()
+        self.login_handler = Mock()
+        self.device_handler = Mock()
+        self.device_handler.check_device_registered = Mock(return_value="FAKE")
+
+        self.datastore = Mock(return_value=Mock())
+        self.datastore.get_current_state_deltas = Mock(return_value=[])
+
+        self.secrets = Mock()
+
+        self.hs = self.setup_test_homeserver()
+
+        self.hs.get_media_repository = Mock()
+        self.hs.get_deactivate_account_handler = Mock()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_token = self.login("user", "pass")
+
+        return self.hs
+
+    def test_requester_is_no_admin(self):
+        """
+        If the user is not a server admin, an error is returned.
+        """
+        self.hs.config.registration_shared_secret = None
+
+        request, channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.other_user_tok,
+            content=b"{}",
+        )
+        self.render(request)
+
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            "You are not a server admin",
+            channel.json_body["error"]
+        )
+
+    def test_requester_is_admin(self):
+        """
+        If the user is a server admin, a new user is created.
+        """
+        self.hs.config.registration_shared_secret = None
+
+        body = json.dumps(
+            {
+                "username": "bob",
+                "password": "abc123",
+                "admin": False,
+            }
+        )
+
+        request, channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding='utf_8'),
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["user_id"])

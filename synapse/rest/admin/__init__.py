@@ -54,6 +54,29 @@ logger = logging.getLogger(__name__)
 class UsersRestServlet(RestServlet):
     PATTERNS = historical_admin_path_patterns("/users")
 
+    """Get request to list all local users.
+    This needs user to have administrator access in Synapse.
+
+    GET /_synapse/admin/v1/users
+
+    returns:
+        200 OK with list of users if success otherwise an error.
+
+
+    Post request to allow an administrator to add a user.
+    This needs user to have administrator access in Synapse.
+
+    POST /_synapse/admin/v1/users
+    {
+        "username": "user",
+        "password": "secret",
+        "displayname": "User"
+    }
+
+    returns:
+        200 OK with empty object if success otherwise an error.
+    """
+
     def __init__(self, hs):
         self.hs = hs
         self.auth = hs.get_auth()
@@ -69,6 +92,57 @@ class UsersRestServlet(RestServlet):
 
         ret = yield self.handlers.admin_handler.get_users()
         return (200, ret)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        yield assert_requester_is_admin(self.auth, request)
+
+        body = parse_json_object_from_request(request)
+
+        if "username" not in body:
+            raise SynapseError(
+                400, "username must be specified", errcode=Codes.BAD_JSON
+            )
+        else:
+            if (
+                not isinstance(body["username"], text_type)
+                or len(body["username"]) > 512
+            ):
+                raise SynapseError(400, "Invalid username")
+
+        if "password" not in body:
+            raise SynapseError(
+                400, "password must be specified", errcode=Codes.BAD_JSON
+            )
+        else:
+            if (
+                not isinstance(body["password"], text_type)
+                or len(body["password"]) > 512
+            ):
+                raise SynapseError(400, "Invalid password")
+
+        admin = body.get("admin", None)
+        user_type = body.get("user_type", None)
+        displayname = body.get("displayname", body["username"])
+
+        if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
+            raise SynapseError(400, "Invalid user type")
+
+        # Reuse the parts of RegisterRestServlet to reduce code duplication
+        from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+
+        register = RegisterRestServlet(self.hs)
+
+        user_id = yield register.registration_handler.register_user(
+            localpart=body["username"].lower(),
+            password=body["password"],
+            admin=bool(admin),
+            default_display_name=displayname,
+            user_type=user_type,
+        )
+
+        result = yield register._create_registration_details(user_id, body)
+        return (200, result)
 
 
 class VersionServlet(RestServlet):
