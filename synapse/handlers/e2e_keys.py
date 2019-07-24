@@ -139,27 +139,31 @@ class E2eKeysHandler(object):
             # remaining users
             user_ids_updated = []
             for (user_id, device_list) in destination_query.items():
-                if user_id not in user_ids_updated:
-                    try:
-                        if not device_list:
-                            room_ids = yield self.store.get_rooms_for_user(user_id)
-                            if room_ids:
-                                # We've decided we're sharing a room with this user and should
-                                # probably be tracking their device lists. However, we haven't
-                                # done an initial sync on the device list so we do it now.
-                                user_devices = yield self.device_handler.device_list_updater.user_device_resync(
-                                    user_id
-                                )
-                                user_devices = user_devices["devices"]
-                                for device in user_devices:
-                                    results[user_id] = {
-                                        device["device_id"]: device["keys"]
-                                    }
-                                user_ids_updated.append(user_id)
-                    except Exception as e:
-                        failures[destination] = failures.get(destination, []).append(
-                            _exception_to_failure(e)
-                        )
+                if user_id in user_ids_updated:
+                    continue
+
+                if device_list:
+                    continue
+
+                room_ids = yield self.store.get_rooms_for_user(user_id)
+                if not room_ids:
+                    continue
+
+                # We've decided we're sharing a room with this user and should
+                # probably be tracking their device lists. However, we haven't
+                # done an initial sync on the device list so we do it now.
+                try:
+                    user_devices = yield self.device_handler.device_list_updater.user_device_resync(
+                        user_id
+                    )
+                    user_devices = user_devices["devices"]
+                    for device in user_devices:
+                        results[user_id] = {device["device_id"]: device["keys"]}
+                    user_ids_updated.append(user_id)
+                except Exception as e:
+                    failures[destination] = failures.get(destination, []).append(
+                        _exception_to_failure(e)
+                    )
 
             if len(destination_query) == len(user_ids_updated):
                 # We've updated all the users in the query and we do not need to
