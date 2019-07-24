@@ -1,3 +1,1 @@
-The decorated servlets were producing cryptic names in prometheus after the
-basic opentracing support was introduced in #5544. This restores the classname
-of the servlet as the name used in prometheus.
+Fix a regression introduced in v1.2.0rc1 which led to incorrect labels on some prometheus metrics.
