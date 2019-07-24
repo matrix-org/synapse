@@ -2610,7 +2610,7 @@ class FederationHandler(BaseHandler):
                 room_version, event_dict, event, context
             )
 
-            EventValidator().validate_new(event)
+            EventValidator().validate_new(event, self.config)
 
             # We need to tell the transaction queue to send this out, even
             # though the sender isn't a local user.
@@ -2715,7 +2715,7 @@ class FederationHandler(BaseHandler):
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder=builder,
         )
-        EventValidator().validate_new(event)
+        EventValidator().validate_new(event, self.config)
         defer.returnValue((event, context))
 
     @defer.inlineCallbacks

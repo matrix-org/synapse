@@ -372,7 +372,7 @@ class EventCreationHandler(object):
                     "You must be in the room to create an alias for it",
                 )
 
-        self.validator.validate_new(event)
+        self.validator.validate_new(event, self.config)
 
         defer.returnValue((event, context))
 
@@ -604,7 +604,7 @@ class EventCreationHandler(object):
         if requester:
             context.app_service = requester.app_service
 
-        self.validator.validate_new(event)
+        self.validator.validate_new(event, self.config)
 
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
