@@ -335,7 +335,7 @@ class JsonResource(HttpServer, resource.Resource):
                 None, or a tuple of (http code, response body).
         """
         if request.method == b"OPTIONS":
-            return _options_handler, {}
+            return _options_handler, "options_request_handler", {}
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
