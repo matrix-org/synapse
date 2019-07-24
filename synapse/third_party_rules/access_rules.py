@@ -17,7 +17,7 @@ import email.utils
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.api.errors import SynapseError
 from synapse.config._base import ConfigError
 from synapse.types import get_domain_from_id
@@ -94,35 +94,52 @@ class RoomAccessRules(object):
         default rule to the initial state.
         """
         is_direct = config.get("is_direct")
-        rule = None
+        preset = config.get("preset")
+        access_rule = None
+        join_rule = None
 
         # If there's a rules event in the initial state, check if it complies with the
         # spec for im.vector.room.access_rules and deny the request if not.
         for event in config.get("initial_state", []):
             if event["type"] == ACCESS_RULES_TYPE:
-                rule = event["content"].get("rule")
+                access_rule = event["content"].get("rule")
 
                 # Make sure the event has a valid content.
-                if rule is None:
+                if access_rule is None:
                     raise SynapseError(400, "Invalid access rule")
 
                 # Make sure the rule name is valid.
-                if rule not in VALID_ACCESS_RULES:
+                if access_rule not in VALID_ACCESS_RULES:
                     raise SynapseError(400, "Invalid access rule")
 
                 # Make sure the rule is "direct" if the room is a direct chat.
                 if (
-                    (is_direct and rule != ACCESS_RULE_DIRECT)
-                    or (rule == ACCESS_RULE_DIRECT and not is_direct)
+                    (is_direct and access_rule != ACCESS_RULE_DIRECT)
+                    or (access_rule == ACCESS_RULE_DIRECT and not is_direct)
                 ):
                     raise SynapseError(400, "Invalid access rule")
 
+            if event["type"] == EventTypes.JoinRules:
+                join_rule = event["content"].get("join_rule")
+
+        if join_rule == JoinRules.PUBLIC and access_rule != ACCESS_RULE_RESTRICTED:
+            raise SynapseError(400, "Invalid access rule")
+
+        if (
+            preset == RoomCreationPreset.PUBLIC_CHAT
+            and access_rule != ACCESS_RULE_RESTRICTED
+        ):
+            raise SynapseError(400, "Invalid access rule")
+
         # If there's no rules event in the initial state, create one with the default
         # setting.
-        if not rule:
+        if not access_rule:
             if is_direct:
                 default_rule = ACCESS_RULE_DIRECT
             else:
+                # If the default value for non-direct chat changes, we should make another
+                # case here for rooms created with either a "public" join_rule or the
+                # "public_chat" preset to make sure those keep defaulting to "restricted"
                 default_rule = ACCESS_RULE_RESTRICTED
 
             if not config.get("initial_state"):
@@ -136,11 +153,11 @@ class RoomAccessRules(object):
                 }
             })
 
-            rule = default_rule
+            access_rule = default_rule
 
         # Check if the creator can override values for the power levels.
         allowed = self._is_power_level_content_allowed(
-            config.get("power_level_content_override", {}), rule,
+            config.get("power_level_content_override", {}), access_rule,
         )
         if not allowed:
             raise SynapseError(400, "Invalid power levels content override")
@@ -148,7 +165,9 @@ class RoomAccessRules(object):
         # Second loop for events we need to know the current rule to process.
         for event in config.get("initial_state", []):
             if event["type"] == EventTypes.PowerLevels:
-                allowed = self._is_power_level_content_allowed(event["content"], rule)
+                allowed = self._is_power_level_content_allowed(
+                    event["content"], access_rule
+                )
                 if not allowed:
                     raise SynapseError(400, "Invalid power levels content")
 
