@@ -757,7 +757,7 @@ class MediaRepositoryResource(Resource):
         # raise an exception if it is tried to be used.
         if (
             not hs.config.enable_media_repo
-            and not config.worker_app == "synapse.app.media_repository"
+            and not hs.config.worker_app == "synapse.app.media_repository"
         ):
             raise Exception("This Synapse is not configured for media repo use.")
 
