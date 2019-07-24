@@ -296,8 +296,6 @@ class JsonResource(HttpServer, resource.Resource):
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
 
         # Make sure we have a name for this handler in prometheus.
-        if servlet_classname is None:
-            servlet_classname = "%r" % callback
         request.request_metrics.name = servlet_classname
 
         # Now trigger the callback. If it returns a response, we send it
