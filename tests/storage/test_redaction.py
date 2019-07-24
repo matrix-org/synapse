@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,23 +17,21 @@
 
 from mock import Mock
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomID, UserID
 
 from tests import unittest
-from tests.utils import create_room, setup_test_homeserver
+from tests.utils import create_room
 
 
-class RedactionTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield setup_test_homeserver(
-            self.addCleanup, resource_for_federation=Mock(), http_client=None
+class RedactionTestCase(unittest.HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+        return self.setup_test_homeserver(
+            resource_for_federation=Mock(), http_client=None
         )
 
+    def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
         self.event_builder_factory = hs.get_event_builder_factory()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -42,11 +41,12 @@ class RedactionTestCase(unittest.TestCase):
 
         self.room1 = RoomID.from_string("!abc123:test")
 
-        yield create_room(hs, self.room1.to_string(), self.u_alice.to_string())
+        self.get_success(
+            create_room(hs, self.room1.to_string(), self.u_alice.to_string())
+        )
 
         self.depth = 1
 
-    @defer.inlineCallbacks
     def inject_room_member(
         self, room, user, membership, replaces_state=None, extra_content={}
     ):
@@ -63,15 +63,14 @@ class RedactionTestCase(unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = self.get_success(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield self.store.persist_event(event, context)
+        self.get_success(self.store.persist_event(event, context))
 
         return event
 
-    @defer.inlineCallbacks
     def inject_message(self, room, user, body):
         self.depth += 1
 
@@ -86,15 +85,14 @@ class RedactionTestCase(unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = self.get_success(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield self.store.persist_event(event, context)
+        self.get_success(self.store.persist_event(event, context))
 
         return event
 
-    @defer.inlineCallbacks
     def inject_redaction(self, room, event_id, user, reason):
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
@@ -108,20 +106,21 @@ class RedactionTestCase(unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = self.get_success(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield self.store.persist_event(event, context)
+        self.get_success(self.store.persist_event(event, context))
 
-    @defer.inlineCallbacks
     def test_redact(self):
-        yield self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
+        self.get_success(
+            self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
+        )
 
-        msg_event = yield self.inject_message(self.room1, self.u_alice, "t")
+        msg_event = self.get_success(self.inject_message(self.room1, self.u_alice, "t"))
 
         # Check event has not been redacted:
-        event = yield self.store.get_event(msg_event.event_id)
+        event = self.get_success(self.store.get_event(msg_event.event_id))
 
         self.assertObjectHasAttributes(
             {
@@ -136,11 +135,11 @@ class RedactionTestCase(unittest.TestCase):
 
         # Redact event
         reason = "Because I said so"
-        yield self.inject_redaction(
-            self.room1, msg_event.event_id, self.u_alice, reason
+        self.get_success(
+            self.inject_redaction(self.room1, msg_event.event_id, self.u_alice, reason)
         )
 
-        event = yield self.store.get_event(msg_event.event_id)
+        event = self.get_success(self.store.get_event(msg_event.event_id))
 
         self.assertEqual(msg_event.event_id, event.event_id)
 
@@ -164,15 +163,18 @@ class RedactionTestCase(unittest.TestCase):
             event.unsigned["redacted_because"],
         )
 
-    @defer.inlineCallbacks
     def test_redact_join(self):
-        yield self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
-
-        msg_event = yield self.inject_room_member(
-            self.room1, self.u_bob, Membership.JOIN, extra_content={"blue": "red"}
+        self.get_success(
+            self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
         )
 
-        event = yield self.store.get_event(msg_event.event_id)
+        msg_event = self.get_success(
+            self.inject_room_member(
+                self.room1, self.u_bob, Membership.JOIN, extra_content={"blue": "red"}
+            )
+        )
+
+        event = self.get_success(self.store.get_event(msg_event.event_id))
 
         self.assertObjectHasAttributes(
             {
@@ -187,13 +189,13 @@ class RedactionTestCase(unittest.TestCase):
 
         # Redact event
         reason = "Because I said so"
-        yield self.inject_redaction(
-            self.room1, msg_event.event_id, self.u_alice, reason
+        self.get_success(
+            self.inject_redaction(self.room1, msg_event.event_id, self.u_alice, reason)
         )
 
         # Check redaction
 
-        event = yield self.store.get_event(msg_event.event_id)
+        event = self.get_success(self.store.get_event(msg_event.event_id))
 
         self.assertTrue("redacted_because" in event.unsigned)
 
