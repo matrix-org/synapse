@@ -1,3 +1,12 @@
+Synapse 1.2.0rc2 (2019-07-24)
+=============================
+
+Bugfixes
+--------
+
+- Fix a regression introduced in v1.2.0rc1 which led to incorrect labels on some prometheus metrics. ([\#5734](https://github.com/matrix-org/synapse/issues/5734))
+
+
 Synapse 1.2.0rc1 (2019-07-22)
 =============================
 
