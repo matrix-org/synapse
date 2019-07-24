@@ -1,0 +1,1 @@
+Stop trying to fetch events with event_id=None.
