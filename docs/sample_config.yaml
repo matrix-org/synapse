@@ -548,6 +548,14 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 
 
 
+##
+## Media Store
+##
+
+# Enable the media store service inside Synapse.
+#
+enable_media_store: True
+
 # Directory where uploaded images and attachments are stored.
 #
 media_store_path: "DATADIR/media_store"
