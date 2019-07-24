@@ -484,15 +484,13 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         )
 
     def create_room(
-        self, direct=False, rule=None, preset=None, initial_state=None,
-        expected_code=200,
+        self, direct=False, rule=None, preset=RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
+        initial_state=None, expected_code=200,
     ):
         content = {
             "is_direct": direct,
+            "preset": preset,
         }
-
-        if preset:
-            content["preset"] = preset
 
         if rule:
             content["initial_state"] = [{
