@@ -193,7 +193,13 @@ class RoomWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_largest_public_rooms(
-        self, network_tuple, search_filter, limit, pagination_token, forwards
+        self,
+        network_tuple,
+        search_filter,
+        limit,
+        pagination_token,
+        forwards,
+        fetch_creation_event_ids=False,
     ):
         """TODO doc this
 
@@ -204,6 +210,8 @@ class RoomWorkerStore(SQLBaseStore):
             pagination_token (str|None): if present, a room ID which is to be
                 the (first/last) included in the results.
             forwards (bool): true iff going forwards, going backwards otherwise
+            fetch_creation_event_ids (bool): if true, room creation_event_ids will
+                be included in the results.
 
         Returns:
             Rooms in order: biggest number of joined users first.
@@ -217,6 +225,14 @@ class RoomWorkerStore(SQLBaseStore):
             SELECT
                 room_id, name, topic, canonical_alias, joined_members,
                 avatar, history_visibility, joined_members
+        """
+
+        if fetch_creation_event_ids:
+            sql += """
+                , cse_create.event_id AS creation_event_id
+            """
+
+        sql += """
             FROM
                 room_stats
                 JOIN room_state USING (room_id)
@@ -229,6 +245,11 @@ class RoomWorkerStore(SQLBaseStore):
                 LEFT JOIN appservice_room_list arl USING (room_id)
             """
 
+        if fetch_creation_event_ids:
+            sql += """
+                LEFT JOIN current_state_events cse_create USING (room_id)
+            """
+
         sql += """
             WHERE
                 is_public
@@ -237,6 +258,12 @@ class RoomWorkerStore(SQLBaseStore):
                     OR history_visibility = 'world_readable'
                 )
         """
+
+        if fetch_creation_event_ids:
+            sql += """
+                AND cse_create.type = 'm.room.create'
+                AND cse_create.state_key = ''
+            """
 
         if pagination_token:
             pt_joined = yield self._simple_select_one_onecol(

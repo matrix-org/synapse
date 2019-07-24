@@ -22,7 +22,6 @@ import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
 from twisted.internet import defer
-from twisted.internet.defer import maybeDeferred
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, HttpResponseException
@@ -149,7 +148,12 @@ class RoomListHandler(BaseHandler):
         probing_limit = limit + 1 if limit is not None else None
 
         results = yield self.store.get_largest_public_rooms(
-            network_tuple, search_filter, probing_limit, pagination_token, forwards
+            network_tuple,
+            search_filter,
+            probing_limit,
+            pagination_token,
+            forwards,
+            fetch_creation_event_ids=from_federation,
         )
 
         def build_room_entry(room):
@@ -164,13 +168,12 @@ class RoomListHandler(BaseHandler):
             }
 
             # Filter out Nones – rather omit the field altogether
-            return {
-                k: v for k, v in entry.items() if v is not None
-            }
+            return {k: v for k, v in entry.items() if v is not None}
 
-        results = [
-            build_room_entry(r) for r in results
-        ]
+        if from_federation:
+            room_creation_event_ids = [r["creation_event_id"] for r in results]
+
+        results = [build_room_entry(r) for r in results]
 
         response = {}
         num_results = len(results)
@@ -195,37 +198,19 @@ class RoomListHandler(BaseHandler):
         if from_federation:
             # only show rooms with m.federate=True or absent (default is True)
 
-            # get rooms' state
-            room_state_ids = yield defer.gatherResults(
-                [
-                    maybeDeferred(self.store.get_current_state_ids, room["room_id"])
-                    for room in results
-                ],
-                consumeErrors=True,
-            )
-
-            # get rooms' creation state events' IDs
-            room_creation_event_ids = {
-                room["room_id"]: event_ids.get((EventTypes.Create, ""))
-                for (room, event_ids) in zip(results, room_state_ids)
-            }
-
-            # get rooms' creation state events
-            creation_events_by_id = yield self.store.get_events(
-                room_creation_event_ids.values()
-            )
-
-            # associate them with the room IDs
-            room_creation_events = {
-                room_id: creation_events_by_id[event_id]
-                for (room_id, event_id) in room_creation_event_ids.items()
-            }
+            # we already have rooms' creation state events' IDs
+            # so get rooms' creation state events
+            creation_events_by_id = yield self.store.get_events(room_creation_event_ids)
 
             # now filter out rooms with m.federate: False in their create event
             results = [
                 room
-                for room in results
-                if room_creation_events[room["room_id"]].content.get("m.federate", True)
+                for (room, room_creation_event_id) in zip(
+                    results, room_creation_event_ids
+                )
+                if creation_events_by_id[room_creation_event_id].content.get(
+                    "m.federate", True
+                )
             ]
 
         for room in results:
