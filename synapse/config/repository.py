@@ -87,6 +87,11 @@ def parse_thumbnail_requirements(thumbnail_sizes):
 
 class ContentRepositoryConfig(Config):
     def read_config(self, config, **kwargs):
+        # If the media repo is disabled and this is not a worker, do not load
+        # the further configuration (which checks if files exists).
+        if self.worker_app is None and not self.enable_media_repo:
+            return
+
         self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
@@ -202,6 +207,14 @@ class ContentRepositoryConfig(Config):
 
         return (
             r"""
+        ##
+        ## Media Store
+        ##
+
+        # Enable the media store service inside Synapse.
+        #
+        enable_media_store: True
+
         # Directory where uploaded images and attachments are stored.
         #
         media_store_path: "%(media_store)s"

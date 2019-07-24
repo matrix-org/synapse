@@ -753,8 +753,15 @@ class MediaRepositoryResource(Resource):
     """
 
     def __init__(self, hs):
-        Resource.__init__(self)
+        # If this is not the media repo (which will always load this class),
+        # raise an exception if it is tried to be used.
+        if (
+            not hs.config.enable_media_repo
+            and not config.worker_app == "synapse.app.media_repository"
+        ):
+            raise Exception("This Synapse is not configured for media repo use.")
 
+        super().__init__(self)
         media_repo = hs.get_media_repository()
 
         self.putChild(b"upload", UploadResource(hs, media_repo))
