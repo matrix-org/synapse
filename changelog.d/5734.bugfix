@@ -1,0 +1,1 @@
+Fix a regression introduced in v1.2.0rc1 which led to incorrect labels on some prometheus metrics.

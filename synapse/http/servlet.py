@@ -290,11 +290,13 @@ class RestServlet(object):
 
             for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
                 if hasattr(self, "on_%s" % (method,)):
+                    servlet_classname = self.__class__.__name__
                     method_handler = getattr(self, "on_%s" % (method,))
                     http_server.register_paths(
                         method,
                         patterns,
-                        trace_servlet(self.__class__.__name__, method_handler),
+                        trace_servlet(servlet_classname, method_handler),
+                        servlet_classname,
                     )
 
         else:
