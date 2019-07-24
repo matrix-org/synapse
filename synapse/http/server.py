@@ -328,7 +328,7 @@ class JsonResource(HttpServer, resource.Resource):
 
         Returns:
             Tuple[Callable, str, dict[unicode, unicode]]: callback method, the
-                prefferred name to use for that method in prometheus and the
+                label to use for that method in prometheus metrics, and the
                 dict mapping keys to path components as specified in the
                 handler's path match regexp.
 
