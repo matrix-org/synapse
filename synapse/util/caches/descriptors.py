@@ -22,6 +22,8 @@ from collections import namedtuple
 import six
 from six import itervalues, string_types
 
+from prometheus_client import Gauge
+
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, preserve_fn
@@ -36,6 +38,12 @@ from . import register_cache
 
 logger = logging.getLogger(__name__)
 
+
+cache_pending_metric = Gauge(
+    "synapse_util_caches_cache_pending",
+    "Number of lookups currently pending for this cache",
+    ["name"],
+)
 
 _CacheSentinel = object()
 
@@ -82,10 +90,18 @@ class Cache(object):
         self.name = name
         self.keylen = keylen
         self.thread = None
-        self.metrics = register_cache("cache", name, self.cache)
+        self.metrics = register_cache(
+            "cache",
+            name,
+            self.cache,
+            collect_callback=self._metrics_collection_callback,
+        )
 
     def _on_evicted(self, evicted_count):
         self.metrics.inc_evictions(evicted_count)
+
+    def _metrics_collection_callback(self):
+        cache_pending_metric.labels(self.name).set(len(self._pending_deferred_cache))
 
     def check_thread(self):
         expected_thread = self.thread
