@@ -72,11 +72,13 @@ class RelationSendServlet(RestServlet):
             "POST",
             client_patterns(self.PATTERN + "$", releases=()),
             self.on_PUT_or_POST,
+            self.__class__.__name__,
         )
         http_server.register_paths(
             "PUT",
             client_patterns(self.PATTERN + "/(?P<txn_id>[^/]*)$", releases=()),
             self.on_PUT,
+            self.__class__.__name__,
         )
 
     def on_PUT(self, request, *args, **kwargs):
