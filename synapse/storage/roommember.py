@@ -256,27 +256,34 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 defer.returnValue(invite)
         defer.returnValue(None)
 
+    @defer.inlineCallbacks
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user
         matches one in the membership list.
+
+        Filters out forgotten rooms.
 
         Args:
             user_id (str): The user ID.
             membership_list (list): A list of synapse.api.constants.Membership
             values which the user must be in.
+
         Returns:
-            A list of dictionary objects, with room_id, membership and sender
-            defined.
+            Deferred[list[RoomsForUser]]
         """
         if not membership_list:
             return defer.succeed(None)
 
-        return self.runInteraction(
+        rooms = yield self.runInteraction(
             "get_rooms_for_user_where_membership_is",
             self._get_rooms_for_user_where_membership_is_txn,
             user_id,
             membership_list,
         )
+
+        # Now we filter out forgotten rooms
+        forgotten_rooms = yield self.get_forgotten_rooms_for_user(user_id)
+        return [room for room in rooms if room.room_id not in forgotten_rooms]
 
     def _get_rooms_for_user_where_membership_is_txn(
         self, txn, user_id, membership_list
@@ -287,26 +294,33 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         results = []
         if membership_list:
-            where_clause = "user_id = ? AND (%s) AND forgotten = 0" % (
-                " OR ".join(["m.membership = ?" for _ in membership_list]),
-            )
+            if self._current_state_events_membership_up_to_date:
+                sql = """
+                    SELECT room_id, e.sender, c.membership, event_id, e.stream_ordering
+                    FROM current_state_events AS c
+                    INNER JOIN events AS e USING (room_id, event_id)
+                    WHERE
+                        c.type = 'm.room.member'
+                        AND state_key = ?
+                        AND c.membership IN (%s)
+                """ % (
+                    ",".join("?" * len(membership_list))
+                )
+            else:
+                sql = """
+                    SELECT room_id, e.sender, m.membership, event_id, e.stream_ordering
+                    FROM current_state_events AS c
+                    INNER JOIN room_memberships AS m USING (room_id, event_id)
+                    INNER JOIN events AS e USING (room_id, event_id)
+                    WHERE
+                        c.type = 'm.room.member'
+                        AND state_key = ?
+                        AND m.membership IN (%s)
+                """ % (
+                    ",".join("?" * len(membership_list))
+                )
 
-            args = [user_id]
-            args.extend(membership_list)
-
-            sql = (
-                "SELECT m.room_id, m.sender, m.membership, m.event_id, e.stream_ordering"
-                " FROM current_state_events as c"
-                " INNER JOIN room_memberships as m"
-                " ON m.event_id = c.event_id"
-                " INNER JOIN events as e"
-                " ON e.event_id = c.event_id"
-                " AND m.room_id = c.room_id"
-                " AND m.user_id = c.state_key"
-                " WHERE c.type = 'm.room.member' AND %s"
-            ) % (where_clause,)
-
-            txn.execute(sql, args)
+            txn.execute(sql, (user_id, *membership_list))
             results = [RoomsForUser(**r) for r in self.cursor_to_dict(txn)]
 
         if do_invite:
