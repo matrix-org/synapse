@@ -572,9 +572,9 @@ class DeviceListUpdater(object):
         """Fetches all devices for a user and updates the device cache with them.
 
         Args:
-            user_id (String): The user's id whose device_list will be updated.
+            user_id (str): The user's id whose device_list will be updated.
         Returns:
-            a dict with device info as under the "devices" in the result of this
+            Deferred[dict]: a dict with device info as under the "devices" in the result of this
             request:
             https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
         """
