@@ -151,17 +151,24 @@ class RoomListHandler(BaseHandler):
             network_tuple, search_filter, probing_limit, pagination_token, forwards
         )
 
-        results = [
-            {
-                "room_id": r["room_id"],
-                "name": r["name"],
-                "topic": r["topic"],
-                "canonical_alias": r["canonical_alias"],
-                "num_joined_members": r["joined_members"],
-                "avatar_url": r["avatar"],
-                "world_readable": r["history_visibility"] == "world_readable",
+        def build_room_entry(room):
+            entry = {
+                "room_id": room["room_id"],
+                "name": room["name"],
+                "topic": room["topic"],
+                "canonical_alias": room["canonical_alias"],
+                "num_joined_members": room["joined_members"],
+                "avatar_url": room["avatar"],
+                "world_readable": room["history_visibility"] == "world_readable",
             }
-            for r in results
+
+            # Filter out Nones – rather omit the field altogether
+            return {
+                k: v for k, v in entry.items() if v is not None
+            }
+
+        results = [
+            build_room_entry(r) for r in results
         ]
 
         response = {}
@@ -224,7 +231,10 @@ class RoomListHandler(BaseHandler):
             # populate search result entries with additional fields, namely
             # 'aliases' and 'guest_can_join'
             room_id = room["room_id"]
-            room["aliases"] = yield self.store.get_aliases_for_room(room_id)
+
+            aliases = yield self.store.get_aliases_for_room(room_id)
+            if aliases:
+                room["aliases"] = aliases
 
             state_ids = yield self.store.get_current_state_ids(room_id)
             guests_can_join = False
