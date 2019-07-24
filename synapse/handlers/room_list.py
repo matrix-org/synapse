@@ -25,6 +25,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, HttpResponseException
+from synapse.api.errors import SynapseError
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.caches.response_cache import ResponseCache
@@ -135,12 +136,12 @@ class RoomListHandler(BaseHandler):
                 timing out. TODO
         """
         pagination_token = None
-        if since_token and since_token != "END":  # todo ought we support END and START?
+        if since_token and since_token != "END":
             if since_token[0] in ("+", "-"):
                 forwards = since_token[0] == "+"
                 pagination_token = since_token[1:]
             else:
-                raise SyntaxError("shrug ")  # TODO
+                raise SynapseError(400, "Invalid since token.")
         else:
             forwards = True
 
