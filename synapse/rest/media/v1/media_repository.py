@@ -761,7 +761,7 @@ class MediaRepositoryResource(Resource):
         ):
             raise Exception("This Synapse is not configured for media repo use.")
 
-        super().__init__(self)
+        super().__init__()
         media_repo = hs.get_media_repository()
 
         self.putChild(b"upload", UploadResource(hs, media_repo))
