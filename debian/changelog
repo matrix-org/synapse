@@ -1,5 +1,8 @@
 matrix-synapse-py3 (1.2.0) stable; urgency=medium
 
+  [ Andrew Morgan ]
+  * Add libsqlite3-dev and libdistro-info-perl packages to required build dependencies.
+
   [ Amber Brown ]
   * Update logging config defaults to match API changes in Synapse.
 
@@ -7,7 +10,7 @@ matrix-synapse-py3 (1.2.0) stable; urgency=medium
   * Add Recommends and Depends for some libraries which you probably want.
 
   [ Synapse Packaging team ]
-  * New synapse release 1.2.0. 
+  * New synapse release 1.2.0.
 
  -- Synapse Packaging team <packages@matrix.org>  Thu, 25 Jul 2019 14:10:07 +0100
 
