@@ -128,12 +128,11 @@ class RoomAccessRules(object):
             # rule, the access rule must be "restricted"). We don't need to check that if
             # there's no access rule provided, as in this case the access rule will
             # default to "restricted", with which any join rule is allowed.
-            if join_rule == JoinRules.PUBLIC and access_rule != ACCESS_RULE_RESTRICTED:
-                raise SynapseError(400, "Invalid access rule")
-
             if (
-                preset == RoomCreationPreset.PUBLIC_CHAT
-                and access_rule != ACCESS_RULE_RESTRICTED
+                (
+                    join_rule == JoinRules.PUBLIC
+                    or preset == RoomCreationPreset.PUBLIC_CHAT
+                ) and access_rule != ACCESS_RULE_RESTRICTED
             ):
                 raise SynapseError(400, "Invalid access rule")
         else:
