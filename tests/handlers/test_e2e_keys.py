@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -145,3 +147,64 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                 "one_time_keys": {local_user: {device_id: {"alg1:k1": "key1"}}},
             },
         )
+
+    @defer.inlineCallbacks
+    def test_replace_master_key(self):
+        """uploading a new signing key should make the old signing key unavailable"""
+        local_user = "@boris:" + self.hs.hostname
+        keys1 = {
+            "master_key": {
+                # private key: 2lonYOM6xYKdEsO+6KrC766xBcHnYnim1x/4LFGF8B0
+                "user_id": local_user,
+                "usage": ["master"],
+                "keys": {
+                    "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk": "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
+                },
+            }
+        }
+        yield self.handler.upload_signing_keys_for_user(local_user, keys1)
+
+        keys2 = {
+            "master_key": {
+                # private key: 4TL4AjRYwDVwD3pqQzcor+ez/euOB1/q78aTJ+czDNs
+                "user_id": local_user,
+                "usage": ["master"],
+                "keys": {
+                    "ed25519:Hq6gL+utB4ET+UvD5ci0kgAwsX6qP/zvf8v6OInU5iw": "Hq6gL+utB4ET+UvD5ci0kgAwsX6qP/zvf8v6OInU5iw"
+                },
+            }
+        }
+        yield self.handler.upload_signing_keys_for_user(local_user, keys2)
+
+        devices = yield self.handler.query_devices({"device_keys": {local_user: []}}, 0, local_user)
+        self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
+
+    @defer.inlineCallbacks
+    def test_self_signing_key_doesnt_show_up_as_device(self):
+        """signing keys should be hidden when fetching a user's devices"""
+        local_user = "@boris:" + self.hs.hostname
+        keys1 = {
+            "master_key": {
+                # private key: 2lonYOM6xYKdEsO+6KrC766xBcHnYnim1x/4LFGF8B0
+                "user_id": local_user,
+                "usage": ["master"],
+                "keys": {
+                    "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk": "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
+                },
+            }
+        }
+        yield self.handler.upload_signing_keys_for_user(local_user, keys1)
+
+        res = None
+        try:
+            yield self.hs.get_device_handler().check_device_registered(
+                user_id=local_user,
+                device_id="nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+                initial_device_display_name="new display name",
+            )
+        except errors.SynapseError as e:
+            res = e.code
+        self.assertEqual(res, 400)
+
+        res = yield self.handler.query_local_devices({local_user: None})
+        self.assertDictEqual(res, {local_user: {}})

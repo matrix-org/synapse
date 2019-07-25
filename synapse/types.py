@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +18,8 @@ import string
 from collections import namedtuple
 
 import attr
+from signedjson.key import decode_verify_key_bytes
+from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import SynapseError
 
@@ -475,3 +478,24 @@ class ReadReceipt(object):
     user_id = attr.ib()
     event_ids = attr.ib()
     data = attr.ib()
+
+
+def get_verify_key_from_cross_signing_key(key_info):
+    """Get the key ID and signedjson verify key from a cross-signing key dict
+
+    Args:
+        key_info (dict): a cross-signing key dict, which must have a "keys"
+            property that has exactly one item in it
+
+    Returns:
+        (str, VerifyKey): the key ID and verify key for the cross-signing key
+    """
+    # make sure that exactly one key is provided
+    if "keys" not in key_info:
+        raise SynapseError(400, "Invalid key")
+    keys = key_info["keys"]
+    if len(keys) != 1:
+        raise SynapseError(400, "Invalid key")
+    # and return that one key
+    for key_id, key_data in keys.items():
+        return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))

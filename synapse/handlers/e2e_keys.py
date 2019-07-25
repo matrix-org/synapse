@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,12 +20,17 @@ import logging
 from six import iteritems
 
 from canonicaljson import encode_canonical_json, json
+from signedjson.sign import SignatureVerifyException, verify_signed_json
 
 from twisted.internet import defer
 
-from synapse.api.errors import CodeMessageException, SynapseError
+from synapse.api.errors import CodeMessageException, Codes, SynapseError
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.types import UserID, get_domain_from_id
+from synapse.types import (
+    UserID,
+    get_domain_from_id,
+    get_verify_key_from_cross_signing_key,
+)
 from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
@@ -46,7 +52,7 @@ class E2eKeysHandler(object):
         )
 
     @defer.inlineCallbacks
-    def query_devices(self, query_body, timeout):
+    def query_devices(self, query_body, timeout, from_user_id):
         """ Handle a device key query from a client
 
         {
@@ -64,6 +70,11 @@ class E2eKeysHandler(object):
                 }
             }
         }
+
+        Args:
+            from_user_id (str): the user making the query.  This is used when
+                adding cross-signing signatures to limit what signatures users
+                can see.
         """
         device_keys_query = query_body.get("device_keys", {})
 
@@ -118,6 +129,11 @@ class E2eKeysHandler(object):
                 r = remote_queries_not_in_cache.setdefault(domain, {})
                 r[user_id] = remote_queries[user_id]
 
+        # Get cached cross-signing keys
+        cross_signing_keys = yield self.query_cross_signing_keys(
+            device_keys_query, from_user_id
+        )
+
         # Now fetch any devices that we don't have in our cache
         @defer.inlineCallbacks
         def do_remote_query(destination):
@@ -130,6 +146,14 @@ class E2eKeysHandler(object):
                 for user_id, keys in remote_result["device_keys"].items():
                     if user_id in destination_query:
                         results[user_id] = keys
+
+                for user_id, key in remote_result["master_keys"].items():
+                    if user_id in destination_query:
+                        cross_signing_keys["master"][user_id] = key
+
+                for user_id, key in remote_result["self_signing_keys"].items():
+                    if user_id in destination_query:
+                        cross_signing_keys["self_signing"][user_id] = key
 
             except Exception as e:
                 failures[destination] = _exception_to_failure(e)
@@ -144,7 +168,73 @@ class E2eKeysHandler(object):
             )
         )
 
-        defer.returnValue({"device_keys": results, "failures": failures})
+        ret = {"device_keys": results, "failures": failures}
+
+        for key, value in iteritems(cross_signing_keys):
+            ret[key + "_keys"] = value
+
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def query_cross_signing_keys(self, query, from_user_id):
+        """Get cross-signing keys for users
+
+        Args:
+            query (Iterable[string]) an iterable of user IDs.  A dict whose keys
+                are user IDs satisfies this, so the query format used for
+                query_devices can be used here.
+            from_user_id (str): the user making the query.  This is used when
+                adding cross-signing signatures to limit what signatures users
+                can see.
+
+        Returns:
+            defer.Deferred[dict[str, dict[str, dict]]]: map from
+                (master|self_signing|user_signing) -> user_id -> key
+        """
+        master_keys = {}
+        self_signing_keys = {}
+        user_signing_keys = {}
+
+        for user_id in query:
+            # XXX: consider changing the store functions to allow querying
+            # multiple users simultaneously.
+            try:
+                key = yield self.store.get_e2e_cross_signing_key(
+                    user_id, "master", from_user_id
+                )
+                if key:
+                    master_keys[user_id] = key
+            except Exception as e:
+                logger.info("Error getting master key: %s", e)
+
+            try:
+                key = yield self.store.get_e2e_cross_signing_key(
+                    user_id, "self_signing", from_user_id
+                )
+                if key:
+                    self_signing_keys[user_id] = key
+            except Exception as e:
+                logger.info("Error getting self-signing key: %s", e)
+
+            # users can see other users' master and self-signing keys, but can
+            # only see their own user-signing keys
+            if from_user_id == user_id:
+                try:
+                    key = yield self.store.get_e2e_cross_signing_key(
+                        user_id, "user_signing", from_user_id
+                    )
+                    if key:
+                        user_signing_keys[user_id] = key
+                except Exception as e:
+                    logger.info("Error getting user-signing key: %s", e)
+
+        defer.returnValue(
+            {
+                "master": master_keys,
+                "self_signing": self_signing_keys,
+                "user_signing": user_signing_keys,
+            }
+        )
 
     @defer.inlineCallbacks
     def query_local_devices(self, query):
@@ -341,6 +431,104 @@ class E2eKeysHandler(object):
                 )
 
         yield self.store.add_e2e_one_time_keys(user_id, device_id, time_now, new_keys)
+
+    @defer.inlineCallbacks
+    def upload_signing_keys_for_user(self, user_id, keys):
+        """Upload signing keys for cross-signing
+
+        Args:
+            user_id (string): the user uploading the keys
+            keys (dict[string, dict]): the signing keys
+        """
+
+        # if a master key is uploaded, then check it.  Otherwise, load the
+        # stored master key, to check signatures on other keys
+        if "master_key" in keys:
+            master_key = keys["master_key"]
+
+            _check_cross_signing_key(master_key, user_id, "master")
+        else:
+            master_key = yield self.store.get_e2e_cross_signing_key(user_id, "master")
+
+        # if there is no master key, then we can't do anything, because all the
+        # other cross-signing keys need to be signed by the master key
+        if not master_key:
+            raise SynapseError(400, "No master key available", Codes.MISSING_PARAM)
+
+        master_key_id, master_verify_key = get_verify_key_from_cross_signing_key(
+            master_key
+        )
+
+        # for the other cross-signing keys, make sure that they have valid
+        # signatures from the master key
+        if "self_signing_key" in keys:
+            self_signing_key = keys["self_signing_key"]
+
+            _check_cross_signing_key(
+                self_signing_key, user_id, "self_signing", master_verify_key
+            )
+
+        if "user_signing_key" in keys:
+            user_signing_key = keys["user_signing_key"]
+
+            _check_cross_signing_key(
+                user_signing_key, user_id, "user_signing", master_verify_key
+            )
+
+        # if everything checks out, then store the keys and send notifications
+        deviceids = []
+        if "master_key" in keys:
+            yield self.store.set_e2e_cross_signing_key(user_id, "master", master_key)
+            deviceids.append(master_verify_key.version)
+        if "self_signing_key" in keys:
+            yield self.store.set_e2e_cross_signing_key(
+                user_id, "self_signing", self_signing_key
+            )
+            deviceids.append(
+                get_verify_key_from_cross_signing_key(self_signing_key)[1].version
+            )
+        if "user_signing_key" in keys:
+            yield self.store.set_e2e_cross_signing_key(
+                user_id, "user_signing", user_signing_key
+            )
+            # the signature stream matches the semantics that we want for
+            # user-signing key updates: only the user themselves is notified of
+            # their own user-signing key updates
+            yield self.device_handler.notify_user_signature_update(user_id, [user_id])
+
+        # master key and self-signing key updates match the semantics of device
+        # list updates: all users who share an encrypted room are notified
+        if len(deviceids):
+            yield self.device_handler.notify_device_update(user_id, deviceids)
+
+        defer.returnValue({})
+
+
+def _check_cross_signing_key(key, user_id, key_type, signing_key=None):
+    """Check a cross-signing key uploaded by a user.  Performs some basic sanity
+    checking, and ensures that it is signed, if a signature is required.
+
+    Args:
+        key (dict): the key data to verify
+        user_id (str): the user whose key is being checked
+        key_type (str): the type of key that the key should be
+        signing_key (VerifyKey): (optional) the signing key that the key should
+            be signed with.  If omitted, signatures will not be checked.
+    """
+    if (
+        key.get("user_id") != user_id
+        or key_type not in key.get("usage", [])
+        or len(key.get("keys", {})) != 1
+    ):
+        raise SynapseError(400, ("Invalid %s key" % (key_type,)), Codes.INVALID_PARAM)
+
+    if signing_key:
+        try:
+            verify_signed_json(key, user_id, signing_key)
+        except SignatureVerifyException:
+            raise SynapseError(
+                400, ("Invalid signature on %s key" % key_type), Codes.INVALID_SIGNATURE
+            )
 
 
 def _exception_to_failure(e):
