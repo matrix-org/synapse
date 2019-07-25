@@ -122,18 +122,18 @@ class RoomAccessRules(object):
             if event["type"] == EventTypes.JoinRules:
                 join_rule = event["content"].get("join_rule")
 
-        if join_rule == JoinRules.PUBLIC and access_rule != ACCESS_RULE_RESTRICTED:
-            raise SynapseError(400, "Invalid access rule")
+        if access_rule:
+            if join_rule == JoinRules.PUBLIC and access_rule != ACCESS_RULE_RESTRICTED:
+                raise SynapseError(400, "Invalid access rule")
 
-        if (
-            preset == RoomCreationPreset.PUBLIC_CHAT
-            and access_rule != ACCESS_RULE_RESTRICTED
-        ):
-            raise SynapseError(400, "Invalid access rule")
-
-        # If there's no rules event in the initial state, create one with the default
-        # setting.
-        if not access_rule:
+            if (
+                preset == RoomCreationPreset.PUBLIC_CHAT
+                and access_rule != ACCESS_RULE_RESTRICTED
+            ):
+                raise SynapseError(400, "Invalid access rule")
+        else:
+            # If there's no rules event in the initial state, create one with the default
+            # setting.
             if is_direct:
                 default_rule = ACCESS_RULE_DIRECT
             else:
