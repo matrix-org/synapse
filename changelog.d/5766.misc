@@ -1,0 +1,1 @@
+Add libsqlite3-dev and libdistro-info-perl to debian dockerfile build dependencies.
