@@ -181,27 +181,27 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
 
         # Changing access rule to unrestricted should fail.
         self.change_rule_in_room(
-            preset_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=400,
+            preset_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=403,
         )
         self.change_rule_in_room(
-            init_state_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=400,
+            init_state_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=403,
         )
 
         # Changing access rule to direct should fail.
         self.change_rule_in_room(
-            preset_room_id, ACCESS_RULE_DIRECT, expected_code=400,
+            preset_room_id, ACCESS_RULE_DIRECT, expected_code=403,
         )
         self.change_rule_in_room(
-            init_state_room_id, ACCESS_RULE_DIRECT, expected_code=400,
+            init_state_room_id, ACCESS_RULE_DIRECT, expected_code=403,
         )
 
         # Changing join rule to public in an unrestricted room should fail.
         self.change_join_rule_in_room(
-            self.unrestricted_room, JoinRules.PUBLIC, expected_code=400,
+            self.unrestricted_room, JoinRules.PUBLIC, expected_code=403,
         )
         # Changing join rule to public in an direct room should fail.
         self.change_join_rule_in_room(
-            self.direct_rooms[0], JoinRules.PUBLIC, expected_code=400,
+            self.direct_rooms[0], JoinRules.PUBLIC, expected_code=403,
         )
 
         # Creating a new room with the public_chat preset and an access rule that isn't
