@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +22,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError
+from synapse.api.errors import Codes, StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import Cache, SQLBaseStore, db_to_json
 from synapse.storage.background_updates import BackgroundUpdateStore
@@ -35,6 +37,7 @@ DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES = (
 
 
 class DeviceWorkerStore(SQLBaseStore):
+    @defer.inlineCallbacks
     def get_device(self, user_id, device_id):
         """Retrieve a device.
 
@@ -46,12 +49,15 @@ class DeviceWorkerStore(SQLBaseStore):
         Raises:
             StoreError: if the device is not found
         """
-        return self._simple_select_one(
+        ret = yield self._simple_select_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id},
-            retcols=("user_id", "device_id", "display_name"),
+            retcols=("user_id", "device_id", "display_name", "hidden"),
             desc="get_device",
         )
+        if ret["hidden"]:
+            raise StoreError(404, "No row found (devices)")
+        return ret
 
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
@@ -67,11 +73,11 @@ class DeviceWorkerStore(SQLBaseStore):
         devices = yield self._simple_select_list(
             table="devices",
             keyvalues={"user_id": user_id},
-            retcols=("user_id", "device_id", "display_name"),
+            retcols=("user_id", "device_id", "display_name", "hidden"),
             desc="get_devices_by_user",
         )
 
-        defer.returnValue({d["device_id"]: d for d in devices})
+        defer.returnValue({d["device_id"]: d for d in devices if not d["hidden"]})
 
     @defer.inlineCallbacks
     def get_devices_by_remote(self, destination, from_stream_id, limit):
@@ -540,6 +546,8 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         Returns:
             defer.Deferred: boolean whether the device was inserted or an
                 existing device existed with that ID.
+        Raises:
+            StoreError: if the device is already in use
         """
         key = (user_id, device_id)
         if self.device_id_exists_cache.get(key, None):
@@ -552,12 +560,25 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "user_id": user_id,
                     "device_id": device_id,
                     "display_name": initial_device_display_name,
+                    "hidden": False,
                 },
                 desc="store_device",
                 or_ignore=True,
             )
+            if not inserted:
+                # if the device already exists, check if it's a real device, or
+                # if the device ID is reserved by something else
+                hidden = yield self._simple_select_one_onecol(
+                    "devices",
+                    keyvalues={"user_id": user_id, "device_id": device_id},
+                    retcol="hidden",
+                )
+                if hidden:
+                    raise StoreError(400, "The device ID is in use", Codes.FORBIDDEN)
             self.device_id_exists_cache.prefill(key, True)
             defer.returnValue(inserted)
+        except StoreError:
+            raise
         except Exception as e:
             logger.error(
                 "store_device with device_id=%s(%r) user_id=%s(%r)"
@@ -582,11 +603,11 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         Returns:
             defer.Deferred
         """
-        yield self._simple_delete_one(
-            table="devices",
-            keyvalues={"user_id": user_id, "device_id": device_id},
-            desc="delete_device",
-        )
+        sql = """
+            DELETE FROM devices
+            WHERE user_id = ? AND device_id = ? AND NOT COALESCE(hidden, ?)
+        """
+        yield self._execute("delete_device", None, sql, user_id, device_id, False)
 
         self.device_id_exists_cache.invalidate((user_id, device_id))
 
@@ -600,13 +621,21 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         Returns:
             defer.Deferred
         """
-        yield self._simple_delete_many(
-            table="devices",
-            column="device_id",
-            iterable=device_ids,
-            keyvalues={"user_id": user_id},
-            desc="delete_devices",
+
+        if not device_ids or len(device_ids) == 0:
+            return
+        sql = """
+            DELETE FROM devices
+            WHERE user_id = ? AND device_id IN (%s) AND NOT COALESCE(hidden, ?)
+        """ % (
+            ",".join("?" for _ in device_ids)
         )
+        values = [user_id]
+        values.extend(device_ids)
+        values.append(False)
+
+        yield self._execute("delete_devices", None, sql, *values)
+
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
 
@@ -628,6 +657,8 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             updates["display_name"] = new_display_name
         if not updates:
             return defer.succeed(None)
+        # FIXME: should only update if hidden is not True.  But updating the
+        # display name of a hidden device should be harmless
         return self._simple_update_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id},
