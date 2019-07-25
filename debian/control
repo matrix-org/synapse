@@ -15,6 +15,7 @@ Build-Depends:
  python3-setuptools,
  python3-pip,
  python3-venv,
+ libdistro-info-perl,
  libsqlite3-dev,
  tar,
 Standards-Version: 3.9.8
