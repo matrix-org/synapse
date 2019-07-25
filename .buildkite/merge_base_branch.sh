@@ -2,7 +2,7 @@
 
 set -ex
 
-if [[ "$BUILDKITE_BRANCH" =~ ^(develop|master|dinsic|shhs|release-.*)$ ]]; then
+if [[ "$BUILDKITE_BRANCH" =~ ^(develop|master|dinsic|shhs-*|release-.*)$ ]]; then
     echo "Not merging forward, as this is a release branch"
     exit 0
 fi
