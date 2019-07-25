@@ -104,6 +104,17 @@ class _EventInternalMetadata(object):
         """
         return getattr(self, "proactively_send", True)
 
+    def is_redacted(self):
+        """Whether the event has been redacted.
+
+        This is used for efficiently checking whether an event has been
+        marked as redacted without needing to make another database call.
+
+        Returns:
+            bool
+        """
+        return getattr(self, "redacted", False)
+
 
 def _event_dict_property(key):
     # We want to be able to use hasattr with the event dict properties.

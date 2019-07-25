@@ -52,9 +52,14 @@ def prune_event(event):
 
     from . import event_type_from_format_version
 
-    return event_type_from_format_version(event.format_version)(
+    pruned_event = event_type_from_format_version(event.format_version)(
         pruned_event_dict, event.internal_metadata.get_dict()
     )
+
+    # Mark the event as redacted
+    pruned_event.internal_metadata.redacted = True
+
+    return pruned_event
 
 
 def prune_event_dict(event_dict):
@@ -360,9 +365,12 @@ class EventClientSerializer(object):
         event_id = event.event_id
         serialized_event = serialize_event(event, time_now, **kwargs)
 
-        # If MSC1849 is enabled then we need to look if thre are any relations
-        # we need to bundle in with the event
-        if self.experimental_msc1849_support_enabled and bundle_aggregations:
+        # If MSC1849 is enabled then we need to look if there are any relations
+        # we need to bundle in with the event.
+        # Do not bundle relations if the event has been redacted
+        if not event.internal_metadata.is_redacted() and (
+            self.experimental_msc1849_support_enabled and bundle_aggregations
+        ):
             annotations = yield self.store.get_aggregation_groups_for_event(event_id)
             references = yield self.store.get_relations_for_event(
                 event_id, RelationTypes.REFERENCE, direction="f"
@@ -392,7 +400,11 @@ class EventClientSerializer(object):
                     serialized_event["content"].pop("m.relates_to", None)
 
                 r = serialized_event["unsigned"].setdefault("m.relations", {})
-                r[RelationTypes.REPLACE] = {"event_id": edit.event_id}
+                r[RelationTypes.REPLACE] = {
+                    "event_id": edit.event_id,
+                    "origin_server_ts": edit.origin_server_ts,
+                    "sender": edit.sender,
+                }
 
         defer.returnValue(serialized_event)
 

@@ -36,9 +36,11 @@ class FederationRateLimiter(object):
             clock (Clock)
             config (FederationRateLimitConfig)
         """
-        self.clock = clock
-        self._config = config
-        self.ratelimiters = {}
+
+        def new_limiter():
+            return _PerHostRatelimiter(clock=clock, config=config)
+
+        self.ratelimiters = collections.defaultdict(new_limiter)
 
     def ratelimit(self, host):
         """Used to ratelimit an incoming request from given host
@@ -53,11 +55,9 @@ class FederationRateLimiter(object):
             host (str): Origin of incoming request.
 
         Returns:
-            _PerHostRatelimiter
+            context manager which returns a deferred.
         """
-        return self.ratelimiters.setdefault(
-            host, _PerHostRatelimiter(clock=self.clock, config=self._config)
-        ).ratelimit()
+        return self.ratelimiters[host].ratelimit()
 
 
 class _PerHostRatelimiter(object):
@@ -122,7 +122,7 @@ class _PerHostRatelimiter(object):
         self.request_times.append(time_now)
 
         def queue_request():
-            if len(self.current_processing) > self.concurrent_requests:
+            if len(self.current_processing) >= self.concurrent_requests:
                 queue_defer = defer.Deferred()
                 self.ready_request_queue[request_id] = queue_defer
                 logger.info(

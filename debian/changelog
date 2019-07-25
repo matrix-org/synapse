@@ -1,9 +1,15 @@
-matrix-synapse-py3 (1.1.0-1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.2.0) stable; urgency=medium
 
   [ Amber Brown ]
   * Update logging config defaults to match API changes in Synapse.
 
- -- Erik Johnston <erikj@rae>  Thu, 04 Jul 2019 13:59:02 +0100
+  [ Richard van der Hoff ]
+  * Add Recommends and Depends for some libraries which you probably want.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.2.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 25 Jul 2019 14:10:07 +0100
 
 matrix-synapse-py3 (1.1.0) stable; urgency=medium
 

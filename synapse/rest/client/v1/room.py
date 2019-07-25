@@ -24,7 +24,12 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientCredentialsError,
+    SynapseError,
+)
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
@@ -62,11 +67,17 @@ class RoomCreateRestServlet(TransactionRestServlet):
         register_txn_path(self, PATTERNS, http_server)
         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
         http_server.register_paths(
-            "OPTIONS", client_patterns("/rooms(?:/.*)?$", v1=True), self.on_OPTIONS
+            "OPTIONS",
+            client_patterns("/rooms(?:/.*)?$", v1=True),
+            self.on_OPTIONS,
+            self.__class__.__name__,
         )
         # define CORS for /createRoom[/txnid]
         http_server.register_paths(
-            "OPTIONS", client_patterns("/createRoom(?:/.*)?$", v1=True), self.on_OPTIONS
+            "OPTIONS",
+            client_patterns("/createRoom(?:/.*)?$", v1=True),
+            self.on_OPTIONS,
+            self.__class__.__name__,
         )
 
     def on_PUT(self, request, txn_id):
@@ -111,16 +122,28 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         )
 
         http_server.register_paths(
-            "GET", client_patterns(state_key, v1=True), self.on_GET
+            "GET",
+            client_patterns(state_key, v1=True),
+            self.on_GET,
+            self.__class__.__name__,
         )
         http_server.register_paths(
-            "PUT", client_patterns(state_key, v1=True), self.on_PUT
+            "PUT",
+            client_patterns(state_key, v1=True),
+            self.on_PUT,
+            self.__class__.__name__,
         )
         http_server.register_paths(
-            "GET", client_patterns(no_state_key, v1=True), self.on_GET_no_state_key
+            "GET",
+            client_patterns(no_state_key, v1=True),
+            self.on_GET_no_state_key,
+            self.__class__.__name__,
         )
         http_server.register_paths(
-            "PUT", client_patterns(no_state_key, v1=True), self.on_PUT_no_state_key
+            "PUT",
+            client_patterns(no_state_key, v1=True),
+            self.on_PUT_no_state_key,
+            self.__class__.__name__,
         )
 
     def on_GET_no_state_key(self, request, room_id, event_type):
@@ -307,7 +330,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
         try:
             yield self.auth.get_user_by_req(request, allow_guest=True)
-        except AuthError as e:
+        except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
             # federations.
@@ -840,18 +863,23 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
         with_get: True to also register respective GET paths for the PUTs.
     """
     http_server.register_paths(
-        "POST", client_patterns(regex_string + "$", v1=True), servlet.on_POST
+        "POST",
+        client_patterns(regex_string + "$", v1=True),
+        servlet.on_POST,
+        servlet.__class__.__name__,
     )
     http_server.register_paths(
         "PUT",
         client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
         servlet.on_PUT,
+        servlet.__class__.__name__,
     )
     if with_get:
         http_server.register_paths(
             "GET",
             client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
             servlet.on_GET,
+            servlet.__class__.__name__,
         )
 
 
