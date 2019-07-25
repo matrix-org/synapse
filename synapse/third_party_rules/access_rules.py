@@ -123,6 +123,11 @@ class RoomAccessRules(object):
                 join_rule = event["content"].get("join_rule")
 
         if access_rule:
+            # If there's an access rules event in the initial state, check if the prefix
+            # or the join rule in use is compatible (i.e. if it involves a "public" join
+            # rule, the access rule must be "restricted"). We don't need to check that if
+            # there's no access rule provided, as in this case the access rule will
+            # default to "restricted", with which any join rule is allowed.
             if join_rule == JoinRules.PUBLIC and access_rule != ACCESS_RULE_RESTRICTED:
                 raise SynapseError(400, "Invalid access rule")
 
@@ -132,8 +137,8 @@ class RoomAccessRules(object):
             ):
                 raise SynapseError(400, "Invalid access rule")
         else:
-            # If there's no rules event in the initial state, create one with the default
-            # setting.
+            # If there's no access rules event in the initial state, create one with the
+            # default setting.
             if is_direct:
                 default_rule = ACCESS_RULE_DIRECT
             else:
@@ -436,6 +441,13 @@ class RoomAccessRules(object):
         """Check whether a join rule change is allowed. A join rule change is always
         allowed unless the new join rule is "public" and the current access rule isn't
         "restricted".
+
+        Note that we currently rely on the default access rule being "restricted": during
+        room creation, the m.room.join_rules event will be sent *before* the
+        im.vector.room.access_rules one, so the access rule that will be considered here
+        in this case will be the default "restricted" one. This is fine since the
+        "restricted" access rule allows any value for the join rule, but we should keep
+        that in mind if we need to change the default access rule in the future.
 
         Args:
             event (synapse.events.EventBase): The event to check.
