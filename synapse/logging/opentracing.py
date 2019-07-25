@@ -334,8 +334,8 @@ def start_active_span_follows_from(operation_name, contexts):
         return scope
 
 
-def start_active_span_from_context(
-    headers,
+def start_active_span_from_request(
+    request,
     operation_name,
     references=None,
     tags=None,
@@ -344,9 +344,9 @@ def start_active_span_from_context(
     finish_on_close=True,
 ):
     """
-    Extracts a span context from Twisted Headers.
+    Extracts a span context from a Twisted Request.
     args:
-        headers (twisted.web.http_headers.Headers)
+        headers (twisted.web.http.Request)
 
         For the other args see opentracing.tracer
 
@@ -360,7 +360,9 @@ def start_active_span_from_context(
     if opentracing is None:
         return _noop_context_manager()
 
-    header_dict = {k.decode(): v[0].decode() for k, v in headers.getAllRawHeaders()}
+    header_dict = {
+        k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
+    }
     context = opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
 
     return opentracing.tracer.start_active_span(
@@ -448,7 +450,7 @@ def set_operation_name(operation_name):
 
 
 @only_if_tracing
-def inject_active_span_twisted_headers(headers, destination):
+def inject_active_span_twisted_headers(headers, destination, check_destination=True):
     """
     Injects a span context into twisted headers in-place
 
@@ -467,7 +469,7 @@ def inject_active_span_twisted_headers(headers, destination):
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
 
-    if not whitelisted_homeserver(destination):
+    if check_destination and not whitelisted_homeserver(destination):
         return
 
     span = opentracing.tracer.active_span
@@ -479,7 +481,7 @@ def inject_active_span_twisted_headers(headers, destination):
 
 
 @only_if_tracing
-def inject_active_span_byte_dict(headers, destination):
+def inject_active_span_byte_dict(headers, destination, check_destination=True):
     """
     Injects a span context into a dict where the headers are encoded as byte
     strings
@@ -511,7 +513,7 @@ def inject_active_span_byte_dict(headers, destination):
 
 
 @only_if_tracing
-def inject_active_span_text_map(carrier, destination=None):
+def inject_active_span_text_map(carrier, destination, check_destination=True):
     """
     Injects a span context into a dict
 
@@ -532,7 +534,7 @@ def inject_active_span_text_map(carrier, destination=None):
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
 
-    if destination and not whitelisted_homeserver(destination):
+    if check_destination and not whitelisted_homeserver(destination):
         return
 
     opentracing.tracer.inject(
@@ -689,30 +691,39 @@ def tag_args(func):
     return _tag_args_inner
 
 
-def trace_servlet(servlet_name, func):
+def trace_servlet(servlet_name, extract_context=False):
     """Decorator which traces a serlet. It starts a span with some servlet specific
     tags such as the servlet_name and request information"""
-    if not opentracing:
-        return func
 
-    @wraps(func)
-    @defer.inlineCallbacks
-    def _trace_servlet_inner(request, *args, **kwargs):
-        with start_active_span(
-            "incoming-client-request",
-            tags={
+    def _trace_servlet_inner_1(func):
+        if not opentracing:
+            return func
+
+        @wraps(func)
+        @defer.inlineCallbacks
+        def _trace_servlet_inner(request, *args, **kwargs):
+            request_tags = {
                 "request_id": request.get_request_id(),
                 tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
                 tags.HTTP_METHOD: request.get_method(),
                 tags.HTTP_URL: request.get_redacted_uri(),
                 tags.PEER_HOST_IPV6: request.getClientIP(),
-                "servlet_name": servlet_name,
-            },
-        ):
-            result = yield defer.maybeDeferred(func, request, *args, **kwargs)
-            return result
+            }
 
-    return _trace_servlet_inner
+            if extract_context:
+                scope = start_active_span_from_request(
+                    request, servlet_name, tags=request_tags
+                )
+            else:
+                scope = start_active_span(servlet_name, tags=request_tags)
+
+            with scope:
+                result = yield defer.maybeDeferred(func, request, *args, **kwargs)
+                return result
+
+        return _trace_servlet_inner
+
+    return _trace_servlet_inner_1
 
 
 # Helper class
