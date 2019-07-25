@@ -870,10 +870,10 @@ class RoomMemberStore(RoomMemberWorkerStore):
                 next_room, = row
 
                 sql = """
-                    UPDATE current_state_events AS c
+                    UPDATE current_state_events
                     SET membership = (
                         SELECT membership FROM room_memberships
-                        WHERE event_id = c.event_id
+                        WHERE event_id = current_state_events.event_id
                     )
                     WHERE room_id = ?
                 """
