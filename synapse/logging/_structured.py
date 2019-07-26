@@ -179,23 +179,13 @@ def parse_handler_configs(config):
     for name, config in config.get("handlers").items():
         logging_type = None
 
-        if "type" not in config and "class" in config:
-            # Handle the old "class": style.
-            if config["class"] == "logging.StreamHandler":
-                yield (
-                    HandlerConfiguration(
-                        name=name,
-                        type=LoggingOutputType.CONSOLE,
-                        location=sys.__stdout__,
-                    )
-                )
-            else:
+        if "type" in config:
+            try:
+                logging_type = LoggingOutputType.lookupByName(config["type"].upper())
+            except ValueError:
                 raise ConfigError(
-                    "The logging class %s is not supported in logging format 2."
-                    % (config["class"],)
+                    "%s is not a known logging handler type." % (config["type"],)
                 )
-        elif "type" in config:
-            logging_type = LoggingOutputType.lookupByName(config["type"].upper())
 
             if logging_type in [LoggingOutputType.CONSOLE, LoggingOutputType.JSON]:
                 location = config.get("location")
@@ -211,6 +201,26 @@ def parse_handler_configs(config):
                     name=name,
                     type=logging_type,
                     location=OutputPipeType.lookupByName(location).value,
+                )
+            else:
+                raise ConfigError(
+                    "The %s logging handler type is currently not implemented."
+                    % (config["type"].upper(),)
+                )
+        elif "class" in config:
+            # Handle the old "class": style.
+            if config["class"] == "logging.StreamHandler":
+                yield (
+                    HandlerConfiguration(
+                        name=name,
+                        type=LoggingOutputType.CONSOLE,
+                        location=sys.__stdout__,
+                    )
+                )
+            else:
+                raise ConfigError(
+                    "The logging class %s is not supported in logging format 2."
+                    % (config["class"],)
                 )
         else:
             raise ConfigError("Handlers need to have either a 'type' or 'class' key.")
@@ -247,12 +257,12 @@ def setup_structured_logging(config, log_config):
     for namespace, config in log_config.get("loggers", {}).items():
         # Set the log level for twisted.logger.Logger namespaces
         log_filter.setLogLevelForNamespace(
-            namespace, stdlib_log_level_to_twisted(log_config.get("level", "INFO"))
+            namespace, stdlib_log_level_to_twisted(config.get("level", "INFO"))
         )
 
         # Also set the log levels for the stdlib logger namespaces, to prevent
         # them getting to PythonStdlibToTwistedLogger and having to be formatted
-        logging.getLogger(namespace).setLevel(log_config.get("level", "NOTSET"))
+        logging.getLogger(namespace).setLevel(config.get("level", "NOTSET"))
 
     f = FilteringLogObserver(publisher, [log_filter])
     lco = LogContextObserver(f)
