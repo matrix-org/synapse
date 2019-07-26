@@ -58,7 +58,7 @@ class Clock(object):
         """Returns the current system time in miliseconds since epoch."""
         return int(self.time() * 1000)
 
-    def looping_call(self, f, msec):
+    def looping_call(self, f, msec, *args):
         """Call a function repeatedly.
 
          Waits `msec` initially before calling `f` for the first time.
@@ -67,7 +67,7 @@ class Clock(object):
             f(function): The function to call repeatedly.
             msec(float): How long to wait between calls in milliseconds.
         """
-        call = task.LoopingCall(f)
+        call = task.LoopingCall(f, *args)
         call.clock = self._reactor
         d = call.start(msec / 1000.0, now=False)
         d.addErrback(
