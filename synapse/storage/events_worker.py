@@ -637,6 +637,10 @@ class EventsWorkerStore(SQLBaseStore):
             # we choose to ignore redactions of m.room.create events.
             return None
 
+        if original_ev.type == "m.room.redaction":
+            # ... and redaction events
+            return None
+
         redaction_map = yield self._get_events_from_cache_or_db(redactions)
 
         for redaction_id in redactions:
