@@ -156,9 +156,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # then we can avoid a join, which is a Very Good Thing given how
             # frequently this function gets called.
             if self._current_state_events_membership_up_to_date:
+                # Note, rejected events will have a null membership field, so
+                # we we manually filter them out.
                 sql = """
                     SELECT count(*), membership FROM current_state_events
                     WHERE type = 'm.room.member' AND room_id = ?
+                        AND membership IS NOT NULL
                     GROUP BY membership
                 """
             else:
@@ -180,10 +183,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # we order by membership and then fairly arbitrarily by event_id so
             # heroes are consistent
             if self._current_state_events_membership_up_to_date:
+                # Note, rejected events will have a null membership field, so
+                # we we manually filter them out.
                 sql = """
                     SELECT state_key, membership, event_id
                     FROM current_state_events
                     WHERE type = 'm.room.member' AND room_id = ?
+                        AND membership IS NOT NULL
                     ORDER BY
                         CASE membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
                         event_id ASC
