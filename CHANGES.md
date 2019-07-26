@@ -12,7 +12,10 @@ This release includes *four* security fixes:
 - Fix a vulnerability where a federated server could spoof read-receipts from
   users on other servers. Thanks to @Dylanger for identifying this issue too. ([\#5743](https://github.com/matrix-org/synapse/issues/5743))
 
-Note that Synapse 1.2.0 also contained a security fix which was not correctly identified during the original release. The changelog below is now updated.
+Additionally, the following fix was in Synapse **1.2.0**, but was not correctly
+identified during the original release:
+
+- It was possible for a room moderator to send a redaction for an `m.room.create` event, which would downgrade the room to version 1. Thanks to `/dev/ponies` for identifying and responsibly disclosing this issue! ([\#5701](https://github.com/matrix-org/synapse/issues/5701))
 
 Synapse 1.2.0 (2019-07-25)
 ==========================
