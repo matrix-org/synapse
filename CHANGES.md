@@ -8,9 +8,9 @@ This release includes *four* security fixes:
 
 - Prevent an attack where a federated server could send redactions for arbitrary events in v1 and v2 rooms. ([\#5767](https://github.com/matrix-org/synapse/issues/5767))
 - Prevent a denial-of-service attack where cycles of redaction events would make Synapse spin infinitely. Thanks to `@lrizika:matrix.org` for identifying and responsibly disclosing this issue. ([0f2ecb961](https://github.com/matrix-org/synapse/commit/0f2ecb961))
-- Prevent an attack where users could be joined or parted from public rooms without their consent. Thanks to @Dylanger for identifying and responsibly disclosing this issue. ([\#5744](https://github.com/matrix-org/synapse/issues/5744))
+- Prevent an attack where users could be joined or parted from public rooms without their consent. Thanks to @dylangerdaly for identifying and responsibly disclosing this issue. ([\#5744](https://github.com/matrix-org/synapse/issues/5744))
 - Fix a vulnerability where a federated server could spoof read-receipts from
-  users on other servers. Thanks to @Dylanger for identifying this issue too. ([\#5743](https://github.com/matrix-org/synapse/issues/5743))
+  users on other servers. Thanks to @dylangerdaly for identifying this issue too. ([\#5743](https://github.com/matrix-org/synapse/issues/5743))
 
 Additionally, the following fix was in Synapse **1.2.0**, but was not correctly
 identified during the original release:
