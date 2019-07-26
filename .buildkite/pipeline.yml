@@ -117,8 +117,10 @@ steps:
           limit: 2
 
   - label: ":python: 3.5 / :postgres: 9.5"
+    agents:
+      queue: "medium"
     env:
-      TRIAL_FLAGS: "-j 4"
+      TRIAL_FLAGS: "-j 8"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
     plugins:
@@ -134,8 +136,10 @@ steps:
           limit: 2
 
   - label: ":python: 3.7 / :postgres: 9.5"
+    agents:
+      queue: "medium"
     env:
-      TRIAL_FLAGS: "-j 4"
+      TRIAL_FLAGS: "-j 8"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
     plugins:
@@ -151,8 +155,10 @@ steps:
           limit: 2
 
   - label: ":python: 3.7 / :postgres: 11"
+    agents:
+      queue: "medium"
     env:
-      TRIAL_FLAGS: "-j 4"
+      TRIAL_FLAGS: "-j 8"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
     plugins:
@@ -173,11 +179,13 @@ steps:
       queue: "medium"
     command:
       - "bash .buildkite/merge_base_branch.sh"
-      - "bash .buildkite/synapse_sytest.sh"
+      - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
+          always-pull: true
+          workdir: "/src"
     retry:
       automatic:
         - exit_status: -1
@@ -192,11 +200,13 @@ steps:
       POSTGRES: "1"
     command:
       - "bash .buildkite/merge_base_branch.sh"
-      - "bash .buildkite/synapse_sytest.sh"
+      - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
+          always-pull: true
+          workdir: "/src"
     retry:
       automatic:
         - exit_status: -1
@@ -210,14 +220,17 @@ steps:
     env:
       POSTGRES: "1"
       WORKERS: "1"
+      BLACKLIST: "synapse-blacklist-with-workers"
     command:
       - "bash .buildkite/merge_base_branch.sh"
-      - "bash .buildkite/synapse_sytest.sh"
+      - "bash -c 'cat /src/sytest-blacklist /src/.buildkite/worker-blacklist > /src/synapse-blacklist-with-workers'"
+      - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapse:py35"
           propagate-environment: true
-    soft_fail: true
+          always-pull: true
+          workdir: "/src"
     retry:
       automatic:
         - exit_status: -1

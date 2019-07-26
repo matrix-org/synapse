@@ -135,7 +135,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _background_reindex_origin_server_ts(self, progress, batch_size):
@@ -212,7 +212,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_ORIGIN_SERVER_TS_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _cleanup_extremities_bg_update(self, progress, batch_size):
@@ -396,4 +396,4 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 "_cleanup_extremities_bg_update_drop_table", _drop_table_txn
             )
 
-        defer.returnValue(num_handled)
+        return num_handled

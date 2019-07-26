@@ -17,6 +17,7 @@ import gc
 import hashlib
 import hmac
 import logging
+import time
 
 from mock import Mock
 
@@ -24,16 +25,17 @@ from canonicaljson import json
 
 import twisted
 import twisted.logger
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import Deferred, succeed
+from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
 
 from synapse.api.constants import EventTypes
 from synapse.config.homeserver import HomeServerConfig
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest
+from synapse.logging.context import LoggingContext
 from synapse.server import HomeServer
 from synapse.types import Requester, UserID, create_requester
-from synapse.util.logcontext import LoggingContext
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
 from tests.test_utils.logging_setup import setup_logging
@@ -155,6 +157,21 @@ class HomeserverTestCase(TestCase):
     """
     A base TestCase that reduces boilerplate for HomeServer-using test cases.
 
+    Defines a setUp method which creates a mock reactor, and instantiates a homeserver
+    running on that reactor.
+
+    There are various hooks for modifying the way that the homeserver is instantiated:
+
+    * override make_homeserver, for example by making it pass different parameters into
+      setup_test_homeserver.
+
+    * override default_config, to return a modified configuration dictionary for use
+      by setup_test_homeserver.
+
+    * On a per-test basis, you can use the @override_config decorator to give a
+      dictionary containing additional configuration settings to be added to the basic
+      config dict.
+
     Attributes:
         servlets (list[function]): List of servlet registration function.
         user_id (str): The user ID to assume if auth is hijacked.
@@ -164,6 +181,14 @@ class HomeserverTestCase(TestCase):
 
     servlets = []
     hijack_auth = True
+    needs_threadpool = False
+
+    def __init__(self, methodName, *args, **kwargs):
+        super().__init__(methodName, *args, **kwargs)
+
+        # see if we have any additional config for this test
+        method = getattr(self, methodName)
+        self._extra_config = getattr(method, "_extra_config", None)
 
     def setUp(self):
         """
@@ -192,15 +217,19 @@ class HomeserverTestCase(TestCase):
             if self.hijack_auth:
 
                 def get_user_by_access_token(token=None, allow_guest=False):
-                    return {
-                        "user": UserID.from_string(self.helper.auth_user_id),
-                        "token_id": 1,
-                        "is_guest": False,
-                    }
+                    return succeed(
+                        {
+                            "user": UserID.from_string(self.helper.auth_user_id),
+                            "token_id": 1,
+                            "is_guest": False,
+                        }
+                    )
 
                 def get_user_by_req(request, allow_guest=False, rights="access"):
-                    return create_requester(
-                        UserID.from_string(self.helper.auth_user_id), 1, False, None
+                    return succeed(
+                        create_requester(
+                            UserID.from_string(self.helper.auth_user_id), 1, False, None
+                        )
                     )
 
                 self.hs.get_auth().get_user_by_req = get_user_by_req
@@ -209,8 +238,25 @@ class HomeserverTestCase(TestCase):
                     return_value="1234"
                 )
 
+        if self.needs_threadpool:
+            self.reactor.threadpool = ThreadPool()
+            self.addCleanup(self.reactor.threadpool.stop)
+            self.reactor.threadpool.start()
+
         if hasattr(self, "prepare"):
             self.prepare(self.reactor, self.clock, self.hs)
+
+    def wait_on_thread(self, deferred, timeout=10):
+        """
+        Wait until a Deferred is done, where it's waiting on a real thread.
+        """
+        start_time = time.time()
+
+        while not deferred.called:
+            if start_time + timeout < time.time():
+                raise ValueError("Timed out waiting for threadpool")
+            self.reactor.advance(0.01)
+            time.sleep(0.01)
 
     def make_homeserver(self, reactor, clock):
         """
@@ -252,7 +298,14 @@ class HomeserverTestCase(TestCase):
         Args:
             name (str): The homeserver name/domain.
         """
-        return default_config(name)
+        config = default_config(name)
+
+        # apply any additional config which was specified via the override_config
+        # decorator.
+        if self._extra_config is not None:
+            config.update(self._extra_config)
+
+        return config
 
     def prepare(self, reactor, clock, homeserver):
         """
@@ -394,6 +447,7 @@ class HomeserverTestCase(TestCase):
         # Create the user
         request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
         self.render(request)
+        self.assertEqual(channel.code, 200)
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
@@ -419,7 +473,7 @@ class HomeserverTestCase(TestCase):
             "POST", "/_matrix/client/r0/admin/register", body.encode("utf8")
         )
         self.render(request)
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
         return user_id
@@ -510,3 +564,27 @@ class HomeserverTestCase(TestCase):
         )
         self.render(request)
         self.assertEqual(channel.code, 403, channel.result)
+
+
+def override_config(extra_config):
+    """A decorator which can be applied to test functions to give additional HS config
+
+    For use
+
+    For example:
+
+        class MyTestCase(HomeserverTestCase):
+            @override_config({"enable_registration": False, ...})
+            def test_foo(self):
+                ...
+
+    Args:
+        extra_config(dict): Additional config settings to be merged into the default
+            config dict before instantiating the test homeserver.
+    """
+
+    def decorator(func):
+        func._extra_config = extra_config
+        return func
+
+    return decorator

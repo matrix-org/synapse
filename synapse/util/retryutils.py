@@ -17,7 +17,7 @@ import random
 
 from twisted.internet import defer
 
-import synapse.util.logcontext
+import synapse.logging.context
 from synapse.api.errors import CodeMessageException
 
 logger = logging.getLogger(__name__)
@@ -95,15 +95,13 @@ def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs)
     # maximum backoff even though it might only have been down briefly
     backoff_on_failure = not ignore_backoff
 
-    defer.returnValue(
-        RetryDestinationLimiter(
-            destination,
-            clock,
-            store,
-            retry_interval,
-            backoff_on_failure=backoff_on_failure,
-            **kwargs
-        )
+    return RetryDestinationLimiter(
+        destination,
+        clock,
+        store,
+        retry_interval,
+        backoff_on_failure=backoff_on_failure,
+        **kwargs
     )
 
 
@@ -225,4 +223,4 @@ class RetryDestinationLimiter(object):
                 logger.exception("Failed to store destination_retry_timings")
 
         # we deliberately do this in the background.
-        synapse.util.logcontext.run_in_background(store_retry_timings)
+        synapse.logging.context.run_in_background(store_retry_timings)

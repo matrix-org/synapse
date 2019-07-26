@@ -34,14 +34,14 @@ from twisted.internet import defer
 import synapse.metrics
 from synapse.api.constants import EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
+from synapse.logging.context import run_in_background
+from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.presence import UserPresenceState
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.descriptors import cachedInlineCallbacks
-from synapse.util.logcontext import run_in_background
-from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
 
@@ -461,7 +461,7 @@ class PresenceHandler(object):
                 if affect_presence:
                     run_in_background(_end)
 
-        defer.returnValue(_user_syncing())
+        return _user_syncing()
 
     def get_currently_syncing_users(self):
         """Get the set of user ids that are currently syncing on this HS.
@@ -556,7 +556,7 @@ class PresenceHandler(object):
         """Get the current presence state for a user.
         """
         res = yield self.current_state_for_users([user_id])
-        defer.returnValue(res[user_id])
+        return res[user_id]
 
     @defer.inlineCallbacks
     def current_state_for_users(self, user_ids):
@@ -585,7 +585,7 @@ class PresenceHandler(object):
                 states.update(new)
                 self.user_to_current_state.update(new)
 
-        defer.returnValue(states)
+        return states
 
     @defer.inlineCallbacks
     def _persist_and_notify(self, states):
@@ -681,7 +681,7 @@ class PresenceHandler(object):
     def get_state(self, target_user, as_event=False):
         results = yield self.get_states([target_user.to_string()], as_event=as_event)
 
-        defer.returnValue(results[0])
+        return results[0]
 
     @defer.inlineCallbacks
     def get_states(self, target_user_ids, as_event=False):
@@ -703,17 +703,15 @@ class PresenceHandler(object):
 
         now = self.clock.time_msec()
         if as_event:
-            defer.returnValue(
-                [
-                    {
-                        "type": "m.presence",
-                        "content": format_user_presence_state(state, now),
-                    }
-                    for state in updates
-                ]
-            )
+            return [
+                {
+                    "type": "m.presence",
+                    "content": format_user_presence_state(state, now),
+                }
+                for state in updates
+            ]
         else:
-            defer.returnValue(updates)
+            return updates
 
     @defer.inlineCallbacks
     def set_state(self, target_user, state, ignore_status_msg=False):
@@ -757,9 +755,9 @@ class PresenceHandler(object):
         )
 
         if observer_room_ids & observed_room_ids:
-            defer.returnValue(True)
+            return True
 
-        defer.returnValue(False)
+        return False
 
     @defer.inlineCallbacks
     def get_all_presence_updates(self, last_id, current_id):
@@ -778,7 +776,7 @@ class PresenceHandler(object):
         # TODO(markjh): replicate the unpersisted changes.
         # This could use the in-memory stores for recent changes.
         rows = yield self.store.get_all_presence_updates(last_id, current_id)
-        defer.returnValue(rows)
+        return rows
 
     def notify_new_event(self):
         """Called when new events have happened. Handles users and servers
@@ -1017,10 +1015,27 @@ class PresenceEventSource(object):
             if from_key is not None:
                 from_key = int(from_key)
 
+            max_token = self.store.get_current_presence_token()
+            if from_key == max_token:
+                # This is necessary as due to the way stream ID generators work
+                # we may get updates that have a stream ID greater than the max
+                # token (e.g. max_token is N but stream generator may return
+                # results for N+2, due to N+1 not having finished being
+                # persisted yet).
+                #
+                # This is usually fine, as it just means that we may send down
+                # some presence updates multiple times. However, we need to be
+                # careful that the sync stream either actually does make some
+                # progress or doesn't return, otherwise clients will end up
+                # tight looping calling /sync due to it immediately returning
+                # the same token repeatedly.
+                #
+                # Hence this guard where we just return nothing so that the sync
+                # doesn't return. C.f. #5503.
+                return ([], max_token)
+
             presence = self.get_presence_handler()
             stream_change_cache = self.store.presence_stream_cache
-
-            max_token = self.store.get_current_presence_token()
 
             users_interested_in = yield self._get_interested_in(user, explicit_room_id)
 
@@ -1051,17 +1066,11 @@ class PresenceEventSource(object):
             updates = yield presence.current_state_for_users(user_ids_changed)
 
         if include_offline:
-            defer.returnValue((list(updates.values()), max_token))
+            return (list(updates.values()), max_token)
         else:
-            defer.returnValue(
-                (
-                    [
-                        s
-                        for s in itervalues(updates)
-                        if s.state != PresenceState.OFFLINE
-                    ],
-                    max_token,
-                )
+            return (
+                [s for s in itervalues(updates) if s.state != PresenceState.OFFLINE],
+                max_token,
             )
 
     def get_current_key(self):
@@ -1090,7 +1099,7 @@ class PresenceEventSource(object):
             )
             users_interested_in.update(user_ids)
 
-        defer.returnValue(users_interested_in)
+        return users_interested_in
 
 
 def handle_timeouts(user_states, is_mine_fn, syncing_user_ids, now):
@@ -1270,7 +1279,7 @@ def get_interested_parties(store, states):
         # Always notify self
         users_to_states.setdefault(state.user_id, []).append(state)
 
-    defer.returnValue((room_ids_to_states, users_to_states))
+    return (room_ids_to_states, users_to_states)
 
 
 @defer.inlineCallbacks
@@ -1304,4 +1313,4 @@ def get_interested_remotes(store, states, state_handler):
         host = get_domain_from_id(user_id)
         hosts_and_states.append(([host], states))
 
-    defer.returnValue(hosts_and_states)
+    return hosts_and_states

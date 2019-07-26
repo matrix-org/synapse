@@ -23,13 +23,12 @@ from twisted.internet import defer
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
 
-from synapse.util import Clock, logcontext, unwrapFirstError
-
-from .logcontext import (
+from synapse.logging.context import (
     PreserveLoggingContext,
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.util import Clock, unwrapFirstError
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +152,7 @@ def concurrently_execute(func, args, limit):
         except StopIteration:
             pass
 
-    return logcontext.make_deferred_yieldable(
+    return make_deferred_yieldable(
         defer.gatherResults(
             [run_in_background(_concurrently_execute_inner) for _ in range(limit)],
             consumeErrors=True,
@@ -174,7 +173,7 @@ def yieldable_gather_results(func, iter, *args, **kwargs):
         Deferred[list]: Resolved when all functions have been invoked, or errors if
         one of the function calls fails.
     """
-    return logcontext.make_deferred_yieldable(
+    return make_deferred_yieldable(
         defer.gatherResults(
             [run_in_background(func, item, *args, **kwargs) for item in iter],
             consumeErrors=True,
@@ -367,7 +366,7 @@ class ReadWriteLock(object):
                 new_defer.callback(None)
                 self.key_to_current_readers.get(key, set()).discard(new_defer)
 
-        defer.returnValue(_ctx_manager())
+        return _ctx_manager()
 
     @defer.inlineCallbacks
     def write(self, key):
@@ -397,7 +396,7 @@ class ReadWriteLock(object):
                 if self.key_to_current_writer[key] == new_defer:
                     self.key_to_current_writer.pop(key)
 
-        defer.returnValue(_ctx_manager())
+        return _ctx_manager()
 
 
 def _cancelled_to_timed_out_error(value, timeout):

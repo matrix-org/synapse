@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+import time
 import unicodedata
 
 import attr
@@ -34,11 +35,12 @@ from synapse.api.errors import (
     LoginError,
     StoreError,
     SynapseError,
+    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.logging.context import defer_to_thread
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
-from synapse.util import logcontext
 from synapse.util.caches.expiringcache import ExpiringCache
 
 from ._base import BaseHandler
@@ -153,7 +155,7 @@ class AuthHandler(BaseHandler):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Invalid auth")
 
-        defer.returnValue(params)
+        return params
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip, password_servlet=False):
@@ -278,7 +280,7 @@ class AuthHandler(BaseHandler):
                     creds,
                     list(clientdict),
                 )
-                defer.returnValue((creds, clientdict, session["id"]))
+                return (creds, clientdict, session["id"])
 
         ret = self._auth_dict_for_flows(flows, session)
         ret["completed"] = list(creds)
@@ -305,8 +307,8 @@ class AuthHandler(BaseHandler):
         if result:
             creds[stagetype] = result
             self._save_session(sess)
-            defer.returnValue(True)
-        defer.returnValue(False)
+            return True
+        return False
 
     def get_session_id(self, clientdict):
         """
@@ -377,7 +379,7 @@ class AuthHandler(BaseHandler):
             res = yield checker(
                 authdict, clientip=clientip, password_servlet=password_servlet
             )
-            defer.returnValue(res)
+            return res
 
         # build a v1-login-style dict out of the authdict and fall back to the
         # v1 code
@@ -387,7 +389,7 @@ class AuthHandler(BaseHandler):
             raise SynapseError(400, "", Codes.MISSING_PARAM)
 
         (canonical_id, callback) = yield self.validate_login(user_id, authdict)
-        defer.returnValue(canonical_id)
+        return canonical_id
 
     @defer.inlineCallbacks
     def _check_recaptcha(self, authdict, clientip, **kwargs):
@@ -431,7 +433,7 @@ class AuthHandler(BaseHandler):
                 resp_body.get("hostname"),
             )
             if resp_body["success"]:
-                defer.returnValue(True)
+                return True
         raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
     def _check_email_identity(self, authdict, **kwargs):
@@ -500,7 +502,7 @@ class AuthHandler(BaseHandler):
 
         threepid["threepid_creds"] = authdict["threepid_creds"]
 
-        defer.returnValue(threepid)
+        return threepid
 
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}
@@ -558,7 +560,7 @@ class AuthHandler(BaseHandler):
         return self.sessions[session_id]
 
     @defer.inlineCallbacks
-    def get_access_token_for_user_id(self, user_id, device_id=None):
+    def get_access_token_for_user_id(self, user_id, device_id, valid_until_ms):
         """
         Creates a new access token for the user with the given user ID.
 
@@ -572,14 +574,26 @@ class AuthHandler(BaseHandler):
             device_id (str|None): the device ID to associate with the tokens.
                None to leave the tokens unassociated with a device (deprecated:
                we should always have a device ID)
+            valid_until_ms (int|None): when the token is valid until. None for
+                no expiry.
         Returns:
               The access token for the user's session.
         Raises:
             StoreError if there was a problem storing the token.
         """
-        logger.info("Logging in user %s on device %s", user_id, device_id)
-        access_token = yield self.issue_access_token(user_id, device_id)
+        fmt_expiry = ""
+        if valid_until_ms is not None:
+            fmt_expiry = time.strftime(
+                " until %Y-%m-%d %H:%M:%S", time.localtime(valid_until_ms / 1000.0)
+            )
+        logger.info("Logging in user %s on device %s%s", user_id, device_id, fmt_expiry)
+
         yield self.auth.check_auth_blocking(user_id)
+
+        access_token = self.macaroon_gen.generate_access_token(user_id)
+        yield self.store.add_access_token_to_user(
+            user_id, access_token, device_id, valid_until_ms
+        )
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -592,7 +606,7 @@ class AuthHandler(BaseHandler):
                 yield self.store.delete_access_token(access_token)
                 raise StoreError(400, "Login raced against device deletion")
 
-        defer.returnValue(access_token)
+        return access_token
 
     @defer.inlineCallbacks
     def check_user_exists(self, user_id):
@@ -610,12 +624,13 @@ class AuthHandler(BaseHandler):
         Raises:
             LimitExceededError if the ratelimiter's login requests count for this
                 user is too high too proceed.
+            UserDeactivatedError if a user is found but is deactivated.
         """
         self.ratelimit_login_per_account(user_id)
         res = yield self._find_user_id_and_pwd_hash(user_id)
         if res is not None:
-            defer.returnValue(res[0])
-        defer.returnValue(None)
+            return res[0]
+        return None
 
     @defer.inlineCallbacks
     def _find_user_id_and_pwd_hash(self, user_id):
@@ -646,7 +661,7 @@ class AuthHandler(BaseHandler):
                 user_id,
                 user_infos.keys(),
             )
-        defer.returnValue(result)
+        return result
 
     def get_supported_login_types(self):
         """Get a the login types supported for the /login API
@@ -707,7 +722,7 @@ class AuthHandler(BaseHandler):
                 known_login_type = True
                 is_valid = yield provider.check_password(qualified_user_id, password)
                 if is_valid:
-                    defer.returnValue((qualified_user_id, None))
+                    return (qualified_user_id, None)
 
             if not hasattr(provider, "get_supported_login_types") or not hasattr(
                 provider, "check_auth"
@@ -741,9 +756,9 @@ class AuthHandler(BaseHandler):
             if result:
                 if isinstance(result, str):
                     result = (result, None)
-                defer.returnValue(result)
+                return result
 
-        if login_type == LoginType.PASSWORD:
+        if login_type == LoginType.PASSWORD and self.hs.config.password_localdb_enabled:
             known_login_type = True
 
             canonical_user_id = yield self._check_local_password(
@@ -751,7 +766,7 @@ class AuthHandler(BaseHandler):
             )
 
             if canonical_user_id:
-                defer.returnValue((canonical_user_id, None))
+                return (canonical_user_id, None)
 
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
@@ -799,9 +814,9 @@ class AuthHandler(BaseHandler):
                     if isinstance(result, str):
                         # If it's a str, set callback function to None
                         result = (result, None)
-                    defer.returnValue(result)
+                    return result
 
-        defer.returnValue((None, None))
+        return (None, None)
 
     @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):
@@ -823,19 +838,20 @@ class AuthHandler(BaseHandler):
         """
         lookupres = yield self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
-            defer.returnValue(None)
+            return None
         (user_id, password_hash) = lookupres
+
+        # If the password hash is None, the account has likely been deactivated
+        if not password_hash:
+            deactivated = yield self.store.get_user_deactivated_status(user_id)
+            if deactivated:
+                raise UserDeactivatedError("This account has been deactivated")
+
         result = yield self.validate_hash(password, password_hash)
         if not result:
             logger.warn("Failed password login for user %s", user_id)
-            defer.returnValue(None)
-        defer.returnValue(user_id)
-
-    @defer.inlineCallbacks
-    def issue_access_token(self, user_id, device_id=None):
-        access_token = self.macaroon_gen.generate_access_token(user_id)
-        yield self.store.add_access_token_to_user(user_id, access_token, device_id)
-        defer.returnValue(access_token)
+            return None
+        return user_id
 
     @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
@@ -849,7 +865,7 @@ class AuthHandler(BaseHandler):
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
         self.ratelimit_login_per_account(user_id)
         yield self.auth.check_auth_blocking(user_id)
-        defer.returnValue(user_id)
+        return user_id
 
     @defer.inlineCallbacks
     def delete_access_token(self, access_token):
@@ -960,7 +976,7 @@ class AuthHandler(BaseHandler):
         )
 
         yield self.store.user_delete_threepid(user_id, medium, address)
-        defer.returnValue(result)
+        return result
 
     def _save_session(self, session):
         # TODO: Persistent storage
@@ -987,7 +1003,7 @@ class AuthHandler(BaseHandler):
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode("ascii")
 
-        return logcontext.defer_to_thread(self.hs.get_reactor(), _do_hash)
+        return defer_to_thread(self.hs.get_reactor(), _do_hash)
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
@@ -1013,7 +1029,7 @@ class AuthHandler(BaseHandler):
             if not isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.encode("ascii")
 
-            return logcontext.defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
+            return defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
 

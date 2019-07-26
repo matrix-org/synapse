@@ -20,7 +20,6 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.handlers.room_member import RoomMemberHandler
 from synapse.replication.http.membership import (
-    ReplicationRegister3PIDGuestRestServlet as Repl3PID,
     ReplicationRemoteJoinRestServlet as ReplRemoteJoin,
     ReplicationRemoteRejectInviteRestServlet as ReplRejectInvite,
     ReplicationUserJoinedLeftRoomRestServlet as ReplJoinedLeft,
@@ -33,7 +32,6 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
     def __init__(self, hs):
         super(RoomMemberWorkerHandler, self).__init__(hs)
 
-        self._get_register_3pid_client = Repl3PID.make_client(hs)
         self._remote_join_client = ReplRemoteJoin.make_client(hs)
         self._remote_reject_client = ReplRejectInvite.make_client(hs)
         self._notify_change_client = ReplJoinedLeft.make_client(hs)
@@ -55,7 +53,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
         yield self._user_joined_room(user, room_id)
 
-        defer.returnValue(ret)
+        return ret
 
     def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
         """Implements RoomMemberHandler._remote_reject_invite
@@ -79,14 +77,4 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         """
         return self._notify_change_client(
             user_id=target.to_string(), room_id=room_id, change="left"
-        )
-
-    def get_or_register_3pid_guest(self, requester, medium, address, inviter_user_id):
-        """Implements RoomMemberHandler.get_or_register_3pid_guest
-        """
-        return self._get_register_3pid_client(
-            requester=requester,
-            medium=medium,
-            address=address,
-            inviter_user_id=inviter_user_id,
         )

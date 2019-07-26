@@ -26,8 +26,8 @@ from twisted.web.server import NOT_DONE_YET
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite, logger
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock
-from synapse.util.logcontext import make_deferred_yieldable
 
 from tests import unittest
 from tests.server import (
@@ -61,7 +61,10 @@ class JsonResourceTests(unittest.TestCase):
 
         res = JsonResource(self.homeserver)
         res.register_paths(
-            "GET", [re.compile("^/_matrix/foo/(?P<room_id>[^/]*)$")], _callback
+            "GET",
+            [re.compile("^/_matrix/foo/(?P<room_id>[^/]*)$")],
+            _callback,
+            "test_servlet",
         )
 
         request, channel = make_request(
@@ -82,7 +85,9 @@ class JsonResourceTests(unittest.TestCase):
             raise Exception("boo")
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
+        )
 
         request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
@@ -105,7 +110,9 @@ class JsonResourceTests(unittest.TestCase):
             return make_deferred_yieldable(d)
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
+        )
 
         request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
@@ -122,7 +129,9 @@ class JsonResourceTests(unittest.TestCase):
             raise SynapseError(403, "Forbidden!!one!", Codes.FORBIDDEN)
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
+        )
 
         request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
@@ -143,7 +152,9 @@ class JsonResourceTests(unittest.TestCase):
             self.fail("shouldn't ever get here")
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
+        )
 
         request, channel = make_request(self.reactor, b"GET", b"/_matrix/foobar")
         render(request, res, self.reactor)

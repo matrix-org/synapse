@@ -33,6 +33,7 @@ exclude Dockerfile
 exclude .dockerignore
 exclude test_postgresql.sh
 exclude .editorconfig
+exclude sytest-blacklist
 
 include pyproject.toml
 recursive-include changelog.d *

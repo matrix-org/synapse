@@ -28,11 +28,11 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersions
 from synapse.events.snapshot import EventContext
+from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ class StateHandler(object):
             event = None
             if event_id:
                 event = yield self.store.get_event(event_id, allow_none=True)
-            defer.returnValue(event)
+            return event
             return
 
         state_map = yield self.store.get_events(
@@ -145,7 +145,7 @@ class StateHandler(object):
             key: state_map[e_id] for key, e_id in iteritems(state) if e_id in state_map
         }
 
-        defer.returnValue(state)
+        return state
 
     @defer.inlineCallbacks
     def get_current_state_ids(self, room_id, latest_event_ids=None):
@@ -169,7 +169,7 @@ class StateHandler(object):
         ret = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
         state = ret.state
 
-        defer.returnValue(state)
+        return state
 
     @defer.inlineCallbacks
     def get_current_users_in_room(self, room_id, latest_event_ids=None):
@@ -189,7 +189,7 @@ class StateHandler(object):
         logger.debug("calling resolve_state_groups from get_current_users_in_room")
         entry = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
         joined_users = yield self.store.get_joined_users_from_state(room_id, entry)
-        defer.returnValue(joined_users)
+        return joined_users
 
     @defer.inlineCallbacks
     def get_current_hosts_in_room(self, room_id, latest_event_ids=None):
@@ -198,7 +198,7 @@ class StateHandler(object):
         logger.debug("calling resolve_state_groups from get_current_hosts_in_room")
         entry = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
         joined_hosts = yield self.store.get_joined_hosts(room_id, entry)
-        defer.returnValue(joined_hosts)
+        return joined_hosts
 
     @defer.inlineCallbacks
     def compute_event_context(self, event, old_state=None):
@@ -241,7 +241,7 @@ class StateHandler(object):
                 prev_state_ids=prev_state_ids,
             )
 
-            defer.returnValue(context)
+            return context
 
         if old_state:
             # We already have the state, so we don't need to calculate it.
@@ -275,7 +275,7 @@ class StateHandler(object):
                 prev_state_ids=prev_state_ids,
             )
 
-            defer.returnValue(context)
+            return context
 
         logger.debug("calling resolve_state_groups from compute_event_context")
 
@@ -343,7 +343,7 @@ class StateHandler(object):
             delta_ids=delta_ids,
         )
 
-        defer.returnValue(context)
+        return context
 
     @defer.inlineCallbacks
     def resolve_state_groups_for_events(self, room_id, event_ids):
@@ -368,19 +368,17 @@ class StateHandler(object):
         state_groups_ids = yield self.store.get_state_groups_ids(room_id, event_ids)
 
         if len(state_groups_ids) == 0:
-            defer.returnValue(_StateCacheEntry(state={}, state_group=None))
+            return _StateCacheEntry(state={}, state_group=None)
         elif len(state_groups_ids) == 1:
             name, state_list = list(state_groups_ids.items()).pop()
 
             prev_group, delta_ids = yield self.store.get_state_group_delta(name)
 
-            defer.returnValue(
-                _StateCacheEntry(
-                    state=state_list,
-                    state_group=name,
-                    prev_group=prev_group,
-                    delta_ids=delta_ids,
-                )
+            return _StateCacheEntry(
+                state=state_list,
+                state_group=name,
+                prev_group=prev_group,
+                delta_ids=delta_ids,
             )
 
         room_version = yield self.store.get_room_version(room_id)
@@ -392,7 +390,7 @@ class StateHandler(object):
             None,
             state_res_store=StateResolutionStore(self.store),
         )
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def resolve_events(self, room_version, state_sets, event):
@@ -415,7 +413,7 @@ class StateHandler(object):
 
         new_state = {key: state_map[ev_id] for key, ev_id in iteritems(new_state)}
 
-        defer.returnValue(new_state)
+        return new_state
 
 
 class StateResolutionHandler(object):
@@ -479,7 +477,7 @@ class StateResolutionHandler(object):
             if self._state_cache is not None:
                 cache = self._state_cache.get(group_names, None)
                 if cache:
-                    defer.returnValue(cache)
+                    return cache
 
             logger.info(
                 "Resolving state for %s with %d groups", room_id, len(state_groups_ids)
@@ -525,7 +523,7 @@ class StateResolutionHandler(object):
             if self._state_cache is not None:
                 self._state_cache[group_names] = cache
 
-            defer.returnValue(cache)
+            return cache
 
 
 def _make_state_cache_entry(new_state, state_groups_ids):

@@ -14,7 +14,9 @@
 Description=Synapse Matrix homeserver
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-abort
 
 User=synapse

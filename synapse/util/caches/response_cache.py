@@ -16,9 +16,9 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches import register_cache
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class ResponseCache(object):
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
         you should wrap normal synapse deferreds with
-        logcontext.run_in_background).
+        synapse.logging.context.run_in_background).
 
         Can return either a new Deferred (which also doesn't follow the synapse
         logcontext rules), or, if *deferred* was already complete, the actual
@@ -121,7 +121,7 @@ class ResponseCache(object):
             @defer.inlineCallbacks
             def handle_request(request):
                 # etc
-                defer.returnValue(result)
+                return result
 
             result = yield response_cache.wrap(
                 key,

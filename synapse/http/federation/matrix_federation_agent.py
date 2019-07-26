@@ -30,9 +30,9 @@ from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent
 
 from synapse.http.federation.srv_resolver import SrvResolver, pick_server_from_list
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock
 from synapse.util.caches.ttlcache import TTLCache
-from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
 
 # period to cache .well-known results for by default
@@ -177,7 +177,7 @@ class MatrixFederationAgent(object):
         res = yield make_deferred_yieldable(
             agent.request(method, uri, headers, bodyProducer)
         )
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def _route_matrix_uri(self, parsed_uri, lookup_well_known=True):
@@ -205,24 +205,20 @@ class MatrixFederationAgent(object):
             port = parsed_uri.port
             if port == -1:
                 port = 8448
-            defer.returnValue(
-                _RoutingResult(
-                    host_header=parsed_uri.netloc,
-                    tls_server_name=parsed_uri.host,
-                    target_host=parsed_uri.host,
-                    target_port=port,
-                )
+            return _RoutingResult(
+                host_header=parsed_uri.netloc,
+                tls_server_name=parsed_uri.host,
+                target_host=parsed_uri.host,
+                target_port=port,
             )
 
         if parsed_uri.port != -1:
             # there is an explicit port
-            defer.returnValue(
-                _RoutingResult(
-                    host_header=parsed_uri.netloc,
-                    tls_server_name=parsed_uri.host,
-                    target_host=parsed_uri.host,
-                    target_port=parsed_uri.port,
-                )
+            return _RoutingResult(
+                host_header=parsed_uri.netloc,
+                tls_server_name=parsed_uri.host,
+                target_host=parsed_uri.host,
+                target_port=parsed_uri.port,
             )
 
         if lookup_well_known:
@@ -259,7 +255,7 @@ class MatrixFederationAgent(object):
                 )
 
                 res = yield self._route_matrix_uri(new_uri, lookup_well_known=False)
-                defer.returnValue(res)
+                return res
 
         # try a SRV lookup
         service_name = b"_matrix._tcp.%s" % (parsed_uri.host,)
@@ -283,13 +279,11 @@ class MatrixFederationAgent(object):
                 parsed_uri.host.decode("ascii"),
             )
 
-        defer.returnValue(
-            _RoutingResult(
-                host_header=parsed_uri.netloc,
-                tls_server_name=parsed_uri.host,
-                target_host=target_host,
-                target_port=port,
-            )
+        return _RoutingResult(
+            host_header=parsed_uri.netloc,
+            tls_server_name=parsed_uri.host,
+            target_host=target_host,
+            target_port=port,
         )
 
     @defer.inlineCallbacks
@@ -314,7 +308,7 @@ class MatrixFederationAgent(object):
             if cache_period > 0:
                 self._well_known_cache.set(server_name, result, cache_period)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _do_get_well_known(self, server_name):
@@ -354,7 +348,7 @@ class MatrixFederationAgent(object):
             # after startup
             cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
             cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
-            defer.returnValue((None, cache_period))
+            return (None, cache_period)
 
         result = parsed_body["m.server"].encode("ascii")
 
@@ -369,7 +363,7 @@ class MatrixFederationAgent(object):
         else:
             cache_period = min(cache_period, WELL_KNOWN_MAX_CACHE_PERIOD)
 
-        defer.returnValue((result, cache_period))
+        return (result, cache_period)
 
 
 @implementer(IStreamClientEndpoint)

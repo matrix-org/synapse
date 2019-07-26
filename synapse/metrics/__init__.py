@@ -29,7 +29,15 @@ from prometheus_client.core import REGISTRY, GaugeMetricFamily, HistogramMetricF
 
 from twisted.internet import reactor
 
+from synapse.metrics._exposition import (
+    MetricsResource,
+    generate_latest,
+    start_http_server,
+)
+
 logger = logging.getLogger(__name__)
+
+METRICS_PREFIX = "/_synapse/metrics"
 
 running_on_pypy = platform.python_implementation() == "PyPy"
 all_metrics = []
@@ -437,7 +445,10 @@ def runUntilCurrentTimer(func):
         counts = gc.get_count()
         for i in (2, 1, 0):
             if threshold[i] < counts[i]:
-                logger.info("Collecting gc %d", i)
+                if i == 0:
+                    logger.debug("Collecting gc %d", i)
+                else:
+                    logger.info("Collecting gc %d", i)
 
                 start = time.time()
                 unreachable = gc.collect(i)
@@ -467,3 +478,12 @@ try:
         gc.disable()
 except AttributeError:
     pass
+
+__all__ = [
+    "MetricsResource",
+    "generate_latest",
+    "start_http_server",
+    "LaterGauge",
+    "InFlightGauge",
+    "BucketCollector",
+]

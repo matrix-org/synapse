@@ -20,8 +20,8 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
+from synapse.logging.context import LoggingContext
 from synapse.metrics import InFlightGauge
-from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def measure_func(name):
         def measured_func(self, *args, **kwargs):
             with Measure(self.clock, name):
                 r = yield func(self, *args, **kwargs)
-            defer.returnValue(r)
+            return r
 
         return measured_func
 

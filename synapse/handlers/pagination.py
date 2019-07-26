@@ -20,10 +20,10 @@ from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
+from synapse.logging.context import run_in_background
 from synapse.storage.state import StateFilter
 from synapse.types import RoomStreamToken
 from synapse.util.async_helpers import ReadWriteLock
-from synapse.util.logcontext import run_in_background
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
 
@@ -242,13 +242,11 @@ class PaginationHandler(object):
             )
 
         if not events:
-            defer.returnValue(
-                {
-                    "chunk": [],
-                    "start": pagin_config.from_token.to_string(),
-                    "end": next_token.to_string(),
-                }
-            )
+            return {
+                "chunk": [],
+                "start": pagin_config.from_token.to_string(),
+                "end": next_token.to_string(),
+            }
 
         state = None
         if event_filter and event_filter.lazy_load_members() and len(events) > 0:
@@ -286,4 +284,4 @@ class PaginationHandler(object):
                 )
             )
 
-        defer.returnValue(chunk)
+        return chunk

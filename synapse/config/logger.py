@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
 import logging.config
 import os
@@ -24,7 +25,7 @@ from twisted.logger import STDLibLogObserver, globalLogBeginner
 
 import synapse
 from synapse.app import _base as appbase
-from synapse.util.logcontext import LoggingContextFilter
+from synapse.logging.context import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config
@@ -40,7 +41,7 @@ formatters:
 
 filters:
     context:
-        (): synapse.util.logcontext.LoggingContextFilter
+        (): synapse.logging.context.LoggingContextFilter
         request: ""
 
 handlers:
@@ -75,10 +76,8 @@ root:
 
 class LoggingConfig(Config):
     def read_config(self, config, **kwargs):
-        self.verbosity = config.get("verbose", 0)
-        self.no_redirect_stdio = config.get("no_redirect_stdio", False)
         self.log_config = self.abspath(config.get("log_config"))
-        self.log_file = self.abspath(config.get("log_file"))
+        self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
@@ -94,37 +93,12 @@ class LoggingConfig(Config):
         )
 
     def read_arguments(self, args):
-        if args.verbose is not None:
-            self.verbosity = args.verbose
         if args.no_redirect_stdio is not None:
             self.no_redirect_stdio = args.no_redirect_stdio
-        if args.log_config is not None:
-            self.log_config = args.log_config
-        if args.log_file is not None:
-            self.log_file = args.log_file
 
-    def add_arguments(cls, parser):
+    @staticmethod
+    def add_arguments(parser):
         logging_group = parser.add_argument_group("logging")
-        logging_group.add_argument(
-            "-v",
-            "--verbose",
-            dest="verbose",
-            action="count",
-            help="The verbosity level. Specify multiple times to increase "
-            "verbosity. (Ignored if --log-config is specified.)",
-        )
-        logging_group.add_argument(
-            "-f",
-            "--log-file",
-            dest="log_file",
-            help="File to log to. (Ignored if --log-config is specified.)",
-        )
-        logging_group.add_argument(
-            "--log-config",
-            dest="log_config",
-            default=None,
-            help="Python logging config file",
-        )
         logging_group.add_argument(
             "-n",
             "--no-redirect-stdio",
@@ -152,58 +126,29 @@ def setup_logging(config, use_worker_options=False):
         config (LoggingConfig | synapse.config.workers.WorkerConfig):
             configuration data
 
-        use_worker_options (bool): True to use 'worker_log_config' and
-            'worker_log_file' options instead of 'log_config' and 'log_file'.
+        use_worker_options (bool): True to use the 'worker_log_config' option
+            instead of 'log_config'.
 
         register_sighup (func | None): Function to call to register a
             sighup handler.
     """
     log_config = config.worker_log_config if use_worker_options else config.log_config
-    log_file = config.worker_log_file if use_worker_options else config.log_file
-
-    log_format = (
-        "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
-        " - %(message)s"
-    )
 
     if log_config is None:
-        # We don't have a logfile, so fall back to the 'verbosity' param from
-        # the config or cmdline. (Note that we generate a log config for new
-        # installs, so this will be an unusual case)
-        level = logging.INFO
-        level_for_storage = logging.INFO
-        if config.verbosity:
-            level = logging.DEBUG
-            if config.verbosity > 1:
-                level_for_storage = logging.DEBUG
+        log_format = (
+            "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
+            " - %(message)s"
+        )
 
         logger = logging.getLogger("")
-        logger.setLevel(level)
-
-        logging.getLogger("synapse.storage.SQL").setLevel(level_for_storage)
+        logger.setLevel(logging.INFO)
+        logging.getLogger("synapse.storage.SQL").setLevel(logging.INFO)
 
         formatter = logging.Formatter(log_format)
-        if log_file:
-            # TODO: Customisable file size / backup count
-            handler = logging.handlers.RotatingFileHandler(
-                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3, encoding="utf8"
-            )
 
-            def sighup(signum, stack):
-                logger.info("Closing log file due to SIGHUP")
-                handler.doRollover()
-                logger.info("Opened new log file due to SIGHUP")
-
-        else:
-            handler = logging.StreamHandler()
-
-            def sighup(*args):
-                pass
-
+        handler = logging.StreamHandler()
         handler.setFormatter(formatter)
-
         handler.addFilter(LoggingContextFilter(request=""))
-
         logger.addHandler(handler)
     else:
 
@@ -217,8 +162,7 @@ def setup_logging(config, use_worker_options=False):
             logging.info("Reloaded log config from %s due to SIGHUP", log_config)
 
         load_log_config()
-
-    appbase.register_sighup(sighup)
+        appbase.register_sighup(sighup)
 
     # make sure that the first thing we log is a thing we can grep backwards
     # for

@@ -33,6 +33,8 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
+from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
+from synapse.logging.utils import log_function
 from synapse.metrics import BucketCollector
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateResolutionStore
@@ -45,8 +47,6 @@ from synapse.util import batch_iter
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.util.frozenutils import frozendict_json_encoder
-from synapse.util.logcontext import PreserveLoggingContext, make_deferred_yieldable
-from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -223,7 +223,7 @@ def _retry_on_integrity_error(func):
         except self.database_engine.module.IntegrityError:
             logger.exception("IntegrityError, retrying.")
             res = yield func(self, *args, delete_existing=True, **kwargs)
-        defer.returnValue(res)
+        return res
 
     return f
 
@@ -253,7 +253,14 @@ class EventsStore(
         )
 
         # Read the extrems every 60 minutes
-        hs.get_clock().looping_call(self._read_forward_extremities, 60 * 60 * 1000)
+        def read_forward_extremities():
+            # run as a background process to make sure that the database transactions
+            # have a logcontext to report to
+            return run_as_background_process(
+                "read_forward_extremities", self._read_forward_extremities
+            )
+
+        hs.get_clock().looping_call(read_forward_extremities, 60 * 60 * 1000)
 
     @defer.inlineCallbacks
     def _read_forward_extremities(self):
@@ -302,7 +309,7 @@ class EventsStore(
 
         max_persisted_id = yield self._stream_id_gen.get_current_token()
 
-        defer.returnValue(max_persisted_id)
+        return max_persisted_id
 
     @defer.inlineCallbacks
     @log_function
@@ -327,7 +334,7 @@ class EventsStore(
         yield make_deferred_yieldable(deferred)
 
         max_persisted_id = yield self._stream_id_gen.get_current_token()
-        defer.returnValue((event.internal_metadata.stream_ordering, max_persisted_id))
+        return (event.internal_metadata.stream_ordering, max_persisted_id)
 
     def _maybe_start_persisting(self, room_id):
         @defer.inlineCallbacks
@@ -588,7 +595,7 @@ class EventsStore(
             stale = latest_event_ids & result
             stale_forward_extremities_counter.observe(len(stale))
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _get_events_which_are_prevs(self, event_ids):
@@ -626,7 +633,7 @@ class EventsStore(
                 "_get_events_which_are_prevs", _get_events_which_are_prevs_txn, chunk
             )
 
-        defer.returnValue(results)
+        return results
 
     @defer.inlineCallbacks
     def _get_prevs_before_rejected(self, event_ids):
@@ -688,7 +695,7 @@ class EventsStore(
                 "_get_prevs_before_rejected", _get_prevs_before_rejected_txn, chunk
             )
 
-        defer.returnValue(existing_prevs)
+        return existing_prevs
 
     @defer.inlineCallbacks
     def _get_new_state_after_events(
@@ -789,7 +796,7 @@ class EventsStore(
         # If they old and new groups are the same then we don't need to do
         # anything.
         if old_state_groups == new_state_groups:
-            defer.returnValue((None, None))
+            return (None, None)
 
         if len(new_state_groups) == 1 and len(old_state_groups) == 1:
             # If we're going from one state group to another, lets check if
@@ -806,7 +813,7 @@ class EventsStore(
                 # the current state in memory then lets also return that,
                 # but it doesn't matter if we don't.
                 new_state = state_groups_map.get(new_state_group)
-                defer.returnValue((new_state, delta_ids))
+                return (new_state, delta_ids)
 
         # Now that we have calculated new_state_groups we need to get
         # their state IDs so we can resolve to a single state set.
@@ -818,7 +825,7 @@ class EventsStore(
         if len(new_state_groups) == 1:
             # If there is only one state group, then we know what the current
             # state is.
-            defer.returnValue((state_groups_map[new_state_groups.pop()], None))
+            return (state_groups_map[new_state_groups.pop()], None)
 
         # Ok, we need to defer to the state handler to resolve our state sets.
 
@@ -847,7 +854,7 @@ class EventsStore(
             state_res_store=StateResolutionStore(self),
         )
 
-        defer.returnValue((res.state, None))
+        return (res.state, None)
 
     @defer.inlineCallbacks
     def _calculate_state_delta(self, room_id, current_state):
@@ -870,7 +877,7 @@ class EventsStore(
             if ev_id != existing_state.get(key)
         }
 
-        defer.returnValue((to_delete, to_insert))
+        return (to_delete, to_insert)
 
     @log_function
     def _persist_events_txn(
@@ -910,8 +917,6 @@ class EventsStore(
 
         min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering
         max_stream_order = events_and_contexts[-1][0].internal_metadata.stream_ordering
-
-        self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)
 
         self._update_forward_extremities_txn(
             txn,
@@ -986,6 +991,10 @@ class EventsStore(
             backfilled=backfilled,
         )
 
+        # We call this last as it assumes we've inserted the events into
+        # room_memberships, where applicable.
+        self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)
+
     def _update_current_state_txn(self, txn, state_delta_by_room, stream_id):
         for room_id, current_state_tuple in iteritems(state_delta_by_room):
             to_delete, to_insert = current_state_tuple
@@ -1055,16 +1064,16 @@ class EventsStore(
                 ),
             )
 
-            self._simple_insert_many_txn(
-                txn,
-                table="current_state_events",
-                values=[
-                    {
-                        "event_id": ev_id,
-                        "room_id": room_id,
-                        "type": key[0],
-                        "state_key": key[1],
-                    }
+            # We include the membership in the current state table, hence we do
+            # a lookup when we insert. This assumes that all events have already
+            # been inserted into room_memberships.
+            txn.executemany(
+                """INSERT INTO current_state_events
+                    (room_id, type, state_key, event_id, membership)
+                VALUES (?, ?, ?, ?, (SELECT membership FROM room_memberships WHERE event_id = ?))
+                """,
+                [
+                    (room_id, key[0], key[1], ev_id, ev_id)
                     for key, ev_id in iteritems(to_insert)
                 ],
             )
@@ -1555,7 +1564,7 @@ class EventsStore(
             return count
 
         ret = yield self.runInteraction("count_messages", _count_messages)
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def count_daily_sent_messages(self):
@@ -1576,7 +1585,7 @@ class EventsStore(
             return count
 
         ret = yield self.runInteraction("count_daily_sent_messages", _count_messages)
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def count_daily_active_rooms(self):
@@ -1591,7 +1600,7 @@ class EventsStore(
             return count
 
         ret = yield self.runInteraction("count_daily_active_rooms", _count)
-        defer.returnValue(ret)
+        return ret
 
     def get_current_backfill_token(self):
         """The current minimum token that backfilled events have reached"""
@@ -2174,7 +2183,7 @@ class EventsStore(
         """
         to_1, so_1 = yield self._get_event_ordering(event_id1)
         to_2, so_2 = yield self._get_event_ordering(event_id2)
-        defer.returnValue((to_1, so_1) > (to_2, so_2))
+        return (to_1, so_1) > (to_2, so_2)
 
     @cachedInlineCallbacks(max_entries=5000)
     def _get_event_ordering(self, event_id):
@@ -2188,9 +2197,7 @@ class EventsStore(
         if not res:
             raise SynapseError(404, "Could not find event %s" % (event_id,))
 
-        defer.returnValue(
-            (int(res["topological_ordering"]), int(res["stream_ordering"]))
-        )
+        return (int(res["topological_ordering"]), int(res["stream_ordering"]))
 
     def get_all_updated_current_state_deltas(self, from_token, to_token, limit):
         def get_all_updated_current_state_deltas_txn(txn):

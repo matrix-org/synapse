@@ -34,6 +34,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import HttpServer
+from synapse.logging.context import LoggingContext
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import PostgresEngine, create_engine
@@ -42,7 +43,6 @@ from synapse.storage.prepare_database import (
     _setup_new_database,
     prepare_database,
 )
-from synapse.util.logcontext import LoggingContext
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 # set this to True to run the tests against postgres instead of sqlite.
@@ -152,12 +152,6 @@ def default_config(name, parse=False):
         "mau_stats_only": False,
         "mau_limits_reserved_threepids": [],
         "admin_contact": None,
-        "rc_federation": {
-            "reject_limit": 10,
-            "sleep_limit": 10,
-            "sleep_delay": 10,
-            "concurrent": 10,
-        },
         "rc_message": {"per_second": 10000, "burst_count": 10000},
         "rc_registration": {"per_second": 10000, "burst_count": 10000},
         "rc_login": {
@@ -367,7 +361,7 @@ def setup_test_homeserver(
     if fed:
         register_federation_servlets(hs, fed)
 
-    defer.returnValue(hs)
+    return hs
 
 
 def register_federation_servlets(hs, resource):
@@ -471,13 +465,13 @@ class MockHttpResource(HttpServer):
                     args = [urlparse.unquote(u) for u in matcher.groups()]
 
                     (code, response) = yield func(mock_request, *args)
-                    defer.returnValue((code, response))
+                    return (code, response)
                 except CodeMessageException as e:
-                    defer.returnValue((e.code, cs_error(e.msg, code=e.errcode)))
+                    return (e.code, cs_error(e.msg, code=e.errcode))
 
         raise KeyError("No event can handle %s" % path)
 
-    def register_paths(self, method, path_patterns, callback):
+    def register_paths(self, method, path_patterns, callback, servlet_name):
         for path_pattern in path_patterns:
             self.callbacks.append((method, path_pattern, callback))
 

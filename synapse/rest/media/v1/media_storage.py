@@ -24,9 +24,8 @@ import six
 from twisted.internet import defer
 from twisted.protocols.basic import FileSender
 
-from synapse.util import logcontext
+from synapse.logging.context import defer_to_thread, make_deferred_yieldable
 from synapse.util.file_consumer import BackgroundFileConsumer
-from synapse.util.logcontext import make_deferred_yieldable
 
 from ._base import Responder
 
@@ -65,12 +64,12 @@ class MediaStorage(object):
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
             # Write to the main repository
-            yield logcontext.defer_to_thread(
+            yield defer_to_thread(
                 self.hs.get_reactor(), _write_file_synchronously, source, f
             )
             yield finish_cb()
 
-        defer.returnValue(fname)
+        return fname
 
     @contextlib.contextmanager
     def store_into_file(self, file_info):
@@ -144,14 +143,14 @@ class MediaStorage(object):
         path = self._file_info_to_path(file_info)
         local_path = os.path.join(self.local_media_directory, path)
         if os.path.exists(local_path):
-            defer.returnValue(FileResponder(open(local_path, "rb")))
+            return FileResponder(open(local_path, "rb"))
 
         for provider in self.storage_providers:
             res = yield provider.fetch(path, file_info)
             if res:
-                defer.returnValue(res)
+                return res
 
-        defer.returnValue(None)
+        return None
 
     @defer.inlineCallbacks
     def ensure_media_is_in_local_cache(self, file_info):
@@ -167,7 +166,7 @@ class MediaStorage(object):
         path = self._file_info_to_path(file_info)
         local_path = os.path.join(self.local_media_directory, path)
         if os.path.exists(local_path):
-            defer.returnValue(local_path)
+            return local_path
 
         dirname = os.path.dirname(local_path)
         if not os.path.exists(dirname):
@@ -182,7 +181,7 @@ class MediaStorage(object):
                     )
                     yield res.write_to_consumer(consumer)
                     yield consumer.wait()
-                defer.returnValue(local_path)
+                return local_path
 
         raise Exception("file could not be found")
 

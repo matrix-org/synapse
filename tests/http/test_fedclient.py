@@ -29,7 +29,7 @@ from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
 )
-from synapse.util.logcontext import LoggingContext
+from synapse.logging.context import LoggingContext
 
 from tests.server import FakeTransport
 from tests.unittest import HomeserverTestCase
@@ -68,7 +68,7 @@ class FederationClientTests(HomeserverTestCase):
 
                 try:
                     fetch_res = yield fetch_d
-                    defer.returnValue(fetch_res)
+                    return fetch_res
                 finally:
                     check_logcontext(context)
 

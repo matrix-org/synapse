@@ -27,8 +27,8 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.http.site import SynapseSite
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.logging.context import LoggingContext
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
@@ -40,7 +40,6 @@ from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.storage.media_repository import MediaRepositoryStore
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 
@@ -162,7 +161,9 @@ def start(config_options):
     )
 
     ss.setup()
-    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ss, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-media-repository", config)
 

@@ -22,9 +22,10 @@ from email.mime.text import MIMEText
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.logging.context import make_deferred_yieldable
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils
-from synapse.util.logcontext import make_deferred_yieldable
 
 try:
     from synapse.push.mailer import load_jinja2_templates
@@ -67,7 +68,14 @@ class AccountValidityHandler(object):
             )
 
             # Check the renewal emails to send and send them every 30min.
-            self.clock.looping_call(self.send_renewal_emails, 30 * 60 * 1000)
+            def send_emails():
+                # run as a background process to make sure that the database transactions
+                # have a logcontext to report to
+                return run_as_background_process(
+                    "send_renewals", self.send_renewal_emails
+                )
+
+            self.clock.looping_call(send_emails, 30 * 60 * 1000)
 
     @defer.inlineCallbacks
     def send_renewal_emails(self):
@@ -185,7 +193,7 @@ class AccountValidityHandler(object):
             if threepid["medium"] == "email":
                 addresses.append(threepid["address"])
 
-        defer.returnValue(addresses)
+        return addresses
 
     @defer.inlineCallbacks
     def _get_renewal_token(self, user_id):
@@ -206,7 +214,7 @@ class AccountValidityHandler(object):
             try:
                 renewal_token = stringutils.random_string(32)
                 yield self.store.set_renewal_token_for_user(user_id, renewal_token)
-                defer.returnValue(renewal_token)
+                return renewal_token
             except StoreError:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a unique string as refresh string.")
@@ -246,4 +254,4 @@ class AccountValidityHandler(object):
             user_id=user_id, expiration_ts=expiration_ts, email_sent=email_sent
         )
 
-        defer.returnValue(expiration_ts)
+        return expiration_ts

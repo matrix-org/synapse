@@ -53,10 +53,10 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         # -1 because user3 is a support user and does not count
         user_num = len(threepids) - 1
 
-        self.store.register(user_id=user1, token="123", password_hash=None)
-        self.store.register(user_id=user2, token="456", password_hash=None)
-        self.store.register(
-            user_id=user3, token="789", password_hash=None, user_type=UserTypes.SUPPORT
+        self.store.register_user(user_id=user1, password_hash=None)
+        self.store.register_user(user_id=user2, password_hash=None)
+        self.store.register_user(
+            user_id=user3, password_hash=None, user_type=UserTypes.SUPPORT
         )
         self.pump()
 
@@ -161,9 +161,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def test_populate_monthly_users_is_guest(self):
         # Test that guest users are not added to mau list
         user_id = "@user_id:host"
-        self.store.register(
-            user_id=user_id, token="123", password_hash=None, make_guest=True
-        )
+        self.store.register_user(user_id=user_id, password_hash=None, make_guest=True)
         self.store.upsert_monthly_active_user = Mock()
         self.store.populate_monthly_active_users(user_id)
         self.pump()
@@ -216,8 +214,8 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.assertEquals(self.get_success(count), 0)
 
         # Test reserved registed users
-        self.store.register(user_id=user1, token="123", password_hash=None)
-        self.store.register(user_id=user2, token="456", password_hash=None)
+        self.store.register_user(user_id=user1, password_hash=None)
+        self.store.register_user(user_id=user2, password_hash=None)
         self.pump()
 
         now = int(self.hs.get_clock().time_msec())
@@ -232,11 +230,8 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.pump()
         self.assertEqual(self.get_success(count), 0)
 
-        self.store.register(
-            user_id=support_user_id,
-            token="123",
-            password_hash=None,
-            user_type=UserTypes.SUPPORT,
+        self.store.register_user(
+            user_id=support_user_id, password_hash=None, user_type=UserTypes.SUPPORT
         )
 
         self.store.upsert_monthly_active_user(support_user_id)

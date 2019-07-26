@@ -19,9 +19,9 @@ from collections import namedtuple
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError
+from synapse.logging.context import run_in_background
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-from synapse.util.logcontext import run_in_background
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
 
@@ -140,7 +140,7 @@ class TypingHandler(object):
 
         if was_present:
             # No point sending another notification
-            defer.returnValue(None)
+            return None
 
         self._push_update(member=member, typing=True)
 
@@ -173,7 +173,7 @@ class TypingHandler(object):
     def _stopped_typing(self, member):
         if member.user_id not in self._room_typing.get(member.room_id, set()):
             # No point
-            defer.returnValue(None)
+            return None
 
         self._member_typing_until.pop(member, None)
         self._member_last_federation_poke.pop(member, None)

@@ -22,6 +22,23 @@ logger = logging.getLogger(__name__)
 
 
 def get_version_string(module):
+    """Given a module calculate a git-aware version string for it.
+
+    If called on a module not in a git checkout will return `__verison__`.
+
+    Args:
+        module (module)
+
+    Returns:
+        str
+    """
+
+    cached_version = getattr(module, "_synapse_version_string_cache", None)
+    if cached_version:
+        return cached_version
+
+    version_string = module.__version__
+
     try:
         null = open(os.devnull, "w")
         cwd = os.path.dirname(os.path.abspath(module.__file__))
@@ -80,8 +97,10 @@ def get_version_string(module):
                 s for s in (git_branch, git_tag, git_commit, git_dirty) if s
             )
 
-            return "%s (%s)" % (module.__version__, git_version)
+            version_string = "%s (%s)" % (module.__version__, git_version)
     except Exception as e:
         logger.info("Failed to check for git repository: %s", e)
 
-    return module.__version__
+    module._synapse_version_string_cache = version_string
+
+    return version_string

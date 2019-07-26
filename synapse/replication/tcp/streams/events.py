@@ -134,7 +134,7 @@ class EventsStream(Stream):
 
         all_updates = heapq.merge(event_updates, state_updates)
 
-        defer.returnValue(all_updates)
+        return all_updates
 
     @classmethod
     def parse_row(cls, row):

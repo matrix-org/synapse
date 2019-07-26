@@ -69,7 +69,7 @@ class PushRuleRestServlet(RestServlet):
         if "attr" in spec:
             yield self.set_rule_attr(user_id, spec, content)
             self.notify_user(user_id)
-            defer.returnValue((200, {}))
+            return (200, {})
 
         if spec["rule_id"].startswith("."):
             # Rule ids starting with '.' are reserved for server default rules.
@@ -106,7 +106,7 @@ class PushRuleRestServlet(RestServlet):
         except RuleNotFoundException as e:
             raise SynapseError(400, str(e))
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, path):
@@ -123,7 +123,7 @@ class PushRuleRestServlet(RestServlet):
         try:
             yield self.store.delete_push_rule(user_id, namespaced_rule_id)
             self.notify_user(user_id)
-            defer.returnValue((200, {}))
+            return (200, {})
         except StoreError as e:
             if e.code == 404:
                 raise NotFoundError()
@@ -151,10 +151,10 @@ class PushRuleRestServlet(RestServlet):
             )
 
         if path[0] == "":
-            defer.returnValue((200, rules))
+            return (200, rules)
         elif path[0] == "global":
             result = _filter_ruleset_with_path(rules["global"], path[1:])
-            defer.returnValue((200, result))
+            return (200, result)
         else:
             raise UnrecognizedRequestError()
 

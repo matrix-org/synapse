@@ -22,7 +22,7 @@ from twisted.internet.error import ConnectError
 from twisted.names import dns, error
 
 from synapse.http.federation.srv_resolver import SrvResolver
-from synapse.util.logcontext import LoggingContext
+from synapse.logging.context import LoggingContext
 
 from tests import unittest
 from tests.utils import MockClock
@@ -61,7 +61,7 @@ class SrvResolverTestCase(unittest.TestCase):
                 # should have restored our context
                 self.assertIs(LoggingContext.current_context(), ctx)
 
-                defer.returnValue(result)
+                return result
 
         test_d = do_lookup()
         self.assertNoResult(test_d)

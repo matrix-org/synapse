@@ -22,9 +22,9 @@ from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
 
-from synapse.api.errors import CodeMessageException, FederationDeniedError, SynapseError
+from synapse.api.errors import CodeMessageException, SynapseError
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID, get_domain_from_id
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
@@ -144,7 +144,7 @@ class E2eKeysHandler(object):
             )
         )
 
-        defer.returnValue({"device_keys": results, "failures": failures})
+        return {"device_keys": results, "failures": failures}
 
     @defer.inlineCallbacks
     def query_local_devices(self, query):
@@ -189,7 +189,7 @@ class E2eKeysHandler(object):
                     r["unsigned"]["device_display_name"] = display_name
                 result_dict[user_id][device_id] = r
 
-        defer.returnValue(result_dict)
+        return result_dict
 
     @defer.inlineCallbacks
     def on_federation_query_client_keys(self, query_body):
@@ -197,7 +197,7 @@ class E2eKeysHandler(object):
         """
         device_keys_query = query_body.get("device_keys", {})
         res = yield self.query_local_devices(device_keys_query)
-        defer.returnValue({"device_keys": res})
+        return {"device_keys": res}
 
     @defer.inlineCallbacks
     def claim_one_time_keys(self, query, timeout):
@@ -259,7 +259,7 @@ class E2eKeysHandler(object):
             ),
         )
 
-        defer.returnValue({"one_time_keys": json_result, "failures": failures})
+        return {"one_time_keys": json_result, "failures": failures}
 
     @defer.inlineCallbacks
     def upload_keys_for_user(self, user_id, device_id, keys):
@@ -297,7 +297,7 @@ class E2eKeysHandler(object):
 
         result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
 
-        defer.returnValue({"one_time_key_counts": result})
+        return {"one_time_key_counts": result}
 
     @defer.inlineCallbacks
     def _upload_one_time_keys_for_user(
@@ -349,9 +349,6 @@ def _exception_to_failure(e):
 
     if isinstance(e, NotRetryingDestination):
         return {"status": 503, "message": "Not ready for retry"}
-
-    if isinstance(e, FederationDeniedError):
-        return {"status": 403, "message": "Federation Denied"}
 
     # include ConnectionRefused and other errors
     #

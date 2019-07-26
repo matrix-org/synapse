@@ -32,22 +32,21 @@ from canonicaljson import json
 
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
+    DirectServeResource,
     respond_with_json,
     respond_with_json_bytes,
     wrap_json_request_handler,
 )
 from synapse.http.servlet import parse_integer, parse_string
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.stringutils import random_string
 
 from ._base import FileInfo
@@ -58,11 +57,11 @@ _charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=r
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 
-class PreviewUrlResource(Resource):
+class PreviewUrlResource(DirectServeResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo, media_storage):
-        Resource.__init__(self)
+        super().__init__()
 
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
@@ -96,18 +95,14 @@ class PreviewUrlResource(Resource):
         )
 
     def render_OPTIONS(self, request):
+        request.setHeader(b"Allow", b"OPTIONS, GET")
         return respond_with_json(request, 200, {}, send_cors=True)
 
-    def render_GET(self, request):
-        self._async_render_GET(request)
-        return NOT_DONE_YET
-
     @wrap_json_request_handler
-    @defer.inlineCallbacks
-    def _async_render_GET(self, request):
+    async def _async_render_GET(self, request):
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
         url = parse_string(request, "url")
         if b"ts" in request.args:
             ts = parse_integer(request, "ts")
@@ -159,7 +154,7 @@ class PreviewUrlResource(Resource):
         else:
             logger.info("Returning cached response")
 
-        og = yield make_deferred_yieldable(observable.observe())
+        og = await make_deferred_yieldable(defer.maybeDeferred(observable.observe))
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
     @defer.inlineCallbacks
@@ -187,7 +182,7 @@ class PreviewUrlResource(Resource):
             og = cache_result["og"]
             if isinstance(og, six.text_type):
                 og = og.encode("utf8")
-            defer.returnValue(og)
+            return og
             return
 
         media_info = yield self._download_url(url, user)
@@ -289,7 +284,7 @@ class PreviewUrlResource(Resource):
             media_info["created_ts"],
         )
 
-        defer.returnValue(jsonog)
+        return jsonog
 
     @defer.inlineCallbacks
     def _download_url(self, url, user):
@@ -359,22 +354,20 @@ class PreviewUrlResource(Resource):
             # therefore not expire it.
             raise
 
-        defer.returnValue(
-            {
-                "media_type": media_type,
-                "media_length": length,
-                "download_name": download_name,
-                "created_ts": time_now_ms,
-                "filesystem_id": file_id,
-                "filename": fname,
-                "uri": uri,
-                "response_code": code,
-                # FIXME: we should calculate a proper expiration based on the
-                # Cache-Control and Expire headers.  But for now, assume 1 hour.
-                "expires": 60 * 60 * 1000,
-                "etag": headers["ETag"][0] if "ETag" in headers else None,
-            }
-        )
+        return {
+            "media_type": media_type,
+            "media_length": length,
+            "download_name": download_name,
+            "created_ts": time_now_ms,
+            "filesystem_id": file_id,
+            "filename": fname,
+            "uri": uri,
+            "response_code": code,
+            # FIXME: we should calculate a proper expiration based on the
+            # Cache-Control and Expire headers.  But for now, assume 1 hour.
+            "expires": 60 * 60 * 1000,
+            "etag": headers["ETag"][0] if "ETag" in headers else None,
+        }
 
     def _start_expire_url_cache_data(self):
         return run_as_background_process(

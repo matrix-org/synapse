@@ -136,7 +136,7 @@ class ServerConfig(Config):
 
         # Whether to enable experimental MSC1849 (aka relations) support
         self.experimental_msc1849_support_enabled = config.get(
-            "experimental_msc1849_support_enabled", False
+            "experimental_msc1849_support_enabled", True
         )
 
         # Options to control access by tracking MAU
@@ -639,7 +639,8 @@ class ServerConfig(Config):
         if args.print_pidfile is not None:
             self.print_pidfile = args.print_pidfile
 
-    def add_arguments(self, parser):
+    @staticmethod
+    def add_arguments(parser):
         server_group = parser.add_argument_group("server")
         server_group.add_argument(
             "-D",
