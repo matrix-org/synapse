@@ -1,0 +1,1 @@
+Log when we receive a `/make_*` request from a different origin.
