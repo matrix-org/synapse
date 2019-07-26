@@ -245,9 +245,14 @@ def setup_structured_logging(config, log_config):
     log_filter = LogLevelFilterPredicate()
 
     for namespace, config in log_config.get("loggers", {}).items():
+        # Set the log level for twisted.logger.Logger namespaces
         log_filter.setLogLevelForNamespace(
             namespace, stdlib_log_level_to_twisted(log_config.get("level", "INFO"))
         )
+
+        # Also set the log levels for the stdlib logger namespaces, to prevent
+        # them getting to PythonStdlibToTwistedLogger and having to be formatted
+        logging.getLogger(namespace).setLevel(log_config.get("level", "NOTSET"))
 
     f = FilteringLogObserver(publisher, [log_filter])
     lco = LogContextObserver(f)
