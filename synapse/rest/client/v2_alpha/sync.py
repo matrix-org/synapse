@@ -138,7 +138,9 @@ class SyncRestServlet(RestServlet):
                 except StoreError as err:
                     if err.code == 404 and err.errcode == Codes.UNKNOWN:
                         # fix up the description and errcode to be more useful
-                        raise SynapseError(404, "No such filter", errcode=Codes.NOT_FOUND)
+                        raise SynapseError(
+                            404, "No such filter", errcode=Codes.NOT_FOUND
+                        )
                     else:
                         raise
         else:
