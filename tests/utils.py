@@ -471,7 +471,7 @@ class MockHttpResource(HttpServer):
 
         raise KeyError("No event can handle %s" % path)
 
-    def register_paths(self, method, path_patterns, callback):
+    def register_paths(self, method, path_patterns, callback, servlet_name):
         for path_pattern in path_patterns:
             self.callbacks.append((method, path_pattern, callback))
 

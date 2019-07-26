@@ -211,16 +211,18 @@ class StatsStore(StateDeltasStore):
             avatar_id = current_state_ids.get((EventTypes.RoomAvatar, ""))
             canonical_alias_id = current_state_ids.get((EventTypes.CanonicalAlias, ""))
 
+            event_ids = [
+                join_rules_id,
+                history_visibility_id,
+                encryption_id,
+                name_id,
+                topic_id,
+                avatar_id,
+                canonical_alias_id,
+            ]
+
             state_events = yield self.get_events(
-                [
-                    join_rules_id,
-                    history_visibility_id,
-                    encryption_id,
-                    name_id,
-                    topic_id,
-                    avatar_id,
-                    canonical_alias_id,
-                ]
+                [ev for ev in event_ids if ev is not None]
             )
 
             def _get_or_none(event_id, arg):

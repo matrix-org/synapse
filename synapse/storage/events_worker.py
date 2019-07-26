@@ -139,8 +139,11 @@ class EventsWorkerStore(SQLBaseStore):
                 If there is a mismatch, behave as per allow_none.
 
         Returns:
-            Deferred : A FrozenEvent.
+            Deferred[EventBase|None]
         """
+        if not isinstance(event_id, str):
+            raise TypeError("Invalid event event_id %r" % (event_id,))
+
         events = yield self.get_events_as_list(
             [event_id],
             check_redacted=check_redacted,
@@ -263,6 +266,14 @@ class EventsWorkerStore(SQLBaseStore):
                     # we never serve redactions of Creates to clients.
                     logger.info(
                         "Withholding redaction %s of create event %s",
+                        event_id,
+                        redacted_event_id,
+                    )
+                    continue
+
+                if original_event.room_id != entry.event.room_id:
+                    logger.info(
+                        "Withholding redaction %s of event %s from a different room",
                         event_id,
                         redacted_event_id,
                     )
@@ -629,6 +640,10 @@ class EventsWorkerStore(SQLBaseStore):
             # we choose to ignore redactions of m.room.create events.
             return None
 
+        if original_ev.type == "m.room.redaction":
+            # ... and redaction events
+            return None
+
         redaction_map = yield self._get_events_from_cache_or_db(redactions)
 
         for redaction_id in redactions:
@@ -636,9 +651,21 @@ class EventsWorkerStore(SQLBaseStore):
             if not redaction_entry:
                 # we don't have the redaction event, or the redaction event was not
                 # authorized.
+                logger.debug(
+                    "%s was redacted by %s but redaction not found/authed",
+                    original_ev.event_id,
+                    redaction_id,
+                )
                 continue
 
             redaction_event = redaction_entry.event
+            if redaction_event.room_id != original_ev.room_id:
+                logger.debug(
+                    "%s was redacted by %s but redaction was in a different room!",
+                    original_ev.event_id,
+                    redaction_id,
+                )
+                continue
 
             # Starting in room version v3, some redactions need to be
             # rechecked if we didn't have the redacted event at the
@@ -650,7 +677,14 @@ class EventsWorkerStore(SQLBaseStore):
                     redaction_event.internal_metadata.recheck_redaction = False
                 else:
                     # Senders don't match, so the event isn't actually redacted
+                    logger.debug(
+                        "%s was redacted by %s but the senders don't match",
+                        original_ev.event_id,
+                        redaction_id,
+                    )
                     continue
+
+            logger.debug("Redacting %s due to %s", original_ev.event_id, redaction_id)
 
             # we found a good redaction event. Redact!
             redacted_event = prune_event(original_ev)
