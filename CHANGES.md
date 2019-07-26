@@ -1,3 +1,18 @@
+Synapse 1.2.1 (2019-07-26)
+==========================
+
+Security update
+---------------
+
+This release includes *four* security fixes:
+
+- Prevent an attack where a federated server could send redactions for arbitrary events in v1 and v2 rooms. ([\#5767](https://github.com/matrix-org/synapse/issues/5767))
+- Prevent a denial-of-service attack where cycles of redaction events would make Synapse spin infinitely. Thanks to `@lrizika:matrix.org` for identifying and responsibly disclosing this issue. ([0f2ecb961](https://github.com/matrix-org/synapse/commit/0f2ecb961))
+- Prevent an attack where users could be joined or parted from public rooms without their consent. Thanks to @Dylanger for identifying and responsibly disclosing this issue. ([\#5744](https://github.com/matrix-org/synapse/issues/5744))
+- Fix a vulnerability where a federated server could spoof read-receipts from users on other servers. ([\#5743](https://github.com/matrix-org/synapse/issues/5743))
+
+Note that Synapse 1.2.0 also contained a security fix which was not correctly identified during the original release. The changelog below is now updated.
+
 Synapse 1.2.0 (2019-07-25)
 ==========================
 
@@ -15,6 +30,14 @@ Bugfixes
 
 Synapse 1.2.0rc1 (2019-07-22)
 =============================
+
+Security fixes
+--------------
+
+This update included a security fix which was initially incorrectly flagged as
+a regular bug fix.
+
+- It was possible for a room moderator to send a redaction for an `m.room.create` event, which would downgrade the room to version 1. Thanks to `/dev/ponies` for identifying and responsibly disclosing this issue! ([\#5701](https://github.com/matrix-org/synapse/issues/5701))
 
 Features
 --------
@@ -41,7 +64,6 @@ Bugfixes
 - Fix bug in #5626 that prevented the original_event field from actually having the contents of the original event in a call to `/relations`. ([\#5654](https://github.com/matrix-org/synapse/issues/5654))
 - Fix 3PID bind requests being sent to identity servers as `application/x-form-www-urlencoded` data, which is deprecated. ([\#5658](https://github.com/matrix-org/synapse/issues/5658))
 - Fix some problems with authenticating redactions in recent room versions. ([\#5699](https://github.com/matrix-org/synapse/issues/5699), [\#5700](https://github.com/matrix-org/synapse/issues/5700), [\#5707](https://github.com/matrix-org/synapse/issues/5707))
-- Ignore redactions of m.room.create events. ([\#5701](https://github.com/matrix-org/synapse/issues/5701))
 
 
 Updates to the Docker image
