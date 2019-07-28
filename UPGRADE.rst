@@ -147,14 +147,16 @@ Upgrading to v0.34.0
 
 1. This release is the first to fully support Python 3. Synapse will now run on
    Python versions 3.5, or 3.6 (as well as 2.7). We recommend switching to
-   Python 3, as it has been shown to give performance improvements.
+   Python 3, as it has been shown to give performance improvements. To switch
+   to Python 3 you need to install the latest packages, see `Platform-Specific
+Instructions <INSTALL.md>`_.
 
    For users who have installed Synapse into a virtualenv, we recommend doing
    this by creating a new virtualenv. For example::
 
        virtualenv -p python3 ~/synapse/env3
        source ~/synapse/env3/bin/activate
-       pip install matrix-synapse
+       pip install psycopg2 lxml matrix-synapse
 
    You can then start synapse as normal, having activated the new virtualenv::
 
