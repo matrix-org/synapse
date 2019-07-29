@@ -38,11 +38,6 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
-ROOM_COMPLEXITY_TOO_GREAT = (
-    "Your homeserver is unable to join rooms this large or complex. "
-    "Please speak to your server administrator, or upgrade your instance "
-    "to join this room."
-)
 
 
 class RoomMemberHandler(object):
@@ -1012,7 +1007,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             if too_complex is True:
                 raise SynapseError(
                     code=400,
-                    msg=ROOM_COMPLEXITY_TOO_GREAT,
+                    msg=self.hs.config.limit_remote_rooms.complexity_error,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 )
 
@@ -1046,7 +1041,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             )
             raise SynapseError(
                 code=400,
-                msg=ROOM_COMPLEXITY_TOO_GREAT,
+                msg=self.hs.config.limit_remote_rooms.complexity_error,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
             )
 

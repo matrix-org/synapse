@@ -39,6 +39,12 @@ DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
 DEFAULT_ROOM_VERSION = "4"
 
+ROOM_COMPLEXITY_TOO_GREAT = (
+    "Your homeserver is unable to join rooms this large or complex. "
+    "Please speak to your server administrator, or upgrade your instance "
+    "to join this room."
+)
+
 
 class ServerConfig(Config):
     def read_config(self, config, **kwargs):
@@ -255,6 +261,10 @@ class ServerConfig(Config):
             )
             complexity = attr.ib(
                 validator=attr.validators.instance_of((int, float)), default=1.0
+            )
+            complexity_error = attr.ib(
+                validator=attr.validators.instance_of(str),
+                default=ROOM_COMPLEXITY_TOO_GREAT,
             )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
@@ -638,10 +648,15 @@ class ServerConfig(Config):
         # limit_remote_rooms.complexity, it will disallow joining or
         # instantly leave.
         #
+        # limit_remote_rooms.complexity_error can be set to customise the text
+        # displayed to the user when a room above the complexity threshold has
+        # its join cancelled.
+        #
         # Uncomment the below lines to enable:
         #limit_remote_rooms:
         #  enabled: True
         #  complexity: 1.0
+        #  complexity_error: "This room is too complex."
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.
