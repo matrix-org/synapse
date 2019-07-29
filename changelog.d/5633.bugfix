@@ -1,1 +1,1 @@
-Don't create broken room when power_level_content_override.users dopes not contain creator_id.
+Don't create broken room when power_level_content_override.users does not contain creator_id.
