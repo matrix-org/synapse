@@ -2796,3 +2796,28 @@ class FederationHandler(BaseHandler):
             )
         else:
             return user_joined_room(self.distributor, user, room_id)
+
+    @defer.inlineCallbacks
+    def get_room_complexity(self, remote_room_hosts, room_id):
+        """
+        Fetch the complexity of a remote room over federation.
+
+        Args:
+            remote_room_hosts (list[str]): The remote servers to ask.
+            room_id (str): The room ID to ask about.
+
+        Returns:
+            Deferred[dict] or Deferred[None]: Dict contains the complexity
+            metric versions, while None means we could not fetch the complexity.
+        """
+
+        for host in remote_room_hosts:
+            res = yield self.federation_client.get_room_complexity(host, room_id)
+
+            # We got a result, return it.
+            if res:
+                defer.returnValue(res)
+
+        # We fell off the bottom, couldn't get the complexity from anyone. Oh
+        # well.
+        defer.returnValue(None)
