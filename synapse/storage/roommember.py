@@ -678,6 +678,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # to see if any have subsequently been updated. This is done so that
             # we can use a partial index on `forgotten = 1` on the assumption
             # that few users will actually forget many rooms.
+            #
+            # Note that a room is considered "forgotten" if *all* membership
+            # events for that user and room have the forgotten field set (as
+            # when a user forgets a room we update all rows for that user and
+            # room, not just the current one).
             sql = """
                 SELECT room_id, (
                     SELECT count(*) FROM room_memberships
