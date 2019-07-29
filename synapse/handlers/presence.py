@@ -333,7 +333,7 @@ class PresenceHandler(object):
         """Checks the presence of users that have timed out and updates as
         appropriate.
         """
-        logger.info("Handling presence timeouts")
+        logger.debug("Handling presence timeouts")
         now = self.clock.time_msec()
 
         # Fetch the list of users that *may* have timed out. Things may have
