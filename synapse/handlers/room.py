@@ -750,7 +750,7 @@ class RoomCreationHandler(BaseHandler):
                     power_level_content["users"][invitee] = 100
 
             if power_level_content_override:
-                power_level_content = power_level_content_override
+                power_level_content.update(power_level_content_override)
 
             if creator_id not in power_level_content["users"]:
                 raise SynapseError(
