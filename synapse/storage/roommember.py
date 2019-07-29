@@ -179,19 +179,27 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
             # we order by membership and then fairly arbitrarily by event_id so
             # heroes are consistent
-            sql = """
-                SELECT m.user_id, m.membership, m.event_id
-                FROM room_memberships as m
-                 INNER JOIN current_state_events as c
-                 ON m.event_id = c.event_id
-                 AND m.room_id = c.room_id
-                 AND m.user_id = c.state_key
-                 WHERE c.type = 'm.room.member' AND c.room_id = ?
-                 ORDER BY
-                    CASE m.membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
-                    m.event_id ASC
-                 LIMIT ?
-            """
+            if self._current_state_events_membership_up_to_date:
+                sql = """
+                    SELECT state_key, membership, event_id
+                    FROM current_state_events
+                    WHERE type = 'm.room.member' AND room_id = ?
+                    ORDER BY
+                        CASE membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
+                        event_id ASC
+                    LIMIT ?
+                """
+            else:
+                sql = """
+                    SELECT c.state_key, m.membership, c.event_id
+                    FROM room_memberships as m
+                    INNER JOIN current_state_events as c USING (room_id, event_id)
+                    WHERE c.type = 'm.room.member' AND c.room_id = ?
+                    ORDER BY
+                        CASE m.membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
+                        c.event_id ASC
+                    LIMIT ?
+                """
 
             # 6 is 5 (number of heroes) plus 1, in case one of them is the calling user.
             txn.execute(sql, (room_id, Membership.JOIN, Membership.INVITE, 6))
@@ -256,27 +264,34 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 return invite
         return None
 
+    @defer.inlineCallbacks
     def get_rooms_for_user_where_membership_is(self, user_id, membership_list):
         """ Get all the rooms for this user where the membership for this user
         matches one in the membership list.
+
+        Filters out forgotten rooms.
 
         Args:
             user_id (str): The user ID.
             membership_list (list): A list of synapse.api.constants.Membership
             values which the user must be in.
+
         Returns:
-            A list of dictionary objects, with room_id, membership and sender
-            defined.
+            Deferred[list[RoomsForUser]]
         """
         if not membership_list:
             return defer.succeed(None)
 
-        return self.runInteraction(
+        rooms = yield self.runInteraction(
             "get_rooms_for_user_where_membership_is",
             self._get_rooms_for_user_where_membership_is_txn,
             user_id,
             membership_list,
         )
+
+        # Now we filter out forgotten rooms
+        forgotten_rooms = yield self.get_forgotten_rooms_for_user(user_id)
+        return [room for room in rooms if room.room_id not in forgotten_rooms]
 
     def _get_rooms_for_user_where_membership_is_txn(
         self, txn, user_id, membership_list
@@ -287,26 +302,33 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         results = []
         if membership_list:
-            where_clause = "user_id = ? AND (%s) AND forgotten = 0" % (
-                " OR ".join(["m.membership = ?" for _ in membership_list]),
-            )
+            if self._current_state_events_membership_up_to_date:
+                sql = """
+                    SELECT room_id, e.sender, c.membership, event_id, e.stream_ordering
+                    FROM current_state_events AS c
+                    INNER JOIN events AS e USING (room_id, event_id)
+                    WHERE
+                        c.type = 'm.room.member'
+                        AND state_key = ?
+                        AND c.membership IN (%s)
+                """ % (
+                    ",".join("?" * len(membership_list))
+                )
+            else:
+                sql = """
+                    SELECT room_id, e.sender, m.membership, event_id, e.stream_ordering
+                    FROM current_state_events AS c
+                    INNER JOIN room_memberships AS m USING (room_id, event_id)
+                    INNER JOIN events AS e USING (room_id, event_id)
+                    WHERE
+                        c.type = 'm.room.member'
+                        AND state_key = ?
+                        AND m.membership IN (%s)
+                """ % (
+                    ",".join("?" * len(membership_list))
+                )
 
-            args = [user_id]
-            args.extend(membership_list)
-
-            sql = (
-                "SELECT m.room_id, m.sender, m.membership, m.event_id, e.stream_ordering"
-                " FROM current_state_events as c"
-                " INNER JOIN room_memberships as m"
-                " ON m.event_id = c.event_id"
-                " INNER JOIN events as e"
-                " ON e.event_id = c.event_id"
-                " AND m.room_id = c.room_id"
-                " AND m.user_id = c.state_key"
-                " WHERE c.type = 'm.room.member' AND %s"
-            ) % (where_clause,)
-
-            txn.execute(sql, args)
+            txn.execute(sql, (user_id, *membership_list))
             results = [RoomsForUser(**r) for r in self.cursor_to_dict(txn)]
 
         if do_invite:
@@ -637,6 +659,44 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         count = yield self.runInteraction("did_forget_membership", f)
         return count == 0
 
+    @cached()
+    def get_forgotten_rooms_for_user(self, user_id):
+        """Gets all rooms the user has forgotten.
+
+        Args:
+            user_id (str)
+
+        Returns:
+            Deferred[set[str]]
+        """
+
+        def _get_forgotten_rooms_for_user_txn(txn):
+            # This is a slightly convoluted query that first looks up all rooms
+            # that the user has forgotten in the past, then rechecks that list
+            # to see if any have subsequently been updated. This is done so that
+            # we can use a partial index on `forgotten = 1` on the assumption
+            # that few users will actually forget many rooms.
+            #
+            # Note that a room is considered "forgotten" if *all* membership
+            # events for that user and room have the forgotten field set (as
+            # when a user forgets a room we update all rows for that user and
+            # room, not just the current one).
+            sql = """
+                SELECT room_id, (
+                    SELECT count(*) FROM room_memberships
+                    WHERE room_id = m.room_id AND user_id = m.user_id AND forgotten = 0
+                ) AS count
+                FROM room_memberships AS m
+                WHERE user_id = ? AND forgotten = 1
+                GROUP BY room_id, user_id;
+            """
+            txn.execute(sql, (user_id,))
+            return set(row[0] for row in txn if row[1] == 0)
+
+        return self.runInteraction(
+            "get_forgotten_rooms_for_user", _get_forgotten_rooms_for_user_txn
+        )
+
     @defer.inlineCallbacks
     def get_rooms_user_has_been_in(self, user_id):
         """Get all rooms that the user has ever been in.
@@ -667,6 +727,13 @@ class RoomMemberStore(RoomMemberWorkerStore):
         self.register_background_update_handler(
             _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME,
             self._background_current_state_membership,
+        )
+        self.register_background_index_update(
+            "room_membership_forgotten_idx",
+            index_name="room_memberships_user_room_forgotten",
+            table="room_memberships",
+            columns=["user_id", "room_id"],
+            where_clause="forgotten = 1",
         )
 
     def _store_room_members_txn(self, txn, events, backfilled):
@@ -769,6 +836,9 @@ class RoomMemberStore(RoomMemberWorkerStore):
             txn.execute(sql, (user_id, room_id))
 
             self._invalidate_cache_and_stream(txn, self.did_forget, (user_id, room_id))
+            self._invalidate_cache_and_stream(
+                txn, self.get_forgotten_rooms_for_user, (user_id,)
+            )
 
         return self.runInteraction("forget_membership", f)
 
