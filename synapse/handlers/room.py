@@ -563,6 +563,7 @@ class RoomCreationHandler(BaseHandler):
         power_level_content_override = config.get("power_level_content_override")
         if (
             power_level_content_override
+            and "users" in power_level_content_override
             and user_id not in power_level_content_override["users"]
         ):
             raise SynapseError(
