@@ -755,10 +755,7 @@ class MediaRepositoryResource(Resource):
     def __init__(self, hs):
         # If this is not the media repo (which will always load this class),
         # raise an exception if it is tried to be used.
-        if (
-            not hs.config.enable_media_repo
-            and not hs.config.worker_app == "synapse.app.media_repository"
-        ):
+        if hs.config.external_media_repo:
             raise Exception("This Synapse is not configured for media repo use.")
 
         super().__init__()

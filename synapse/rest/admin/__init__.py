@@ -825,7 +825,6 @@ def register_servlets(hs, http_server):
 def register_servlets_for_client_rest_resource(hs, http_server):
     """Register only the servlets which need to be exposed on /_matrix/client/xxx"""
     WhoisRestServlet(hs).register(http_server)
-    PurgeMediaCacheRestServlet(hs).register(http_server)
     PurgeHistoryStatusRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     PurgeHistoryRestServlet(hs).register(http_server)
@@ -834,10 +833,15 @@ def register_servlets_for_client_rest_resource(hs, http_server):
     GetUsersPaginatedRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     ShutdownRoomRestServlet(hs).register(http_server)
-    QuarantineMediaInRoom(hs).register(http_server)
-    ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
     DeleteGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
+
+    # Media URLs -- if we're using an external media repo, don't add them.
+    if not hs.config.external_media_repo:
+        PurgeMediaCacheRestServlet(hs).register(http_server)
+        QuarantineMediaInRoom(hs).register(http_server)
+        ListMediaInRoom(hs).register(http_server)
+
     # don't add more things here: new servlets should only be exposed on
     # /_synapse/admin so should not go here. Instead register them in AdminRestResource.

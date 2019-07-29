@@ -139,6 +139,13 @@ def start(config_options):
 
     assert config.worker_app == "synapse.app.media_repository"
 
+    if config.external_media_repo:
+        _base.quit_with_error(
+            "external_media_repo must be disabled before the \n"
+            "media_repository worker can be used\n"
+            "Please add ``external_media_repo: false`` to the main config\n"
+        )
+
     if config.enable_media_repo:
         _base.quit_with_error(
             "enable_media_repo must be disabled in the main synapse process\n"
