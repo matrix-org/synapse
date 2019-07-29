@@ -49,14 +49,15 @@ steps:
 
 
   - command:
-      - "python -m pip install tox"
+      - "apt-get update && apt-get install -y python3.5 python3.5-dev python3-pip libxml2-dev libxslt-dev zlib1g-dev"
+      - "python3.5 -m pip install tox"
       - "tox -e py35-old,codecov"
     label: ":python: 3.5 / SQLite / Old Deps"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
       - docker#v3.0.1:
-          image: "python:3.5"
+          image: "ubuntu:xenial"  # We use xenail to get an old sqlite and python
           propagate-environment: true
     retry:
       automatic:
