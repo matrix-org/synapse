@@ -325,7 +325,7 @@ class RoomListHandler(BaseHandler):
                     current_limit=since_token.current_limit - 1,
                 ).to_token()
 
-        defer.returnValue(results)
+        return results
 
     @defer.inlineCallbacks
     def _append_room_entry_to_chunk(
@@ -420,7 +420,7 @@ class RoomListHandler(BaseHandler):
         if join_rules_event:
             join_rule = join_rules_event.content.get("join_rule", None)
             if not allow_private and join_rule and join_rule != JoinRules.PUBLIC:
-                defer.returnValue(None)
+                return None
 
         # Return whether this room is open to federation users or not
         create_event = current_state.get((EventTypes.Create, ""))
@@ -469,7 +469,7 @@ class RoomListHandler(BaseHandler):
             if avatar_url:
                 result["avatar_url"] = avatar_url
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def get_remote_public_room_list(
@@ -482,7 +482,7 @@ class RoomListHandler(BaseHandler):
         third_party_instance_id=None,
     ):
         if not self.enable_room_list_search:
-            defer.returnValue({"chunk": [], "total_room_count_estimate": 0})
+            return {"chunk": [], "total_room_count_estimate": 0}
 
         if search_filter:
             # We currently don't support searching across federation, so we have
@@ -507,7 +507,7 @@ class RoomListHandler(BaseHandler):
                 ]
             }
 
-        defer.returnValue(res)
+        return res
 
     def _get_remote_list_cached(
         self,

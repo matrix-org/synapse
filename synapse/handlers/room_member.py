@@ -29,7 +29,7 @@ from twisted.internet import defer
 import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, HttpResponseException, SynapseError
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -191,7 +191,7 @@ class RoomMemberHandler(object):
         )
         if duplicate is not None:
             # Discard the new event since this membership change is a no-op.
-            defer.returnValue(duplicate)
+            return duplicate
 
         yield self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[target], ratelimit=ratelimit
@@ -233,7 +233,7 @@ class RoomMemberHandler(object):
                 if prev_member_event.membership == Membership.JOIN:
                     yield self._user_left_room(target, room_id)
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def copy_room_tags_and_direct_to_room(self, old_room_id, new_room_id, user_id):
@@ -303,7 +303,7 @@ class RoomMemberHandler(object):
                 require_consent=require_consent,
             )
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _update_membership(
@@ -423,7 +423,7 @@ class RoomMemberHandler(object):
                 same_membership = old_membership == effective_membership_state
                 same_sender = requester.user.to_string() == old_state.sender
                 if same_sender and same_membership and same_content:
-                    defer.returnValue(old_state)
+                    return old_state
 
             if old_membership in ["ban", "leave"] and action == "kick":
                 raise AuthError(403, "The target user is not in the room")
@@ -473,7 +473,7 @@ class RoomMemberHandler(object):
                 ret = yield self._remote_join(
                     requester, remote_room_hosts, room_id, target, content
                 )
-                defer.returnValue(ret)
+                return ret
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
@@ -495,7 +495,7 @@ class RoomMemberHandler(object):
                     res = yield self._remote_reject_invite(
                         requester, remote_room_hosts, room_id, target
                     )
-                    defer.returnValue(res)
+                    return res
 
         res = yield self._local_membership_update(
             requester=requester,
@@ -508,7 +508,7 @@ class RoomMemberHandler(object):
             content=content,
             require_consent=require_consent,
         )
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def send_membership_event(
@@ -596,11 +596,11 @@ class RoomMemberHandler(object):
         """
         guest_access_id = current_state_ids.get((EventTypes.GuestAccess, ""), None)
         if not guest_access_id:
-            defer.returnValue(False)
+            return False
 
         guest_access = yield self.store.get_event(guest_access_id)
 
-        defer.returnValue(
+        return (
             guest_access
             and guest_access.content
             and "guest_access" in guest_access.content
@@ -635,7 +635,7 @@ class RoomMemberHandler(object):
             servers.remove(room_alias.domain)
         servers.insert(0, room_alias.domain)
 
-        defer.returnValue((RoomID.from_string(room_id), servers))
+        return (RoomID.from_string(room_id), servers)
 
     @defer.inlineCallbacks
     def _get_inviter(self, user_id, room_id):
@@ -643,7 +643,7 @@ class RoomMemberHandler(object):
             user_id=user_id, room_id=room_id
         )
         if invite:
-            defer.returnValue(UserID.from_string(invite.sender))
+            return UserID.from_string(invite.sender)
 
     @defer.inlineCallbacks
     def do_3pid_invite(
@@ -708,11 +708,11 @@ class RoomMemberHandler(object):
                 if "signatures" not in data:
                     raise AuthError(401, "No signatures on 3pid binding")
                 yield self._verify_any_signature(data, id_server)
-                defer.returnValue(data["mxid"])
+                return data["mxid"]
 
         except IOError as e:
             logger.warn("Error from identity server lookup: %s" % (e,))
-            defer.returnValue(None)
+            return None
 
     @defer.inlineCallbacks
     def _verify_any_signature(self, data, server_hostname):
@@ -872,9 +872,23 @@ class RoomMemberHandler(object):
             "sender_avatar_url": inviter_avatar_url,
         }
 
-        data = yield self.simple_http_client.post_urlencoded_get_json(
-            is_url, invite_config
-        )
+        try:
+            data = yield self.simple_http_client.post_json_get_json(
+                is_url, invite_config
+            )
+        except HttpResponseException as e:
+            # Some identity servers may only support application/x-www-form-urlencoded
+            # types. This is especially true with old instances of Sydent, see
+            # https://github.com/matrix-org/sydent/pull/170
+            logger.info(
+                "Failed to POST %s with JSON, falling back to urlencoded form: %s",
+                is_url,
+                e,
+            )
+            data = yield self.simple_http_client.post_urlencoded_get_json(
+                is_url, invite_config
+            )
+
         # TODO: Check for success
         token = data["token"]
         public_keys = data.get("public_keys", [])
@@ -890,7 +904,7 @@ class RoomMemberHandler(object):
         if not public_keys:
             public_keys.append(fallback_public_key)
         display_name = data["display_name"]
-        defer.returnValue((token, public_keys, fallback_public_key, display_name))
+        return (token, public_keys, fallback_public_key, display_name)
 
     @defer.inlineCallbacks
     def _is_host_in_room(self, current_state_ids):
@@ -899,7 +913,7 @@ class RoomMemberHandler(object):
         create_event_id = current_state_ids.get(("m.room.create", ""))
         if len(current_state_ids) == 1 and create_event_id:
             # We can only get here if we're in the process of creating the room
-            defer.returnValue(True)
+            return True
 
         for etype, state_key in current_state_ids:
             if etype != EventTypes.Member or not self.hs.is_mine_id(state_key):
@@ -911,16 +925,16 @@ class RoomMemberHandler(object):
                 continue
 
             if event.membership == Membership.JOIN:
-                defer.returnValue(True)
+                return True
 
-        defer.returnValue(False)
+        return False
 
     @defer.inlineCallbacks
     def _is_server_notice_room(self, room_id):
         if self._server_notices_mxid is None:
-            defer.returnValue(False)
+            return False
         user_ids = yield self.store.get_users_in_room(room_id)
-        defer.returnValue(self._server_notices_mxid in user_ids)
+        return self._server_notices_mxid in user_ids
 
 
 class RoomMemberMasterHandler(RoomMemberHandler):
@@ -964,7 +978,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             ret = yield fed_handler.do_remotely_reject_invite(
                 remote_room_hosts, room_id, target.to_string()
             )
-            defer.returnValue(ret)
+            return ret
         except Exception as e:
             # if we were unable to reject the exception, just mark
             # it as rejected on our end and plough ahead.
@@ -975,7 +989,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             logger.warn("Failed to reject invite: %s", e)
 
             yield self.store.locally_reject_invite(target.to_string(), room_id)
-            defer.returnValue({})
+            return {}
 
     def _user_joined_room(self, target, room_id):
         """Implements RoomMemberHandler._user_joined_room

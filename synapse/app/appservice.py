@@ -27,8 +27,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext, run_in_background
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.directory import DirectoryStore
 from synapse.replication.slave.storage.events import SlavedEventStore
@@ -169,7 +168,9 @@ def start(config_options):
     )
 
     ps.setup()
-    reactor.callWhenRunning(_base.start, ps, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ps, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-appservice", config)
 

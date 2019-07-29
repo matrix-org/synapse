@@ -83,7 +83,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
             remote_room_hosts, room_id, user_id, event_content
         )
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
 
 class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
@@ -153,7 +153,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
             yield self.store.locally_reject_invite(user_id, room_id)
             ret = {}
 
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):

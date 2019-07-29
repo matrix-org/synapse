@@ -1,0 +1,1 @@
+Replace uses of returnValue with plain return, as returnValue is not needed on Python 3.

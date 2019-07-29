@@ -361,7 +361,7 @@ def setup_test_homeserver(
     if fed:
         register_federation_servlets(hs, fed)
 
-    defer.returnValue(hs)
+    return hs
 
 
 def register_federation_servlets(hs, resource):
@@ -465,13 +465,13 @@ class MockHttpResource(HttpServer):
                     args = [urlparse.unquote(u) for u in matcher.groups()]
 
                     (code, response) = yield func(mock_request, *args)
-                    defer.returnValue((code, response))
+                    return (code, response)
                 except CodeMessageException as e:
-                    defer.returnValue((e.code, cs_error(e.msg, code=e.errcode)))
+                    return (e.code, cs_error(e.msg, code=e.errcode))
 
         raise KeyError("No event can handle %s" % path)
 
-    def register_paths(self, method, path_patterns, callback):
+    def register_paths(self, method, path_patterns, callback, servlet_name):
         for path_pattern in path_patterns:
             self.callbacks.append((method, path_pattern, callback))
 

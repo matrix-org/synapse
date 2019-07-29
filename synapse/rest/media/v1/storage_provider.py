@@ -67,7 +67,7 @@ class StorageProviderWrapper(StorageProvider):
         backend (StorageProvider)
         store_local (bool): Whether to store new local files or not.
         store_synchronous (bool): Whether to wait for file to be successfully
-            uploaded, or todo the upload in the backgroud.
+            uploaded, or todo the upload in the background.
         store_remote (bool): Whether remote media should be uploaded
     """
 

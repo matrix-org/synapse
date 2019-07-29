@@ -63,7 +63,7 @@ def resolve_events_with_store(room_version, state_sets, event_map, state_res_sto
     unconflicted_state, conflicted_state = _seperate(state_sets)
 
     if not conflicted_state:
-        defer.returnValue(unconflicted_state)
+        return unconflicted_state
 
     logger.debug("%d conflicted state entries", len(conflicted_state))
     logger.debug("Calculating auth chain difference")
@@ -137,7 +137,7 @@ def resolve_events_with_store(room_version, state_sets, event_map, state_res_sto
 
     logger.debug("done")
 
-    defer.returnValue(resolved_state)
+    return resolved_state
 
 
 @defer.inlineCallbacks
@@ -168,18 +168,18 @@ def _get_power_level_for_sender(event_id, event_map, state_res_store):
             aev = yield _get_event(aid, event_map, state_res_store)
             if (aev.type, aev.state_key) == (EventTypes.Create, ""):
                 if aev.content.get("creator") == event.sender:
-                    defer.returnValue(100)
+                    return 100
                 break
-        defer.returnValue(0)
+        return 0
 
     level = pl.content.get("users", {}).get(event.sender)
     if level is None:
         level = pl.content.get("users_default", 0)
 
     if level is None:
-        defer.returnValue(0)
+        return 0
     else:
-        defer.returnValue(int(level))
+        return int(level)
 
 
 @defer.inlineCallbacks
@@ -224,7 +224,7 @@ def _get_auth_chain_difference(state_sets, event_map, state_res_store):
     intersection = set(auth_sets[0]).intersection(*auth_sets[1:])
     union = set().union(*auth_sets)
 
-    defer.returnValue(union - intersection)
+    return union - intersection
 
 
 def _seperate(state_sets):
@@ -343,7 +343,7 @@ def _reverse_topological_power_sort(event_ids, event_map, state_res_store, auth_
     it = lexicographical_topological_sort(graph, key=_get_power_order)
     sorted_events = list(it)
 
-    defer.returnValue(sorted_events)
+    return sorted_events
 
 
 @defer.inlineCallbacks
@@ -396,7 +396,7 @@ def _iterative_auth_checks(
         except AuthError:
             pass
 
-    defer.returnValue(resolved_state)
+    return resolved_state
 
 
 @defer.inlineCallbacks
@@ -439,7 +439,7 @@ def _mainline_sort(event_ids, resolved_power_event_id, event_map, state_res_stor
 
     event_ids.sort(key=lambda ev_id: order_map[ev_id])
 
-    defer.returnValue(event_ids)
+    return event_ids
 
 
 @defer.inlineCallbacks
@@ -462,7 +462,7 @@ def _get_mainline_depth_for_event(event, mainline_map, event_map, state_res_stor
     while event:
         depth = mainline_map.get(event.event_id)
         if depth is not None:
-            defer.returnValue(depth)
+            return depth
 
         auth_events = event.auth_event_ids()
         event = None
@@ -474,7 +474,7 @@ def _get_mainline_depth_for_event(event, mainline_map, event_map, state_res_stor
                 break
 
     # Didn't find a power level auth event, so we just return 0
-    defer.returnValue(0)
+    return 0
 
 
 @defer.inlineCallbacks
@@ -493,7 +493,7 @@ def _get_event(event_id, event_map, state_res_store):
     if event_id not in event_map:
         events = yield state_res_store.get_events([event_id], allow_rejected=True)
         event_map.update(events)
-    defer.returnValue(event_map[event_id])
+    return event_map[event_id]
 
 
 def lexicographical_topological_sort(graph, key):

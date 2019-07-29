@@ -131,9 +131,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
         if not rows:
-            defer.returnValue(0)
+            return 0
         else:
-            defer.returnValue(max(row["depth"] for row in rows))
+            return max(row["depth"] for row in rows)
 
     def _get_oldest_events_in_room_txn(self, txn, room_id):
         return self._simple_select_onecol_txn(
@@ -169,7 +169,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             # make sure that we don't completely ignore the older events.
             res = res[0:5] + random.sample(res[5:], 5)
 
-        defer.returnValue(res)
+        return res
 
     def get_latest_event_ids_and_hashes_in_room(self, room_id):
         """
@@ -411,7 +411,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             limit,
         )
         events = yield self.get_events_as_list(ids)
-        defer.returnValue(events)
+        return events
 
     def _get_missing_events(self, txn, room_id, earliest_events, latest_events, limit):
 
@@ -463,7 +463,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             desc="get_successor_events",
         )
 
-        defer.returnValue([row["event_id"] for row in rows])
+        return [row["event_id"] for row in rows]
 
 
 class EventFederationStore(EventFederationWorkerStore):
@@ -654,4 +654,4 @@ class EventFederationStore(EventFederationWorkerStore):
         if not result:
             yield self._end_background_update(self.EVENT_AUTH_STATE_ONLY)
 
-        defer.returnValue(batch_size)
+        return batch_size
