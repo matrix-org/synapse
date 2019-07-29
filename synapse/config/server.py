@@ -18,6 +18,7 @@
 import logging
 import os.path
 
+import attr
 from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -247,10 +248,17 @@ class ServerConfig(Config):
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
-        # Resource-constrained Homeserver Configuration
-        self.limit_large_room_joins = config.get("limit_large_remote_room_joins", False)
-        self.limit_large_room_complexity = config.get(
-            "limit_large_remote_room_complexity", 1.0
+        @attr.s
+        class LimitRemoteRoomsConfig(object):
+            enabled = attr.ib(
+                validator=attr.validators.instance_of(bool), default=False
+            )
+            complexity = attr.ib(
+                validator=attr.validators.instance_of((int, float)), default=1.0
+            )
+
+        self.limit_remote_rooms = LimitRemoteRoomsConfig(
+            **config.get("limit_remote_rooms", {})
         )
 
         bind_port = config.get("bind_port")
@@ -625,14 +633,15 @@ class ServerConfig(Config):
 
         # Resource-constrained Homeserver Settings
         #
-        # If limit_large_remote_room_joins is True, the room complexity will be
+        # If limit_remote_rooms.enabled is True, the room complexity will be
         # checked before a user joins a new remote room. If it is above
-        # limit_large_remote_room_complexity, it will disallow joining or
+        # limit_remote_rooms.complexity, it will disallow joining or
         # instantly leave.
         #
         # Uncomment the below lines to enable:
-        #limit_large_remote_room_joins: True
-        #limit_large_remote_room_complexity: 1.0
+        #limit_remote_rooms:
+        #  enabled: True
+        #  complexity: 1.0
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.

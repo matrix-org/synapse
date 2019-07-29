@@ -961,7 +961,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Returns: bool of whether the complexity is too great, or None
             if unable to be fetched
         """
-        max_complexity = self.hs.config.limit_large_room_complexity
+        max_complexity = self.hs.config.limit_remote_rooms.complexity
         complexity = yield self.federation_handler.get_room_complexity(
             remote_room_hosts, room_id
         )
@@ -982,7 +982,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         Returns: bool
         """
-        max_complexity = self.hs.config.limit_large_room_complexity
+        max_complexity = self.hs.config.limit_remote_rooms.complexity
         complexity = yield self.store.get_room_complexity(room_id)
 
         if complexity["v1"] > max_complexity:
@@ -1004,7 +1004,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
-        if self.hs.config.limit_large_room_joins:
+        if self.hs.config.limit_remote_rooms.enabled:
             # Fetch the room complexity
             too_complex = yield self._is_remote_room_too_complex(
                 room_id, remote_room_hosts
@@ -1027,7 +1027,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         # Check the room we just joined wasn't too large, if we didn't fetch the
         # complexity of it before.
-        if self.hs.config.limit_large_room_joins:
+        if self.hs.config.limit_remote_rooms.enabled:
             if too_complex is False:
                 # We checked, and we're under the limit.
                 return
