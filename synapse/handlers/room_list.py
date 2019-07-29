@@ -24,8 +24,7 @@ from unpaddedbase64 import decode_base64, encode_base64
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
-from synapse.api.errors import Codes, HttpResponseException
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.caches.response_cache import ResponseCache
