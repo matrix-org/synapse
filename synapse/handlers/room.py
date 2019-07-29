@@ -561,7 +561,10 @@ class RoomCreationHandler(BaseHandler):
         yield self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
         power_level_content_override = config.get("power_level_content_override")
-        if power_level_content_override and user_id not in power_level_content_override["users"]:
+        if (
+            power_level_content_override
+            and user_id not in power_level_content_override["users"]
+        ):
             raise SynapseError(
                 400,
                 "Not a valid power_level_content_override, did not contain %s"
