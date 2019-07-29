@@ -44,7 +44,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs_config["max_mau_value"] = 50
         hs_config["limit_usage_by_mau"] = True
 
-        hs = self.setup_test_homeserver(config=hs_config, expire_access_token=True)
+        hs = self.setup_test_homeserver(config=hs_config)
         return hs
 
     def prepare(self, reactor, clock, hs):
