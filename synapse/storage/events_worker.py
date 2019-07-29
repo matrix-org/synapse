@@ -277,27 +277,33 @@ class EventsWorkerStore(SQLBaseStore):
                     #  2. have _get_event_from_row just call the first half of
                     #     that
 
-                    orig_sender = yield self._simple_select_one_onecol(
+                    orig_event_info = yield self._simple_select_one(
                         table="events",
                         keyvalues={"event_id": entry.event.redacts},
-                        retcol="sender",
+                        retcols=["sender", "room_id", "type"],
                         allow_none=True,
                     )
 
-                    expected_domain = get_domain_from_id(entry.event.sender)
-                    if (
-                        orig_sender
-                        and get_domain_from_id(orig_sender) == expected_domain
-                    ):
-                        # This redaction event is allowed. Mark as not needing a
-                        # recheck.
-                        entry.event.internal_metadata.recheck_redaction = False
-                    else:
+                    if not orig_event_info:
                         # We don't have the event that is being redacted, so we
                         # assume that the event isn't authorized for now. (If we
                         # later receive the event, then we will always redact
                         # it anyway, since we have this redaction)
                         continue
+
+                    if orig_event_info["room_id"] != entry.event.room_id:
+                        continue
+
+                    if orig_event_info["type"] == EventTypes.Redaction:
+                        continue
+
+                    expected_domain = get_domain_from_id(entry.event.sender)
+                    if (
+                        get_domain_from_id(orig_event_info["sender"]) == expected_domain
+                    ):
+                        # This redaction event is allowed. Mark as not needing a
+                        # recheck.
+                        entry.event.internal_metadata.recheck_redaction = False
 
             if allow_rejected or not entry.event.rejected_reason:
                 if check_redacted and entry.redacted_event:
@@ -566,6 +572,12 @@ class EventsWorkerStore(SQLBaseStore):
                         else:
                             # Senders don't match, so the event isn't actually redacted
                             redacted_event = None
+
+                    if because.room_id != original_ev.room_id:
+                        redacted_event = None
+
+                    if original_ev.type == EventTypes.Redaction:
+                        redacted_event = None
 
             cache_entry = _EventCacheEntry(
                 event=original_ev, redacted_event=redacted_event
