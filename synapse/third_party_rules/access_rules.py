@@ -122,20 +122,7 @@ class RoomAccessRules(object):
             if event["type"] == EventTypes.JoinRules:
                 join_rule = event["content"].get("join_rule")
 
-        if access_rule:
-            # If there's an access rules event in the initial state, check if the prefix
-            # or the join rule in use is compatible (i.e. if it involves a "public" join
-            # rule, the access rule must be "restricted"). We don't need to check that if
-            # there's no access rule provided, as in this case the access rule will
-            # default to "restricted", with which any join rule is allowed.
-            if (
-                (
-                    join_rule == JoinRules.PUBLIC
-                    or preset == RoomCreationPreset.PUBLIC_CHAT
-                ) and access_rule != ACCESS_RULE_RESTRICTED
-            ):
-                raise SynapseError(400, "Invalid access rule")
-        else:
+        if access_rule is None:
             # If there's no access rules event in the initial state, create one with the
             # default setting.
             if is_direct:
@@ -158,6 +145,17 @@ class RoomAccessRules(object):
             })
 
             access_rule = default_rule
+
+        # Check that the preset or the join rule in use is compatible with the access
+        # rule, whether it's a user-defined one or the default one (i.e. if it involves
+        # a "public" join rule, the access rule must be "restricted").
+        if (
+            (
+                join_rule == JoinRules.PUBLIC
+                or preset == RoomCreationPreset.PUBLIC_CHAT
+            ) and access_rule != ACCESS_RULE_RESTRICTED
+        ):
+            raise SynapseError(400, "Invalid access rule")
 
         # Check if the creator can override values for the power levels.
         allowed = self._is_power_level_content_allowed(
@@ -488,7 +486,7 @@ class RoomAccessRules(object):
         """
         join_rule_event = state_events.get((EventTypes.JoinRules, ""))
         if join_rule_event is None:
-            return ""
+            return None
         return join_rule_event.content.get("join_rule")
 
     @staticmethod
