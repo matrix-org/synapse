@@ -568,7 +568,7 @@ class RoomCreationHandler(BaseHandler):
         ):
             raise SynapseError(
                 400,
-                "Not a valid power_level_content_override, did not contain %s"
+                "Not a valid power_level_content_override: 'users' did not contain %s"
                 % (user_id,),
             )
 
