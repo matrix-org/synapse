@@ -1,0 +1,54 @@
+@import url('./themes.less');
+
+@font-face {
+  font-family: 'LiberationSansBold';
+  src: url('../fonts/LiberationSans-Bold.ttf') format('truetype');
+}
+
+.theme {
+  .dark();
+}
+
+html {
+  box-sizing: border-box;
+  font-family: 'LiberationSansBold';
+  font-size: 2rem;
+}
+
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
+body {
+  .theme();
+  background-color: @secondary;
+  color: @font;
+}
+
+.action {
+  .theme();
+  margin: 0 20% 0 20%;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  justify-content: space-evenly;
+  height: 100%;
+
+  button {
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    padding: 0.6rem;
+    color: @font;
+    background-color: @highlight;
+    border: none;
+    display: inline-block;
+    text-transform: capitalize;
+    font-style: bold;
+  }
+}
+
+h1 {
+  .theme();
+  font-size: 2rem;
+  color: @highlight;
+}
