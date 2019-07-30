@@ -255,6 +255,29 @@ class EventsWorkerStore(SQLBaseStore):
             # didn't have the redacted event at the time, so we recheck on read
             # instead.
             if not allow_rejected and entry.event.type == EventTypes.Redaction:
+                orig_event_info = yield self._simple_select_one(
+                    table="events",
+                    keyvalues={"event_id": entry.event.redacts},
+                    retcols=["sender", "room_id", "type"],
+                    allow_none=True,
+                )
+
+                if not orig_event_info:
+                    # We don't have the event that is being redacted, so we
+                    # assume that the event isn't authorized for now. (If we
+                    # later receive the event, then we will always redact
+                    # it anyway, since we have this redaction)
+                    continue
+
+                if orig_event_info["room_id"] != entry.event.room_id:
+                    # Don't process redactions if the redacted event doesn't belong to the
+                    # redaction's room.
+                    continue
+
+                if orig_event_info["type"] == EventTypes.Redaction:
+                    # Don't process redactions of redactions.
+                    continue
+
                 if entry.event.internal_metadata.need_to_check_redaction():
                     # XXX: we need to avoid calling get_event here.
                     #
@@ -276,26 +299,6 @@ class EventsWorkerStore(SQLBaseStore):
                     #     redaction/rejection filtering
                     #  2. have _get_event_from_row just call the first half of
                     #     that
-
-                    orig_event_info = yield self._simple_select_one(
-                        table="events",
-                        keyvalues={"event_id": entry.event.redacts},
-                        retcols=["sender", "room_id", "type"],
-                        allow_none=True,
-                    )
-
-                    if not orig_event_info:
-                        # We don't have the event that is being redacted, so we
-                        # assume that the event isn't authorized for now. (If we
-                        # later receive the event, then we will always redact
-                        # it anyway, since we have this redaction)
-                        continue
-
-                    if orig_event_info["room_id"] != entry.event.room_id:
-                        continue
-
-                    if orig_event_info["type"] == EventTypes.Redaction:
-                        continue
 
                     expected_domain = get_domain_from_id(entry.event.sender)
                     if (
