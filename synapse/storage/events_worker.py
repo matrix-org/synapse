@@ -559,26 +559,26 @@ class EventsWorkerStore(SQLBaseStore):
                 )
 
                 if because:
+                    # It's fine to do add the event directly, since get_pdu_json
+                    # will serialise this field correctly
+                    redacted_event.unsigned["redacted_because"] = because
+
+                    # Starting in room version v3, some redactions need to be
+                    # rechecked if we didn't have the redacted event at the
+                    # time, so we recheck on read instead.
+                    if because.internal_metadata.need_to_check_redaction():
+                        expected_domain = get_domain_from_id(original_ev.sender)
+                        if get_domain_from_id(because.sender) == expected_domain:
+                            # This redaction event is allowed. Mark as not needing a
+                            # recheck.
+                            because.internal_metadata.recheck_redaction = False
+                        else:
+                            # Senders don't match, so the event isn't actually
+                            # redacted
+                            redacted_event = None
+
                     if because.room_id != original_ev.room_id:
                         redacted_event = None
-                    else:
-                        # It's fine to do add the event directly, since get_pdu_json
-                        # will serialise this field correctly
-                        redacted_event.unsigned["redacted_because"] = because
-
-                        # Starting in room version v3, some redactions need to be
-                        # rechecked if we didn't have the redacted event at the
-                        # time, so we recheck on read instead.
-                        if because.internal_metadata.need_to_check_redaction():
-                            expected_domain = get_domain_from_id(original_ev.sender)
-                            if get_domain_from_id(because.sender) == expected_domain:
-                                # This redaction event is allowed. Mark as not needing a
-                                # recheck.
-                                because.internal_metadata.recheck_redaction = False
-                            else:
-                                # Senders don't match, so the event isn't actually
-                                # redacted
-                                redacted_event = None
 
             cache_entry = _EventCacheEntry(
                 event=original_ev, redacted_event=redacted_event
