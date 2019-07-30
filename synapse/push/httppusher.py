@@ -262,17 +262,17 @@ class HttpPusher(object):
     @defer.inlineCallbacks
     def _process_one(self, push_action):
         if "notify" not in push_action["actions"]:
-            defer.returnValue(True)
+            return True
 
         tweaks = push_rule_evaluator.tweaks_for_actions(push_action["actions"])
         badge = yield push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
 
         event = yield self.store.get_event(push_action["event_id"], allow_none=True)
         if event is None:
-            defer.returnValue(True)  # It's been redacted
+            return True  # It's been redacted
         rejected = yield self.dispatch_push(event, tweaks, badge)
         if rejected is False:
-            defer.returnValue(False)
+            return False
 
         if isinstance(rejected, list) or isinstance(rejected, tuple):
             for pk in rejected:
@@ -286,7 +286,7 @@ class HttpPusher(object):
                 else:
                     logger.info("Pushkey %s was rejected: removing", pk)
                     yield self.hs.remove_pusher(self.app_id, pk, self.user_id)
-        defer.returnValue(True)
+        return True
 
     @defer.inlineCallbacks
     def _build_notification_dict(self, event, tweaks, badge):
@@ -306,7 +306,7 @@ class HttpPusher(object):
                     ],
                 }
             }
-            defer.returnValue(d)
+            return d
 
         ctx = yield push_tools.get_context_for_event(
             self.store, self.state_handler, event, self.user_id
@@ -349,13 +349,13 @@ class HttpPusher(object):
         if "name" in ctx and len(ctx["name"]) > 0:
             d["notification"]["room_name"] = ctx["name"]
 
-        defer.returnValue(d)
+        return d
 
     @defer.inlineCallbacks
     def dispatch_push(self, event, tweaks, badge):
         notification_dict = yield self._build_notification_dict(event, tweaks, badge)
         if not notification_dict:
-            defer.returnValue([])
+            return []
         try:
             resp = yield self.http_client.post_json_get_json(
                 self.url, notification_dict
@@ -368,11 +368,11 @@ class HttpPusher(object):
                 type(e),
                 e,
             )
-            defer.returnValue(False)
+            return False
         rejected = []
         if "rejected" in resp:
             rejected = resp["rejected"]
-        defer.returnValue(rejected)
+        return rejected
 
     @defer.inlineCallbacks
     def _send_badge(self, badge):

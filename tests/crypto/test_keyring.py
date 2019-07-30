@@ -107,7 +107,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
             self.assertEquals(LoggingContext.current_context().request, "11")
             with PreserveLoggingContext():
                 yield persp_deferred
-            defer.returnValue(persp_resp)
+            return persp_resp
 
         self.http_client.post_json.side_effect = get_perspectives
 
@@ -554,7 +554,7 @@ def run_in_context(f, *args, **kwargs):
         # logs.
         ctx.request = "testctx"
         rv = yield f(*args, **kwargs)
-    defer.returnValue(rv)
+    return rv
 
 
 def _verify_json_for_server(kr, *args):
@@ -565,6 +565,6 @@ def _verify_json_for_server(kr, *args):
     @defer.inlineCallbacks
     def v():
         rv1 = yield kr.verify_json_for_server(*args)
-        defer.returnValue(rv1)
+        return rv1
 
     return run_in_context(v)

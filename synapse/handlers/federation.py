@@ -210,7 +210,7 @@ class FederationHandler(BaseHandler):
                 event_id,
                 origin,
             )
-            defer.returnValue(None)
+            return None
 
         state = None
         auth_chain = []
@@ -676,7 +676,7 @@ class FederationHandler(BaseHandler):
         events = [e for e in events if e.event_id not in seen_events]
 
         if not events:
-            defer.returnValue([])
+            return []
 
         event_map = {e.event_id: e for e in events}
 
@@ -838,7 +838,7 @@ class FederationHandler(BaseHandler):
             # TODO: We can probably do something more clever here.
             yield self._handle_new_event(dest, event, backfilled=True)
 
-        defer.returnValue(events)
+        return events
 
     @defer.inlineCallbacks
     def maybe_backfill(self, room_id, current_depth):
@@ -894,7 +894,7 @@ class FederationHandler(BaseHandler):
         )
 
         if not filtered_extremities:
-            defer.returnValue(False)
+            return False
 
         # Check if we reached a point where we should start backfilling.
         sorted_extremeties_tuple = sorted(extremities.items(), key=lambda e: -int(e[1]))
@@ -965,7 +965,7 @@ class FederationHandler(BaseHandler):
                     # If this succeeded then we probably already have the
                     # appropriate stuff.
                     # TODO: We can probably do something more intelligent here.
-                    defer.returnValue(True)
+                    return True
                 except SynapseError as e:
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
@@ -985,11 +985,11 @@ class FederationHandler(BaseHandler):
                     logger.exception("Failed to backfill from %s because %s", dom, e)
                     continue
 
-            defer.returnValue(False)
+            return False
 
         success = yield try_backfill(likely_domains)
         if success:
-            defer.returnValue(True)
+            return True
 
         # Huh, well *those* domains didn't work out. Lets try some domains
         # from the time.
@@ -1031,11 +1031,11 @@ class FederationHandler(BaseHandler):
                 [dom for dom, _ in likely_domains if dom not in tried_domains]
             )
             if success:
-                defer.returnValue(True)
+                return True
 
             tried_domains.update(dom for dom, _ in likely_domains)
 
-        defer.returnValue(False)
+        return False
 
     def _sanity_check_event(self, ev):
         """
@@ -1082,7 +1082,7 @@ class FederationHandler(BaseHandler):
             pdu=event,
         )
 
-        defer.returnValue(pdu)
+        return pdu
 
     @defer.inlineCallbacks
     def on_event_auth(self, event_id):
@@ -1090,7 +1090,7 @@ class FederationHandler(BaseHandler):
         auth = yield self.store.get_auth_chain(
             [auth_id for auth_id in event.auth_event_ids()], include_given=True
         )
-        defer.returnValue([e for e in auth])
+        return [e for e in auth]
 
     @log_function
     @defer.inlineCallbacks
@@ -1177,7 +1177,7 @@ class FederationHandler(BaseHandler):
 
             run_in_background(self._handle_queued_pdus, room_queue)
 
-        defer.returnValue(True)
+        return True
 
     @defer.inlineCallbacks
     def _handle_queued_pdus(self, room_queue):
@@ -1204,11 +1204,28 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_make_join_request(self, room_id, user_id):
+    def on_make_join_request(self, origin, room_id, user_id):
         """ We've received a /make_join/ request, so we create a partial
         join event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.
+
+        Args:
+            origin (str): The (verified) server name of the requesting server.
+            room_id (str): Room to create join event in
+            user_id (str): The user to create the join for
+
+        Returns:
+            Deferred[FrozenEvent]
         """
+
+        if get_domain_from_id(user_id) != origin:
+            logger.info(
+                "Got /make_join request for user %r from different origin %s, ignoring",
+                user_id,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
+
         event_content = {"membership": Membership.JOIN}
 
         room_version = yield self.store.get_room_version(room_id)
@@ -1247,7 +1264,7 @@ class FederationHandler(BaseHandler):
             room_version, event, context, do_sig_check=False
         )
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     @log_function
@@ -1308,7 +1325,7 @@ class FederationHandler(BaseHandler):
 
         state = yield self.store.get_events(list(prev_state_ids.values()))
 
-        defer.returnValue({"state": list(state.values()), "auth_chain": auth_chain})
+        return {"state": list(state.values()), "auth_chain": auth_chain}
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, pdu):
@@ -1364,7 +1381,7 @@ class FederationHandler(BaseHandler):
         context = yield self.state_handler.compute_event_context(event)
         yield self.persist_events_and_notify([(event, context)])
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
@@ -1389,7 +1406,7 @@ class FederationHandler(BaseHandler):
         context = yield self.state_handler.compute_event_context(event)
         yield self.persist_events_and_notify([(event, context)])
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def _make_and_verify_event(
@@ -1407,15 +1424,31 @@ class FederationHandler(BaseHandler):
         assert event.user_id == user_id
         assert event.state_key == user_id
         assert event.room_id == room_id
-        defer.returnValue((origin, event, format_ver))
+        return (origin, event, format_ver)
 
     @defer.inlineCallbacks
     @log_function
-    def on_make_leave_request(self, room_id, user_id):
+    def on_make_leave_request(self, origin, room_id, user_id):
         """ We've received a /make_leave/ request, so we create a partial
         leave event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.
+
+        Args:
+            origin (str): The (verified) server name of the requesting server.
+            room_id (str): Room to create leave event in
+            user_id (str): The user to create the leave for
+
+        Returns:
+            Deferred[FrozenEvent]
         """
+        if get_domain_from_id(user_id) != origin:
+            logger.info(
+                "Got /make_leave request for user %r from different origin %s, ignoring",
+                user_id,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
+
         room_version = yield self.store.get_room_version(room_id)
         builder = self.event_builder_factory.new(
             room_version,
@@ -1451,7 +1484,7 @@ class FederationHandler(BaseHandler):
             logger.warn("Failed to create new leave %r because %s", event, e)
             raise e
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     @log_function
@@ -1484,7 +1517,7 @@ class FederationHandler(BaseHandler):
             event.signatures,
         )
 
-        defer.returnValue(None)
+        return None
 
     @defer.inlineCallbacks
     def get_state_for_pdu(self, room_id, event_id):
@@ -1512,9 +1545,9 @@ class FederationHandler(BaseHandler):
                     del results[(event.type, event.state_key)]
 
             res = list(results.values())
-            defer.returnValue(res)
+            return res
         else:
-            defer.returnValue([])
+            return []
 
     @defer.inlineCallbacks
     def get_state_ids_for_pdu(self, room_id, event_id):
@@ -1539,9 +1572,9 @@ class FederationHandler(BaseHandler):
                 else:
                     results.pop((event.type, event.state_key), None)
 
-            defer.returnValue(list(results.values()))
+            return list(results.values())
         else:
-            defer.returnValue([])
+            return []
 
     @defer.inlineCallbacks
     @log_function
@@ -1554,7 +1587,7 @@ class FederationHandler(BaseHandler):
 
         events = yield filter_events_for_server(self.store, origin, events)
 
-        defer.returnValue(events)
+        return events
 
     @defer.inlineCallbacks
     @log_function
@@ -1584,9 +1617,9 @@ class FederationHandler(BaseHandler):
 
             events = yield filter_events_for_server(self.store, origin, [event])
             event = events[0]
-            defer.returnValue(event)
+            return event
         else:
-            defer.returnValue(None)
+            return None
 
     def get_min_depth_for_context(self, context):
         return self.store.get_min_depth(context)
@@ -1618,7 +1651,7 @@ class FederationHandler(BaseHandler):
                     self.store.remove_push_actions_from_staging, event.event_id
                 )
 
-        defer.returnValue(context)
+        return context
 
     @defer.inlineCallbacks
     def _handle_new_events(self, origin, event_infos, backfilled=False):
@@ -1641,7 +1674,7 @@ class FederationHandler(BaseHandler):
                     auth_events=ev_info.get("auth_events"),
                     backfilled=backfilled,
                 )
-            defer.returnValue(res)
+            return res
 
         contexts = yield make_deferred_yieldable(
             defer.gatherResults(
@@ -1800,7 +1833,7 @@ class FederationHandler(BaseHandler):
         if event.type == EventTypes.GuestAccess and not context.rejected:
             yield self.maybe_kick_guest_users(event)
 
-        defer.returnValue(context)
+        return context
 
     @defer.inlineCallbacks
     def _check_for_soft_fail(self, event, state, backfilled):
@@ -1919,7 +1952,7 @@ class FederationHandler(BaseHandler):
 
         logger.debug("on_query_auth returning: %s", ret)
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def on_get_missing_events(
@@ -1942,7 +1975,7 @@ class FederationHandler(BaseHandler):
             self.store, origin, missing_events
         )
 
-        defer.returnValue(missing_events)
+        return missing_events
 
     @defer.inlineCallbacks
     @log_function
@@ -2418,16 +2451,14 @@ class FederationHandler(BaseHandler):
 
         logger.debug("construct_auth_difference returning")
 
-        defer.returnValue(
-            {
-                "auth_chain": local_auth,
-                "rejects": {
-                    e.event_id: {"reason": reason_map[e.event_id], "proof": None}
-                    for e in base_remote_rejected
-                },
-                "missing": [e.event_id for e in missing_locals],
-            }
-        )
+        return {
+            "auth_chain": local_auth,
+            "rejects": {
+                e.event_id: {"reason": reason_map[e.event_id], "proof": None}
+                for e in base_remote_rejected
+            },
+            "missing": [e.event_id for e in missing_locals],
+        }
 
     @defer.inlineCallbacks
     @log_function
@@ -2575,7 +2606,7 @@ class FederationHandler(BaseHandler):
             builder=builder
         )
         EventValidator().validate_new(event)
-        defer.returnValue((event, context))
+        return (event, context)
 
     @defer.inlineCallbacks
     def _check_signature(self, event, context):
@@ -2765,3 +2796,28 @@ class FederationHandler(BaseHandler):
             )
         else:
             return user_joined_room(self.distributor, user, room_id)
+
+    @defer.inlineCallbacks
+    def get_room_complexity(self, remote_room_hosts, room_id):
+        """
+        Fetch the complexity of a remote room over federation.
+
+        Args:
+            remote_room_hosts (list[str]): The remote servers to ask.
+            room_id (str): The room ID to ask about.
+
+        Returns:
+            Deferred[dict] or Deferred[None]: Dict contains the complexity
+            metric versions, while None means we could not fetch the complexity.
+        """
+
+        for host in remote_room_hosts:
+            res = yield self.federation_client.get_room_complexity(host, room_id)
+
+            # We got a result, return it.
+            if res:
+                defer.returnValue(res)
+
+        # We fell off the bottom, couldn't get the complexity from anyone. Oh
+        # well.
+        defer.returnValue(None)

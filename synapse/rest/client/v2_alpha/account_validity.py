@@ -58,7 +58,7 @@ class AccountValidityRenewServlet(RestServlet):
         )
         request.write(AccountValidityRenewServlet.SUCCESS_HTML)
         finish_request(request)
-        defer.returnValue(None)
+        return None
 
 
 class AccountValiditySendMailServlet(RestServlet):
@@ -87,7 +87,7 @@ class AccountValiditySendMailServlet(RestServlet):
         user_id = requester.user.to_string()
         yield self.account_activity_handler.send_renewal_email_to_user(user_id)
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
 
 def register_servlets(hs, http_server):

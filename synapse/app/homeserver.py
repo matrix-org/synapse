@@ -406,7 +406,7 @@ def setup(config_options):
         if provision:
             yield acme.provision_certificate()
 
-        defer.returnValue(provision)
+        return provision
 
     @defer.inlineCallbacks
     def reprovision_acme():
@@ -447,7 +447,7 @@ def setup(config_options):
                 reactor.stop()
             sys.exit(1)
 
-    reactor.callWhenRunning(start)
+    reactor.addSystemEventTrigger("before", "startup", start)
 
     return hs
 

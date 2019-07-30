@@ -92,7 +92,7 @@ class SendServerNoticeServlet(RestServlet):
             event_content=body["content"],
         )
 
-        defer.returnValue((200, {"event_id": event.event_id}))
+        return (200, {"event_id": event.event_id})
 
     def on_PUT(self, request, txn_id):
         return self.txns.fetch_or_execute_request(

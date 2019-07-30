@@ -63,7 +63,7 @@ class PusherWorkerStore(SQLBaseStore):
         ret = yield self._simple_select_one_onecol(
             "pushers", {"user_name": user_id}, "id", allow_none=True
         )
-        defer.returnValue(ret is not None)
+        return ret is not None
 
     def get_pushers_by_app_id_and_pushkey(self, app_id, pushkey):
         return self.get_pushers_by({"app_id": app_id, "pushkey": pushkey})
@@ -95,7 +95,7 @@ class PusherWorkerStore(SQLBaseStore):
             ],
             desc="get_pushers_by",
         )
-        defer.returnValue(self._decode_pushers_rows(ret))
+        return self._decode_pushers_rows(ret)
 
     @defer.inlineCallbacks
     def get_all_pushers(self):
@@ -106,7 +106,7 @@ class PusherWorkerStore(SQLBaseStore):
             return self._decode_pushers_rows(rows)
 
         rows = yield self.runInteraction("get_all_pushers", get_pushers)
-        defer.returnValue(rows)
+        return rows
 
     def get_all_updated_pushers(self, last_id, current_id, limit):
         if last_id == current_id:
@@ -205,7 +205,7 @@ class PusherWorkerStore(SQLBaseStore):
         result = {user_id: False for user_id in user_ids}
         result.update({r["user_name"]: True for r in rows})
 
-        defer.returnValue(result)
+        return result
 
 
 class PusherStore(PusherWorkerStore):
@@ -343,7 +343,7 @@ class PusherStore(PusherWorkerStore):
                 "throttle_ms": row["throttle_ms"],
             }
 
-        defer.returnValue(params_by_room)
+        return params_by_room
 
     @defer.inlineCallbacks
     def set_throttle_params(self, pusher_id, room_id, params):

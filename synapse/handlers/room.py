@@ -128,7 +128,7 @@ class RoomCreationHandler(BaseHandler):
             old_room_id,
             new_version,  # args for _upgrade_room
         )
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def _upgrade_room(self, requester, old_room_id, new_version):
@@ -193,7 +193,7 @@ class RoomCreationHandler(BaseHandler):
             requester, old_room_id, new_room_id, old_room_state
         )
 
-        defer.returnValue(new_room_id)
+        return new_room_id
 
     @defer.inlineCallbacks
     def _update_upgraded_room_pls(
@@ -671,7 +671,7 @@ class RoomCreationHandler(BaseHandler):
             result["room_alias"] = room_alias.to_string()
             yield directory_handler.send_room_alias_update_event(requester, room_id)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _send_events_for_new_room(
@@ -796,7 +796,7 @@ class RoomCreationHandler(BaseHandler):
                     room_creator_user_id=creator_id,
                     is_public=is_public,
                 )
-                defer.returnValue(gen_room_id)
+                return gen_room_id
             except StoreError:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a room ID.")
@@ -839,7 +839,7 @@ class RoomContextHandler(object):
             event_id, get_prev_content=True, allow_none=True
         )
         if not event:
-            defer.returnValue(None)
+            return None
             return
 
         filtered = yield (filter_evts([event]))
@@ -890,7 +890,7 @@ class RoomContextHandler(object):
 
         results["end"] = token.copy_and_replace("room_key", results["end"]).to_string()
 
-        defer.returnValue(results)
+        return results
 
 
 class RoomEventSource(object):
@@ -941,7 +941,7 @@ class RoomEventSource(object):
             else:
                 end_key = to_key
 
-        defer.returnValue((events, end_key))
+        return (events, end_key)
 
     def get_current_key(self):
         return self.store.get_room_events_max_id()
@@ -959,4 +959,4 @@ class RoomEventSource(object):
             limit=config.limit,
         )
 
-        defer.returnValue((events, next_key))
+        return (events, next_key)

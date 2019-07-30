@@ -126,7 +126,6 @@ def default_config(name, parse=False):
         "enable_registration": True,
         "enable_registration_captcha": False,
         "macaroon_secret_key": "not even a little secret",
-        "expire_access_token": False,
         "trusted_third_party_id_servers": [],
         "room_invite_state_types": [],
         "password_providers": [],
@@ -361,7 +360,7 @@ def setup_test_homeserver(
     if fed:
         register_federation_servlets(hs, fed)
 
-    defer.returnValue(hs)
+    return hs
 
 
 def register_federation_servlets(hs, resource):
@@ -465,9 +464,9 @@ class MockHttpResource(HttpServer):
                     args = [urlparse.unquote(u) for u in matcher.groups()]
 
                     (code, response) = yield func(mock_request, *args)
-                    defer.returnValue((code, response))
+                    return (code, response)
                 except CodeMessageException as e:
-                    defer.returnValue((e.code, cs_error(e.msg, code=e.errcode)))
+                    return (e.code, cs_error(e.msg, code=e.errcode))
 
         raise KeyError("No event can handle %s" % path)
 
