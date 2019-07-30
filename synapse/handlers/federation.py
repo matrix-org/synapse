@@ -978,6 +978,9 @@ class FederationHandler(BaseHandler):
                 except NotRetryingDestination as e:
                     logger.info(str(e))
                     continue
+                except RequestSendFailed as e:
+                    logger.info("Falied to get backfill from %s because %s", dom, e)
+                    continue
                 except FederationDeniedError as e:
                     logger.info(e)
                     continue
