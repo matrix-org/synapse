@@ -161,9 +161,7 @@ class E2eKeysHandler(object):
                         results[user_id] = {device["device_id"]: device["keys"]}
                     user_ids_updated.append(user_id)
                 except Exception as e:
-                    failures[destination] = failures.get(destination, []).append(
-                        _exception_to_failure(e)
-                    )
+                    failures[destination] = _exception_to_failure(e)
 
             if len(destination_query) == len(user_ids_updated):
                 # We've updated all the users in the query and we do not need to
