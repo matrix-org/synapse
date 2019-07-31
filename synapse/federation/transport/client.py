@@ -21,7 +21,11 @@ from six.moves import urllib
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.urls import FEDERATION_V1_PREFIX, FEDERATION_V2_PREFIX
+from synapse.api.urls import (
+    FEDERATION_UNSTABLE_PREFIX,
+    FEDERATION_V1_PREFIX,
+    FEDERATION_V2_PREFIX,
+)
 from synapse.logging.utils import log_function
 
 logger = logging.getLogger(__name__)
@@ -183,7 +187,7 @@ class TransportLayerClient(object):
             try_trailing_slash_on_400=True,
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -201,7 +205,7 @@ class TransportLayerClient(object):
             ignore_backoff=ignore_backoff,
         )
 
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -259,7 +263,7 @@ class TransportLayerClient(object):
             ignore_backoff=ignore_backoff,
         )
 
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -270,7 +274,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -288,7 +292,7 @@ class TransportLayerClient(object):
             ignore_backoff=True,
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -299,7 +303,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -310,7 +314,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -339,7 +343,7 @@ class TransportLayerClient(object):
             destination=remote_server, path=path, args=args, ignore_backoff=True
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -350,7 +354,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=event_dict
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -359,7 +363,7 @@ class TransportLayerClient(object):
 
         content = yield self.client.get_json(destination=destination, path=path)
 
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -370,7 +374,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content
         )
 
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -402,7 +406,7 @@ class TransportLayerClient(object):
         content = yield self.client.post_json(
             destination=destination, path=path, data=query_content, timeout=timeout
         )
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -426,7 +430,7 @@ class TransportLayerClient(object):
         content = yield self.client.get_json(
             destination=destination, path=path, timeout=timeout
         )
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -460,7 +464,7 @@ class TransportLayerClient(object):
         content = yield self.client.post_json(
             destination=destination, path=path, data=query_content, timeout=timeout
         )
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -488,7 +492,7 @@ class TransportLayerClient(object):
             timeout=timeout,
         )
 
-        defer.returnValue(content)
+        return content
 
     @log_function
     def get_group_profile(self, destination, group_id, requester_user_id):
@@ -935,6 +939,23 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
+    def get_room_complexity(self, destination, room_id):
+        """
+        Args:
+            destination (str): The remote server
+            room_id (str): The room ID to ask about.
+        """
+        path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/rooms/%s/complexity", room_id)
+
+        return self.client.get_json(destination=destination, path=path)
+
+
+def _create_path(federation_prefix, path, *args):
+    """
+    Ensures that all args are url encoded.
+    """
+    return federation_prefix + path % tuple(urllib.parse.quote(arg, "") for arg in args)
+
 
 def _create_v1_path(path, *args):
     """Creates a path against V1 federation API from the path template and
@@ -951,9 +972,7 @@ def _create_v1_path(path, *args):
     Returns:
         str
     """
-    return FEDERATION_V1_PREFIX + path % tuple(
-        urllib.parse.quote(arg, "") for arg in args
-    )
+    return _create_path(FEDERATION_V1_PREFIX, path, *args)
 
 
 def _create_v2_path(path, *args):
@@ -971,6 +990,4 @@ def _create_v2_path(path, *args):
     Returns:
         str
     """
-    return FEDERATION_V2_PREFIX + path % tuple(
-        urllib.parse.quote(arg, "") for arg in args
-    )
+    return _create_path(FEDERATION_V2_PREFIX, path, *args)

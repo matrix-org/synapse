@@ -125,7 +125,7 @@ class DeactivateAccountHandler(BaseHandler):
         # Mark the user as deactivated.
         yield self.store.set_user_deactivated_status(user_id, True)
 
-        defer.returnValue(identity_server_supports_unbinding)
+        return identity_server_supports_unbinding
 
     def _start_user_parting(self):
         """

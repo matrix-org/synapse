@@ -15,10 +15,12 @@
 
 import gc
 import logging
+import os
 import signal
 import sys
 import traceback
 
+import sdnotify
 from daemonize import Daemonize
 
 from twisted.internet import defer, error, reactor
@@ -242,8 +244,15 @@ def start(hs, listeners=None):
         if hasattr(signal, "SIGHUP"):
 
             def handle_sighup(*args, **kwargs):
+                # Tell systemd our state, if we're using it. This will silently fail if
+                # we're not using systemd.
+                sd_channel = sdnotify.SystemdNotifier()
+                sd_channel.notify("RELOADING=1")
+
                 for i in _sighup_callbacks:
                     i(hs)
+
+                sd_channel.notify("READY=1")
 
             signal.signal(signal.SIGHUP, handle_sighup)
 
@@ -260,6 +269,7 @@ def start(hs, listeners=None):
         hs.get_datastore().start_profiling()
 
         setup_sentry(hs)
+        setup_sdnotify(hs)
     except Exception:
         traceback.print_exc(file=sys.stderr)
         reactor = hs.get_reactor()
@@ -290,6 +300,25 @@ def setup_sentry(hs):
         name = hs.config.worker_name if hs.config.worker_name else "master"
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)
+
+
+def setup_sdnotify(hs):
+    """Adds process state hooks to tell systemd what we are up to.
+    """
+
+    # Tell systemd our state, if we're using it. This will silently fail if
+    # we're not using systemd.
+    sd_channel = sdnotify.SystemdNotifier()
+
+    hs.get_reactor().addSystemEventTrigger(
+        "after",
+        "startup",
+        lambda: sd_channel.notify("READY=1\nMAINPID=%s" % (os.getpid())),
+    )
+
+    hs.get_reactor().addSystemEventTrigger(
+        "before", "shutdown", lambda: sd_channel.notify("STOPPING=1")
+    )
 
 
 def install_dns_limiter(reactor, max_dns_requests_in_flight=100):

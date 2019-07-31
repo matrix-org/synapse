@@ -1,1 +1,0 @@
-Add `lint.sh` to the scripts-dev folder which will run all linting steps required by CI.

@@ -168,7 +168,9 @@ def start(config_options):
     )
 
     ps.setup()
-    reactor.callWhenRunning(_base.start, ps, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ps, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-appservice", config)
 

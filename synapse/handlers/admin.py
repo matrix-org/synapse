@@ -49,7 +49,7 @@ class AdminHandler(BaseHandler):
             "devices": {"": {"sessions": [{"connections": connections}]}},
         }
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def get_users(self):
@@ -61,7 +61,7 @@ class AdminHandler(BaseHandler):
         """
         ret = yield self.store.get_users()
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def get_users_paginate(self, order, start, limit):
@@ -78,7 +78,7 @@ class AdminHandler(BaseHandler):
         """
         ret = yield self.store.get_users_paginate(order, start, limit)
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def search_users(self, term):
@@ -92,7 +92,7 @@ class AdminHandler(BaseHandler):
         """
         ret = yield self.store.search_users(term)
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def export_user_data(self, user_id, writer):
@@ -225,7 +225,7 @@ class AdminHandler(BaseHandler):
                 state = yield self.store.get_state_for_event(event_id)
                 writer.write_state(room_id, event_id, state)
 
-        defer.returnValue(writer.finished())
+        return writer.finished()
 
 
 class ExfiltrationWriter(object):
