@@ -630,7 +630,6 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         )
         values = [user_id]
         values.extend(device_ids)
-        values.append(False)
 
         yield self._execute("delete_devices", None, sql, *values)
 
