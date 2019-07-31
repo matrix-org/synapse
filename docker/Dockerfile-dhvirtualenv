@@ -61,7 +61,6 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         python3-setuptools \
         python3-venv \
         sqlite3 \
-        libsqlite3-dev \
         libdistro-info-perl \
         libpq-dev
 
