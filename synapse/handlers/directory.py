@@ -278,7 +278,6 @@ class DirectoryHandler(BaseHandler):
             servers = list(servers)
 
         return {"room_id": room_id, "servers": servers}
-        return
 
     @defer.inlineCallbacks
     def on_directory_query(self, args):
