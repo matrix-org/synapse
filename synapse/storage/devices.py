@@ -603,9 +603,9 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         """
         sql = """
             DELETE FROM devices
-            WHERE user_id = ? AND device_id = ? AND NOT hidden
+            WHERE user_id = ? AND device_id = ? AND hidden = ?
         """
-        yield self._execute("delete_device", None, sql, user_id, device_id)
+        yield self._execute("delete_device", None, sql, user_id, device_id, False)
 
         self.device_id_exists_cache.invalidate((user_id, device_id))
 
@@ -624,12 +624,13 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             return
         sql = """
             DELETE FROM devices
-            WHERE user_id = ? AND device_id IN (%s) AND NOT hidden
+            WHERE user_id = ? AND device_id IN (%s) AND hidden = ?
         """ % (
             ",".join("?" for _ in device_ids)
         )
         values = [user_id]
         values.extend(device_ids)
+        values.append(False)
 
         yield self._execute("delete_devices", None, sql, *values)
 
