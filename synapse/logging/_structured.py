@@ -145,9 +145,11 @@ def SynapseFileLogObserver(outFile):
     return FileLogObserver(outFile, formatEvent)
 
 
-class LoggingOutputType(Names):
+class DrainType(Names):
     CONSOLE = NamedConstant()
-    JSON = NamedConstant()
+    CONSOLE_JSON = NamedConstant()
+    FILE = NamedConstant()
+    FILE_JSON = NamedConstant()
     FLUENTD = NamedConstant()
 
 
@@ -157,76 +159,68 @@ class OutputPipeType(Values):
 
 
 @attr.s
-class HandlerConfiguration(object):
+class DrainConfiguration(object):
     name = attr.ib()
     type = attr.ib()
     location = attr.ib()
 
 
-def parse_handler_configs(config):
+def parse_drain_configs(drains):
     """
-    Parse the logging format version 2 handler section.
+    Parse the drain configurations.
 
     Args:
-        config (dict): A logging format v2 dictionary.
+        drains (list): A list of drain configurations.
 
     Yields:
-        HandlerConfiguration instances.
+        DrainConfiguration instances.
 
     Raises:
-        ConfigError: If any of the handler configuration items are invalid.
+        ConfigError: If any of the drain configuration items are invalid.
     """
-    for name, config in config.get("handlers").items():
-        logging_type = None
+    for name, config in drains.items():
+        if "type" not in config:
+            raise ConfigError("Logging drains require a 'type' key.")
 
-        if "type" in config:
-            try:
-                logging_type = LoggingOutputType.lookupByName(config["type"].upper())
-            except ValueError:
+        try:
+            logging_type = DrainType.lookupByName(config["type"].upper())
+        except ValueError:
+            raise ConfigError(
+                "%s is not a known logging drain type." % (config["type"],)
+            )
+
+        if logging_type in [DrainType.CONSOLE, DrainType.CONSOLE_JSON]:
+            location = config.get("location")
+            if location is None or location not in ["stdout", "stderr"]:
                 raise ConfigError(
-                    "%s is not a known logging handler type." % (config["type"],)
-                )
-
-            if logging_type in [LoggingOutputType.CONSOLE, LoggingOutputType.JSON]:
-                location = config.get("location")
-                if location is None or location not in ["stdout", "stderr"]:
-                    raise ConfigError(
-                        (
-                            "The %s handler needs the 'location' key set to "
-                            "either 'stdout' or 'stderr'."
-                        )
+                    (
+                        "The %s drain needs the 'location' key set to "
+                        "either 'stdout' or 'stderr'."
                     )
+                    % (logging_type,)
+                )
 
-                yield HandlerConfiguration(
-                    name=name,
-                    type=logging_type,
-                    location=OutputPipeType.lookupByName(location).value,
-                )
-            else:
+            pipe = OutputPipeType.lookupByName(location).value
+
+            yield DrainConfiguration(name=name, type=logging_type, location=pipe)
+
+        elif logging_type in [DrainType.FILE, DrainType.FILE_JSON]:
+            if "location" not in config:
                 raise ConfigError(
-                    "The %s logging handler type is currently not implemented."
-                    % (config["type"].upper(),)
+                    "The %s drain needs the 'location' key set." % (logging_type,)
                 )
-        elif "class" in config:
-            # Handle the old "class": style.
-            if config["class"] == "logging.StreamHandler":
-                yield (
-                    HandlerConfiguration(
-                        name=name,
-                        type=LoggingOutputType.CONSOLE,
-                        location=sys.__stdout__,
-                    )
-                )
-            else:
-                raise ConfigError(
-                    "The logging class %s is not supported in logging format 2."
-                    % (config["class"],)
-                )
+
+            location = config.get("location")
+            yield DrainConfiguration(name=name, type=logging_type, location=location)
+
         else:
-            raise ConfigError("Handlers need to have either a 'type' or 'class' key.")
+            raise ConfigError(
+                "The %s drain type is currently not implemented."
+                % (config["type"].upper(),)
+            )
 
 
-def setup_structured_logging(config, log_config):
+def setup_structured_logging(config, log_config, logBeginner=globalLogBeginner):
     """
     Set up Twisted's structured logging system.
 
@@ -236,33 +230,55 @@ def setup_structured_logging(config, log_config):
     """
     if config.no_redirect_stdio:
         raise ConfigError(
-            "no_redirect_stdio cannot be defined using log_config version 2."
+            "no_redirect_stdio cannot be defined using structured logging."
         )
 
     logger = Logger()
 
+    if not "drains" in log_config:
+        raise ConfigError("The logging configuration requires a list of drains.")
+
     observers = []
 
-    for observer in parse_handler_configs(log_config):
-        if observer.type == LoggingOutputType.CONSOLE:
-            logger.debug("Starting up the {name} console logger", name=observer.name)
+    for observer in parse_drain_configs(log_config["drains"]):
+        # Pipe drains
+        if observer.type == DrainType.CONSOLE:
+            logger.debug(
+                "Starting up the {name} console logger drain", name=observer.name
+            )
             observers.append(SynapseFileLogObserver(observer.location))
-        if observer.type == LoggingOutputType.JSON:
-            logger.debug("Starting up the {name} JSON logger", name=observer.name)
+        if observer.type == DrainType.CONSOLE_JSON:
+            logger.debug(
+                "Starting up the {name} JSON console logger drain", name=observer.name
+            )
             observers.append(jsonFileLogObserver(observer.location))
+
+        # File drains
+        if observer.type == DrainType.FILE:
+            logger.debug("Starting up the {name} file logger drain", name=observer.name)
+            log_file = open(observer.location, "at", buffering=1, encoding="utf8")
+            observers.append(SynapseFileLogObserver(log_file))
+        if observer.type == DrainType.FILE_JSON:
+            logger.debug(
+                "Starting up the {name} JSON file logger drain", name=observer.name
+            )
+            log_file = open(observer.location, "at", buffering=1, encoding="utf8")
+            observers.append(jsonFileLogObserver(log_file))
 
     publisher = LogPublisher(*observers)
     log_filter = LogLevelFilterPredicate()
 
-    for namespace, config in log_config.get("loggers", {}).items():
+    for namespace, namespace_config in log_config.get("loggers", {}).items():
         # Set the log level for twisted.logger.Logger namespaces
         log_filter.setLogLevelForNamespace(
-            namespace, stdlib_log_level_to_twisted(config.get("level", "INFO"))
+            namespace,
+            stdlib_log_level_to_twisted(namespace_config.get("level", "INFO")),
         )
 
         # Also set the log levels for the stdlib logger namespaces, to prevent
         # them getting to PythonStdlibToTwistedLogger and having to be formatted
-        logging.getLogger(namespace).setLevel(config.get("level", "NOTSET"))
+        if "level" in namespace_config:
+            logging.getLogger(namespace).setLevel(namespace_config.get("level"))
 
     f = FilteringLogObserver(publisher, [log_filter])
     lco = LogContextObserver(f)
@@ -274,7 +290,7 @@ def setup_structured_logging(config, log_config):
 
     # Redirecting stdio is important here, especially if there's a JSON
     # outputter!
-    globalLogBeginner.beginLoggingTo([lco], redirectStandardIO=True)
+    logBeginner.beginLoggingTo([lco], redirectStandardIO=True)
 
 
 def reload_structured_logging(*args, log_config=None):

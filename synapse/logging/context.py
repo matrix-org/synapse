@@ -202,7 +202,7 @@ class LoggingContext(object):
         def copy_to(self, record):
             pass
 
-        def copy_to_twisted_log_entry(record):
+        def copy_to_twisted_log_entry(self, record):
             record["request"] = None
             record["scope"] = None
 
