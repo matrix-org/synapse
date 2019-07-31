@@ -272,10 +272,7 @@ class EventsWorkerStore(SQLBaseStore):
                 if orig_event_info["room_id"] != entry.event.room_id:
                     # Don't process redactions if the redacted event doesn't belong to the
                     # redaction's room.
-                    continue
-
-                if orig_event_info["type"] == EventTypes.Redaction:
-                    # Don't process redactions of redactions.
+                    logger.info("Ignoring redation in another room.")
                     continue
 
                 if entry.event.internal_metadata.need_to_check_redaction():
