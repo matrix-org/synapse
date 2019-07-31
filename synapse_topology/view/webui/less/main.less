@@ -25,7 +25,7 @@ body {
   color: @font;
 }
 
-.action {
+.contentWrapper {
   .theme();
   margin: 0 20% 0 20%;
   display: flex;
@@ -33,6 +33,14 @@ body {
   text-align: center;
   justify-content: space-evenly;
   height: 100%;
+
+  .buttonDisplay {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    color: lighten(@font, 20%);
+  }
+
 
   button {
     border-radius: 0.5rem;
@@ -44,6 +52,25 @@ body {
     display: inline-block;
     text-transform: capitalize;
     font-style: bold;
+    color: lighten(@font, 20%);
+  }
+
+  button[disabled] {
+    background-color: @tertiary;
+    color: @primary;
+  }
+
+  input {
+    padding: 0.4rem;
+    font-size: 1rem;
+    background-color: @secondary;
+    border-width: 0.1rem;
+    border-color: @primary;
+    border-radius: 0.5rem;
+    color: lighten(@font, 20%);
+  }
+  .redButton {
+    background-color: red;
   }
 }
 

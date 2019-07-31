@@ -10,6 +10,7 @@
     "@babel/cli": "^7.5.5",
     "@babel/core": "^7.5.5",
     "@babel/node": "^7.5.5",
+    "@babel/plugin-proposal-object-rest-spread": "^7.5.5",
     "@babel/preset-env": "^7.5.5",
     "@babel/preset-react": "^7.0.0",
     "@babel/register": "^7.5.5",
@@ -21,6 +22,7 @@
     "less-loader": "^5.0.0",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
+    "redux-devtools-extension": "^2.13.8",
     "style-loader": "^0.23.1",
     "webpack": "^4.38.0",
     "webpack-cli": "^3.3.6",
@@ -32,6 +34,9 @@
     "watch": "webpack --progress -d --config webpack.config.babel.js --watch"
   },
   "dependencies": {
-    "fetch-absolute": "^1.0.0"
+    "fetch-absolute": "^1.0.0",
+    "react-localize-redux": "^3.5.3",
+    "react-redux": "^7.1.0",
+    "redux": "^4.0.4"
   }
 }

@@ -2,7 +2,7 @@ import 'webpack';
 import { Path } from 'path';
 
 export default {
-  entry:  __dirname + '/js/index.jsx',
+  entry: __dirname + '/js/index.jsx',
   output: {
     path: __dirname + '/dist',
     filename: 'bundle.js',
@@ -11,7 +11,7 @@ export default {
     extensions: ['.js', '.jsx', '.css']
   },
   module: {
-    rules:[
+    rules: [
       {
         test: /\.jsx$/,
         exclude: /node_modules/,
@@ -20,22 +20,22 @@ export default {
       {
         test: /\.less$/,
         use: [
-	  {
-	    loader: 'style-loader',
-	  },
-	  {
+          {
+            loader: 'style-loader',
+          },
+          {
             loader: 'css-loader',
             options: {
               sourceMap: true,
               modules: {
-		  localIdentName: '[local]___[hash:base64:5]'
-	      }
-	    },
+                localIdentName: '[local]___[hash:base64:5]'
+              }
+            },
           },
-	  {
-	    loader: 'less-loader',
-	  },
-	],
+          {
+            loader: 'less-loader',
+          },
+        ],
       },
       {
         test: /\.(woff(2)?|ttf|eot|svg)(\?v=\d+\.\d+\.\d+)?$/,
