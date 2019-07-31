@@ -601,11 +601,11 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         Returns:
             defer.Deferred
         """
-        sql = """
-            DELETE FROM devices
-            WHERE user_id = ? AND device_id = ? AND hidden = ?
-        """
-        yield self._execute("delete_device", None, sql, user_id, device_id, False)
+        yield self._simple_delete_one(
+            table="devices",
+            keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
+            desc="delete_device",
+        )
 
         self.device_id_exists_cache.invalidate((user_id, device_id))
 
@@ -619,21 +619,13 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         Returns:
             defer.Deferred
         """
-
-        if not device_ids or len(device_ids) == 0:
-            return
-        sql = """
-            DELETE FROM devices
-            WHERE user_id = ? AND device_id IN (%s) AND hidden = ?
-        """ % (
-            ",".join("?" for _ in device_ids)
+        yield self._simple_delete_many(
+            table="devices",
+            column="device_id",
+            iterable=device_ids,
+            keyvalues={"user_id": user_id, "hidden": False},
+            desc="delete_devices",
         )
-        values = [user_id]
-        values.extend(device_ids)
-        values.append(False)
-
-        yield self._execute("delete_devices", None, sql, *values)
-
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
 
