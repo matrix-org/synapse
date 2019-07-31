@@ -569,7 +569,9 @@ class RoomEventServlet(RestServlet):
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         try:
-            event = yield self.event_handler.get_event(requester.user, room_id, event_id)
+            event = yield self.event_handler.get_event(
+                requester.user, room_id, event_id
+            )
         except AuthError as e:
             # This endpoint is supposed to return a 404 when the requester does
             # not have permission to access the event
