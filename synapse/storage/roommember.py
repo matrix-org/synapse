@@ -935,7 +935,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
             while processed < batch_size:
                 txn.execute(
                     """
-                        SELECT MIN(room_id) FROM rooms WHERE room_id > ?
+                        SELECT MIN(room_id) FROM current_state_events WHERE room_id > ?
                     """,
                     (last_processed_room,),
                 )
