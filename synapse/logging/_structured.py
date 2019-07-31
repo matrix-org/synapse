@@ -78,9 +78,12 @@ class LogContextObserver(object):
 
         context = LoggingContext.current_context()
 
+        print(context)
+
         # Copy the context information to the log event.
         if context is not None:
             context.copy_to_twisted_log_entry(event)
+            print(event)
         else:
             # If there's no logging context, not even the root one, we might be
             # starting up or it might be from non-Synapse code. Log it as if it
@@ -291,6 +294,8 @@ def setup_structured_logging(config, log_config, logBeginner=globalLogBeginner):
     # Redirecting stdio is important here, especially if there's a JSON
     # outputter!
     logBeginner.beginLoggingTo([lco], redirectStandardIO=True)
+
+    return publisher
 
 
 def reload_structured_logging(*args, log_config=None):
