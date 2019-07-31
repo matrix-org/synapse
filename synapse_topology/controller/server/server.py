@@ -9,6 +9,11 @@ app = Klein()
 from . import error_handlers
 
 
+@app.route("/setup", methods=["GET"])
+def get_config_setup(request):
+    return json.dumps({model.constants.CONFIG_LOCK: model.config_in_use()})
+
+
 @app.route("/servername", methods=["GET"])
 def get_server_name(request):
     return model.get_server_name()
