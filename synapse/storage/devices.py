@@ -37,9 +37,9 @@ DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES = (
 
 
 class DeviceWorkerStore(SQLBaseStore):
-    @defer.inlineCallbacks
     def get_device(self, user_id, device_id):
-        """Retrieve a device.
+        """Retrieve a device. Only returns devices that are not marked as
+        hidden.
 
         Args:
             user_id (str): The ID of the user which owns the device
@@ -49,19 +49,17 @@ class DeviceWorkerStore(SQLBaseStore):
         Raises:
             StoreError: if the device is not found
         """
-        ret = yield self._simple_select_one(
+        return self._simple_select_one(
             table="devices",
-            keyvalues={"user_id": user_id, "device_id": device_id},
+            keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             retcols=("user_id", "device_id", "display_name", "hidden"),
             desc="get_device",
         )
-        if ret["hidden"]:
-            raise StoreError(404, "No row found (devices)")
-        return ret
 
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
-        """Retrieve all of a user's registered devices.
+        """Retrieve all of a user's registered devices. Only returns devices
+        that are not marked as hidden.
 
         Args:
             user_id (str):
@@ -72,12 +70,12 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         devices = yield self._simple_select_list(
             table="devices",
-            keyvalues={"user_id": user_id},
-            retcols=("user_id", "device_id", "display_name", "hidden"),
+            keyvalues={"user_id": user_id, "hidden": False},
+            retcols=("user_id", "device_id", "display_name"),
             desc="get_devices_by_user",
         )
 
-        defer.returnValue({d["device_id"]: d for d in devices if not d["hidden"]})
+        defer.returnValue({d["device_id"]: d for d in devices})
 
     @defer.inlineCallbacks
     def get_devices_by_remote(self, destination, from_stream_id, limit):
@@ -662,9 +660,9 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         """
         sql = """
             DELETE FROM devices
-            WHERE user_id = ? AND device_id = ? AND NOT COALESCE(hidden, ?)
+            WHERE user_id = ? AND device_id = ? AND NOT hidden
         """
-        yield self._execute("delete_device", None, sql, user_id, device_id, False)
+        yield self._execute("delete_device", None, sql, user_id, device_id)
 
         self.device_id_exists_cache.invalidate((user_id, device_id))
 
@@ -683,7 +681,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             return
         sql = """
             DELETE FROM devices
-            WHERE user_id = ? AND device_id IN (%s) AND NOT COALESCE(hidden, ?)
+            WHERE user_id = ? AND device_id IN (%s) AND NOT hidden
         """ % (
             ",".join("?" for _ in device_ids)
         )
@@ -697,7 +695,8 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             self.device_id_exists_cache.invalidate((user_id, device_id))
 
     def update_device(self, user_id, device_id, new_display_name=None):
-        """Update a device.
+        """Update a device. Only updates the device if it is not marked as
+        hidden.
 
         Args:
             user_id (str): The ID of the user which owns the device
@@ -714,11 +713,9 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             updates["display_name"] = new_display_name
         if not updates:
             return defer.succeed(None)
-        # FIXME: should only update if hidden is not True.  But updating the
-        # display name of a hidden device should be harmless
         return self._simple_update_one(
             table="devices",
-            keyvalues={"user_id": user_id, "device_id": device_id},
+            keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             updatevalues=updates,
             desc="update_device",
         )
