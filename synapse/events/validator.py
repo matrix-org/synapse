@@ -106,6 +106,13 @@ class EventValidator(object):
             if event.content["membership"] not in Membership.LIST:
                 raise SynapseError(400, "Invalid membership key")
 
+        elif event.type == EventTypes.Tombstone:
+            if "replacement_room" not in event.content:
+                raise SynapseError(400, "Content has no replacement_room key")
+
+            if event.content["replacement_room"] == event.room_id:
+                raise SynapseError(400, "Tombstone cannot reference itself")
+
     def _ensure_strings(self, d, keys):
         for s in keys:
             if s not in d:
