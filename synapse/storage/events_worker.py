@@ -579,6 +579,11 @@ class EventsWorkerStore(SQLBaseStore):
 
                     if because.room_id != original_ev.room_id:
                         redacted_event = None
+                else:
+                    # The lack of a redaction likely means that the redaction is invalid
+                    # and therefore not returned by get_event, so it should be safe to
+                    # just ignore it here.
+                    redacted_event = None
 
             cache_entry = _EventCacheEntry(
                 event=original_ev, redacted_event=redacted_event
