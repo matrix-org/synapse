@@ -568,7 +568,13 @@ class RoomEventServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        event = yield self.event_handler.get_event(requester.user, room_id, event_id)
+        try:
+            event = yield self.event_handler.get_event(requester.user, room_id, event_id)
+        except AuthError as e:
+            # This endpoint is supposed to return a 404 when the requester does
+            # not have permission to access the event
+            # https://matrix.org/docs/spec/client_server/r0.5.0#get-matrix-client-r0-rooms-roomid-event-eventid
+            return (404, e.msg)
 
         time_now = self.clock.time_msec()
         if event:
