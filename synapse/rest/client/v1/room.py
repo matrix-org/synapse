@@ -572,7 +572,7 @@ class RoomEventServlet(RestServlet):
             event = yield self.event_handler.get_event(
                 requester.user, room_id, event_id
             )
-        except AuthError as e:
+        except AuthError:
             # This endpoint is supposed to return a 404 when the requester does
             # not have permission to access the event
             # https://matrix.org/docs/spec/client_server/r0.5.0#get-matrix-client-r0-rooms-roomid-event-eventid
