@@ -576,7 +576,7 @@ class RoomEventServlet(RestServlet):
             # This endpoint is supposed to return a 404 when the requester does
             # not have permission to access the event
             # https://matrix.org/docs/spec/client_server/r0.5.0#get-matrix-client-r0-rooms-roomid-event-eventid
-            return (404, e.msg)
+            return (404, "Event not found.")
 
         time_now = self.clock.time_msec()
         if event:
