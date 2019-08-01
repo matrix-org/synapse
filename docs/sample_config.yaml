@@ -800,7 +800,7 @@ uploads_path: "DATADIR/uploads"
 #  # Directory in which Synapse will try to find the HTML files to serve to the
 #  # user when trying to renew an account. Optional, defaults to
 #  # synapse/res/templates.
-#  template_dir: "res/templates" 
+#  template_dir: "res/templates"
 #  # HTML to be displayed to the user after they successfully renewed their
 #  # account. Optional.
 #  account_renewed_html_path: "account_renewed.html"
