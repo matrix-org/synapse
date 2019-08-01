@@ -52,7 +52,7 @@ class AccountValidityRenewServlet(RestServlet):
         renewal_token = request.args[b"token"][0]
 
         token_valid = yield self.account_activity_handler.renew_account(
-            renewal_token.decode("utf8"),
+            renewal_token.decode("utf8")
         )
 
         if token_valid:
@@ -64,9 +64,7 @@ class AccountValidityRenewServlet(RestServlet):
 
         request.setResponseCode(status_code)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(
-            b"Content-Length", b"%d" % (len(response),)
-        )
+        request.setHeader(b"Content-Length", b"%d" % (len(response),))
         request.write(response.encode("utf8"))
         finish_request(request)
         defer.returnValue(None)

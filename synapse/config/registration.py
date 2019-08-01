@@ -14,9 +14,9 @@
 # limitations under the License.
 
 import os
-import pkg_resources
-
 from distutils.util import strtobool
+
+import pkg_resources
 
 from synapse.config._base import Config, ConfigError
 from synapse.types import RoomAlias
@@ -54,13 +54,10 @@ class AccountValidityConfig(Config):
             template_dir = pkg_resources.resource_filename("synapse", "res/templates")
 
         if "account_renewed_html_path" in config:
-            file_path = os.path.join(
-                template_dir, config["account_renewed_html_path"],
-            )
+            file_path = os.path.join(template_dir, config["account_renewed_html_path"])
 
             self.account_renewed_html_content = self.read_file(
-                file_path,
-                "account_validity.account_renewed_html_path",
+                file_path, "account_validity.account_renewed_html_path"
             )
         else:
             self.account_renewed_html_content = (
@@ -68,12 +65,10 @@ class AccountValidityConfig(Config):
             )
 
         if "invalid_token_html_path" in config:
-            file_path = os.path.join(
-                template_dir, config["invalid_token_html_path"],
-            )
+            file_path = os.path.join(template_dir, config["invalid_token_html_path"])
 
             self.invalid_token_html_content = self.read_file(
-                file_path, "account_validity.invalid_token_html_path",
+                file_path, "account_validity.invalid_token_html_path"
             )
         else:
             self.invalid_token_html_content = (
@@ -184,7 +179,7 @@ class RegistrationConfig(Config):
         #  # Directory in which Synapse will try to find the HTML files to serve to the
         #  # user when trying to renew an account. Optional, defaults to
         #  # synapse/res/templates.
-        #  template_dir: "res/templates" 
+        #  template_dir: "res/templates"
         #  # HTML to be displayed to the user after they successfully renewed their
         #  # account. Optional.
         #  account_renewed_html_path: "account_renewed.html"
