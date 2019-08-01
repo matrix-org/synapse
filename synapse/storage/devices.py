@@ -52,7 +52,7 @@ class DeviceWorkerStore(SQLBaseStore):
         return self._simple_select_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
-            retcols=("user_id", "device_id", "display_name", "hidden"),
+            retcols=("user_id", "device_id", "display_name"),
             desc="get_device",
         )
 
