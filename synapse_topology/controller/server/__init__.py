@@ -1,4 +1,7 @@
-from . import server
+from klein import Klein
 
-app = server.app
+app = Klein()
+
+from . import server
+from . import error_handlers
 

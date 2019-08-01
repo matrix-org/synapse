@@ -1,12 +1,22 @@
+from os.path import abspath, dirname, join
+
 from canonicaljson import json
-from klein import Klein
 from synapse_topology import model
 
+from twisted.web.static import File
+
+from . import error_handlers
 from .schemas import BASE_CONFIG_SCHEMA, SERVERNAME_SCHEMA
 from .utils import validate_schema
 
-app = Klein()
-from . import error_handlers
+from . import app
+
+
+@app.route("/topology_webui/", branch=True)
+def server_webui(request):
+    client_path = abspath(join(dirname(abspath(__file__)), "../../view/webui"))
+    print(client_path)
+    return File(client_path)
 
 
 @app.route("/setup", methods=["GET"])
@@ -27,7 +37,7 @@ def set_server_name(request, body):
 
 @app.route("/secretkey", methods=["GET"])
 def get_secret_key(request):
-    return model.get_secret_key()
+    return json.dumps({"secret_key": model.get_secret_key()})
 
 
 @app.route("/config", methods=["GET"])
