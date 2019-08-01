@@ -95,10 +95,10 @@ class EventValidator(object):
 
         elif event.type == EventTypes.Topic:
             self._ensure_strings(event.content, ["topic"])
-
+            self._ensure_state_event(event)
         elif event.type == EventTypes.Name:
             self._ensure_strings(event.content, ["name"])
-
+            self._ensure_state_event(event)
         elif event.type == EventTypes.Member:
             if "membership" not in event.content:
                 raise SynapseError(400, "Content has not membership key")
@@ -106,6 +106,7 @@ class EventValidator(object):
             if event.content["membership"] not in Membership.LIST:
                 raise SynapseError(400, "Invalid membership key")
 
+            self._ensure_state_event(event)
         elif event.type == EventTypes.Tombstone:
             if "replacement_room" not in event.content:
                 raise SynapseError(400, "Content has no replacement_room key")
@@ -115,9 +116,15 @@ class EventValidator(object):
                     400, "Tombstone cannot reference the room it was sent in"
                 )
 
+            self._ensure_state_event(event)
+
     def _ensure_strings(self, d, keys):
         for s in keys:
             if s not in d:
                 raise SynapseError(400, "'%s' not in content" % (s,))
             if not isinstance(d[s], string_types):
                 raise SynapseError(400, "'%s' not a string type" % (s,))
+
+    def _ensure_state_event(self, event):
+        if not event.is_state():
+            raise SynapseError(400, "'%s' must be state events" % (event.type,))
