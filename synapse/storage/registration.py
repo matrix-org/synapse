@@ -569,6 +569,27 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="get_id_servers_user_bound",
         )
 
+    @cachedInlineCallbacks()
+    def get_user_deactivated_status(self, user_id):
+        """Retrieve the value for the `deactivated` property for the provided user.
+
+        Args:
+            user_id (str): The ID of the user to retrieve the status for.
+
+        Returns:
+            defer.Deferred(bool): The requested value.
+        """
+
+        res = yield self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="deactivated",
+            desc="get_user_deactivated_status",
+        )
+
+        # Convert the integer into a boolean.
+        return res == 1
+
 
 class RegistrationStore(
     RegistrationWorkerStore, background_updates.BackgroundUpdateStore
@@ -1317,24 +1338,3 @@ class RegistrationStore(
             user_id,
             deactivated,
         )
-
-    @cachedInlineCallbacks()
-    def get_user_deactivated_status(self, user_id):
-        """Retrieve the value for the `deactivated` property for the provided user.
-
-        Args:
-            user_id (str): The ID of the user to retrieve the status for.
-
-        Returns:
-            defer.Deferred(bool): The requested value.
-        """
-
-        res = yield self._simple_select_one_onecol(
-            table="users",
-            keyvalues={"name": user_id},
-            retcol="deactivated",
-            desc="get_user_deactivated_status",
-        )
-
-        # Convert the integer into a boolean.
-        return res == 1
