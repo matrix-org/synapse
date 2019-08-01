@@ -797,6 +797,16 @@ uploads_path: "DATADIR/uploads"
 #  period: 6w
 #  renew_at: 1w
 #  renew_email_subject: "Renew your %(app)s account"
+#  # Directory in which Synapse will try to find the HTML files to serve to the
+#  # user when trying to renew an account. Optional, defaults to
+#  # synapse/res/templates.
+#  template_dir: "res/templates" 
+#  # HTML to be displayed to the user after they successfully renewed their
+#  # account. Optional.
+#  account_renewed_html_path: "account_renewed.html"
+#  # HTML to be displayed when the user tries to renew an account with an invalid
+#  # renewal token. Optional.
+#  invalid_token_html_path: "invalid_token.html"
 
 # The user must provide all of the below types of 3PID when registering.
 #
