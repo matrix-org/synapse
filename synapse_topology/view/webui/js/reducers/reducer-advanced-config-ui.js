@@ -3,5 +3,5 @@ const ADVANCED_CONFIG_UI_COMPONENTS = {
 }
 
 export default (state, action) => {
-
+  return state;
 }

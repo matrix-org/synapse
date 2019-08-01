@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8889/";
+const API_URL = "http://localhost:8888/";
 const SERVER_NAME = "/servername";
 const SECRET_KEY = "/secretkey";
 const CONFIG = "/config";

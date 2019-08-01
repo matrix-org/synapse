@@ -37,6 +37,7 @@
     "fetch-absolute": "^1.0.0",
     "react-localize-redux": "^3.5.3",
     "react-redux": "^7.1.0",
-    "redux": "^4.0.4"
+    "redux": "^4.0.4",
+    "redux-thunk": "^2.3.0"
   }
 }

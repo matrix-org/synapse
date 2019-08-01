@@ -11,20 +11,24 @@ import {
 
 const fetchAbs = fetchAbsolute(fetch)(API_URL)
 
-export const get_server_name = () => {
+export const get_server_name = () =>
   fetchAbs(SERVER_NAME)
     .then(res => res.json())
-};
 
-export const post_server_name = () => {
+export const post_server_name = (servername, consent) =>
+  fetchAbs(
+    SERVER_NAME,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        "server_name": servername,
+        "report_stats": consent
+      })
+    }
+  )
 
-};
-
-export const get_secret_key = () => {
-  fetchAbs(SECRET_KEY)
-    .then(res => res.json())
-
-};
+export const fetch_secret_key = () =>
+  fetchAbs(SECRET_KEY).then(res => res.json()).then(json => json.secret_key)
 
 export const get_config = () => {
 
@@ -36,5 +40,5 @@ export const post_config = () => {
 
 // Checks if the server's base config has been setup.
 export const get_server_setup = () => fetchAbs(SETUP_CHECK)
-  .then(res => res.json()[CONFIG_LOCK])
-
+  .then(res => res.json())
+  .then(json => json[CONFIG_LOCK])

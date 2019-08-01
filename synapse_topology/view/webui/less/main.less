@@ -1,4 +1,5 @@
 @import url('./themes.less');
+@import url('./animations.less');
 
 @font-face {
   font-family: 'LiberationSansBold';
@@ -23,16 +24,29 @@ body {
   .theme();
   background-color: @secondary;
   color: @font;
+  margin: 0;
 }
+
+a {
+  color: hotpink;
+}
+
+.servername {
+  position: absolute;
+  margin-top: 0.5rem;
+  margin-left: 0.5rem;
+  color: lighten(silver, 20%);
+}
+
 
 .contentWrapper {
   .theme();
-  margin: 0 20% 0 20%;
+  margin: 0 20% 2rem 20%;
   display: flex;
   flex-direction: column;
   text-align: center;
   justify-content: space-evenly;
-  height: 100%;
+  min-height: 100%;
 
   .buttonDisplay {
     display: flex;
@@ -41,26 +55,34 @@ body {
     color: lighten(@font, 20%);
   }
 
+  .keyDisplay {
+    word-wrap: break-word;
+  }
 
   button {
+    .rippler();
+    .dropshadowed();
     border-radius: 0.5rem;
     font-size: 1rem;
     padding: 0.6rem;
     color: @font;
-    background-color: @highlight;
+    background-color: darken(@highlight, 15%);
     border: none;
     display: inline-block;
     text-transform: capitalize;
     font-style: bold;
     color: lighten(@font, 20%);
+    margin-left: 0.4rem;
+    margin-right: 0.4rem;
   }
+
 
   button[disabled] {
     background-color: @tertiary;
     color: @primary;
   }
 
-  input {
+  input, select {
     padding: 0.4rem;
     font-size: 1rem;
     background-color: @secondary;
@@ -68,9 +90,15 @@ body {
     border-color: @primary;
     border-radius: 0.5rem;
     color: lighten(@font, 20%);
+    margin-bottom: 1rem;
   }
   .redButton {
     background-color: red;
+  }
+
+  p {
+    text-align: justify;
+    text-align-last: center;
   }
 }
 
