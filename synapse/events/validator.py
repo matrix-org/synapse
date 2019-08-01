@@ -111,7 +111,9 @@ class EventValidator(object):
                 raise SynapseError(400, "Content has no replacement_room key")
 
             if event.content["replacement_room"] == event.room_id:
-                raise SynapseError(400, "Tombstone cannot reference itself")
+                raise SynapseError(
+                    400, "Tombstone cannot reference the room it was sent in"
+                )
 
     def _ensure_strings(self, d, keys):
         for s in keys:
