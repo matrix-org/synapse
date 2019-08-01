@@ -45,7 +45,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             dict containing "key_json", "device_display_name".
         """
         if not query_list:
-            defer.returnValue({})
+            return {}
 
         results = yield self.runInteraction(
             "get_e2e_device_keys",
@@ -59,7 +59,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             for device_id, device_info in iteritems(device_keys):
                 device_info["keys"] = db_to_json(device_info.pop("key_json"))
 
-        defer.returnValue(results)
+        return results
 
     def _get_e2e_device_keys_txn(
         self, txn, query_list, include_all_devices=False, include_deleted_devices=False
@@ -134,9 +134,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             desc="add_e2e_one_time_keys_check",
         )
 
-        defer.returnValue(
-            {(row["algorithm"], row["key_id"]): row["key_json"] for row in rows}
-        )
+        return {(row["algorithm"], row["key_id"]): row["key_json"] for row in rows}
 
     @defer.inlineCallbacks
     def add_e2e_one_time_keys(self, user_id, device_id, time_now, new_keys):

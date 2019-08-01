@@ -472,7 +472,7 @@ class DataStore(
         return self._simple_select_list(
             table="users",
             keyvalues={},
-            retcols=["name", "password_hash", "is_guest", "admin"],
+            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
             desc="get_users",
         )
 
@@ -497,11 +497,11 @@ class DataStore(
             orderby=order,
             start=start,
             limit=limit,
-            retcols=["name", "password_hash", "is_guest", "admin"],
+            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
         )
         count = yield self.runInteraction("get_users_paginate", self.get_user_count_txn)
         retval = {"users": users, "total": count}
-        defer.returnValue(retval)
+        return retval
 
     def search_users(self, term):
         """Function to search users list for one or more users with
@@ -517,7 +517,7 @@ class DataStore(
             table="users",
             term=term,
             col="name",
-            retcols=["name", "password_hash", "is_guest", "admin"],
+            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
             desc="search_users",
         )
 

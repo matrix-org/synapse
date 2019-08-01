@@ -59,9 +59,14 @@ class SendServerNoticeServlet(RestServlet):
 
     def register(self, json_resource):
         PATTERN = "^/_synapse/admin/v1/send_server_notice"
-        json_resource.register_paths("POST", (re.compile(PATTERN + "$"),), self.on_POST)
         json_resource.register_paths(
-            "PUT", (re.compile(PATTERN + "/(?P<txn_id>[^/]*)$"),), self.on_PUT
+            "POST", (re.compile(PATTERN + "$"),), self.on_POST, self.__class__.__name__
+        )
+        json_resource.register_paths(
+            "PUT",
+            (re.compile(PATTERN + "/(?P<txn_id>[^/]*)$"),),
+            self.on_PUT,
+            self.__class__.__name__,
         )
 
     @defer.inlineCallbacks
@@ -87,7 +92,7 @@ class SendServerNoticeServlet(RestServlet):
             event_content=body["content"],
         )
 
-        defer.returnValue((200, {"event_id": event.event_id}))
+        return (200, {"event_id": event.event_id})
 
     def on_PUT(self, request, txn_id):
         return self.txns.fetch_or_execute_request(

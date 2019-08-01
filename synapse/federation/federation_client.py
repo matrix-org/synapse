@@ -213,7 +213,7 @@ class FederationClient(FederationBase):
             ).addErrback(unwrapFirstError)
         )
 
-        defer.returnValue(pdus)
+        return pdus
 
     @defer.inlineCallbacks
     @log_function
@@ -245,7 +245,7 @@ class FederationClient(FederationBase):
 
         ev = self._get_pdu_cache.get(event_id)
         if ev:
-            defer.returnValue(ev)
+            return ev
 
         pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
@@ -307,7 +307,7 @@ class FederationClient(FederationBase):
         if signed_pdu:
             self._get_pdu_cache[event_id] = signed_pdu
 
-        defer.returnValue(signed_pdu)
+        return signed_pdu
 
     @defer.inlineCallbacks
     @log_function
@@ -355,7 +355,7 @@ class FederationClient(FederationBase):
 
             auth_chain.sort(key=lambda e: e.depth)
 
-            defer.returnValue((pdus, auth_chain))
+            return (pdus, auth_chain)
         except HttpResponseException as e:
             if e.code == 400 or e.code == 404:
                 logger.info("Failed to use get_room_state_ids API, falling back")
@@ -404,7 +404,7 @@ class FederationClient(FederationBase):
 
         signed_auth.sort(key=lambda e: e.depth)
 
-        defer.returnValue((signed_pdus, signed_auth))
+        return (signed_pdus, signed_auth)
 
     @defer.inlineCallbacks
     def get_events_from_store_or_dest(self, destination, room_id, event_ids):
@@ -429,7 +429,7 @@ class FederationClient(FederationBase):
             missing_events.discard(k)
 
         if not missing_events:
-            defer.returnValue((signed_events, failed_to_fetch))
+            return (signed_events, failed_to_fetch)
 
         logger.debug(
             "Fetching unknown state/auth events %s for room %s",
@@ -465,7 +465,7 @@ class FederationClient(FederationBase):
             # We removed all events we successfully fetched from `batch`
             failed_to_fetch.update(batch)
 
-        defer.returnValue((signed_events, failed_to_fetch))
+        return (signed_events, failed_to_fetch)
 
     @defer.inlineCallbacks
     @log_function
@@ -485,7 +485,7 @@ class FederationClient(FederationBase):
 
         signed_auth.sort(key=lambda e: e.depth)
 
-        defer.returnValue(signed_auth)
+        return signed_auth
 
     @defer.inlineCallbacks
     def _try_destination_list(self, description, destinations, callback):
@@ -521,7 +521,7 @@ class FederationClient(FederationBase):
 
             try:
                 res = yield callback(destination)
-                defer.returnValue(res)
+                return res
             except InvalidResponseError as e:
                 logger.warn("Failed to %s via %s: %s", description, destination, e)
             except HttpResponseException as e:
@@ -615,7 +615,7 @@ class FederationClient(FederationBase):
                 event_dict=pdu_dict,
             )
 
-            defer.returnValue((destination, ev, event_format))
+            return (destination, ev, event_format)
 
         return self._try_destination_list(
             "make_" + membership, destinations, send_request
@@ -728,13 +728,11 @@ class FederationClient(FederationBase):
 
             check_authchain_validity(signed_auth)
 
-            defer.returnValue(
-                {
-                    "state": signed_state,
-                    "auth_chain": signed_auth,
-                    "origin": destination,
-                }
-            )
+            return {
+                "state": signed_state,
+                "auth_chain": signed_auth,
+                "origin": destination,
+            }
 
         return self._try_destination_list("send_join", destinations, send_request)
 
@@ -758,7 +756,7 @@ class FederationClient(FederationBase):
 
         # FIXME: We should handle signature failures more gracefully.
 
-        defer.returnValue(pdu)
+        return pdu
 
     @defer.inlineCallbacks
     def _do_send_invite(self, destination, pdu, room_version):
@@ -786,7 +784,7 @@ class FederationClient(FederationBase):
                     "invite_room_state": pdu.unsigned.get("invite_room_state", []),
                 },
             )
-            defer.returnValue(content)
+            return content
         except HttpResponseException as e:
             if e.code in [400, 404]:
                 err = e.to_synapse_error()
@@ -821,7 +819,7 @@ class FederationClient(FederationBase):
             event_id=pdu.event_id,
             content=pdu.get_pdu_json(time_now),
         )
-        defer.returnValue(content)
+        return content
 
     def send_leave(self, destinations, pdu):
         """Sends a leave event to one of a list of homeservers.
@@ -856,7 +854,7 @@ class FederationClient(FederationBase):
             )
 
             logger.debug("Got content: %s", content)
-            defer.returnValue(None)
+            return None
 
         return self._try_destination_list("send_leave", destinations, send_request)
 
@@ -917,7 +915,7 @@ class FederationClient(FederationBase):
             "missing": content.get("missing", []),
         }
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def get_missing_events(
@@ -974,7 +972,7 @@ class FederationClient(FederationBase):
             # get_missing_events
             signed_events = []
 
-        defer.returnValue(signed_events)
+        return signed_events
 
     @defer.inlineCallbacks
     def forward_third_party_invite(self, destinations, room_id, event_dict):
@@ -986,7 +984,7 @@ class FederationClient(FederationBase):
                 yield self.transport_layer.exchange_third_party_invite(
                     destination=destination, room_id=room_id, event_dict=event_dict
                 )
-                defer.returnValue(None)
+                return None
             except CodeMessageException:
                 raise
             except Exception as e:
@@ -995,3 +993,39 @@ class FederationClient(FederationBase):
                 )
 
         raise RuntimeError("Failed to send to any server.")
+
+    @defer.inlineCallbacks
+    def get_room_complexity(self, destination, room_id):
+        """
+        Fetch the complexity of a remote room from another server.
+
+        Args:
+            destination (str): The remote server
+            room_id (str): The room ID to ask about.
+
+        Returns:
+            Deferred[dict] or Deferred[None]: Dict contains the complexity
+            metric versions, while None means we could not fetch the complexity.
+        """
+        try:
+            complexity = yield self.transport_layer.get_room_complexity(
+                destination=destination, room_id=room_id
+            )
+            defer.returnValue(complexity)
+        except CodeMessageException as e:
+            # We didn't manage to get it -- probably a 404. We are okay if other
+            # servers don't give it to us.
+            logger.debug(
+                "Failed to fetch room complexity via %s for %s, got a %d",
+                destination,
+                room_id,
+                e.code,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to fetch room complexity via %s for %s", destination, room_id
+            )
+
+        # If we don't manage to find it, return None. It's not an error if a
+        # server doesn't give it to us.
+        defer.returnValue(None)

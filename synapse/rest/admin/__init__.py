@@ -84,7 +84,7 @@ class UsersRestServlet(RestServlet):
 
         ret = yield self.handlers.admin_handler.get_users()
 
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class VersionServlet(RestServlet):
@@ -227,7 +227,7 @@ class UserRegisterServlet(RestServlet):
         )
 
         result = yield register._create_registration_details(user_id, body)
-        defer.returnValue((200, result))
+        return (200, result)
 
 
 class WhoisRestServlet(RestServlet):
@@ -252,7 +252,7 @@ class WhoisRestServlet(RestServlet):
 
         ret = yield self.handlers.admin_handler.get_whois(target_user)
 
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class PurgeMediaCacheRestServlet(RestServlet):
@@ -271,7 +271,7 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
         ret = yield self.media_repository.delete_old_remote_media(before_ts)
 
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class PurgeHistoryRestServlet(RestServlet):
@@ -356,7 +356,7 @@ class PurgeHistoryRestServlet(RestServlet):
             room_id, token, delete_local_events=delete_local_events
         )
 
-        defer.returnValue((200, {"purge_id": purge_id}))
+        return (200, {"purge_id": purge_id})
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
@@ -381,7 +381,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        defer.returnValue((200, purge_status.asdict()))
+        return (200, purge_status.asdict())
 
 
 class DeactivateAccountRestServlet(RestServlet):
@@ -413,7 +413,7 @@ class DeactivateAccountRestServlet(RestServlet):
         else:
             id_server_unbind_result = "no-support"
 
-        defer.returnValue((200, {"id_server_unbind_result": id_server_unbind_result}))
+        return (200, {"id_server_unbind_result": id_server_unbind_result})
 
 
 class ShutdownRoomRestServlet(RestServlet):
@@ -531,16 +531,14 @@ class ShutdownRoomRestServlet(RestServlet):
             room_id, new_room_id, requester_user_id
         )
 
-        defer.returnValue(
-            (
-                200,
-                {
-                    "kicked_users": kicked_users,
-                    "failed_to_kick_users": failed_to_kick_users,
-                    "local_aliases": aliases_for_room,
-                    "new_room_id": new_room_id,
-                },
-            )
+        return (
+            200,
+            {
+                "kicked_users": kicked_users,
+                "failed_to_kick_users": failed_to_kick_users,
+                "local_aliases": aliases_for_room,
+                "new_room_id": new_room_id,
+            },
         )
 
 
@@ -564,7 +562,7 @@ class QuarantineMediaInRoom(RestServlet):
             room_id, requester.user.to_string()
         )
 
-        defer.returnValue((200, {"num_quarantined": num_quarantined}))
+        return (200, {"num_quarantined": num_quarantined})
 
 
 class ListMediaInRoom(RestServlet):
@@ -585,7 +583,7 @@ class ListMediaInRoom(RestServlet):
 
         local_mxcs, remote_mxcs = yield self.store.get_media_mxcs_in_room(room_id)
 
-        defer.returnValue((200, {"local": local_mxcs, "remote": remote_mxcs}))
+        return (200, {"local": local_mxcs, "remote": remote_mxcs})
 
 
 class ResetPasswordRestServlet(RestServlet):
@@ -629,7 +627,7 @@ class ResetPasswordRestServlet(RestServlet):
         yield self._set_password_handler.set_password(
             target_user_id, new_password, requester
         )
-        defer.returnValue((200, {}))
+        return (200, {})
 
 
 class GetUsersPaginatedRestServlet(RestServlet):
@@ -671,7 +669,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
-        defer.returnValue((200, ret))
+        return (200, ret)
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
@@ -699,7 +697,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class SearchUsersRestServlet(RestServlet):
@@ -742,7 +740,7 @@ class SearchUsersRestServlet(RestServlet):
         logger.info("term: %s ", term)
 
         ret = yield self.handlers.admin_handler.search_users(term)
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class DeleteGroupAdminRestServlet(RestServlet):
@@ -765,7 +763,7 @@ class DeleteGroupAdminRestServlet(RestServlet):
             raise SynapseError(400, "Can only delete local groups")
 
         yield self.group_server.delete_group(group_id, requester.user.to_string())
-        defer.returnValue((200, {}))
+        return (200, {})
 
 
 class AccountValidityRenewServlet(RestServlet):
@@ -796,7 +794,7 @@ class AccountValidityRenewServlet(RestServlet):
         )
 
         res = {"expiration_ts": expiration_ts}
-        defer.returnValue((200, res))
+        return (200, res)
 
 
 ########################################################################################

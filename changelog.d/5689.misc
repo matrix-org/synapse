@@ -1,1 +1,0 @@
-Convert `synapse.federation.transport.server` to `async`. Might improve some stack traces.

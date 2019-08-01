@@ -84,7 +84,7 @@ class E2eRoomKeysHandler(object):
                 user_id, version, room_id, session_id
             )
 
-            defer.returnValue(results)
+            return results
 
     @defer.inlineCallbacks
     def delete_room_keys(self, user_id, version, room_id=None, session_id=None):
@@ -262,7 +262,7 @@ class E2eRoomKeysHandler(object):
             new_version = yield self.store.create_e2e_room_keys_version(
                 user_id, version_info
             )
-            defer.returnValue(new_version)
+            return new_version
 
     @defer.inlineCallbacks
     def get_version_info(self, user_id, version=None):
@@ -292,7 +292,7 @@ class E2eRoomKeysHandler(object):
                     raise NotFoundError("Unknown backup version")
                 else:
                     raise
-            defer.returnValue(res)
+            return res
 
     @defer.inlineCallbacks
     def delete_version(self, user_id, version=None):
@@ -350,4 +350,4 @@ class E2eRoomKeysHandler(object):
                 user_id, version, version_info
             )
 
-            defer.returnValue({})
+            return {}

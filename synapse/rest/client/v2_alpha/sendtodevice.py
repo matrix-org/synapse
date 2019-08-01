@@ -60,7 +60,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         )
 
         response = (200, {})
-        defer.returnValue(response)
+        return response
 
 
 def register_servlets(hs, http_server):

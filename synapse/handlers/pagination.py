@@ -242,13 +242,11 @@ class PaginationHandler(object):
             )
 
         if not events:
-            defer.returnValue(
-                {
-                    "chunk": [],
-                    "start": pagin_config.from_token.to_string(),
-                    "end": next_token.to_string(),
-                }
-            )
+            return {
+                "chunk": [],
+                "start": pagin_config.from_token.to_string(),
+                "end": next_token.to_string(),
+            }
 
         state = None
         if event_filter and event_filter.lazy_load_members() and len(events) > 0:
@@ -286,4 +284,4 @@ class PaginationHandler(object):
                 )
             )
 
-        defer.returnValue(chunk)
+        return chunk

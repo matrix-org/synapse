@@ -83,7 +83,7 @@ class TypingHandler(object):
         self._room_typing = {}
 
     def _handle_timeouts(self):
-        logger.info("Checking for typing timeouts")
+        logger.debug("Checking for typing timeouts")
 
         now = self.clock.time_msec()
 
@@ -140,7 +140,7 @@ class TypingHandler(object):
 
         if was_present:
             # No point sending another notification
-            defer.returnValue(None)
+            return None
 
         self._push_update(member=member, typing=True)
 
@@ -173,7 +173,7 @@ class TypingHandler(object):
     def _stopped_typing(self, member):
         if member.user_id not in self._room_typing.get(member.room_id, set()):
             # No point
-            defer.returnValue(None)
+            return None
 
         self._member_typing_until.pop(member, None)
         self._member_last_federation_poke.pop(member, None)

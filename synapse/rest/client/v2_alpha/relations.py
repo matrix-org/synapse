@@ -72,11 +72,13 @@ class RelationSendServlet(RestServlet):
             "POST",
             client_patterns(self.PATTERN + "$", releases=()),
             self.on_PUT_or_POST,
+            self.__class__.__name__,
         )
         http_server.register_paths(
             "PUT",
             client_patterns(self.PATTERN + "/(?P<txn_id>[^/]*)$", releases=()),
             self.on_PUT,
+            self.__class__.__name__,
         )
 
     def on_PUT(self, request, *args, **kwargs):
@@ -116,7 +118,7 @@ class RelationSendServlet(RestServlet):
             requester, event_dict=event_dict, txn_id=txn_id
         )
 
-        defer.returnValue((200, {"event_id": event.event_id}))
+        return (200, {"event_id": event.event_id})
 
 
 class RelationPaginationServlet(RestServlet):
@@ -196,7 +198,7 @@ class RelationPaginationServlet(RestServlet):
         return_value["chunk"] = events
         return_value["original_event"] = original_event
 
-        defer.returnValue((200, return_value))
+        return (200, return_value)
 
 
 class RelationAggregationPaginationServlet(RestServlet):
@@ -268,7 +270,7 @@ class RelationAggregationPaginationServlet(RestServlet):
                 to_token=to_token,
             )
 
-        defer.returnValue((200, pagination_chunk.to_dict()))
+        return (200, pagination_chunk.to_dict())
 
 
 class RelationAggregationGroupPaginationServlet(RestServlet):
@@ -354,7 +356,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         return_value = result.to_dict()
         return_value["chunk"] = events
 
-        defer.returnValue((200, return_value))
+        return (200, return_value)
 
 
 def register_servlets(hs, http_server):

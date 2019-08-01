@@ -86,35 +86,6 @@ class KeyringTestCase(unittest.HomeserverTestCase):
             getattr(LoggingContext.current_context(), "request", None), expected
         )
 
-    def test_wait_for_previous_lookups(self):
-        kr = keyring.Keyring(self.hs)
-
-        lookup_1_deferred = defer.Deferred()
-        lookup_2_deferred = defer.Deferred()
-
-        # we run the lookup in a logcontext so that the patched inlineCallbacks can check
-        # it is doing the right thing with logcontexts.
-        wait_1_deferred = run_in_context(
-            kr.wait_for_previous_lookups, {"server1": lookup_1_deferred}
-        )
-
-        # there were no previous lookups, so the deferred should be ready
-        self.successResultOf(wait_1_deferred)
-
-        # set off another wait. It should block because the first lookup
-        # hasn't yet completed.
-        wait_2_deferred = run_in_context(
-            kr.wait_for_previous_lookups, {"server1": lookup_2_deferred}
-        )
-
-        self.assertFalse(wait_2_deferred.called)
-
-        # let the first lookup complete (in the sentinel context)
-        lookup_1_deferred.callback(None)
-
-        # now the second wait should complete.
-        self.successResultOf(wait_2_deferred)
-
     def test_verify_json_objects_for_server_awaits_previous_requests(self):
         key1 = signedjson.key.generate_signing_key(1)
 
@@ -136,7 +107,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
             self.assertEquals(LoggingContext.current_context().request, "11")
             with PreserveLoggingContext():
                 yield persp_deferred
-            defer.returnValue(persp_resp)
+            return persp_resp
 
         self.http_client.post_json.side_effect = get_perspectives
 
@@ -583,7 +554,7 @@ def run_in_context(f, *args, **kwargs):
         # logs.
         ctx.request = "testctx"
         rv = yield f(*args, **kwargs)
-    defer.returnValue(rv)
+    return rv
 
 
 def _verify_json_for_server(kr, *args):
@@ -594,6 +565,6 @@ def _verify_json_for_server(kr, *args):
     @defer.inlineCallbacks
     def v():
         rv1 = yield kr.verify_json_for_server(*args)
-        defer.returnValue(rv1)
+        return rv1
 
     return run_in_context(v)
