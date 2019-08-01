@@ -6,14 +6,13 @@ from synapse_topology.model.errors import (
     ConfigNotFoundError,
 )
 
-from . import server
-
-app = server.app
+from . import app
 
 
 @app.handle_errors(ValidationError)
 def validation_error(request, failure):
     request.setResponseCode(400)
+    print("Invalid post schema {}".format(failure.getErrorMessage()))
     return "Invalid post schema {}".format(failure.getErrorMessage())
 
 

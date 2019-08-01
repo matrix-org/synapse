@@ -5,7 +5,6 @@ import sys
 
 import synapse_topology.controller.server as server
 import synapse_topology.model as model
-import synapse_topology.view.server as webui_server
 
 from twisted.internet import endpoints, reactor
 from twisted.web.server import Site
@@ -36,18 +35,11 @@ if not path.isdir(args.config_dir):
 
 model.set_config_dir(args.config_dir)
 
-# Backend
 
 backend_endpoint = endpoints.serverFromString(
-    reactor, "tcp6:port=8889:interface=localhost"
+    reactor, "tcp6:port=8888:interface=localhost"
 )
 backend_endpoint.listen(Site(server.app.resource()))
 
-# Frontend
-
-frontend_endpoint = endpoints.serverFromString(
-    reactor, "tcp6:port=8888:interface=localhost"
-)
-frontend_endpoint.listen(Site(webui_server.app.resource()))
 
 reactor.run()
