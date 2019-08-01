@@ -438,6 +438,10 @@ class RoomAccessRules(object):
         """Check whether a join rule change is allowed. A join rule change is always
         allowed unless the new join rule is "public" and the current access rule isn't
         "restricted".
+        The rationale is that external users (those whose server would be denied access
+        to rooms enforcing the "restricted" access rule) should always rely on non-
+        external users for access to rooms, therefore they shouldn't be able to access
+        rooms that don't require an invite to be joined.
 
         Note that we currently rely on the default access rule being "restricted": during
         room creation, the m.room.join_rules event will be sent *before* the
