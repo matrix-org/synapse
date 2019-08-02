@@ -1,1 +1,1 @@
-allow uploading of cross-signing keys
+Allow uploading of cross-signing keys.

@@ -176,7 +176,9 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         }
         yield self.handler.upload_signing_keys_for_user(local_user, keys2)
 
-        devices = yield self.handler.query_devices({"device_keys": {local_user: []}}, 0, local_user)
+        devices = yield self.handler.query_devices(
+            {"device_keys": {local_user: []}}, 0, local_user
+        )
         self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
     @defer.inlineCallbacks
