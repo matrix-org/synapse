@@ -82,3 +82,13 @@ def get_secret_key():
 
 def verify_yaml():
     pass
+
+
+def add_certs(cert, cert_key):
+    with open(
+        path.join(config_dir, get_server_name() + ".tls.crt"), "w"
+    ) as cert_file, open(
+        path.join(config_dir, get_server_name() + ".tls.key"), "w"
+    ) as key_file:
+        cert_file.write(cert)
+        key_file.write(cert_key)
