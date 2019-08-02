@@ -82,7 +82,7 @@ a {
     color: @primary;
   }
 
-  input, select {
+  input, .select {
     padding: 0.4rem;
     font-size: 1rem;
     background-color: @secondary;
@@ -92,10 +92,26 @@ a {
     color: lighten(@font, 20%);
     margin-bottom: 1rem;
   }
+
+  select {
+    .select();
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+
+    &:after {
+      content: ▸;
+      transform: rotate(90deg);
+      position: absolute;
+    }
+  }
   .redButton {
     background-color: red;
   }
 
+  .invalidInput {
+    border-color: red;
+  }
   p {
     text-align: justify;
     text-align-last: center;

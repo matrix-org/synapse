@@ -19,7 +19,6 @@ const download = (filename, text) => {
 }
 
 export default ({ secret_key_loaded, secret_key, onClick }) => {
-  console.log(onClick)
   if (!secret_key_loaded) {
     return <ContentWrapper>
       <h1>Generating secret key</h1>

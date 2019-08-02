@@ -5,6 +5,13 @@ import {
   GETTING_SECRET_KEY,
   SET_DELEGATION,
   SET_DELEGATION_SERVERNAME,
+  SET_REVERSE_PROXY,
+  SET_TLS,
+  TESTING_TLS_CERT_PATHS,
+  SET_TLS_CERT_PATHS,
+  SET_TLS_CERT_PATHS_VALIDITY,
+  SET_TLS_CERT_FILES,
+  UPLOADING_TLS_CERT_PATHS,
 } from "../actions/types";
 
 export default (state = { servername: undefined }, action) => {
@@ -39,6 +46,44 @@ export default (state = { servername: undefined }, action) => {
       return {
         ...state,
         delegation_servername: action.delegation_servername,
+      }
+    case SET_REVERSE_PROXY:
+      return {
+        ...state,
+        reverse_proxy: action.proxy_type,
+      }
+    case SET_TLS:
+      return {
+        ...state,
+        tls: action.tls_type,
+      }
+    case TESTING_TLS_CERT_PATHS:
+      return {
+        ...state,
+        testing_cert_paths: action.testing,
+      }
+    case SET_TLS_CERT_PATHS_VALIDITY:
+      return {
+        ...state,
+        cert_path_invalid: action.cert_path_invalid,
+        cert_key_path_invalid: action.cert_key_path_invalid,
+      }
+    case SET_TLS_CERT_PATHS:
+      return {
+        ...state,
+        tls_cert_path: action.cert_path,
+        tls_cert_key_path: action.cert_key_path,
+      }
+    case SET_TLS_CERT_FILES:
+      return {
+        ...state,
+        tls_cert_file: action.tls_cert_file,
+        tls_cert_key_file: action.tls_cert_key_file,
+      }
+    case UPLOADING_TLS_CERT_PATHS:
+      return {
+        ...state,
+        uploading_certs: action.uploading,
       }
     default:
       return state;

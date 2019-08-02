@@ -12,3 +12,9 @@ export const REVERSE_PROXY_TYPES = {
   OTHER: "OTHER",
   NONE: "NONE",
 }
+
+export const TLS_TYPES = {
+  ACME: "ACME",
+  TLS: "TLS",
+  NONE: "NONE",
+}

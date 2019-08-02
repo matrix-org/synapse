@@ -10,15 +10,16 @@ import {
   WELL_KNOWN_UI,
   DNS_UI,
   WORKER_UI,
-  ACME_UI,
+  TLS_UI,
   REVERSE_PROXY_UI,
   PORT_SELECTION_UI,
   REVERSE_PROXY_TEMPLATE_UI,
   LOADING_UI,
+  TLS_CERTPATH_UI,
 } from './ui_constants';
 
 import {
-  DELEGATION_TYPES
+  DELEGATION_TYPES, TLS_TYPES
 } from '../actions/constants';
 
 export default (state, action) => {
@@ -50,8 +51,17 @@ export default (state, action) => {
         case DELEGATION_SERVER_NAME_UI:
           return REVERSE_PROXY_UI;
         case REVERSE_PROXY_UI:
-          return ACME_UI;
-        case ACME_UI:
+          return TLS_UI;
+        case TLS_UI:
+          switch (action.option) {
+            case TLS_TYPES.ACME:
+              return PORT_SELECTION_UI;
+            case TLS_TYPES.TLS:
+              return TLS_CERTPATH_UI;
+            case TLS_TYPES.NONE:
+              return PORT_SELECTION_UI;
+          }
+        case TLS_CERTPATH_UI:
           return PORT_SELECTION_UI;
         case WELL_KNOWN_UI:
         case DNS_UI:
