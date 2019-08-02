@@ -17,7 +17,7 @@ export default ({ onClick }) => {
       The name will also be what other servers look up when they're trying to reach this one.
     </p>
     <p>
-      Normally the server name is usually just your domain. For example matrix.org's server is
+      Normally the server name is usually just your domain. For example <a target="_blank" href="https://matrix.org">matrix.org</a>'s server is
       known as `matrix.org`.
     </p>
     <input type="text" onChange={onChange} autoFocus placeholder="synapse.dev"></input>

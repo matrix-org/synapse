@@ -7,6 +7,7 @@ import {
   SECRET_KEY,
   SERVER_NAME,
   SETUP_CHECK,
+  CERT_PATHS,
 } from './constants';
 
 const fetchAbs = fetchAbsolute(fetch)(API_URL)
@@ -23,6 +24,30 @@ export const post_server_name = (servername, consent) =>
       body: JSON.stringify({
         "server_name": servername,
         "report_stats": consent
+      })
+    }
+  )
+
+export const post_cert_paths = (cert_path, cert_key_path) =>
+  fetchAbs(
+    CERT_PATHS,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        cert_path,
+        cert_key_path,
+      })
+    }
+  ).then(res => res.json())
+
+export const post_certs = (cert, cert_key) =>
+  fetchAbs(
+    CERT_PATHS,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        cert,
+        cert_key,
       })
     }
   )
