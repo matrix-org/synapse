@@ -492,10 +492,10 @@ def get_verify_key_from_cross_signing_key(key_info):
     """
     # make sure that exactly one key is provided
     if "keys" not in key_info:
-        raise SynapseError(400, "Invalid key")
+        raise ValueError("Invalid key")
     keys = key_info["keys"]
     if len(keys) != 1:
-        raise SynapseError(400, "Invalid key")
+        raise ValueError("Invalid key")
     # and return that one key
     for key_id, key_data in keys.items():
         return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))

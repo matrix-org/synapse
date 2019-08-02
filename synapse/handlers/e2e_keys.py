@@ -510,9 +510,18 @@ class E2eKeysHandler(object):
         if not master_key:
             raise SynapseError(400, "No master key available", Codes.MISSING_PARAM)
 
-        master_key_id, master_verify_key = get_verify_key_from_cross_signing_key(
-            master_key
-        )
+        try:
+            master_key_id, master_verify_key = get_verify_key_from_cross_signing_key(
+                master_key
+            )
+        except ValueError:
+            if "master_key" in keys:
+                # the invalid key came from the request
+                raise SynapseError(400, "Invalid master key", Codes.INVALID_PARAM)
+            else:
+                # the invalid key came from the database
+                logger.error("Invalid master key found for user %s", user_id)
+                raise SynapseError(500, "Invalid master key")
 
         # for the other cross-signing keys, make sure that they have valid
         # signatures from the master key
@@ -539,9 +548,12 @@ class E2eKeysHandler(object):
             yield self.store.set_e2e_cross_signing_key(
                 user_id, "self_signing", self_signing_key
             )
-            deviceids.append(
-                get_verify_key_from_cross_signing_key(self_signing_key)[1].version
-            )
+            try:
+                deviceids.append(
+                    get_verify_key_from_cross_signing_key(self_signing_key)[1].version
+                )
+            except ValueError:
+                raise SynapseError(400, "Invalid self-signing key", Codes.INVALID_PARAM)
         if "user_signing_key" in keys:
             yield self.store.set_e2e_cross_signing_key(
                 user_id, "user_signing", user_signing_key
