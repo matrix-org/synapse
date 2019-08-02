@@ -6,7 +6,12 @@ from synapse_topology import model
 from twisted.web.static import File
 
 from . import error_handlers
-from .schemas import BASE_CONFIG_SCHEMA, SERVERNAME_SCHEMA
+from .schemas import (
+    BASE_CONFIG_SCHEMA,
+    SERVERNAME_SCHEMA,
+    CERT_PATHS_SCHEMA,
+    CERTS_SCHEMA,
+)
 from .utils import validate_schema
 
 from . import app
@@ -61,3 +66,22 @@ with app.subroute("/config") as app:
         @app.route("/config/{}".format(config), methods=["POST"])
         def set_sub_config(request, sub_config):
             model.set_config(json.loads(request.content.read()), sub_config=config)
+
+
+@app.route("/testcertpaths", methods=["POST"])
+@validate_schema(CERT_PATHS_SCHEMA)
+def test_cert_paths(request, body):
+    result = {}
+    for path in ["cert_path", "cert_key_path"]:
+        try:
+            with open(body[path], "r"):
+                result[path + "_invalid"] = False
+        except:
+            result[path + "_invalid"] = True
+    return json.dumps(result)
+
+
+@app.route("/certs", methods=["POST"])
+@validate_schema(CERTS_SCHEMA)
+def upload_certs(request, body):
+    model.add_certs(**body)
