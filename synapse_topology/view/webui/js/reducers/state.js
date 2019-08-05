@@ -10,6 +10,7 @@ const state = {
     secret_key: "asdfsadf",
     delegation_type: "local|well_known|DNS_SRV",
     delegation_server_name: "name",
+    delegation_port: "udefined|325",
     reverse_proxy: "nginx|caddy|apache|haproxy|other|none",
     tls: "acme|tls|none|reverseproxy",
     testing_cert_paths: true,

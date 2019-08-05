@@ -9,6 +9,7 @@ import {
   GETTING_SECRET_KEY,
   SET_DELEGATION,
   SET_DELEGATION_SERVERNAME,
+  SET_DELEGATION_PORT,
   SET_REVERSE_PROXY,
   SET_TLS,
   TESTING_TLS_CERT_PATHS,
@@ -158,6 +159,11 @@ export const set_delegation = delegation_type => ({
 export const set_delegation_servername = servername => ({
   type: SET_DELEGATION_SERVERNAME,
   servername,
+});
+
+export const set_delegation_port = port => ({
+  type: SET_DELEGATION_PORT,
+  port,
 });
 
 export const set_reverse_proxy = proxy_type => ({

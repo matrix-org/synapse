@@ -5,6 +5,7 @@ export const STATS_REPORT_UI = "stats_report_ui";
 export const KEY_EXPORT_UI = "key_export_ui";
 export const DELEGATION_OPTIONS_UI = "delegation_options_ui";
 export const DELEGATION_SERVER_NAME_UI = "delegation_server_name_ui";
+export const DELEGATION_PORT_SELECTION_UI = "delegation_port_selection_ui";
 export const WELL_KNOWN_UI = "well_known_ui";
 export const DNS_UI = "dns_ui";
 export const WORKER_UI = "worker_ui";

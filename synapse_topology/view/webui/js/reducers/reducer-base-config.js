@@ -47,6 +47,11 @@ export default (state = { servername: undefined }, action) => {
         ...state,
         delegation_servername: action.delegation_servername,
       }
+    case SET_DELEGATION_SERVERNAME:
+      return {
+        ...state,
+        delegation_port: action.port,
+      }
     case SET_REVERSE_PROXY:
       return {
         ...state,
