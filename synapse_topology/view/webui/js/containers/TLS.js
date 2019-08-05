@@ -20,8 +20,12 @@ const mapDispathToProps = (dispatch) => ({
     dispatch(set_tls(TLS_TYPES.TLS));
   },
   onClickNoTLS: () => {
-    dispatch(advance_ui());
+    dispatch(advance_ui(TLS_TYPES.NONE));
     dispatch(set_tls(TLS_TYPES.NONE));
+  },
+  onClickReverseProxy: () => {
+    dispatch(advance_ui(TLS_TYPES.REVERSE_PROXY)),
+      dispatch(set_tls(TLS_TYPES.REVERSE_PROXY))
   },
 });
 
