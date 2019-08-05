@@ -126,9 +126,12 @@ class GroupsLocalHandler(object):
                 group_id, requester_user_id
             )
         else:
-            res = yield self.transport_client.get_group_summary(
-                get_domain_from_id(group_id), group_id, requester_user_id
-            )
+            try:
+                res = yield self.transport_client.get_group_summary(
+                    get_domain_from_id(group_id), group_id, requester_user_id
+                )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
             group_server_name = get_domain_from_id(group_id)
 
@@ -183,9 +186,12 @@ class GroupsLocalHandler(object):
 
             content["user_profile"] = yield self.profile_handler.get_profile(user_id)
 
-            res = yield self.transport_client.create_group(
-                get_domain_from_id(group_id), group_id, user_id, content
-            )
+            try:
+                res = yield self.transport_client.create_group(
+                    get_domain_from_id(group_id), group_id, user_id, content
+                )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
             remote_attestation = res["attestation"]
             yield self.attestations.verify_attestation(
@@ -221,9 +227,12 @@ class GroupsLocalHandler(object):
 
         group_server_name = get_domain_from_id(group_id)
 
-        res = yield self.transport_client.get_users_in_group(
-            get_domain_from_id(group_id), group_id, requester_user_id
-        )
+        try:
+            res = yield self.transport_client.get_users_in_group(
+                get_domain_from_id(group_id), group_id, requester_user_id
+            )
+        except RequestSendFailed:
+            raise SynapseError(502, "Failed to contact group server")
 
         chunk = res["chunk"]
         valid_entries = []
@@ -258,9 +267,12 @@ class GroupsLocalHandler(object):
             local_attestation = self.attestations.create_attestation(group_id, user_id)
             content["attestation"] = local_attestation
 
-            res = yield self.transport_client.join_group(
-                get_domain_from_id(group_id), group_id, user_id, content
-            )
+            try:
+                res = yield self.transport_client.join_group(
+                    get_domain_from_id(group_id), group_id, user_id, content
+                )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
             remote_attestation = res["attestation"]
 
@@ -299,9 +311,12 @@ class GroupsLocalHandler(object):
             local_attestation = self.attestations.create_attestation(group_id, user_id)
             content["attestation"] = local_attestation
 
-            res = yield self.transport_client.accept_group_invite(
-                get_domain_from_id(group_id), group_id, user_id, content
-            )
+            try:
+                res = yield self.transport_client.accept_group_invite(
+                    get_domain_from_id(group_id), group_id, user_id, content
+                )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
             remote_attestation = res["attestation"]
 
@@ -338,13 +353,16 @@ class GroupsLocalHandler(object):
                 group_id, user_id, requester_user_id, content
             )
         else:
-            res = yield self.transport_client.invite_to_group(
-                get_domain_from_id(group_id),
-                group_id,
-                user_id,
-                requester_user_id,
-                content,
-            )
+            try:
+                res = yield self.transport_client.invite_to_group(
+                    get_domain_from_id(group_id),
+                    group_id,
+                    user_id,
+                    requester_user_id,
+                    content,
+                )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
         return res
 
@@ -398,13 +416,16 @@ class GroupsLocalHandler(object):
             )
         else:
             content["requester_user_id"] = requester_user_id
-            res = yield self.transport_client.remove_user_from_group(
-                get_domain_from_id(group_id),
-                group_id,
-                requester_user_id,
-                user_id,
-                content,
-            )
+            try:
+                res = yield self.transport_client.remove_user_from_group(
+                    get_domain_from_id(group_id),
+                    group_id,
+                    requester_user_id,
+                    user_id,
+                    content,
+                )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
         return res
 
@@ -435,9 +456,13 @@ class GroupsLocalHandler(object):
 
             return {"groups": result}
         else:
-            bulk_result = yield self.transport_client.bulk_get_publicised_groups(
-                get_domain_from_id(user_id), [user_id]
-            )
+            try:
+                bulk_result = yield self.transport_client.bulk_get_publicised_groups(
+                    get_domain_from_id(user_id), [user_id]
+                )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
+
             result = bulk_result.get("users", {}).get(user_id)
             # TODO: Verify attestations
             return {"groups": result}

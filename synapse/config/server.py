@@ -18,6 +18,7 @@
 import logging
 import os.path
 
+import attr
 from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -37,6 +38,12 @@ logger = logging.Logger(__name__)
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
 DEFAULT_ROOM_VERSION = "4"
+
+ROOM_COMPLEXITY_TOO_GREAT = (
+    "Your homeserver is unable to join rooms this large or complex. "
+    "Please speak to your server administrator, or upgrade your instance "
+    "to join this room."
+)
 
 
 class ServerConfig(Config):
@@ -246,6 +253,23 @@ class ServerConfig(Config):
             _warn_if_webclient_configured(self.listeners)
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
+
+        @attr.s
+        class LimitRemoteRoomsConfig(object):
+            enabled = attr.ib(
+                validator=attr.validators.instance_of(bool), default=False
+            )
+            complexity = attr.ib(
+                validator=attr.validators.instance_of((int, float)), default=1.0
+            )
+            complexity_error = attr.ib(
+                validator=attr.validators.instance_of(str),
+                default=ROOM_COMPLEXITY_TOO_GREAT,
+            )
+
+        self.limit_remote_rooms = LimitRemoteRoomsConfig(
+            **config.get("limit_remote_rooms", {})
+        )
 
         bind_port = config.get("bind_port")
         if bind_port:
@@ -616,6 +640,23 @@ class ServerConfig(Config):
 
         # Used by phonehome stats to group together related servers.
         #server_context: context
+
+        # Resource-constrained Homeserver Settings
+        #
+        # If limit_remote_rooms.enabled is True, the room complexity will be
+        # checked before a user joins a new remote room. If it is above
+        # limit_remote_rooms.complexity, it will disallow joining or
+        # instantly leave.
+        #
+        # limit_remote_rooms.complexity_error can be set to customise the text
+        # displayed to the user when a room above the complexity threshold has
+        # its join cancelled.
+        #
+        # Uncomment the below lines to enable:
+        #limit_remote_rooms:
+        #  enabled: True
+        #  complexity: 1.0
+        #  complexity_error: "This room is too complex."
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.

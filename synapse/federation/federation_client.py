@@ -511,9 +511,8 @@ class FederationClient(FederationBase):
             The [Deferred] result of callback, if it succeeds
 
         Raises:
-            SynapseError if the chosen remote server returns a 300/400 code.
-
-            RuntimeError if no servers were reachable.
+            SynapseError if the chosen remote server returns a 300/400 code, or
+            no servers were reachable.
         """
         for destination in destinations:
             if destination == self.server_name:
@@ -538,7 +537,7 @@ class FederationClient(FederationBase):
             except Exception:
                 logger.warn("Failed to %s via %s", description, destination, exc_info=1)
 
-        raise RuntimeError("Failed to %s via any server" % (description,))
+        raise SynapseError(502, "Failed to %s via any server" % (description,))
 
     def make_membership_event(
         self, destinations, room_id, user_id, membership, content, params
@@ -993,3 +992,39 @@ class FederationClient(FederationBase):
                 )
 
         raise RuntimeError("Failed to send to any server.")
+
+    @defer.inlineCallbacks
+    def get_room_complexity(self, destination, room_id):
+        """
+        Fetch the complexity of a remote room from another server.
+
+        Args:
+            destination (str): The remote server
+            room_id (str): The room ID to ask about.
+
+        Returns:
+            Deferred[dict] or Deferred[None]: Dict contains the complexity
+            metric versions, while None means we could not fetch the complexity.
+        """
+        try:
+            complexity = yield self.transport_layer.get_room_complexity(
+                destination=destination, room_id=room_id
+            )
+            defer.returnValue(complexity)
+        except CodeMessageException as e:
+            # We didn't manage to get it -- probably a 404. We are okay if other
+            # servers don't give it to us.
+            logger.debug(
+                "Failed to fetch room complexity via %s for %s, got a %d",
+                destination,
+                room_id,
+                e.code,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to fetch room complexity via %s for %s", destination, room_id
+            )
+
+        # If we don't manage to find it, return None. It's not an error if a
+        # server doesn't give it to us.
+        defer.returnValue(None)

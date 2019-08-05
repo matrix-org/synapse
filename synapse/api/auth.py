@@ -421,21 +421,16 @@ class Auth(object):
         try:
             user_id = self.get_user_id_from_macaroon(macaroon)
 
-            has_expiry = False
             guest = False
             for caveat in macaroon.caveats:
-                if caveat.caveat_id.startswith("time "):
-                    has_expiry = True
-                elif caveat.caveat_id == "guest = true":
+                if caveat.caveat_id == "guest = true":
                     guest = True
 
-            self.validate_macaroon(
-                macaroon, rights, self.hs.config.expire_access_token, user_id=user_id
-            )
+            self.validate_macaroon(macaroon, rights, user_id=user_id)
         except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
             raise InvalidClientTokenError("Invalid macaroon passed.")
 
-        if not has_expiry and rights == "access":
+        if rights == "access":
             self.token_cache[token] = (user_id, guest)
 
         return user_id, guest
@@ -461,7 +456,7 @@ class Auth(object):
                 return caveat.caveat_id[len(user_prefix) :]
         raise InvalidClientTokenError("No user caveat in macaroon")
 
-    def validate_macaroon(self, macaroon, type_string, verify_expiry, user_id):
+    def validate_macaroon(self, macaroon, type_string, user_id):
         """
         validate that a Macaroon is understood by and was signed by this server.
 
@@ -469,7 +464,6 @@ class Auth(object):
             macaroon(pymacaroons.Macaroon): The macaroon to validate
             type_string(str): The kind of token required (e.g. "access",
                               "delete_pusher")
-            verify_expiry(bool): Whether to verify whether the macaroon has expired.
             user_id (str): The user_id required
         """
         v = pymacaroons.Verifier()
@@ -482,19 +476,7 @@ class Auth(object):
         v.satisfy_exact("type = " + type_string)
         v.satisfy_exact("user_id = %s" % user_id)
         v.satisfy_exact("guest = true")
-
-        # verify_expiry should really always be True, but there exist access
-        # tokens in the wild which expire when they should not, so we can't
-        # enforce expiry yet (so we have to allow any caveat starting with
-        # 'time < ' in access tokens).
-        #
-        # On the other hand, short-term login tokens (as used by CAS login, for
-        # example) have an expiry time which we do want to enforce.
-
-        if verify_expiry:
-            v.satisfy_general(self._verify_expiry)
-        else:
-            v.satisfy_general(lambda c: c.startswith("time < "))
+        v.satisfy_general(self._verify_expiry)
 
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))

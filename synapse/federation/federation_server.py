@@ -365,7 +365,7 @@ class FederationServer(FederationBase):
             logger.warn("Room version %s not in %s", room_version, supported_versions)
             raise IncompatibleRoomVersionError(room_version=room_version)
 
-        pdu = yield self.handler.on_make_join_request(room_id, user_id)
+        pdu = yield self.handler.on_make_join_request(origin, room_id, user_id)
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
@@ -415,7 +415,7 @@ class FederationServer(FederationBase):
     def on_make_leave_request(self, origin, room_id, user_id):
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, room_id)
-        pdu = yield self.handler.on_make_leave_request(room_id, user_id)
+        pdu = yield self.handler.on_make_leave_request(origin, room_id, user_id)
 
         room_version = yield self.store.get_room_version(room_id)
 
