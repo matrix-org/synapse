@@ -216,11 +216,11 @@ class DeviceWorkerHandler(BaseHandler):
             possibly_joined = []
             possibly_left = []
 
-        opentracing.log_kv(
-            {"changed": list(possibly_joined), "left": list(possibly_left)}
-        )
+        result = {"changed": list(possibly_joined), "left": list(possibly_left)}
 
-        return {"changed": list(possibly_joined), "left": list(possibly_left)}
+        opentracing.log_kv(result)
+
+        return {result}
 
 
 class DeviceHandler(DeviceWorkerHandler):
