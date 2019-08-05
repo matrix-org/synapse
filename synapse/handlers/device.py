@@ -512,7 +512,8 @@ class DeviceListUpdater(object):
             opentracing.set_tag("error", True)
             opentracing.log_kv(
                 {
-                    "message": "Got a device list update edu from a user and device which does not match the origin of the request.",
+                    "message": "Got a device list update edu from a user and "
+                    "device which does not match the origin of the request.",
                     "user_id": user_id,
                     "device_id": device_id,
                 }
@@ -527,7 +528,7 @@ class DeviceListUpdater(object):
             opentracing.log_kv(
                 {
                     "message": "Got an update from a user for which "
-                    + "we don't share any rooms",
+                    "we don't share any rooms",
                     "other user_id": user_id,
                 }
             )
