@@ -527,6 +527,31 @@ def inject_active_span_text_map(carrier, destination=None):
     )
 
 
+def get_active_span_text_map(destination=None):
+    """
+    Gets a span context as a dict. This can be used instead of injecting a span
+    into an empty carrier.
+
+    Args:
+        destination (str): the name of the remote server. The dict will only
+        contain a span context if the destination matches the homeserver_whitelist
+        or if destination is None.
+
+    Returns:
+        A dict containing the span context.
+    """
+
+    if not opentracing or (destination and not whitelisted_homeserver(destination)):
+        return {}
+
+    carrier = {}
+    opentracing.tracer.inject(
+        opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
+    )
+
+    return carrier
+
+
 def active_span_context_as_string():
     """
     Returns:
