@@ -198,8 +198,6 @@ class KeyChangesServlet(RestServlet):
 
         user_id = requester.user.to_string()
 
-        opentracing.set_tag("user_id", user_id)
-
         results = yield self.device_handler.get_user_ids_changed(user_id, from_token)
 
         return (200, results)
