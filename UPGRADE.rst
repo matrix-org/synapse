@@ -156,7 +156,7 @@ Instructions <INSTALL.md>`_.
 
        virtualenv -p python3 ~/synapse/env3
        source ~/synapse/env3/bin/activate
-       pip install psycopg2 lxml matrix-synapse
+       pip install matrix-synapse
 
    You can then start synapse as normal, having activated the new virtualenv::
 
