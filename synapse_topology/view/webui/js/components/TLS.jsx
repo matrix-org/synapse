@@ -1,5 +1,7 @@
 import React from 'react';
 
+import style from '../../less/main.less';
+
 import ButtonDisplay from './ButtonDisplay';
 import ContentWrapper from '../containers/ContentWrapper';
 
@@ -29,12 +31,26 @@ export default ({ onClickACME, onClickTLS, onClickNoTLS }) =>
     <h3>
       Provide your own
     </h3>
+    <p>
+      If you have your own TLS certs for the domain name you can specify a path
+      to them or you can upload them for synapse to use.
+    </p>
     <h3>
-      ReverseProxy / optout
+      ReverseProxy
     </h3>
+    <p>
+      Using a ReverseProxy is considered a very good idea.
+    </p>
+    <h3>
+      Don't use TLS
+    </h3>
+    <p>
+      Please don't do this.
+    </p>
     <ButtonDisplay>
       <button onClick={() => onClickACME()}>Use ACME</button>
       <button onClick={() => onClickTLS()}>I have a TLS cert</button>
-      <button onClick={() => onClickNoTLS()}>Do not use TLS</button>
+      <button onClick={() => onClickReverseProxy()}>Use a Reverse Proxy</button>
     </ButtonDisplay>
+    <button className={style.redButton} onClick={() => onClickNoTLS()}>Do not use TLS</button>
   </ContentWrapper >

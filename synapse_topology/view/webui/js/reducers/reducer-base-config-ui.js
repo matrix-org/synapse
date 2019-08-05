@@ -49,8 +49,6 @@ export default (state, action) => {
               return DELEGATION_OPTIONS_UI;
           }
         case DELEGATION_SERVER_NAME_UI:
-          return REVERSE_PROXY_UI;
-        case REVERSE_PROXY_UI:
           return TLS_UI;
         case TLS_UI:
           switch (action.option) {
@@ -60,7 +58,11 @@ export default (state, action) => {
               return TLS_CERTPATH_UI;
             case TLS_TYPES.NONE:
               return PORT_SELECTION_UI;
+            case TLS_TYPES.REVERSE_PROXY:
+              return REVERSE_PROXY_UI;
           }
+        case REVERSE_PROXY_UI:
+          return PORT_SELECTION_UI;
         case TLS_CERTPATH_UI:
           return PORT_SELECTION_UI;
         case WELL_KNOWN_UI:

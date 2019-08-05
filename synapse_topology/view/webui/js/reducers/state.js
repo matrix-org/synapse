@@ -11,7 +11,7 @@ const state = {
     delegation_type: "local|well_known|DNS_SRV",
     delegation_server_name: "name",
     reverse_proxy: "nginx|caddy|apache|haproxy|other|none",
-    tls: "acme|tls|none",
+    tls: "acme|tls|none|reverseproxy",
     testing_cert_paths: true,
     uploading_certs: true,
     cert_path_invalid: true,
