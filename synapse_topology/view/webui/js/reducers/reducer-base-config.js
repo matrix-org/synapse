@@ -50,7 +50,8 @@ export default (state = { servername: undefined }, action) => {
     case SET_DELEGATION_SERVERNAME:
       return {
         ...state,
-        delegation_port: action.port,
+        delegation_federation_port: action.federation_port,
+        delegation_client_port: action.client_port,
       }
     case SET_REVERSE_PROXY:
       return {
