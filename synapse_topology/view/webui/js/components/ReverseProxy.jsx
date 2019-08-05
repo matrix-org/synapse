@@ -27,7 +27,6 @@ export default ({ onClick }) => {
       <option value={REVERSE_PROXY_TYPES.HAPROXY}>HAProxy</option>
       <option value={REVERSE_PROXY_TYPES.NGINX}>NGiNX</option>
       <option value={REVERSE_PROXY_TYPES.OTHER}>Some other Reverse Proxy</option>
-      <option value={REVERSE_PROXY_TYPES.NONE}>I will either not use a Reverse Proxy, or I will use delegation</option>
     </select>
     <div>
       <button onClick={() => onClick(reverseProxy)}>Safety First</button>
