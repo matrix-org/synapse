@@ -303,7 +303,6 @@ class E2eKeysHandler(object):
 
         # TODO: Validate the JSON to make sure it has the right keys.
         device_keys = keys.get("device_keys", None)
-        opentracing.set_tag("device_keys", device_keys)
         if device_keys:
             logger.info(
                 "Updating device_keys for device %r for user %s at %d",
@@ -330,7 +329,6 @@ class E2eKeysHandler(object):
                 {"message": "Not updating device_keys for user", "user_id": user_id}
             )
         one_time_keys = keys.get("one_time_keys", None)
-        opentracing.set_tag("one_time_keys", one_time_keys)
         if one_time_keys:
             opentracing.log_kv(
                 {
