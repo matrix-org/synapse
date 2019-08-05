@@ -10,7 +10,6 @@ export const REVERSE_PROXY_TYPES = {
   HAPROXY: "HAPROXY",
   NGINX: "NGINX",
   OTHER: "OTHER",
-  NONE: "NONE",
 }
 
 export const TLS_TYPES = {
