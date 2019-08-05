@@ -115,7 +115,7 @@ tag names. It uses kwarg names as tag names without the prefix.
 .. code-block:: python
 
    import synapse.logging.opentracing as opentracing
-   
+
    @opentracing.tag_args
    def set_fates(clotho, lachesis, atropos, father="Zues", mother="Themis"):
        pass
