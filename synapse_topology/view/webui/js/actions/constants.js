@@ -16,5 +16,4 @@ export const TLS_TYPES = {
   ACME: "ACME",
   TLS: "TLS",
   REVERSE_PROXY: "REVERSE_PROXY",
-  NONE: "NONE",
 }

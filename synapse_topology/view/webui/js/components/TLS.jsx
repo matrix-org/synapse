@@ -12,7 +12,7 @@ const haproxyLink = "http://www.haproxy.org/";
 const nginxLink = "https://www.nginx.com/";
 const proxyInfoLink = "https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst";
 
-export default ({ onClickACME, onClickTLS, onClickReverseProxy, onClickNoTLS }) =>
+export default ({ onClickACME, onClickTLS, onClickReverseProxy }) =>
   <ContentWrapper>
     <h1>TLS</h1>
     <p>
@@ -22,7 +22,7 @@ export default ({ onClickACME, onClickTLS, onClickReverseProxy, onClickNoTLS }) 
     <p>
       TLS keeps the communication between homeservers secure. To enable TLS you'll
       need a TLS cert. You can use ACME, provide your own certs, or let the reverse
-      proxy handle the TLS certs instead. (You can also not use TLS but that's not recommended)
+      proxy handle the TLS certs instead.
     </p>
     <h3>
       ReverseProxy
@@ -69,18 +69,9 @@ export default ({ onClickACME, onClickTLS, onClickReverseProxy, onClickNoTLS }) 
       If you have your own TLS certs for the domain we'll ask you for the path
       to them or you can upload them for synapse to use.
     </p>
-    <h3>
-      Don't use TLS
-    </h3>
-    <p>
-      Please don't do this.
-    </p>
     <ButtonDisplay>
       <button onClick={() => onClickACME()}>Use ACME</button>
       <button onClick={() => onClickReverseProxy()}>I already/will use a Reverse Proxy with TLS</button>
       <button onClick={() => onClickTLS()}>I have a TLS cert</button>
     </ButtonDisplay>
-    <ButtonDisplay>
-      <button className={style.redButton} onClick={() => onClickNoTLS()}>Do not use TLS</button>
-    </ButtonDisplay>
-  </ContentWrapper >
+  </ContentWrapper>

@@ -45,9 +45,7 @@ export default (state, action) => {
             case DELEGATION_TYPES.WELL_KNOWN:
               return DELEGATION_SERVER_NAME_UI;
             case DELEGATION_TYPES.LOCAL:
-              return REVERSE_PROXY_UI;
-            default:
-              return DELEGATION_OPTIONS_UI;
+              return TLS_UI;
           }
         case DELEGATION_SERVER_NAME_UI:
           return DELEGATION_PORT_SELECTION_UI;
