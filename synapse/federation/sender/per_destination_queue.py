@@ -232,14 +232,9 @@ class PerDestinationQueue(object):
                         # If there is no span context then we are either blacklisting
                         # this destination or we are not tracing
                         if span_context:
-                            if "references" not in span_context:
-                                span_context["references"] = [
-                                    opentracing.active_span_context_as_string()
-                                ]
-                            else:
-                                span_context["references"].append(
-                                    opentracing.active_span_context_as_string()
-                                )
+                            span_context.setdefault("references", []).append(
+                                opentracing.active_span_context_as_string()
+                            )
                             edu_dict["content"]["context"] = json.dumps(
                                 {"opentracing": span_context}
                             )
