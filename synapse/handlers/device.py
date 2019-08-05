@@ -654,7 +654,7 @@ class DeviceListUpdater(object):
             opentracing.log_kv({"reason": "FederationDeniedError"})
             logger.info(e)
             return
-        except Exception:
+        except Exception as e:
             # TODO: Remember that we are now out of sync and try again
             # later
             opentracing.set_tag("error", True)
