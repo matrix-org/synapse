@@ -81,7 +81,7 @@ class DeviceMessageHandler(object):
 
     @defer.inlineCallbacks
     def send_device_message(self, sender_user_id, message_type, messages):
-        opentracing.set_tag("number of messages", len(messages))
+        opentracing.set_tag("number_of_messages", len(messages))
         opentracing.set_tag("sender", sender_user_id)
         local_messages = {}
         remote_messages = {}
