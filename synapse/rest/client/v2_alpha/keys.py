@@ -183,7 +183,6 @@ class KeyChangesServlet(RestServlet):
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
 
-    @opentracing.trace
     @defer.inlineCallbacks
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)

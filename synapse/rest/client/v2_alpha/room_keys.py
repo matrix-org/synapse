@@ -312,7 +312,6 @@ class RoomKeysVersionServlet(RestServlet):
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
-    @opentracing.trace_using_operation_name("get_room_keys_version")
     @defer.inlineCallbacks
     def on_GET(self, request, version):
         """
