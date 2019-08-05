@@ -12,7 +12,7 @@ const haproxyLink = "http://www.haproxy.org/";
 const nginxLink = "https://www.nginx.com/";
 const proxyInfoLink = "https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst";
 
-export default ({ onClickACME, onClickTLS, onClickNoTLS }) =>
+export default ({ onClickACME, onClickTLS, onClickReverseProxy, onClickNoTLS }) =>
   <ContentWrapper>
     <h1>TLS</h1>
     <p>
@@ -23,26 +23,6 @@ export default ({ onClickACME, onClickTLS, onClickNoTLS }) =>
       TLS keeps the communication between homeservers secure. To enable TLS you'll
       need a TLS cert. You can use ACME, provide your own certs, or let the reverse
       proxy handle the TLS certs instead. (You can also not use TLS but that's not recommended)
-    </p>
-    <h3>
-      ACME
-    </h3>
-    <p>
-      ACME is <strike>a super cool initiative</strike> a protocol that allows TLS
-      certificates to be requested automagically. Synapse supports ACME by requesting
-      certs from Let's Encrypt. This is the easiest way to manage your certs because
-      once you set it up you don't need to manage it.
-    </p>
-    <p>
-      If you wish to use ACME you will need access to port 80 which usually requires
-      root privileges. Do not run Synapse as root. Use a Reverse Proxy or Authbind
-    </p>
-    <h3>
-      Provide your own
-    </h3>
-    <p>
-      If you have your own TLS certs for the domain you can specify a path
-      to them or you can upload them for synapse to use.
     </p>
     <h3>
       ReverseProxy
@@ -67,7 +47,27 @@ export default ({ onClickACME, onClickTLS, onClickNoTLS }) =>
       configuration templates later. Easy breasy.
     </p>
     <p>
-      More information <a target="_blank" href={proxyInfoLink}> in the docs.</a>
+      More information about Reverse Proxies <a target="_blank" href={proxyInfoLink}> in the docs.</a>
+    </p>
+    <h3>
+      ACME
+    </h3>
+    <p>
+      ACME is <strike>a super cool initiative</strike> a protocol that allows TLS
+      certificates to be requested automagically. Synapse supports ACME by requesting
+      certs from Let's Encrypt. This is the easiest way to manage your certs because
+      once you set it up you don't need to manage it.
+    </p>
+    <p>
+      If you wish to use ACME you will need access to port 80 which usually requires
+      root privileges. Do not run Synapse as root. Use a Reverse Proxy or Authbind
+    </p>
+    <h3>
+      Provide your own TLS certs
+    </h3>
+    <p>
+      If you have your own TLS certs for the domain we'll ask you for the path
+      to them or you can upload them for synapse to use.
     </p>
     <h3>
       Don't use TLS
@@ -77,8 +77,8 @@ export default ({ onClickACME, onClickTLS, onClickNoTLS }) =>
     </p>
     <ButtonDisplay>
       <button onClick={() => onClickACME()}>Use ACME</button>
+      <button onClick={() => onClickReverseProxy()}>I already/will use a Reverse Proxy with TLS</button>
       <button onClick={() => onClickTLS()}>I have a TLS cert</button>
-      <button onClick={() => onClickReverseProxy()}>I already use a Reverse Proxy with TLS</button>
     </ButtonDisplay>
     <ButtonDisplay>
       <button className={style.redButton} onClick={() => onClickNoTLS()}>Do not use TLS</button>
