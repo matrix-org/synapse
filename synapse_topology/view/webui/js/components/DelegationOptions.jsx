@@ -41,7 +41,7 @@ export default ({ servername, clickLocal, clickWellKnown, clickDNS }) => {
     </p>
     <ButtonDisplay>
       <button onClick={clickLocal}>{local_button_text}</button>
-      <button onClick={clickWellKnown}>Use well_known</button>
+      <button onClick={clickWellKnown}>Use 'well known'</button>
       <button onClick={clickDNS}>Use DNS</button>
     </ButtonDisplay>
   </ContentWrapper>;
