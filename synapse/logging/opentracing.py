@@ -57,9 +57,9 @@ exited. This is usually done by using ``with``.
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import start_active_span
+   import synapse.logging.opentracing as opentracing
 
-   with start_active_span("operation name"):
+   with opentracing.start_active_span("operation name"):
        # Do something we want to tracer
 
 Forgetting to enter or exit a scope will result in some mysterious and grievous log
@@ -76,10 +76,10 @@ the function becomes the operation name for the span.
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import trace
+   import synapse.logging.opentracing as opentracing
 
    # Start a span using 'interesting_function' as the operation name
-   @trace
+   @opentracing.trace
    def interesting_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
@@ -90,11 +90,9 @@ Operation names can be explicitly set for functions by using
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import (
-       trace_using_operation_name,
-   )
+   import synapse.logging.opentracing as opentracing
 
-   @trace_using_operation_name("A *much* better operation name")
+   @opentracing.trace_using_operation_name("A *much* better operation name")
    def interesting_badly_named_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
@@ -106,7 +104,7 @@ To set a tag on the active span do
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import set_tag
+   import synapse.logging.opentracing as opentracing
 
    opentracing.set_tag(tag_name, tag_value)
 
@@ -116,9 +114,9 @@ tag names. It uses kwarg names as tag names without the prefix.
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import tag_args
-
-   @tag_args
+   import synapse.logging.opentracing as opentracing
+   
+   @opentracing.tag_args
    def set_fates(clotho, lachesis, atropos, father="Zues", mother="Themis"):
        pass
 
