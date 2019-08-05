@@ -16,7 +16,11 @@ export default ({ onClick }) => {
 
   return <ContentWrapper>
     <h1>Reverse Proxy</h1>
-
+    <p>
+      Please choose the reverse proxy you're using. This is just so we can provide
+      you with a template later, if you already know how you're going to set yours
+      up don't worry too much about this.
+    </p>
     <select defaultValue={REVERSE_PROXY_TYPES.NGINX} onChange={(e) => setReverseProxy(e.target.value)}>
       <option value={REVERSE_PROXY_TYPES.APACHE}>Apache</option>
       <option value={REVERSE_PROXY_TYPES.CADDY}>Caddy</option>

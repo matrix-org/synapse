@@ -78,7 +78,7 @@ export default ({ onClickACME, onClickTLS, onClickNoTLS }) =>
     <ButtonDisplay>
       <button onClick={() => onClickACME()}>Use ACME</button>
       <button onClick={() => onClickTLS()}>I have a TLS cert</button>
-      <button onClick={() => onClickReverseProxy()}>Use a Reverse Proxy</button>
+      <button onClick={() => onClickReverseProxy()}>I already use a Reverse Proxy with TLS</button>
     </ButtonDisplay>
     <ButtonDisplay>
       <button className={style.redButton} onClick={() => onClickNoTLS()}>Do not use TLS</button>
