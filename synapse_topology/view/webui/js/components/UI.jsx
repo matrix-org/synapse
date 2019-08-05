@@ -19,6 +19,7 @@ import {
   ERROR_UI,
   DELEGATION_SERVER_NAME_UI,
   TLS_CERTPATH_UI,
+  DELEGATION_PORT_SELECTION_UI,
 } from '../reducers/ui_constants';
 
 import Error from '../components/Error';
@@ -33,6 +34,7 @@ import DelegationServerName from '../containers/DelegationServerName';
 import ReverseProxy from '../containers/ReverseProxy';
 import TLS from '../containers/TLS';
 import TLSCertPath from '../containers/TLSCertPath';
+import DelegationPortSelection from '../containers/DelegationPortSelection';
 
 export default ({ active_ui, dispatch }) => {
   console.log(`switching to ui ${active_ui}`)
@@ -53,6 +55,8 @@ export default ({ active_ui, dispatch }) => {
       return <DelegationOptions />
     case DELEGATION_SERVER_NAME_UI:
       return <DelegationServerName />
+    case DELEGATION_PORT_SELECTION_UI:
+      return <DelegationPortSelection />
     case REVERSE_PROXY_UI:
       return <ReverseProxy />
     case TLS_UI:

@@ -16,6 +16,7 @@ import {
   REVERSE_PROXY_TEMPLATE_UI,
   LOADING_UI,
   TLS_CERTPATH_UI,
+  DELEGATION_PORT_SELECTION_UI,
 } from './ui_constants';
 
 import {
@@ -49,6 +50,8 @@ export default (state, action) => {
               return DELEGATION_OPTIONS_UI;
           }
         case DELEGATION_SERVER_NAME_UI:
+          return DELEGATION_PORT_SELECTION_UI;
+        case DELEGATION_PORT_SELECTION_UI:
           return TLS_UI;
         case TLS_UI:
           switch (action.option) {
