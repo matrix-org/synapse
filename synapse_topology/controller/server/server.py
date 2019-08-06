@@ -5,12 +5,15 @@ from synapse_topology import model
 
 from twisted.web.static import File
 
+from .utils import port_checker
+
 from . import error_handlers
 from .schemas import (
     BASE_CONFIG_SCHEMA,
     SERVERNAME_SCHEMA,
     CERT_PATHS_SCHEMA,
     CERTS_SCHEMA,
+    PORTS_SCHEMA,
 )
 from .utils import validate_schema
 
@@ -85,3 +88,13 @@ def test_cert_paths(request, body):
 @validate_schema(CERTS_SCHEMA)
 def upload_certs(request, body):
     model.add_certs(**body)
+
+
+@app.route("/ports", methods=["POST"])
+@validate_schema(PORTS_SCHEMA)
+def check_ports(request, body):
+    results = []
+    for port in body["ports"]:
+        results.append(port_checker(port))
+    return json.dumps({"ports": results})
+
