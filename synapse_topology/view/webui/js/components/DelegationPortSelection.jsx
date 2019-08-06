@@ -28,7 +28,7 @@ export default ({ onClick }) => {
   }
 
   return <ContentWrapper>
-    <h1>Outward facing port selection</h1>
+    <h1>Outward facing ports</h1>
     <p>
       Normally other matrix servers will try to contact the Synapse install's server on
       port 8448 and clients, such as riot, riotX, neo etc., will try to contact
