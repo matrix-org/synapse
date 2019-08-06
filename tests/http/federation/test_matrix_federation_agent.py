@@ -953,7 +953,7 @@ class MatrixFederationAgentTests(TestCase):
         well_known_server = self._handle_well_known_connection(
             client_factory,
             expected_sni=b"testserv",
-            response_headers={b"Cache-Control": b"max-age=10"},
+            response_headers={b"Cache-Control": b"max-age=1000"},
             content=b'{ "m.server": "target-server" }',
         )
 
@@ -969,7 +969,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(r, b"target-server")
 
         # expire the cache
-        self.reactor.pump((10.0,))
+        self.reactor.pump((1000.0,))
 
         # now it should connect again
         fetch_d = self.do_get_well_known(b"testserv")

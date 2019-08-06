@@ -47,6 +47,9 @@ WELL_KNOWN_INVALID_CACHE_PERIOD = 1 * 3600
 # cap for .well-known cache period
 WELL_KNOWN_MAX_CACHE_PERIOD = 48 * 3600
 
+# lower bound for .well-known cache period
+WELL_KNOWN_MIN_CACHE_PERIOD = 5 * 60
+
 logger = logging.getLogger(__name__)
 well_known_cache = TTLCache("well-known")
 
@@ -356,6 +359,7 @@ class MatrixFederationAgent(object):
             cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
         else:
             cache_period = min(cache_period, WELL_KNOWN_MAX_CACHE_PERIOD)
+            cache_period = max(cache_period, WELL_KNOWN_MIN_CACHE_PERIOD)
 
         return (result, cache_period)
 
