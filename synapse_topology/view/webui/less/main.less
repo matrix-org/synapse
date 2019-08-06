@@ -2,7 +2,7 @@
 @import url('./animations.less');
 
 @font-face {
-  font-family: 'LiberationSansBold';
+  font-family: "Helvetica Neue", "Helvetica", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   src: url('../fonts/LiberationSans-Bold.ttf') format('truetype');
 }
 
@@ -12,7 +12,7 @@
 
 html {
   box-sizing: border-box;
-  font-family: 'LiberationSansBold';
+  font-family: Ariel, sans-serif;
   font-size: 2rem;
 }
 
@@ -22,20 +22,29 @@ html {
 
 body {
   .theme();
-  background-color: @secondary;
+  background-color: @primary;
   color: @font;
   margin: 0;
 }
 
 a {
-  color: hotpink;
+  .theme();
+  color: @link;
+  text-decoration: none;
+}
+
+.logo {
+  position: absolute;
+  top:0;
+  right: 0;
+  margin: 0.5rem;
 }
 
 .servername {
   position: absolute;
   margin-top: 0.5rem;
   margin-left: 0.5rem;
-  color: lighten(silver, 20%);
+  color: darken(silver, 20%);
 }
 
 
@@ -52,7 +61,6 @@ a {
     display: flex;
     flex-direction: row;
     justify-content: space-evenly;
-    color: lighten(@font, 20%);
     margin-top: 0.5rem;
     margin-bottom: 0.5rem;
   }
@@ -68,20 +76,20 @@ a {
     font-size: 1rem;
     padding: 0.6rem;
     color: @font;
-    background-color: darken(@highlight, 15%);
+    background-color: @tertiary;
     border: none;
     display: inline-block;
     text-transform: capitalize;
     font-style: bold;
-    color: lighten(@font, 20%);
+    color: @primary;
     margin-left: 0.4rem;
     margin-right: 0.4rem;
   }
 
 
   button[disabled] {
-    background-color: @tertiary;
-    color: @primary;
+    background-color: darken(@secondary, 20%);
+    color: lighten(@font, 20%);
   }
 
   input, .select {
@@ -93,6 +101,8 @@ a {
     border-radius: 0.5rem;
     color: lighten(@font, 20%);
     margin-bottom: 1rem;
+    border-style: solid;
+    border-color: darken(@secondary, 50%);
   }
 
   select {
@@ -123,5 +133,4 @@ a {
 h1 {
   .theme();
   font-size: 2rem;
-  color: @highlight;
 }
