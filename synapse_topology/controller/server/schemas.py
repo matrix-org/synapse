@@ -33,3 +33,9 @@ CERTS_SCHEMA = {
     },
     "required": ["cert", "cert_key"],
 }
+
+PORTS_SCHEMA = {
+    "type": "object",
+    "properties": {"ports": {"type": "array"}},
+    "required": ["ports"],
+}

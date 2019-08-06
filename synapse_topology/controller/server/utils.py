@@ -3,6 +3,9 @@ from functools import wraps
 from canonicaljson import json
 from jsonschema import validate
 
+from contextlib import closing
+import socket
+
 
 def validate_schema(schema):
     def _wrap_validate(func):
@@ -15,3 +18,17 @@ def validate_schema(schema):
         return _do_validate
 
     return _wrap_validate
+
+
+def port_checker(port):
+    if port < 0 or 65535 < port:
+        return False
+
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+        try:
+            sock.bind((socket.gethostname(), port))
+            sock.listen()
+            sock.close()
+            return True
+        except:
+            return False
