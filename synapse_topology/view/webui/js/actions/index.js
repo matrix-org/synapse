@@ -17,6 +17,9 @@ import {
   SET_TLS_CERT_PATHS_VALIDITY,
   SET_TLS_CERT_FILES,
   UPLOADING_TLS_CERT_PATHS,
+  TESTING_SYNAPSE_PORTS,
+  SET_SYNAPSE_PORTS,
+  SET_SYNAPSE_PORTS_FREE,
 } from './types';
 
 import {
@@ -25,6 +28,7 @@ import {
   fetch_secret_key,
   post_cert_paths,
   post_certs,
+  test_ports,
 } from '../api';
 
 export const startup = () => {
@@ -176,3 +180,43 @@ export const set_tls = tls_type => ({
   type: SET_TLS,
   tls_type,
 });
+
+export const set_synapse_ports = (federation_port, client_port) => {
+  const fed_port_priv = federation_port < 1024;
+  const client_port_priv = client_port < 1024;
+  return dispatch => {
+    dispatch(testing_synapse_ports(true));
+    dispatch({
+      type: SET_SYNAPSE_PORTS,
+      federation_port,
+      client_port,
+    })
+    test_ports([federation_port, client_port])
+      .then(
+        results => dispatch(update_ports_free(
+          fed_port_priv ? true : results.ports[0],
+          client_port_priv ? true : results.ports[1]
+        )),
+        error => dispatch(fail(error)),
+      )
+  }
+};
+
+export const update_ports_free = (synapse_federation_port_free, synapse_client_port_free) => {
+  return dispatch => {
+    dispatch(testing_synapse_ports(false));
+    dispatch({
+      type: SET_SYNAPSE_PORTS_FREE,
+      synapse_federation_port_free,
+      synapse_client_port_free,
+    });
+    if (synapse_federation_port_free && synapse_client_port_free) {
+      dispatch(advance_ui())
+    }
+  }
+}
+
+export const testing_synapse_ports = verifying => ({
+  type: TESTING_SYNAPSE_PORTS,
+  verifying,
+})

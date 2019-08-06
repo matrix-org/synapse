@@ -5,4 +5,5 @@ export const CONFIG = "/config";
 export const CONFIG_SOMETHING = "/config_something";
 export const SETUP_CHECK = "/setup";
 export const CERT_PATHS = "/testcertpaths";
+export const TEST_PORTS = "/ports";
 export const CONFIG_LOCK = "server_config_in_use";

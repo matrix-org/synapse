@@ -5,27 +5,25 @@ import ContentWrapper from './ContentWrapper';
 import style from '../../less/main.less';
 
 export default ({
-  serverName,
+  servername,
   verifyingPorts,
   fedPortInUse,
   clientPortInUse,
   canChangePorts,
   defaultFedPort,
   defaultClientPort,
-  justification,
-  onClickCheck,
-  onClickSkipCheck,
+  onClick,
 }) => {
   if (verifyingPorts) {
-    return <ContentWrapper ><h1>Verifying ports.</h1></ContentWrapper>
+    return <ContentWrapper><h1>Verifying ports.</h1></ContentWrapper>
   }
 
   const [fedPort, setFedPort] = useState(defaultFedPort);
   const [clientPort, setClientPort] = useState(defaultClientPort);
   const [clientPortValid, setClientPortValid] = useState(true)
   const [fedPortValid, setFedPortValid] = useState(true)
-  const [clientPortPriv, setClientPortPriv] = useState(true)
-  const [fedPortPriv, setFedPortPriv] = useState(true)
+  const [clientPortPriv, setClientPortPriv] = useState(defaultClientPort < 1024)
+  const [fedPortPriv, setFedPortPriv] = useState(defaultFedPort < 1024)
 
   const updateValidity = (port, setValid) => setValid(
     !isNaN(port) && 0 < port && port <= 65535
@@ -50,7 +48,7 @@ export default ({
   }
 
   return <ContentWrapper>
-    <h1>{serverName}'s ports</h1>
+    <h1>{servername}'s ports</h1>
     <p>
       The synapse install itself will be listening on the following ports.
     </p>
@@ -76,8 +74,8 @@ export default ({
       or you can change the ports as explained above.
     </p>
     <p>
-      Note: we can't check the whether privileged ports are in use. If you've
-      set a privileged port <b>we will skip the check</b>.
+      Note: we can't check whether privileged ports are in use. If you've
+      set a privileged port <b>we will skip the check for that port</b>.
     </p>
 
     <h3>Federation Port</h3>
@@ -102,7 +100,7 @@ export default ({
     <div>
       <button
         disabled={clientPortValid && fedPortValid ? undefined : true}
-        onClick={() => onClick(fedPort, clientPort)}
+        onClick={() => onClick(parseInt(fedPort), parseInt(clientPort))}
       >Verify These Ports</button>
     </div>
   </ContentWrapper>
