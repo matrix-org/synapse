@@ -8,7 +8,6 @@ export const DELEGATION_SERVER_NAME_UI = "delegation_server_name_ui";
 export const DELEGATION_PORT_SELECTION_UI = "delegation_port_selection_ui";
 export const WELL_KNOWN_UI = "well_known_ui";
 export const DNS_UI = "dns_ui";
-export const WORKER_UI = "worker_ui";
 export const TLS_UI = "tls_ui";
 export const TLS_CERTPATH_UI = "tls_certpath_ui";
 export const REVERSE_PROXY_UI = "reverse_proxy_ui";

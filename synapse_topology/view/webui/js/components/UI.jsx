@@ -68,7 +68,6 @@ export default ({ active_ui, dispatch }) => {
       return <PortSelection />
     case WELL_KNOWN_UI:
     case DNS_UI:
-    case WORKER_UI:
     case REVERSE_PROXY_TEMPLATE_UI:
     default:
       return <h1>how did i get here?</h1>
