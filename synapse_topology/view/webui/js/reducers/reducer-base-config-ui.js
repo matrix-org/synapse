@@ -9,12 +9,10 @@ import {
   DELEGATION_SERVER_NAME_UI,
   WELL_KNOWN_UI,
   DNS_UI,
-  WORKER_UI,
   TLS_UI,
   REVERSE_PROXY_UI,
   PORT_SELECTION_UI,
   REVERSE_PROXY_TEMPLATE_UI,
-  LOADING_UI,
   TLS_CERTPATH_UI,
   DELEGATION_PORT_SELECTION_UI,
 } from './ui_constants';
@@ -69,8 +67,6 @@ export default (state, action) => {
         case WELL_KNOWN_UI:
         case DNS_UI:
         case PORT_SELECTION_UI:
-          return WORKER_UI;
-        case WORKER_UI:
           return REVERSE_PROXY_TEMPLATE_UI;
         default:
           return BASE_INTRO_UI;

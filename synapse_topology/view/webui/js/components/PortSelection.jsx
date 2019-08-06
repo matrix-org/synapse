@@ -69,7 +69,7 @@ export default ({
     }
 
     <p>
-      We will check that the port are not in use. If they are you can either
+      We will check that the ports are not in use. If they are you can either
       reconfigure the server that synapse is installed on outside of this installer
       or you can change the ports as explained above.
     </p>
