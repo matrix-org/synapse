@@ -582,8 +582,8 @@ class RoomEventServlet(RestServlet):
         if event:
             event = yield self._event_serializer.serialize_event(event, time_now)
             return (200, event)
-        else:
-            return (404, "Event not found.")
+
+        return SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
 
 class RoomEventContextServlet(RestServlet):
