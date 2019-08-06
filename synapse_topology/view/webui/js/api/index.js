@@ -8,6 +8,7 @@ import {
   SERVER_NAME,
   SETUP_CHECK,
   CERT_PATHS,
+  TEST_PORTS,
 } from './constants';
 
 const fetchAbs = fetchAbsolute(fetch)(API_URL)
@@ -52,8 +53,21 @@ export const post_certs = (cert, cert_key) =>
     }
   )
 
+export const test_ports = (ports) =>
+  fetchAbs(
+    TEST_PORTS,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        ports
+      })
+    }
+  ).then(res => res.json())
+
 export const fetch_secret_key = () =>
-  fetchAbs(SECRET_KEY).then(res => res.json()).then(json => json.secret_key)
+  fetchAbs(SECRET_KEY)
+    .then(res => res.json())
+    .then(json => json.secret_key)
 
 export const get_config = () => {
 

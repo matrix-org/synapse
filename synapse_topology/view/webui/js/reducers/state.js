@@ -23,5 +23,10 @@ const state = {
     tls_cert_file: "sadfa;dlf;sad;fkla;sdlfjkas;dlfkjas;dflkja;sdfkljadf ------",
     tls_cert_key_file: "sadfa;dlf;sad;fkla;sdlfjkas;dlfkjas;dflkja;sdfkljadf ------",
     tls_path: "sdasfaf/a/fdasfd/a/fasd/",
+    verifying_ports: true,
+    synapse_federation_port_free: true,
+    synapse_client_port_free: true,
+    synapse_federation_port: 1234,
+    synapse_client_port: 1234,
   }
 }

@@ -12,6 +12,9 @@ import {
   SET_TLS_CERT_PATHS_VALIDITY,
   SET_TLS_CERT_FILES,
   UPLOADING_TLS_CERT_PATHS,
+  TESTING_SYNAPSE_PORTS,
+  SET_SYNAPSE_PORTS,
+  SET_SYNAPSE_PORTS_FREE,
 } from "../actions/types";
 
 export default (state = { servername: undefined }, action) => {
@@ -45,7 +48,7 @@ export default (state = { servername: undefined }, action) => {
     case SET_DELEGATION_SERVERNAME:
       return {
         ...state,
-        delegation_servername: action.delegation_servername,
+        delegation_servername: action.servername,
       }
     case SET_DELEGATION_SERVERNAME:
       return {
@@ -91,6 +94,24 @@ export default (state = { servername: undefined }, action) => {
         ...state,
         uploading_certs: action.uploading,
       }
+    case TESTING_SYNAPSE_PORTS:
+      return {
+        ...state,
+        verifying_ports: action.verifying,
+      }
+    case SET_SYNAPSE_PORTS:
+      return {
+        ...state,
+        synapse_federation_port: action.federation_port,
+        synapse_client_port: action.client_port,
+      }
+    case SET_SYNAPSE_PORTS_FREE:
+      return {
+        ...state,
+        synapse_federation_port_free: action.synapse_federation_port_free,
+        synapse_client_port_free: action.synapse_client_port_free,
+      }
+
     default:
       return state;
   }

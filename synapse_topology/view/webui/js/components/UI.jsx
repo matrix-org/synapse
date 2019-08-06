@@ -35,6 +35,7 @@ import ReverseProxy from '../containers/ReverseProxy';
 import TLS from '../containers/TLS';
 import TLSCertPath from '../containers/TLSCertPath';
 import DelegationPortSelection from '../containers/DelegationPortSelection';
+import PortSelection from '../containers/PortSelection';
 
 export default ({ active_ui, dispatch }) => {
   console.log(`switching to ui ${active_ui}`)
@@ -63,10 +64,11 @@ export default ({ active_ui, dispatch }) => {
       return <TLS />
     case TLS_CERTPATH_UI:
       return <TLSCertPath />
+    case PORT_SELECTION_UI:
+      return <PortSelection />
     case WELL_KNOWN_UI:
     case DNS_UI:
     case WORKER_UI:
-    case PORT_SELECTION_UI:
     case REVERSE_PROXY_TEMPLATE_UI:
     default:
       return <h1>how did i get here?</h1>
