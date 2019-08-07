@@ -285,11 +285,10 @@ def setup_structured_logging(config, log_config, logBeginner=globalLogBeginner):
     stuff_into_twisted = PythonStdlibToTwistedLogger(lco)
 
     stdliblogger = logging.getLogger("")
-    stdliblogger.setLevel(logging.DEBUG)
     stdliblogger.addHandler(stuff_into_twisted)
 
-    # Redirecting stdio is important here, especially if there's a JSON
-    # outputter!
+    # Always redirect standard I/O, otherwise other logging outputs might miss
+    # it.
     logBeginner.beginLoggingTo([lco], redirectStandardIO=True)
 
     return publisher

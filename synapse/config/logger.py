@@ -208,7 +208,7 @@ def setup_logging(config, use_worker_options=False):
 
     log_config_body = read_config()
 
-    if log_config_body and log_config_body.get("version") == 2:
+    if log_config_body and log_config_body.get("structured") == True:
         setup_structured_logging(config, log_config_body)
         appbase.register_sighup(read_config, callback=reload_structured_logging)
     else:
