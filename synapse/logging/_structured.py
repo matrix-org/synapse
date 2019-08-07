@@ -238,7 +238,7 @@ def setup_structured_logging(config, log_config, logBeginner=globalLogBeginner):
 
     logger = Logger()
 
-    if not "drains" in log_config:
+    if "drains" not in log_config:
         raise ConfigError("The logging configuration requires a list of drains.")
 
     observers = []
