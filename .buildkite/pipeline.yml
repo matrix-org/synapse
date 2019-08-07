@@ -55,6 +55,7 @@ steps:
     label: ":python: 3.5 / SQLite / Old Deps"
     env:
       TRIAL_FLAGS: "-j 2"
+      LANG: "C.UTF-8"
     plugins:
       - docker#v3.0.1:
           image: "ubuntu:xenial"  # We use xenail to get an old sqlite and python
