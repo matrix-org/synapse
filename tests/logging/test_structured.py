@@ -16,13 +16,16 @@
 import os
 import os.path
 import shutil
+import sys
+import textwrap
 
 from twisted.logger import Logger, eventAsText, eventsFromJSONLogFile
 
+from synapse.config.logger import setup_logging
 from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContext
 
-from tests.unittest import HomeserverTestCase
+from tests.unittest import DEBUG, HomeserverTestCase
 
 
 class FakeBeginner(object):
@@ -130,3 +133,61 @@ class StructuredLoggingTestCase(HomeserverTestCase):
 
         self.assertEqual(len(logs), 1)
         self.assertEqual(logs[0]["request"], "somereq")
+
+
+class StructuredLoggingConfigurationFileTestCase(HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+
+        tempdir = self.mktemp()
+        os.mkdir(tempdir)
+        log_config_file = os.path.abspath(os.path.join(tempdir, "log.config.yaml"))
+        self.homeserver_log = os.path.abspath(os.path.join(tempdir, "homeserver.log"))
+
+        config = self.default_config()
+        config["log_config"] = log_config_file
+
+        with open(log_config_file, "w") as f:
+            f.write(
+                textwrap.dedent(
+                    """\
+                    structured: true
+
+                    drains:
+                        file:
+                            type: file_json
+                            location: %s
+                    """
+                    % (self.homeserver_log,)
+                )
+            )
+
+        self.addCleanup(self._sys_cleanup)
+
+        return self.setup_test_homeserver(config=config)
+
+    def _sys_cleanup(self):
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+
+    # Do not remove! We need the logging system to be set other than WARNING.
+    @DEBUG
+    def test_log_output(self):
+        """
+        When a structured logging config is given, Synapse will use it.
+        """
+        setup_logging(self.hs.config)
+
+        # Make a logger and send an event
+        logger = Logger(namespace="tests.logging.test_structured")
+
+        with LoggingContext("testcontext", request="somereq"):
+            logger.info("Hello there, {name}!", name="steve")
+
+        with open(self.homeserver_log, "r") as f:
+            logged_events = [
+                eventAsText(x, includeTimestamp=False) for x in eventsFromJSONLogFile(f)
+            ]
+
+        logs = "\n".join(logged_events)
+        self.assertTrue("***** STARTING SERVER *****" in logs)
+        self.assertTrue("Hello there, steve!" in logs)

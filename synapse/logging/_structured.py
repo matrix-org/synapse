@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import os.path
 import sys
 
 import attr
@@ -211,6 +212,11 @@ def parse_drain_configs(drains):
                 )
 
             location = config.get("location")
+            if os.path.abspath(location) != location:
+                raise ConfigError(
+                    "File paths need to be absolute, '%s' is a relative path"
+                    % (location,)
+                )
             yield DrainConfiguration(name=name, type=logging_type, location=location)
 
         else:

@@ -52,7 +52,7 @@ Outputs human-readable logs to a file.
 
 Arguments:
 
-- `location`: A relative path to a file.
+- `location`: An absolute path to the file to log to.
 
 ### `file_json`
 
@@ -60,4 +60,4 @@ Outputs machine-readable logs to a file.
 
 Arguments:
 
-- `location`: A relative path to a file.
+- `location`: An absolute path to the file to log to.
