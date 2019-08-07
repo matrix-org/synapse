@@ -46,7 +46,7 @@ class StructuredLoggingTestCase(HomeserverTestCase):
         os.mkdir(temp_dir)
         self.addCleanup(shutil.rmtree, temp_dir)
 
-        json_log_file = os.path.join(temp_dir, "out.json")
+        json_log_file = os.path.abspath(os.path.join(temp_dir, "out.json"))
 
         log_config = {
             "drains": {"jsonfile": {"type": "file_json", "location": json_log_file}}
@@ -81,7 +81,7 @@ class StructuredLoggingTestCase(HomeserverTestCase):
         os.mkdir(temp_dir)
         self.addCleanup(shutil.rmtree, temp_dir)
 
-        log_file = os.path.join(temp_dir, "out.log")
+        log_file = os.path.abspath(os.path.join(temp_dir, "out.log"))
 
         log_config = {"drains": {"file": {"type": "file", "location": log_file}}}
 
