@@ -15,18 +15,20 @@ import {
   REVERSE_PROXY_TEMPLATE_UI,
   TLS_CERTPATH_UI,
   DELEGATION_PORT_SELECTION_UI,
+  DELEGATION_TEMPLATE_UI,
+  DATABASE_UI,
 } from './ui_constants';
 
 import {
   DELEGATION_TYPES, TLS_TYPES
 } from '../actions/constants';
 
-export default (state, action) => {
+export default ({ ui, base_config }, action) => {
   switch (action.type) {
     case BASE_CONFIG_CHECKED:
       return BASE_INTRO_UI;
     case ADVANCE_UI:
-      switch (state) {
+      switch (ui.active_ui) {
         case BASE_INTRO_UI:
           return SERVER_NAME_UI;
         case SERVER_NAME_UI:
@@ -64,17 +66,27 @@ export default (state, action) => {
           return PORT_SELECTION_UI;
         case TLS_CERTPATH_UI:
           return PORT_SELECTION_UI;
+        case PORT_SELECTION_UI:
+          return base_config.tls == TLS_TYPES.REVERSE_PROXY ?
+            REVERSE_PROXY_TEMPLATE_UI :
+            base_config.delegation_type != DELEGATION_TYPES.LOCAL ?
+              DELEGATION_TEMPLATE_UI :
+              DATABASE_UI;
+        case REVERSE_PROXY_TEMPLATE_UI:
+          return base_config.delegation_type != DELEGATION_TYPES.LOCAL ?
+            DELEGATION_TEMPLATE_UI :
+            DATABASE_UI;
+        case DELEGATION_TEMPLATE_UI:
+          return DATABASE_UI;
         case WELL_KNOWN_UI:
         case DNS_UI:
-        case PORT_SELECTION_UI:
-          return REVERSE_PROXY_TEMPLATE_UI;
         default:
           return BASE_INTRO_UI;
       }
 
     // TODO: Think about how back should work..
     case BACK_UI:
-      switch (state) {
+      switch (ui.active_ui) {
         case STATS_REPORT_UI:
           return SERVER_NAME_UI;
         case KEY_EXPORT_UI:
@@ -89,6 +101,6 @@ export default (state, action) => {
           BASE_INTRO_UI;
       }
     default:
-      return state;
+      return ui.active_ui;
   }
 }

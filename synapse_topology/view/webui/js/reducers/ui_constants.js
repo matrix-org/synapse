@@ -13,6 +13,8 @@ export const TLS_CERTPATH_UI = "tls_certpath_ui";
 export const REVERSE_PROXY_UI = "reverse_proxy_ui";
 export const PORT_SELECTION_UI = "port_selection_ui";
 export const REVERSE_PROXY_TEMPLATE_UI = "reverse_proxy_tamplate_ui";
+export const DELEGATION_TEMPLATE_UI = "delegation_tamplate_ui";
+export const DATABASE_UI = "database_ui";
 
 // Advanced Config
 export const CONFIG_SELECTION_UI = "config_selection_ui";

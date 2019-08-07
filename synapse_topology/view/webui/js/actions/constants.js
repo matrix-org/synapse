@@ -17,3 +17,8 @@ export const TLS_TYPES = {
   TLS: "TLS",
   REVERSE_PROXY: "REVERSE_PROXY",
 }
+
+export const DATABASE_TYPES = {
+  SQLITE3: "SQLITE3",
+  POSTGRES: "POSTGRES",
+}

@@ -15,6 +15,7 @@ import {
   TESTING_SYNAPSE_PORTS,
   SET_SYNAPSE_PORTS,
   SET_SYNAPSE_PORTS_FREE,
+  SET_DATABASE,
 } from "../actions/types";
 
 export default (state = { servername: undefined }, action) => {
@@ -111,7 +112,11 @@ export default (state = { servername: undefined }, action) => {
         synapse_federation_port_free: action.synapse_federation_port_free,
         synapse_client_port_free: action.synapse_client_port_free,
       }
-
+    case SET_DATABASE:
+      return {
+        ...state,
+        database: action.database,
+      }
     default:
       return state;
   }

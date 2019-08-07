@@ -1,4 +1,4 @@
-export default config = ({
+export default ({
   delegationFedPort,
   delegationClientPort,
   fedPort,
@@ -6,8 +6,7 @@ export default config = ({
   synapseServerName,
 }) => {
   if (fedPort == clientPort) {
-    return `
-frontend https
+    return `frontend https
   bind :::${delegationClientPort} v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
 
   # Matrix client traffic
@@ -24,8 +23,7 @@ backend matrix
   server matrix 127.0.0.1:${fedPort}
 `
   } else {
-    return `
-frontend https
+    return `frontend https
   bind:::${delegationClientPort} v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2, http / 1.1
 
 # Matrix client traffic
@@ -41,7 +39,6 @@ default_backend matrix
 backend matrix
   server matrix 127.0.0.1:${fedPort}
 
-backend matrix-client 127.0.0.1:${clientPort}
-`
+backend matrix-client 127.0.0.1:${clientPort}`
   }
 }
