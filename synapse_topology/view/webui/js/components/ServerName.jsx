@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import ContentWrapper from './ContentWrapper';
+import ContentWrapper from '../containers/ContentWrapper';
 
 export default ({ onClick }) => {
   const [servername, setServerName] = useState("");

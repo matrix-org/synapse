@@ -1,8 +1,6 @@
-export const config = (
+export default ({
   synapseServerName,
   delegationSynapsePort,
-) => `
-{
+}) => `{
   "m.server": "${synapseServerName}:${delegationSynapsePort}"
-}
-`
+}`

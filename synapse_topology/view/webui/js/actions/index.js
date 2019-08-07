@@ -20,6 +20,7 @@ import {
   TESTING_SYNAPSE_PORTS,
   SET_SYNAPSE_PORTS,
   SET_SYNAPSE_PORTS_FREE,
+  SET_DATABASE,
 } from './types';
 
 import {
@@ -219,4 +220,9 @@ export const update_ports_free = (synapse_federation_port_free, synapse_client_p
 export const testing_synapse_ports = verifying => ({
   type: TESTING_SYNAPSE_PORTS,
   verifying,
+})
+
+export const set_database = database => ({
+  type: SET_DATABASE,
+  database,
 })

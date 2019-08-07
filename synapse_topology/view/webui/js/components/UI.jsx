@@ -20,6 +20,8 @@ import {
   DELEGATION_SERVER_NAME_UI,
   TLS_CERTPATH_UI,
   DELEGATION_PORT_SELECTION_UI,
+  DELEGATION_TEMPLATE_UI,
+  DATABASE_UI,
 } from '../reducers/ui_constants';
 
 import Error from '../components/Error';
@@ -36,6 +38,9 @@ import TLS from '../containers/TLS';
 import TLSCertPath from '../containers/TLSCertPath';
 import DelegationPortSelection from '../containers/DelegationPortSelection';
 import PortSelection from '../containers/PortSelection';
+import ReverseProxySampleConfig from '../containers/ReverseProxySampleConfig';
+import DelegationSampleConfig from '../containers/DelegationSampleConfig';
+import Database from '../containers/Database';
 
 export default ({ active_ui, dispatch }) => {
   console.log(`switching to ui ${active_ui}`)
@@ -66,9 +71,12 @@ export default ({ active_ui, dispatch }) => {
       return <TLSCertPath />
     case PORT_SELECTION_UI:
       return <PortSelection />
-    case WELL_KNOWN_UI:
-    case DNS_UI:
     case REVERSE_PROXY_TEMPLATE_UI:
+      return <ReverseProxySampleConfig />
+    case DELEGATION_TEMPLATE_UI:
+      return <DelegationSampleConfig />
+    case DATABASE_UI:
+      return <Database />
     default:
       return <h1>how did i get here?</h1>
   }

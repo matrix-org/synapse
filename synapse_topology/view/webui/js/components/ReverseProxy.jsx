@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import ContentWrapper from './ContentWrapper';
+import ContentWrapper from '../containers/ContentWrapper';
 
 import {
   REVERSE_PROXY_TYPES
