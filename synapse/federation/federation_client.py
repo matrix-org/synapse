@@ -511,9 +511,8 @@ class FederationClient(FederationBase):
             The [Deferred] result of callback, if it succeeds
 
         Raises:
-            SynapseError if the chosen remote server returns a 300/400 code.
-
-            RuntimeError if no servers were reachable.
+            SynapseError if the chosen remote server returns a 300/400 code, or
+            no servers were reachable.
         """
         for destination in destinations:
             if destination == self.server_name:
@@ -538,7 +537,7 @@ class FederationClient(FederationBase):
             except Exception:
                 logger.warn("Failed to %s via %s", description, destination, exc_info=1)
 
-        raise RuntimeError("Failed to %s via any server" % (description,))
+        raise SynapseError(502, "Failed to %s via any server" % (description,))
 
     def make_membership_event(
         self, destinations, room_id, user_id, membership, content, params

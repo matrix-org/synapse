@@ -226,10 +226,18 @@ class AccountValidityHandler(object):
 
         Args:
             renewal_token (str): Token sent with the renewal request.
+        Returns:
+            bool: Whether the provided token is valid.
         """
-        user_id = yield self.store.get_user_from_renewal_token(renewal_token)
+        try:
+            user_id = yield self.store.get_user_from_renewal_token(renewal_token)
+        except StoreError:
+            defer.returnValue(False)
+
         logger.debug("Renewing an account for user %s", user_id)
         yield self.renew_account_for_user(user_id)
+
+        defer.returnValue(True)
 
     @defer.inlineCallbacks
     def renew_account_for_user(self, user_id, expiration_ts=None, email_sent=False):
