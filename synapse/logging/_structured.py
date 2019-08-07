@@ -78,12 +78,9 @@ class LogContextObserver(object):
 
         context = LoggingContext.current_context()
 
-        print(context)
-
         # Copy the context information to the log event.
         if context is not None:
             context.copy_to_twisted_log_entry(event)
-            print(event)
         else:
             # If there's no logging context, not even the root one, we might be
             # starting up or it might be from non-Synapse code. Log it as if it
