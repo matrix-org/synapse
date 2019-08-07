@@ -1,5 +1,4 @@
-Structured Logging
-==================
+# Structured Logging
 
 A structured logging system can be useful when your logs are destined for a machine to parse and process. By maintaining its machine-readable characteristics, it enables more efficient searching and aggregations when consumed by software such as the "ELK stack".
 
@@ -27,13 +26,11 @@ drains:
 
 The above logging config will set Synapse as 'INFO' logging level by default, with the SQL layer at 'WARNING', and will have two logging drains (to the console and to a file, stored as JSON).
 
-Drain Types
------------
+## Drain Types
 
 Drain types can be specified by the `type` key.
 
-`console`
-~~~~~~~~~
+### `console`
 
 Outputs human-readable logs to the console.
 
@@ -41,8 +38,7 @@ Arguments:
 
 - `location`: Either `stdout` or `stderr`.
 
-`console_json`
-~~~~~~~~~~~~~~
+### `console_json`
 
 Outputs machine-readable JSON logs to the console.
 
@@ -50,8 +46,7 @@ Arguments:
 
 - `location`: Either `stdout` or `stderr`.
 
-`file`
-~~~~~~
+### `file`
 
 Outputs human-readable logs to a file.
 
@@ -59,8 +54,7 @@ Arguments:
 
 - `location`: A relative path to a file.
 
-`file_json`
-~~~~~~
+### `file_json`
 
 Outputs machine-readable logs to a file.
 
