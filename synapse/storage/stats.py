@@ -14,6 +14,8 @@
 # limitations under the License.
 
 import logging
+from itertools import chain
+from threading import Lock
 
 from twisted.internet import defer
 
@@ -50,6 +52,8 @@ class StatsStore(StateDeltasStore):
         self.clock = self.hs.get_clock()
         self.stats_enabled = hs.config.stats_enabled
         self.stats_bucket_size = hs.config.stats_bucket_size
+
+        self.stats_delta_processing_lock = Lock()
 
         self.register_background_update_handler(
             "populate_stats_createtables", self._populate_stats_createtables
