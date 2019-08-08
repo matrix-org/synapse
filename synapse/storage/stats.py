@@ -682,28 +682,66 @@ class StatsStore(StateDeltasStore):
             desc="update_room_state",
         )
 
-    def get_deltas_for_room(self, room_id, start, size=100):
+    def get_statistics_for_subject(self, stats_type, stats_id, start, size=100):
         """
-        Get statistics deltas for a given room.
+        Get statistics for a given subject.
 
         Args:
-            room_id (str)
+            stats_type (str): The type of subject
+            stats_id (str): The ID of the subject (e.g. room_id or user_id)
             start (int): Pagination start. Number of entries, not timestamp.
             size (int): How many entries to return.
 
         Returns:
             Deferred[list[dict]], where the dict has the keys of
-            ABSOLUTE_STATS_FIELDS["room"] and "ts".
+            ABSOLUTE_STATS_FIELDS[stats_type],  and "bucket_size" and "end_ts".
         """
-        return self._simple_select_list_paginate(
-            "room_stats",
-            {"room_id": room_id},
-            "ts",
+        return self.runInteraction(
+            "get_statistics_for_subject",
+            self._get_statistics_for_subject_txn,
+            stats_type,
+            stats_id,
             start,
             size,
-            retcols=(list(ABSOLUTE_STATS_FIELDS["room"]) + ["ts"]),
+        )
+
+    # TODO fix and account for _current.
+    def _get_statistics_for_subject_txn(
+        self, txn, stats_type, stats_id, start, size=100
+    ):
+
+        table, id_col = TYPE_TO_TABLE[stats_type]
+        selected_columns = list(
+            ABSOLUTE_STATS_FIELDS[stats_type] + PER_SLICE_FIELDS[stats_type]
+        )
+
+        slice_list = self._simple_select_list_paginate_txn(
+            txn,
+            table + "_historical",
+            {id_col: stats_id},
+            "end_ts",
+            start,
+            size,
+            retcols=selected_columns + ["bucket_size", "end_ts"],
             order_direction="DESC",
         )
+
+        if len(slice_list) < size:
+            # also fetch the current row
+            current = self._simple_select_one_txn(
+                txn,
+                table + "_current",
+                {id_col: stats_id},
+                retcols=selected_columns + ["start_ts", "end_ts"],
+                allow_none=True,
+            )
+
+            if current is not None and current["end_ts"] is not None:
+                # it is dirty, so contains new information, so should be included
+                current["bucket_size"] = current["end_ts"] - current["start_ts"]
+                del current["start_ts"]
+                return [current] + slice_list
+        return slice_list
 
     def get_all_room_state(self):
         return self._simple_select_list(

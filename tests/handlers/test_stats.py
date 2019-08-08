@@ -14,13 +14,11 @@
 # limitations under the License.
 
 from mock import Mock
-
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
-
 from tests import unittest
 
 
@@ -47,7 +45,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.get_success(
             self.store._simple_insert(
                 "background_updates",
-                {"update_name": "populate_stats_createtables", "progress_json": "{}"},
+                {"update_name": "populate_stats_prepare", "progress_json": "{}"},
             )
         )
         self.get_success(
@@ -56,7 +54,17 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 {
                     "update_name": "populate_stats_process_rooms",
                     "progress_json": "{}",
-                    "depends_on": "populate_stats_createtables",
+                    "depends_on": "populate_stats_prepare",
+                },
+            )
+        )
+        self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {
+                    "update_name": "populate_stats_process_users",
+                    "progress_json": "{}",
+                    "depends_on": "populate_stats_process_rooms",
                 },
             )
         )
@@ -66,7 +74,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 {
                     "update_name": "populate_stats_cleanup",
                     "progress_json": "{}",
-                    "depends_on": "populate_stats_process_rooms",
+                    "depends_on": "populate_stats_process_users",
                 },
             )
         )
@@ -114,6 +122,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         Ingestion via notify_new_event will ignore tokens that the background
         update have already processed.
         """
+
         self.reactor.advance(86401)
 
         self.hs.config.stats_enabled = False
@@ -138,12 +147,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.hs.config.stats_enabled = True
         self.handler.stats_enabled = True
         self.store._all_done = False
-        self.get_success(self.store.update_stats_stream_pos(None))
+        self.get_success(self.store.update_stats_positions(None))
 
         self.get_success(
             self.store._simple_insert(
                 "background_updates",
-                {"update_name": "populate_stats_createtables", "progress_json": "{}"},
+                {"update_name": "populate_stats_prepare", "progress_json": "{}"},
             )
         )
 
@@ -153,6 +162,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # Now, before the table is actually ingested, add some more events.
         self.helper.invite(room=room_1, src=u1, targ=u2, tok=u1_token)
         self.helper.join(room=room_1, user=u2, tok=u2_token)
+
+        # orig_delta_processor = self.store.
 
         # Now do the initial ingestion.
         self.get_success(
@@ -185,8 +196,13 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.helper.invite(room=room_1, src=u1, targ=u3, tok=u1_token)
         self.helper.join(room=room_1, user=u3, tok=u3_token)
 
-        # Get the deltas! There should be two -- day 1, and day 2.
-        r = self.get_success(self.store.get_deltas_for_room(room_1, 0))
+        # self.handler.notify_new_event()
+
+        # We need to let the delta processor advance…
+        self.pump(10 * 60)
+
+        # Get the slices! There should be two -- day 1, and day 2.
+        r = self.get_success(self.store.get_statistics_for_subject("room", room_1, 0))
 
         # The oldest has 2 joined members
         self.assertEqual(r[-1]["joined_members"], 2)
@@ -299,6 +315,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # One delta, with two joined members -- the room creator, and our fake
         # user.
-        r = self.get_success(self.store.get_deltas_for_room(room_1, 0))
+        r = self.get_success(self.store.get_statistics_for_subject("room", room_1, 0))
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["joined_members"], 2)
