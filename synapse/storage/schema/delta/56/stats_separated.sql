@@ -168,7 +168,7 @@ CREATE INDEX IF NOT EXISTS user_stats_historical_end_ts ON user_stats_historical
 -- Set up staging tables
 -- we depend on current_state_events_membership because this is used
 -- in our counting.
-INSERT INTO background_updates (update_name, progress_json) VALUES
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
     ('populate_stats_prepare', '{}', 'current_state_events_membership');
 
 -- Run through each room and update stats
