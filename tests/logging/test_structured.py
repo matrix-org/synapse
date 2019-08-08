@@ -54,7 +54,9 @@ class StructuredLoggingTestCase(HomeserverTestCase):
 
         # Begin the logger with our config
         beginner = FakeBeginner()
-        setup_structured_logging(self.hs, self.hs.config, log_config, logBeginner=beginner)
+        setup_structured_logging(
+            self.hs, self.hs.config, log_config, logBeginner=beginner
+        )
 
         # Make a logger and send an event
         logger = Logger(
@@ -87,7 +89,9 @@ class StructuredLoggingTestCase(HomeserverTestCase):
 
         # Begin the logger with our config
         beginner = FakeBeginner()
-        setup_structured_logging(self.hs, self.hs.config, log_config, logBeginner=beginner)
+        setup_structured_logging(
+            self.hs, self.hs.config, log_config, logBeginner=beginner
+        )
 
         # Make a logger and send an event
         logger = Logger(
