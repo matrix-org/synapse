@@ -29,7 +29,12 @@ def server_webui(request):
 
 @app.route("/setup", methods=["GET"])
 def get_config_setup(request):
-    return json.dumps({model.constants.CONFIG_LOCK: model.config_in_use()})
+    return json.dumps(
+        {
+            model.constants.CONFIG_LOCK: model.config_in_use(),
+            "config_dir": model.get_config_dir(),
+        }
+    )
 
 
 @app.route("/servername", methods=["GET"])

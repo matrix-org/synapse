@@ -21,6 +21,7 @@ import {
   SET_SYNAPSE_PORTS,
   SET_SYNAPSE_PORTS_FREE,
   SET_DATABASE,
+  SET_CONFIG_DIR,
 } from './types';
 
 import {
@@ -31,15 +32,24 @@ import {
   post_certs,
   test_ports,
 } from '../api';
+import { CONFIG_LOCK, CONFIG_DIR } from '../api/constants';
 
 export const startup = () => {
   return dispatch => {
     get_server_setup().then(
-      result => dispatch(start(result)),
+      result => {
+        dispatch(start(result[CONFIG_LOCK]));
+        dispatch(set_config_dir(result[CONFIG_DIR]));
+      },
       error => dispatch(fail(error)),
     )
   }
 }
+
+const set_config_dir = dir => ({
+  type: SET_CONFIG_DIR,
+  config_dir = dir,
+});
 
 export const generate_secret_keys = consent => {
   return (dispatch, getState) => {
