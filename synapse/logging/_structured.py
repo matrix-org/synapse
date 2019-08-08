@@ -35,6 +35,7 @@ from twisted.logger import (
 )
 
 from synapse.config._base import ConfigError
+from synapse.logging._fluentd import FluentDToConsoleLogObserver
 from synapse.logging.context import LoggingContext
 
 
@@ -74,7 +75,9 @@ class LogContextObserver(object):
             if event["log_text"].startswith("(UDP Port "):
                 return
 
-            if event["log_text"].startswith("Timing out client"):
+            if event["log_text"].startswith("Timing out client") or event[
+                "log_format"
+            ].startswith("Timing out client"):
                 return
 
         context = LoggingContext.current_context()
@@ -135,11 +138,10 @@ def SynapseFileLogObserver(outFile):
     """
 
     def formatEvent(_event):
-        event = _event.copy()
+        event = dict(_event)
         event["log_level"] = event["log_level"].name.upper()
-        event["log_format"] = (
-            "- {log_namespace} - {log_level} - {request} - "
-            + event.get("log_format", "{log_text}")
+        event["log_format"] = "- {log_namespace} - {log_level} - {request} - " + (
+            event.get("log_format", "{log_text}") or "{log_text}"
         )
         return eventAsText(event, includeSystem=False) + "\n"
 
@@ -166,6 +168,9 @@ class DrainConfiguration(object):
     location = attr.ib()
 
 
+DEFAULT_LOGGERS = {"synapse": {"level": "INFO"}}
+
+
 def parse_drain_configs(drains):
     """
     Parse the drain configurations.
@@ -190,7 +195,11 @@ def parse_drain_configs(drains):
                 "%s is not a known logging drain type." % (config["type"],)
             )
 
-        if logging_type in [DrainType.CONSOLE, DrainType.CONSOLE_JSON]:
+        if logging_type in [
+            DrainType.CONSOLE,
+            DrainType.CONSOLE_JSON,
+            DrainType.FLUENTD,
+        ]:
             location = config.get("location")
             if location is None or location not in ["stdout", "stderr"]:
                 raise ConfigError(
@@ -271,10 +280,19 @@ def setup_structured_logging(config, log_config, logBeginner=globalLogBeginner):
             log_file = open(observer.location, "at", buffering=1, encoding="utf8")
             observers.append(jsonFileLogObserver(log_file))
 
+        if observer.type == DrainType.FLUENTD:
+            logger.debug(
+                "Starting up the {name} FluentD console logger drain",
+                name=observer.name,
+            )
+            observers.append(FluentDToConsoleLogObserver(observer.location))
+
     publisher = LogPublisher(*observers)
     log_filter = LogLevelFilterPredicate()
 
-    for namespace, namespace_config in log_config.get("loggers", {}).items():
+    for namespace, namespace_config in log_config.get(
+        "loggers", DEFAULT_LOGGERS
+    ).items():
         # Set the log level for twisted.logger.Logger namespaces
         log_filter.setLogLevelForNamespace(
             namespace,
