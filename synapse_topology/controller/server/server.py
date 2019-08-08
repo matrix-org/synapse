@@ -80,12 +80,14 @@ with app.subroute("/config") as app:
 @validate_schema(CERT_PATHS_SCHEMA)
 def test_cert_paths(request, body):
     result = {}
-    for path in ["cert_path", "cert_key_path"]:
+    config_path = model.get_config_dir()
+    for name, path in body.items():
+        path = abspath(join(config_path, path))
         try:
-            with open(body[path], "r"):
-                result[path + "_invalid"] = False
+            with open(path, "r"):
+                result[name] = {"invalid": False, "absolute_path": path}
         except:
-            result[path + "_invalid"] = True
+            result[name] = {"invalid": True}
     return json.dumps(result)
 
 
