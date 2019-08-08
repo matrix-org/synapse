@@ -1,10 +1,11 @@
 import yaml from 'yaml';
 import { TLS_TYPES, REVERSE_PROXY_TYPES } from '../actions/constants';
+import { CONFIG_LOCK } from '../api/constants';
 
 const listeners = config => {
   const listeners = [];
   if (config.tls == TLS_TYPES.TLS) {
-    listeners.append({
+    listeners.push({
       port: config.synapse_federation_port,
       tls: true,
       bind_addresses: ['::1', '127.0.0.1'],
@@ -17,7 +18,7 @@ const listeners = config => {
       }],
     });
   } else {
-    listeners.append({
+    listeners.push({
       port: config.synapse_federation_port,
       tls: true,
       type: "http",
@@ -29,9 +30,9 @@ const listeners = config => {
   }
 
   if (config.synapse_client_port == config.synapse_federation_port) {
-    listeners[0].resources[0].names.append("client");
+    listeners[0].resources[0].names.push("client");
   } else if (config.tls == TLS_TYPES.TLS) {
-    listeners.append({
+    listeners.push({
       port: config.synapse_client_port,
       tls: true,
       bind_addresses: ['::1', '127.0.0.1'],
@@ -44,7 +45,7 @@ const listeners = config => {
       }],
     });
   } else {
-    listeners.append({
+    listeners.push({
       port: config.synapse_client_port,
       tls: true,
       type: "http",
@@ -65,8 +66,8 @@ const tls_paths = config => {
     }
   } else if (config.reverser_proxy == REVERSE_PROXY_TYPES.ACME) {
     return {
-      tls_certificate_path: config.config_dir + config.server_name + ".tls.cert",
-      tls_private_key_path: config.config_dir + config.server_name + ".tls.key",
+      tls_certificate_path: config.config_dir + "/" + config.server_name + ".tls.cert",
+      tls_private_key_path: config.config_dir + "/" + config.server_name + ".tls.key",
     }
   } else {
     return {}
@@ -82,32 +83,35 @@ const acme = config => {
         bind_addresses: ['::', '0.0.0.0'],
         reprovision_threshold: 30,
         domain: config.delegation_server_name ? config.delegation_server_name : servername,
-        account_key_file: config.config_dir + "data/acme_account.key",
+        account_key_file: config.config_dir + "/data/acme_account.key",
       }
     }
   } else {
     return {}
   }
-},
+}
 
 const database = config => ({
   database: {
     name: config.database,
-    args: config.config_dir + "data/homeserver.db"
+    args: config.config_dir + "/data/homeserver.db"
   }
 })
 
-const base_config_to_synapse_config = config => ({
-  server_name: config.servername,
-  report_stats: config.report_stats,
-  log_config: config.config_dir + config.server_name + ".log.config",
-  media_store_path: config.config_dir + "data/media_store",
-  uploads_path: config.config_dir + "data/uploads",
-  pid_file: config.config_dir + "data/homeserver.pid",
-  ...listeners(config),
-  ...tls_paths(config),
-  ...acme(config),
-  ...database(config),
-})
-
-const base_config_to_yaml = config => yaml.stringify(base_config_to_synapse_config(config))
+export const base_config_to_synapse_config = config => {
+  const conf = {
+    server_name: config.servername,
+    report_stats: config.report_stats,
+    log_config: config.config_dir + "/" + config.server_name + ".log.config",
+    media_store_path: config.config_dir + "/data/media_store",
+    uploads_path: config.config_dir + "/data/uploads",
+    pid_file: config.config_dir + "/data/homeserver.pid",
+    ...listeners(config),
+    ...tls_paths(config),
+    ...acme(config),
+    ...database(config),
+    [CONFIG_LOCK]: true,
+  }
+  console.log(conf)
+  return conf
+}
