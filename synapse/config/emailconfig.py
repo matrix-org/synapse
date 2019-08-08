@@ -77,6 +77,7 @@ class EmailConfig(Config):
         email_trust_identity_server_for_password_resets = email_config.get(
             "trust_identity_server_for_password_resets", False
         )
+        # TODO: Generalize this into `account_threepid_delegate`
         self.email_password_reset_behaviour = (
             "remote" if email_trust_identity_server_for_password_resets else "local"
         )
@@ -125,28 +126,45 @@ class EmailConfig(Config):
                     % (", ".join(missing),)
                 )
 
-            # Templates for password reset emails
+            # These email templates have placeholders in them, and thus must be
+            # parsed using a templating engine during a request
             self.email_password_reset_template_html = email_config.get(
                 "password_reset_template_html", "password_reset.html"
             )
             self.email_password_reset_template_text = email_config.get(
                 "password_reset_template_text", "password_reset.txt"
             )
-            self.email_password_reset_failure_template = email_config.get(
-                "password_reset_failure_template", "password_reset_failure.html"
+            self.email_registration_template_html = email_config.get(
+                "registration_template_html", "registration.html"
             )
-            # This template does not support any replaceable variables, so we will
-            # read it from the disk once during setup
-            email_password_reset_success_template = email_config.get(
-                "password_reset_success_template", "password_reset_success.html"
+            self.email_registration_template_text = email_config.get(
+                "registration_template_text", "registration.txt"
+            )
+            self.email_password_reset_template_failure_html = email_config.get(
+                "password_reset_template_failure_html", "password_reset_failure.html"
+            )
+            self.email_registration_template_failure_html = email_config.get(
+                "registration_template_failure_html", "registration_failure.html"
+            )
+
+            # These templates do not support any placeholder variables, so we
+            # will read them from disk once during setup
+            email_password_reset_template_success_html = email_config.get(
+                "password_reset_template_success_html", "password_reset_success.html"
+            )
+            email_registration_template_success_html = email_config.get(
+                "registration_template_success_html", "registration_success.html"
             )
 
             # Check templates exist
             for f in [
                 self.email_password_reset_template_html,
                 self.email_password_reset_template_text,
-                self.email_password_reset_failure_template,
-                email_password_reset_success_template,
+                self.email_registration_template_html,
+                self.email_registration_template_text,
+                self.email_password_reset_template_failure_html,
+                email_password_reset_template_success_html,
+                email_registration_template_success_html,
             ]:
                 p = os.path.join(self.email_template_dir, f)
                 if not os.path.isfile(p):
@@ -154,10 +172,16 @@ class EmailConfig(Config):
 
             # Retrieve content of web templates
             filepath = os.path.join(
-                self.email_template_dir, email_password_reset_success_template
+                self.email_template_dir, email_password_reset_template_success_html
             )
-            self.email_password_reset_success_html_content = self.read_file(
+            self.email_password_reset_template_success_html = self.read_file(
                 filepath, "email.password_reset_template_success_html"
+            )
+            filepath = os.path.join(
+                self.email_template_dir, email_registration_template_success_html
+            )
+            self.email_registration_template_success_html = self.read_file(
+                filepath, "email.registration_template_success_html"
             )
 
         if self.email_enable_notifs:
@@ -288,4 +312,10 @@ class EmailConfig(Config):
         #   #
         #   #password_reset_template_success_html: password_reset_success.html
         #   #password_reset_template_failure_html: password_reset_failure.html
+        #
+        #   # Templates for registration success and failure pages that a user
+        #   # will see after attempting to register using an email or phone
+        #   #
+        #   #registration_template_success_html: registration_success.html
+        #   #registration_template_failure_html: registration_reset_failure.html
         """

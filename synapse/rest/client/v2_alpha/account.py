@@ -32,7 +32,6 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
-from synapse.util.stringutils import random_string
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
@@ -110,7 +109,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             )
         else:
             # Send password reset emails from Synapse
-            sid = yield self.send_password_reset(
+            sid = yield self.mailer.send_threepid_validation(
                 email, client_secret, send_attempt, next_link
             )
 
@@ -118,74 +117,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             ret = {"sid": sid}
 
         return (200, ret)
-
-    @defer.inlineCallbacks
-    def send_password_reset(self, email, client_secret, send_attempt, next_link=None):
-        """Send a password reset email
-
-        Args:
-            email (str): The user's email address
-            client_secret (str): The provided client secret
-            send_attempt (int): Which send attempt this is
-
-        Returns:
-            The new session_id upon success
-
-        Raises:
-            SynapseError is an error occurred when sending the email
-        """
-        # Check that this email/client_secret/send_attempt combo is new or
-        # greater than what we've seen previously
-        session = yield self.datastore.get_threepid_validation_session(
-            "email", client_secret, address=email, validated=False
-        )
-
-        # Check to see if a session already exists and that it is not yet
-        # marked as validated
-        if session and session.get("validated_at") is None:
-            session_id = session["session_id"]
-            last_send_attempt = session["last_send_attempt"]
-
-            # Check that the send_attempt is higher than previous attempts
-            if send_attempt <= last_send_attempt:
-                # If not, just return a success without sending an email
-                return session_id
-        else:
-            # An non-validated session does not exist yet.
-            # Generate a session id
-            session_id = random_string(16)
-
-        # Generate a new validation token
-        token = random_string(32)
-
-        # Send the mail with the link containing the token, client_secret
-        # and session_id
-        try:
-            yield self.mailer.send_password_reset_mail(
-                email, token, client_secret, session_id
-            )
-        except Exception:
-            logger.exception("Error sending a password reset email to %s", email)
-            raise SynapseError(
-                500, "An error was encountered when sending the password reset email"
-            )
-
-        token_expires = (
-            self.hs.clock.time_msec() + self.config.email_validation_token_lifetime
-        )
-
-        yield self.datastore.start_or_continue_validation_session(
-            "email",
-            email,
-            session_id,
-            client_secret,
-            send_attempt,
-            next_link,
-            token,
-            token_expires,
-        )
-
-        return session_id
 
 
 class MsisdnPasswordRequestTokenRestServlet(RestServlet):
@@ -224,11 +155,11 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         return (200, ret)
 
 
-class PasswordResetSubmitTokenServlet(RestServlet):
+class ThreepidSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
 
     PATTERNS = client_patterns(
-        "/password_reset/(?P<medium>[^/]*)/submit_token/*$", releases=(), unstable=True
+        "/(?P<purpose>registration|password_reset)/(?P<medium>[^/]*)/submit_token/*$", releases=(), unstable=True
     )
 
     def __init__(self, hs):
@@ -236,7 +167,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(PasswordResetSubmitTokenServlet, self).__init__()
+        super(ThreepidSubmitTokenServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.config = hs.config
@@ -244,18 +175,28 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         self.datastore = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def on_GET(self, request, medium):
+    def on_GET(self, request, purpose, medium):
+        if purpose == "password_reset":
+            purpose = "password resets"
+        elif purpose != "registration":
+            raise SynapseError(
+                404, "Unknown endpoint"
+            )
+
         if medium != "email":
             raise SynapseError(
-                400, "This medium is currently not supported for password resets"
+                400, "This medium is currently not supported for %s" % purpose
             )
         if self.config.email_password_reset_behaviour == "off":
             if self.config.password_resets_were_disabled_due_to_email_config:
+                # TODO: Change the config to just be `account_threepid_delegate`
                 logger.warn(
-                    "User password resets have been disabled due to lack of email config"
+                    "User %s have been disabled due to lack of email config",
+                    purpose,
                 )
             raise SynapseError(
-                400, "Email-based password resets have been disabled on this server"
+                400, "Email-based %s is disabled on this server",
+                purpose,
             )
 
         sid = parse_string(request, "sid")
@@ -282,15 +223,26 @@ class PasswordResetSubmitTokenServlet(RestServlet):
                     return None
 
             # Otherwise show the success template
-            html = self.config.email_password_reset_success_html_content
+            if purpose == "password resets":
+                html = self.config.email_password_reset_template_success_html
+            elif purpose == "registration":
+                html = self.config.email_registration_template_success_html
+
             request.setResponseCode(200)
         except ThreepidValidationError as e:
             # Show a failure page with a reason
-            html = self.load_jinja2_template(
-                self.config.email_template_dir,
-                self.config.email_password_reset_failure_template,
-                template_vars={"failure_reason": e.msg},
-            )
+            if purpose == "password resets":
+                html = self.load_jinja2_template(
+                    self.config.email_template_dir,
+                    self.config.email_password_reset_template_failure_html,
+                    template_vars={"failure_reason": e.msg},
+                )
+            elif purpose == "registration":
+                html = self.load_jinja2_template(
+                    self.config.email_template_dir,
+                    self.config.email_registration_template_failure_html,
+                    template_vars={"failure_reason": e.msg},
+                )
             request.setResponseCode(e.code)
 
         request.write(html.encode("utf-8"))
@@ -319,7 +271,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
     def on_POST(self, request, medium):
         if medium != "email":
             raise SynapseError(
-                400, "This medium is currently not supported for password resets"
+                400, "This medium is currently not supported"
             )
 
         body = parse_json_object_from_request(request)
@@ -454,10 +406,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/email/requestToken$")
 
     def __init__(self, hs):
-        self.hs = hs
         super(EmailThreepidRequestTokenRestServlet, self).__init__()
+        self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
-        self.datastore = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -465,8 +416,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         assert_params_in_dict(
             body, ["id_server", "client_secret", "email", "send_attempt"]
         )
+        email = body["email"]
 
-        if not check_3pid_allowed(self.hs, "email", body["email"]):
+        if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized on this server",
@@ -474,13 +426,14 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
-            "email", body["email"]
+            "email", email
         )
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestEmailToken(**body)
+            ret = yield self.identity_handler.requestEmailToken(**body)
+
         return (200, ret)
 
 
@@ -623,7 +576,7 @@ class WhoamiRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
     MsisdnPasswordRequestTokenRestServlet(hs).register(http_server)
-    PasswordResetSubmitTokenServlet(hs).register(http_server)
+    ThreepidSubmitTokenServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)

@@ -1197,6 +1197,12 @@ password_config:
 #   #
 #   #password_reset_template_success_html: password_reset_success.html
 #   #password_reset_template_failure_html: password_reset_failure.html
+#
+#   # Templates for registration success and failure pages that a user
+#   # will see after attempting to register using an email or phone
+#   #
+#   #registration_template_success_html: registration_success.html
+#   #registration_template_failure_html: registration_failure.html
 
 
 #password_providers:

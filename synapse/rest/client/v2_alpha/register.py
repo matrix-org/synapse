@@ -72,6 +72,21 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
+        if self.hs.config.email_password_reset_behaviour == "local":
+            from synapse.push.mailer import Mailer, load_jinja2_templates
+
+            templates = load_jinja2_templates(
+                config=hs.config,
+                template_html_name=hs.config.email_registration_template_html,
+                template_text_name=hs.config.email_registration_template_text,
+            )
+            self.mailer = Mailer(
+                hs=self.hs,
+                app_name=self.hs.config.email_app_name,
+                template_html=templates[0],
+                template_text=templates[1],
+            )
+
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
@@ -79,8 +94,12 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         assert_params_in_dict(
             body, ["id_server", "client_secret", "email", "send_attempt"]
         )
+        email = body["email"]
+        client_secret = body["client_secret"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link") # Optional param
 
-        if not check_3pid_allowed(self.hs, "email", body["email"]):
+        if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized to register on this server",
@@ -88,13 +107,25 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
-            "email", body["email"]
+            "email", email
         )
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestEmailToken(**body)
+        if self.hs.config.email_password_reset_behaviour == "remote":
+            # Have the identity server handle the registration flow
+            # Just pass through the body for simplicity
+            ret = yield self.identity_handler.requestEmailToken(**body)
+        else:
+            # Send the registration email from Synapse
+            sid = yield self.mailer.send_threepid_validation(
+                email, client_secret, send_attempt, next_link
+            )
+
+            # Wrap the session id in a JSON object
+            ret = {"sid": sid}
+
         return (200, ret)
 
 

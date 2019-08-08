@@ -26,7 +26,7 @@ from synapse.api.urls import CLIENT_API_PREFIX
 logger = logging.getLogger(__name__)
 
 
-def client_patterns(path_regex, releases=(0,), unstable=True, v1=False):
+def client_patterns(*path_regexes, releases=(0,), unstable=True, v1=False):
     """Creates a regex compiled client path with the correct client path
     prefix.
 
@@ -37,15 +37,17 @@ def client_patterns(path_regex, releases=(0,), unstable=True, v1=False):
         SRE_Pattern
     """
     patterns = []
-    if unstable:
-        unstable_prefix = CLIENT_API_PREFIX + "/unstable"
-        patterns.append(re.compile("^" + unstable_prefix + path_regex))
-    if v1:
-        v1_prefix = CLIENT_API_PREFIX + "/api/v1"
-        patterns.append(re.compile("^" + v1_prefix + path_regex))
-    for release in releases:
-        new_prefix = CLIENT_API_PREFIX + "/r%d" % (release,)
-        patterns.append(re.compile("^" + new_prefix + path_regex))
+
+    for path_regex in path_regexes:
+        if unstable:
+            unstable_prefix = CLIENT_API_PREFIX + "/unstable"
+            patterns.append(re.compile("^" + unstable_prefix + path_regex))
+        if v1:
+            v1_prefix = CLIENT_API_PREFIX + "/api/v1"
+            patterns.append(re.compile("^" + v1_prefix + path_regex))
+        for release in releases:
+            new_prefix = CLIENT_API_PREFIX + "/r%d" % (release,)
+            patterns.append(re.compile("^" + new_prefix + path_regex))
     return patterns
 
 
