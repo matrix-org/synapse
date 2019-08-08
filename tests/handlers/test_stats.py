@@ -16,10 +16,14 @@
 from mock import Mock
 from twisted.internet import defer
 
+from synapse import storage
 from synapse.api.constants import EventTypes, Membership
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from tests import unittest
+
+# The expected number of state events in a fresh room.
+EXPECTED_NUM_STATE_EVENTS_IN_FRESH_ROOM = 5
 
 
 class StatsRoomTests(unittest.HomeserverTestCase):
@@ -31,7 +35,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-
         self.store = hs.get_datastore()
         self.handler = self.hs.get_stats_handler()
 
@@ -78,6 +81,28 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 },
             )
         )
+
+    def _get_current_stats(self, stats_type, stat_id):
+        table, id_col = storage.stats.TYPE_TO_TABLE[stats_type]
+
+        cols = (
+            ["start_ts", "end_ts", "completed_delta_stream_id"]
+            + list(storage.stats.ABSOLUTE_STATS_FIELDS[stats_type])
+            + list(storage.stats.PER_SLICE_FIELDS[stats_type])
+        )
+
+        return self.get_success(
+            self.store._simple_select_one(
+                table + "_current", {id_col: stat_id}, cols, allow_none=True
+            )
+        )
+
+    def _complete_background_initial_update(self):
+        # Do the initial population of the stats via the background update
+        self._add_background_updates()
+
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)
 
     def test_initial_room(self):
         """
@@ -275,7 +300,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
 
-        # Do the initial population of the user directory via the background update
+        # Do the initial population of the stats via the background update
         self._add_background_updates()
 
         while not self.get_success(self.store.has_completed_background_updates()):
@@ -318,3 +343,319 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         r = self.get_success(self.store.get_statistics_for_subject("room", room_1, 0))
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["joined_members"], 2)
+
+    def test_create_user(self):
+        """
+        When we create a user, it should have statistics already ready.
+        """
+
+        u1 = self.register_user("u1", "pass")
+
+        u1stats = self._get_current_stats("user", u1)
+
+        self.assertIsNotNone(u1stats)
+
+        # row is complete
+        self.assertIsNotNone(u1stats["completed_delta_stream_id"])
+
+        # not in any rooms by default
+        self.assertEqual(u1stats["public_rooms"], 0)
+        self.assertEqual(u1stats["private_rooms"], 0)
+
+    def test_create_room(self):
+        """
+        When we create a room, it should have statistics already ready.
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+        r1stats = self._get_current_stats("room", r1)
+
+        self.assertIsNotNone(r1stats)
+
+        # row is complete
+        self.assertIsNotNone(r1stats["completed_delta_stream_id"])
+
+        # contains the default things you'd expect in a fresh room
+        self.assertEqual(
+            r1stats["total_events"],
+            EXPECTED_NUM_STATE_EVENTS_IN_FRESH_ROOM,
+            "Wrong number of total_events in new room's stats!"
+            " You may need to update this if more state events are added to"
+            " the room creation process.",
+        )
+
+        self.assertEqual(
+            r1stats["current_state_events"], EXPECTED_NUM_STATE_EVENTS_IN_FRESH_ROOM
+        )
+
+        self.assertEqual(r1stats["joined_members"], 1)
+        self.assertEqual(r1stats["invited_members"], 0)
+        self.assertEqual(r1stats["banned_members"], 0)
+
+    def test_send_message_increments_total_events(self):
+        """
+        When we send a message, it increments total_events.
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        self.helper.send(r1, "hiss", tok=u1token)
+
+        r1stats_post = self._get_current_stats("room", r1)
+
+        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+
+    def test_send_state_event_nonoverwriting(self):
+        """
+        When we send a non-overwriting state event, it increments total_events AND current_state_events
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        self.helper.send_state(
+            r1, "cat.hissing", {"value": True}, tok=u1token, state_key="tabby"
+        )
+
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        self.helper.send_state(
+            r1, "cat.hissing", {"value": False}, tok=u1token, state_key="moggy"
+        )
+
+        r1stats_post = self._get_current_stats("room", r1)
+
+        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+        self.assertEqual(
+            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
+            1,
+        )
+
+    def test_send_state_event_overwriting(self):
+        """
+        When we send an overwriting state event, it increments total_events ONLY
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        self.helper.send_state(
+            r1, "cat.hissing", {"value": True}, tok=u1token, state_key="tabby"
+        )
+
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        self.helper.send_state(
+            r1, "cat.hissing", {"value": False}, tok=u1token, state_key="tabby"
+        )
+
+        r1stats_post = self._get_current_stats("room", r1)
+
+        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+        self.assertEqual(
+            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
+            0,
+        )
+
+    def test_join_first_time(self):
+        """
+        When a user joins a room for the first time, total_events, current_state_events and
+        joined_members should increase by exactly 1.
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        u2 = self.register_user("u2", "pass")
+        u2token = self.login("u2", "pass")
+
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        self.helper.join(r1, u2, tok=u2token)
+
+        r1stats_post = self._get_current_stats("room", r1)
+
+        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+        self.assertEqual(
+            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
+            1,
+        )
+        self.assertEqual(
+            r1stats_post["joined_members"] - r1stats_ante["joined_members"], 1
+        )
+
+    def test_join_after_leave(self):
+        """
+        When a user joins a room after being previously left, total_events and
+        joined_members should increase by exactly 1.
+        current_state_events should not increase.
+        left_members should decrease by exactly 1.
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        u2 = self.register_user("u2", "pass")
+        u2token = self.login("u2", "pass")
+
+        self.helper.join(r1, u2, tok=u2token)
+        self.helper.leave(r1, u2, tok=u2token)
+
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        self.helper.join(r1, u2, tok=u2token)
+
+        r1stats_post = self._get_current_stats("room", r1)
+
+        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+        self.assertEqual(
+            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
+            0,
+        )
+        self.assertEqual(
+            r1stats_post["joined_members"] - r1stats_ante["joined_members"], +1
+        )
+        self.assertEqual(
+            r1stats_post["left_members"] - r1stats_ante["left_members"], -1
+        )
+
+    def test_invited(self):
+        """
+        When a user invites another user, current_state_events, total_events and
+        invited_members should increase by exactly 1.
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        u2 = self.register_user("u2", "pass")
+
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        self.helper.invite(r1, u1, u2, tok=u1token)
+
+        r1stats_post = self._get_current_stats("room", r1)
+
+        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+        self.assertEqual(
+            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
+            1,
+        )
+        self.assertEqual(
+            r1stats_post["invited_members"] - r1stats_ante["invited_members"], +1
+        )
+
+    def test_join_after_invite(self):
+        """
+        When a user joins a room after being invited, total_events and
+        joined_members should increase by exactly 1.
+        current_state_events should not increase.
+        invited_members should decrease by exactly 1.
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        u2 = self.register_user("u2", "pass")
+        u2token = self.login("u2", "pass")
+
+        self.helper.invite(r1, u1, u2, tok=u1token)
+
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        self.helper.join(r1, u2, tok=u2token)
+
+        r1stats_post = self._get_current_stats("room", r1)
+
+        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+        self.assertEqual(
+            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
+            0,
+        )
+        self.assertEqual(
+            r1stats_post["joined_members"] - r1stats_ante["joined_members"], +1
+        )
+        self.assertEqual(
+            r1stats_post["invited_members"] - r1stats_ante["invited_members"], -1
+        )
+
+    def test_left(self):
+        """
+        When a user leaves a room after joining, total_events and
+        left_members should increase by exactly 1.
+        current_state_events should not increase.
+        joined_members should decrease by exactly 1.
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        u2 = self.register_user("u2", "pass")
+        u2token = self.login("u2", "pass")
+
+        self.helper.join(r1, u2, tok=u2token)
+
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        self.helper.leave(r1, u2, tok=u2token)
+
+        r1stats_post = self._get_current_stats("room", r1)
+
+        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+        self.assertEqual(
+            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
+            0,
+        )
+        self.assertEqual(
+            r1stats_post["left_members"] - r1stats_ante["left_members"], +1
+        )
+        self.assertEqual(
+            r1stats_post["joined_members"] - r1stats_ante["joined_members"], -1
+        )
+
+    def test_banned(self):
+        """
+        When a user is banned from a room after joining, total_events and
+        left_members should increase by exactly 1.
+        current_state_events should not increase.
+        banned_members should decrease by exactly 1.
+        """
+
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        u2 = self.register_user("u2", "pass")
+        u2token = self.login("u2", "pass")
+
+        self.helper.join(r1, u2, tok=u2token)
+
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        self.helper.change_membership(r1, u1, u2, "ban", tok=u1token)
+
+        r1stats_post = self._get_current_stats("room", r1)
+
+        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+        self.assertEqual(
+            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
+            0,
+        )
+        self.assertEqual(
+            r1stats_post["banned_members"] - r1stats_ante["banned_members"], +1
+        )
+        self.assertEqual(
+            r1stats_post["joined_members"] - r1stats_ante["joined_members"], -1
+        )
