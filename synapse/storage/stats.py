@@ -782,21 +782,6 @@ class StatsStore(StateDeltasStore):
             allow_none=True,
         )
 
-    def update_stats(self, stats_type, stats_id, ts, fields):
-        table, id_col = TYPE_TO_TABLE[stats_type]
-        return self._simple_upsert(
-            table=table,
-            keyvalues={id_col: stats_id, "ts": ts},
-            values=fields,
-            desc="update_stats",
-        )
-
-    def _update_stats_txn(self, txn, stats_type, stats_id, ts, fields):
-        table, id_col = TYPE_TO_TABLE[stats_type]
-        return self._simple_upsert_txn(
-            txn, table=table, keyvalues={id_col: stats_id, "ts": ts}, values=fields
-        )
-
     def _collect_old_txn(self, txn, stats_type, limit=500):
         # we do them in batches to prevent concurrent updates from
         # messing us over with lots of retries
