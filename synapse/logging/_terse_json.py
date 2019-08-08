@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-FluentD log formatter.
+Log formatters that output terse JSON.
 """
 
 import sys
@@ -76,7 +76,7 @@ def flatten_event(_event, metadata):
     return {**event, **metadata}
 
 
-def FluentDToConsoleLogObserver(outFile, metadata={}):
+def TerseJSONToConsoleLogObserver(outFile, metadata={}):
     """
     A log observer that formats events to a flattened JSON representation.
 

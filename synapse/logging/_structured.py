@@ -35,7 +35,7 @@ from twisted.logger import (
 )
 
 from synapse.config._base import ConfigError
-from synapse.logging._fluentd import FluentDToConsoleLogObserver
+from synapse.logging._terse_json import TerseJSONToConsoleLogObserver
 from synapse.logging.context import LoggingContext
 
 
@@ -151,9 +151,9 @@ def SynapseFileLogObserver(outFile):
 class DrainType(Names):
     CONSOLE = NamedConstant()
     CONSOLE_JSON = NamedConstant()
+    CONSOLE_JSON_TERSE = NamedConstant()
     FILE = NamedConstant()
     FILE_JSON = NamedConstant()
-    FLUENTD = NamedConstant()
 
 
 class OutputPipeType(Values):
@@ -198,7 +198,7 @@ def parse_drain_configs(drains):
         if logging_type in [
             DrainType.CONSOLE,
             DrainType.CONSOLE_JSON,
-            DrainType.FLUENTD,
+            DrainType.CONSOLE_JSON_TERSE,
         ]:
             location = config.get("location")
             if location is None or location not in ["stdout", "stderr"]:
@@ -267,6 +267,12 @@ def setup_structured_logging(config, log_config, logBeginner=globalLogBeginner):
                 "Starting up the {name} JSON console logger drain", name=observer.name
             )
             observers.append(jsonFileLogObserver(observer.location))
+        if observer.type == DrainType.CONSOLE_JSON_TERSE:
+            logger.debug(
+                "Starting up the {name} terse JSON console logger drain",
+                name=observer.name,
+            )
+            observers.append(TerseJSONToConsoleLogObserver(observer.location))
 
         # File drains
         if observer.type == DrainType.FILE:
@@ -279,13 +285,6 @@ def setup_structured_logging(config, log_config, logBeginner=globalLogBeginner):
             )
             log_file = open(observer.location, "at", buffering=1, encoding="utf8")
             observers.append(jsonFileLogObserver(log_file))
-
-        if observer.type == DrainType.FLUENTD:
-            logger.debug(
-                "Starting up the {name} FluentD console logger drain",
-                name=observer.name,
-            )
-            observers.append(FluentDToConsoleLogObserver(observer.location))
 
     publisher = LogPublisher(*observers)
     log_filter = LogLevelFilterPredicate()
