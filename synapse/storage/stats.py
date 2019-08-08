@@ -748,6 +748,20 @@ class StatsStore(StateDeltasStore):
             "room_state", None, retcols=("name", "topic", "canonical_alias")
         )
 
+    def get_room_state(self, room_id):
+        return self._simple_select_one(
+            "room_state",
+            {"room_id": room_id},
+            retcols=(
+                "name",
+                "topic",
+                "canonical_alias",
+                "avatar",
+                "join_rules",
+                "history_visibility",
+            ),
+        )
+
     @cached()
     def get_earliest_token_for_stats(self, stats_type, id):
         """
