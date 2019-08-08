@@ -16,6 +16,7 @@ import {
   SET_SYNAPSE_PORTS,
   SET_SYNAPSE_PORTS_FREE,
   SET_DATABASE,
+  SET_CONFIG_DIR,
 } from "../actions/types";
 
 export default (state = { servername: undefined }, action) => {
@@ -116,6 +117,11 @@ export default (state = { servername: undefined }, action) => {
       return {
         ...state,
         database: action.database,
+      }
+    case SET_CONFIG_DIR:
+      return {
+        ...state,
+        config_dir: action.config_dir,
       }
     default:
       return state;

@@ -97,7 +97,6 @@ a {
     font-size: 1rem;
     background-color: @secondary;
     border-width: 0.1rem;
-    border-color: @primary;
     border-radius: 0.5rem;
     color: lighten(@font, 20%);
     margin-bottom: 1rem;
@@ -117,6 +116,17 @@ a {
       position: absolute;
     }
   }
+
+  pre {
+    padding: 0.4rem;
+    font-size: 0.6rem;
+    text-align: left;
+    border-style: solid;
+    border-color: darken(@secondary, 50%);
+    border-radius: 0.5rem;
+    text-decoration: none;
+  }
+
   .redButton {
     background-color: red;
   }

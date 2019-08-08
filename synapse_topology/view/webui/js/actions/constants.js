@@ -19,6 +19,6 @@ export const TLS_TYPES = {
 }
 
 export const DATABASE_TYPES = {
-  SQLITE3: "SQLITE3",
-  POSTGRES: "POSTGRES",
+  SQLITE3: "sqlite3",
+  POSTGRES: "psycopg2",
 }

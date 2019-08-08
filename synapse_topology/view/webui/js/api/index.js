@@ -2,8 +2,6 @@ import fetchAbsolute from 'fetch-absolute';
 import {
   API_URL,
   CONFIG,
-  CONFIG_LOCK,
-  CONFIG_SOMETHING,
   SECRET_KEY,
   SERVER_NAME,
   SETUP_CHECK,
@@ -80,4 +78,3 @@ export const post_config = () => {
 // Checks if the server's base config has been setup.
 export const get_server_setup = () => fetchAbs(SETUP_CHECK)
   .then(res => res.json())
-  .then(json => json[CONFIG_LOCK])

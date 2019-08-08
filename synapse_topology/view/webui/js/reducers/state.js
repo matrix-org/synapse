@@ -13,7 +13,7 @@ const state = {
     delegation_federation_port: "\"\"|325",
     delegation_client_port: "\"\"|325",
     reverse_proxy: "nginx|caddy|apache|haproxy|other|none",
-    tls: "acme|tls|none|reverseproxy",
+    tls: "acme|tls|reverseproxy",
     testing_cert_paths: true,
     uploading_certs: true,
     cert_path_invalid: true,
@@ -28,5 +28,7 @@ const state = {
     synapse_client_port_free: true,
     synapse_federation_port: 1234,
     synapse_client_port: 1234,
+    database: "sqlite3|postgres",
+    config_dir: "sadfasdf",
   }
 }
