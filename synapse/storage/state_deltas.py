@@ -31,7 +31,7 @@ class StateDeltasStore(SQLBaseStore):
             - state_key (str):
             - event_id (str|None): new event_id for this state key. None if the
                 state has been deleted.
-            - prev_event_id (str|None): previous event_id for this state key. None
+            - prev_event_id (str): previous event_id for this state key. None
                 if it's new state.
 
         Args:
