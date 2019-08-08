@@ -18,13 +18,19 @@ Log formatters that output terse JSON.
 """
 
 import sys
+from collections import deque
 
+import attr
 from simplejson import dumps
 
+from twisted.application.internet import ClientService
+from twisted.internet.endpoints import HostnameEndpoint
+from twisted.internet.protocol import Factory, Protocol
 from twisted.logger import FileLogObserver
+from twisted.python.failure import Failure
 
 
-def flatten_event(_event, metadata):
+def flatten_event(_event, metadata, include_time=False):
     """
     Flatten a Twisted logging event to something that makes more sense to go
     into a structured logging aggregation system.
@@ -61,6 +67,9 @@ def flatten_event(_event, metadata):
     else:
         event["log"] = _event["log_format"]
 
+    if include_time:
+        event["time"] = _event["log_time"]
+
     event["level"] = _event["log_level"].name
 
     for key in _event.keys():
@@ -90,3 +99,55 @@ def TerseJSONToConsoleLogObserver(outFile, metadata={}):
         return dumps(flattened, ensure_ascii=False, separators=(",", ":")) + "\n"
 
     return FileLogObserver(outFile, formatEvent)
+
+
+@attr.s
+class TerseJSONToTCPLogObserver(object):
+
+    hs = attr.ib()
+    host = attr.ib()
+    port = attr.ib()
+    metadata = attr.ib()
+    retry_time = attr.ib(default=5)
+    _buffer = attr.ib(default=attr.Factory(deque))
+    _writer = attr.ib(default=None)
+
+    def start(self):
+        endpoint = HostnameEndpoint(self.hs.get_reactor(), self.host, self.port)
+        factory = Factory.forProtocol(Protocol)
+        self._service = ClientService(endpoint, factory)
+        self._service.startService()
+
+    def _write_loop(self):
+        """
+        Implement the write loop.
+        """
+        if self._writer:
+            return
+
+        self._writer = self._service.whenConnected()
+
+        @self._writer.addBoth
+        def _(r):
+            if isinstance(r, Failure):
+                r.printTraceback(file=sys.__stderr__)
+                self._writer = None
+                self.hs.get_reactor().callLater(self.retry_time, self._write_loop)
+                return
+
+            try:
+                r.transport.write(b"\n".join(reversed(self._buffer)) + b"\n")
+                self._buffer.clear()
+            except Exception as e:
+                sys.__stderr__.write("Failed writing out logs with %s\n" % (str(e),))
+
+            self._writer = False
+            self.hs.get_reactor().callLater(self.retry_time, self._write_loop)
+
+    def __call__(self, _event):
+        flattened = flatten_event(_event, self.metadata, include_time=True)
+        self._buffer.append(
+            dumps(flattened, ensure_ascii=False, separators=(",", ":")).encode("utf8")
+        )
+        # Try and write immediately
+        self._write_loop()

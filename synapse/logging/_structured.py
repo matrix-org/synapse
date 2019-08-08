@@ -35,7 +35,10 @@ from twisted.logger import (
 )
 
 from synapse.config._base import ConfigError
-from synapse.logging._terse_json import TerseJSONToConsoleLogObserver
+from synapse.logging._terse_json import (
+    TerseJSONToConsoleLogObserver,
+    TerseJSONToTCPLogObserver,
+)
 from synapse.logging.context import LoggingContext
 
 
@@ -154,6 +157,7 @@ class DrainType(Names):
     CONSOLE_JSON_TERSE = NamedConstant()
     FILE = NamedConstant()
     FILE_JSON = NamedConstant()
+    NETWORK_JSON_TERSE = NamedConstant()
 
 
 class OutputPipeType(Values):
@@ -228,6 +232,13 @@ def parse_drain_configs(drains):
                 )
             yield DrainConfiguration(name=name, type=logging_type, location=location)
 
+        elif logging_type in [DrainType.NETWORK_JSON_TERSE]:
+            host = config.get("host")
+            port = config.get("port")
+            yield DrainConfiguration(
+                name=name, type=logging_type, location=(host, port)
+            )
+
         else:
             raise ConfigError(
                 "The %s drain type is currently not implemented."
@@ -235,7 +246,7 @@ def parse_drain_configs(drains):
             )
 
 
-def setup_structured_logging(config, log_config, logBeginner=globalLogBeginner):
+def setup_structured_logging(hs, config, log_config, logBeginner=globalLogBeginner):
     """
     Set up Twisted's structured logging system.
 
@@ -285,6 +296,14 @@ def setup_structured_logging(config, log_config, logBeginner=globalLogBeginner):
             )
             log_file = open(observer.location, "at", buffering=1, encoding="utf8")
             observers.append(jsonFileLogObserver(log_file))
+
+        if observer.type == DrainType.NETWORK_JSON_TERSE:
+            metadata = {"server_name": hs.config.server_name}
+            observer = TerseJSONToTCPLogObserver(
+                hs, observer.location[0], observer.location[1], metadata
+            )
+            observer.start()
+            observers.append(observer)
 
     publisher = LogPublisher(*observers)
     log_filter = LogLevelFilterPredicate()

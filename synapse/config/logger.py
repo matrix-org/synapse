@@ -180,7 +180,7 @@ def _reload_stdlib_logging(*args, log_config=None):
     logging.config.dictConfig(log_config)
 
 
-def setup_logging(config, use_worker_options=False):
+def setup_logging(hs, config, use_worker_options=False):
     """
     Set up the logging subsystem.
 
@@ -209,7 +209,7 @@ def setup_logging(config, use_worker_options=False):
     log_config_body = read_config()
 
     if log_config_body and log_config_body.get("structured") is True:
-        setup_structured_logging(config, log_config_body)
+        setup_structured_logging(hs, config, log_config_body)
         appbase.register_sighup(read_config, callback=reload_structured_logging)
     else:
         _setup_stdlib_logging(config, log_config_body)
