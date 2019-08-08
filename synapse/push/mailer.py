@@ -28,7 +28,7 @@ import jinja2
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import StoreError
+from synapse.api.errors import StoreError, SynapseError
 from synapse.logging.context import make_deferred_yieldable
 from synapse.push.presentable_names import (
     calculate_room_name,
@@ -126,11 +126,7 @@ class Mailer(object):
 
     @defer.inlineCallbacks
     def send_threepid_validation(
-        self,
-        email,
-        client_secret,
-        send_attempt,
-        next_link=None,
+        self, email, client_secret, send_attempt, next_link=None
     ):
         """Send a threepid validation email for password reset or
         registration purposes
@@ -173,14 +169,10 @@ class Mailer(object):
         # Send the mail with the link containing the token, client_secret
         # and session_id
         try:
-            yield self.send_password_reset_mail(
-                email, token, client_secret, session_id
-            )
+            yield self.send_password_reset_mail(email, token, client_secret, session_id)
         except Exception:
             logger.exception("Error sending threepid validation email to %s", email)
-            raise SynapseError(
-                500, "An error was encountered when sending the email"
-            )
+            raise SynapseError(500, "An error was encountered when sending the email")
 
         token_expires = (
             self.hs.clock.time_msec() + self.hs.config.email_validation_token_lifetime

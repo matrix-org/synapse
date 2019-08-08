@@ -97,7 +97,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         email = body["email"]
         client_secret = body["client_secret"]
         send_attempt = body["send_attempt"]
-        next_link = body.get("next_link") # Optional param
+        next_link = body.get("next_link")  # Optional param
 
         if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(

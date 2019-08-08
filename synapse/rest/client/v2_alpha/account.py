@@ -159,7 +159,9 @@ class ThreepidSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
 
     PATTERNS = client_patterns(
-        "/(?P<purpose>registration|password_reset)/(?P<medium>[^/]*)/submit_token/*$", releases=(), unstable=True
+        "/(?P<purpose>registration|password_reset)/(?P<medium>[^/]*)/submit_token/*$",
+        releases=(),
+        unstable=True,
     )
 
     def __init__(self, hs):
@@ -179,9 +181,7 @@ class ThreepidSubmitTokenServlet(RestServlet):
         if purpose == "password_reset":
             purpose = "password resets"
         elif purpose != "registration":
-            raise SynapseError(
-                404, "Unknown endpoint"
-            )
+            raise SynapseError(404, "Unknown endpoint")
 
         if medium != "email":
             raise SynapseError(
@@ -191,12 +191,10 @@ class ThreepidSubmitTokenServlet(RestServlet):
             if self.config.password_resets_were_disabled_due_to_email_config:
                 # TODO: Change the config to just be `account_threepid_delegate`
                 logger.warn(
-                    "User %s have been disabled due to lack of email config",
-                    purpose,
+                    "User %s have been disabled due to lack of email config", purpose
                 )
             raise SynapseError(
-                400, "Email-based %s is disabled on this server",
-                purpose,
+                400, "Email-based %s is disabled on this server", purpose
             )
 
         sid = parse_string(request, "sid")
@@ -270,9 +268,7 @@ class ThreepidSubmitTokenServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, medium):
         if medium != "email":
-            raise SynapseError(
-                400, "This medium is currently not supported"
-            )
+            raise SynapseError(400, "This medium is currently not supported")
 
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["sid", "client_secret", "token"])
@@ -425,9 +421,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.datastore.get_user_id_by_threepid(
-            "email", email
-        )
+        existingUid = yield self.datastore.get_user_id_by_threepid("email", email)
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
