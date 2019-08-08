@@ -72,7 +72,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if self.hs.config.email_password_reset_behaviour == "local":
+        if self.hs.config.email_threepid_behaviour == "local":
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -89,6 +89,14 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if self.config.email_threepid_behaviour == "off":
+            if self.config.local_threepid_emails_disabled_due_to_config:
+                logger.warn(
+                    "Email registration has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration has been disabled on this server"
+            )
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(
@@ -113,7 +121,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        if self.hs.config.email_password_reset_behaviour == "remote":
+        if self.hs.config.email_threepid_behaviour == "remote":
             # Have the identity server handle the registration flow
             # Just pass through the body for simplicity
             ret = yield self.identity_handler.requestEmailToken(**body)

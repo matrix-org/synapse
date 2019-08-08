@@ -74,20 +74,16 @@ class EmailConfig(Config):
             "renew_at"
         )
 
-        email_trust_identity_server_for_password_resets = email_config.get(
-            "trust_identity_server_for_password_resets", False
+        self.email_threepid_behaviour = (
+            "local" if self.account_threepid_delegate else "remote"
         )
-        # TODO: Generalize this into `account_threepid_delegate`
-        self.email_password_reset_behaviour = (
-            "remote" if email_trust_identity_server_for_password_resets else "local"
-        )
-        self.password_resets_were_disabled_due_to_email_config = False
-        if self.email_password_reset_behaviour == "local" and email_config == {}:
+        self.local_threepid_emails_disabled_due_to_config = False
+        if self.email_threepid_behaviour == "local" and email_config == {}:
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
-            self.password_resets_were_disabled_due_to_email_config = True
+            self.local_threepid_emails_disabled_due_to_config = True
 
-            self.email_password_reset_behaviour = "off"
+            self.email_threepid_behaviour = "off"
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
@@ -97,7 +93,7 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.email_password_reset_behaviour == "local"
+            or self.email_threepid_behaviour == "local"
         ):
             # make sure we can import the required deps
             import jinja2
@@ -107,7 +103,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.email_password_reset_behaviour == "local":
+        if self.email_threepid_behaviour == "local":
             required = ["smtp_host", "smtp_port", "notif_from"]
 
             missing = []
@@ -263,19 +259,6 @@ class EmailConfig(Config):
         #   #
         #   riot_base_url: "http://localhost/riot"
         #
-        #   # Enable sending password reset emails via the configured, trusted
-        #   # identity servers
-        #   #
-        #   # IMPORTANT! This will give a malicious or overtaken identity server
-        #   # the ability to reset passwords for your users! Make absolutely sure
-        #   # that you want to do this! It is strongly recommended that password
-        #   # reset emails be sent by the homeserver instead
-        #   #
-        #   # If this option is set to false and SMTP options have not been
-        #   # configured, resetting user passwords via email will be disabled
-        #   #
-        #   #trust_identity_server_for_password_resets: false
-        #
         #   # Configure the time that a validation email or text message code
         #   # will expire after sending
         #   #
@@ -317,5 +300,5 @@ class EmailConfig(Config):
         #   # will see after attempting to register using an email or phone
         #   #
         #   #registration_template_success_html: registration_success.html
-        #   #registration_template_failure_html: registration_reset_failure.html
+        #   #registration_template_failure_html: registration_failure.html
         """
