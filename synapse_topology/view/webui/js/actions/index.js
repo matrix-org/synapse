@@ -33,6 +33,7 @@ import {
   post_certs,
   test_ports,
   post_config,
+  start_synapse,
 } from '../api';
 import { CONFIG_LOCK, CONFIG_DIR } from '../api/constants';
 import { base_config_to_synapse_config } from '../utils/yaml';
@@ -249,6 +250,6 @@ export const set_database = database => ({
 export const write_config = (config, sub_config_name) => {
   return (dispatch, getState) => {
     post_config(base_config_to_synapse_config(getState().base_config), sub_config_name)
-      .then(res => console.log(res), error => dispatch(fail(error)))
+      .then(res => start_synapse(), error => dispatch(fail(error)))
   }
 }

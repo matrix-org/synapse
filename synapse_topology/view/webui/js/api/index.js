@@ -7,6 +7,7 @@ import {
   SETUP_CHECK,
   CERT_PATHS,
   TEST_PORTS,
+  START,
 } from './constants';
 
 const fetchAbs = fetchAbsolute(fetch)(API_URL)
@@ -84,3 +85,5 @@ export const post_config = (config, sub_config_name) =>
 // Checks if the server's base config has been setup.
 export const get_server_setup = () => fetchAbs(SETUP_CHECK)
   .then(res => res.json())
+
+export const start_synapse = () => fetchAbs(START)

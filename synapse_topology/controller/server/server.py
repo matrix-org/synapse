@@ -19,6 +19,9 @@ from .utils import validate_schema, log_body_if_fail
 
 from . import app
 
+import subprocess
+import sys
+
 
 @app.route("/topology_webui/", branch=True)
 def server_webui(request):
@@ -106,3 +109,9 @@ def check_ports(request, body):
         results.append(port_checker(port))
     return json.dumps({"ports": results})
 
+
+@app.route("/start", methods=["POST"])
+def start_synapse():
+    print("Start")
+    subprocess.Popen("synctl", "start", "-c", model.get_config_dir(), "homeserver.yaml")
+    sys.exit()
