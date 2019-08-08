@@ -8,3 +8,4 @@ export const CERT_PATHS = "/testcertpaths";
 export const TEST_PORTS = "/ports";
 export const CONFIG_LOCK = "server_config_in_use";
 export const CONFIG_DIR = "config_dir";
+export const START = "/start";
