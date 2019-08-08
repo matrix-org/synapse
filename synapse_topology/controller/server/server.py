@@ -15,7 +15,7 @@ from .schemas import (
     CERTS_SCHEMA,
     PORTS_SCHEMA,
 )
-from .utils import validate_schema
+from .utils import validate_schema, log_body_if_fail
 
 from . import app
 
@@ -77,6 +77,7 @@ with app.subroute("/config") as app:
 
 
 @app.route("/testcertpaths", methods=["POST"])
+@log_body_if_fail
 @validate_schema(CERT_PATHS_SCHEMA)
 def test_cert_paths(request, body):
     result = {}

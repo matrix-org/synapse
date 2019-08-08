@@ -71,9 +71,15 @@ export const get_config = () => {
 
 };
 
-export const post_config = () => {
+export const post_config = (config, sub_config_name) =>
+  fetchAbs(
+    sub_config_name ? CONFIG + "/" + sub_config_name : CONFIG,
+    {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }
+  )
 
-};
 
 // Checks if the server's base config has been setup.
 export const get_server_setup = () => fetchAbs(SETUP_CHECK)

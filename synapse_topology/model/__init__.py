@@ -39,7 +39,7 @@ def get_config_dir():
 def set_config(config, sub_config=BASE_CONFIG):
     if sub_config == BASE_CONFIG and config_in_use():
         raise BasConfigInUseError()
-    with open(path.join(config_dir, sub_config, "w")) as f:
+    with open(path.join(config_dir, sub_config), "w") as f:
         f.write(yaml.dump(config))
 
 

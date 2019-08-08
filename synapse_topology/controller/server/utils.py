@@ -32,3 +32,17 @@ def port_checker(port):
             return True
         except:
             return False
+
+
+def log_body_if_fail(func):
+    @wraps(func)
+    def _log_wrapper(request):
+        try:
+            return func(request)
+        except Exception:
+            body = json.loads(request.content.read())
+            print(body)
+            raise
+
+    return _log_wrapper
+

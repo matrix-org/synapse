@@ -22,6 +22,7 @@ import {
   SET_SYNAPSE_PORTS_FREE,
   SET_DATABASE,
   SET_CONFIG_DIR,
+  WRITE_CONFIG,
 } from './types';
 
 import {
@@ -31,8 +32,10 @@ import {
   post_cert_paths,
   post_certs,
   test_ports,
+  post_config,
 } from '../api';
 import { CONFIG_LOCK, CONFIG_DIR } from '../api/constants';
+import { base_config_to_synapse_config } from '../utils/yaml';
 
 export const startup = () => {
   return dispatch => {
@@ -242,3 +245,10 @@ export const set_database = database => ({
   type: SET_DATABASE,
   database,
 })
+
+export const write_config = (config, sub_config_name) => {
+  return (dispatch, getState) => {
+    post_config(base_config_to_synapse_config(getState().base_config), sub_config_name)
+      .then(res => console.log(res), error => dispatch(fail(error)))
+  }
+}

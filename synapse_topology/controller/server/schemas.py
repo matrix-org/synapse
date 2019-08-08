@@ -12,8 +12,18 @@ BASE_CONFIG_SCHEMA = {
     "properties": {
         "server_name": {"type": "string", "minlength": 1},
         "report_stats": {"type": "boolean"},
+        "log_config": {"type": "string", "minlength": 1},
+        "media_store_path": {"type": "string", "minlength": 1},
+        "uploads_path": {"type": "string", "minlength": 1},
+        "pid_file": {"type": "string", "minlength": 1},
+        "listeners": {"type": "array"},
+        "acme": {"type": "object"},
+        "database": {"type": "object"},
+        "tls_certificate_path": {"type": "string", "minlength": 1},
+        "tls_private_key_path": {"type": "string", "minlength": 1},
+        "server_config_in_use": {"type": "boolean"},
     },
-    "required": ["server_name", "report_stats"],
+    "required": ["server_name", "report_stats", "database"],
 }
 
 CERT_PATHS_SCHEMA = {
