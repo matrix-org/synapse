@@ -22,7 +22,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.third_party_rules.access_rules import (
@@ -155,6 +155,84 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         """Tests that creating a direct room with an invalid rule will fail.
         """
         self.create_room(direct=True, rule=ACCESS_RULE_RESTRICTED, expected_code=400)
+
+    def test_public_room(self):
+        """Tests that it's not possible to have a room with the public join rule and an
+        access rule that's not restricted.
+        """
+        # Creating a room with the public_chat preset should succeed and set the access
+        # rule to restricted.
+        preset_room_id = self.create_room(preset=RoomCreationPreset.PUBLIC_CHAT)
+        self.assertEqual(
+            self.current_rule_in_room(preset_room_id), ACCESS_RULE_RESTRICTED,
+        )
+
+        # Creating a room with the public join rule in its initial state should succeed
+        # and set the access rule to restricted.
+        init_state_room_id = self.create_room(initial_state=[{
+            "type": "m.room.join_rules",
+            "content": {
+                "join_rule": JoinRules.PUBLIC,
+            },
+        }])
+        self.assertEqual(
+            self.current_rule_in_room(init_state_room_id), ACCESS_RULE_RESTRICTED,
+        )
+
+        # Changing access rule to unrestricted should fail.
+        self.change_rule_in_room(
+            preset_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=403,
+        )
+        self.change_rule_in_room(
+            init_state_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=403,
+        )
+
+        # Changing access rule to direct should fail.
+        self.change_rule_in_room(
+            preset_room_id, ACCESS_RULE_DIRECT, expected_code=403,
+        )
+        self.change_rule_in_room(
+            init_state_room_id, ACCESS_RULE_DIRECT, expected_code=403,
+        )
+
+        # Changing join rule to public in an unrestricted room should fail.
+        self.change_join_rule_in_room(
+            self.unrestricted_room, JoinRules.PUBLIC, expected_code=403,
+        )
+        # Changing join rule to public in an direct room should fail.
+        self.change_join_rule_in_room(
+            self.direct_rooms[0], JoinRules.PUBLIC, expected_code=403,
+        )
+
+        # Creating a new room with the public_chat preset and an access rule that isn't
+        # restricted should fail.
+        self.create_room(
+            preset=RoomCreationPreset.PUBLIC_CHAT, rule=ACCESS_RULE_UNRESTRICTED,
+            expected_code=400,
+        )
+        self.create_room(
+            preset=RoomCreationPreset.PUBLIC_CHAT, rule=ACCESS_RULE_DIRECT,
+            expected_code=400,
+        )
+
+        # Creating a room with the public join rule in its initial state and an access
+        # rule that isn't restricted should fail.
+        self.create_room(
+            initial_state=[{
+                "type": "m.room.join_rules",
+                "content": {
+                    "join_rule": JoinRules.PUBLIC,
+                },
+            }], rule=ACCESS_RULE_UNRESTRICTED, expected_code=400,
+        )
+        self.create_room(
+            initial_state=[{
+                "type": "m.room.join_rules",
+                "content": {
+                    "join_rule": JoinRules.PUBLIC,
+                },
+            }], rule=ACCESS_RULE_DIRECT, expected_code=400,
+        )
 
     def test_restricted(self):
         """Tests that in restricted mode we're unable to invite users from blacklisted
@@ -405,9 +483,13 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             expected_code=403,
         )
 
-    def create_room(self, direct=False, rule=None, expected_code=200):
+    def create_room(
+        self, direct=False, rule=None, preset=RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
+        initial_state=None, expected_code=200,
+    ):
         content = {
             "is_direct": direct,
+            "preset": preset,
         }
 
         if rule:
@@ -418,6 +500,12 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
                     "rule": rule,
                 }
             }]
+
+        if initial_state:
+            if "initial_state" not in content:
+                content["initial_state"] = []
+
+            content["initial_state"] += initial_state
 
         request, channel = self.make_request(
             "POST",
@@ -450,6 +538,20 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, ACCESS_RULES_TYPE),
+            json.dumps(data),
+            access_token=self.tok,
+        )
+        self.render(request)
+
+        self.assertEqual(channel.code, expected_code, channel.result)
+
+    def change_join_rule_in_room(self, room_id, new_join_rule, expected_code=200):
+        data = {
+            "join_rule": new_join_rule,
+        }
+        request, channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, EventTypes.JoinRules),
             json.dumps(data),
             access_token=self.tok,
         )

@@ -17,7 +17,7 @@ import email.utils
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.api.errors import SynapseError
 from synapse.config._base import ConfigError
 from synapse.types import get_domain_from_id
@@ -94,35 +94,43 @@ class RoomAccessRules(object):
         default rule to the initial state.
         """
         is_direct = config.get("is_direct")
-        rule = None
+        preset = config.get("preset")
+        access_rule = None
+        join_rule = None
 
         # If there's a rules event in the initial state, check if it complies with the
         # spec for im.vector.room.access_rules and deny the request if not.
         for event in config.get("initial_state", []):
             if event["type"] == ACCESS_RULES_TYPE:
-                rule = event["content"].get("rule")
+                access_rule = event["content"].get("rule")
 
                 # Make sure the event has a valid content.
-                if rule is None:
+                if access_rule is None:
                     raise SynapseError(400, "Invalid access rule")
 
                 # Make sure the rule name is valid.
-                if rule not in VALID_ACCESS_RULES:
+                if access_rule not in VALID_ACCESS_RULES:
                     raise SynapseError(400, "Invalid access rule")
 
                 # Make sure the rule is "direct" if the room is a direct chat.
                 if (
-                    (is_direct and rule != ACCESS_RULE_DIRECT)
-                    or (rule == ACCESS_RULE_DIRECT and not is_direct)
+                    (is_direct and access_rule != ACCESS_RULE_DIRECT)
+                    or (access_rule == ACCESS_RULE_DIRECT and not is_direct)
                 ):
                     raise SynapseError(400, "Invalid access rule")
 
-        # If there's no rules event in the initial state, create one with the default
-        # setting.
-        if not rule:
+            if event["type"] == EventTypes.JoinRules:
+                join_rule = event["content"].get("join_rule")
+
+        if access_rule is None:
+            # If there's no access rules event in the initial state, create one with the
+            # default setting.
             if is_direct:
                 default_rule = ACCESS_RULE_DIRECT
             else:
+                # If the default value for non-direct chat changes, we should make another
+                # case here for rooms created with either a "public" join_rule or the
+                # "public_chat" preset to make sure those keep defaulting to "restricted"
                 default_rule = ACCESS_RULE_RESTRICTED
 
             if not config.get("initial_state"):
@@ -136,11 +144,22 @@ class RoomAccessRules(object):
                 }
             })
 
-            rule = default_rule
+            access_rule = default_rule
+
+        # Check that the preset or the join rule in use is compatible with the access
+        # rule, whether it's a user-defined one or the default one (i.e. if it involves
+        # a "public" join rule, the access rule must be "restricted").
+        if (
+            (
+                join_rule == JoinRules.PUBLIC
+                or preset == RoomCreationPreset.PUBLIC_CHAT
+            ) and access_rule != ACCESS_RULE_RESTRICTED
+        ):
+            raise SynapseError(400, "Invalid access rule")
 
         # Check if the creator can override values for the power levels.
         allowed = self._is_power_level_content_allowed(
-            config.get("power_level_content_override", {}), rule,
+            config.get("power_level_content_override", {}), access_rule,
         )
         if not allowed:
             raise SynapseError(400, "Invalid power levels content override")
@@ -148,7 +167,9 @@ class RoomAccessRules(object):
         # Second loop for events we need to know the current rule to process.
         for event in config.get("initial_state", []):
             if event["type"] == EventTypes.PowerLevels:
-                allowed = self._is_power_level_content_allowed(event["content"], rule)
+                allowed = self._is_power_level_content_allowed(
+                    event["content"], access_rule
+                )
                 if not allowed:
                     raise SynapseError(400, "Invalid power levels content")
 
@@ -213,6 +234,9 @@ class RoomAccessRules(object):
         if event.type == EventTypes.Member or event.type == EventTypes.ThirdPartyInvite:
             return self._on_membership_or_invite(event, rule, state_events)
 
+        if event.type == EventTypes.JoinRules:
+            return self._on_join_rule_change(event, rule)
+
         return True
 
     def _on_rules_change(self, event, state_events):
@@ -230,6 +254,12 @@ class RoomAccessRules(object):
 
         # Check for invalid values.
         if new_rule not in VALID_ACCESS_RULES:
+            return False
+
+        # We must not allow rooms with the "public" join rule to be given any other access
+        # rule than "restricted".
+        join_rule = self._get_join_rule_from_state(state_events)
+        if join_rule == JoinRules.PUBLIC and new_rule != ACCESS_RULE_RESTRICTED:
             return False
 
         # Make sure we don't apply "direct" if the room has more than two members.
@@ -381,7 +411,6 @@ class RoomAccessRules(object):
             access_rule (str): The access rule in place in this room.
         Returns:
             bool, True if the event can be allowed, False otherwise.
-
         """
         # Check if we need to apply the restrictions with the current rule.
         if access_rule not in RULES_WITH_RESTRICTED_POWER_LEVELS:
@@ -405,6 +434,33 @@ class RoomAccessRules(object):
 
         return True
 
+    def _on_join_rule_change(self, event, rule):
+        """Check whether a join rule change is allowed. A join rule change is always
+        allowed unless the new join rule is "public" and the current access rule isn't
+        "restricted".
+        The rationale is that external users (those whose server would be denied access
+        to rooms enforcing the "restricted" access rule) should always rely on non-
+        external users for access to rooms, therefore they shouldn't be able to access
+        rooms that don't require an invite to be joined.
+
+        Note that we currently rely on the default access rule being "restricted": during
+        room creation, the m.room.join_rules event will be sent *before* the
+        im.vector.room.access_rules one, so the access rule that will be considered here
+        in this case will be the default "restricted" one. This is fine since the
+        "restricted" access rule allows any value for the join rule, but we should keep
+        that in mind if we need to change the default access rule in the future.
+
+        Args:
+            event (synapse.events.EventBase): The event to check.
+            rule (str): The name of the rule to apply.
+        Returns:
+            bool, True if the event can be allowed, False otherwise.
+        """
+        if event.content.get('join_rule') == JoinRules.PUBLIC:
+            return rule == ACCESS_RULE_RESTRICTED
+
+        return True
+
     @staticmethod
     def _get_rule_from_state(state_events):
         """Extract the rule to be applied from the given set of state events.
@@ -421,6 +477,21 @@ class RoomAccessRules(object):
         else:
             rule = access_rules.content.get("rule")
         return rule
+
+    @staticmethod
+    def _get_join_rule_from_state(state_events):
+        """Extract the room's join rule from the given set of state events.
+
+        Args:
+            state_events (dict[tuple[event type, state key], EventBase]): The set of state
+                events.
+        Returns:
+            str, the name of the join rule (either "public", or "invite")
+        """
+        join_rule_event = state_events.get((EventTypes.JoinRules, ""))
+        if join_rule_event is None:
+            return None
+        return join_rule_event.content.get("join_rule")
 
     @staticmethod
     def _get_members_and_tokens_from_state(state_events):
