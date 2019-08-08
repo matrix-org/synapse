@@ -48,7 +48,7 @@ export const startup = () => {
 
 const set_config_dir = dir => ({
   type: SET_CONFIG_DIR,
-  config_dir = dir,
+  config_dir: dir,
 });
 
 export const generate_secret_keys = consent => {
@@ -65,11 +65,6 @@ export const generate_secret_keys = consent => {
 export const set_tls_cert_paths = (cert_path, cert_key_path) => {
   return dispatch => {
     dispatch(testing_tls_cert_paths(true));
-    dispatch({
-      type: SET_TLS_CERT_PATHS,
-      cert_path,
-      cert_key_path,
-    })
     post_cert_paths(cert_path, cert_key_path)
       .then(
         result => dispatch(check_tls_cert_path_validity(result)),
@@ -78,16 +73,27 @@ export const set_tls_cert_paths = (cert_path, cert_key_path) => {
   }
 }
 
+const set_tls_certs = (cert_path, cert_key_path) => ({
+  type: SET_TLS_CERT_PATHS,
+  cert_path,
+  cert_key_path,
+})
+
 const testing_tls_cert_paths = testing => ({
   type: TESTING_TLS_CERT_PATHS,
   testing,
 });
 
-const check_tls_cert_path_validity = ({ cert_path_invalid, cert_key_path_invalid }) => {
+const check_tls_cert_path_validity = (args) => {
+  const { cert_path, cert_key_path } = args
+  console.log("!!!!!!!!!!")
+  console.log(args)
+  console.log("!!!!!!!!!!")
   return dispatch => {
     dispatch(testing_tls_cert_paths(false));
-    dispatch(set_cert_path_validity({ cert_path_invalid, cert_key_path_invalid }));
-    if (!cert_path_invalid && !cert_key_path_invalid) {
+    dispatch(set_tls_certs(cert_path.absolute_path, cert_key_path.absolute_path))
+    dispatch(set_cert_path_validity({ cert_path, cert_key_path }));
+    if (!cert_path.invalid && !cert_key_path.invalid) {
       dispatch(advance_ui());
     }
   }
@@ -117,10 +123,10 @@ export const set_tls_cert_files = (tls_cert_file, tls_cert_key_file) => ({
   tls_cert_file,
   tls_cert_key_file,
 })
-const set_cert_path_validity = ({ cert_path_invalid, cert_key_path_invalid }) => ({
+const set_cert_path_validity = ({ cert_path, cert_key_path }) => ({
   type: SET_TLS_CERT_PATHS_VALIDITY,
-  cert_path_invalid,
-  cert_key_path_invalid,
+  cert_path_invalid: cert_path.invalid,
+  cert_key_path_invalid: cert_key_path.invalid,
 });
 
 export const getting_secret_keys = () => ({
