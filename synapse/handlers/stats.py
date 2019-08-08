@@ -16,6 +16,7 @@
 import logging
 
 from twisted.internet import defer
+from twisted.internet.defer import ensureDeferred
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
@@ -352,11 +353,16 @@ class StatsHandler(StateDeltasHandler):
 
         for user_id in user_ids:
             if self.hs.is_mine(UserID.from_string(user_id)):
-                yield self.store.update_stats_delta(
-                    ts, "user", user_id, "public_rooms", +1 if is_public else -1
-                )
-                yield self.store.update_stats_delta(
-                    ts, "user", user_id, "private_rooms", -1 if is_public else +1
+                yield ensureDeferred(
+                    self.store.update_stats_delta(
+                        ts,
+                        "user",
+                        user_id,
+                        {
+                            "public_rooms": +1 if is_public else -1,
+                            "private_rooms": -1 if is_public else +1,
+                        },
+                    )
                 )
 
     @defer.inlineCallbacks
