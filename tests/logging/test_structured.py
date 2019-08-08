@@ -54,7 +54,7 @@ class StructuredLoggingTestCase(HomeserverTestCase):
 
         # Begin the logger with our config
         beginner = FakeBeginner()
-        setup_structured_logging(self.hs.config, log_config, logBeginner=beginner)
+        setup_structured_logging(self.hs, self.hs.config, log_config, logBeginner=beginner)
 
         # Make a logger and send an event
         logger = Logger(
@@ -87,7 +87,7 @@ class StructuredLoggingTestCase(HomeserverTestCase):
 
         # Begin the logger with our config
         beginner = FakeBeginner()
-        setup_structured_logging(self.hs.config, log_config, logBeginner=beginner)
+        setup_structured_logging(self.hs, self.hs.config, log_config, logBeginner=beginner)
 
         # Make a logger and send an event
         logger = Logger(
@@ -116,7 +116,7 @@ class StructuredLoggingTestCase(HomeserverTestCase):
         # Begin the logger with our config
         beginner = FakeBeginner()
         publisher = setup_structured_logging(
-            self.hs.config, log_config, logBeginner=beginner
+            self.hs, self.hs.config, log_config, logBeginner=beginner
         )
 
         logs = []
@@ -175,7 +175,7 @@ class StructuredLoggingConfigurationFileTestCase(HomeserverTestCase):
         """
         When a structured logging config is given, Synapse will use it.
         """
-        setup_logging(self.hs.config)
+        setup_logging(self.hs, self.hs.config)
 
         # Make a logger and send an event
         logger = Logger(namespace="tests.logging.test_structured")
