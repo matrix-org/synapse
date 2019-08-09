@@ -772,7 +772,7 @@ def register_servlets_for_client_rest_resource(hs, http_server):
 
     # Load the media repo ones if we're using them.
     if hs.config.can_load_media_repo:
-        register_servlets_for_client_rest_resource(hs, http_server)
+        register_servlets_for_media_repo(hs, http_server)
 
     # don't add more things here: new servlets should only be exposed on
     # /_synapse/admin so should not go here. Instead register them in AdminRestResource.
