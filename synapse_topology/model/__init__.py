@@ -9,10 +9,11 @@ from .constants import (
     CONFIG_LOCK,
     CONFIG_LOCK_DATA,
     DATA_SUBDIR,
-    SECRET_KEY,
     SERVER_NAME,
 )
 from .errors import BasConfigInUseError, BaseConfigNotFoundError, ConfigNotFoundError
+
+import subprocess
 
 
 def set_config_dir(conf_dir):
@@ -68,6 +69,7 @@ def generate_base_config(server_name, report_stats):
         generate_secrets=True,
         report_stats=report_stats,
     )
+
     with open(path.join(config_dir, BASE_CONFIG), "w") as f:
         f.write(conf)
         f.write(CONFIG_LOCK_DATA)
@@ -81,7 +83,11 @@ def get_server_name():
 
 def get_secret_key():
     config = get_config()
-    return config.get(SECRET_KEY)
+    server_name = config.get(SERVER_NAME)
+    signing_key_path = path.join(config_dir, server_name + ".signing.key")
+    subprocess.run(["generate_signing_key.py", "-o", signing_key_path])
+    with open(signing_key_path, "r") as f:
+        return f.read()
 
 
 def verify_yaml():

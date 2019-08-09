@@ -28,7 +28,7 @@ import {
 import {
   get_server_setup,
   post_server_name,
-  fetch_secret_key,
+  get_secretkey,
   post_cert_paths,
   post_certs,
   test_ports,
@@ -139,7 +139,7 @@ export const getting_secret_keys = () => ({
 
 export const get_secret_key = () => {
   return dispatch => {
-    fetch_secret_key().then(
+    get_secretkey().then(
       result => dispatch(set_secret_key(result)),
       error => dispatch(fail(error)),
     )
