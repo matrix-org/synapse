@@ -63,7 +63,7 @@ export const test_ports = (ports) =>
     }
   ).then(res => res.json())
 
-export const fetch_secret_key = () =>
+export const get_secretkey = () =>
   fetchAbs(SECRET_KEY)
     .then(res => res.json())
     .then(json => json.secret_key)

@@ -110,8 +110,13 @@ def check_ports(request, body):
     return json.dumps({"ports": results})
 
 
-@app.route("/start", methods=["POST"])
-def start_synapse():
+@app.route("/iw", methods=["POST"])
+def start_synapse(request):
     print("Start")
-    subprocess.Popen("synctl", "start", "-c", model.get_config_dir(), "homeserver.yaml")
+    subprocess.Popen(["synctl", "start", model.get_config_dir() + "/homeserver.yaml"])
     sys.exit()
+
+
+@app.route("/favicon.ico")
+def noop(request):
+    return

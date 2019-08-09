@@ -20,7 +20,7 @@ store.dispatch(startup());
 
 render(
   <Provider store={store}>
-    <img className={style.logo} src={logo} />
+    {/* <img className={style.logo} src={logo} /> */}
     <UI />
   </Provider>,
   document.getElementById("content")

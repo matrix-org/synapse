@@ -102,7 +102,7 @@ export const base_config_to_synapse_config = config => {
   const conf = {
     server_name: config.servername,
     report_stats: config.report_stats,
-    log_config: config.config_dir + "/" + config.server_name + ".log.config",
+    log_config: config.config_dir + "/" + config.servername + ".log.config",
     media_store_path: config.config_dir + "/data/media_store",
     uploads_path: config.config_dir + "/data/uploads",
     pid_file: config.config_dir + "/data/homeserver.pid",
