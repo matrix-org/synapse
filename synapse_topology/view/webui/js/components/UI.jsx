@@ -42,8 +42,7 @@ import ReverseProxySampleConfig from '../containers/ReverseProxySampleConfig';
 import DelegationSampleConfig from '../containers/DelegationSampleConfig';
 import Database from '../containers/Database';
 
-export default ({ active_ui, dispatch }) => {
-  console.log(`switching to ui ${active_ui}`)
+const block_mapping = block_const => {
   switch (active_ui) {
     case LOADING_UI:
       return <Loading />
@@ -80,4 +79,11 @@ export default ({ active_ui, dispatch }) => {
     default:
       return <h1>how did i get here?</h1>
   }
+}
+
+export default ({ active_ui_blocks, dispatch }) => {
+  console.log(`switching to ui ${active_ui_blocks}`);
+  <WalkThrough>
+    {active_ui_blocks.map(block_mapping)}
+  </WalkThrough>
 }

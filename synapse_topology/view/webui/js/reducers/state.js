@@ -1,7 +1,12 @@
 const state = {
   ui: {
-    base_config_done: true,
-    active_ui
+    setup_done: true,
+  },
+  setup_ui: {
+    active_blocks: ["block1"],
+  },
+  config_ui: {
+
   },
   base_config: {
     servername: "server_name",
