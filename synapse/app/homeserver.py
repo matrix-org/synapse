@@ -219,11 +219,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         if name in ["media", "federation", "client"]:
-            if name == "media" and not self.get_config().enable_media_repo:
-                raise ConfigError(
-                    "'media' resource conflicts with enable_media_repo=False"
-                )
-            elif self.get_config().enable_media_repo:
+            if self.get_config().enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
                     {
@@ -233,6 +229,10 @@ class SynapseHomeServer(HomeServer):
                             self, self.config.uploads_path
                         ),
                     }
+                )
+            elif name == "media":
+                raise ConfigError(
+                    "'media' resource conflicts with enable_media_repo=False"
                 )
 
         if name in ["keys", "federation"]:
