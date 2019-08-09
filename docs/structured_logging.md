@@ -46,6 +46,16 @@ Arguments:
 
 - `location`: Either `stdout` or `stderr`.
 
+### `console_json_terse`
+
+Outputs machine-readable JSON logs to the console, separated by newlines. This
+format is not designed to be read and re-formatted into human-readable text, but
+is optimal for a logging aggregation system.
+
+Arguments:
+
+- `location`: Either `stdout` or `stderr`.
+
 ### `file`
 
 Outputs human-readable logs to a file.
@@ -61,3 +71,13 @@ Outputs machine-readable logs to a file.
 Arguments:
 
 - `location`: An absolute path to the file to log to.
+
+### `network_json_terse`
+
+Delivers machine-readable JSON logs to a log aggregator over TCP. This is
+compatible with LogStash's TCP input with the codec set to `json_lines`.
+
+Arguments:
+
+- `host`: Hostname or IP address of the log aggregator.
+- `port`: Numerical port to contact on the host.
