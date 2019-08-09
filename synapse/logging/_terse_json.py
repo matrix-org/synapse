@@ -52,11 +52,6 @@ def flatten_event(_event: dict, metadata: dict, include_time: bool = False):
     """
     event = {}
 
-    # If it's from the Twisted legacy logger (twisted.python.log), it adds some
-    # more keys we want to purge.
-    if _event.get("log_namespace") == "log_legacy":
-        keys_to_delete.extend(["message", "system", "time"])
-
     # If it's a failure, make the new event's log_failure be the traceback text.
     if "log_failure" in _event:
         event["log_failure"] = _event["log_failure"].getTraceback()
@@ -100,6 +95,11 @@ def flatten_event(_event: dict, metadata: dict, include_time: bool = False):
         "observer",
         "warning",
     ]
+
+    # If it's from the Twisted legacy logger (twisted.python.log), it adds some
+    # more keys we want to purge.
+    if _event.get("log_namespace") == "log_legacy":
+        keys_to_delete.extend(["message", "system", "time"])
 
     # Rather than modify the dictionary in place, construct a new one with only
     # the content we want. The original event should be considered 'frozen'.
