@@ -569,7 +569,7 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 
 # Enable the media store service inside Synapse.
 #
-# enable_media_repo: False
+# enable_media_repo: false
 
 # Directory where uploaded images and attachments are stored.
 #
