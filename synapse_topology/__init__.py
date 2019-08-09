@@ -1,4 +1,4 @@
-#! python3
+#! python
 import argparse
 import os.path as path
 import sys
