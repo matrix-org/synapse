@@ -73,7 +73,7 @@ class ExpiringCacheTestCase(unittest.TestCase):
         self.assertEquals(cache.get("key"), 1)
         self.assertEquals(cache.get("key2"), 2)
 
-        clock.advance_time(0.9)
+        clock.advance_time(0.7)
         self.assertEquals(cache.get("key"), None)
         self.assertEquals(cache.get("key2"), 2)
 

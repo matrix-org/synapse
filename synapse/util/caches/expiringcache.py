@@ -14,9 +14,12 @@
 # limitations under the License.
 
 import logging
+import random
 from collections import OrderedDict
 
 from six import iteritems, itervalues
+
+import attr
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.caches import register_cache
@@ -46,7 +49,7 @@ class ExpiringCache(object):
                 which indicates there is no max limit.
             expiry_ms (int): How long before an item is evicted from the cache
                 in milliseconds. Default is 0, indicating items never get
-                evicted based on time.
+                evicted based on time. This value is smeared +/- 10%.
             reset_expiry_on_get (bool): If true, will reset the expiry time for
                 an item on access. Defaults to False.
             iterable (bool): If true, the size is calculated by summing the
@@ -77,11 +80,12 @@ class ExpiringCache(object):
                 "prune_cache_%s" % self._cache_name, self._prune_cache
             )
 
-        self._clock.looping_call(f, self._expiry_ms / 2)
+        # We want to do this reasonably frequently to ensure we don't end up
+        # batching evictions.
+        self._clock.looping_call(f, self._expiry_ms / 20)
 
     def __setitem__(self, key, value):
-        now = self._clock.time_msec()
-        self._cache[key] = _CacheEntry(now, value)
+        self._cache[key] = _CacheEntry(self._get_expiry_time(), value)
 
         # Evict if there are now too many items
         while self._max_len and len(self) > self._max_len:
@@ -100,7 +104,7 @@ class ExpiringCache(object):
             raise
 
         if self._reset_expiry_on_get:
-            entry.time = self._clock.time_msec()
+            entry.time = self._get_expiry_time()
 
         return entry.value
 
@@ -147,7 +151,7 @@ class ExpiringCache(object):
         keys_to_delete = set()
 
         for key, cache_entry in iteritems(self._cache):
-            if now - cache_entry.time > self._expiry_ms:
+            if now > cache_entry.time:
                 keys_to_delete.add(key)
 
         for k in keys_to_delete:
@@ -170,10 +174,13 @@ class ExpiringCache(object):
         else:
             return len(self._cache)
 
+    def _get_expiry_time(self):
+        """Get a new expiry time.
+        """
+        return self._clock.time_msec() + self._expiry_ms * random.uniform(0.9, 1.0)
 
+
+@attr.s(slots=True)
 class _CacheEntry(object):
-    __slots__ = ["time", "value"]
-
-    def __init__(self, time, value):
-        self.time = time
-        self.value = value
+    time = attr.ib()  # Expiry time
+    value = attr.ib()
