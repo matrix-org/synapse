@@ -177,12 +177,14 @@ class DrainConfiguration(object):
 DEFAULT_LOGGERS = {"synapse": {"level": "INFO"}}
 
 
-def parse_drain_configs(drains: list) -> typing.List[DrainConfiguration]:
+def parse_drain_configs(
+    drains: dict
+) -> typing.Generator[DrainConfiguration, None, None]:
     """
     Parse the drain configurations.
 
     Args:
-        drains (list): A list of drain configurations.
+        drains (dict): A list of drain configurations.
 
     Yields:
         DrainConfiguration instances.
@@ -306,11 +308,11 @@ def setup_structured_logging(
 
         if observer.type == DrainType.NETWORK_JSON_TERSE:
             metadata = {"server_name": hs.config.server_name}
-            observer = TerseJSONToTCPLogObserver(
+            log_observer = TerseJSONToTCPLogObserver(
                 hs, observer.location[0], observer.location[1], metadata
             )
-            observer.start()
-            observers.append(observer)
+            log_observer.start()
+            observers.append(log_observer)
 
     publisher = LogPublisher(*observers)
     log_filter = LogLevelFilterPredicate()

@@ -25,6 +25,7 @@ See doc/log_contexts.rst for details on how this works.
 import logging
 import threading
 import types
+from typing import Any, List
 
 from twisted.internet import defer, threads
 
@@ -194,7 +195,7 @@ class LoggingContext(object):
     class Sentinel(object):
         """Sentinel to represent the root context"""
 
-        __slots__ = []
+        __slots__ = []  # type: List[Any]
 
         def __str__(self):
             return "sentinel"
