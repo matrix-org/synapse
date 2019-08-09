@@ -214,7 +214,7 @@ class ContentRepositoryConfig(Config):
         formatted_thumbnail_sizes = formatted_thumbnail_sizes[:-1]
 
         return (
-            r"""\
+            r"""
         ## Media Store ##
 
         # Enable the media store service inside Synapse.
