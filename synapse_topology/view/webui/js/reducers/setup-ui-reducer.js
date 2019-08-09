@@ -23,6 +23,47 @@ import {
   DELEGATION_TYPES, TLS_TYPES
 } from '../actions/constants';
 
+export default ({ setup_done, setup_ui, base_config }, action) => {
+  if (!base_config.base_config_checked) {
+    return setup_ui;
+  }
+  if (setup_done) {
+    return setup_ui;
+  }
+  switch (action.type) {
+    case BASE_CONFIG_CHECKED:
+      return [BASE_INTRO_UI];
+    case ADVANCE_UI:
+      return {
+        active_blocks: [
+          ...setup_ui.active_blocks,
+          forward_mapping(
+            setup_ui.active_blocks[setup_ui.active_blocks.length - 1]
+          ),
+        ]
+      }
+
+    // TODO: Think about how back should work..
+    case BACK_UI:
+      switch (ui.active_ui) {
+        case STATS_REPORT_UI:
+          return SERVER_NAME_UI;
+        case KEY_EXPORT_UI:
+          return STATS_REPORT_UI;
+        case DELEGATION_OPTIONS_UI:
+          return KEY_EXPORT_UI;
+        case WELL_KNOWN_UI:
+          return DELEGATION_OPTIONS_UI;
+        case DNS_UI:
+          return WELL_KNOWN_UI;
+        default:
+          BASE_INTRO_UI;
+      }
+    default:
+      return ui.active_ui;
+  }
+}
+
 const forward_mapping = (current_ui, action) => {
   switch (current_ui) {
     case BASE_INTRO_UI:
@@ -78,33 +119,5 @@ const forward_mapping = (current_ui, action) => {
     case DNS_UI:
     default:
       return BASE_INTRO_UI;
-  }
-}
-
-export default ({ ui, base_config }, action) => {
-  switch (action.type) {
-    case BASE_CONFIG_CHECKED:
-      return [BASE_INTRO_UI];
-    case ADVANCE_UI:
-
-
-    // TODO: Think about how back should work..
-    case BACK_UI:
-      switch (ui.active_ui) {
-        case STATS_REPORT_UI:
-          return SERVER_NAME_UI;
-        case KEY_EXPORT_UI:
-          return STATS_REPORT_UI;
-        case DELEGATION_OPTIONS_UI:
-          return KEY_EXPORT_UI;
-        case WELL_KNOWN_UI:
-          return DELEGATION_OPTIONS_UI;
-        case DNS_UI:
-          return WELL_KNOWN_UI;
-        default:
-          BASE_INTRO_UI;
-      }
-    default:
-      return ui.active_ui;
   }
 }

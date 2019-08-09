@@ -19,7 +19,7 @@ import {
   SET_CONFIG_DIR,
 } from "../actions/types";
 
-export default (state = { servername: undefined }, action) => {
+export default (state, action) => {
   switch (action.type) {
     case SET_SERVERNAME:
       return {

@@ -1,7 +1,5 @@
 const state = {
-  ui: {
-    setup_done: true,
-  },
+  setup_done: true,
   setup_ui: {
     active_blocks: ["block1"],
   },
@@ -9,6 +7,7 @@ const state = {
 
   },
   base_config: {
+    base_config_checked: false,
     servername: "server_name",
     report_stats: false,
     getting_secret_key: false,

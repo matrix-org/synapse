@@ -1,9 +1,21 @@
-import ui from './ui-reducer';
 import base_config_reducer from './base-config-reducer';
 
-import { LOADING_UI } from './ui_constants';
+import config_ui_reducer from './config-ui-reducer';
+import setup_ui_reducer from './setup-ui-reducer';
 
-export default (state = { ui: { active_ui: LOADING_UI }, base_config: {} }, action) => ({
-  ui: ui(state, action),
+import { BASE_INTRO_UI } from './ui_constants';
+
+export default (state = {
+  setup_ui: {
+    active_blocks: [BASE_INTRO_UI],
+  },
+  config_ui: {
+  },
+  base_config: {
+    base_config_checked: false,
+  }
+}, action) => ({
+  config_ui: config_ui_reducer(state, action),
+  setup_ui: setup_ui_reducer(state, action),
   base_config: base_config_reducer(state.base_config, action)
 });

@@ -24,8 +24,9 @@ import {
   DATABASE_UI,
 } from '../reducers/ui_constants';
 
-import Error from '../components/Error';
-import Loading from '../components/Loading';
+import WalkThrough from './WalkThrough'
+import Error from './Error';
+import Loading from './Loading';
 
 import IntroUi from '../containers/BaseIntro';
 import ServerName from '../containers/ServerName';
@@ -41,9 +42,10 @@ import PortSelection from '../containers/PortSelection';
 import ReverseProxySampleConfig from '../containers/ReverseProxySampleConfig';
 import DelegationSampleConfig from '../containers/DelegationSampleConfig';
 import Database from '../containers/Database';
+import ConfigSelector from './ConfigSelector';
 
-const block_mapping = block_const => {
-  switch (active_ui) {
+const block_mapping = ui_block => {
+  switch (ui_block) {
     case LOADING_UI:
       return <Loading />
     case ERROR_UI:
@@ -81,9 +83,16 @@ const block_mapping = block_const => {
   }
 }
 
-export default ({ active_ui_blocks, dispatch }) => {
-  console.log(`switching to ui ${active_ui_blocks}`);
-  <WalkThrough>
-    {active_ui_blocks.map(block_mapping)}
-  </WalkThrough>
+export default ({ setup_done, setup_ui, config_ui, base_config }) => {
+  if (!base_config.base_config_checked) {
+    return <Loading />
+  }
+  if (setup_done) {
+    console.log(`switching to ui ${config_ui}`);
+    return <ConfigSelector></ConfigSelector>
+  } else {
+    return <WalkThrough>
+      {setup_ui.active_blocks.map(block_mapping)}
+    </WalkThrough>
+  }
 }
