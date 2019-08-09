@@ -90,9 +90,6 @@ const testing_tls_cert_paths = testing => ({
 
 const check_tls_cert_path_validity = (args) => {
   const { cert_path, cert_key_path } = args
-  console.log("!!!!!!!!!!")
-  console.log(args)
-  console.log("!!!!!!!!!!")
   return dispatch => {
     dispatch(testing_tls_cert_paths(false));
     dispatch(set_tls_certs(cert_path.absolute_path, cert_key_path.absolute_path))
@@ -153,7 +150,7 @@ export const set_secret_key = key => ({
 
 export const start = server_setup => ({
   type: BASE_CONFIG_CHECKED,
-  base_config_done: server_setup,
+  setup_done: server_setup,
 });
 
 export const fail = reason => ({
