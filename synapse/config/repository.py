@@ -214,14 +214,12 @@ class ContentRepositoryConfig(Config):
         formatted_thumbnail_sizes = formatted_thumbnail_sizes[:-1]
 
         return (
-            r"""
-        ##
-        ## Media Store
-        ##
+            r"""\
+        ## Media Store ##
 
         # Enable the media store service inside Synapse.
         #
-        enable_media_repo: True
+        # enable_media_repo: False
 
         # Directory where uploaded images and attachments are stored.
         #
