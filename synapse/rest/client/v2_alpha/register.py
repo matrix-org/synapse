@@ -89,8 +89,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.config.email_threepid_behaviour == "off":
-            if self.config.local_threepid_emails_disabled_due_to_config:
+        if self.hs.config.email_threepid_behaviour == "off":
+            if self.hs.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "Email registration has been disabled due to lack of email config"
                 )

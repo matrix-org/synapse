@@ -99,7 +99,7 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config.get(
             "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
-        self.account_threepid_delegate = config.get("account_threepid_delegate")
+        self.account_threepid_delegate = config.get("account_threepid_delegate", "")
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
@@ -272,14 +272,14 @@ class RegistrationConfig(Config):
         # this! It is strongly recommended that these messages be sent by the
         # homeserver instead
         #
-        # If this option is set to null and SMTP options have not been
+        # If this option is an empty string and SMTP options have not been
         # configured, registration by email and resetting user passwords via
         # email will be disabled
         #
-        # Otherwise, to enable set this option to a string containing the
-        # reachable domain name for an identity server (e.g "matrix.org")
+        # Otherwise, to enable set this option to the reachable domain name for
+        # an identity server (e.g "matrix.org")
         #
-        #account_threepid_delegate: null
+        #account_threepid_delegate: ""
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
