@@ -16,7 +16,6 @@
 import logging
 
 from twisted.internet import defer
-from twisted.internet.defer import ensureDeferred
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
@@ -245,10 +244,8 @@ class StatsHandler(StateDeltasHandler):
                     field = "public_rooms" if public else "private_rooms"
                     delta = +1 if membership == Membership.JOIN else -1
 
-                    yield ensureDeferred(
-                        self.store.update_stats_delta(
-                            now, "user", user_id, {field: delta}
-                        )
+                    yield self.store.update_stats_delta(
+                        now, "user", user_id, {field: delta}
                     )
 
             elif typ == EventTypes.Create:
@@ -329,20 +326,17 @@ class StatsHandler(StateDeltasHandler):
                 )
 
             if room_stats_complete:
-                yield ensureDeferred(
-                    self.store.update_stats_delta(
-                        now,
-                        "room",
-                        room_id,
-                        room_stats_delta,
-                        complete_with_stream_id=stream_id,
-                    )
+                yield self.store.update_stats_delta(
+                    now,
+                    "room",
+                    room_id,
+                    room_stats_delta,
+                    complete_with_stream_id=stream_id,
                 )
+
             elif len(room_stats_delta) > 0:
-                yield ensureDeferred(
-                    self.store.update_stats_delta(
-                        now, "room", room_id, room_stats_delta
-                    )
+                yield self.store.update_stats_delta(
+                    now, "room", room_id, room_stats_delta
                 )
 
     @defer.inlineCallbacks
@@ -362,16 +356,14 @@ class StatsHandler(StateDeltasHandler):
 
         for user_id in user_ids:
             if self.hs.is_mine(UserID.from_string(user_id)):
-                yield ensureDeferred(
-                    self.store.update_stats_delta(
-                        ts,
-                        "user",
-                        user_id,
-                        {
-                            "public_rooms": +1 if is_public else -1,
-                            "private_rooms": -1 if is_public else +1,
-                        },
-                    )
+                yield self.store.update_stats_delta(
+                    ts,
+                    "user",
+                    user_id,
+                    {
+                        "public_rooms": +1 if is_public else -1,
+                        "private_rooms": -1 if is_public else +1,
+                    },
                 )
 
     @defer.inlineCallbacks
