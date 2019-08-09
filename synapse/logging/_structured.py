@@ -16,6 +16,7 @@
 import logging
 import os.path
 import sys
+import typing
 
 import attr
 from constantly import NamedConstant, Names, ValueConstant, Values
@@ -25,6 +26,7 @@ from twisted.logger import (
     FileLogObserver,
     FilteringLogObserver,
     ILogObserver,
+    LogBeginner,
     Logger,
     LogLevel,
     LogLevelFilterPredicate,
@@ -42,7 +44,7 @@ from synapse.logging._terse_json import (
 from synapse.logging.context import LoggingContext
 
 
-def stdlib_log_level_to_twisted(level):
+def stdlib_log_level_to_twisted(level: str) -> LogLevel:
     """
     Convert a stdlib log level to Twisted's log level.
     """
@@ -62,7 +64,7 @@ class LogContextObserver(object):
 
     observer = attr.ib()
 
-    def __call__(self, event):
+    def __call__(self, event: dict) -> None:
         """
         Consume a log event and emit it to the parent observer after filtering
         and adding log context information.
@@ -95,7 +97,7 @@ class LogContextObserver(object):
             event["request"] = None
             event["scope"] = None
 
-        return self.observer(event)
+        self.observer(event)
 
 
 class PythonStdlibToTwistedLogger(logging.Handler):
@@ -112,7 +114,7 @@ class PythonStdlibToTwistedLogger(logging.Handler):
         self.observer = observer
         super().__init__(*args, **kwargs)
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         """
         Emit a record to Twisted's observer.
 
@@ -131,7 +133,7 @@ class PythonStdlibToTwistedLogger(logging.Handler):
         )
 
 
-def SynapseFileLogObserver(outFile):
+def SynapseFileLogObserver(outFile: typing.io.TextIO) -> FileLogObserver:
     """
     A log observer that formats events like the traditional log formatter and
     sends them to `outFile`.
@@ -140,7 +142,7 @@ def SynapseFileLogObserver(outFile):
         outFile (file object): The file object to write to.
     """
 
-    def formatEvent(_event):
+    def formatEvent(_event: dict) -> str:
         event = dict(_event)
         event["log_level"] = event["log_level"].name.upper()
         event["log_format"] = "- {log_namespace} - {log_level} - {request} - " + (
@@ -175,7 +177,7 @@ class DrainConfiguration(object):
 DEFAULT_LOGGERS = {"synapse": {"level": "INFO"}}
 
 
-def parse_drain_configs(drains):
+def parse_drain_configs(drains: list) -> typing.List[DrainConfiguration]:
     """
     Parse the drain configurations.
 
@@ -246,11 +248,14 @@ def parse_drain_configs(drains):
             )
 
 
-def setup_structured_logging(hs, config, log_config, logBeginner=globalLogBeginner):
+def setup_structured_logging(
+    hs, config, log_config: dict, logBeginner: LogBeginner = globalLogBeginner
+) -> LogPublisher:
     """
     Set up Twisted's structured logging system.
 
     Args:
+        hs: The homeserver to use.
         config (HomeserverConfig): The configuration of the Synapse homeserver.
         log_config (dict): The log configuration to use.
     """
@@ -283,7 +288,9 @@ def setup_structured_logging(hs, config, log_config, logBeginner=globalLogBeginn
                 "Starting up the {name} terse JSON console logger drain",
                 name=observer.name,
             )
-            observers.append(TerseJSONToConsoleLogObserver(observer.location))
+            observers.append(
+                TerseJSONToConsoleLogObserver(observer.location, metadata={})
+            )
 
         # File drains
         if observer.type == DrainType.FILE:
@@ -336,7 +343,7 @@ def setup_structured_logging(hs, config, log_config, logBeginner=globalLogBeginn
     return publisher
 
 
-def reload_structured_logging(*args, log_config=None):
+def reload_structured_logging(*args, log_config=None) -> None:
     # TODO: Reload the structured logging system. Since we don't implement any
     # sort of file rotation, we don't need to worry about doing that here.
     pass
