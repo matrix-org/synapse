@@ -88,17 +88,17 @@ def parse_thumbnail_requirements(thumbnail_sizes):
 
 class ContentRepositoryConfig(Config):
     def read_config(self, config, **kwargs):
-        self.external_media_repo = config.get("external_media_repo", False)
 
-        if self.external_media_repo and self.enable_media_repo:
-            raise ConfigError(
-                "external_media_repo can't be True if the enable_media_repo is True"
-            )
-
-        # If we're using an external media repo, do not load the further
-        # configuration (which checks if files exists).
-        if self.external_media_repo:
+        # Only enable the media repo if either the media repo is enabled or the
+        # current worker app is the media repo.
+        if (
+            self.enable_media_repo is False
+            and config.worker_app != "synapse.app.media_repository"
+        ):
+            self.can_load_media_repo = False
             return
+        else:
+            self.can_load_media_repo = True
 
         self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
@@ -218,13 +218,6 @@ class ContentRepositoryConfig(Config):
         ##
         ## Media Store
         ##
-
-        # Is an external media repo in use?
-        #
-        # Set 'False' to use Synapse's media repo. If this is set to 'True',
-        # Synapse's media repo below must be disabled.
-        #
-        #external_media_repo: False
 
         # Enable the media store service inside Synapse.
         #

@@ -33,6 +33,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.config._base import ConfigError
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.async_helpers import Linearizer
@@ -753,10 +754,9 @@ class MediaRepositoryResource(Resource):
     """
 
     def __init__(self, hs):
-        # If this is not the media repo (which will always load this class),
-        # raise an exception if it is tried to be used.
-        if hs.config.external_media_repo:
-            raise Exception("This Synapse is not configured for media repo use.")
+        # If we're not configured to use it, raise if we somehow got here.
+        if not hs.config.can_load_media_repo:
+            raise ConfigError("Synapse is not configured to use a media repo.")
 
         super().__init__()
         media_repo = hs.get_media_repository()

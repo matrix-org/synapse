@@ -223,14 +223,7 @@ class SynapseHomeServer(HomeServer):
                 raise ConfigError(
                     "'media' resource conflicts with enable_media_repo=False"
                 )
-            elif name == "media" and self.get_config().external_media_repo:
-                raise ConfigError(
-                    "'media' resource conflicts with external_media_repo=True"
-                )
-            elif (
-                self.get_config().enable_media_repo
-                and not self.get_config().external_media_repo
-            ):
+            elif self.get_config().enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
                     {

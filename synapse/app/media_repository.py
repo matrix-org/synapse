@@ -35,6 +35,7 @@ from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
@@ -71,6 +72,12 @@ class MediaRepositoryServer(HomeServer):
                     resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "media":
                     media_repo = self.get_media_repository_resource()
+
+                    # We need to serve the admin servlets for media on the
+                    # worker.
+                    admin_resource = JsonResource(self, canonical_json=False)
+                    register_servlets_for_media_repo(self, admin_resource)
+
                     resources.update(
                         {
                             MEDIA_PREFIX: media_repo,
@@ -78,6 +85,7 @@ class MediaRepositoryServer(HomeServer):
                             CONTENT_REPO_PREFIX: ContentRepoResource(
                                 self, self.config.uploads_path
                             ),
+                            "/_synapse/admin": admin_resource,
                         }
                     )
 
@@ -138,13 +146,6 @@ def start(config_options):
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.media_repository"
-
-    if config.external_media_repo:
-        _base.quit_with_error(
-            "external_media_repo must be disabled before the \n"
-            "media_repository worker can be used\n"
-            "Please add ``external_media_repo: false`` to the main config\n"
-        )
 
     if config.enable_media_repo:
         _base.quit_with_error(

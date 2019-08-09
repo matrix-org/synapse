@@ -569,13 +569,6 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 ## Media Store
 ##
 
-# Is an external media repo in use?
-#
-# Set 'False' to use Synapse's media repo. If this is set to 'True',
-# Synapse's media repo below must be disabled.
-#
-#external_media_repo: False
-
 # Enable the media store service inside Synapse.
 #
 enable_media_repo: True
