@@ -37,6 +37,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.admin._base import assert_requester_is_admin, assert_user_is_admin
+from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.types import UserID, create_requester
 from synapse.util.versionstring import get_version_string
@@ -818,6 +819,7 @@ def register_servlets(hs, http_server):
     Register all the admin servlets.
     """
     register_servlets_for_client_rest_resource(hs, http_server)
+    PurgeRoomServlet(hs).register(http_server)
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
 

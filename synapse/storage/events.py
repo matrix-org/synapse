@@ -2177,6 +2177,89 @@ class EventsStore(
 
         return to_delete, to_dedelta
 
+    def purge_room(self, room_id):
+        """Deletes all record of a room
+
+        Args:
+            room_id (str):
+        """
+
+        return self.runInteraction("purge_room", self._purge_room_txn, room_id)
+
+    def _purge_room_txn(self, txn, room_id):
+        # first we have to delete the state groups states
+        logger.info("[purge] removing %s from state_groups_state", room_id)
+
+        txn.execute(
+            "DELETE FROM state_groups_state "
+            "WHERE state_group IN ("
+            "SELECT state_group FROM events JOIN event_to_state_groups USING(event_id) "
+            "WHERE events.room_id=?"
+            ")",
+            (room_id,),
+        )
+
+        # ... and the state group edges
+        logger.info("[purge] removing %s from state_group_edges", room_id)
+
+        txn.execute(
+            "DELETE FROM state_group_edges "
+            "WHERE state_group IN ("
+            "SELECT state_group FROM events JOIN event_to_state_groups USING(event_id) "
+            "WHERE events.room_id=?"
+            ")",
+            (room_id,),
+        )
+
+        # ... and the state groups
+        logger.info("[purge] removing %s from state_groups", room_id)
+
+        txn.execute(
+            "DELETE FROM state_groups "
+            "WHERE id IN ("
+            "SELECT state_group FROM events JOIN event_to_state_groups USING(event_id) "
+            "WHERE events.room_id=?"
+            ")",
+            (room_id,),
+        )
+
+        # and then tables which lack an index on room_id but have one on event_id
+        for table in (
+            "event_auth",
+            "event_edges",
+            "event_reference_hashes",
+            "event_to_state_groups",
+            "rejections",
+            "state_events",
+        ):
+            logger.info("[purge] removing %s from %s", room_id, table)
+
+            txn.execute(
+                "DELETE FROM %s WHERE event_id IN (SELECT event_id FROM events "
+                "WHERE room_id=?)" % (table,),
+                (room_id,),
+            )
+
+        # and finally, the tables with an index on room_id
+        for table in (
+            "current_state_events",
+            "event_backward_extremities",
+            "event_forward_extremities",
+            "event_json",
+            "event_push_actions",
+            "event_search",
+            "events",
+            "receipts_graph",
+            "receipts_linearized",
+            "room_depth",
+            "room_memberships",
+            "rooms",
+        ):
+            logger.info("[purge] removing %s from %s", room_id, table)
+            txn.execute("DELETE FROM %s WHERE room_id=?" % (table,), (room_id,))
+
+        logger.info("[purge] done")
+
     @defer.inlineCallbacks
     def is_event_after(self, event_id1, event_id2):
         """Returns True if event_id1 is after event_id2 in the stream
