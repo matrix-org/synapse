@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from distutils.util import strtobool
+
+import pkg_resources
 
 from synapse.config._base import Config, ConfigError
 from synapse.types import RoomAlias
@@ -41,8 +44,36 @@ class AccountValidityConfig(Config):
 
             self.startup_job_max_delta = self.period * 10. / 100.
 
-        if self.renew_by_email_enabled and "public_baseurl" not in synapse_config:
-            raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+        if self.renew_by_email_enabled:
+            if "public_baseurl" not in synapse_config:
+                raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+
+        template_dir = config.get("template_dir")
+
+        if not template_dir:
+            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
+
+        if "account_renewed_html_path" in config:
+            file_path = os.path.join(template_dir, config["account_renewed_html_path"])
+
+            self.account_renewed_html_content = self.read_file(
+                file_path, "account_validity.account_renewed_html_path"
+            )
+        else:
+            self.account_renewed_html_content = (
+                "<html><body>Your account has been successfully renewed.</body><html>"
+            )
+
+        if "invalid_token_html_path" in config:
+            file_path = os.path.join(template_dir, config["invalid_token_html_path"])
+
+            self.invalid_token_html_content = self.read_file(
+                file_path, "account_validity.invalid_token_html_path"
+            )
+        else:
+            self.invalid_token_html_content = (
+                "<html><body>Invalid renewal token.</body><html>"
+            )
 
 
 class RegistrationConfig(Config):
@@ -161,6 +192,16 @@ class RegistrationConfig(Config):
         #  period: 6w
         #  renew_at: 1w
         #  renew_email_subject: "Renew your %%(app)s account"
+        #  # Directory in which Synapse will try to find the HTML files to serve to the
+        #  # user when trying to renew an account. Optional, defaults to
+        #  # synapse/res/templates.
+        #  template_dir: "res/templates"
+        #  # HTML to be displayed to the user after they successfully renewed their
+        #  # account. Optional.
+        #  account_renewed_html_path: "account_renewed.html"
+        #  # HTML to be displayed when the user tries to renew an account with an invalid
+        #  # renewal token. Optional.
+        #  invalid_token_html_path: "invalid_token.html"
 
         # The user must provide all of the below types of 3PID when registering.
         #
