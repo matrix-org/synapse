@@ -23,16 +23,14 @@ import {
   DELEGATION_TYPES, TLS_TYPES
 } from '../actions/constants';
 
-export default ({ setup_done, setup_ui, base_config }, action) => {
+export default ({ setup_ui, base_config }, action) => {
   if (!base_config.base_config_checked) {
     return setup_ui;
   }
-  if (setup_done) {
+  if (base_config.setup_done) {
     return setup_ui;
   }
   switch (action.type) {
-    case BASE_CONFIG_CHECKED:
-      return [BASE_INTRO_UI];
     case ADVANCE_UI:
       return {
         active_blocks: [

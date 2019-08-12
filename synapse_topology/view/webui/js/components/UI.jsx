@@ -3,7 +3,7 @@ import React from 'react';
 import style from '../../less/main.less';
 
 import {
-  BASE_INTRO_UI,
+  SETUP_INTRO_UI,
   SERVER_NAME_UI,
   STATS_REPORT_UI,
   KEY_EXPORT_UI,
@@ -45,12 +45,13 @@ import Database from '../containers/Database';
 import ConfigSelector from './ConfigSelector';
 
 const block_mapping = ui_block => {
+  console.log(`fetching ${ui_block}`)
   switch (ui_block) {
     case LOADING_UI:
       return <Loading />
     case ERROR_UI:
       return <Error />
-    case BASE_INTRO_UI:
+    case SETUP_INTRO_UI:
       return < IntroUi />
     case SERVER_NAME_UI:
       return <ServerName />
@@ -83,14 +84,15 @@ const block_mapping = ui_block => {
   }
 }
 
-export default ({ setup_done, setup_ui, config_ui, base_config }) => {
+export default ({ setup_ui, config_ui, base_config }) => {
   if (!base_config.base_config_checked) {
     return <Loading />
   }
-  if (setup_done) {
+  if (base_config.setup_done) {
     console.log(`switching to ui ${config_ui}`);
     return <ConfigSelector></ConfigSelector>
   } else {
+    console.log(setup_ui);
     return <WalkThrough>
       {setup_ui.active_blocks.map(block_mapping)}
     </WalkThrough>

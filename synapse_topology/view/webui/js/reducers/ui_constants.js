@@ -1,5 +1,5 @@
 // Base config
-export const BASE_INTRO_UI = "INTRO_UI";
+export const SETUP_INTRO_UI = "SETUP_INTRO_UI";
 export const SERVER_NAME_UI = "server_name_ui";
 export const STATS_REPORT_UI = "stats_report_ui";
 export const KEY_EXPORT_UI = "key_export_ui";

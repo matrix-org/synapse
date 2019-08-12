@@ -6,7 +6,7 @@ export default ({ config_ui, base_config }, action) => {
   if (!base_config.base_config_checked) {
     return config_ui;
   }
-  if (!setup_done) {
+  if (!base_config.setup_done) {
     return config_ui;
   }
   return config_ui;

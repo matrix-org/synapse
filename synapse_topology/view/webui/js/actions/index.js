@@ -148,9 +148,9 @@ export const set_secret_key = key => ({
   key,
 });
 
-export const start = server_setup => ({
+export const start = setup_done => ({
   type: BASE_CONFIG_CHECKED,
-  setup_done: server_setup,
+  setup_done,
 });
 
 export const fail = reason => ({

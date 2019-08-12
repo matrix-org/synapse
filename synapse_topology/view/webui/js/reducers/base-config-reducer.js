@@ -17,10 +17,17 @@ import {
   SET_SYNAPSE_PORTS_FREE,
   SET_DATABASE,
   SET_CONFIG_DIR,
+  BASE_CONFIG_CHECKED,
 } from "../actions/types";
 
 export default (state, action) => {
   switch (action.type) {
+    case BASE_CONFIG_CHECKED:
+      return {
+        ...state,
+        base_config_checked: true,
+        setup_done: action.setup_done,
+      }
     case SET_SERVERNAME:
       return {
         ...state,
