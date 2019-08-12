@@ -1,7 +1,7 @@
 export const DELEGATION_TYPES = {
   LOCAL: "local",
-  WELL_KNOWN: "well_known",
-  DNS: "dns",
+  WELL_KNOWN: ".well_known",
+  DNS: "DNS SRV",
 }
 
 export const REVERSE_PROXY_TYPES = {

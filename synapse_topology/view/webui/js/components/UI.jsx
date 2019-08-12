@@ -20,9 +20,7 @@ import {
   REVERSE_PROXY_TEMPLATE_UI,
   LOADING_UI,
   ERROR_UI,
-  DELEGATION_SERVER_NAME_UI,
   TLS_CERTPATH_UI,
-  DELEGATION_PORT_SELECTION_UI,
   DELEGATION_TEMPLATE_UI,
   DATABASE_UI,
 } from '../reducers/ui_constants';
@@ -36,11 +34,9 @@ import ServerName from '../containers/ServerName';
 import StatsReporter from '../containers/StatsReporter';
 import ExportKeys from '../containers/ExportKeys';
 import DelegationOptions from '../containers/DelegationOptions';
-import DelegationServerName from '../containers/DelegationServerName';
 import ReverseProxy from '../containers/ReverseProxy';
 import TLS from '../containers/TLS';
 import TLSCertPath from '../containers/TLSCertPath';
-import DelegationPortSelection from '../containers/DelegationPortSelection';
 import PortSelection from '../containers/PortSelection';
 import ReverseProxySampleConfig from '../containers/ReverseProxySampleConfig';
 import DelegationSampleConfig from '../containers/DelegationSampleConfig';
@@ -64,10 +60,6 @@ const block_mapping = ui_block => {
       return <ExportKeys key={ui_block} />
     case DELEGATION_OPTIONS_UI:
       return <DelegationOptions key={ui_block} />
-    case DELEGATION_SERVER_NAME_UI:
-      return <DelegationServerName key={ui_block} />
-    case DELEGATION_PORT_SELECTION_UI:
-      return <DelegationPortSelection key={ui_block} />
     case REVERSE_PROXY_UI:
       return <ReverseProxy key={ui_block} />
     case TLS_UI:

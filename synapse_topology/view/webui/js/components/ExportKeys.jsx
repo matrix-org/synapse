@@ -1,32 +1,38 @@
 import React from 'react';
 
+import Accordion from 'react-bootstrap/Accordion';
+import Card from 'react-bootstrap/Card';
+
 import ButtonDisplay from './ButtonDisplay';
-import ContentWrapper from '../containers/ContentWrapper';
 import DownloadOrCopy from './DownloadOrCopy';
 
-import style from '../../less/main.less';
+import { KEY_EXPORT_UI } from '../reducers/ui_constants';
 
 
 export default ({ secret_key_loaded, secret_key, onClick }) => {
+  var body;
   if (!secret_key_loaded) {
-    return <ContentWrapper>
-      <h1>Generating secret key</h1>
-    </ContentWrapper>;
+    body = <Card.Body>Generating secret key</Card.Body>
   } else {
-    return <ContentWrapper>
-      <h1>Export keys</h1>
+    body = <Card.Body>
       <p>
-        This is your server's secret key:
+        Your server uses a secret key to identify itself to other servers. Keep
+        a copy of it to retain ownership of the server name in case the server
+        is inaccessible:
       </p>
-      <p className={style.keyDisplay}>{secret_key}</p>
+      <pre><code>{secret_key}</code></pre>
+      <p>Keep a copy of this key somewhere safe</p>
       <DownloadOrCopy content={secret_key} fileName="secret_key.txt" />
-      <p>
-        The server uses this to identify
-        itself to other servers. You can use it to retain ownership of the server's
-        name in the event that the server itself becomes irrevocably inaccessible.
-      </p>
-      <p>Keep it safe</p>
-      <ButtonDisplay><button onClick={onClick}>Continue</button></ButtonDisplay>
-    </ContentWrapper>;
+      <ButtonDisplay><button onClick={onClick}>Next</button></ButtonDisplay>
+    </Card.Body>
   }
+
+  return <Card>
+    <Accordion.Toggle as={Card.Header} eventKey={KEY_EXPORT_UI}>
+      Secret Key
+    </Accordion.Toggle>
+    <Accordion.Collapse eventKey={KEY_EXPORT_UI}>
+      {body}
+    </Accordion.Collapse>
+  </Card>
 }

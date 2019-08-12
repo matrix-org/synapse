@@ -1,7 +1,7 @@
 import { connect } from 'react-redux';
 
 import DelegationOptions from '../components/DelegationOptions';
-import { set_delegation, advance_ui } from '../actions';
+import { set_delegation, advance_ui, set_delegation_servername, set_delegation_ports } from '../actions';
 import { DELEGATION_TYPES } from '../actions/constants';
 
 const mapStateToProps = (state, { children }) => {
@@ -12,17 +12,16 @@ const mapStateToProps = (state, { children }) => {
 
 
 const mapDispatchToProps = (dispatch) => ({
-  clickLocal: () => {
-    dispatch(advance_ui(DELEGATION_TYPES.LOCAL));
+  onClick: (type, servername, fedPort, clientPort) => {
+    dispatch(advance_ui());
+    dispatch(set_delegation(type));
+    dispatch(set_delegation_servername(servername));
+    dispatch(set_delegation_ports(fedPort, clientPort));
+  },
+
+  skip: () => {
+    dispatch(advance_ui());
     dispatch(set_delegation(DELEGATION_TYPES.LOCAL));
-  },
-  clickWellKnown: () => {
-    dispatch(advance_ui(DELEGATION_TYPES.WELL_KNOWN));
-    dispatch(set_delegation(DELEGATION_TYPES.WELL_KNOWN));
-  },
-  clickDNS: () => {
-    dispatch(advance_ui(DELEGATION_TYPES.DNS));
-    dispatch(set_delegation(DELEGATION_TYPES.DNS));
   }
 });
 

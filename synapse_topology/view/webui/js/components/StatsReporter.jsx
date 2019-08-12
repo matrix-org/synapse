@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 
-import style from '../../less/main.less';
-
 import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
+
 import { STATS_REPORT_UI } from '../reducers/ui_constants';
 
 

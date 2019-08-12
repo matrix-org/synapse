@@ -75,18 +75,6 @@ const forward_mapping = (current_ui, action, base_config) => {
     case KEY_EXPORT_UI:
       return DELEGATION_OPTIONS_UI;
     case DELEGATION_OPTIONS_UI:
-      switch (action.option) {
-        // TODO: figure these out
-        case DELEGATION_TYPES.DNS:
-          return DELEGATION_SERVER_NAME_UI;
-        case DELEGATION_TYPES.WELL_KNOWN:
-          return DELEGATION_SERVER_NAME_UI;
-        case DELEGATION_TYPES.LOCAL:
-          return TLS_UI;
-      }
-    case DELEGATION_SERVER_NAME_UI:
-      return DELEGATION_PORT_SELECTION_UI;
-    case DELEGATION_PORT_SELECTION_UI:
       return TLS_UI;
     case TLS_UI:
       switch (action.option) {
