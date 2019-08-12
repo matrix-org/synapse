@@ -90,12 +90,10 @@ CREATE TABLE IF NOT EXISTS room_stats_current (
 -- TODO check: make it easier to find dirty rows
 -- TODO check we specify 'AND start_ts IS NOT NULL' in old collector, to take
 -- advantage of optimisations.
-CREATE INDEX IF NOT EXISTS room_stats_current_dirty ON room_stats_current (start_ts)
-    WHERE start_ts IS NOT NULL;
+
 
 -- TODO check: make it easier to find incomplete rows
-CREATE INDEX IF NOT EXISTS room_stats_not_complete ON room_stats_current (room_id)
-    WHERE completed_delta_stream_id IS NULL;
+
 
 -- represents HISTORICAL room statistics for a room
 CREATE TABLE IF NOT EXISTS room_stats_historical (
