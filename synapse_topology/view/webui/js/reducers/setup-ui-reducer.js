@@ -36,33 +36,35 @@ export default ({ setup_ui, base_config }, action) => {
         active_blocks: [
           ...setup_ui.active_blocks,
           forward_mapping(
-            setup_ui.active_blocks[setup_ui.active_blocks.length - 1]
+            setup_ui.active_blocks[setup_ui.active_blocks.length - 1],
+            action,
+            base_config,
           ),
         ]
       }
 
     // TODO: Think about how back should work..
-    case BACK_UI:
-      switch (ui.active_ui) {
-        case STATS_REPORT_UI:
-          return SERVER_NAME_UI;
-        case KEY_EXPORT_UI:
-          return STATS_REPORT_UI;
-        case DELEGATION_OPTIONS_UI:
-          return KEY_EXPORT_UI;
-        case WELL_KNOWN_UI:
-          return DELEGATION_OPTIONS_UI;
-        case DNS_UI:
-          return WELL_KNOWN_UI;
-        default:
-          SETUP_INTRO_UI;
-      }
+    // case BACK_UI:
+    //   switch (ui.active_ui) {
+    //     case STATS_REPORT_UI:
+    //       return SERVER_NAME_UI;
+    //     case KEY_EXPORT_UI:
+    //       return STATS_REPORT_UI;
+    //     case DELEGATION_OPTIONS_UI:
+    //       return KEY_EXPORT_UI;
+    //     case WELL_KNOWN_UI:
+    //       return DELEGATION_OPTIONS_UI;
+    //     case DNS_UI:
+    //       return WELL_KNOWN_UI;
+    //     default:
+    //       SETUP_INTRO_UI;
+    //   }
     default:
-      return ui.active_ui;
+      return setup_ui;
   }
 }
 
-const forward_mapping = (current_ui, action) => {
+const forward_mapping = (current_ui, action, base_config) => {
   switch (current_ui) {
     case SETUP_INTRO_UI:
       return SERVER_NAME_UI;

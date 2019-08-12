@@ -48,37 +48,37 @@ const block_mapping = ui_block => {
   console.log(`fetching ${ui_block}`)
   switch (ui_block) {
     case LOADING_UI:
-      return <Loading />
+      return <Loading key={ui_block} />
     case ERROR_UI:
-      return <Error />
+      return <Error key={ui_block} />
     case SETUP_INTRO_UI:
-      return < IntroUi />
+      return < IntroUi key={ui_block} />
     case SERVER_NAME_UI:
-      return <ServerName />
+      return <ServerName key={ui_block} />
     case STATS_REPORT_UI:
-      return <StatsReporter />
+      return <StatsReporter key={ui_block} />
     case KEY_EXPORT_UI:
-      return <ExportKeys />
+      return <ExportKeys key={ui_block} />
     case DELEGATION_OPTIONS_UI:
-      return <DelegationOptions />
+      return <DelegationOptions key={ui_block} />
     case DELEGATION_SERVER_NAME_UI:
-      return <DelegationServerName />
+      return <DelegationServerName key={ui_block} />
     case DELEGATION_PORT_SELECTION_UI:
-      return <DelegationPortSelection />
+      return <DelegationPortSelection key={ui_block} />
     case REVERSE_PROXY_UI:
-      return <ReverseProxy />
+      return <ReverseProxy key={ui_block} />
     case TLS_UI:
-      return <TLS />
+      return <TLS key={ui_block} />
     case TLS_CERTPATH_UI:
-      return <TLSCertPath />
+      return <TLSCertPath key={ui_block} />
     case PORT_SELECTION_UI:
-      return <PortSelection />
+      return <PortSelection key={ui_block} />
     case REVERSE_PROXY_TEMPLATE_UI:
-      return <ReverseProxySampleConfig />
+      return <ReverseProxySampleConfig key={ui_block} />
     case DELEGATION_TEMPLATE_UI:
-      return <DelegationSampleConfig />
+      return <DelegationSampleConfig key={ui_block} />
     case DATABASE_UI:
-      return <Database />
+      return <Database key={ui_block} />
     default:
       return <h1>how did i get here?</h1>
   }
