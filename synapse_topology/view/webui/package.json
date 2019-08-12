@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "fetch-absolute": "^1.0.0",
+    "react-bootstrap": "^1.0.0-beta.11",
     "react-localize-redux": "^3.5.3",
     "react-redux": "^7.1.0",
     "redux": "^4.0.4",

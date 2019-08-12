@@ -2,6 +2,9 @@ import React from 'react';
 
 import style from '../../less/main.less';
 
+import Accordion from 'react-bootstrap/Accordion';
+import Card from 'react-bootstrap/Card';
+
 import {
   SETUP_INTRO_UI,
   SERVER_NAME_UI,
@@ -85,16 +88,20 @@ const block_mapping = ui_block => {
 }
 
 export default ({ setup_ui, config_ui, base_config }) => {
+
   if (!base_config.base_config_checked) {
     return <Loading />
   }
+
   if (base_config.setup_done) {
     console.log(`switching to ui ${config_ui}`);
     return <ConfigSelector></ConfigSelector>
-  } else {
+  }
+
+  if (!base_config.setup_done) {
     console.log(setup_ui);
-    return <WalkThrough>
+    return <Accordion defaultActiveKey="0">
       {setup_ui.active_blocks.map(block_mapping)}
-    </WalkThrough>
+    </Accordion >
   }
 }

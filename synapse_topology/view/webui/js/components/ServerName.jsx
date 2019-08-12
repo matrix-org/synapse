@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 
-import ContentWrapper from '../containers/ContentWrapper';
+import Accordion from 'react-bootstrap/Accordion';
+import Card from 'react-bootstrap/Card';
+import { SERVER_NAME_UI } from '../reducers/ui_constants';
 
 export default ({ onClick }) => {
   const [servername, setServerName] = useState("");
@@ -9,20 +11,25 @@ export default ({ onClick }) => {
     setServerName(event.target.value);
   }
 
-  return <ContentWrapper>
-    <h1>Select a server name</h1>
-    <p>It's important to choose a good name for your server because it cannot be changed later.</p>
-    <p>
-      The name forms a part of the user id's for the users on the server. Which will look like `@you:server.name`.
-      The name will also be what other servers look up when they're trying to reach this one.
-    </p>
-    <p>
-      Normally the server name is usually just your domain. For example <a target="_blank" href="https://matrix.org">matrix.org</a>'s server is
-      known as `matrix.org`.
-    </p>
-    <input type="text" onChange={onChange} autoFocus placeholder="synapse.dev"></input>
-    <div>
-      <button disabled={servername ? undefined : true} onClick={() => onClick(servername)}>I like it</button>
-    </div>
-  </ContentWrapper>;
+  return <Card>
+    <Accordion.Toggle as={Card.Header} eventKey={SERVER_NAME_UI}>
+      Name your server
+    </Accordion.Toggle>
+    <Accordion.Collapse eventKey={SERVER_NAME_UI}>
+      <Card.Body>
+        <p>
+          Your server name usually matches your domain. For example, the
+          matrix.org server is simply called `matrix.org`.
+        </p>
+        <p>
+          Your server name will be used to establish User IDs (e.g.
+          `@user:server.name`) and Room Aliases (e.g. `#room:server.name`).
+        </p>
+        <input type="text" onChange={onChange} autoFocus placeholder="Enter server name"></input>
+        <div>
+          <button disabled={servername ? undefined : true} onClick={() => onClick(servername)}>Continue</button>
+        </div>
+      </Card.Body>
+    </Accordion.Collapse>
+  </Card>;
 }
