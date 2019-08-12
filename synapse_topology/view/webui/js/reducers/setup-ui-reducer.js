@@ -1,7 +1,7 @@
 import { ADVANCE_UI, BACK_UI, BASE_CONFIG_CHECKED } from '../actions/types';
 
 import {
-  BASE_INTRO_UI,
+  SETUP_INTRO_UI,
   SERVER_NAME_UI,
   STATS_REPORT_UI,
   KEY_EXPORT_UI,
@@ -55,7 +55,7 @@ export default ({ setup_ui, base_config }, action) => {
         case DNS_UI:
           return WELL_KNOWN_UI;
         default:
-          BASE_INTRO_UI;
+          SETUP_INTRO_UI;
       }
     default:
       return ui.active_ui;
@@ -64,7 +64,7 @@ export default ({ setup_ui, base_config }, action) => {
 
 const forward_mapping = (current_ui, action) => {
   switch (current_ui) {
-    case BASE_INTRO_UI:
+    case SETUP_INTRO_UI:
       return SERVER_NAME_UI;
     case SERVER_NAME_UI:
       return STATS_REPORT_UI;
@@ -116,6 +116,6 @@ const forward_mapping = (current_ui, action) => {
     case WELL_KNOWN_UI:
     case DNS_UI:
     default:
-      return BASE_INTRO_UI;
+      return SETUP_INTRO_UI;
   }
 }
