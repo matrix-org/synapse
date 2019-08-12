@@ -27,7 +27,7 @@ export default ({ onClick }) => {
         </p>
         <input type="text" onChange={onChange} autoFocus placeholder="Enter server name"></input>
         <div>
-          <button disabled={servername ? undefined : true} onClick={() => onClick(servername)}>Continue</button>
+          <button disabled={servername ? undefined : true} onClick={() => onClick(servername)}>Next</button>
         </div>
       </Card.Body>
     </Accordion.Collapse>
