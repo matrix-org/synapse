@@ -44,6 +44,12 @@ WELL_KNOWN_MAX_CACHE_PERIOD = 48 * 3600
 # lower bound for .well-known cache period
 WELL_KNOWN_MIN_CACHE_PERIOD = 5 * 60
 
+# Attempt to refetch a cached well-known N% of the TTL before it expires.
+# e.g. if set to 0.2 and we have a cached entry with a TTL of 5mins, then
+# we'll start trying to refetch 1 minute before it expires.
+WELL_KNOWN_GRACE_PERIOD_FACTOR = 0.2
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,15 +86,38 @@ class WellKnownResolver(object):
             Deferred[WellKnownLookupResult]: The result of the lookup
         """
         try:
-            result = self._well_known_cache[server_name]
+            prev_result, expiry, ttl = self._well_known_cache.get_with_expiry(
+                server_name
+            )
+
+            now = self._clock.time()
+            if now < expiry - WELL_KNOWN_GRACE_PERIOD_FACTOR * ttl:
+                return WellKnownLookupResult(delegated_server=prev_result)
         except KeyError:
-            # TODO: should we linearise so that we don't end up doing two .well-known
-            # requests for the same server in parallel?
+            prev_result = None
+
+        # TODO: should we linearise so that we don't end up doing two .well-known
+        # requests for the same server in parallel?
+        try:
             with Measure(self._clock, "get_well_known"):
                 result, cache_period = yield self._do_get_well_known(server_name)
 
-            if cache_period > 0:
-                self._well_known_cache.set(server_name, result, cache_period)
+        except _FetchWellKnownFailure as e:
+            if prev_result and e.temporary:
+                # This is a temporary failure and we have a still valid cached
+                # result, so lets return that. Hopefully the next time we ask
+                # the remote will be back up again.
+                return WellKnownLookupResult(delegated_server=prev_result)
+
+            result = None
+
+            # add some randomness to the TTL to avoid a stampeding herd every hour
+            # after startup
+            cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
+            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
+
+        if cache_period > 0:
+            self._well_known_cache.set(server_name, result, cache_period)
 
         return WellKnownLookupResult(delegated_server=result)
 
@@ -99,40 +128,42 @@ class WellKnownResolver(object):
         Args:
             server_name (bytes): name of the server, from the requested url
 
+        Raises:
+            _FetchWellKnownFailure if we fail to lookup a result
+
         Returns:
-            Deferred[Tuple[bytes|None|object],int]:
-                result, cache period, where result is one of:
-                 - the new server name from the .well-known (as a `bytes`)
-                 - None if there was no .well-known file.
-                 - INVALID_WELL_KNOWN if the .well-known was invalid
+            Deferred[Tuple[bytes,int]]: The lookup result and cache period.
         """
         uri = b"https://%s/.well-known/matrix/server" % (server_name,)
         uri_str = uri.decode("ascii")
         logger.info("Fetching %s", uri_str)
+
+        # We do this in two steps to differentiate between possibly transient
+        # errors (e.g. can't connect to host, 503 response) and more permenant
+        # errors (such as getting a 404 response).
         try:
             response = yield make_deferred_yieldable(
                 self._well_known_agent.request(b"GET", uri)
             )
             body = yield make_deferred_yieldable(readBody(response))
+
+            if 500 <= response.code < 600:
+                raise Exception("Non-200 response %s" % (response.code,))
+        except Exception as e:
+            logger.info("Error fetching %s: %s", uri_str, e)
+            raise _FetchWellKnownFailure(temporary=True)
+
+        try:
             if response.code != 200:
                 raise Exception("Non-200 response %s" % (response.code,))
 
             parsed_body = json.loads(body.decode("utf-8"))
             logger.info("Response from .well-known: %s", parsed_body)
-            if not isinstance(parsed_body, dict):
-                raise Exception("not a dict")
-            if "m.server" not in parsed_body:
-                raise Exception("Missing key 'm.server'")
+
+            result = parsed_body["m.server"].encode("ascii")
         except Exception as e:
             logger.info("Error fetching %s: %s", uri_str, e)
-
-            # add some randomness to the TTL to avoid a stampeding herd every hour
-            # after startup
-            cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
-            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
-            return (None, cache_period)
-
-        result = parsed_body["m.server"].encode("ascii")
+            raise _FetchWellKnownFailure(temporary=False)
 
         cache_period = _cache_period_from_headers(
             response.headers, time_now=self._reactor.seconds
@@ -185,3 +216,10 @@ def _parse_cache_control(headers):
             v = splits[1] if len(splits) > 1 else None
             cache_controls[k] = v
     return cache_controls
+
+
+@attr.s()
+class _FetchWellKnownFailure(Exception):
+    # True if we didn't get a non-5xx HTTP response, i.e. this may or may not be
+    # a temporary failure.
+    temporary = attr.ib()
