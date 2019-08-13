@@ -41,11 +41,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
-from synapse.rest.admin.media import (
-    ListMediaInRoom,
-    PurgeMediaCacheRestServlet,
-    QuarantineMediaInRoom,
-)
+from synapse.rest.admin.media import register_servlets_for_media_repo
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.types import UserID, create_requester
 from synapse.util.versionstring import get_version_string
@@ -744,15 +740,6 @@ def register_servlets(hs, http_server):
     register_servlets_for_client_rest_resource(hs, http_server)
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
-
-
-def register_servlets_for_media_repo(hs, http_server):
-    """
-    Media repo specific APIs.
-    """
-    PurgeMediaCacheRestServlet(hs).register(http_server)
-    QuarantineMediaInRoom(hs).register(http_server)
-    ListMediaInRoom(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):

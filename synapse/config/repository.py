@@ -217,9 +217,10 @@ class ContentRepositoryConfig(Config):
             r"""
         ## Media Store ##
 
-        # Enable the media store service inside Synapse.
+        # Enable the media store service in the Synapse master. Uncomment the
+        # following if you are using a separate media store worker.
         #
-        # enable_media_repo: False
+        #enable_media_repo: false
 
         # Directory where uploaded images and attachments are stored.
         #

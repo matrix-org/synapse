@@ -90,3 +90,12 @@ class PurgeMediaCacheRestServlet(RestServlet):
         ret = yield self.media_repository.delete_old_remote_media(before_ts)
 
         return (200, ret)
+
+
+def register_servlets_for_media_repo(hs, http_server):
+    """
+    Media repo specific APIs.
+    """
+    PurgeMediaCacheRestServlet(hs).register(http_server)
+    QuarantineMediaInRoom(hs).register(http_server)
+    ListMediaInRoom(hs).register(http_server)
