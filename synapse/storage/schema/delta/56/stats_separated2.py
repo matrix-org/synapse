@@ -42,9 +42,9 @@ def _run_create_generic(stats_type, cursor, database_engine):
         cursor.execute(
             """
                 CREATE INDEX IF NOT EXISTS %s_stats_not_complete
-                    ON %s_stats_current (completed_delta_stream_id, room_id);
+                    ON %s_stats_current (completed_delta_stream_id, %s_id);
             """
-            % (stats_type, stats_type)
+            % (stats_type, stats_type, stats_type)
         )
     elif isinstance(database_engine, PostgresEngine):
         # This partial index helps us with finding dirty stats rows
@@ -60,10 +60,10 @@ def _run_create_generic(stats_type, cursor, database_engine):
         cursor.execute(
             """
                 CREATE INDEX IF NOT EXISTS %s_stats_not_complete
-                    ON %s_stats_current (room_id)
+                    ON %s_stats_current (%s_id)
                     WHERE completed_delta_stream_id IS NULL;
             """
-            % (stats_type, stats_type)
+            % (stats_type, stats_type, stats_type)
         )
     else:
         raise NotImplementedError("Unknown database engine.")
