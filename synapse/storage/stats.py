@@ -808,7 +808,8 @@ class StatsStore(StateDeltasStore):
                 txn,
                 table + "_current",
                 {id_col: stats_id},
-                retcols=selected_columns + ["start_ts", "end_ts"],
+                retcols=selected_columns
+                + ["start_ts", "end_ts", "completed_delta_stream_id"],
                 allow_none=True,
             )
 
