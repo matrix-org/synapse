@@ -93,7 +93,7 @@ class ContentRepositoryConfig(Config):
         # current worker app is the media repo.
         if (
             self.enable_media_repo is False
-            and config.worker_app != "synapse.app.media_repository"
+            and config.get("worker_app") != "synapse.app.media_repository"
         ):
             self.can_load_media_repo = False
             return
