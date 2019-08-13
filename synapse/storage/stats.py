@@ -627,21 +627,6 @@ class StatsStore(StateDeltasStore):
         txn.execute(sql, (room_id, low_token, high_token))
         return txn.fetchone()[0]
 
-    def delete_all_stats(self):
-        """
-        Delete all statistics records.
-        TODO obsolete?
-        TODO at least will need updating
-        """
-
-        def _delete_all_stats_txn(txn):
-            txn.execute("DELETE FROM room_state")
-            txn.execute("DELETE FROM room_stats")
-            txn.execute("DELETE FROM room_stats_earliest_token")
-            txn.execute("DELETE FROM user_stats")
-
-        return self.runInteraction("delete_all_stats", _delete_all_stats_txn)
-
     def get_stats_positions(self, for_initial_processor=False):
         """
         Returns the stats processor positions.
