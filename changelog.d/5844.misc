@@ -1,0 +1,1 @@
+Retry well-known lookup before the cache expires, giving a grace period where the remote well-known can be down but we still use the old result.
