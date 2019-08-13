@@ -2,13 +2,20 @@ import React, { useState } from 'react';
 
 import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
+import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
 
 import { STATS_REPORT_UI } from '../reducers/ui_constants';
 import AccordionToggle from '../containers/AccordionToggle';
+import { next_ui } from '../reducers/setup-ui-reducer';
 
 
 export default ({ onClick }) => {
   const [consent, setConsent] = useState(true);
+  const toggle = useAccordionToggle(next_ui(STATS_REPORT_UI));
+  const decoratedOnClick = () => {
+    toggle();
+    onClick(consent);
+  }
 
   return <Card>
     <AccordionToggle as={Card.Header} eventKey={STATS_REPORT_UI}>
@@ -28,7 +35,7 @@ export default ({ onClick }) => {
           />
           Yes, send anonymous statistics
         </label>
-        <button onClick={() => onClick(consent)}>Next</button>
+        <button onClick={decoratedOnClick}>Next</button>
       </Card.Body>
     </Accordion.Collapse>
   </Card >

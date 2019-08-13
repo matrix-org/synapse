@@ -2,15 +2,23 @@ import React from 'react';
 
 import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
+import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
 
 import ButtonDisplay from './ButtonDisplay';
 import DownloadOrCopy from './DownloadOrCopy';
 
 import { KEY_EXPORT_UI } from '../reducers/ui_constants';
 import AccordionToggle from '../containers/AccordionToggle';
+import { next_ui } from '../reducers/setup-ui-reducer';
 
 
 export default ({ secret_key_loaded, secret_key, onClick }) => {
+  const toggle = useAccordionToggle(next_ui(KEY_EXPORT_UI));
+
+  const decoratedOnClick = () => {
+    toggle();
+    onClick();
+  }
   var body;
   if (!secret_key_loaded) {
     body = <Card.Body>Generating secret key</Card.Body>
@@ -24,7 +32,7 @@ export default ({ secret_key_loaded, secret_key, onClick }) => {
       <pre><code>{secret_key}</code></pre>
       <p>Keep a copy of this key somewhere safe</p>
       <DownloadOrCopy content={secret_key} fileName="secret_key.txt" />
-      <ButtonDisplay><button onClick={onClick}>Next</button></ButtonDisplay>
+      <ButtonDisplay><button onClick={decoratedOnClick}>Next</button></ButtonDisplay>
     </Card.Body>
   }
 
