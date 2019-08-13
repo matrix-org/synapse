@@ -11,6 +11,7 @@ import {
   REVERSE_PROXY_TEMPLATE_UI,
   DELEGATION_TEMPLATE_UI,
   DATABASE_UI,
+  COMPLETE_UI,
 } from './ui_constants';
 
 import {
@@ -59,6 +60,7 @@ const forward_mapping = (current_ui, action, base_config) => {
     case PORT_SELECTION_UI:
       return DATABASE_UI;
     case DATABASE_UI:
+      return COMPLETE_UI;
       return base_config.tls == TLS_TYPES.REVERSE_PROXY ?
         REVERSE_PROXY_TEMPLATE_UI :
         base_config.delegation_type != DELEGATION_TYPES.LOCAL ?

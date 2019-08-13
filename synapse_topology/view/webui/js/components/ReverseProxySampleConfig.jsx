@@ -5,10 +5,7 @@ import ButtonDisplay from './ButtonDisplay';
 import DownloadOrCopy from './DownloadOrCopy';
 import { REVERSE_PROXY_TYPES } from '../actions/constants';
 
-export default ({ proxyType, sampleConfig, fileName, onClick }) => {
-  console.log("SFSFD")
-  console.log(sampleConfig)
-  console.log("SFSFD")
+export default ({ proxyType, sampleConfig, fileName }) => {
   return <ContentWrapper>
     <h1>Configure the ReverseProxy</h1>
     <p>
@@ -32,8 +29,5 @@ export default ({ proxyType, sampleConfig, fileName, onClick }) => {
       </code>
     </pre>
     <DownloadOrCopy content={sampleConfig} fileName={fileName} />
-    <ButtonDisplay>
-      <button onClick={onClick}>Continue</button>
-    </ButtonDisplay>
   </ContentWrapper>;
 }

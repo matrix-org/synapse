@@ -18,6 +18,7 @@ import {
   ERROR_UI,
   DELEGATION_TEMPLATE_UI,
   DATABASE_UI,
+  COMPLETE_UI,
 } from '../reducers/ui_constants';
 
 import Error from './Error';
@@ -34,6 +35,7 @@ import ReverseProxySampleConfig from '../containers/ReverseProxySampleConfig';
 import DelegationSampleConfig from '../containers/DelegationSampleConfig';
 import Database from '../containers/Database';
 import ConfigSelector from './ConfigSelector';
+import CompleteSetup from '../containers/CompleteSetup';
 
 const block_mapping = ui_block => {
   console.log(`fetching ${ui_block}`)
@@ -62,6 +64,8 @@ const block_mapping = ui_block => {
       return <DelegationSampleConfig key={ui_block} />
     case DATABASE_UI:
       return <Database key={ui_block} />
+    case COMPLETE_UI:
+      return <CompleteSetup key={ui_block} />
     default:
       return <h1>how did i get here?</h1>
   }
