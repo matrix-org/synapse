@@ -11,6 +11,20 @@ export const DELEGATION_TEMPLATE_UI = "delegation_tamplate_ui";
 export const DATABASE_UI = "database_ui";
 export const COMPLETE_UI = "complete_ui";
 
+// Setup order
+export const SETUP_ORDER = [
+  SETUP_INTRO_UI,
+  SERVER_NAME_UI,
+  STATS_REPORT_UI,
+  KEY_EXPORT_UI,
+  DELEGATION_OPTIONS_UI,
+  TLS_UI,
+  PORT_SELECTION_UI,
+  DATABASE_UI,
+  COMPLETE_UI
+];
+
+
 // Config
 export const CONFIG_SELECTION_UI = "config_selection_ui";
 

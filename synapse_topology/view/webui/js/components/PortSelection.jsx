@@ -5,6 +5,7 @@ import ContentWrapper from '../containers/ContentWrapper';
 import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
 import { PORT_SELECTION_UI } from '../reducers/ui_constants';
+import AccordionToggle from '../containers/AccordionToggle';
 
 export default ({
   servername,
@@ -50,9 +51,9 @@ export default ({
   }
 
   return <Card>
-    <Accordion.Toggle as={Card.Header} eventKey={PORT_SELECTION_UI}>
+    <AccordionToggle as={Card.Header} eventKey={PORT_SELECTION_UI}>
       {servername}'s ports
-    </Accordion.Toggle>
+    </AccordionToggle>
     <Accordion.Collapse eventKey={PORT_SELECTION_UI}>
       <Card.Body>
 

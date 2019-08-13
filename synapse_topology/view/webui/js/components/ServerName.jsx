@@ -3,6 +3,9 @@ import React, { useState } from 'react';
 import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
 import { SERVER_NAME_UI } from '../reducers/ui_constants';
+import AccordionToggle from '../containers/AccordionToggle';
+import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
+import { next_ui } from '../reducers/setup-ui-reducer';
 
 export default ({ onClick }) => {
   const [servername, setServerName] = useState("");
@@ -11,10 +14,15 @@ export default ({ onClick }) => {
     setServerName(event.target.value);
   }
 
+  const decoratedOnClick = () => {
+    useAccordionToggle(SERVER_NAME_UI);
+    onClick(servername);
+  }
+
   return <Card>
-    <Accordion.Toggle as={Card.Header} eventKey={SERVER_NAME_UI}>
+    <AccordionToggle as={Card.Header} eventKey={SERVER_NAME_UI} >
       Name your server
-    </Accordion.Toggle>
+    </AccordionToggle>
     <Accordion.Collapse eventKey={SERVER_NAME_UI}>
       <Card.Body>
         <p>
@@ -27,7 +35,7 @@ export default ({ onClick }) => {
         </p>
         <input type="text" onChange={onChange} autoFocus placeholder="Enter server name"></input>
         <div>
-          <button disabled={servername ? undefined : true} onClick={() => onClick(servername)}>Next</button>
+          <button disabled={servername ? undefined : true} onClick={decoratedOnClick}>Next</button>
         </div>
       </Card.Body>
     </Accordion.Collapse>

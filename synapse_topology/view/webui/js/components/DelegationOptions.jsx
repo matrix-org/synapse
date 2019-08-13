@@ -9,6 +9,7 @@ import Tab from 'react-bootstrap/Tab';
 
 import { DELEGATION_TYPES } from '../actions/constants';
 import { DELEGATION_OPTIONS_UI } from '../reducers/ui_constants';
+import AccordionToggle from '../containers/AccordionToggle';
 
 export default ({ servername, skip, onClick }) => {
   const defaultType = DELEGATION_TYPES.DNS;
@@ -39,12 +40,12 @@ export default ({ servername, skip, onClick }) => {
   }
 
   return <Card>
-    <Accordion.Toggle as={Card.Header} eventKey={DELEGATION_OPTIONS_UI}>
+    <AccordionToggle as={Card.Header} eventKey={DELEGATION_OPTIONS_UI}>
       Delegation (optional)
       <button onClick={skip}>
         Skip
       </button>
-    </Accordion.Toggle>
+    </AccordionToggle>
     <Accordion.Collapse eventKey={DELEGATION_OPTIONS_UI}>
       <Card.Body>
         <p>

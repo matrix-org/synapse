@@ -7,6 +7,7 @@ import ButtonDisplay from './ButtonDisplay';
 import DownloadOrCopy from './DownloadOrCopy';
 
 import { KEY_EXPORT_UI } from '../reducers/ui_constants';
+import AccordionToggle from '../containers/AccordionToggle';
 
 
 export default ({ secret_key_loaded, secret_key, onClick }) => {
@@ -28,9 +29,9 @@ export default ({ secret_key_loaded, secret_key, onClick }) => {
   }
 
   return <Card>
-    <Accordion.Toggle as={Card.Header} eventKey={KEY_EXPORT_UI}>
+    <AccordionToggle as={Card.Header} eventKey={KEY_EXPORT_UI}>
       Secret Key
-    </Accordion.Toggle>
+    </AccordionToggle>
     <Accordion.Collapse eventKey={KEY_EXPORT_UI}>
       {body}
     </Accordion.Collapse>

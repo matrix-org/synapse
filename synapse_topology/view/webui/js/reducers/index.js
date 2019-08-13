@@ -3,12 +3,12 @@ import base_config_reducer from './base-config-reducer';
 import config_ui_reducer from './config-ui-reducer';
 import setup_ui_reducer from './setup-ui-reducer';
 
-import { SETUP_INTRO_UI } from './ui_constants';
+import { SETUP_INTRO_UI, SERVER_NAME_UI } from './ui_constants';
 
 
 export default (state = {
   setup_ui: {
-    active_blocks: [SETUP_INTRO_UI],
+    active_blocks: [SETUP_INTRO_UI, SERVER_NAME_UI],
   },
   config_ui: {
   },

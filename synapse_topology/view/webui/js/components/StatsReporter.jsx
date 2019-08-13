@@ -4,15 +4,16 @@ import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
 
 import { STATS_REPORT_UI } from '../reducers/ui_constants';
+import AccordionToggle from '../containers/AccordionToggle';
 
 
 export default ({ onClick }) => {
   const [consent, setConsent] = useState(true);
 
   return <Card>
-    <Accordion.Toggle as={Card.Header} eventKey={STATS_REPORT_UI}>
+    <AccordionToggle as={Card.Header} eventKey={STATS_REPORT_UI}>
       Anonymous Statistics
-    </Accordion.Toggle>
+    </AccordionToggle>
     <Accordion.Collapse eventKey={STATS_REPORT_UI}>
       <Card.Body>
         <p>

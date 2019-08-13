@@ -19,6 +19,7 @@ import {
   DELEGATION_TEMPLATE_UI,
   DATABASE_UI,
   COMPLETE_UI,
+  SETUP_ORDER,
 } from '../reducers/ui_constants';
 
 import Error from './Error';
@@ -85,7 +86,7 @@ export default ({ setup_ui, config_ui, base_config }) => {
   if (!base_config.setup_done) {
     console.log(setup_ui);
     return <Accordion defaultActiveKey="0">
-      {setup_ui.active_blocks.map(block_mapping)}
+      {SETUP_ORDER.map(block_mapping)}
     </Accordion >
   }
 }

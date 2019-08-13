@@ -1,22 +1,13 @@
 import { ADVANCE_UI, BACK_UI, BASE_CONFIG_CHECKED } from '../actions/types';
-
+import useAccordionToggle from 'react-bootstrap/useAccordionToggle'
 import {
-  SETUP_INTRO_UI,
-  SERVER_NAME_UI,
-  STATS_REPORT_UI,
-  KEY_EXPORT_UI,
-  DELEGATION_OPTIONS_UI,
-  TLS_UI,
-  PORT_SELECTION_UI,
-  REVERSE_PROXY_TEMPLATE_UI,
-  DELEGATION_TEMPLATE_UI,
-  DATABASE_UI,
-  COMPLETE_UI,
+  SETUP_ORDER,
 } from './ui_constants';
 
-import {
-  DELEGATION_TYPES, TLS_TYPES
-} from '../actions/constants';
+
+const new_active_blocks = active_blocks => {
+  return SETUP_ORDER.slice(0, active_blocks.length + 1)
+}
 
 export default ({ setup_ui, base_config }, action) => {
   if (!base_config.base_config_checked) {
@@ -28,14 +19,7 @@ export default ({ setup_ui, base_config }, action) => {
   switch (action.type) {
     case ADVANCE_UI:
       return {
-        active_blocks: [
-          ...setup_ui.active_blocks,
-          forward_mapping(
-            setup_ui.active_blocks[setup_ui.active_blocks.length - 1],
-            action,
-            base_config,
-          ),
-        ]
+        active_blocks: new_active_blocks(setup_ui.active_blocks),
       }
     case BACK_UI:
     default:
@@ -43,34 +27,4 @@ export default ({ setup_ui, base_config }, action) => {
   }
 }
 
-const forward_mapping = (current_ui, action, base_config) => {
-  switch (current_ui) {
-    case SETUP_INTRO_UI:
-      return SERVER_NAME_UI;
-    case SERVER_NAME_UI:
-      return STATS_REPORT_UI;
-    case STATS_REPORT_UI:
-      return KEY_EXPORT_UI;
-    case KEY_EXPORT_UI:
-      return DELEGATION_OPTIONS_UI;
-    case DELEGATION_OPTIONS_UI:
-      return TLS_UI;
-    case TLS_UI:
-      return PORT_SELECTION_UI;
-    case PORT_SELECTION_UI:
-      return DATABASE_UI;
-    case DATABASE_UI:
-      return COMPLETE_UI;
-      return base_config.tls == TLS_TYPES.REVERSE_PROXY ?
-        REVERSE_PROXY_TEMPLATE_UI :
-        base_config.delegation_type != DELEGATION_TYPES.LOCAL ?
-          DELEGATION_TEMPLATE_UI :
-          DATABASE_UI;
-    case REVERSE_PROXY_TEMPLATE_UI:
-      return base_config.delegation_type != DELEGATION_TYPES.LOCAL ?
-        DELEGATION_TEMPLATE_UI :
-        DATABASE_UI;
-    default:
-      return SETUP_INTRO_UI;
-  }
-}
+export const next_ui = current => SETUP_ORDER[SETUP_ORDER.lastIndexOf(current) + 1]

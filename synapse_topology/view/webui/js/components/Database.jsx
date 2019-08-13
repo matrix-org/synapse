@@ -8,6 +8,7 @@ import {
 } from '../actions/constants'
 
 import { DATABASE_UI } from '../reducers/ui_constants';
+import AccordionToggle from '../containers/AccordionToggle';
 
 export default ({
   onClick,
@@ -15,9 +16,9 @@ export default ({
   const defaultDatabase = DATABASE_TYPES.POSTGRES;
   const [database, setDatabase] = useState(defaultDatabase)
   return <Card>
-    <Accordion.Toggle as={Card.Header} eventKey={DATABASE_UI}>
+    <AccordionToggle as={Card.Header} eventKey={DATABASE_UI}>
       Database
-    </Accordion.Toggle>
+    </AccordionToggle>
     <Accordion.Collapse eventKey={DATABASE_UI}>
       <Card.Body>
         <p>Synapse can use either SQLite3 or Postgres as it's database.</p>

@@ -5,6 +5,7 @@ import Card from 'react-bootstrap/Card';
 
 import ReverseProxySampleConfig from '../containers/ReverseProxySampleConfig'
 import DelegationSampleConfig from '../containers/DelegationSampleConfig';
+import AccordionToggle from '../containers/AccordionToggle';
 
 import { TLS_TYPES, DELEGATION_TYPES } from '../actions/constants';
 import { COMPLETE_UI } from '../reducers/ui_constants';
@@ -52,9 +53,9 @@ export default ({
   }
 
   return <Card>
-    <Accordion.Toggle as={Card.Header} eventKey={COMPLETE_UI}>
+    <AccordionToggle as={Card.Header} eventKey={COMPLETE_UI}>
       Setup Complete
-    </Accordion.Toggle>
+    </AccordionToggle>
     <Accordion.Collapse eventKey={COMPLETE_UI}>
       {body}
     </Accordion.Collapse>

@@ -9,6 +9,7 @@ import Tab from 'react-bootstrap/Tab';
 
 import { TLS_UI } from '../reducers/ui_constants';
 import { TLS_TYPES, REVERSE_PROXY_TYPES } from '../actions/constants';
+import AccordionToggle from '../containers/AccordionToggle';
 
 const tlsLink = "https://en.wikipedia.org/wiki/Transport_Layer_Security";
 const apacheLink = "http://httpd.apache.org/";
@@ -31,9 +32,9 @@ export default ({ testingCertPaths, uploadingCerts, certPathInvalid, certKeyPath
   const [reverseProxy, setReverseProxy] = useState(defaultValue);
 
   return <Card>
-    <Accordion.Toggle as={Card.Header} eventKey={TLS_UI}>
+    <AccordionToggle as={Card.Header} eventKey={TLS_UI}>
       TLS
-    </Accordion.Toggle>
+    </AccordionToggle>
     <Accordion.Collapse eventKey={TLS_UI}>
       <Card.Body>
         <p>
