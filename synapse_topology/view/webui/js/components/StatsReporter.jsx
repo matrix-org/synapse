@@ -10,7 +10,7 @@ import { next_ui } from '../reducers/setup-ui-reducer';
 
 
 export default ({ onClick }) => {
-  const [consent, setConsent] = useState(true);
+  const [consent, setConsent] = useState(false);
   const toggle = useAccordionToggle(next_ui(STATS_REPORT_UI));
   const decoratedOnClick = () => {
     toggle();
