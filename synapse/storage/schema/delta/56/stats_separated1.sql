@@ -87,13 +87,6 @@ CREATE TABLE IF NOT EXISTS room_stats_current (
     CONSTRAINT timestamp_nullity_equality CHECK ((start_ts IS NULL) = (end_ts IS NULL))
 );
 
--- TODO check: make it easier to find dirty rows
--- TODO check we specify 'AND start_ts IS NOT NULL' in old collector, to take
--- advantage of optimisations.
-
-
--- TODO check: make it easier to find incomplete rows
-
 
 -- represents HISTORICAL room statistics for a room
 CREATE TABLE IF NOT EXISTS room_stats_historical (
@@ -113,7 +106,7 @@ CREATE TABLE IF NOT EXISTS room_stats_historical (
     PRIMARY KEY (room_id, end_ts)
 );
 
--- We use this index to speed up deletion of old user stats.
+-- We use this index to speed up deletion of ancient room stats.
 CREATE INDEX IF NOT EXISTS room_stats_historical_end_ts ON room_stats_historical (end_ts);
 
 -- We don't need an index on (room_id, end_ts) because PRIMARY KEY sorts that
@@ -137,13 +130,6 @@ CREATE TABLE IF NOT EXISTS user_stats_current (
     completed_delta_stream_id BIGINT
 );
 
-CREATE INDEX IF NOT EXISTS user_stats_current_dirty ON user_stats_current (start_ts)
-    WHERE start_ts IS NOT NULL;
-
--- TODO check: make it easier to find incomplete rows
-CREATE INDEX IF NOT EXISTS user_stats_not_complete ON user_stats_current (user_id)
-    WHERE completed_delta_stream_id IS NULL;
-
 -- represents HISTORICAL statistics for a user
 CREATE TABLE IF NOT EXISTS user_stats_historical (
     user_id TEXT NOT NULL,
@@ -156,7 +142,7 @@ CREATE TABLE IF NOT EXISTS user_stats_historical (
     PRIMARY KEY (user_id, end_ts)
 );
 
--- We use this index to speed up deletion of old user stats.
+-- We use this index to speed up deletion of ancient user stats.
 CREATE INDEX IF NOT EXISTS user_stats_historical_end_ts ON user_stats_historical (end_ts);
 
 -- We don't need an index on (user_id, end_ts) because PRIMARY KEY sorts that
