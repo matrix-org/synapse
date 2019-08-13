@@ -6,10 +6,12 @@ import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
 import Tabs from 'react-bootstrap/Tabs';
 import Tab from 'react-bootstrap/Tab';
+import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
 
 import { DELEGATION_TYPES } from '../actions/constants';
 import { DELEGATION_OPTIONS_UI } from '../reducers/ui_constants';
 import AccordionToggle from '../containers/AccordionToggle';
+import { next_ui } from '../reducers/setup-ui-reducer';
 
 export default ({ servername, skip, onClick }) => {
   const defaultType = DELEGATION_TYPES.DNS;
@@ -39,10 +41,15 @@ export default ({ servername, skip, onClick }) => {
     updateValidity(val, setClientPortValid);
   }
 
+  const toggle = useAccordionToggle(next_ui(DELEGATION_OPTIONS_UI));
+
   return <Card>
     <AccordionToggle as={Card.Header} eventKey={DELEGATION_OPTIONS_UI}>
       Delegation (optional)
-      <button onClick={skip}>
+      <button onClick={() => {
+        toggle();
+        skip();
+      }}>
         Skip
       </button>
     </AccordionToggle>
@@ -115,7 +122,10 @@ export default ({ servername, skip, onClick }) => {
         />
 
         <button disabled={delegatedServername && clientPortValid && fedPortValid ? undefined : true}
-          onClick={() => onClick(type, delegatedServername, fedPort, clientPort)}
+          onClick={() => {
+            toggle();
+            onClick(type, delegatedServername, fedPort, clientPort)
+          }}
         >
           Use {type}
         </button>

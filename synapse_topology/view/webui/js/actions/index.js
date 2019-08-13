@@ -66,12 +66,12 @@ export const generate_secret_keys = consent => {
   }
 }
 
-export const set_tls_cert_paths = (cert_path, cert_key_path) => {
+export const set_tls_cert_paths = (cert_path, cert_key_path, callback) => {
   return dispatch => {
     dispatch(testing_tls_cert_paths(true));
     post_cert_paths(cert_path, cert_key_path)
       .then(
-        result => dispatch(check_tls_cert_path_validity(result)),
+        result => dispatch(check_tls_cert_path_validity(result, callback)),
         error => dispatch(fail(error))
       )
   }
@@ -88,14 +88,14 @@ const testing_tls_cert_paths = testing => ({
   testing,
 });
 
-const check_tls_cert_path_validity = (args) => {
-  const { cert_path, cert_key_path } = args
+const check_tls_cert_path_validity = ({ cert_path, cert_key_path }, callback) => {
   return dispatch => {
     dispatch(testing_tls_cert_paths(false));
     dispatch(set_tls_certs(cert_path.absolute_path, cert_key_path.absolute_path))
     dispatch(set_cert_path_validity({ cert_path, cert_key_path }));
     if (!cert_path.invalid && !cert_key_path.invalid) {
       dispatch(advance_ui());
+      callback();
     }
   }
 }
@@ -199,7 +199,7 @@ export const set_tls = tls_type => ({
   tls_type,
 });
 
-export const set_synapse_ports = (federation_port, client_port) => {
+export const set_synapse_ports = (federation_port, client_port, callback) => {
   const fed_port_priv = federation_port < 1024;
   const client_port_priv = client_port < 1024;
   return dispatch => {
@@ -213,14 +213,15 @@ export const set_synapse_ports = (federation_port, client_port) => {
       .then(
         results => dispatch(update_ports_free(
           fed_port_priv ? true : results.ports[0],
-          client_port_priv ? true : results.ports[1]
+          client_port_priv ? true : results.ports[1],
+          callback,
         )),
         error => dispatch(fail(error)),
       )
   }
 };
 
-export const update_ports_free = (synapse_federation_port_free, synapse_client_port_free) => {
+export const update_ports_free = (synapse_federation_port_free, synapse_client_port_free, callback) => {
   return dispatch => {
     dispatch(testing_synapse_ports(false));
     dispatch({
@@ -229,7 +230,8 @@ export const update_ports_free = (synapse_federation_port_free, synapse_client_p
       synapse_client_port_free,
     });
     if (synapse_federation_port_free && synapse_client_port_free) {
-      dispatch(advance_ui())
+      callback();
+      dispatch(advance_ui());
     }
   }
 }

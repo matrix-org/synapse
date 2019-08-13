@@ -33,8 +33,8 @@ const mapStateToProps = ({ base_config }) => ({
 });
 
 const mapDispathToProps = (dispatch) => ({
-  onClick: (fedPort, clientPort) => {
-    dispatch(set_synapse_ports(fedPort, clientPort));
+  onClick: (fedPort, clientPort, callback) => {
+    dispatch(set_synapse_ports(fedPort, clientPort, callback));
   }
 });
 

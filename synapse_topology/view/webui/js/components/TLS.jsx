@@ -6,10 +6,12 @@ import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
 import Tabs from 'react-bootstrap/Tabs';
 import Tab from 'react-bootstrap/Tab';
+import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
 
 import { TLS_UI } from '../reducers/ui_constants';
 import { TLS_TYPES, REVERSE_PROXY_TYPES } from '../actions/constants';
 import AccordionToggle from '../containers/AccordionToggle';
+import { next_ui } from '../reducers/setup-ui-reducer';
 
 const tlsLink = "https://en.wikipedia.org/wiki/Transport_Layer_Security";
 const apacheLink = "http://httpd.apache.org/";
@@ -30,6 +32,8 @@ export default ({ testingCertPaths, uploadingCerts, certPathInvalid, certKeyPath
 
   const defaultValue = REVERSE_PROXY_TYPES.NGINX;
   const [reverseProxy, setReverseProxy] = useState(defaultValue);
+
+  const toggle = useAccordionToggle(next_ui(TLS_UI));
 
   return <Card>
     <AccordionToggle as={Card.Header} eventKey={TLS_UI}>
@@ -85,7 +89,10 @@ export default ({ testingCertPaths, uploadingCerts, certPathInvalid, certKeyPath
               <option value={REVERSE_PROXY_TYPES.OTHER}>Some other Reverse Proxy</option>
             </select>
             <div>
-              <button onClick={() => onClickReverseProxy(reverseProxy)}>
+              <button onClick={() => {
+                toggle();
+                onClickReverseProxy(reverseProxy)
+              }}>
                 I already/will use a Reverse Proxy with TLS
               </button>
             </div>
@@ -102,7 +109,10 @@ export default ({ testingCertPaths, uploadingCerts, certPathInvalid, certKeyPath
               usually requires root privileges. Do not run Synapse as root. Use
               a Reverse Proxy or Authbind
             </p>
-            <button onClick={() => onClickACME()}>Use ACME</button>
+            <button onClick={() => {
+              toggle();
+              onClickACME()
+            }}>Use ACME</button>
           </Tab>
           <Tab eventKey={TLS_TYPES.TLS} title="Provide your own TLS certs">
             <p>
@@ -128,7 +138,7 @@ export default ({ testingCertPaths, uploadingCerts, certPathInvalid, certKeyPath
 
             <button
               disabled={certPath && certKeyPath ? undefined : true}
-              onClick={() => onClickCertPath(certPath, certKeyPath)}
+              onClick={() => onClickCertPath(certPath, certKeyPath, toggle)}
             >Use TLS Path</button>
 
             <h3>OR..</h3>
@@ -137,7 +147,7 @@ export default ({ testingCertPaths, uploadingCerts, certPathInvalid, certKeyPath
             <input type="file" name="cert" onChange={e => setCertFile(e.target.files[0])} />
             <p>Upload the cert's private key file.</p>
             <input type="file" name="certkey" onChange={e => setCertKeyFile(e.target.files[0])} />
-            <button disabled={certFile && certKeyFile ? undefined : true} onClick={() => onClickCertUpload(certFile, certKeyFile)}>Upload cert</button>
+            <button disabled={certFile && certKeyFile ? undefined : true} onClick={() => onClickCertUpload(certFile, certKeyFile, toggle)}>Upload cert</button>
 
           </Tab>
         </Tabs>

@@ -23,11 +23,12 @@ const mapDispathToProps = (dispatch) => ({
     dispatch(set_tls(TLS_TYPES.REVERSE_PROXY))
     dispatch(set_reverse_proxy(proxy_type))
   },
-  onClickCertPath: (cert_path, cert_key_path) => {
-    dispatch(set_tls_cert_paths(cert_path, cert_key_path));
+  onClickCertPath: (cert_path, cert_key_path, callback) => {
+    dispatch(set_tls_cert_paths(cert_path, cert_key_path, callback));
   },
-  onClickCertUpload: (tls_cert_file, tls_key_file) => {
-    dispatch(upload_tls_cert_files(tls_cert_file, tls_key_file));
+  onClickCertUpload: (tls_cert_file, tls_key_file, callback) => {
+    dispatch(set_tls_cert_files(tls_cert_file, tls_key_file));
+    callback();
   },
 });
 

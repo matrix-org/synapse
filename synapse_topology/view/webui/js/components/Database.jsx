@@ -2,19 +2,26 @@ import React, { useState } from 'react';
 
 import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
+import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
 
 import {
   DATABASE_TYPES
 } from '../actions/constants'
 
 import { DATABASE_UI } from '../reducers/ui_constants';
+
 import AccordionToggle from '../containers/AccordionToggle';
+
+import { next_ui } from '../reducers/setup-ui-reducer';
 
 export default ({
   onClick,
 }) => {
   const defaultDatabase = DATABASE_TYPES.POSTGRES;
   const [database, setDatabase] = useState(defaultDatabase)
+
+  const toggle = useAccordionToggle(next_ui(DATABASE_UI));
+
   return <Card>
     <AccordionToggle as={Card.Header} eventKey={DATABASE_UI}>
       Database
@@ -28,7 +35,10 @@ export default ({
           <option value={DATABASE_TYPES.POSTGRES}>PostgreSQL</option>
           <option value={DATABASE_TYPES.SQLITE3}>SQLite3</option>
         </select>
-        <button onClick={() => onClick(database)}>Next</button>
+        <button onClick={() => {
+          toggle();
+          onClick(database)
+        }}>Next</button>
       </Card.Body>
     </Accordion.Collapse>
   </Card>

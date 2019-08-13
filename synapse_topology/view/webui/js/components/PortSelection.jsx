@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 
-import ContentWrapper from '../containers/ContentWrapper';
-
 import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
+import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
+
 import { PORT_SELECTION_UI } from '../reducers/ui_constants';
+
 import AccordionToggle from '../containers/AccordionToggle';
-import ServerName from '../containers/ServerName';
+import ContentWrapper from '../containers/ContentWrapper';
+
+import { next_ui } from '../reducers/setup-ui-reducer';
 
 export default ({
   servername,
@@ -50,6 +53,8 @@ export default ({
     updatePriv(val, setClientPortPriv);
     updateValidity(val, setClientPortValid);
   }
+
+  const toggle = useAccordionToggle(next_ui(PORT_SELECTION_UI));
 
   return <Card>
     <AccordionToggle as={Card.Header} eventKey={PORT_SELECTION_UI}>
@@ -108,7 +113,7 @@ export default ({
         <div>
           <button
             disabled={clientPortValid && fedPortValid ? undefined : true}
-            onClick={() => onClick(parseInt(fedPort), parseInt(clientPort))}
+            onClick={() => onClick(parseInt(fedPort), parseInt(clientPort), toggle)}
           >Verify These Ports</button>
         </div>
       </Card.Body>
