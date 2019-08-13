@@ -318,7 +318,7 @@ class PusherStore(PusherWorkerStore):
             last_success (int)
 
         Returns:
-            Deferred[bool]: Whether the pusher stil exists or not.
+            Deferred[bool]: True if the pusher still exists; False if it has been deleted.
         """
         updated = yield self._simple_update(
             table="pushers",
