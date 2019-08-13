@@ -73,8 +73,11 @@ class StatsStore(StateDeltasStore):
         self.register_background_update_handler(
             "populate_stats_process_users", self._populate_stats_process_users
         )
-        self.register_background_update_handler(
-            "populate_stats_cleanup", self._populate_stats_cleanup
+        # we no longer need to perform clean-up, but we will give ourselves
+        # the potential to reintroduce it in the future – so documentation
+        # will still encourage the use of this no-op handler.
+        self.register_noop_background_update(
+            "populate_stats_cleanup"
         )
 
     def quantise_stats_time(self, ts):
@@ -215,17 +218,6 @@ class StatsStore(StateDeltasStore):
         self.get_earliest_token_for_stats.invalidate_all()
 
         yield self._end_background_update("populate_stats_prepare")
-        defer.returnValue(1)
-
-    @defer.inlineCallbacks
-    def _populate_stats_cleanup(self, progress, batch_size):
-        """
-        This is a background update which cleans up after statistics regeneration.
-        """
-        # TODO is there really no clean-up to be done?
-
-        # TODO if not self.stats_enabled … cleanup.
-        yield self._end_background_update("populate_stats_cleanup")
         defer.returnValue(1)
 
     @defer.inlineCallbacks
