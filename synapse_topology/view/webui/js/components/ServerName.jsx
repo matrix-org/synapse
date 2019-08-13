@@ -12,10 +12,11 @@ export default ({ onClick }) => {
 
   const onChange = event => {
     setServerName(event.target.value);
-  }
+  };
 
+  const toggle = useAccordionToggle(next_ui(SERVER_NAME_UI));
   const decoratedOnClick = () => {
-    useAccordionToggle(SERVER_NAME_UI);
+    toggle();
     onClick(servername);
   }
 

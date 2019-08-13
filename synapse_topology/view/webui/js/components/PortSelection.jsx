@@ -6,6 +6,7 @@ import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
 import { PORT_SELECTION_UI } from '../reducers/ui_constants';
 import AccordionToggle from '../containers/AccordionToggle';
+import ServerName from '../containers/ServerName';
 
 export default ({
   servername,
