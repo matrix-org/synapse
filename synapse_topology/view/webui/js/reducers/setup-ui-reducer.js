@@ -36,23 +36,7 @@ export default ({ setup_ui, base_config }, action) => {
           ),
         ]
       }
-
-    // TODO: Think about how back should work..
-    // case BACK_UI:
-    //   switch (ui.active_ui) {
-    //     case STATS_REPORT_UI:
-    //       return SERVER_NAME_UI;
-    //     case KEY_EXPORT_UI:
-    //       return STATS_REPORT_UI;
-    //     case DELEGATION_OPTIONS_UI:
-    //       return KEY_EXPORT_UI;
-    //     case WELL_KNOWN_UI:
-    //       return DELEGATION_OPTIONS_UI;
-    //     case DNS_UI:
-    //       return WELL_KNOWN_UI;
-    //     default:
-    //       SETUP_INTRO_UI;
-    //   }
+    case BACK_UI:
     default:
       return setup_ui;
   }
