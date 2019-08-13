@@ -47,6 +47,9 @@ WELL_KNOWN_MIN_CACHE_PERIOD = 5 * 60
 logger = logging.getLogger(__name__)
 
 
+_well_known_cache = TTLCache("well-known")
+
+
 @attr.s(slots=True, frozen=True)
 class WellKnownLookupResult(object):
     delegated_server = attr.ib()
@@ -61,7 +64,7 @@ class WellKnownResolver(object):
         self._clock = Clock(reactor)
 
         if well_known_cache is None:
-            well_known_cache = TTLCache("well-known")
+            well_known_cache = _well_known_cache
 
         self._well_known_cache = well_known_cache
         self._well_known_agent = RedirectAgent(agent)
