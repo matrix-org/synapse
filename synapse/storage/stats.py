@@ -76,9 +76,7 @@ class StatsStore(StateDeltasStore):
         # we no longer need to perform clean-up, but we will give ourselves
         # the potential to reintroduce it in the future – so documentation
         # will still encourage the use of this no-op handler.
-        self.register_noop_background_update(
-            "populate_stats_cleanup"
-        )
+        self.register_noop_background_update("populate_stats_cleanup")
 
     def quantise_stats_time(self, ts):
         """

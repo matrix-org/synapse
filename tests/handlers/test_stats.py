@@ -14,12 +14,14 @@
 # limitations under the License.
 
 from mock import Mock
+
 from twisted.internet import defer
 
 from synapse import storage
 from synapse.api.constants import EventTypes, Membership
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
+
 from tests import unittest
 
 # The expected number of state events in a fresh public room.

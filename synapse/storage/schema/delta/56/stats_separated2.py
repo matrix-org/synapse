@@ -15,7 +15,7 @@
 
 # This schema delta will be run after 'stats_separated1.sql' due to lexicographic
 # ordering. Note that it MUST be so.
-from synapse.storage.engines import Sqlite3Engine, PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 
 def _run_create_generic(stats_type, cursor, database_engine):
