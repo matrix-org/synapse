@@ -1,13 +1,8 @@
-@import url('./themes.less');
-@import url('./animations.less');
+@import './themes.scss';
+@import './animations.scss';
 
-@font-face {
-  font-family: "Helvetica Neue", "Helvetica", Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  src: url('../fonts/LiberationSans-Bold.ttf') format('truetype');
-}
-
-.theme {
-  .dark();
+@mixin theme {
+  @include dark;
 }
 
 html {
@@ -21,15 +16,15 @@ html {
 }
 
 body {
-  .theme();
-  background-color: @primary;
-  color: @font;
+  @include theme;
+  background-color: $primary;
+  color: $font;
   margin: 0;
 }
 
 a {
-  .theme();
-  color: @link;
+  @include theme;
+  color: $link;
   text-decoration: none;
 }
 
@@ -49,7 +44,7 @@ a {
 
 
 .contentWrapper {
-  .theme();
+  @include theme;
   margin: 0 20% 2rem 20%;
   display: flex;
   flex-direction: column;
@@ -70,42 +65,46 @@ a {
   }
 
   button {
-    .rippler();
-    .dropshadowed();
+    @include rippler;
+    @include dropshadowed;
     border-radius: 0.5rem;
     font-size: 1rem;
     padding: 0.6rem;
-    color: @font;
-    background-color: @tertiary;
+    color: $font;
+    background-color: $tertiary;
     border: none;
     display: inline-block;
     text-transform: capitalize;
     font-style: bold;
-    color: @primary;
+    color: $primary;
     margin-left: 0.4rem;
     margin-right: 0.4rem;
   }
 
 
   button[disabled] {
-    background-color: darken(@secondary, 20%);
-    color: lighten(@font, 20%);
+    background-color: darken($secondary, 20%);
+    color: lighten($font, 20%);
   }
 
-  input, .select {
+  @mixin select {
     padding: 0.4rem;
     font-size: 1rem;
-    background-color: @secondary;
+    background-color: $secondary;
     border-width: 0.1rem;
     border-radius: 0.5rem;
-    color: lighten(@font, 20%);
+    color: lighten($font, 20%);
     margin-bottom: 1rem;
     border-style: solid;
-    border-color: darken(@secondary, 50%);
+    border-color: darken($secondary, 50%);
+  }
+
+  input {
+    @include select;
   }
 
   select {
-    .select();
+    @include select;
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
@@ -122,7 +121,7 @@ a {
     font-size: 0.6rem;
     text-align: left;
     border-style: solid;
-    border-color: darken(@secondary, 50%);
+    border-color: darken($secondary, 50%);
     border-radius: 0.5rem;
     text-decoration: none;
   }
@@ -141,6 +140,6 @@ a {
 }
 
 h1 {
-  .theme();
+  @include theme;
   font-size: 2rem;
 }

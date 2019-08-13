@@ -18,23 +18,11 @@ export default {
         use: ['babel-loader'],
       },
       {
-        test: /\.less$/,
+        test: /\.scss$/,
         use: [
-          {
-            loader: 'style-loader',
-          },
-          {
-            loader: 'css-loader',
-            options: {
-              sourceMap: true,
-              modules: {
-                localIdentName: '[local]___[hash:base64:5]'
-              }
-            },
-          },
-          {
-            loader: 'less-loader',
-          },
+	  'style-loader',
+	  'css-loader',
+	  'sass-loader',
         ],
       },
       {

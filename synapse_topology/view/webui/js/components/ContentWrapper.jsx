@@ -1,6 +1,6 @@
 import React from 'react';
 
-import style from '../../less/main.less';
+import style from '../../scss/main.scss';
 
 export default ({ servername, children }) => {
   if (servername) {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import style from '../../less/main.less';
+import style from '../../scss/main.scss';
 
 import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';

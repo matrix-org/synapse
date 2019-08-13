@@ -5,7 +5,7 @@ import { createStore, applyMiddleware } from 'redux'
 import thunk from 'redux-thunk';
 import rootReducer from './reducers';
 import UI from './containers/UI';
-import style from '../less/main.less';
+import style from '../scss/main.scss';
 import logo from '../fonts/matrix-logo.svg';
 
 import { startup } from './actions';
