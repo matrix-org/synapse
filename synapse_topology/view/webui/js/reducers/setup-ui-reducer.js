@@ -57,6 +57,8 @@ const forward_mapping = (current_ui, action, base_config) => {
     case TLS_UI:
       return PORT_SELECTION_UI;
     case PORT_SELECTION_UI:
+      return DATABASE_UI;
+    case DATABASE_UI:
       return base_config.tls == TLS_TYPES.REVERSE_PROXY ?
         REVERSE_PROXY_TEMPLATE_UI :
         base_config.delegation_type != DELEGATION_TYPES.LOCAL ?
@@ -66,8 +68,6 @@ const forward_mapping = (current_ui, action, base_config) => {
       return base_config.delegation_type != DELEGATION_TYPES.LOCAL ?
         DELEGATION_TEMPLATE_UI :
         DATABASE_UI;
-    case DELEGATION_TEMPLATE_UI:
-      return DATABASE_UI;
     default:
       return SETUP_INTRO_UI;
   }
