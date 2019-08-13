@@ -247,7 +247,6 @@ class EmailPusher(object):
             # The pusher has been deleted while we were processing, so
             # lets just stop and return.
             self.on_stop()
-            return
 
     def seconds_until(self, ts_msec):
         secs = (ts_msec - self.clock.time_msec()) / 1000
