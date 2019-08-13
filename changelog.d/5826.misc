@@ -1,0 +1,1 @@
+Reduce global pauses in the events stream caused by expensive state resolution during persistence.
