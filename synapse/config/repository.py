@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import os
 from collections import namedtuple
 
@@ -87,6 +88,18 @@ def parse_thumbnail_requirements(thumbnail_sizes):
 
 class ContentRepositoryConfig(Config):
     def read_config(self, config, **kwargs):
+
+        # Only enable the media repo if either the media repo is enabled or the
+        # current worker app is the media repo.
+        if (
+            self.enable_media_repo is False
+            and config.worker_app != "synapse.app.media_repository"
+        ):
+            self.can_load_media_repo = False
+            return
+        else:
+            self.can_load_media_repo = True
+
         self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
@@ -202,6 +215,13 @@ class ContentRepositoryConfig(Config):
 
         return (
             r"""
+        ## Media Store ##
+
+        # Enable the media store service in the Synapse master. Uncomment the
+        # following if you are using a separate media store worker.
+        #
+        #enable_media_repo: false
+
         # Directory where uploaded images and attachments are stored.
         #
         media_store_path: "%(media_store)s"
