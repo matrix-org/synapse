@@ -22,14 +22,14 @@ const defaultClientPort = state => {
   return state.delegation_federation_port ? state.delegation_federation_port : 443;
 }
 
-const mapStateToProps = (state, ownProps) => ({
-  servername: state.base_config.servername,
-  verifyingPorts: state.base_config.verifying_ports,
-  fedPortInUse: !state.base_config.synapse_federation_port_free,
-  clientPortInUse: !state.base_config.synapse_client_port_free,
-  canChangePorts: state.base_config.tls == TLS_TYPES.REVERSE_PROXY,
-  defaultFedPort: defaultFedPort(state.base_config),
-  defaultClientPort: defaultClientPort(state.base_config),
+const mapStateToProps = ({ base_config }) => ({
+  servername: base_config.servername,
+  verifyingPorts: base_config.verifying_ports,
+  fedPortInUse: base_config.synapse_federation_port_free != undefined ? !base_config.synapse_federation_port_free : false,
+  clientPortInUse: base_config.synapse_client_port_free != undefined ? !base_config.synapse_client_port_free : false,
+  canChangePorts: base_config.tls == TLS_TYPES.REVERSE_PROXY,
+  defaultFedPort: defaultFedPort(base_config),
+  defaultClientPort: defaultClientPort(base_config),
 });
 
 const mapDispathToProps = (dispatch) => ({
