@@ -62,7 +62,7 @@ export default ({ servername, skip, onClick }) => {
         </p>
 
         <Tabs defaultActiveKey={defaultType} onSelect={k => setType(k)}>
-          <Tab eventKey={DELEGATION_TYPES.DNS} title="DNS SRV">
+          <Tab eventKey={DELEGATION_TYPES.DNS} title={DELEGATION_TYPES.DNS}>
             <p>
               You will need access to {servername}'s domain zone DNS records.
               This method also requires the synapse install's server to provide
@@ -73,7 +73,7 @@ export default ({ servername, skip, onClick }) => {
               again, we'll print the SRV record out for you later.)
             </p>
           </Tab>
-          <Tab eventKey={DELEGATION_TYPES.WELL_KNOWN} title=".well_known">
+          <Tab eventKey={DELEGATION_TYPES.WELL_KNOWN} title={DELEGATION_TYPES.WELL_KNOWN}>
             <p>
               {servername} provides the url
               https://{servername}/.well-known/matrix/server which gives
