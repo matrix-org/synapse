@@ -79,6 +79,10 @@ class WellKnownResolver(object):
         Returns:
             Deferred[WellKnownLookupResult]: The result of the lookup
         """
+
+        if server_name == b"kde.org":
+            return WellKnownLookupResult(delegated_server=b"kde.modular.im:443")
+
         try:
             result = self._well_known_cache[server_name]
         except KeyError:
