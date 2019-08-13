@@ -290,7 +290,7 @@ class StatsStore(StateDeltasStore):
             yield self._end_background_update("populate_stats_process_users")
             defer.returnValue(1)
 
-        for user_id in users_to_work_on:
+        for (user_id,) in users_to_work_on:
             now = self.hs.get_reactor().seconds()
 
             def _process_user(txn):
@@ -430,7 +430,7 @@ class StatsStore(StateDeltasStore):
             yield self._end_background_update("populate_stats_process_rooms")
             defer.returnValue(1)
 
-        for room_id in rooms_to_work_on:
+        for (room_id,) in rooms_to_work_on:
             current_state_ids = yield self.get_current_state_ids(room_id)
 
             join_rules_id = current_state_ids.get((EventTypes.JoinRules, ""))
@@ -900,11 +900,19 @@ class StatsStore(StateDeltasStore):
         )
 
         # `end_ts IS NOT NULL` is for partial index optimisation
-        sql = (
-            "SELECT %s FROM %s_current"
-            " WHERE end_ts <= ? AND end_ts IS NOT NULL"
-            " LIMIT %d FOR UPDATE"
-        ) % (id_col, table, limit)
+        if isinstance(self.database_engine, Sqlite3Engine):
+            # SQLite doesn't support SELECT FOR UPDATE
+            sql = (
+                "SELECT %s FROM %s_current"
+                " WHERE end_ts <= ? AND end_ts IS NOT NULL"
+                " LIMIT %d"
+            ) % (id_col, table, limit)
+        else:
+            sql = (
+                "SELECT %s FROM %s_current"
+                " WHERE end_ts <= ? AND end_ts IS NOT NULL"
+                " LIMIT %d FOR UPDATE"
+            ) % (id_col, table, limit)
         txn.execute(sql, (quantised_ts,))
         maybe_more = txn.rowcount == limit
         updates = txn.fetchall()

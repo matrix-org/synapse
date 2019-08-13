@@ -61,7 +61,7 @@ INSERT INTO stats_incremental_position (
     total_events_min_stream_ordering,
     total_events_max_stream_ordering,
     is_background_contract
-) VALUES (NULL, NULL, NULL, FALSE), (NULL, NULL, NULL, TRUE);
+) VALUES (NULL, NULL, NULL, (0 = 1)), (NULL, NULL, NULL, (1 = 1));
 
 -- represents PRESENT room statistics for a room
 CREATE TABLE IF NOT EXISTS room_stats_current (
@@ -102,14 +102,15 @@ CREATE TABLE IF NOT EXISTS room_stats_historical (
     -- Note that end_ts is quantised, and start_ts usually so.
     end_ts BIGINT NOT NULL,
     bucket_size INT NOT NULL,
-    PRIMARY KEY (room_id, end_ts),
 
     current_state_events INT NOT NULL,
     total_events INT NOT NULL,
     joined_members INT NOT NULL,
     invited_members INT NOT NULL,
     left_members INT NOT NULL,
-    banned_members INT NOT NULL
+    banned_members INT NOT NULL,
+
+    PRIMARY KEY (room_id, end_ts)
 );
 
 -- We use this index to speed up deletion of old user stats.
@@ -148,10 +149,11 @@ CREATE TABLE IF NOT EXISTS user_stats_historical (
     user_id TEXT NOT NULL,
     end_ts BIGINT NOT NULL,
     bucket_size INT NOT NULL,
-    PRIMARY KEY (user_id, end_ts),
 
     public_rooms INT NOT NULL,
-    private_rooms INT NOT NULL
+    private_rooms INT NOT NULL,
+
+    PRIMARY KEY (user_id, end_ts)
 );
 
 -- We use this index to speed up deletion of old user stats.
@@ -159,8 +161,6 @@ CREATE INDEX IF NOT EXISTS user_stats_historical_end_ts ON user_stats_historical
 
 -- We don't need an index on (user_id, end_ts) because PRIMARY KEY sorts that
 -- out for us. (We would want it to review stats for a particular user.)
-
--- TODO old SQLites may not support partial indices
 
 
 -- Set up staging tables
