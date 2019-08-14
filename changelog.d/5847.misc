@@ -1,0 +1,2 @@
+Rework room and user statistics to separate current & historical rows, as well
+as track stats correctly.
