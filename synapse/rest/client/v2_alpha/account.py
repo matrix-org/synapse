@@ -405,7 +405,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if self.config.email_threepid_behaviour == "local":
+        if hs.config.email_threepid_behaviour == "local":
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -414,16 +414,16 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 template_text_name=hs.config.email_registration_template_text,
             )
             self.mailer = Mailer(
-                hs=self.hs,
-                app_name=self.config.email_app_name,
+                hs=hs,
+                app_name=hs.config.email_app_name,
                 template_html=templates[0],
                 template_text=templates[1],
             )
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.config.email_threepid_behaviour == "off":
-            if self.config.local_threepid_emails_disabled_due_to_config:
+        if self.hs.config.email_threepid_behaviour == "off":
+            if self.hs.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"
                 )
