@@ -405,13 +405,40 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
+        if self.config.email_threepid_behaviour == "local":
+            from synapse.push.mailer import Mailer, load_jinja2_templates
+
+            templates = load_jinja2_templates(
+                config=hs.config,
+                template_html_name=hs.config.email_registration_template_html,
+                template_text_name=hs.config.email_registration_template_text,
+            )
+            self.mailer = Mailer(
+                hs=self.hs,
+                app_name=self.config.email_app_name,
+                template_html=templates[0],
+                template_text=templates[1],
+            )
+
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if self.config.email_threepid_behaviour == "off":
+            if self.config.local_threepid_emails_disabled_due_to_config:
+                logger.warn(
+                    "User password resets have been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Adding email identities have been disabled on this server"
+            )
+
         body = parse_json_object_from_request(request)
         assert_params_in_dict(
             body, ["id_server", "client_secret", "email", "send_attempt"]
         )
         email = body["email"]
+        client_secret = body["client_secret"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")
 
         if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
@@ -420,12 +447,19 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.datastore.get_user_id_by_threepid("email", email)
+        existingUid = yield self.hs.datastore.get_user_id_by_threepid("email", email)
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
+        if self.hs.config.email_threepid_behaviour == "remote":
+            # Send 3PID validation email from an identity server
             ret = yield self.identity_handler.requestEmailToken(**body)
+        else:
+            # Send 3PID validation email from Synapse
+            ret = yield self.mailer.send_threepid_validation(
+                email, client_secret, send_attempt, next_link
+            )
 
         return (200, ret)
 

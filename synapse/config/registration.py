@@ -99,7 +99,7 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config.get(
             "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
-        self.account_threepid_delegate = config.get("account_threepid_delegate", "")
+        self.account_threepid_delegate = config.get("account_threepid_delegate")
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 

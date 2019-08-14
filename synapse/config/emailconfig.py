@@ -75,7 +75,9 @@ class EmailConfig(Config):
         )
 
         self.email_threepid_behaviour = (
-            "local" if self.account_threepid_delegate else "remote"
+            # Have Synapse handle the email sending if account_threepid_delegate
+            # is not defined
+            "remote" if self.account_threepid_delegate else "local"
         )
         self.local_threepid_emails_disabled_due_to_config = False
         if self.email_threepid_behaviour == "local" and email_config == {}:
