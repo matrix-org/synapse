@@ -25,6 +25,7 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
+import synapse.logging.opentracing as opentracing
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
@@ -53,8 +54,6 @@ from synapse.types import get_domain_from_id
 from synapse.util import glob_to_regex
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
-
-import synapse.logging.opentracing as opentracing
 
 # when processing incoming transactions, we try to handle multiple rooms in
 # parallel, up to this limit.

@@ -22,9 +22,9 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import (
+    get_active_span_text_map,
     trace,
     whitelisted_homeserver,
-    get_active_span_text_map,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import Cache, SQLBaseStore, db_to_json
