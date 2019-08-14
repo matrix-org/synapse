@@ -21,7 +21,6 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
 from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
@@ -30,6 +29,7 @@ from synapse.api.errors import (
 from synapse.events import EventBase
 from synapse.federation.units import Edu
 from synapse.handlers.presence import format_user_presence_state
+from synapse.logging.opentracing import extract_text_map, start_active_span_follows_from
 from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage import UserPresenceState
@@ -211,7 +211,7 @@ class PerDestinationQueue(object):
                 # are never received on the remote the span effectively has no causality.
 
                 span_contexts = [
-                    opentracing.extract_text_map(
+                    extract_text_map(
                         json.loads(
                             edu.get_dict().get("content", {}).get("context", "{}")
                         )
@@ -219,9 +219,7 @@ class PerDestinationQueue(object):
                     for edu in pending_edus
                 ]
 
-                with opentracing.start_active_span_follows_from(
-                    "send_transaction", span_contexts
-                ):
+                with start_active_span_follows_from("send_transaction", span_contexts):
                     # BEGIN CRITICAL SECTION
                     #
                     # In order to avoid a race condition, we need to make sure that

@@ -19,8 +19,13 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
 from synapse.api.errors import SynapseError
+from synapse.logging.opentracing import (
+    get_active_span_text_map,
+    set_tag,
+    start_active_span,
+    whitelisted_homeserver,
+)
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.stringutils import random_string
 
@@ -103,19 +108,19 @@ class DeviceMessageHandler(object):
 
         message_id = random_string(16)
 
-        context = opentracing.get_active_span_text_map()
+        context = get_active_span_text_map()
 
         remote_edu_contents = {}
         for destination, messages in remote_messages.items():
-            with opentracing.start_active_span("to_device_for_user"):
-                opentracing.set_tag("destination", destination)
+            with start_active_span("to_device_for_user"):
+                set_tag("destination", destination)
                 remote_edu_contents[destination] = {
                     "messages": messages,
                     "sender": sender_user_id,
                     "type": message_type,
                     "message_id": message_id,
                     "org.matrix.context": json.dumps(context)
-                    if opentracing.whitelisted_homeserver(destination)
+                    if whitelisted_homeserver(destination)
                     else None,
                 }
 
