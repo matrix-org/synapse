@@ -18,11 +18,10 @@ from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore, db_to_json
-
-import synapse.logging.opentracing as opentracing
 
 
 class EndToEndKeyWorkerStore(SQLBaseStore):

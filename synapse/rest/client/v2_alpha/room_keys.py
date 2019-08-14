@@ -23,7 +23,6 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-import synapse.logging.opentracing as opentracing
 
 from ._base import client_patterns
 
