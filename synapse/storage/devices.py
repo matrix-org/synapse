@@ -21,6 +21,11 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.logging.opentracing import (
+    trace,
+    whitelisted_homeserver,
+    get_active_span_text_map,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import Cache, SQLBaseStore, db_to_json
 from synapse.storage.background_updates import BackgroundUpdateStore
@@ -73,7 +78,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return {d["device_id"]: d for d in devices}
 
-    @opentracing.trace_defered_function
+    @trace
     @defer.inlineCallbacks
     def get_devices_by_remote(self, destination, from_stream_id, limit):
         """Get stream of updates to send to remote servers
@@ -223,7 +228,7 @@ class DeviceWorkerStore(SQLBaseStore):
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
                     "context": query_map[(user_id, device_id)][1]
-                    if opentracing.whitelisted_homeserver(destination)
+                    if whitelisted_homeserver(destination)
                     else "{}",
                 }
 
@@ -823,7 +828,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             ],
         )
 
-        context = {"opentracing": opentracing.get_active_span_text_map()}
+        context = {"opentracing": get_active_span_text_map()}
 
         self._simple_insert_many_txn(
             txn,
@@ -837,7 +842,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "sent": False,
                     "ts": now,
                     "context": json.dumps(context)
-                    if opentracing.whitelisted_homeserver(destination)
+                    if whitelisted_homeserver(destination)
                     else "{}",
                 }
                 for destination in hosts
