@@ -220,7 +220,7 @@ class DeviceWorkerHandler(BaseHandler):
 
         opentracing.log_kv(result)
 
-        return {result}
+        return result
 
 
 class DeviceHandler(DeviceWorkerHandler):
