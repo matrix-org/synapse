@@ -179,7 +179,7 @@ class Auth(object):
     def get_public_keys(self, invite_event):
         return event_auth.get_public_keys(invite_event)
 
-    @opentracing.trace_deferred
+    @opentracing.trace
     @defer.inlineCallbacks
     def get_user_by_req(
         self, request, allow_guest=False, rights="access", allow_expired=False
@@ -214,7 +214,6 @@ class Auth(object):
                 opentracing.set_tag("authenticated_entity", user_id)
                 # there is at least one other place where authenticated entity is
                 # set. user_id is tagged in case authenticated_entity is clobbered
-                opentracing.set_tag("user_id", user_id)
 
                 if ip_addr and self.hs.config.track_appservice_user_ips:
                     yield self.store.insert_client_ip(
