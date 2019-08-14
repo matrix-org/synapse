@@ -144,10 +144,15 @@ class DeviceWorkerStore(SQLBaseStore):
                 break
 
             key = (update[0], update[1])
-            context = update[3]
-            stream_id = max(query_map.get(key, (0, None))[0], update[2])
 
-            query_map[key] = (stream_id, context)
+            update_context = update[3]
+            update_stream_id = update[2]
+
+            previous_update = query_map.get(key, (0, None))
+            previous_update_stream_id = previous_update[0]
+
+            if update_stream_id > previous_update_stream_id:
+                query_map[key] = (update_stream_id, update_context)
 
         # If we didn't find any updates with a stream_id lower than the cutoff, it
         # means that there are more than limit updates all of which have the same
@@ -198,8 +203,9 @@ class DeviceWorkerStore(SQLBaseStore):
         Args:
             destination (str): The host the device updates are intended for
             from_stream_id (int): The minimum stream_id to filter updates by, exclusive
-            query_map (Dict[(str, str): (int, str)]): Dictionary mapping
-                user_id/device_id to update stream_id and the relevent opentracing context
+            query_map (Dict[(str, str): (int, str|None)]): Dictionary mapping
+                user_id/device_id to update stream_id and the relevent json-encoded
+                opentracing context
 
         Returns:
             List[Dict]: List of objects representing an device update EDU
@@ -841,7 +847,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "ts": now,
                     "context": json.dumps(context)
                     if whitelisted_homeserver(destination)
-                    else "{}",
+                    else None,
                 }
                 for destination in hosts
                 for device_id in device_ids
