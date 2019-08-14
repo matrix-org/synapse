@@ -19,7 +19,6 @@ from six import iteritems
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
 from synapse.api.errors import (
     Codes,
     NotFoundError,
@@ -27,6 +26,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.logging.opentracing import log_kv, trace
 from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class E2eRoomKeysHandler(object):
         # changed.
         self._upload_linearizer = Linearizer("upload_room_keys_lock")
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def get_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk get the E2E room keys for a given backup, optionally filtered to a given
@@ -86,10 +86,10 @@ class E2eRoomKeysHandler(object):
                 user_id, version, room_id, session_id
             )
 
-            opentracing.log_kv(results)
+            log_kv(results)
             return results
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def delete_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
@@ -111,7 +111,7 @@ class E2eRoomKeysHandler(object):
         with (yield self._upload_linearizer.queue(user_id)):
             yield self.store.delete_e2e_room_keys(user_id, version, room_id, session_id)
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def upload_room_keys(self, user_id, version, room_keys):
         """Bulk upload a list of room keys into a given backup version, asserting
@@ -191,7 +191,7 @@ class E2eRoomKeysHandler(object):
             session_id(str): the session whose room_key we're setting
             room_key(dict): the room_key being set
         """
-        opentracing.log_kv(
+        log_kv(
             {
                 "message": "Trying to upload room key",
                 "room_id": room_id,
@@ -207,7 +207,7 @@ class E2eRoomKeysHandler(object):
             )
         except StoreError as e:
             if e.code == 404:
-                opentracing.log_kv(
+                log_kv(
                     {
                         "message": "Room key not found.",
                         "room_id": room_id,
@@ -218,12 +218,12 @@ class E2eRoomKeysHandler(object):
                 raise
 
         if self._should_replace_room_key(current_room_key, room_key):
-            opentracing.log_kv({"message": "Replacing room key."})
+            log_kv({"message": "Replacing room key."})
             yield self.store.set_e2e_room_key(
                 user_id, version, room_id, session_id, room_key
             )
         else:
-            opentracing.log_kv({"message": "Not replacing room_key."})
+            log_kv({"message": "Not replacing room_key."})
 
     @staticmethod
     def _should_replace_room_key(current_room_key, room_key):
@@ -257,7 +257,7 @@ class E2eRoomKeysHandler(object):
                 return False
         return True
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def create_version(self, user_id, version_info):
         """Create a new backup version.  This automatically becomes the new
@@ -316,7 +316,7 @@ class E2eRoomKeysHandler(object):
                     raise
             return res
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def delete_version(self, user_id, version=None):
         """Deletes a given version of the user's e2e_room_keys backup
@@ -337,7 +337,7 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def update_version(self, user_id, version, version_info):
         """Update the info about a given version of the user's backup
