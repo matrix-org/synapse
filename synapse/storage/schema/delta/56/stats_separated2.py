@@ -22,7 +22,7 @@ def _run_create_generic(stats_type, cursor, database_engine):
     """
     Creates the pertinent (partial, if supported) indices for one kind of stats.
     Args:
-        stats_type: "room" or "user" – the type of stats
+        stats_type: "room" or "user" - the type of stats
         cursor: Database Cursor
         database_engine: Database Engine
     """
@@ -72,7 +72,7 @@ def _run_create_generic(stats_type, cursor, database_engine):
 def run_create(cursor, database_engine):
     """
     This function is called as part of the schema delta.
-    It will create indices – partial, if supported – for the new 'separated'
+    It will create indices - partial, if supported - for the new 'separated'
     room & user statistics.
     """
     _run_create_generic("room", cursor, database_engine)

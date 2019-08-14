@@ -67,7 +67,7 @@ INSERT INTO stats_incremental_position (
 CREATE TABLE IF NOT EXISTS room_stats_current (
     room_id TEXT NOT NULL PRIMARY KEY,
 
-    -- These starts cover the time from start_ts…end_ts (in seconds).
+    -- These starts cover the time from start_ts...end_ts (in seconds).
     -- Note that end_ts is quantised, and start_ts usually so.
     start_ts BIGINT,
     end_ts BIGINT,
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS room_stats_current (
 -- represents HISTORICAL room statistics for a room
 CREATE TABLE IF NOT EXISTS room_stats_historical (
     room_id TEXT NOT NULL,
-    -- These starts cover the time from (end_ts - bucket_size)…end_ts (in seconds).
+    -- These stats cover the time from (end_ts - bucket_size)...end_ts (in seconds).
     -- Note that end_ts is quantised, and start_ts usually so.
     end_ts BIGINT NOT NULL,
     bucket_size INT NOT NULL,
