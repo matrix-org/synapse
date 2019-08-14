@@ -14,10 +14,7 @@
  */
 
 /*
- * Opentracing needs to inject a span_context into data item which leaves the
- * current execution context. Since device list updates are dumped in here
- * and then processed later they need to include the span context for opentraing.
- * Since we may also decide later to include other tracking information the column
- * has just been called "context", the structure of the data within it may change.
+ * Opentracing context data for inclusion in the device_list_update EDUs, as a
+ * json-encoded dictionary
  */
 ALTER TABLE device_lists_outbound_pokes ADD context TEXT;
