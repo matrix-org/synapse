@@ -233,7 +233,7 @@ class DeviceWorkerStore(SQLBaseStore):
                     "device_id": device_id,
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
-                    "context": query_map[(user_id, device_id)][1],
+                    "org.matrix.context": query_map[(user_id, device_id)][1],
                 }
 
                 prev_id = stream_id

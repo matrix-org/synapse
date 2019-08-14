@@ -103,8 +103,7 @@ class DeviceMessageHandler(object):
 
         message_id = random_string(16)
 
-        context = {"opentracing": {}}
-        opentracing.inject_active_span_text_map(context["opentracing"])
+        context = opentracing.get_active_span_text_map()
 
         remote_edu_contents = {}
         for destination, messages in remote_messages.items():
@@ -115,9 +114,9 @@ class DeviceMessageHandler(object):
                     "sender": sender_user_id,
                     "type": message_type,
                     "message_id": message_id,
-                    "context": json.dumps(context)
+                    "org.matrix.context": json.dumps(context)
                     if opentracing.whitelisted_homeserver(destination)
-                    else "{}",
+                    else None,
                 }
 
         stream_id = yield self.store.add_messages_to_device_inbox(

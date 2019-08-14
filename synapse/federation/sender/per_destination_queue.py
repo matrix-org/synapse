@@ -214,7 +214,7 @@ class PerDestinationQueue(object):
                     opentracing.extract_text_map(
                         json.loads(
                             edu.get_dict().get("content", {}).get("context", "{}")
-                        ).get("opentracing", {})
+                        )
                     )
                     for edu in pending_edus
                 ]
@@ -222,25 +222,6 @@ class PerDestinationQueue(object):
                 with opentracing.start_active_span_follows_from(
                     "send_transaction", span_contexts
                 ):
-                    # Link each sent edu to this transaction's span
-                    _pending_edus = []
-                    for edu in pending_edus:
-                        edu_dict = edu.get_dict()
-                        span_context = json.loads(
-                            edu_dict.get("content", {}).get("context", "{}")
-                        ).get("opentracing", {})
-                        # If there is no span context then we are either blacklisting
-                        # this destination or we are not tracing
-                        if span_context:
-                            span_context.setdefault("references", []).append(
-                                opentracing.active_span_context_as_string()
-                            )
-                            edu_dict["content"]["context"] = json.dumps(
-                                {"opentracing": span_context}
-                            )
-                        _pending_edus.append(Edu(**edu_dict))
-                    pending_edus = _pending_edus
-
                     # BEGIN CRITICAL SECTION
                     #
                     # In order to avoid a race condition, we need to make sure that
