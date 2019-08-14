@@ -75,12 +75,12 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         info = yield self.get_user_by_id(user_id)
         if not info:
-            defer.returnValue(False)
+            return False
 
         now = self.clock.time_msec()
         trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
-        defer.returnValue(is_trial)
+        return is_trial
 
     @cached()
     def get_user_by_access_token(self, token):
@@ -115,7 +115,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             allow_none=True,
             desc="get_expiration_ts_for_user",
         )
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def set_account_validity_for_user(
@@ -190,7 +190,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="get_user_from_renewal_token",
         )
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def get_renewal_token_for_user(self, user_id):
@@ -209,7 +209,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="get_renewal_token_for_user",
         )
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def get_users_expiring_soon(self):
@@ -237,7 +237,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             self.config.account_validity.renew_at,
         )
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def set_renewal_mail_status(self, user_id, email_sent):
@@ -280,7 +280,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="is_server_admin",
         )
 
-        defer.returnValue(res if res else False)
+        return res if res else False
 
     def _query_for_auth(self, txn, token):
         sql = (
@@ -311,7 +311,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         res = yield self.runInteraction(
             "is_support_user", self.is_support_user_txn, user_id
         )
-        defer.returnValue(res)
+        return res
 
     def is_support_user_txn(self, txn, user_id):
         res = self._simple_select_one_onecol_txn(
@@ -349,7 +349,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             return 0
 
         ret = yield self.runInteraction("count_users", _count_users)
-        defer.returnValue(ret)
+        return ret
 
     def count_daily_user_type(self):
         """
@@ -395,7 +395,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             return count
 
         ret = yield self.runInteraction("count_users", _count_users)
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def find_next_generated_user_id_localpart(self):
@@ -425,7 +425,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 if i not in found:
                     return i
 
-        defer.returnValue(
+        return (
             (
                 yield self.runInteraction(
                     "find_next_generated_user_id", _find_next_generated_user_id
@@ -447,7 +447,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         user_id = yield self.runInteraction(
             "get_user_id_by_threepid", self.get_user_id_by_threepid_txn, medium, address
         )
-        defer.returnValue(user_id)
+        return user_id
 
     def get_user_id_by_threepid_txn(self, txn, medium, address):
         """Returns user id from threepid
@@ -487,7 +487,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             ["medium", "address", "validated_at", "added_at"],
             "user_get_threepids",
         )
-        defer.returnValue(ret)
+        return ret
 
     def user_delete_threepid(self, user_id, medium, address):
         return self._simple_delete(
@@ -568,6 +568,27 @@ class RegistrationWorkerStore(SQLBaseStore):
             retcol="id_server",
             desc="get_id_servers_user_bound",
         )
+
+    @cachedInlineCallbacks()
+    def get_user_deactivated_status(self, user_id):
+        """Retrieve the value for the `deactivated` property for the provided user.
+
+        Args:
+            user_id (str): The ID of the user to retrieve the status for.
+
+        Returns:
+            defer.Deferred(bool): The requested value.
+        """
+
+        res = yield self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="deactivated",
+            desc="get_user_deactivated_status",
+        )
+
+        # Convert the integer into a boolean.
+        return res == 1
 
 
 class RegistrationStore(
@@ -677,7 +698,7 @@ class RegistrationStore(
         if end:
             yield self._end_background_update("users_set_deactivated_flag")
 
-        defer.returnValue(batch_size)
+        return batch_size
 
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id, valid_until_ms):
@@ -968,7 +989,7 @@ class RegistrationStore(
             desc="is_guest",
         )
 
-        defer.returnValue(res if res else False)
+        return res if res else False
 
     def add_user_pending_deactivation(self, user_id):
         """
@@ -1035,7 +1056,7 @@ class RegistrationStore(
 
         yield self._end_background_update("user_threepids_grandfather")
 
-        defer.returnValue(1)
+        return 1
 
     def get_threepid_validation_session(
         self, medium, client_secret, address=None, sid=None, validated=True
@@ -1328,24 +1349,3 @@ class RegistrationStore(
             user_id,
             deactivated,
         )
-
-    @cachedInlineCallbacks()
-    def get_user_deactivated_status(self, user_id):
-        """Retrieve the value for the `deactivated` property for the provided user.
-
-        Args:
-            user_id (str): The ID of the user to retrieve the status for.
-
-        Returns:
-            defer.Deferred(bool): The requested value.
-        """
-
-        res = yield self._simple_select_one_onecol(
-            table="users",
-            keyvalues={"name": user_id},
-            retcol="deactivated",
-            desc="get_user_deactivated_status",
-        )
-
-        # Convert the integer into a boolean.
-        defer.returnValue(res == 1)

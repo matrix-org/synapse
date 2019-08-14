@@ -87,7 +87,7 @@ class MessageHandler(object):
             )
             data = room_state[membership_event_id].get(key)
 
-        defer.returnValue(data)
+        return data
 
     @defer.inlineCallbacks
     def get_state_events(
@@ -174,7 +174,7 @@ class MessageHandler(object):
             # events, as clients won't use them.
             bundle_aggregations=False,
         )
-        defer.returnValue(events)
+        return events
 
     @defer.inlineCallbacks
     def get_joined_members(self, requester, room_id):
@@ -213,15 +213,13 @@ class MessageHandler(object):
                 # Loop fell through, AS has no interested users in room
                 raise AuthError(403, "Appservice not in room")
 
-        defer.returnValue(
-            {
-                user_id: {
-                    "avatar_url": profile.avatar_url,
-                    "display_name": profile.display_name,
-                }
-                for user_id, profile in iteritems(users_with_profile)
+        return {
+            user_id: {
+                "avatar_url": profile.avatar_url,
+                "display_name": profile.display_name,
             }
-        )
+            for user_id, profile in iteritems(users_with_profile)
+        }
 
 
 class EventCreationHandler(object):
@@ -380,7 +378,11 @@ class EventCreationHandler(object):
             # tolerate them in event_auth.check().
             prev_state_ids = yield context.get_prev_state_ids(self.store)
             prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
-            prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+            prev_event = (
+                yield self.store.get_event(prev_event_id, allow_none=True)
+                if prev_event_id
+                else None
+            )
             if not prev_event or prev_event.membership != Membership.JOIN:
                 logger.warning(
                     (
@@ -398,7 +400,7 @@ class EventCreationHandler(object):
 
         self.validator.validate_new(event)
 
-        defer.returnValue((event, context))
+        return (event, context)
 
     def _is_exempt_from_privacy_policy(self, builder, requester):
         """"Determine if an event to be sent is exempt from having to consent
@@ -425,9 +427,9 @@ class EventCreationHandler(object):
     @defer.inlineCallbacks
     def _is_server_notices_room(self, room_id):
         if self.config.server_notices_mxid is None:
-            defer.returnValue(False)
+            return False
         user_ids = yield self.store.get_users_in_room(room_id)
-        defer.returnValue(self.config.server_notices_mxid in user_ids)
+        return self.config.server_notices_mxid in user_ids
 
     @defer.inlineCallbacks
     def assert_accepted_privacy_policy(self, requester):
@@ -507,7 +509,7 @@ class EventCreationHandler(object):
                     event.event_id,
                     prev_state.event_id,
                 )
-                defer.returnValue(prev_state)
+                return prev_state
 
         yield self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
@@ -523,6 +525,8 @@ class EventCreationHandler(object):
         """
         prev_state_ids = yield context.get_prev_state_ids(self.store)
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
+        if not prev_event_id:
+            return
         prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
         if not prev_event:
             return
@@ -531,7 +535,7 @@ class EventCreationHandler(object):
             prev_content = encode_canonical_json(prev_event.content)
             next_content = encode_canonical_json(event.content)
             if prev_content == next_content:
-                defer.returnValue(prev_event)
+                return prev_event
         return
 
     @defer.inlineCallbacks
@@ -563,7 +567,7 @@ class EventCreationHandler(object):
             yield self.send_nonmember_event(
                 requester, event, context, ratelimit=ratelimit
             )
-        defer.returnValue(event)
+        return event
 
     @measure_func("create_new_client_event")
     @defer.inlineCallbacks
@@ -626,7 +630,7 @@ class EventCreationHandler(object):
 
         logger.debug("Created event %s", event.event_id)
 
-        defer.returnValue((event, context))
+        return (event, context)
 
     @measure_func("handle_new_client_event")
     @defer.inlineCallbacks
@@ -791,13 +795,15 @@ class EventCreationHandler(object):
                 get_prev_content=False,
                 allow_rejected=False,
                 allow_none=True,
-                check_room_id=event.room_id,
             )
 
             # we can make some additional checks now if we have the original event.
             if original_event:
                 if original_event.type == EventTypes.Create:
                     raise AuthError(403, "Redacting create events is not permitted")
+
+                if original_event.room_id != event.room_id:
+                    raise SynapseError(400, "Cannot redact event from a different room")
 
             prev_state_ids = yield context.get_prev_state_ids(self.store)
             auth_events_ids = yield self.auth.compute_auth_events(

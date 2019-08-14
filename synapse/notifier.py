@@ -365,7 +365,7 @@ class Notifier(object):
             current_token = user_stream.current_token
             result = yield callback(prev_token, current_token)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def get_events_for(
@@ -400,7 +400,7 @@ class Notifier(object):
         @defer.inlineCallbacks
         def check_for_updates(before_token, after_token):
             if not after_token.is_after(before_token):
-                defer.returnValue(EventStreamResult([], (from_token, from_token)))
+                return EventStreamResult([], (from_token, from_token))
 
             events = []
             end_token = from_token
@@ -440,7 +440,7 @@ class Notifier(object):
                 events.extend(new_events)
                 end_token = end_token.copy_and_replace(keyname, new_key)
 
-            defer.returnValue(EventStreamResult(events, (from_token, end_token)))
+            return EventStreamResult(events, (from_token, end_token))
 
         user_id_for_stream = user.to_string()
         if is_peeking:
@@ -465,18 +465,18 @@ class Notifier(object):
             from_token=from_token,
         )
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _get_room_ids(self, user, explicit_room_id):
         joined_room_ids = yield self.store.get_rooms_for_user(user.to_string())
         if explicit_room_id:
             if explicit_room_id in joined_room_ids:
-                defer.returnValue(([explicit_room_id], True))
+                return ([explicit_room_id], True)
             if (yield self._is_world_readable(explicit_room_id)):
-                defer.returnValue(([explicit_room_id], False))
+                return ([explicit_room_id], False)
             raise AuthError(403, "Non-joined access not allowed")
-        defer.returnValue((joined_room_ids, True))
+        return (joined_room_ids, True)
 
     @defer.inlineCallbacks
     def _is_world_readable(self, room_id):
@@ -484,9 +484,9 @@ class Notifier(object):
             room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if state and "history_visibility" in state.content:
-            defer.returnValue(state.content["history_visibility"] == "world_readable")
+            return state.content["history_visibility"] == "world_readable"
         else:
-            defer.returnValue(False)
+            return False
 
     @log_function
     def remove_expired_streams(self):

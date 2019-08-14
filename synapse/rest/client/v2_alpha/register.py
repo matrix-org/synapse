@@ -95,7 +95,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -138,7 +138,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -178,7 +178,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
             yield self.registration_handler.check_username(username)
 
-            defer.returnValue((200, {"available": True}))
+            return (200, {"available": True})
 
 
 class RegisterRestServlet(RestServlet):
@@ -230,7 +230,7 @@ class RegisterRestServlet(RestServlet):
 
         if kind == b"guest":
             ret = yield self._do_guest_registration(body, address=client_addr)
-            defer.returnValue(ret)
+            return ret
             return
         elif kind != b"user":
             raise UnrecognizedRequestError(
@@ -282,7 +282,7 @@ class RegisterRestServlet(RestServlet):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
-            defer.returnValue((200, result))  # we throw for non 200 responses
+            return (200, result)  # we throw for non 200 responses
             return
 
         # for either shared secret or regular registration, downcase the
@@ -301,7 +301,7 @@ class RegisterRestServlet(RestServlet):
             result = yield self._do_shared_secret_registration(
                 desired_username, desired_password, body
             )
-            defer.returnValue((200, result))  # we throw for non 200 responses
+            return (200, result)  # we throw for non 200 responses
             return
 
         # == Normal User Registration == (everyone else)
@@ -500,7 +500,7 @@ class RegisterRestServlet(RestServlet):
                 bind_msisdn=params.get("bind_msisdn"),
             )
 
-        defer.returnValue((200, return_dict))
+        return (200, return_dict)
 
     def on_OPTIONS(self, _):
         return 200, {}
@@ -510,7 +510,7 @@ class RegisterRestServlet(RestServlet):
         user_id = yield self.registration_handler.appservice_register(
             username, as_token
         )
-        defer.returnValue((yield self._create_registration_details(user_id, body)))
+        return (yield self._create_registration_details(user_id, body))
 
     @defer.inlineCallbacks
     def _do_shared_secret_registration(self, username, password, body):
@@ -546,7 +546,7 @@ class RegisterRestServlet(RestServlet):
         )
 
         result = yield self._create_registration_details(user_id, body)
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _create_registration_details(self, user_id, params):
@@ -570,7 +570,7 @@ class RegisterRestServlet(RestServlet):
             )
 
             result.update({"access_token": access_token, "device_id": device_id})
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _do_guest_registration(self, params, address=None):
@@ -588,16 +588,14 @@ class RegisterRestServlet(RestServlet):
             user_id, device_id, initial_display_name, is_guest=True
         )
 
-        defer.returnValue(
-            (
-                200,
-                {
-                    "user_id": user_id,
-                    "device_id": device_id,
-                    "access_token": access_token,
-                    "home_server": self.hs.hostname,
-                },
-            )
+        return (
+            200,
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+            },
         )
 
 

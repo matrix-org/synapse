@@ -100,4 +100,4 @@ class AcmeHandler(object):
             logger.exception("Failed saving!")
             raise
 
-        defer.returnValue(True)
+        return True

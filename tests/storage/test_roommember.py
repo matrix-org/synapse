@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
-from synapse.types import RoomID, UserID
+from synapse.types import Requester, RoomID, UserID
 
 from tests import unittest
 from tests.utils import create_room, setup_test_homeserver
@@ -67,7 +67,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
 
         yield self.store.persist_event(event, context)
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def test_one_member(self):
@@ -84,3 +84,38 @@ class RoomMemberStoreTestCase(unittest.TestCase):
                 )
             ],
         )
+
+
+class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, homeserver):
+        self.store = homeserver.get_datastore()
+        self.room_creator = homeserver.get_room_creation_handler()
+
+    def test_can_rerun_update(self):
+        # First make sure we have completed all updates.
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)
+
+        # Now let's create a room, which will insert a membership
+        user = UserID("alice", "test")
+        requester = Requester(user, None, False, None, None)
+        self.get_success(self.room_creator.create_room(requester, {}))
+
+        # Register the background update to run again.
+        self.get_success(
+            self.store._simple_insert(
+                table="background_updates",
+                values={
+                    "update_name": "current_state_events_membership",
+                    "progress_json": "{}",
+                    "depends_on": None,
+                },
+            )
+        )
+
+        # ... and tell the DataStore that it hasn't finished all updates yet
+        self.store._all_done = False
+
+        # Now let's actually drive the updates to completion
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)

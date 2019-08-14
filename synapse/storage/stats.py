@@ -140,7 +140,7 @@ class StatsStore(StateDeltasStore):
 
         if not self.stats_enabled:
             yield self._end_background_update("populate_stats_prepare")
-            defer.returnValue(1)
+            return 1
 
         def _wedge_incremental_processor(txn):
             """
@@ -218,7 +218,7 @@ class StatsStore(StateDeltasStore):
         self.get_earliest_token_for_stats.invalidate_all()
 
         yield self._end_background_update("populate_stats_prepare")
-        defer.returnValue(1)
+        return 1
 
     @defer.inlineCallbacks
     def _populate_stats_process_users(self, progress, batch_size):
@@ -227,7 +227,7 @@ class StatsStore(StateDeltasStore):
         """
         if not self.stats_enabled:
             yield self._end_background_update("populate_stats_process_users")
-            defer.returnValue(1)
+            return 1
 
         def _get_next_batch(txn):
             # Only fetch 250 users, so we don't fetch too many at once, even
@@ -260,7 +260,7 @@ class StatsStore(StateDeltasStore):
         # No more users -- complete the transaction.
         if not users_to_work_on:
             yield self._end_background_update("populate_stats_process_users")
-            defer.returnValue(1)
+            return 1
 
         logger.info(
             "Processing the next %d users of %d remaining",
@@ -280,7 +280,7 @@ class StatsStore(StateDeltasStore):
                 promised_positions,
             )
             yield self._end_background_update("populate_stats_process_users")
-            defer.returnValue(1)
+            return 1
 
         for (user_id,) in users_to_work_on:
             now = self.hs.get_reactor().seconds()
@@ -348,7 +348,7 @@ class StatsStore(StateDeltasStore):
 
             if processed_membership_count > batch_size:
                 # Don't process any more users, we've hit our batch size.
-                defer.returnValue(processed_membership_count)
+                return processed_membership_count
 
         yield self.runInteraction(
             "populate_stats",
@@ -357,7 +357,7 @@ class StatsStore(StateDeltasStore):
             progress,
         )
 
-        defer.returnValue(processed_membership_count)
+        return processed_membership_count
 
     @defer.inlineCallbacks
     def _populate_stats_process_rooms(self, progress, batch_size):
@@ -366,7 +366,7 @@ class StatsStore(StateDeltasStore):
         """
         if not self.stats_enabled:
             yield self._end_background_update("populate_stats_process_rooms")
-            defer.returnValue(1)
+            return 1
 
         def _get_next_batch(txn):
             # Only fetch 250 rooms, so we don't fetch too many at once, even
@@ -399,7 +399,7 @@ class StatsStore(StateDeltasStore):
         # No more rooms -- complete the transaction.
         if not rooms_to_work_on:
             yield self._end_background_update("populate_stats_process_rooms")
-            defer.returnValue(1)
+            return 1
 
         logger.info(
             "Processing the next %d rooms of %d remaining",
@@ -420,7 +420,7 @@ class StatsStore(StateDeltasStore):
                 promised_positions,
             )
             yield self._end_background_update("populate_stats_process_rooms")
-            defer.returnValue(1)
+            return 1
 
         for (room_id,) in rooms_to_work_on:
             current_state_ids = yield self.get_current_state_ids(room_id)
@@ -435,16 +435,18 @@ class StatsStore(StateDeltasStore):
             avatar_id = current_state_ids.get((EventTypes.RoomAvatar, ""))
             canonical_alias_id = current_state_ids.get((EventTypes.CanonicalAlias, ""))
 
+            event_ids = [
+                join_rules_id,
+                history_visibility_id,
+                encryption_id,
+                name_id,
+                topic_id,
+                avatar_id,
+                canonical_alias_id,
+            ]
+
             state_events = yield self.get_events(
-                [
-                    join_rules_id,
-                    history_visibility_id,
-                    encryption_id,
-                    name_id,
-                    topic_id,
-                    avatar_id,
-                    canonical_alias_id,
-                ]
+                [ev for ev in event_ids if ev is not None]
             )
 
             def _get_or_none(event_id, arg):
@@ -535,7 +537,7 @@ class StatsStore(StateDeltasStore):
 
             if processed_event_count > batch_size:
                 # Don't process any more rooms, we've hit our batch size.
-                defer.returnValue(processed_event_count)
+                return processed_event_count
 
         yield self.runInteraction(
             "populate_stats",
@@ -544,7 +546,7 @@ class StatsStore(StateDeltasStore):
             progress,
         )
 
-        defer.returnValue(processed_event_count)
+        return processed_event_count
 
     def update_total_event_count_between_txn(self, txn, low_pos, high_pos):
         """
@@ -934,7 +936,7 @@ class StatsStore(StateDeltasStore):
                 "stats_collect_old", self._collect_old_txn, stats_type
             )
             if not maybe_more:
-                defer.returnValue(None)
+                return None
 
     @defer.inlineCallbacks
     def update_stats_delta(
@@ -966,7 +968,7 @@ class StatsStore(StateDeltasStore):
                     fields,
                     complete_with_stream_id=complete_with_stream_id,
                 )
-                defer.returnValue(res)
+                return res
             except OldCollectionRequired:
                 # retry after collecting old rows
                 yield self.collect_old(stats_type)
