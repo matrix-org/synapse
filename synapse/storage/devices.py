@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import synapse.logging.opentracing as opentracing
 
 from six import iteritems
 
@@ -21,6 +20,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import (
     get_active_span_text_map,

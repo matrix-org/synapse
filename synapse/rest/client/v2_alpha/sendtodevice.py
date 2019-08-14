@@ -17,10 +17,10 @@ import logging
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.http import servlet
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.rest.client.transactions import HttpTransactionCache
-import synapse.logging.opentracing as opentracing
 
 from ._base import client_patterns
 

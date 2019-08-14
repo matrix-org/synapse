@@ -28,7 +28,6 @@ from synapse.logging.opentracing import (
 )
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.stringutils import random_string
-import synapse.logging.opentracing as opentracing
 
 logger = logging.getLogger(__name__)
 
