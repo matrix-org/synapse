@@ -86,8 +86,10 @@ class StatsStore(StateDeltasStore):
             ts: the timestamp to quantise, in seconds since the Unix Epoch
 
         Returns:
-            a timestamp which is divisible by the bucket size,
-            is no later than `ts` and is the largest such timestamp.
+            a timestamp which
+              - is divisible by the bucket size;
+              - is no later than `ts`; and
+              - is the largest such timestamp.
         """
         return (ts // self.stats_bucket_size) * self.stats_bucket_size
 
@@ -546,14 +548,23 @@ class StatsStore(StateDeltasStore):
 
     def update_total_event_count_between_txn(self, txn, low_pos, high_pos):
         """
-        Updates the total_events counts for rooms
+        Updates the total_events counts for rooms, in a range of stream_orderings.
+
+        Inclusivity of low_pos and high_pos is dependent upon their signs.
+        This makes it intuitive to use this function for both backfilled
+        and non-backfilled events.
+
+        Examples:
+        (low, high) → (kind)
+        (3, 7) → 3 < … <= 7 (normal-filled; low already processed before)
+        (-4, -2) → -4 <= … < -2 (backfilled; high already processed before)
+        (-7, 7) → -7 <= … <= 7 (both)
+
         Args:
             txn: Database transaction. It is assumed that you will have one,
                 since you probably want to update pointers at the same time.
-            low_pos: The old stream position (stream position of the last event
-                that was already handled.)
-            high_pos: The new stream position (stream position of the new last
-                event to handle.)
+            low_pos: Low stream ordering
+            high_pos: High stream ordering
         """
 
         if low_pos >= high_pos:
@@ -565,11 +576,6 @@ class StatsStore(StateDeltasStore):
         # we choose comparators based on the signs
         low_comparator = "<=" if low_pos < 0 else "<"
         high_comparator = "<" if high_pos < 0 else "<="
-
-        # so, examples:
-        # 3, 7 → 3 < … <= 7 (normal-filled)
-        # -4, -2 → -4 <= … < -2 (backfilled)
-        # -7, 7 → -7 <= … <= 7 (both)
 
         sql = """
             SELECT room_id, COUNT(*) AS new_events
