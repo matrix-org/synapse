@@ -149,6 +149,9 @@ unchartered waters will require the enforcement of the whitelist.
 ``logging/opentracing.py`` has a ``whitelisted_homeserver`` method which takes
 in a destination and compares it to the whitelist.
 
+Most injection methods take a 'destination' arg. The context will only be injected
+if the destination matches the whitelist or the destination is none.
+
 =======
 Gotchas
 =======
@@ -542,16 +545,14 @@ def inject_active_span_text_map(carrier, destination=None):
 
 def get_active_span_text_map(destination=None):
     """
-    Gets a span context as a dict. This can be used instead of injecting a span
-    into an empty carrier.
+    Gets a span context as a dict. This can be used instead of manually
+    injecting a span into an empty carrier.
 
     Args:
-        destination (str): the name of the remote server. The dict will only
-        contain a span context if the destination matches the homeserver_whitelist
-        or if destination is None.
+        destination (str): the name of the remote server.
 
     Returns:
-        A dict containing the span context.
+        A dict - it contains the active span's context if opentracing is enabled.
     """
 
     if not opentracing or (destination and not whitelisted_homeserver(destination)):
