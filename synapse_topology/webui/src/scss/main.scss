@@ -2,47 +2,47 @@
 @import './animations.scss';
 @import './bootstrap.min.css';
 @mixin theme {
-  @include dark;
+    @include dark;
 }
 
 html {
-  box-sizing: border-box;
-  font-family: Ariel, sans-serif;
-  font-size: 2rem;
+    box-sizing: border-box;
+    font-family: Ariel, sans-serif;
+    font-size: 2rem;
 }
 
 *, *:before, *:after {
-  box-sizing: inherit;
+    box-sizing: inherit;
 }
 
 body {
-  @include theme;
-  background-color: $primary;
-  color: $font;
-  margin: 0;
+    @include theme;
+    background-color: $primary;
+    color: $font;
+    margin: 0;
 }
 
 a {
-  @include theme;
-  color: $link;
-  text-decoration: none;
+    @include theme;
+    color: $link;
+    text-decoration: none;
 }
 
 .invalid {
     border-color: red;
 }
 .logo {
-  position: absolute;
-  top:0;
-  right: 0;
-  margin: 0.5rem;
+    position: absolute;
+    top:0;
+    right: 0;
+    margin: 0.5rem;
 }
 
 .servername {
-  position: absolute;
-  margin-top: 0.5rem;
-  margin-left: 0.5rem;
-  color: darken(silver, 20%);
+    position: absolute;
+    margin-top: 0.5rem;
+    margin-left: 0.5rem;
+    color: darken(silver, 20%);
 }
 
 
@@ -55,84 +55,84 @@ a {
 }
 
 .keyDisplay {
-word-wrap: break-word;
+    word-wrap: break-word;
 }
 
 button {
-@include rippler;
-@include dropshadowed;
-border-radius: 0.5rem;
-font-size: 1rem;
-padding: 0.6rem;
-color: $font;
-background-color: $tertiary;
-border: none;
-display: inline-block;
-text-transform: capitalize;
-font-style: bold;
-color: $primary;
-margin-left: 0.4rem;
-margin-right: 0.4rem;
+    @include rippler;
+    @include dropshadowed;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    padding: 0.6rem;
+    color: $font;
+    background-color: $tertiary;
+    border: none;
+    display: inline-block;
+    text-transform: capitalize;
+    font-style: bold;
+    color: $primary;
+    margin-left: 0.4rem;
+    margin-right: 0.4rem;
 }
 
 
 button[disabled] {
-background-color: darken($secondary, 20%);
-color: lighten($font, 20%);
+    background-color: darken($secondary, 20%);
+    color: lighten($font, 20%);
 }
 
 @mixin select {
-padding: 0.4rem;
-font-size: 1rem;
-background-color: $secondary;
-border-width: 0.1rem;
-border-radius: 0.5rem;
-color: lighten($font, 20%);
-margin-bottom: 1rem;
-border-style: solid;
-border-color: darken($secondary, 50%);
+    padding: 0.4rem;
+    font-size: 1rem;
+    background-color: $secondary;
+    border-width: 0.1rem;
+    border-radius: 0.5rem;
+    color: lighten($font, 20%);
+    margin-bottom: 1rem;
+    border-style: solid;
+    border-color: darken($secondary, 50%);
 }
 
 input {
-@include select;
+    @include select;
 }
 
 select {
-@include select;
--webkit-appearance: none;
--moz-appearance: none;
-appearance: none;
+    @include select;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 
-&:after {
-    content: ▸;
-    transform: rotate(90deg);
-    position: absolute;
-}
+    &:after {
+        content: ▸;
+        transform: rotate(90deg);
+        position: absolute;
+    }
 }
 
 pre {
-padding: 0.4rem;
-font-size: 0.6rem;
-text-align: left;
-border-style: solid;
-border-color: darken($secondary, 50%);
-border-radius: 0.5rem;
-text-decoration: none;
+    padding: 0.4rem;
+    font-size: 0.6rem;
+    text-align: left;
+    border-style: solid;
+    border-color: darken($secondary, 50%);
+    border-radius: 0.5rem;
+    text-decoration: none;
 }
 
 .redButton {
-background-color: red;
+    background-color: red;
 }
 
 .invalidInput {
-border-color: red;
+    border-color: red;
 }
 p {
-text-align: justify;
-text-align-last: center;
+    text-align: justify;
+    text-align-last: center;
 }
 
 h1 {
-  @include theme;
-  font-size: 2rem;
+    @include theme;
+    font-size: 2rem;
 }
