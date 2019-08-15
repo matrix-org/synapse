@@ -10,8 +10,10 @@ const mapStateToProps = (state, ownProps) => ({
 
 const mapDispathToProps = (dispatch) => ({
     onClick: servername => {
+
         dispatch(advanceUI());
         dispatch(setServername(servername));
+
     },
 });
 
