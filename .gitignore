@@ -16,6 +16,7 @@ _trial_temp*/
 /*.log
 /*.log.config
 /*.pid
+/.python-version
 /*.signing.key
 /env/
 /homeserver*.yaml

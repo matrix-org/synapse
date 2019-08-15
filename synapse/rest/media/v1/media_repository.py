@@ -33,6 +33,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.config._base import ConfigError
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.async_helpers import Linearizer
@@ -171,7 +172,7 @@ class MediaRepository(object):
 
         yield self._generate_thumbnails(None, media_id, media_id, media_type)
 
-        defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
+        return "mxc://%s/%s" % (self.server_name, media_id)
 
     @defer.inlineCallbacks
     def get_local_media(self, request, media_id, name):
@@ -282,7 +283,7 @@ class MediaRepository(object):
             with responder:
                 pass
 
-        defer.returnValue(media_info)
+        return media_info
 
     @defer.inlineCallbacks
     def _get_remote_media_impl(self, server_name, media_id):
@@ -317,14 +318,14 @@ class MediaRepository(object):
 
             responder = yield self.media_storage.fetch_media(file_info)
             if responder:
-                defer.returnValue((responder, media_info))
+                return (responder, media_info)
 
         # Failed to find the file anywhere, lets download it.
 
         media_info = yield self._download_remote_file(server_name, media_id, file_id)
 
         responder = yield self.media_storage.fetch_media(file_info)
-        defer.returnValue((responder, media_info))
+        return (responder, media_info)
 
     @defer.inlineCallbacks
     def _download_remote_file(self, server_name, media_id, file_id):
@@ -421,7 +422,7 @@ class MediaRepository(object):
 
         yield self._generate_thumbnails(server_name, media_id, file_id, media_type)
 
-        defer.returnValue(media_info)
+        return media_info
 
     def _get_thumbnail_requirements(self, media_type):
         return self.thumbnail_requirements.get(media_type, ())
@@ -500,7 +501,7 @@ class MediaRepository(object):
                 media_id, t_width, t_height, t_type, t_method, t_len
             )
 
-            defer.returnValue(output_path)
+            return output_path
 
     @defer.inlineCallbacks
     def generate_remote_exact_thumbnail(
@@ -554,7 +555,7 @@ class MediaRepository(object):
                 t_len,
             )
 
-            defer.returnValue(output_path)
+            return output_path
 
     @defer.inlineCallbacks
     def _generate_thumbnails(
@@ -667,7 +668,7 @@ class MediaRepository(object):
                     media_id, t_width, t_height, t_type, t_method, t_len
                 )
 
-        defer.returnValue({"width": m_width, "height": m_height})
+        return {"width": m_width, "height": m_height}
 
     @defer.inlineCallbacks
     def delete_old_remote_media(self, before_ts):
@@ -704,7 +705,7 @@ class MediaRepository(object):
                 yield self.store.delete_remote_media(origin, media_id)
                 deleted += 1
 
-        defer.returnValue({"deleted": deleted})
+        return {"deleted": deleted}
 
 
 class MediaRepositoryResource(Resource):
@@ -753,8 +754,11 @@ class MediaRepositoryResource(Resource):
     """
 
     def __init__(self, hs):
-        Resource.__init__(self)
+        # If we're not configured to use it, raise if we somehow got here.
+        if not hs.config.can_load_media_repo:
+            raise ConfigError("Synapse is not configured to use a media repo.")
 
+        super().__init__()
         media_repo = hs.get_media_repository()
 
         self.putChild(b"upload", UploadResource(hs, media_repo))

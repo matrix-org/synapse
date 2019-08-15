@@ -55,7 +55,7 @@ class AccountDataServlet(RestServlet):
 
         self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, account_data_type):
@@ -70,7 +70,7 @@ class AccountDataServlet(RestServlet):
         if event is None:
             raise NotFoundError("Account data not found")
 
-        defer.returnValue((200, event))
+        return (200, event)
 
 
 class RoomAccountDataServlet(RestServlet):
@@ -112,7 +112,7 @@ class RoomAccountDataServlet(RestServlet):
 
         self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id, room_id, account_data_type):
@@ -127,7 +127,7 @@ class RoomAccountDataServlet(RestServlet):
         if event is None:
             raise NotFoundError("Room account data not found")
 
-        defer.returnValue((200, event))
+        return (200, event)
 
 
 def register_servlets(hs, http_server):

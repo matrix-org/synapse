@@ -36,7 +36,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
             "room_name": "Server Notices",
         }
 
-        hs = self.setup_test_homeserver(config=hs_config, expire_access_token=True)
+        hs = self.setup_test_homeserver(config=hs_config)
         return hs
 
     def prepare(self, reactor, clock, hs):

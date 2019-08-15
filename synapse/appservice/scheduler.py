@@ -193,7 +193,7 @@ class _TransactionController(object):
     @defer.inlineCallbacks
     def _is_service_up(self, service):
         state = yield self.store.get_appservice_state(service)
-        defer.returnValue(state == ApplicationServiceState.UP or state is None)
+        return state == ApplicationServiceState.UP or state is None
 
 
 class _Recoverer(object):
@@ -208,7 +208,7 @@ class _Recoverer(object):
                 r.service.id,
             )
             r.recover()
-        defer.returnValue(recoverers)
+        return recoverers
 
     def __init__(self, clock, store, as_api, service, callback):
         self.clock = clock

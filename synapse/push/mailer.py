@@ -316,7 +316,7 @@ class Mailer(object):
                 if not merge:
                     room_vars["notifs"].append(notifvars)
 
-        defer.returnValue(room_vars)
+        return room_vars
 
     @defer.inlineCallbacks
     def get_notif_vars(self, notif, user_id, notif_event, room_state_ids):
@@ -343,7 +343,7 @@ class Mailer(object):
             if messagevars is not None:
                 ret["messages"].append(messagevars)
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def get_message_vars(self, notif, event, room_state_ids):
@@ -379,7 +379,7 @@ class Mailer(object):
         if "body" in event.content:
             ret["body_text_plain"] = event.content["body"]
 
-        defer.returnValue(ret)
+        return ret
 
     def add_text_message_vars(self, messagevars, event):
         msgformat = event.content.get("format")
@@ -428,19 +428,16 @@ class Mailer(object):
                 inviter_name = name_from_member_event(inviter_member_event)
 
                 if room_name is None:
-                    defer.returnValue(
-                        INVITE_FROM_PERSON
-                        % {"person": inviter_name, "app": self.app_name}
-                    )
+                    return INVITE_FROM_PERSON % {
+                        "person": inviter_name,
+                        "app": self.app_name,
+                    }
                 else:
-                    defer.returnValue(
-                        INVITE_FROM_PERSON_TO_ROOM
-                        % {
-                            "person": inviter_name,
-                            "room": room_name,
-                            "app": self.app_name,
-                        }
-                    )
+                    return INVITE_FROM_PERSON_TO_ROOM % {
+                        "person": inviter_name,
+                        "room": room_name,
+                        "app": self.app_name,
+                    }
 
             sender_name = None
             if len(notifs_by_room[room_id]) == 1:
@@ -454,26 +451,21 @@ class Mailer(object):
                     sender_name = name_from_member_event(state_event)
 
                 if sender_name is not None and room_name is not None:
-                    defer.returnValue(
-                        MESSAGE_FROM_PERSON_IN_ROOM
-                        % {
-                            "person": sender_name,
-                            "room": room_name,
-                            "app": self.app_name,
-                        }
-                    )
+                    return MESSAGE_FROM_PERSON_IN_ROOM % {
+                        "person": sender_name,
+                        "room": room_name,
+                        "app": self.app_name,
+                    }
                 elif sender_name is not None:
-                    defer.returnValue(
-                        MESSAGE_FROM_PERSON
-                        % {"person": sender_name, "app": self.app_name}
-                    )
+                    return MESSAGE_FROM_PERSON % {
+                        "person": sender_name,
+                        "app": self.app_name,
+                    }
             else:
                 # There's more than one notification for this room, so just
                 # say there are several
                 if room_name is not None:
-                    defer.returnValue(
-                        MESSAGES_IN_ROOM % {"room": room_name, "app": self.app_name}
-                    )
+                    return MESSAGES_IN_ROOM % {"room": room_name, "app": self.app_name}
                 else:
                     # If the room doesn't have a name, say who the messages
                     # are from explicitly to avoid, "messages in the Bob room"
@@ -493,24 +485,19 @@ class Mailer(object):
                         ]
                     )
 
-                    defer.returnValue(
-                        MESSAGES_FROM_PERSON
-                        % {
-                            "person": descriptor_from_member_events(
-                                member_events.values()
-                            ),
-                            "app": self.app_name,
-                        }
-                    )
+                    return MESSAGES_FROM_PERSON % {
+                        "person": descriptor_from_member_events(member_events.values()),
+                        "app": self.app_name,
+                    }
         else:
             # Stuff's happened in multiple different rooms
 
             # ...but we still refer to the 'reason' room which triggered the mail
             if reason["room_name"] is not None:
-                defer.returnValue(
-                    MESSAGES_IN_ROOM_AND_OTHERS
-                    % {"room": reason["room_name"], "app": self.app_name}
-                )
+                return MESSAGES_IN_ROOM_AND_OTHERS % {
+                    "room": reason["room_name"],
+                    "app": self.app_name,
+                }
             else:
                 # If the reason room doesn't have a name, say who the messages
                 # are from explicitly to avoid, "messages in the Bob room"
@@ -527,13 +514,10 @@ class Mailer(object):
                     [room_state_ids[room_id][("m.room.member", s)] for s in sender_ids]
                 )
 
-                defer.returnValue(
-                    MESSAGES_FROM_PERSON_AND_OTHERS
-                    % {
-                        "person": descriptor_from_member_events(member_events.values()),
-                        "app": self.app_name,
-                    }
-                )
+                return MESSAGES_FROM_PERSON_AND_OTHERS % {
+                    "person": descriptor_from_member_events(member_events.values()),
+                    "app": self.app_name,
+                }
 
     def make_room_link(self, room_id):
         if self.hs.config.email_riot_base_url:

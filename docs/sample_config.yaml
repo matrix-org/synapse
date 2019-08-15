@@ -278,6 +278,23 @@ listeners:
 # Used by phonehome stats to group together related servers.
 #server_context: context
 
+# Resource-constrained Homeserver Settings
+#
+# If limit_remote_rooms.enabled is True, the room complexity will be
+# checked before a user joins a new remote room. If it is above
+# limit_remote_rooms.complexity, it will disallow joining or
+# instantly leave.
+#
+# limit_remote_rooms.complexity_error can be set to customise the text
+# displayed to the user when a room above the complexity threshold has
+# its join cancelled.
+#
+# Uncomment the below lines to enable:
+#limit_remote_rooms:
+#  enabled: True
+#  complexity: 1.0
+#  complexity_error: "This room is too complex."
+
 # Whether to require a user to be in the room to add an alias to it.
 # Defaults to 'true'.
 #
@@ -548,6 +565,13 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 
 
 
+## Media Store ##
+
+# Enable the media store service in the Synapse master. Uncomment the
+# following if you are using a separate media store worker.
+#
+#enable_media_repo: false
+
 # Directory where uploaded images and attachments are stored.
 #
 media_store_path: "DATADIR/media_store"
@@ -785,6 +809,16 @@ uploads_path: "DATADIR/uploads"
 #  period: 6w
 #  renew_at: 1w
 #  renew_email_subject: "Renew your %(app)s account"
+#  # Directory in which Synapse will try to find the HTML files to serve to the
+#  # user when trying to renew an account. Optional, defaults to
+#  # synapse/res/templates.
+#  template_dir: "res/templates"
+#  # HTML to be displayed to the user after they successfully renewed their
+#  # account. Optional.
+#  account_renewed_html_path: "account_renewed.html"
+#  # HTML to be displayed when the user tries to renew an account with an invalid
+#  # renewal token. Optional.
+#  invalid_token_html_path: "invalid_token.html"
 
 # Time that a user's session remains valid for, after they log in.
 #
@@ -924,10 +958,6 @@ uploads_path: "DATADIR/uploads"
 # a secret key is derived from the signing key.
 #
 # macaroon_secret_key: <PRIVATE STRING>
-
-# Used to enable access token expiration.
-#
-#expire_access_token: False
 
 # a secret which is used to calculate HMACs for form values, to stop
 # falsification of values. Must be specified for the User Consent
@@ -1430,3 +1460,19 @@ opentracing:
     #
     #homeserver_whitelist:
     #  - ".*"
+
+    # Jaeger can be configured to sample traces at different rates.
+    # All configuration options provided by Jaeger can be set here.
+    # Jaeger's configuration mostly related to trace sampling which
+    # is documented here:
+    # https://www.jaegertracing.io/docs/1.13/sampling/.
+    #
+    #jaeger_config:
+    #  sampler:
+    #    type: const
+    #    param: 1
+
+    #  Logging whether spans were started and reported
+    #
+    #  logging:
+    #    false
