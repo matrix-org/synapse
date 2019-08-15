@@ -126,15 +126,19 @@ class Mailer(object):
 
     @defer.inlineCallbacks
     def send_threepid_validation(
-        self, email, client_secret, send_attempt, next_link=None
+        self, email_address, client_secret, send_attempt, send_email_func, next_link=None
     ):
         """Send a threepid validation email for password reset or
         registration purposes
 
         Args:
-            email (str): The user's email address
+            email_address (str): The user's email address
             client_secret (str): The provided client secret
             send_attempt (int): Which send attempt this is
+            send_email_func (func): A function that takes an email address, token,
+                                    client_secret and session_id, sends an email
+                                    and returns a Deferred.
+            next_link (str|None): The URL to redirect the user to after validation
 
         Returns:
             The new session_id upon success
@@ -145,7 +149,7 @@ class Mailer(object):
         # Check that this email/client_secret/send_attempt combo is new or
         # greater than what we've seen previously
         session = yield self.store.get_threepid_validation_session(
-            "email", client_secret, address=email, validated=False
+            "email", client_secret, address=email_address, validated=False
         )
 
         # Check to see if a session already exists and that it is not yet
@@ -169,9 +173,9 @@ class Mailer(object):
         # Send the mail with the link containing the token, client_secret
         # and session_id
         try:
-            yield self.send_password_reset_mail(email, token, client_secret, session_id)
+            yield send_email_func(email_address, token, client_secret, session_id)
         except Exception:
-            logger.exception("Error sending threepid validation email to %s", email)
+            logger.exception("Error sending threepid validation email to %s", email_address)
             raise SynapseError(500, "An error was encountered when sending the email")
 
         token_expires = (
@@ -180,7 +184,7 @@ class Mailer(object):
 
         yield self.store.start_or_continue_validation_session(
             "email",
-            email,
+            email_address,
             session_id,
             client_secret,
             send_attempt,
@@ -214,7 +218,7 @@ class Mailer(object):
 
         yield self.send_email(
             email_address,
-            "[%s] Password Reset Email" % self.hs.config.server_name,
+            "[%s] Password Reset" % self.hs.config.server_name,
             template_vars,
         )
 

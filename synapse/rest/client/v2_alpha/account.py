@@ -110,7 +110,8 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         else:
             # Send password reset emails from Synapse
             sid = yield self.mailer.send_threepid_validation(
-                email, client_secret, send_attempt, next_link
+                email, client_secret, send_attempt, self.mailer.send_password_reset_mail,
+                next_link
             )
 
             # Wrap the session id in a JSON object
@@ -454,6 +455,8 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
+        # TODO: We need to differentiate between binding and just adding an email to your
+        #  account. This results in another MSC!
         if self.config.email_threepid_behaviour == "remote":
             # Send 3PID validation email from an identity server
             ret = yield self.identity_handler.requestEmailToken(**body)

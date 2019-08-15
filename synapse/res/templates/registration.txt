@@ -5,4 +5,6 @@ was you, please click the link below to confirm your email address:
 
 {{ link }}
 
-If this was not you, you can safely disregard this email. Thank you.
+If this was not you, you can safely disregard this email.
+
+Thank you.

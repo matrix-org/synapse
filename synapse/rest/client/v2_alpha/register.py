@@ -128,7 +128,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         else:
             # Send the registration email from Synapse
             sid = yield self.mailer.send_threepid_validation(
-                email, client_secret, send_attempt, next_link
+                email, client_secret, send_attempt, self.mailer.send_registration_mail,
+                next_link
             )
 
             # Wrap the session id in a JSON object
