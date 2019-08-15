@@ -12,10 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
+
 import logging
-import random
-import time
 
 import attr
 from netaddr import IPAddress
@@ -24,31 +22,16 @@ from zope.interface import implementer
 from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.internet.interfaces import IStreamClientEndpoint
-from twisted.web.client import URI, Agent, HTTPConnectionPool, RedirectAgent, readBody
-from twisted.web.http import stringToDatetime
+from twisted.web.client import URI, Agent, HTTPConnectionPool
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent
 
 from synapse.http.federation.srv_resolver import SrvResolver, pick_server_from_list
+from synapse.http.federation.well_known_resolver import WellKnownResolver
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock
-from synapse.util.caches.ttlcache import TTLCache
-from synapse.util.metrics import Measure
-
-# period to cache .well-known results for by default
-WELL_KNOWN_DEFAULT_CACHE_PERIOD = 24 * 3600
-
-# jitter to add to the .well-known default cache ttl
-WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER = 10 * 60
-
-# period to cache failure to fetch .well-known for
-WELL_KNOWN_INVALID_CACHE_PERIOD = 1 * 3600
-
-# cap for .well-known cache period
-WELL_KNOWN_MAX_CACHE_PERIOD = 48 * 3600
 
 logger = logging.getLogger(__name__)
-well_known_cache = TTLCache("well-known")
 
 
 @implementer(IAgent)
@@ -64,10 +47,6 @@ class MatrixFederationAgent(object):
         tls_client_options_factory (ClientTLSOptionsFactory|None):
             factory to use for fetching client tls options, or none to disable TLS.
 
-        _well_known_tls_policy (IPolicyForHTTPS|None):
-            TLS policy to use for fetching .well-known files. None to use a default
-            (browser-like) implementation.
-
         _srv_resolver (SrvResolver|None):
             SRVResolver impl to use for looking up SRV records. None to use a default
             implementation.
@@ -81,9 +60,8 @@ class MatrixFederationAgent(object):
         self,
         reactor,
         tls_client_options_factory,
-        _well_known_tls_policy=None,
         _srv_resolver=None,
-        _well_known_cache=well_known_cache,
+        _well_known_cache=None,
     ):
         self._reactor = reactor
         self._clock = Clock(reactor)
@@ -98,21 +76,15 @@ class MatrixFederationAgent(object):
         self._pool.maxPersistentPerHost = 5
         self._pool.cachedConnectionTimeout = 2 * 60
 
-        agent_args = {}
-        if _well_known_tls_policy is not None:
-            # the param is called 'contextFactory', but actually passing a
-            # contextfactory is deprecated, and it expects an IPolicyForHTTPS.
-            agent_args["contextFactory"] = _well_known_tls_policy
-        _well_known_agent = RedirectAgent(
-            Agent(self._reactor, pool=self._pool, **agent_args)
+        self._well_known_resolver = WellKnownResolver(
+            self._reactor,
+            agent=Agent(
+                self._reactor,
+                pool=self._pool,
+                contextFactory=tls_client_options_factory,
+            ),
+            well_known_cache=_well_known_cache,
         )
-        self._well_known_agent = _well_known_agent
-
-        # our cache of .well-known lookup results, mapping from server name
-        # to delegated name. The values can be:
-        #   `bytes`:     a valid server-name
-        #   `None`:      there is no (valid) .well-known here
-        self._well_known_cache = _well_known_cache
 
     @defer.inlineCallbacks
     def request(self, method, uri, headers=None, bodyProducer=None):
@@ -223,7 +195,10 @@ class MatrixFederationAgent(object):
 
         if lookup_well_known:
             # try a .well-known lookup
-            well_known_server = yield self._get_well_known(parsed_uri.host)
+            well_known_result = yield self._well_known_resolver.get_well_known(
+                parsed_uri.host
+            )
+            well_known_server = well_known_result.delegated_server
 
             if well_known_server:
                 # if we found a .well-known, start again, but don't do another
@@ -286,85 +261,6 @@ class MatrixFederationAgent(object):
             target_port=port,
         )
 
-    @defer.inlineCallbacks
-    def _get_well_known(self, server_name):
-        """Attempt to fetch and parse a .well-known file for the given server
-
-        Args:
-            server_name (bytes): name of the server, from the requested url
-
-        Returns:
-            Deferred[bytes|None]: either the new server name, from the .well-known, or
-                None if there was no .well-known file.
-        """
-        try:
-            result = self._well_known_cache[server_name]
-        except KeyError:
-            # TODO: should we linearise so that we don't end up doing two .well-known
-            # requests for the same server in parallel?
-            with Measure(self._clock, "get_well_known"):
-                result, cache_period = yield self._do_get_well_known(server_name)
-
-            if cache_period > 0:
-                self._well_known_cache.set(server_name, result, cache_period)
-
-        return result
-
-    @defer.inlineCallbacks
-    def _do_get_well_known(self, server_name):
-        """Actually fetch and parse a .well-known, without checking the cache
-
-        Args:
-            server_name (bytes): name of the server, from the requested url
-
-        Returns:
-            Deferred[Tuple[bytes|None|object],int]:
-                result, cache period, where result is one of:
-                 - the new server name from the .well-known (as a `bytes`)
-                 - None if there was no .well-known file.
-                 - INVALID_WELL_KNOWN if the .well-known was invalid
-        """
-        uri = b"https://%s/.well-known/matrix/server" % (server_name,)
-        uri_str = uri.decode("ascii")
-        logger.info("Fetching %s", uri_str)
-        try:
-            response = yield make_deferred_yieldable(
-                self._well_known_agent.request(b"GET", uri)
-            )
-            body = yield make_deferred_yieldable(readBody(response))
-            if response.code != 200:
-                raise Exception("Non-200 response %s" % (response.code,))
-
-            parsed_body = json.loads(body.decode("utf-8"))
-            logger.info("Response from .well-known: %s", parsed_body)
-            if not isinstance(parsed_body, dict):
-                raise Exception("not a dict")
-            if "m.server" not in parsed_body:
-                raise Exception("Missing key 'm.server'")
-        except Exception as e:
-            logger.info("Error fetching %s: %s", uri_str, e)
-
-            # add some randomness to the TTL to avoid a stampeding herd every hour
-            # after startup
-            cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
-            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
-            return (None, cache_period)
-
-        result = parsed_body["m.server"].encode("ascii")
-
-        cache_period = _cache_period_from_headers(
-            response.headers, time_now=self._reactor.seconds
-        )
-        if cache_period is None:
-            cache_period = WELL_KNOWN_DEFAULT_CACHE_PERIOD
-            # add some randomness to the TTL to avoid a stampeding herd every 24 hours
-            # after startup
-            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
-        else:
-            cache_period = min(cache_period, WELL_KNOWN_MAX_CACHE_PERIOD)
-
-        return (result, cache_period)
-
 
 @implementer(IStreamClientEndpoint)
 class LoggingHostnameEndpoint(object):
@@ -378,44 +274,6 @@ class LoggingHostnameEndpoint(object):
     def connect(self, protocol_factory):
         logger.info("Connecting to %s:%i", self.host.decode("ascii"), self.port)
         return self.ep.connect(protocol_factory)
-
-
-def _cache_period_from_headers(headers, time_now=time.time):
-    cache_controls = _parse_cache_control(headers)
-
-    if b"no-store" in cache_controls:
-        return 0
-
-    if b"max-age" in cache_controls:
-        try:
-            max_age = int(cache_controls[b"max-age"])
-            return max_age
-        except ValueError:
-            pass
-
-    expires = headers.getRawHeaders(b"expires")
-    if expires is not None:
-        try:
-            expires_date = stringToDatetime(expires[-1])
-            return expires_date - time_now()
-        except ValueError:
-            # RFC7234 says 'A cache recipient MUST interpret invalid date formats,
-            # especially the value "0", as representing a time in the past (i.e.,
-            # "already expired").
-            return 0
-
-    return None
-
-
-def _parse_cache_control(headers):
-    cache_controls = {}
-    for hdr in headers.getRawHeaders(b"cache-control", []):
-        for directive in hdr.split(b","):
-            splits = [x.strip() for x in directive.split(b"=", 1)]
-            k = splits[0].lower()
-            v = splits[1] if len(splits) > 1 else None
-            cache_controls[k] = v
-    return cache_controls
 
 
 @attr.s

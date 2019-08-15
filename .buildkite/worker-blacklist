@@ -3,10 +3,6 @@
 
 Message history can be paginated
 
-m.room.history_visibility == "world_readable" allows/forbids appropriately for Guest users
-
-m.room.history_visibility == "world_readable" allows/forbids appropriately for Real users
-
 Can re-join room if re-invited
 
 /upgrade creates a new room

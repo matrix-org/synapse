@@ -19,4 +19,6 @@
 -- This will be null for non-membership events and the content.membership key
 -- for membership events. (Will also be null for membership events until the
 -- background update job has finished).
-ALTER TABLE current_state_events ADD membership TEXT;
+
+INSERT INTO background_updates (update_name, progress_json) VALUES
+  ('current_state_events_membership', '{}');
