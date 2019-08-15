@@ -1,7 +1,9 @@
-matrix-synapse-py3 (1.2.0) stable; urgency=medium
+matrix-synapse-py3 (1.3.0) stable; urgency=medium
 
   [ Andrew Morgan ]
   * Remove libsqlite3-dev from required build dependencies.
+
+matrix-synapse-py3 (1.2.0) stable; urgency=medium
 
   [ Amber Brown ]
   * Update logging config defaults to match API changes in Synapse.
