@@ -1,1 +1,0 @@
-Set the logs emitted when checking typing and presence timeouts to DEBUG level, not INFO.

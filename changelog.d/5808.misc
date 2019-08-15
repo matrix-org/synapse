@@ -1,1 +1,0 @@
-Handle incorrectly encoded query params correctly by returning a 400.

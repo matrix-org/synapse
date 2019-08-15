@@ -1,1 +1,0 @@
-Add a lower bound to well-known lookup cache time to avoid repeated lookups.

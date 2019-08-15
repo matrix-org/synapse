@@ -1,1 +1,0 @@
-Handle pusher being deleted during processing rather than logging an exception.
