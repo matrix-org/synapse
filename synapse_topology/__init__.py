@@ -3,7 +3,7 @@ import argparse
 import os.path as path
 import sys
 
-import synapse_topology.controller.server as server
+from synapse_topology.server import app
 import synapse_topology.model as model
 
 from twisted.internet import endpoints, reactor
@@ -39,7 +39,7 @@ model.set_config_dir(args.config_dir)
 backend_endpoint = endpoints.serverFromString(
     reactor, "tcp6:port=8888:interface=localhost"
 )
-backend_endpoint.listen(Site(server.app.resource()))
+backend_endpoint.listen(Site(app.resource()))
 
 
 reactor.run()
