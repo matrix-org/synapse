@@ -77,10 +77,20 @@ class EmailConfig(Config):
         self.email_threepid_behaviour = (
             # Have Synapse handle the email sending if account_threepid_delegate
             # is not defined
-            "remote"
-            if self.account_threepid_delegate
-            else "local"
+            "remote" if self.account_threepid_delegate else "local"
         )
+
+        # Prior to Synapse v1.4.0, there used to be another option that defined whether you 
+        # wanted an identity server to send emails on your behalf. We now warn the user if 
+        # they have this set and tell them to use the updated option.
+        # TODO: Eventually we want to remove the functionality of having an identity server 
+        #  send emails on behalf of the homeserver. At that point, we should remove this check
+        if config.get("trust_identity_server_for_password_resets", False) is True:
+            raise ConfigError('The config option "trust_identity_server_for_password_resets" '
+                              'has been replaced by "account_threepid_delegate". Please '
+                              'consult the default config at docs/sample_config.yaml for '
+                              'details and update your config file.')
+
         self.local_threepid_emails_disabled_due_to_config = False
         if self.email_threepid_behaviour == "local" and email_config == {}:
             # We cannot warn the user this has happened here
