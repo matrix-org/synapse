@@ -408,21 +408,6 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         self.store = self.hs.get_datastore()
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if self.config.email_threepid_behaviour == "local":
-            from synapse.push.mailer import Mailer, load_jinja2_templates
-
-            templates = load_jinja2_templates(
-                config=self.config,
-                template_html_name=self.config.email_registration_template_html,
-                template_text_name=self.config.email_registration_template_text,
-            )
-            self.mailer = Mailer(
-                hs=hs,
-                app_name=self.config.email_app_name,
-                template_html=templates[0],
-                template_text=templates[1],
-            )
-
     @defer.inlineCallbacks
     def on_POST(self, request):
         if self.config.email_threepid_behaviour == "off":
@@ -454,17 +439,6 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
-
-        # TODO: We need to differentiate between binding and just adding an email to your
-        #  account. This results in another MSC!
-        if self.config.email_threepid_behaviour == "remote":
-            # Send 3PID validation email from an identity server
-            ret = yield self.identity_handler.requestEmailToken(**body)
-        else:
-            # Send 3PID validation email from Synapse
-            ret = yield self.mailer.send_threepid_validation(
-                email, client_secret, send_attempt, next_link
-            )
 
         return (200, ret)
 
