@@ -52,7 +52,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "is_verified": room_key["is_verified"],
                 "session_data": json.dumps(room_key["session_data"]),
             },
-            desc="update_e2e_room_key"
+            desc="update_e2e_room_key",
         )
 
     @defer.inlineCallbacks
@@ -67,17 +67,20 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         yield self._simple_insert_many(
             table="e2e_room_keys",
-            values=[{
-                "user_id": user_id,
-                "version": version,
-                "room_id": room_id,
-                "session_id": session_id,
-                "first_message_index": room_key["first_message_index"],
-                "forwarded_count": room_key["forwarded_count"],
-                "is_verified": room_key["is_verified"],
-                "session_data": json.dumps(room_key["session_data"]),
-            } for (room_id, session_id, room_key) in room_keys],
-            desc="add_e2e_room_keys"
+            values=[
+                {
+                    "user_id": user_id,
+                    "version": version,
+                    "room_id": room_id,
+                    "session_id": session_id,
+                    "first_message_index": room_key["first_message_index"],
+                    "forwarded_count": room_key["forwarded_count"],
+                    "is_verified": room_key["is_verified"],
+                    "session_data": json.dumps(room_key["session_data"]),
+                }
+                for (room_id, session_id, room_key) in room_keys
+            ],
+            desc="add_e2e_room_keys",
         )
 
     @defer.inlineCallbacks
@@ -157,8 +160,11 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         """
 
         return self.runInteraction(
-            "get_e2e_room_keys_multi", self._get_e2e_room_keys_multi_txn,
-            user_id, version, room_keys
+            "get_e2e_room_keys_multi",
+            self._get_e2e_room_keys_multi_txn,
+            user_id,
+            version,
+            room_keys,
         )
 
     @staticmethod
@@ -184,7 +190,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                is_verified, session_data
         FROM e2e_room_keys
         WHERE user_id = ? AND version = ? AND (%s)
-        """ % (" OR ".join(where_clauses))
+        """ % (
+            " OR ".join(where_clauses)
+        )
 
         txn.execute(sql, params)
 

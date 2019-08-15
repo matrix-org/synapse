@@ -203,10 +203,7 @@ class E2eRoomKeysHandler(object):
                 )
 
             count = yield self.store.count_e2e_room_keys(user_id, version)
-            return {
-                "hash": version_hash,
-                "count": count
-            }
+            return {"hash": version_hash, "count": count}
 
     @staticmethod
     def _should_replace_room_key(current_room_key, room_key):
