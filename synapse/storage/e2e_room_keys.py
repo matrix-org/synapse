@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
+# Copyright 2019 Matrix.org Foundation CIC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,49 +25,8 @@ from ._base import SQLBaseStore
 
 class EndToEndRoomKeyStore(SQLBaseStore):
     @defer.inlineCallbacks
-    def get_e2e_room_key(self, user_id, version, room_id, session_id):
-        """Get the encrypted E2E room key for a given session from a given
-        backup version of room_keys.  We only store the 'best' room key for a given
-        session at a given time, as determined by the handler.
-
-        Args:
-            user_id(str): the user whose backup we're querying
-            version(str): the version ID of the backup for the set of keys we're querying
-            room_id(str): the ID of the room whose keys we're querying.
-                This is a bit redundant as it's implied by the session_id, but
-                we include for consistency with the rest of the API.
-            session_id(str): the session whose room_key we're querying.
-
-        Returns:
-            A deferred dict giving the session_data and message metadata for
-            this room key.
-        """
-
-        row = yield self._simple_select_one(
-            table="e2e_room_keys",
-            keyvalues={
-                "user_id": user_id,
-                "version": version,
-                "room_id": room_id,
-                "session_id": session_id,
-            },
-            retcols=(
-                "first_message_index",
-                "forwarded_count",
-                "is_verified",
-                "session_data",
-            ),
-            desc="get_e2e_room_key",
-        )
-
-        row["session_data"] = json.loads(row["session_data"])
-
-        return row
-
-    @defer.inlineCallbacks
-    def set_e2e_room_key(self, user_id, version, room_id, session_id, room_key):
-        """Replaces or inserts the encrypted E2E room key for a given session in
-        a given backup
+    def update_e2e_room_key(self, user_id, version, room_id, session_id, room_key):
+        """Replaces the encrypted E2E room key for a given session in a given backup
 
         Args:
             user_id(str): the user whose backup we're setting
@@ -78,21 +38,46 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             StoreError
         """
 
-        yield self._simple_upsert(
+        yield self._simple_update_one(
             table="e2e_room_keys",
             keyvalues={
                 "user_id": user_id,
+                "version": version,
                 "room_id": room_id,
                 "session_id": session_id,
             },
-            values={
-                "version": version,
+            updatevalues={
                 "first_message_index": room_key["first_message_index"],
                 "forwarded_count": room_key["forwarded_count"],
                 "is_verified": room_key["is_verified"],
                 "session_data": json.dumps(room_key["session_data"]),
             },
-            lock=False,
+            desc="update_e2e_room_key"
+        )
+
+    @defer.inlineCallbacks
+    def add_e2e_room_keys(self, user_id, version, room_keys):
+        """Bulk add room keys to a given backup.
+
+        Args:
+            user_id(str): the user whose backup we're adding to
+            version(str): the version ID of the backup for the set of keys we're adding to
+            room_keys(iterable[dict]): the keys to add
+        """
+
+        yield self._simple_insert_many(
+            table="e2e_room_keys",
+            values=[{
+                "user_id": user_id,
+                "version": version,
+                "room_id": room_id,
+                "session_id": session_id,
+                "first_message_index": room_key["first_message_index"],
+                "forwarded_count": room_key["forwarded_count"],
+                "is_verified": room_key["is_verified"],
+                "session_data": json.dumps(room_key["session_data"]),
+            } for (room_id, session_id, room_key) in room_keys],
+            desc="add_e2e_room_keys"
         )
 
     @defer.inlineCallbacks
@@ -152,6 +137,86 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             }
 
         return sessions
+
+    def get_e2e_room_keys_multi(self, user_id, version, room_keys):
+        """Get multiple room keys at a time.  The difference between this function and
+        get_e2e_room_keys is that this function can be used to retrieve
+        multiple specific keys at a time, whereas get_e2e_room_keys is used for
+        getting all the keys in a backup version, all the keys for a room, or a
+        specific key.
+
+        Args:
+            user_id(str): the user whose backup we're querying
+            version(str): the version ID of the backup we're querying about
+            room_keys(dict[dict[iterable[str]]]): a map of room IDs to dict which
+                has a "session" key that is an iterable of session IDs that we
+                want to query
+
+        Returns:
+           dict[dict[dict]]: a map of room IDs to session IDs to room key
+        """
+
+        return self.runInteraction(
+            "get_e2e_room_keys_multi", self._get_e2e_room_keys_multi_txn,
+            user_id, version, room_keys
+        )
+
+    @staticmethod
+    def _get_e2e_room_keys_multi_txn(txn, user_id, version, room_keys):
+        if not len(room_keys):
+            return {}
+
+        where_clauses = []
+        params = [user_id, version]
+        for room_id, room in room_keys.items():
+            sessions = list(room["sessions"])
+            if not len(sessions):
+                continue
+            params.append(room_id)
+            params.extend(sessions)
+            where_clauses.append(
+                "(room_id = ? AND session_id IN (%s))"
+                % (",".join(["?" for _ in sessions]),)
+            )
+
+        sql = """
+        SELECT room_id, session_id, first_message_index, forwarded_count,
+               is_verified, session_data
+        FROM e2e_room_keys
+        WHERE user_id = ? AND version = ? AND (%s)
+        """ % (" OR ".join(where_clauses))
+
+        txn.execute(sql, params)
+
+        ret = {}
+
+        for row in txn:
+            room_id = row[0]
+            session_id = row[1]
+            ret.setdefault(room_id, {})
+            ret[room_id][session_id] = {
+                "first_message_index": row[2],
+                "forwarded_count": row[3],
+                "is_verified": row[4],
+                "session_data": json.loads(row[5]),
+            }
+
+        return ret
+
+    def count_e2e_room_keys(self, user_id, version):
+        """Get the number of keys in a backup version.
+
+        Args:
+            user_id(str): the user whose backup we're querying
+            version(str): the version ID of the backup we're querying about
+        """
+
+        return self._simple_select_one_onecol(
+            table="e2e_room_keys",
+            keyvalues={"user_id": user_id, "version": version},
+            retcol="COUNT(*)",
+            desc="count_e2e_room_keys",
+        )
 
     @defer.inlineCallbacks
     def delete_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):
@@ -226,10 +291,12 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 txn,
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": this_version, "deleted": 0},
-                retcols=("version", "algorithm", "auth_data"),
+                retcols=("version", "algorithm", "auth_data", "hash"),
             )
             result["auth_data"] = json.loads(result["auth_data"])
             result["version"] = str(result["version"])
+            if not result["hash"]:
+                result["hash"] = 0
             return result
 
         return self.runInteraction(
@@ -284,11 +351,17 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             version(str): the version ID of the backup version we're updating
             info(dict): the new backup version info to store
         """
+        updatevalues = {}
+
+        if "auth_data" in info:
+            updatevalues["auth_data"] = json.dumps(info["auth_data"])
+        if "hash" in info:
+            updatevalues["hash"] = info["hash"]
 
         return self._simple_update(
             table="e2e_room_keys_versions",
             keyvalues={"user_id": user_id, "version": version},
-            updatevalues={"auth_data": json.dumps(info["auth_data"])},
+            updatevalues=updatevalues,
             desc="update_e2e_room_keys_version",
         )
 

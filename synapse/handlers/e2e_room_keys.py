@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
+# Copyright 2019 Matrix.org Foundation CIC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -166,43 +167,46 @@ class E2eRoomKeysHandler(object):
                     else:
                         raise
 
-            # go through the room_keys.
-            # XXX: this should/could be done concurrently, given we're in a lock.
+            # Fetch any existing room keys for the sessions that have been
+            # submitted.  Then compare them with the submitted keys.  If the
+            # key is new, insert it; if the key should be updated, then update
+            # it; otherwise, drop it.
+            existing_keys = yield self.store.get_e2e_room_keys_multi(
+                user_id, version, room_keys["rooms"]
+            )
+            to_insert = []  # batch the inserts together
+            changed = False  # if anything has changed, we need to update the hash
             for room_id, room in iteritems(room_keys["rooms"]):
-                for session_id, session in iteritems(room["sessions"]):
-                    yield self._upload_room_key(
-                        user_id, version, room_id, session_id, session
-                    )
+                for session_id, room_key in iteritems(room["sessions"]):
+                    current_room_key = existing_keys.get(room_id, {}).get(session_id)
+                    if current_room_key:
+                        if self._should_replace_room_key(current_room_key, room_key):
+                            # updates are done one at a time in the DB, so send
+                            # updates right away rather than batching them up,
+                            # like we do with the inserts
+                            yield self.store.update_e2e_room_key(
+                                user_id, version, room_id, session_id, room_key
+                            )
+                            changed = True
+                    else:
+                        to_insert.append((room_id, session_id, room_key))
+                        changed = True
 
-    @defer.inlineCallbacks
-    def _upload_room_key(self, user_id, version, room_id, session_id, room_key):
-        """Upload a given room_key for a given room and session into a given
-        version of the backup.  Merges the key with any which might already exist.
+            if len(to_insert):
+                yield self.store.add_e2e_room_keys(user_id, version, to_insert)
 
-        Args:
-            user_id(str): the user whose backup we're setting
-            version(str): the version ID of the backup we're updating
-            room_id(str): the ID of the room whose keys we're setting
-            session_id(str): the session whose room_key we're setting
-            room_key(dict): the room_key being set
-        """
+            version_hash = int(version_info["hash"])
+            if changed:
+                version_hash = version_hash + 1
+                yield self.store.update_e2e_room_keys_version(
+                    user_id, version, {"hash": str(version_hash)}
+                )
 
-        # get the room_key for this particular row
-        current_room_key = None
-        try:
-            current_room_key = yield self.store.get_e2e_room_key(
-                user_id, version, room_id, session_id
-            )
-        except StoreError as e:
-            if e.code == 404:
-                pass
-            else:
-                raise
-
-        if self._should_replace_room_key(current_room_key, room_key):
-            yield self.store.set_e2e_room_key(
-                user_id, version, room_id, session_id, room_key
-            )
+            count = yield self.store.count_e2e_room_keys(user_id, version)
+            return {
+                "hash": version_hash,
+                "count": count
+            }
 
     @staticmethod
     def _should_replace_room_key(current_room_key, room_key):
@@ -292,6 +296,8 @@ class E2eRoomKeysHandler(object):
                     raise NotFoundError("Unknown backup version")
                 else:
                     raise
+
+            res["count"] = yield self.store.count_e2e_room_keys(user_id, res["version"])
             return res
 
     @defer.inlineCallbacks
@@ -345,6 +351,10 @@ class E2eRoomKeysHandler(object):
                     raise
             if old_info["algorithm"] != version_info["algorithm"]:
                 raise SynapseError(400, "Algorithm does not match", Codes.INVALID_PARAM)
+
+            # don't allow the user to set the hash
+            if "hash" in version_info:
+                del version_info["hash"]
 
             yield self.store.update_e2e_room_keys_version(
                 user_id, version, version_info
