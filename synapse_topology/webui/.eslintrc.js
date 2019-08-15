@@ -5,19 +5,13 @@ const path = require('path');
 // but only if they come from a module that starts with eslint-config-
 // So we load the filename directly (and it could be in node_modules/
 // or or ../node_modules/ etc)
-const matrixJsSdkPath = path.dirname(require.resolve('matrix-js-sdk'));
 
 module.exports = {
     parser: "babel-eslint",
-    extends: [matrixJsSdkPath + "/.eslintrc.js"],
     plugins: [
       "react",
-      "flowtype",
       "babel"
     ],
-    globals: {
-        LANGUAGES_FILE: "readonly",
-    },
     env: {
         es6: true,
     },
@@ -27,6 +21,66 @@ module.exports = {
         }
     },
     rules: {
+	        // rules we've always adhered to or now do
+        "max-len": ["error", {
+            code: 90,
+            ignoreComments: true,
+        }],
+        curly: ["error", "multi-line"],
+        "prefer-const": ["error"],
+        "comma-dangle": ["error", {
+            arrays: "always-multiline",
+            objects: "always-multiline",
+            imports: "always-multiline",
+            exports: "always-multiline",
+            functions: "always-multiline",
+        }],
+
+        // loosen jsdoc requirements a little
+        "require-jsdoc": ["error", {
+            require: {
+                FunctionDeclaration: false,
+            }
+        }],
+        "valid-jsdoc": ["error", {
+            requireParamDescription: false,
+            requireReturn: false,
+            requireReturnDescription: false,
+        }],
+
+        // rules we do not want from eslint-recommended
+        "no-console": ["off"],
+        "no-constant-condition": ["off"],
+        "no-empty": ["error", { "allowEmptyCatch": true }],
+
+        // rules we do not want from the google styleguide
+        "object-curly-spacing": ["off"],
+        "spaced-comment": ["off"],
+        "guard-for-in": ["off"],
+
+        // in principle we prefer single quotes, but life is too short
+        quotes: ["off"],
+
+        // rules we'd ideally like to adhere to, but the current
+        // code does not (in most cases because it's still ES5)
+        // we set these to warnings, and assert that the number
+        // of warnings doesn't exceed a given threshold
+        "no-var": ["warn"],
+        "brace-style": ["warn", "1tbs", {"allowSingleLine": true}],
+        "prefer-rest-params": ["warn"],
+        "prefer-spread": ["warn"],
+        "one-var": ["warn"],
+        "padded-blocks": ["warn"],
+        "no-extend-native": ["warn"],
+        "camelcase": ["warn"],
+        "no-multi-spaces": ["error", { "ignoreEOLComments": true }],
+        "space-before-function-paren": ["error", {
+            "anonymous": "never",
+            "named": "never",
+            "asyncArrow": "always",
+        }],
+        "arrow-parens": "off",
+
         // eslint's built in no-invalid-this rule breaks with class properties
         "no-invalid-this": "off",
         // so we replace it with a version that is class property aware
@@ -69,41 +123,6 @@ module.exports = {
         //
         // https://github.com/yannickcr/eslint-plugin-react/blob/HEAD/docs/rules/jsx-tag-spacing.md
         "react/jsx-tag-spacing": ["error"],
-
-        /** flowtype **/
-        "flowtype/require-parameter-type": ["warn", {
-            "excludeArrowFunctions": true,
-        }],
-        "flowtype/define-flow-type": "warn",
-        "flowtype/require-return-type": ["warn",
-            "always",
-            {
-              "annotateUndefined": "never",
-              "excludeArrowFunctions": true,
-            }
-        ],
-        "flowtype/space-after-type-colon": ["warn", "always"],
-        "flowtype/space-before-type-colon": ["warn", "never"],
-
-        /*
-         * things that are errors in the js-sdk config that the current
-         * code does not adhere to, turned down to warn
-         */
-        "max-len": ["warn", {
-            // apparently people believe the length limit shouldn't apply
-            // to JSX.
-            ignorePattern: '^\\s*<',
-            ignoreComments: true,
-            ignoreRegExpLiterals: true,
-            code: 120,
-        }],
-        "valid-jsdoc": ["warn"],
-        "new-cap": ["warn"],
-        "key-spacing": ["warn"],
-        "prefer-const": ["warn"],
-
-        // crashes currently: https://github.com/eslint/eslint/issues/6274
-        "generator-star-spacing": "off",
     },
     settings: {
         flowtype: {
