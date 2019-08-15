@@ -146,7 +146,7 @@ class DeviceWorkerHandler(BaseHandler):
                     if etype != EventTypes.Member:
                         continue
                     possibly_left.add(state_key)
-                    continue
+                continue
 
             # Fetch the current state at the time.
             try:
