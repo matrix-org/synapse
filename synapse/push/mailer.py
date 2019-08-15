@@ -241,7 +241,7 @@ class Mailer(object):
 
         yield self.send_email(
             email_address,
-            "[%s] Password Reset Email" % self.hs.config.server_name,
+            "[%s] Register your Email Address" % self.hs.config.server_name,
             template_vars,
         )
 
