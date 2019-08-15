@@ -92,6 +92,26 @@ two problems, namely:
   but that doesn't prevent another server sending you baggage which will be logged
   to OpenTracing's logs.
 
+==========
+EDU FORMAT
+==========
+
+EDUs can contain tracing data in their content. This is not specced but
+it could be of interest for other homeservers.
+
+Edu format:
+
+.. code-block:: json
+
+   edu: {
+     edu_type: "type"
+     content: {
+       context: {
+         ...opentracing_context
+       }
+     }
+   }
+
 ==================
 Configuring Jaeger
 ==================
