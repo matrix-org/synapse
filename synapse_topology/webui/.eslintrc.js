@@ -9,8 +9,8 @@ const path = require('path');
 module.exports = {
     parser: "babel-eslint",
     plugins: [
-      "react",
-      "babel"
+        "react",
+        "babel"
     ],
     env: {
         es6: true,
@@ -21,7 +21,7 @@ module.exports = {
         }
     },
     rules: {
-	        // rules we've always adhered to or now do
+        // rules we've always adhered to or now do
         "max-len": ["error", {
             code: 90,
             ignoreComments: true,
@@ -66,10 +66,9 @@ module.exports = {
         // we set these to warnings, and assert that the number
         // of warnings doesn't exceed a given threshold
         "no-var": ["warn"],
-        "brace-style": ["warn", "1tbs", {"allowSingleLine": true}],
+        "brace-style": ["warn", "1tbs", { "allowSingleLine": true }],
         "prefer-rest-params": ["warn"],
         "prefer-spread": ["warn"],
-        "one-var": ["warn"],
         "padded-blocks": ["warn"],
         "no-extend-native": ["warn"],
         "camelcase": ["warn"],

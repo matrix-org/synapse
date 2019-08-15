@@ -1,22 +1,22 @@
-import base_config_reducer from './base-config-reducer';
+import baseConfigReducer from './base-config-reducer';
 
-import config_ui_reducer from './config-ui-reducer';
-import setup_ui_reducer from './setup-ui-reducer';
+import configUIReducer from './config-ui-reducer';
+import setupUIReducer from './setup-ui-reducer';
 
-import { SETUP_INTRO_UI, SERVER_NAME_UI } from './ui_constants';
+import { SETUP_INTRO_UI, SERVER_NAME_UI } from './ui-constants';
 
 
 export default (state = {
-  setup_ui: {
-    active_blocks: [SETUP_INTRO_UI, SERVER_NAME_UI],
-  },
-  config_ui: {
-  },
-  base_config: {
-    base_config_checked: false,
-  }
+    setupUI: {
+        activeBlocks: [SETUP_INTRO_UI, SERVER_NAME_UI],
+    },
+    configUI: {
+    },
+    baseConfig: {
+        baseConfigChecked: false,
+    },
 }, action) => ({
-  config_ui: config_ui_reducer(state, action),
-  setup_ui: setup_ui_reducer(state, action),
-  base_config: base_config_reducer(state.base_config, action)
+    configUI: configUIReducer(state, action),
+    setupUI: setupUIReducer(state, action),
+    baseConfig: baseConfigReducer(state.baseConfig, action),
 });

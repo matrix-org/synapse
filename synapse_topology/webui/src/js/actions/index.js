@@ -1,254 +1,301 @@
 import {
-  ADVANCE_UI,
-  BACK_UI,
-  SET_SERVERNAME,
-  SET_STATS,
-  BASE_CONFIG_CHECKED,
-  FAIL,
-  SET_SECRET_KEY,
-  GETTING_SECRET_KEY,
-  SET_DELEGATION,
-  SET_DELEGATION_SERVERNAME,
-  SET_DELEGATION_PORTS,
-  SET_REVERSE_PROXY,
-  SET_TLS,
-  TESTING_TLS_CERT_PATHS,
-  SET_TLS_CERT_PATHS,
-  SET_TLS_CERT_PATHS_VALIDITY,
-  SET_TLS_CERT_FILES,
-  UPLOADING_TLS_CERT_PATHS,
-  TESTING_SYNAPSE_PORTS,
-  SET_SYNAPSE_PORTS,
-  SET_SYNAPSE_PORTS_FREE,
-  SET_DATABASE,
-  SET_CONFIG_DIR,
-  WRITE_CONFIG,
+    ADVANCE_UI,
+    BACK_UI,
+    SET_SERVERNAME,
+    SET_STATS,
+    BASE_CONFIG_CHECKED,
+    FAIL,
+    SET_SECRET_KEY,
+    GETTING_SECRET_KEY,
+    SET_DELEGATION,
+    SET_DELEGATION_SERVERNAME,
+    SET_DELEGATION_PORTS,
+    SET_REVERSE_PROXY,
+    SET_TLS,
+    TESTING_TLS_CERT_PATHS,
+    SET_TLS_CERT_PATHS,
+    SET_TLS_CERT_PATHS_VALIDITY,
+    SET_TLS_CERT_FILES,
+    UPLOADING_TLS_CERT_PATHS,
+    TESTING_SYNAPSE_PORTS,
+    SET_SYNAPSE_PORTS,
+    SET_SYNAPSE_PORTS_FREE,
+    SET_DATABASE,
+    SET_CONFIG_DIR,
 } from './types';
 
 import {
-  get_server_setup,
-  post_server_name,
-  get_secretkey,
-  post_cert_paths,
-  post_certs,
-  test_ports,
-  post_config,
-  start_synapse,
+    getServerSetup,
+    postServerName,
+    getSecretkey,
+    postCertPaths,
+    postCerts,
+    testPorts,
+    postConfig,
+    startSynapse,
 } from '../api';
+
 import { CONFIG_LOCK, CONFIG_DIR } from '../api/constants';
-import { base_config_to_synapse_config } from '../utils/yaml';
+import { baseConfigToSynapseConfig } from '../utils/yaml';
 
 export const startup = () => {
-  return dispatch => {
-    get_server_setup().then(
-      result => {
-        dispatch(start(result[CONFIG_LOCK]));
-        dispatch(set_config_dir(result[CONFIG_DIR]));
-      },
-      error => dispatch(fail(error)),
-    )
-  }
-}
 
-const set_config_dir = dir => ({
-  type: SET_CONFIG_DIR,
-  config_dir: dir,
+    return dispatch => {
+
+        getServerSetup().then(
+            result => {
+
+                dispatch(start(result[CONFIG_LOCK]));
+                dispatch(setConfigDir(result[CONFIG_DIR]));
+
+            },
+            error => dispatch(fail(error)),
+        )
+
+    };
+
+};
+
+const setConfigDir = dir => ({
+    type: SET_CONFIG_DIR,
+    configDir: dir,
 });
 
-export const generate_secret_keys = consent => {
-  return (dispatch, getState) => {
-    dispatch(getting_secret_keys());
-    post_server_name(getState().base_config.servername, consent)
-      .then(
-        result => dispatch(get_secret_key()),
-        error => dispatch(fail(error))
-      )
-  }
-}
+export const generateSecretKeys = consent => {
 
-export const set_tls_cert_paths = (cert_path, cert_key_path, callback) => {
-  return dispatch => {
-    dispatch(testing_tls_cert_paths(true));
-    post_cert_paths(cert_path, cert_key_path)
-      .then(
-        result => dispatch(check_tls_cert_path_validity(result, callback)),
-        error => dispatch(fail(error))
-      )
-  }
-}
+    return (dispatch, getState) => {
 
-const set_tls_certs = (cert_path, cert_key_path) => ({
-  type: SET_TLS_CERT_PATHS,
-  cert_path,
-  cert_key_path,
+        dispatch(gettingSecretKeys());
+        postServerName(getState().baseConfig.servername, consent)
+            .then(
+                result => dispatch(getSecretKey()),
+                error => dispatch(fail(error)),
+            );
+
+    };
+
+};
+
+export const setTlsCertPaths = (certPath, certKeyPath, callback) => {
+
+    return dispatch => {
+
+        dispatch(testingTlsCertPaths(true));
+        postCertPaths(certPath, certKeyPath)
+            .then(
+                result => dispatch(checkTlsCertPathValidity(result, callback)),
+                error => dispatch(fail(error)),
+            );
+
+    };
+
+};
+
+const setTlsCerts = (certPath, certKeyPath) => ({
+    type: SET_TLS_CERT_PATHS,
+    certPath: certPath,
+    certKeyPath: certKeyPath,
+});
+
+const testingTlsCertPaths = testing => ({
+    type: TESTING_TLS_CERT_PATHS,
+    testing,
+});
+
+const checkTlsCertPathValidity =
+    ({ cert_path: certPath, cert_key_path: certKeyPath }, callback) => {
+
+        return dispatch => {
+
+            dispatch(testingTlsCertPaths(false));
+            dispatch(setTlsCerts(certPath.absolute_path, certKeyPath.absolute_path))
+            dispatch(setCertPathValidity({ certPath, certKeyPath }));
+
+            if (!certPath.invalid && !certKeyPath.invalid) {
+
+                dispatch(advanceUI());
+                callback();
+
+            };
+
+        };
+
+    };
+
+export const uploadTlsCertFiles = (tlsCertFile, tlsCertKeyFile) =>
+
+    dispatch => {
+
+        dispatch(setTlsCertFiles(tlsCertFile, tlsCertKeyFile));
+        dispatch(uploadingTlsCertFiles(true));
+        postCerts(tlsCertFile, tlsCertKeyFile)
+            .then(
+                result => {
+
+                    dispatch(uploadingTlsCertFiles(false));
+                    dispatch(advanceUI())
+
+                },
+                error => dispatch(fail(error)),
+            )
+
+    };
+
+const uploadingTlsCertFiles = uploading => ({
+    type: UPLOADING_TLS_CERT_PATHS,
+    uploading,
+});
+
+export const setTlsCertFiles = (tlsCertFile, tlsCertKeyFile) => ({
+    type: SET_TLS_CERT_FILES,
+    tlsCertFile,
+    tlsCertKeyFile,
 })
 
-const testing_tls_cert_paths = testing => ({
-  type: TESTING_TLS_CERT_PATHS,
-  testing,
+const setCertPathValidity = ({ certPath, certKeyPath }) => ({
+    type: SET_TLS_CERT_PATHS_VALIDITY,
+    certPathInvalid: certPath.invalid,
+    certKeyPathInvalid: certKeyPath.invalid,
 });
 
-const check_tls_cert_path_validity = ({ cert_path, cert_key_path }, callback) => {
-  return dispatch => {
-    dispatch(testing_tls_cert_paths(false));
-    dispatch(set_tls_certs(cert_path.absolute_path, cert_key_path.absolute_path))
-    dispatch(set_cert_path_validity({ cert_path, cert_key_path }));
-    if (!cert_path.invalid && !cert_key_path.invalid) {
-      dispatch(advance_ui());
-      callback();
-    }
-  }
-}
-
-export const upload_tls_cert_files = (tls_cert_file, tls_cert_key_file) =>
-  dispatch => {
-    dispatch(set_tls_cert_files(tls_cert_file, tls_cert_key_file));
-    dispatch(uploading_tls_cert_files(true));
-    post_certs(tls_cert_file, tls_cert_key_file)
-      .then(
-        result => {
-          dispatch(uploading_tls_cert_files(false));
-          dispatch(advance_ui())
-        },
-        error => dispatch(fail(error)),
-      )
-  }
-
-const uploading_tls_cert_files = uploading => ({
-  type: UPLOADING_TLS_CERT_PATHS,
-  uploading
-})
-
-export const set_tls_cert_files = (tls_cert_file, tls_cert_key_file) => ({
-  type: SET_TLS_CERT_FILES,
-  tls_cert_file,
-  tls_cert_key_file,
-})
-const set_cert_path_validity = ({ cert_path, cert_key_path }) => ({
-  type: SET_TLS_CERT_PATHS_VALIDITY,
-  cert_path_invalid: cert_path.invalid,
-  cert_key_path_invalid: cert_key_path.invalid,
+export const gettingSecretKeys = () => ({
+    type: GETTING_SECRET_KEY,
 });
 
-export const getting_secret_keys = () => ({
-  type: GETTING_SECRET_KEY,
+export const getSecretKey = () => {
+
+    return dispatch => {
+
+        getSecretkey().then(
+            result => dispatch(setSecretKey(result)),
+            error => dispatch(fail(error)),
+        )
+
+    };
+
+};
+
+export const setSecretKey = key => ({
+    type: SET_SECRET_KEY,
+    key,
 });
 
-export const get_secret_key = () => {
-  return dispatch => {
-    get_secretkey().then(
-      result => dispatch(set_secret_key(result)),
-      error => dispatch(fail(error)),
-    )
-  }
-}
-
-export const set_secret_key = key => ({
-  type: SET_SECRET_KEY,
-  key,
-});
-
-export const start = setup_done => ({
-  type: BASE_CONFIG_CHECKED,
-  setup_done,
+export const start = setupDone => ({
+    type: BASE_CONFIG_CHECKED,
+    setupDone,
 });
 
 export const fail = reason => ({
-  type: FAIL,
-  reason,
+    type: FAIL,
+    reason,
 });
 
-export const advance_ui = option => ({
-  type: ADVANCE_UI,
-  option,
+export const advanceUI = option => ({
+    type: ADVANCE_UI,
+    option,
 });
 
-export const set_servername = servername => ({
-  type: SET_SERVERNAME,
-  servername,
+export const setServername = servername => ({
+    type: SET_SERVERNAME,
+    servername,
 });
 
-export const set_stats = consent => ({
-  type: SET_STATS,
-  consent,
+export const setStats = consent => ({
+    type: SET_STATS,
+    consent,
 });
 
-export const set_delegation = delegation_type => ({
-  type: SET_DELEGATION,
-  delegation_type,
+export const setDelegation = delegationType => ({
+    type: SET_DELEGATION,
+    delegationType,
 });
 
-export const set_delegation_servername = servername => ({
-  type: SET_DELEGATION_SERVERNAME,
-  servername,
+export const setDelegationServername = servername => ({
+    type: SET_DELEGATION_SERVERNAME,
+    servername,
 });
 
-export const set_delegation_ports = (federation_port, client_port) => ({
-  type: SET_DELEGATION_PORTS,
-  federation_port,
-  client_port,
+export const setDelegationPorts = (federationPort, clientPort) => ({
+    type: SET_DELEGATION_PORTS,
+    federationPort,
+    clientPort,
 });
 
-export const set_reverse_proxy = proxy_type => ({
-  type: SET_REVERSE_PROXY,
-  proxy_type,
+export const setReverseProxy = proxyType => ({
+    type: SET_REVERSE_PROXY,
+    proxyType,
 });
 
-export const set_tls = tls_type => ({
-  type: SET_TLS,
-  tls_type,
+export const setTls = tlsType => ({
+    type: SET_TLS,
+    tlsType,
 });
 
-export const set_synapse_ports = (federation_port, client_port, callback) => {
-  const fed_port_priv = federation_port < 1024;
-  const client_port_priv = client_port < 1024;
-  return dispatch => {
-    dispatch(testing_synapse_ports(true));
-    dispatch({
-      type: SET_SYNAPSE_PORTS,
-      federation_port,
-      client_port,
-    })
-    test_ports([federation_port, client_port])
-      .then(
-        results => dispatch(update_ports_free(
-          fed_port_priv ? true : results.ports[0],
-          client_port_priv ? true : results.ports[1],
-          callback,
-        )),
-        error => dispatch(fail(error)),
-      )
-  }
+export const setSynapsePorts = (federationPort, clientPort, callback) => {
+
+    const fedPortPriv = federationPort < 1024;
+    const clientPortPriv = clientPort < 1024;
+
+    return dispatch => {
+
+        dispatch(testingSynapsePorts(true));
+        dispatch({
+            type: SET_SYNAPSE_PORTS,
+            federationPort,
+            clientPort,
+        })
+        testPorts([federationPort, clientPort])
+            .then(
+                results => dispatch(updatePortsFree(
+                    fedPortPriv ? true : results.ports[0],
+                    clientPortPriv ? true : results.ports[1],
+                    callback,
+                )),
+                error => dispatch(fail(error)),
+            )
+
+    }
+
 };
 
-export const update_ports_free = (synapse_federation_port_free, synapse_client_port_free, callback) => {
-  return dispatch => {
-    dispatch(testing_synapse_ports(false));
-    dispatch({
-      type: SET_SYNAPSE_PORTS_FREE,
-      synapse_federation_port_free,
-      synapse_client_port_free,
-    });
-    if (synapse_federation_port_free && synapse_client_port_free) {
-      callback();
-      dispatch(advance_ui());
+export const updatePortsFree =
+    (synapseFederationPortFree, synapseClientPortFree, callback) => {
+
+        return dispatch => {
+
+            dispatch(testingSynapsePorts(false));
+            dispatch({
+                type: SET_SYNAPSE_PORTS_FREE,
+                synapseFederationPortFree,
+                synapseClientPortFree,
+            });
+            if (synapseFederationPortFree && synapseClientPortFree) {
+                callback();
+                dispatch(advanceUI());
+
+            }
+
+        }
+
     }
-  }
-}
 
-export const testing_synapse_ports = verifying => ({
-  type: TESTING_SYNAPSE_PORTS,
-  verifying,
+export const testingSynapsePorts = verifying => ({
+    type: TESTING_SYNAPSE_PORTS,
+    verifying,
 })
 
-export const set_database = database => ({
-  type: SET_DATABASE,
-  database,
+export const setDatabase = database => ({
+    type: SET_DATABASE,
+    database,
 })
 
-export const write_config = (config, sub_config_name) => {
-  return (dispatch, getState) => {
-    post_config(base_config_to_synapse_config(getState().base_config), sub_config_name)
-      .then(res => start_synapse(), error => dispatch(fail(error)))
-  }
+export const writeConfig = (config, subConfigName) => {
+
+    return (dispatch, getState) => {
+
+        postConfig(baseConfigToSynapseConfig(getState().baseConfig), subConfigName)
+            .then(res => startSynapse(), error => dispatch(fail(error)))
+
+    }
+
 }

@@ -1,12 +1,15 @@
+/* eslint-disable max-len */
 export default ({
-  delegationFedPort,
-  delegationClientPort,
-  fedPort,
-  clientPort,
-  synapseServerName,
+    delegationFedPort,
+    delegationClientPort,
+    fedPort,
+    clientPort,
+    synapseServerName,
 }) => {
-  if (fedPort == clientPort) {
-    return `frontend https
+
+    if (fedPort == clientPort) {
+
+        return `frontend https
   bind :::${delegationClientPort} v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
 
   # Matrix client traffic
@@ -22,8 +25,10 @@ frontend matrix-federation
 backend matrix
   server matrix 127.0.0.1:${fedPort}
 `
-  } else {
-    return `frontend https
+
+    } else {
+
+        return `frontend https
   bind:::${delegationClientPort} v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2, http / 1.1
 
 # Matrix client traffic
@@ -40,5 +45,7 @@ backend matrix
   server matrix 127.0.0.1:${fedPort}
 
 backend matrix-client 127.0.0.1:${clientPort}`
-  }
+
+    }
+
 }

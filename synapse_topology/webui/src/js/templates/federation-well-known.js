@@ -1,6 +1,6 @@
 export default ({
-  synapseServerName,
-  delegationSynapsePort,
+    synapseServerName,
+    delegationSynapsePort,
 }) => `{
   "m.server": "${synapseServerName}:${delegationSynapsePort}"
 }`

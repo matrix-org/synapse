@@ -2,22 +2,24 @@ import { connect } from 'react-redux';
 
 import ExportKeys from '../components/ExportKeys';
 
-import { advance_ui } from '../actions';
+import { advanceUI } from '../actions';
 
-const mapStateToProps = (state, ownProps) => {
-  const secret_key_loaded = state.base_config.secret_key_loaded;
-  const secret_key = state.base_config.secret_key;
-  return {
-    secret_key_loaded,
-    secret_key,
-  }
+const mapStateToProps = state => {
+
+    const secretKeyLoaded = state.baseConfig.secretKeyLoaded;
+    const secretKey = state.baseConfig.secretKey;
+    return {
+        secretKeyLoaded,
+        secretKey,
+    }
+
 };
 
-const mapDispatchToProps = (dispatch) => ({
-  onClick: () => dispatch(advance_ui())
+const mapDispatchToProps = dispatch => ({
+    onClick: () => dispatch(advanceUI()),
 });
 
 export default connect(
-  mapStateToProps,
-  mapDispatchToProps
+    mapStateToProps,
+    mapDispatchToProps,
 )(ExportKeys);

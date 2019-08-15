@@ -1,10 +1,10 @@
 import React from 'react';
 export default ({
-  delegationFedPort,
-  delegationClientPort,
-  fedPort,
-  clientPort,
-  synapseServerName,
+    delegationFedPort,
+    delegationClientPort,
+    fedPort,
+    clientPort,
+    synapseServerName,
 }) => `listen {delegationClientPort} ssl;
 listen [::]:${delegationClientPort} ssl;
 server_name ${synapseServerName};

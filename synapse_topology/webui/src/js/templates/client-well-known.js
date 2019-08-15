@@ -1,6 +1,7 @@
+/* eslint-disable max-len */
 export default ({
-  synapseServerName,
-  delegationClientPort,
+    synapseServerName,
+    delegationClientPort,
 }) => `{
   "m.homeserver": {
     "base_url": "https://${synapseServerName}${delegationClientPort ? `:${delegationClientPort}` : ""}"

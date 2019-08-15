@@ -2,17 +2,17 @@ import { connect } from 'react-redux';
 
 import BaseIntro from '../components/BaseIntro';
 
-import { advance_ui } from '../actions';
+import { advanceUI } from '../actions';
 
 const mapStateToProps = (state, ownProps) => ({
 
 });
 
 const mapDispathToProps = (dispatch) => ({
-  onClick: () => dispatch(advance_ui())
+    onClick: () => dispatch(advanceUI()),
 });
 
 export default connect(
-  null,
-  mapDispathToProps
+    null,
+    mapDispathToProps,
 )(BaseIntro);

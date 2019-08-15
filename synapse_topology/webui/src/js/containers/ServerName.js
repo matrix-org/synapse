@@ -2,20 +2,20 @@ import { connect } from 'react-redux';
 
 import ServerName from '../components/ServerName';
 
-import { advance_ui, set_servername } from '../actions';
+import { advanceUI, setServername } from '../actions';
 
 const mapStateToProps = (state, ownProps) => ({
 
 });
 
 const mapDispathToProps = (dispatch) => ({
-  onClick: servername => {
-    dispatch(advance_ui());
-    dispatch(set_servername(servername));
-  }
+    onClick: servername => {
+        dispatch(advanceUI());
+        dispatch(setServername(servername));
+    },
 });
 
 export default connect(
-  null,
-  mapDispathToProps
+    null,
+    mapDispathToProps,
 )(ServerName);

@@ -1,9 +1,9 @@
 export default ({
-  delegationFedPort,
-  delegationClientPort,
-  fedPort,
-  clientPort,
-  synapseServerName,
+    delegationFedPort,
+    delegationClientPort,
+    fedPort,
+    clientPort,
+    synapseServerName,
 }) => `
 <VirtualHost *:${delegationClientPort}>
     SSLEngine on

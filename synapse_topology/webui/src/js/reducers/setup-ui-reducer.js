@@ -1,30 +1,39 @@
 import { ADVANCE_UI, BACK_UI, BASE_CONFIG_CHECKED } from '../actions/types';
-import useAccordionToggle from 'react-bootstrap/useAccordionToggle'
 import {
-  SETUP_ORDER,
-} from './ui_constants';
+    SETUP_ORDER,
+} from './ui-constants';
 
 
-const new_active_blocks = active_blocks => {
-  return SETUP_ORDER.slice(0, active_blocks.length + 1)
+const newActiveBlocks = activeBlocks => {
+
+    return SETUP_ORDER.slice(0, activeBlocks.length + 1)
+
 }
 
-export default ({ setup_ui, base_config }, action) => {
-  if (!base_config.base_config_checked) {
-    return setup_ui;
-  }
-  if (base_config.setup_done) {
-    return setup_ui;
-  }
-  switch (action.type) {
-    case ADVANCE_UI:
-      return {
-        active_blocks: new_active_blocks(setup_ui.active_blocks),
-      }
-    case BACK_UI:
-    default:
-      return setup_ui;
-  }
+export default ({ setupUI, baseConfig }, action) => {
+
+    if (!baseConfig.baseConfigChecked) {
+
+        return setupUI;
+
+    }
+    if (baseConfig.setupDone) {
+
+        return setupUI;
+
+    }
+    switch (action.type) {
+
+        case ADVANCE_UI:
+            return {
+                activeBlocks: newActiveBlocks(setupUI.activeBlocks),
+            }
+        case BACK_UI:
+        default:
+            return setupUI;
+
+    }
+
 }
 
-export const next_ui = current => SETUP_ORDER[SETUP_ORDER.lastIndexOf(current) + 1]
+export const nextUI = current => SETUP_ORDER[SETUP_ORDER.lastIndexOf(current) + 1]

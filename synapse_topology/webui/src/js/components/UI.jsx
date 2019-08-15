@@ -6,21 +6,21 @@ import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
 
 import {
-  SETUP_INTRO_UI,
-  SERVER_NAME_UI,
-  STATS_REPORT_UI,
-  KEY_EXPORT_UI,
-  DELEGATION_OPTIONS_UI,
-  TLS_UI,
-  PORT_SELECTION_UI,
-  REVERSE_PROXY_TEMPLATE_UI,
-  LOADING_UI,
-  ERROR_UI,
-  DELEGATION_TEMPLATE_UI,
-  DATABASE_UI,
-  COMPLETE_UI,
-  SETUP_ORDER,
-} from '../reducers/ui_constants';
+    SETUP_INTRO_UI,
+    SERVER_NAME_UI,
+    STATS_REPORT_UI,
+    KEY_EXPORT_UI,
+    DELEGATION_OPTIONS_UI,
+    TLS_UI,
+    PORT_SELECTION_UI,
+    REVERSE_PROXY_TEMPLATE_UI,
+    LOADING_UI,
+    ERROR_UI,
+    DELEGATION_TEMPLATE_UI,
+    DATABASE_UI,
+    COMPLETE_UI,
+    SETUP_ORDER,
+} from '../reducers/ui-constants';
 
 import Error from './Error';
 import Loading from './Loading';
@@ -38,55 +38,66 @@ import Database from '../containers/Database';
 import ConfigSelector from './ConfigSelector';
 import CompleteSetup from '../containers/CompleteSetup';
 
-const block_mapping = ui_block => {
-  console.log(`fetching ${ui_block}`)
-  switch (ui_block) {
-    case LOADING_UI:
-      return <Loading key={ui_block} />
-    case ERROR_UI:
-      return <Error key={ui_block} />
-    case SETUP_INTRO_UI:
-      return < IntroUi key={ui_block} />
-    case SERVER_NAME_UI:
-      return <ServerName key={ui_block} />
-    case STATS_REPORT_UI:
-      return <StatsReporter key={ui_block} />
-    case KEY_EXPORT_UI:
-      return <ExportKeys key={ui_block} />
-    case DELEGATION_OPTIONS_UI:
-      return <DelegationOptions key={ui_block} />
-    case TLS_UI:
-      return <TLS key={ui_block} />
-    case PORT_SELECTION_UI:
-      return <PortSelection key={ui_block} />
-    case REVERSE_PROXY_TEMPLATE_UI:
-      return <ReverseProxySampleConfig key={ui_block} />
-    case DELEGATION_TEMPLATE_UI:
-      return <DelegationSampleConfig key={ui_block} />
-    case DATABASE_UI:
-      return <Database key={ui_block} />
-    case COMPLETE_UI:
-      return <CompleteSetup key={ui_block} />
-    default:
-      return <h1>how did i get here?</h1>
-  }
+const blockMapping = uiBlock => {
+
+    console.log(`fetching ${uiBlock}`)
+    switch (uiBlock) {
+
+        case LOADING_UI:
+            return <Loading key={uiBlock} />
+        case ERROR_UI:
+            return <Error key={uiBlock} />
+        case SETUP_INTRO_UI:
+            return <IntroUi key={uiBlock} />
+        case SERVER_NAME_UI:
+            return <ServerName key={uiBlock} />
+        case STATS_REPORT_UI:
+            return <StatsReporter key={uiBlock} />
+        case KEY_EXPORT_UI:
+            return <ExportKeys key={uiBlock} />
+        case DELEGATION_OPTIONS_UI:
+            return <DelegationOptions key={uiBlock} />
+        case TLS_UI:
+            return <TLS key={uiBlock} />
+        case PORT_SELECTION_UI:
+            return <PortSelection key={uiBlock} />
+        case REVERSE_PROXY_TEMPLATE_UI:
+            return <ReverseProxySampleConfig key={uiBlock} />
+        case DELEGATION_TEMPLATE_UI:
+            return <DelegationSampleConfig key={uiBlock} />
+        case DATABASE_UI:
+            return <Database key={uiBlock} />
+        case COMPLETE_UI:
+            return <CompleteSetup key={uiBlock} />
+        default:
+            return <h1>how did i get here?</h1>
+
+    }
+
 }
 
-export default ({ setup_ui, config_ui, base_config }) => {
+export default ({ setupUI, configUI, baseConfig }) => {
 
-  if (!base_config.base_config_checked) {
-    return <Loading />
-  }
+    if (!baseConfig.baseConfigChecked) {
 
-  if (base_config.setup_done) {
-    console.log(`switching to ui ${config_ui}`);
-    return <ConfigSelector></ConfigSelector>
-  }
+        return <Loading />
 
-  if (!base_config.setup_done) {
-    console.log(setup_ui);
-    return <Accordion defaultActiveKey="0">
-      {SETUP_ORDER.map(block_mapping)}
-    </Accordion >
-  }
+    }
+
+    if (baseConfig.setupDone) {
+
+        console.log(`switching to ui ${configUI}`);
+        return <ConfigSelector></ConfigSelector>
+
+    }
+
+    if (!baseConfig.setupDone) {
+
+        console.log(setupUI);
+        return <Accordion defaultActiveKey="0">
+            {SETUP_ORDER.map(blockMapping)}
+        </Accordion >
+
+    }
+
 }

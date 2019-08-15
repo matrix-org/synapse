@@ -1,89 +1,92 @@
 import fetchAbsolute from 'fetch-absolute';
 import {
-  API_URL,
-  CONFIG,
-  SECRET_KEY,
-  SERVER_NAME,
-  SETUP_CHECK,
-  CERT_PATHS,
-  TEST_PORTS,
-  START,
+    API_URL,
+    CONFIG,
+    SECRET_KEY,
+    SERVER_NAME,
+    SETUP_CHECK,
+    CERT_PATHS,
+    TEST_PORTS,
+    START,
 } from './constants';
 
 const fetchAbs = fetchAbsolute(fetch)(API_URL)
 
-export const get_server_name = () =>
-  fetchAbs(SERVER_NAME)
-    .then(res => res.json())
+export const getServerName = () =>
+    fetchAbs(SERVER_NAME)
+        .then(res => res.json())
 
-export const post_server_name = (servername, consent) =>
-  fetchAbs(
-    SERVER_NAME,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        "server_name": servername,
-        "report_stats": consent
-      })
-    }
-  )
+export const postServerName = (servername, consent) =>
+    fetchAbs(
+        SERVER_NAME,
+        {
+            method: 'POST',
+            body: JSON.stringify({
+                "server_name": servername,
+                "report_stats": consent,
+            }),
+        },
+    )
 
-export const post_cert_paths = (cert_path, cert_key_path) =>
-  fetchAbs(
-    CERT_PATHS,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        cert_path,
-        cert_key_path,
-      })
-    }
-  ).then(res => res.json())
+export const postCertPaths = (certPath, certKeyPath) =>
+    fetchAbs(
+        CERT_PATHS,
+        {
+            method: 'POST',
+            body: JSON.stringify({
+                // eslint-disable-next-line camelcase
+                cert_path: certPath,
+                // eslint-disable-next-line camelcase
+                cert_key_path: certKeyPath,
+            }),
+        },
+    ).then(res => res.json())
 
-export const post_certs = (cert, cert_key) =>
-  fetchAbs(
-    CERT_PATHS,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        cert,
-        cert_key,
-      })
-    }
-  )
+export const postCerts = (cert, certKey) =>
+    fetchAbs(
+        CERT_PATHS,
+        {
+            method: 'POST',
+            body: JSON.stringify({
+                cert,
+                // eslint-disable-next-line camelcase
+                cert_key: certKey,
+            }),
+        },
+    )
 
-export const test_ports = (ports) =>
-  fetchAbs(
-    TEST_PORTS,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        ports
-      })
-    }
-  ).then(res => res.json())
+export const testPorts = (ports) =>
+    fetchAbs(
+        TEST_PORTS,
+        {
+            method: 'POST',
+            body: JSON.stringify({
+                ports,
+            }),
+        },
+    ).then(res => res.json())
 
-export const get_secretkey = () =>
-  fetchAbs(SECRET_KEY)
-    .then(res => res.json())
-    .then(json => json.secret_key)
+export const getSecretkey = () =>
+    fetchAbs(SECRET_KEY)
+        .then(res => res.json())
+        .then(json => json.secret_key)
 
-export const get_config = () => {
+export const getConfig = () => {
 
 };
 
-export const post_config = (config, sub_config_name) =>
-  fetchAbs(
-    sub_config_name ? CONFIG + "/" + sub_config_name : CONFIG,
-    {
-      method: 'POST',
-      body: JSON.stringify(config),
-    }
-  )
+export const postConfig = (config, subConfigName) =>
+    fetchAbs(
+        subConfigName ? CONFIG + "/" + subConfigName : CONFIG,
+        {
+            method: 'POST',
+            body: JSON.stringify(config),
+        },
+    );
 
 
 // Checks if the server's base config has been setup.
-export const get_server_setup = () => fetchAbs(SETUP_CHECK)
-  .then(res => res.json())
+export const getServerSetup = () => fetchAbs(SETUP_CHECK)
+    .then(res => res.json())
 
-export const start_synapse = () => fetchAbs(START)
+export const startSynapse = () => fetchAbs(START)

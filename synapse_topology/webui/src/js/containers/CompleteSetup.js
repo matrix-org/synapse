@@ -1,21 +1,19 @@
 import { connect } from 'react-redux';
 
 import CompleteSetup from '../components/CompleteSetup';
-import { write_config } from '../actions';
+import { writeConfig } from '../actions';
 
 const mapStateToProps = (state) => ({
-  tlsType: state.base_config.tls,
-  delegationType: state.base_config.delegation_type,
+    tlsType: state.baseConfig.tls,
+    delegationType: state.baseConfig.delegationType,
 });
 
 
 const mapDispatchToProps = (dispatch) => ({
-  onClick: () => {
-    dispatch(write_config())
-  },
+    onClick: () => dispatch(writeConfig()),
 });
 
 export default connect(
-  mapStateToProps,
-  mapDispatchToProps,
+    mapStateToProps,
+    mapDispatchToProps,
 )(CompleteSetup);
