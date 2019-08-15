@@ -5,6 +5,7 @@ import HtmlWebpackTagsPlugin from 'html-webpack-tags-plugin';
 
 export default {
     entry: ['./src/js/index.jsx', './src/scss/main.scss', './src/scss/bootstrap.min.css'],
+    watch: true,
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'bundle.js',
@@ -22,12 +23,6 @@ export default {
             {
                 test: /\.scss$/,
                 use: [
-                    {
-                        loader: 'file-loader',
-                        options: {
-                            name: 'css/[name].css',
-                        },
-                    },
                     {
                         loader: 'style-loader',
                     },

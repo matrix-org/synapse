@@ -46,100 +46,90 @@ a {
 }
 
 
-.contentWrapper {
-  @include theme;
-  margin: 0 20% 2rem 20%;
-  display: flex;
-  flex-direction: column;
-  text-align: center;
-  justify-content: space-evenly;
-  min-height: 100%;
-
-  .buttonDisplay {
+.buttonDisplay {
     display: flex;
     flex-direction: row;
     justify-content: space-evenly;
     margin-top: 0.5rem;
     margin-bottom: 0.5rem;
-  }
+}
 
-  .keyDisplay {
-    word-wrap: break-word;
-  }
+.keyDisplay {
+word-wrap: break-word;
+}
 
-  button {
-    @include rippler;
-    @include dropshadowed;
-    border-radius: 0.5rem;
-    font-size: 1rem;
-    padding: 0.6rem;
-    color: $font;
-    background-color: $tertiary;
-    border: none;
-    display: inline-block;
-    text-transform: capitalize;
-    font-style: bold;
-    color: $primary;
-    margin-left: 0.4rem;
-    margin-right: 0.4rem;
-  }
+button {
+@include rippler;
+@include dropshadowed;
+border-radius: 0.5rem;
+font-size: 1rem;
+padding: 0.6rem;
+color: $font;
+background-color: $tertiary;
+border: none;
+display: inline-block;
+text-transform: capitalize;
+font-style: bold;
+color: $primary;
+margin-left: 0.4rem;
+margin-right: 0.4rem;
+}
 
 
-  button[disabled] {
-    background-color: darken($secondary, 20%);
-    color: lighten($font, 20%);
-  }
+button[disabled] {
+background-color: darken($secondary, 20%);
+color: lighten($font, 20%);
+}
 
-  @mixin select {
-    padding: 0.4rem;
-    font-size: 1rem;
-    background-color: $secondary;
-    border-width: 0.1rem;
-    border-radius: 0.5rem;
-    color: lighten($font, 20%);
-    margin-bottom: 1rem;
-    border-style: solid;
-    border-color: darken($secondary, 50%);
-  }
+@mixin select {
+padding: 0.4rem;
+font-size: 1rem;
+background-color: $secondary;
+border-width: 0.1rem;
+border-radius: 0.5rem;
+color: lighten($font, 20%);
+margin-bottom: 1rem;
+border-style: solid;
+border-color: darken($secondary, 50%);
+}
 
-  input {
-    @include select;
-  }
+input {
+@include select;
+}
 
-  select {
-    @include select;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
+select {
+@include select;
+-webkit-appearance: none;
+-moz-appearance: none;
+appearance: none;
 
-    &:after {
-      content: ▸;
-      transform: rotate(90deg);
-      position: absolute;
-    }
-  }
+&:after {
+    content: ▸;
+    transform: rotate(90deg);
+    position: absolute;
+}
+}
 
-  pre {
-    padding: 0.4rem;
-    font-size: 0.6rem;
-    text-align: left;
-    border-style: solid;
-    border-color: darken($secondary, 50%);
-    border-radius: 0.5rem;
-    text-decoration: none;
-  }
+pre {
+padding: 0.4rem;
+font-size: 0.6rem;
+text-align: left;
+border-style: solid;
+border-color: darken($secondary, 50%);
+border-radius: 0.5rem;
+text-decoration: none;
+}
 
-  .redButton {
-    background-color: red;
-  }
+.redButton {
+background-color: red;
+}
 
-  .invalidInput {
-    border-color: red;
-  }
-  p {
-    text-align: justify;
-    text-align-last: center;
-  }
+.invalidInput {
+border-color: red;
+}
+p {
+text-align: justify;
+text-align-last: center;
 }
 
 h1 {
