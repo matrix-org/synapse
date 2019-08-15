@@ -1,1 +1,1 @@
-Remove libsqlite3-dev from require build dependencies.
+Remove libsqlite3-dev from required build dependencies.
