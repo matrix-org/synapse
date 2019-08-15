@@ -1,10 +1,12 @@
 import 'webpack';
-import { Path } from 'path';
+import path from 'path';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
+import HtmlWebpackTagsPlugin from 'html-webpack-tags-plugin';
 
 export default {
-  entry: __dirname + '/js/index.jsx',
+  entry: [ './src/js/index.jsx', './src/scss/main.scss', './src/scss/bootstrap.min.css'],
   output: {
-    path: __dirname + '/dist',
+    path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.js',
   },
   resolve: {
@@ -20,9 +22,32 @@ export default {
       {
         test: /\.scss$/,
         use: [
-	  'style-loader',
-	  'css-loader',
-	  'sass-loader',
+          {
+            loader: 'file-loader',
+            options: {
+              name: 'css/[name].css'
+            }
+          },
+          {
+            loader: 'style-loader',
+          },
+          {
+            loader: 'css-loader',
+          },
+          {
+            loader: 'sass-loader',
+          },
+        ],
+      },
+      {
+        test: /\.css$/,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              name: 'css/[name].css'
+            }
+          },
         ],
       },
       {
@@ -39,5 +64,15 @@ export default {
       }
     ]
   },
+  plugins: [
+    new HtmlWebpackPlugin({
+      hash: true,
+      filename: __dirname + '/dist/index.html',
+      title: 'Topology - The synapse configuration tool',
+    }),
+    new HtmlWebpackTagsPlugin({
+      tags: ['css/bootstrap.min.css', 'css/main.css']
+    }),
+  ],
 };
 

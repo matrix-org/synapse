@@ -1,6 +1,6 @@
 @import './themes.scss';
 @import './animations.scss';
-
+@import './bootstrap.min.css';
 @mixin theme {
   @include dark;
 }

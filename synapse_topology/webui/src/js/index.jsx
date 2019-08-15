@@ -23,5 +23,5 @@ render(
     {/* <img className={style.logo} src={logo} /> */}
     <UI />
   </Provider>,
-  document.getElementById("content")
+  document.body,
 );

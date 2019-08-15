@@ -25,7 +25,7 @@ import sys
 
 @app.route("/topology_webui/", branch=True)
 def server_webui(request):
-    client_path = abspath(join(dirname(abspath(__file__)), "../webui"))
+    client_path = abspath(join(dirname(abspath(__file__)), "../webui/dist/"))
     print(client_path)
     return File(client_path)
 
