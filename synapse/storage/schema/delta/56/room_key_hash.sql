@@ -14,4 +14,4 @@
  */
 
 -- store the current hash of backup version
-ALTER TABLE e2e_room_keys_versions ADD COLUMN hash TEXT NULLABLE;
+ALTER TABLE e2e_room_keys_versions ADD COLUMN hash TEXT;
