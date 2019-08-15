@@ -21,6 +21,7 @@ export default ({ servername, skip, onClick }) => {
 
   const [fedPort, setFedPort] = useState("");
   const [clientPort, setClientPort] = useState("");
+
   const [clientPortValid, setClientPortValid] = useState(true)
   const [fedPortValid, setFedPortValid] = useState(true)
 
@@ -106,21 +107,22 @@ export default ({ servername, skip, onClick }) => {
         <input
           type="text"
           onChange={onFederationChange}
-          className={fedPortValid ? undefined : style.invalidInput}
+          className={fedPortValid ? undefined : "invalid"}
           autoFocus
           placeholder="Use Default 8448"
         />
+        {fedPortValid ? undefined : <p>Invalid port</p> }
         <p>
           Client Port
         </p>
         <input
           type="text"
           onChange={onClientChange}
-          className={clientPortValid ? undefined : style.invalidInput}
+          className={clientPortValid ? undefined : "invalid"}
           autoFocus
           placeholder="Use Default 443"
         />
-
+        {clientPortValid ? undefined : <p>Invalid port</p> }
         <button disabled={delegatedServername && clientPortValid && fedPortValid ? undefined : true}
           onClick={() => {
             toggle();

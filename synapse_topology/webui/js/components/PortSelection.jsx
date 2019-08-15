@@ -27,10 +27,15 @@ export default ({
 
   const [fedPort, setFedPort] = useState(defaultFedPort);
   const [clientPort, setClientPort] = useState(defaultClientPort);
+
   const [clientPortValid, setClientPortValid] = useState(true)
   const [fedPortValid, setFedPortValid] = useState(true)
+
   const [clientPortPriv, setClientPortPriv] = useState(defaultClientPort < 1024)
   const [fedPortPriv, setFedPortPriv] = useState(defaultFedPort < 1024)
+
+  const [_fedPortInUse, set_fedPortInUse] = useState(fedPortInUse)
+  const [_clientPortInUse, set_clientPortInUse] = useState(clientPortInUse)
 
   const updateValidity = (port, setValid) => setValid(
     !isNaN(port) && 0 < port && port <= 65535
@@ -42,6 +47,7 @@ export default ({
 
   const onFederationChange = event => {
     const val = event.target.value ? event.target.value : defaultFedPort;
+    set_fedPortInUse(false);
     setFedPort(val);
     updatePriv(val, setFedPortPriv);
     updateValidity(val, setFedPortValid);
@@ -49,6 +55,7 @@ export default ({
 
   const onClientChange = event => {
     const val = event.target.value ? event.target.value : defaultClientPort;
+    set_clientPortInUse(false);
     setClientPort(val);
     updatePriv(val, setClientPortPriv);
     updateValidity(val, setClientPortValid);
@@ -93,22 +100,26 @@ export default ({
         <h3>Federation Port</h3>
         <input
           type="text"
+          className={_fedPortInUse|!fedPortValid?"invalid":undefined}
           onChange={onFederationChange}
           disabled={canChangePorts ? undefined : true}
           autoFocus
           placeholder={defaultFedPort}
         />
-        {fedPortInUse ? <p>This port is in use.</p> : undefined}
+        {_fedPortInUse ? <p>This port is in use.</p> : undefined}
+        {fedPortValid ? undefined : <p>Invalid port</p> }
         {fedPortPriv ? <p>This is a privileged port.</p> : undefined}
         <h3>Client Port</h3>
         <input
           type="text"
+          className={_clientPortInUse|!clientPortValid?"invalid":undefined}
           onChange={onClientChange}
           disabled={canChangePorts ? undefined : true}
           autoFocus
           placeholder={defaultClientPort}
         />
-        {clientPortInUse ? <p>This port is in use.</p> : undefined}
+        {_clientPortInUse ? <p>This port is in use.</p> : undefined}
+        {clientPortValid ? undefined : <p>Invalid port</p> }
         {clientPortPriv ? <p>This is a privileged port.</p> : undefined}
         <div>
           <button
