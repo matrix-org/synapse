@@ -751,6 +751,64 @@ class PublicRoomList(BaseFederationServlet):
         return 200, data
 
 
+class UnstablePublicRoomList(BaseFederationServlet):
+    """
+    Fetch the public room list for this server.
+
+    This API returns information in the same format as /publicRooms on the
+    client API, but will only ever include local public rooms and hence is
+    intended for consumption by other home servers.
+
+    This is the unstable-prefixed version which adds support for MSC2197, which
+    is still undergoing review.
+    """
+
+    PATH = "/publicRooms"
+    PREFIX = FEDERATION_UNSTABLE_PREFIX
+
+    def __init__(self, handler, authenticator, ratelimiter, server_name, allow_access):
+        super(UnstablePublicRoomList, self).__init__(
+            handler, authenticator, ratelimiter, server_name
+        )
+        self.allow_access = allow_access
+
+    # TODO(MSC2197): Move away from Unstable prefix and back to normal prefix
+    async def on_POST(self, origin, content, query):
+        if not self.allow_access:
+            raise FederationDeniedError(origin)
+
+        limit = int(content.get("limit", 100))
+        since_token = content.get("since", None)
+        search_filter = content.get("filter", None)
+
+        include_all_networks = content.get("include_all_networks", False)
+        third_party_instance_id = content.get("third_party_instance_id", None)
+
+        if include_all_networks:
+            network_tuple = None
+            if third_party_instance_id is not None:
+                raise SynapseError(
+                    400, "Can't use include_all_networks with an explicit network"
+                )
+        elif third_party_instance_id is None:
+            network_tuple = ThirdPartyInstanceID(None, None)
+        else:
+            network_tuple = ThirdPartyInstanceID.from_string(third_party_instance_id)
+
+        if search_filter is None:
+            logger.warning("Nonefilter")
+
+        data = await self.handler.get_local_public_room_list(
+            limit=limit,
+            since_token=since_token,
+            search_filter=search_filter,
+            network_tuple=network_tuple,
+            from_federation=True,
+        )
+
+        return 200, data
+
+
 class FederationVersionServlet(BaseFederationServlet):
     PATH = "/version"
 
@@ -1315,7 +1373,7 @@ FEDERATION_SERVLET_CLASSES = (
 
 OPENID_SERVLET_CLASSES = (OpenIdUserInfo,)
 
-ROOM_LIST_CLASSES = (PublicRoomList,)
+ROOM_LIST_CLASSES = (PublicRoomList, UnstablePublicRoomList)
 
 GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsProfileServlet,
