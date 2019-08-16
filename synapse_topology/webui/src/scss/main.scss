@@ -6,9 +6,9 @@
 }
 
 html {
-    box-sizing: border-box;
-    font-family: Ariel, sans-serif;
-    font-size: 2rem;
+  box-sizing: border-box;
+  font-family: Ariel, sans-serif;
+  font-size: 1.6rem;
 }
 
 *, *:before, *:after {
@@ -16,16 +16,26 @@ html {
 }
 
 body {
-    @include theme;
-    background-color: $primary;
-    color: $font;
-    margin: 0;
+  @include theme;
+  background-color: $primary;
+  color: $font;
+  margin: auto;
+  width: 48rem;
+  max-width: 90%;
+  text-align: center;
 }
 
 a {
-    @include theme;
-    color: $link;
-    text-decoration: none;
+  @include theme;
+  color: $link;
+  text-decoration: none;
+  font-size: 0.6rem;
+  line-height: 0.8rem;
+}
+
+a:hover {
+  color: $link;
+  text-decoration: none;
 }
 
 .invalid {
@@ -59,26 +69,29 @@ a {
 }
 
 button {
-    @include rippler;
-    @include dropshadowed;
-    border-radius: 0.5rem;
-    font-size: 1rem;
-    padding: 0.6rem;
-    color: $font;
-    background-color: $tertiary;
-    border: none;
-    display: inline-block;
-    text-transform: capitalize;
-    font-style: bold;
-    color: $primary;
-    margin-left: 0.4rem;
-    margin-right: 0.4rem;
+@include rippler;
+  border-radius: 5rem;
+  font-size: 0.8rem;
+  padding: 0.4rem 1.2rem;
+  color: $font;
+  background-color: $tertiary;
+  border: none;
+  display: inline-block;
+  text-transform: capitalize;
+  font-style: bold;
+  color: $primary;
+  // margin-left: 0.4rem;
+  // margin-right: 0.4rem;
+}
+
+button:hover {
+  background-color: $link;
 }
 
 
 button[disabled] {
-    background-color: darken($secondary, 20%);
-    color: lighten($font, 20%);
+  background-color: darken($secondary, 8%);
+  color: lighten($font, 50%);
 }
 
 @mixin select {
@@ -94,20 +107,39 @@ button[disabled] {
 }
 
 input {
-    @include select;
+@include select
+  font-size: 0.6rem;
+  border-style: none;
+  background: white;
+  border-radius: 4rem;
+  color: $font;
+  padding: 0.6rem 1rem;
+}
+
+pre {
+  background: white;
+  border-radius: 4rem;
+  border-style: none !important;
+  color: $font;
 }
 
 select {
-    @include select;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
+@include select;
+-webkit-appearance: none;
+-moz-appearance: none;
+appearance: none;
+font-size: 0.6rem;
+border-style: none;
+background: white;
+border-radius: 4rem;
+color: $font;
+padding: 0.6rem 1rem;
 
-    &:after {
-        content: ▸;
-        transform: rotate(90deg);
-        position: absolute;
-    }
+&:after {
+    content: ▸;
+    transform: rotate(90deg);
+    position: absolute;
+}
 }
 
 pre {
@@ -127,12 +159,54 @@ pre {
 .invalidInput {
     border-color: red;
 }
-p {
-    text-align: justify;
-    text-align-last: center;
-}
 
 h1 {
-    @include theme;
-    font-size: 2rem;
+  @include theme;
+  font-size: 1rem;
+  margin: 1rem;
+}
+
+p {
+  font-size: 0.6rem;
+  line-height: 0.8rem;
+}
+
+label {
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+input[type=checkbox] {
+  margin-right: 0.4rem;
+}
+
+.card {
+  text-align: left;
+  border-style: none;
+  background: $secondary;
+  margin-bottom: 8px;
+}
+
+.baseintro {
+  padding: 2rem 1rem;
+}
+
+.card-header {
+  font-size: 0.8rem;
+  border-style: none;
+}
+
+.blockwrapper {
+  display: block;
+}
+
+.or {
+  font-size: 0.6rem;
+  margin-left: 0.4rem;
+  margin-right: 0.4rem;
+}
+
+.buttonGroup {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
 }
