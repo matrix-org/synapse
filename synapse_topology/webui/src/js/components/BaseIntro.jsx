@@ -24,4 +24,5 @@ export default ({ started, servername, onClick }) => {
             }
         </div>
     </ContentWrapper>
+
 }
