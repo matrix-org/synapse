@@ -1,1 +1,1 @@
-Tag authenticated entity and servlet_name.
+Add a tag recording a requests authenticated entity and corresponding servlet in opentracing.
