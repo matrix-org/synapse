@@ -30,7 +30,7 @@ export default ({
         <Accordion.Collapse eventKey={DATABASE_UI}>
             <Card.Body>
                 <p>Synapse can use either SQLite3 or Postgres as it's database.</p>
-                <p>Postgres is recommended</p>
+                <p>Postgres is recommended.</p>
 
                 <select defaultValue={defaultDatabase}
                     onChange={event => setDatabase(event.target.value)}
@@ -38,11 +38,11 @@ export default ({
                     <option value={DATABASE_TYPES.POSTGRES}>PostgreSQL</option>
                     <option value={DATABASE_TYPES.SQLITE3}>SQLite3</option>
                 </select>
-                <button onClick={() => {
-
+                <button
+                    className='inputButton'
+                    onClick={() => {
                     toggle();
                     onClick(database)
-
                 }}>Next</button>
             </Card.Body>
         </Accordion.Collapse>

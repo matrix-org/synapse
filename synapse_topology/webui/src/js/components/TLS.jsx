@@ -152,17 +152,22 @@ export default ({
                         />
 
                         <button
+                            className="inputButton"
                             disabled={certPath && certKeyPath ? undefined : true}
                             onClick={() => onClickCertPath(certPath, certKeyPath, toggle)}
                         >Use TLS Path</button>
 
-                        <h3>OR..</h3>
-                        <h1>Upload a TLS cert</h1>
-                        <p>Upload a cert file.</p>
+                        <hr />
+
+                        <p>Or, upload a cert file.</p>
                         <input type="file" name="cert" onChange={e => setCertFile(e.target.files[0])} />
                         <p>Upload the cert's private key file.</p>
                         <input type="file" name="certkey" onChange={e => setCertKeyFile(e.target.files[0])} />
-                        <button disabled={certFile && certKeyFile ? undefined : true} onClick={() => onClickCertUpload(certFile, certKeyFile, toggle)}>Upload cert</button>
+                        <button
+                            className="inputButton"
+                            disabled={certFile && certKeyFile ? undefined : true}
+                            onClick={() => onClickCertUpload(certFile, certKeyFile, toggle)}
+                        >Upload cert</button>
                     </Tab>
                 </Tabs>
             </Card.Body>
