@@ -113,7 +113,7 @@ input {
     background: white;
     border-radius: 4rem;
     color: $font;
-    padding: 0.6rem 1rem;
+    padding: 0.4rem 1.2rem;
 }
 
 pre {
@@ -188,6 +188,13 @@ input[type=checkbox] {
     margin-bottom: 8px;
 }
 
+.card-header-tabs {
+    margin-right: 0;
+    margin-bottom: 0;
+    margin-left: 0;
+}
+
+
 .baseintro {
     padding: 2rem 1rem;
 }
@@ -232,6 +239,24 @@ input[type=checkbox] {
 .chevron {
     float:right;
 }
+
+.tab-content {
+    background-color: $smoke;
+    padding: 1rem;
+}
+
+.nav-tabs .nav-link.active {
+    border-color: transparent;
+    background-color: $smoke;
+    // border-bottom: 1px;
+}
+
+.nav-tabs .nav-link:hover {
+    border-color: transparent;
+    background-color: $smoke;
+    // border-bottom: 1px;
+}
+
 .inputButton {
     margin-left: 0.6rem;
     font-size: 0.6rem;
