@@ -90,14 +90,13 @@ export default ({ setupUI, configUI, baseConfig }) => {
 
     if (!baseConfig.setupDone) {
 
-        const accordion = setupUI.activeBlocks.length ? <Accordion defaultActiveKey="0">
-            {SETUP_ORDER.map(blockMapping)}
-        </Accordion > : undefined
-
-
         return <ContentWrapper>
-            <BaseIntro />
-            {accordion}
+            <Accordion>
+                <BaseIntro />
+                <div style={setupUI.activeBlocks.length ? undefined : { display: "none" }}>
+                    {SETUP_ORDER.map(blockMapping)}
+                </div>
+            </Accordion>
         </ContentWrapper>
 
     }

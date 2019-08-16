@@ -4,7 +4,18 @@ import React from 'react';
 import ContentWrapper from '../containers/ContentWrapper';
 import ButtonDisplay from './ButtonDisplay';
 
+import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
+import { nextUI } from '../reducers/setup-ui-reducer';
+
 export default ({ started, servername, onClick }) => {
+    console.log(useAccordionToggle)
+    const toggle = useAccordionToggle(nextUI())
+    const wrappedOnClick = () => {
+
+        onClick();
+        toggle();
+
+    }
 
     const prompt = servername ? "Configuring " + servername : "Let's configure your Synapse server."
 
@@ -19,7 +30,7 @@ export default ({ started, servername, onClick }) => {
             <p>{prompt}</p>
             {
                 !started ?
-                    <ButtonDisplay><button onClick={onClick}>Get Started</button></ButtonDisplay>
+                    <ButtonDisplay><button onClick={wrappedOnClick}>Get Started</button></ButtonDisplay>
                     : undefined
             }
         </div>
