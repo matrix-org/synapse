@@ -40,7 +40,6 @@ import CompleteSetup from '../containers/CompleteSetup';
 
 const blockMapping = uiBlock => {
 
-    console.log(`fetching ${uiBlock}`)
     switch (uiBlock) {
 
         case LOADING_UI:

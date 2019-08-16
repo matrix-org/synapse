@@ -7,7 +7,6 @@ import { TLS_TYPES } from '../actions/constants';
 
 const defaultFedPort = state => {
 
-    console.log(state)
     if (state.tls == TLS_TYPES.REVERSE_PROXY) {
 
         return 8008;
