@@ -4,6 +4,7 @@ import {
     SET_SECRET_KEY,
     GETTING_SECRET_KEY,
     SET_DELEGATION,
+    SET_DELEGATION_PORTS,
     SET_DELEGATION_SERVERNAME,
     SET_REVERSE_PROXY,
     SET_TLS,
@@ -56,16 +57,16 @@ export default (state, action) => {
                 ...state,
                 delegationType: action.delegationType,
             }
-        case SET_DELEGATION_SERVERNAME:
-            return {
-                ...state,
-                delegationServername: action.servername,
-            }
-        case SET_DELEGATION_SERVERNAME:
+        case SET_DELEGATION_PORTS:
             return {
                 ...state,
                 delegationFederationPort: action.federationPort,
                 delegationClientPort: action.clientPort,
+            }
+        case SET_DELEGATION_SERVERNAME:
+            return {
+                ...state,
+                delegationServername: action.servername,
             }
         case SET_REVERSE_PROXY:
             return {
