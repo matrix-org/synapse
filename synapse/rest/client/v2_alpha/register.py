@@ -124,8 +124,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.hs.config.email_threepid_behaviour == "remote":
-            # Have the identity server handle the registration flow
-            # Just pass through the body for simplicity
+            # Have the configured identity server handle the registration flow
+            # Pass through the rest of the body for simplicity
             ret = yield self.identity_handler.requestEmailToken(**body)
         else:
             # Send the registration email from Synapse

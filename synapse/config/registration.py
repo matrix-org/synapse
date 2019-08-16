@@ -51,7 +51,9 @@ class AccountValidityConfig(Config):
         template_dir = config.get("template_dir")
 
         if not template_dir:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
+            template_dir = pkg_resources.resource_filename(
+                "synapse", "res/emailtemplates"
+            )
 
         if "account_renewed_html_path" in config:
             file_path = os.path.join(template_dir, config["account_renewed_html_path"])
@@ -276,8 +278,8 @@ class RegistrationConfig(Config):
         # configured, registration by email and resetting user passwords via
         # email will be disabled
         #
-        # Otherwise, to enable set this option to the reachable domain name for
-        # an identity server (e.g "matrix.org")
+        # Otherwise, to enable set this option to the reachable URL for
+        # an identity server (e.g "https://matrix.org")
         #
         #account_threepid_delegate: ""
 
