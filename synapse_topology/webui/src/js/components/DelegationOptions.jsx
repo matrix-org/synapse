@@ -13,6 +13,7 @@ import { DELEGATION_TYPES } from '../actions/constants';
 import { DELEGATION_OPTIONS_UI } from '../reducers/ui-constants';
 import AccordionToggle from '../containers/AccordionToggle';
 import { nextUI } from '../reducers/setup-ui-reducer';
+import InlineError from './InlineError';
 
 export default ({ servername, skip, onClick }) => {
 
@@ -62,27 +63,29 @@ export default ({ servername, skip, onClick }) => {
         <p>
             Homeserver Port
         </p>
-        <input
-            type="text"
-            onChange={onFederationChange}
-            className={fedPortValid ? undefined : "invalid"}
-            autoFocus
-            placeholder="Use Default 8448"
-            value={fedPort}
-        />
-        {fedPortValid ? undefined : <p>Invalid port</p>}
+        <InlineError error={fedPortValid ? undefined : "Invalid port"}>
+            <input
+                type="text"
+                onChange={onFederationChange}
+                className={fedPortValid ? undefined : "invalid"}
+                autoFocus
+                placeholder="Use Default 8448"
+                value={fedPort}
+            />
+        </InlineError>
         <p>
             Client Port
         </p>
-        <input
-            type="text"
-            onChange={onClientChange}
-            className={clientPortValid ? undefined : "invalid"}
-            autoFocus
-            placeholder="Use Default 443"
-            value={clientPort}
-        />
-        {clientPortValid ? undefined : <p>Invalid port</p>}
+        <InlineError error={clientPortValid ? undefined : "Invalid port"}>
+            <input
+                type="text"
+                onChange={onClientChange}
+                className={clientPortValid ? undefined : "invalid"}
+                autoFocus
+                placeholder="Use Default 443"
+                value={clientPort}
+            />
+        </InlineError>
         <button disabled={delegatedServername && clientPortValid && fedPortValid ? undefined : true}
             onClick={() => {
 
@@ -93,7 +96,7 @@ export default ({ servername, skip, onClick }) => {
         >
             Use {type}
         </button>
-    </div>
+    </div >
 
     return <Card>
         <AccordionToggle as={Card.Header} eventKey={DELEGATION_OPTIONS_UI}>

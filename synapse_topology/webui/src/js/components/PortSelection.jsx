@@ -11,6 +11,7 @@ import AccordionToggle from '../containers/AccordionToggle';
 import ContentWrapper from '../containers/ContentWrapper';
 
 import { nextUI } from '../reducers/setup-ui-reducer';
+import InlineError from './InlineError';
 
 export default ({
     servername,
@@ -71,6 +72,16 @@ export default ({
 
     const toggle = useAccordionToggle(nextUI(PORT_SELECTION_UI));
 
+    const fedPortError = internalFedPortInUse ?
+        "This port is in use" :
+        !fedPortValid ? "Invalid port" :
+            undefined;
+
+    const clientPortError = internalClientPortInUse ?
+        "This port is in use" :
+        !clientPortValid ? "Invalid port" :
+            undefined;
+
     return <Card>
         <AccordionToggle as={Card.Header} eventKey={PORT_SELECTION_UI}>
             {servername ? servername + "'s ports" : "Ports"}
@@ -106,26 +117,27 @@ export default ({
                 </p>
 
                 <h6>Federation Port</h6>
-                <input
-                    type="text"
-                    className={internalFedPortInUse | !fedPortValid ? "invalid" : undefined}
-                    onChange={onFederationChange}
-                    disabled={canChangePorts ? undefined : true}
-                    autoFocus
-                    placeholder={defaultFedPort}
-                />
-                {internalFedPortInUse ? <p>This port is in use.</p> : undefined}
-                {fedPortValid ? undefined : <p>Invalid port</p>}
+                <InlineError error={fedPortError}>
+                    <input
+                        type="text"
+                        onChange={onFederationChange}
+                        disabled={canChangePorts ? undefined : true}
+                        autoFocus
+                        placeholder={defaultFedPort}
+                    />
+                </InlineError>
                 {fedPortPriv ? <p>This is a privileged port.</p> : undefined}
                 <h6>Client Port</h6>
-                <input
-                    type="text"
-                    className={internalClientPortInUse | !clientPortValid ? "invalid" : undefined}
-                    onChange={onClientChange}
-                    disabled={canChangePorts ? undefined : true}
-                    autoFocus
-                    placeholder={defaultClientPort}
-                />
+                <InlineError error={clientPortError}>
+                    <input
+                        type="text"
+                        className={internalClientPortInUse | !clientPortValid ? "invalid" : undefined}
+                        onChange={onClientChange}
+                        disabled={canChangePorts ? undefined : true}
+                        autoFocus
+                        placeholder={defaultClientPort}
+                    />
+                </InlineError>
                 {internalClientPortInUse ? <p>This port is in use.</p> : undefined}
                 {clientPortValid ? undefined : <p>Invalid port</p>}
                 {clientPortPriv ? <p>This is a privileged port.</p> : undefined}

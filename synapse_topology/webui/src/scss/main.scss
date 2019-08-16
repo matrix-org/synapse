@@ -39,7 +39,7 @@ a:hover {
 }
 
 .invalid {
-    border-color: red;
+    border-color: $error;
 }
 .logo {
     position: absolute;
@@ -217,4 +217,13 @@ input[type=checkbox] {
 .buttonGroup {
     margin-top: 1rem;
     margin-bottom: 1rem;
+}
+
+.inlineError {
+    color: $error;
+    font-size: 0.6rem;
+    line-height: 0.8rem;
+    span {
+        margin-left: 1rem;
+    }
 }
