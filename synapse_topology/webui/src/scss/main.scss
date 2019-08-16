@@ -125,13 +125,14 @@ pre {
 
 select {
     @include select;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
+    // -webkit-appearance: none;
+    // -moz-appearance: none;
+    // appearance: none;
+    height: 1.6rem;
     font-size: 0.6rem;
     border-style: none;
     background: white;
-    border-radius: 4rem;
+    border-radius: 14rem;
     color: $font;
     padding: 0.6rem 1rem;
 
