@@ -80,8 +80,6 @@ button {
     text-transform: capitalize;
     font-style: bold;
     color: $primary;
-    // margin-left: 0.4rem;
-    // margin-right: 0.4rem;
 }
 
 button:hover {
@@ -125,9 +123,6 @@ pre {
 
 select {
     @include select;
-    // -webkit-appearance: none;
-    // -moz-appearance: none;
-    // appearance: none;
     height: 1.6rem;
     font-size: 0.6rem;
     border-style: none;
@@ -248,13 +243,11 @@ input[type=checkbox] {
 .nav-tabs .nav-link.active {
     border-color: transparent;
     background-color: $smoke;
-    // border-bottom: 1px;
 }
 
 .nav-tabs .nav-link:hover {
     border-color: transparent;
     background-color: $smoke;
-    // border-bottom: 1px;
 }
 
 .inputButton {
