@@ -1,12 +1,14 @@
+/* eslint-disable max-len */
 import React from 'react';
 
 import ContentWrapper from '../containers/ContentWrapper';
 import ButtonDisplay from './ButtonDisplay';
 
-import style from '../../scss/main.scss';
+export default ({ started, servername, onClick }) => {
 
-export default ({ onClick }) =>
-    <ContentWrapper>
+    const prompt = servername ? "Configuring " + servername : "Let's configure your Synapse server."
+
+    return <ContentWrapper>
         <div className='baseintro'>
             <svg width="113" height="48" xmlns="http://www.w3.org/2000/svg">
                 <g fill="#2D2D2D" fillRule="nonzero">
@@ -14,7 +16,12 @@ export default ({ onClick }) =>
                 </g>
             </svg>
             <h1>Setting up Synapse</h1>
-            <p>Let&apos;s configure your Synapse server.</p>
-            <ButtonDisplay><button onClick={onClick}>Get Started</button></ButtonDisplay>
+            <p>{prompt}</p>
+            {
+                !started ?
+                    <ButtonDisplay><button onClick={onClick}>Get Started</button></ButtonDisplay>
+                    : undefined
+            }
         </div>
     </ContentWrapper>
+}

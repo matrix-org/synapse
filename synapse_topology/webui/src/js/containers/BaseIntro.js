@@ -5,7 +5,8 @@ import BaseIntro from '../components/BaseIntro';
 import { advanceUI } from '../actions';
 
 const mapStateToProps = (state, ownProps) => ({
-
+    started: Boolean(state.setupUI.activeBlocks.length),
+    servername: state.baseConfig.servername,
 });
 
 const mapDispathToProps = (dispatch) => ({
@@ -13,6 +14,6 @@ const mapDispathToProps = (dispatch) => ({
 });
 
 export default connect(
-    null,
+    mapStateToProps,
     mapDispathToProps,
 )(BaseIntro);

@@ -1,5 +1,4 @@
 // Setup
-export const SETUP_INTRO_UI = "setup_intro_ui";
 export const SERVER_NAME_UI = "server_name_ui";
 export const STATS_REPORT_UI = "stats_report_ui";
 export const KEY_EXPORT_UI = "key_export_ui";
@@ -13,7 +12,6 @@ export const COMPLETE_UI = "complete_ui";
 
 // Setup order
 export const SETUP_ORDER = [
-    SETUP_INTRO_UI,
     SERVER_NAME_UI,
     STATS_REPORT_UI,
     KEY_EXPORT_UI,

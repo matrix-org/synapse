@@ -3,14 +3,13 @@ import baseConfigReducer from './base-config-reducer';
 import configUIReducer from './config-ui-reducer';
 import setupUIReducer from './setup-ui-reducer';
 
-import { SETUP_INTRO_UI, SERVER_NAME_UI } from './ui-constants';
 
 import { uiStateMapping } from './state';
 import { BACK_UI } from '../actions/types';
 
 export default (state = {
     setupUI: {
-        activeBlocks: [SETUP_INTRO_UI, SERVER_NAME_UI],
+        activeBlocks: [],
     },
     configUI: {
     },

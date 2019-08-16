@@ -6,7 +6,6 @@ import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
 
 import {
-    SETUP_INTRO_UI,
     SERVER_NAME_UI,
     STATS_REPORT_UI,
     KEY_EXPORT_UI,
@@ -25,7 +24,7 @@ import {
 import Error from './Error';
 import Loading from './Loading';
 
-import IntroUi from '../containers/BaseIntro';
+import BaseIntro from '../containers/BaseIntro';
 import ServerName from '../containers/ServerName';
 import StatsReporter from '../containers/StatsReporter';
 import ExportKeys from '../containers/ExportKeys';
@@ -37,6 +36,7 @@ import DelegationSampleConfig from '../containers/DelegationSampleConfig';
 import Database from '../containers/Database';
 import ConfigSelector from './ConfigSelector';
 import CompleteSetup from '../containers/CompleteSetup';
+import ContentWrapper from '../containers/ContentWrapper';
 
 const blockMapping = uiBlock => {
 
@@ -46,8 +46,6 @@ const blockMapping = uiBlock => {
             return <Loading key={uiBlock} />
         case ERROR_UI:
             return <Error key={uiBlock} />
-        case SETUP_INTRO_UI:
-            return <IntroUi key={uiBlock} />
         case SERVER_NAME_UI:
             return <ServerName key={uiBlock} />
         case STATS_REPORT_UI:
@@ -92,10 +90,15 @@ export default ({ setupUI, configUI, baseConfig }) => {
 
     if (!baseConfig.setupDone) {
 
-        console.log(setupUI);
-        return <Accordion defaultActiveKey="0">
+        const accordion = setupUI.activeBlocks.length ? <Accordion defaultActiveKey="0">
             {SETUP_ORDER.map(blockMapping)}
-        </Accordion >
+        </Accordion > : undefined
+
+
+        return <ContentWrapper>
+            <BaseIntro />
+            {accordion}
+        </ContentWrapper>
 
     }
 
