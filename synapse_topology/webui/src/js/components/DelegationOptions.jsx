@@ -154,9 +154,6 @@ export default ({ servername, skip, onClick }) => {
                         {portSelection}
                     </Tab>
                 </Tabs>
-
-
-
             </Card.Body>
         </Accordion.Collapse>
     </Card>
