@@ -264,7 +264,6 @@ class Auth(object):
                 )
 
             request.authenticated_entity = user.to_string()
-
             opentracing.set_tag("authenticated_entity", user.to_string())
             # there is at least one other place where authenticated entity is
             # set.
