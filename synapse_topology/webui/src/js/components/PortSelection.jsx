@@ -30,8 +30,8 @@ export default ({
 
     }
 
-    const [fedPort, setFedPort] = useState(defaultFedPort);
-    const [clientPort, setClientPort] = useState(defaultClientPort);
+    const [fedPort, setFedPort] = useState();
+    const [clientPort, setClientPort] = useState();
 
     const [clientPortValid, setClientPortValid] = useState(true)
     const [fedPortValid, setFedPortValid] = useState(true)
@@ -144,7 +144,11 @@ export default ({
                 <div>
                     <button
                         disabled={clientPortValid && fedPortValid ? undefined : true}
-                        onClick={() => onClick(parseInt(fedPort), parseInt(clientPort), toggle)}
+                        onClick={() => onClick(
+                            fedPort ? parseInt(fedPort) : defaultFedPort,
+                            clientPort ? parseInt(clientPort) : defaultClientPort,
+                            toggle,
+                        )}
                     >Verify These Ports</button>
                 </div>
             </Card.Body>
