@@ -150,7 +150,7 @@ unchartered waters will require the enforcement of the whitelist.
 in a destination and compares it to the whitelist.
 
 Most injection methods take a 'destination' arg. The context will only be injected
-if the destination matches the whitelist or the destination is none.
+if the destination matches the whitelist or the destination is None.
 
 =======
 Gotchas
