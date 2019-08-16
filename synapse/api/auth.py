@@ -213,7 +213,7 @@ class Auth(object):
                 request.authenticated_entity = user_id
                 opentracing.set_tag("authenticated_entity", user_id)
                 # there is at least one other place where authenticated entity is
-                # set. user_id is tagged in case authenticated_entity is clobbered
+                # set.
 
                 if ip_addr and self.hs.config.track_appservice_user_ips:
                     yield self.store.insert_client_ip(
