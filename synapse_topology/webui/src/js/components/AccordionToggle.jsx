@@ -16,6 +16,8 @@ export default ({ active, children, eventKey, as, reset }) => {
 
     }
     const As = as;
-    return <As onClick={decoratedOnClick} active={active}> {children}</As>
+    return <div className={active ? "active-card-header" : "inactive-card-header"}>
+        <As onClick={decoratedOnClick} active={active}> {children}</As>
+    </div>
 
 }

@@ -196,6 +196,14 @@ input[type=checkbox] {
   border-style: none;
 }
 
+.active-card-header {
+    cursor: pointer;
+}
+
+.inactive-card-header {
+    cursor: not-allowed;
+}
+
 .blockwrapper {
   display: block;
 }
