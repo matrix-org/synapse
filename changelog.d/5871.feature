@@ -1,0 +1,1 @@
+Drop hard dependency on `sdnotify` python package.
