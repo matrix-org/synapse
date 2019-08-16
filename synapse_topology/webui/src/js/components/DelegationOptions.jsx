@@ -50,6 +50,51 @@ export default ({ servername, skip, onClick }) => {
 
     const toggle = useAccordionToggle(nextUI(DELEGATION_OPTIONS_UI));
 
+    const portSelection = <div>
+        <p>Please enter the domain name of the server synapse is installed on.</p>
+        <input
+            type="text"
+            onChange={e => setDelegatedServerName(e.target.value)}
+            autoFocus
+            placeholder="Enter server name"
+            value={delegatedServername}
+        />
+        <p>
+            Homeserver Port
+        </p>
+        <input
+            type="text"
+            onChange={onFederationChange}
+            className={fedPortValid ? undefined : "invalid"}
+            autoFocus
+            placeholder="Use Default 8448"
+            value={fedPort}
+        />
+        {fedPortValid ? undefined : <p>Invalid port</p>}
+        <p>
+            Client Port
+        </p>
+        <input
+            type="text"
+            onChange={onClientChange}
+            className={clientPortValid ? undefined : "invalid"}
+            autoFocus
+            placeholder="Use Default 443"
+            value={clientPort}
+        />
+        {clientPortValid ? undefined : <p>Invalid port</p>}
+        <button disabled={delegatedServername && clientPortValid && fedPortValid ? undefined : true}
+            onClick={() => {
+
+                toggle();
+                onClick(type, delegatedServername, fedPort, clientPort)
+
+            }}
+        >
+            Use {type}
+        </button>
+    </div>
+
     return <Card>
         <AccordionToggle as={Card.Header} eventKey={DELEGATION_OPTIONS_UI}>
             Delegation (optional)
@@ -86,64 +131,27 @@ export default ({ servername, skip, onClick }) => {
                         <p>
                             You will need access to {servername}'s domain zone DNS records.
                             This method also requires the synapse install's server to provide
-                            a valid TLS cert for {servername}
+                        a valid TLS cert for {servername}
                         </p>
                         <p>
                             You will need to add an SRV record to {servername}'s DNS zone. (Once
                             again, we'll print the SRV record out for you later.)
                         </p>
+                        {portSelection}
                     </Tab>
                     <Tab eventKey={DELEGATION_TYPES.WELL_KNOWN} title={DELEGATION_TYPES.WELL_KNOWN}>
                         <p>
                             {servername} provides the url
                             https://{servername}/.well-known/matrix/server which gives
-                            federating servers information about how to contact the actual
-                            server hosting the synapse install. (Don't worry! We'll print out
-                            the .well-known file for you later.)
+                                    federating servers information about how to contact the actual
+                                    server hosting the synapse install. (Don't worry! We'll print out
+                                    the .well-known file for you later.)
                         </p>
+                        {portSelection}
                     </Tab>
                 </Tabs>
 
-                <p>Please enter the domain name of the server synapse is installed on.</p>
-                <input
-                    type="text"
-                    onChange={e => setDelegatedServerName(e.target.value)}
-                    autoFocus
-                    placeholder="Enter server name"
-                />
 
-                <p>
-                    Homeserver Port
-                </p>
-                <input
-                    type="text"
-                    onChange={onFederationChange}
-                    className={fedPortValid ? undefined : "invalid"}
-                    autoFocus
-                    placeholder="Use Default 8448"
-                />
-                {fedPortValid ? undefined : <p>Invalid port</p>}
-                <p>
-                    Client Port
-                </p>
-                <input
-                    type="text"
-                    onChange={onClientChange}
-                    className={clientPortValid ? undefined : "invalid"}
-                    autoFocus
-                    placeholder="Use Default 443"
-                />
-                {clientPortValid ? undefined : <p>Invalid port</p>}
-                <button disabled={delegatedServername && clientPortValid && fedPortValid ? undefined : true}
-                    onClick={() => {
-
-                        toggle();
-                        onClick(type, delegatedServername, fedPort, clientPort)
-
-                    }}
-                >
-                    Use {type}
-                </button>
 
             </Card.Body>
         </Accordion.Collapse>
