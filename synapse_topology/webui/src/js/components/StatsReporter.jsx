@@ -38,7 +38,9 @@ export default ({ onClick }) => {
                     />
                     Yes, send anonymous statistics
                 </label>
-                <button onClick={decoratedOnClick}>Next</button>
+                <div className='blockWrapper'>
+                    <button onClick={decoratedOnClick}>Next</button>
+                </div>
             </Card.Body>
         </Accordion.Collapse>
     </Card>

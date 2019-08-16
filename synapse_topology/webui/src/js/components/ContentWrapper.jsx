@@ -7,9 +7,9 @@ export default ({ servername, children }) => {
     if (servername) {
 
         return <div>
-            <p className={style.servername}>{servername}</p>
             <div className={style.contentWrapper}>
                 {children}
+                {/* <p className={style.servername}>{servername}</p> */}
             </div>
         </div>
 

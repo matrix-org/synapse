@@ -18,6 +18,9 @@ const download = (filename, text) => {
 
 export default ({ content, fileName }) =>
     <ButtonDisplay>
-        <button onClick={() => download(fileName, content)}>Download</button>
-        <button onClick={() => navigator.clipboard.writeText(content)}>Copy</button>
+        <div className='buttonGroup'>
+            <button onClick={() => download(fileName, content)}>Download</button>
+            <span className='or'>or</span>
+            <button onClick={() => navigator.clipboard.writeText(content)}>Copy</button>
+        </div>
     </ButtonDisplay>

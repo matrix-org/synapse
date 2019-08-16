@@ -105,7 +105,7 @@ export default ({
                     set a privileged port <b>we will skip the check for that port</b>.
                 </p>
 
-                <h3>Federation Port</h3>
+                <h6>Federation Port</h6>
                 <input
                     type="text"
                     className={internalFedPortInUse | !fedPortValid ? "invalid" : undefined}
@@ -117,7 +117,7 @@ export default ({
                 {internalFedPortInUse ? <p>This port is in use.</p> : undefined}
                 {fedPortValid ? undefined : <p>Invalid port</p>}
                 {fedPortPriv ? <p>This is a privileged port.</p> : undefined}
-                <h3>Client Port</h3>
+                <h6>Client Port</h6>
                 <input
                     type="text"
                     className={internalClientPortInUse | !clientPortValid ? "invalid" : undefined}

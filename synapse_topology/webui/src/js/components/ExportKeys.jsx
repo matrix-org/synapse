@@ -27,7 +27,7 @@ export default ({ secretKeyLoaded, secretKey, onClick }) => {
 
     if (!secretKeyLoaded) {
 
-        body = <Card.Body>Generating secret key</Card.Body>
+        body = <Card.Body><p>Generating secret key</p></Card.Body>
 
     } else {
 
@@ -38,11 +38,13 @@ export default ({ secretKeyLoaded, secretKey, onClick }) => {
                 is inaccessible:
       </p>
             <pre><code>{secretKey}</code></pre>
-            <p>Keep a copy of this key somewhere safe</p>
+            <p>Keep a copy of this key somewhere safe by downloading or copying the key to your clipboard to continue.</p>
             <DownloadOrCopy content={secretKey} fileName="secret_key.txt" />
-            <ButtonDisplay>
-                <button onClick={decoratedOnClick}>Next</button>
-            </ButtonDisplay>
+            <div className='blockWrapper'>
+                <ButtonDisplay>
+                    <button onClick={decoratedOnClick}>Next</button>
+                </ButtonDisplay>
+            </div>
         </Card.Body>
 
     }
