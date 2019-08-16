@@ -4,6 +4,7 @@ import AccordionToggle from '../components/AccordionToggle';
 import { resetUI } from '../actions';
 const mapStateToProps = (state, { eventKey, as, children }) => ({
     active: state.setupUI.activeBlocks.includes(eventKey),
+    open: state.setupUI.activeBlocks[state.setupUI.activeBlocks.length - 1] == eventKey,
     eventKey,
     as,
     children,

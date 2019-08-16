@@ -1,8 +1,9 @@
 import React from 'react';
 import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
 import { reset } from 'ansi-colors';
+import Chevron from './Chevron';
 
-export default ({ active, children, eventKey, as, reset }) => {
+export default ({ active, open, children, eventKey, as, reset }) => {
 
     const toggle = useAccordionToggle(eventKey);
     const decoratedOnClick = () => {
@@ -17,7 +18,7 @@ export default ({ active, children, eventKey, as, reset }) => {
     }
     const As = as;
     return <div className={active ? "active-card-header" : "inactive-card-header"}>
-        <As onClick={decoratedOnClick}> {children}</As>
+        <As onClick={decoratedOnClick}> {children} <Chevron open={open} /></As>
     </div>
 
 }
