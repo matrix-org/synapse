@@ -148,8 +148,7 @@ class DeviceWorkerStore(SQLBaseStore):
             update_context = update[3]
             update_stream_id = update[2]
 
-            previous_update = query_map.get(key, (0, None))
-            previous_update_stream_id = previous_update[0]
+            previous_update_stream_id, _ = query_map.get(key, (0, None))
 
             if update_stream_id > previous_update_stream_id:
                 query_map[key] = (update_stream_id, update_context)
