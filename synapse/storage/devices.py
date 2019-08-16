@@ -831,7 +831,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             ],
         )
 
-        context = {"opentracing": get_active_span_text_map()}
+        context = get_active_span_text_map()
 
         self._simple_insert_many_txn(
             txn,
