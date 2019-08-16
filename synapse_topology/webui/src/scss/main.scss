@@ -5,6 +5,8 @@
     @include dark;
 }
 
+// Type selectors (Parents)
+
 html {
     box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
@@ -25,6 +27,8 @@ body {
     text-align: center;
 }
 
+// Type selectors (Children)
+
 a {
     @include theme;
     color: $link;
@@ -36,36 +40,6 @@ a {
 a:hover {
     color: $link;
     text-decoration: none;
-}
-
-.invalid {
-    border-color: $error;
-}
-.logo {
-    position: absolute;
-    top:0;
-    right: 0;
-    margin: 0.5rem;
-}
-
-.servername {
-    position: absolute;
-    margin-top: 0.5rem;
-    margin-left: 0.5rem;
-    color: darken(silver, 20%);
-}
-
-
-.buttonDisplay {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-evenly;
-    margin-top: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.keyDisplay {
-    word-wrap: break-word;
 }
 
 button {
@@ -92,6 +66,12 @@ button[disabled] {
     color: lighten($font, 50%);
 }
 
+h1 {
+    @include theme;
+    font-size: 1rem;
+    margin: 1rem;
+}
+
 @mixin select {
     padding: 0.4rem;
     font-size: 1rem;
@@ -114,11 +94,28 @@ input {
     padding: 0.4rem 1.2rem;
 }
 
+input[type=checkbox] {
+    margin-right: 0.4rem;
+}
+
+label {
+    font-size: 0.6rem;
+    font-weight: 600;
+}
+
+p {
+    font-size: 0.6rem;
+    line-height: 0.8rem;
+}
+
 pre {
     background: white;
-    border-radius: 4rem;
-    border-style: none !important;
+    border-radius: 0.4rem;
     color: $font;
+    padding: 1rem;
+    font-size: 0.6rem;
+    text-align: left;
+    text-decoration: none;
 }
 
 select {
@@ -138,42 +135,32 @@ select {
     }
 }
 
-pre {
-    padding: 0.4rem;
-    font-size: 0.6rem;
-    text-align: left;
-    border-style: solid;
-    border-color: darken($secondary, 50%);
-    border-radius: 0.5rem;
-    text-decoration: none;
+
+// Class selectors
+
+.active-card-header {
+    cursor: pointer;
 }
 
-.redButton {
-    background-color: red;
+.baseintro {
+    padding: 2rem 1rem;
 }
 
-.invalidInput {
-    border-color: red;
+.blockwrapper {
+    display: block;
 }
 
-h1 {
-    @include theme;
-    font-size: 1rem;
-    margin: 1rem;
+.buttonDisplay {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
-p {
-    font-size: 0.6rem;
-    line-height: 0.8rem;
-}
-
-label {
-    font-size: 0.6rem;
-    font-weight: 600;
-}
-
-input[type=checkbox] {
-    margin-right: 0.4rem;
+.buttonGroup {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
 }
 
 .card {
@@ -183,43 +170,28 @@ input[type=checkbox] {
     margin-bottom: 8px;
 }
 
+.card-header {
+    font-size: 0.8rem;
+    border-style: none;
+}
+
 .card-header-tabs {
     margin-right: 0;
     margin-bottom: 0;
     margin-left: 0;
 }
 
-
-.baseintro {
-    padding: 2rem 1rem;
-}
-
-.card-header {
-    font-size: 0.8rem;
-    border-style: none;
-}
-
-.active-card-header {
-    cursor: pointer;
+.chevron {
+    float:right;
 }
 
 .inactive-card-header {
     cursor: not-allowed;
 }
 
-.blockwrapper {
-    display: block;
-}
-
-.or {
+.inputButton {
+    margin-left: 0.6rem;
     font-size: 0.6rem;
-    margin-left: 0.4rem;
-    margin-right: 0.4rem;
-}
-
-.buttonGroup {
-    margin-top: 1rem;
-    margin-bottom: 1rem;
 }
 
 .inlineError {
@@ -231,13 +203,23 @@ input[type=checkbox] {
     }
 }
 
-.chevron {
-    float:right;
+.invalid {
+    border-color: $error;
 }
 
-.tab-content {
-    background-color: $smoke;
-    padding: 1rem;
+.invalidInput {
+    border-color: red;
+}
+
+.keyDisplay {
+    word-wrap: break-word;
+}
+
+.logo {
+    position: absolute;
+    top:0;
+    right: 0;
+    margin: 0.5rem;
 }
 
 .nav-tabs .nav-link.active {
@@ -250,12 +232,29 @@ input[type=checkbox] {
     background-color: $smoke;
 }
 
-.inputButton {
-    margin-left: 0.6rem;
+.or {
     font-size: 0.6rem;
+    margin-left: 0.4rem;
+    margin-right: 0.4rem;
+}
+
+.redButton {
+    background-color: red;
+}
+
+.servername {
+    position: absolute;
+    margin-top: 0.5rem;
+    margin-left: 0.5rem;
+    color: darken(silver, 20%);
 }
 
 .setupCompleteTitle {
     margin-left: 0;
     margin-top: 0;
+}
+
+.tab-content {
+    background-color: $smoke;
+    padding: 1rem;
 }
