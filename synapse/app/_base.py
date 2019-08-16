@@ -311,7 +311,7 @@ def setup_sdnotify(hs):
         "after",
         "startup",
         sdnotify,
-        b"READY=1\nMAINPID=%s" % (os.getpid()),
+        b"READY=1\nMAINPID=%i" % (os.getpid(), ),
     )
 
     hs.get_reactor().addSystemEventTrigger(
