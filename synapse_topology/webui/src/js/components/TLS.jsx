@@ -106,7 +106,7 @@ export default ({
                                 onClickReverseProxy(reverseProxy)
 
                             }}>
-                                I already/will use a Reverse Proxy with TLS
+                                Use a reverse proxy with TLS
                         </button>
                         </div>
                     </Tab>
