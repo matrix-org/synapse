@@ -239,10 +239,10 @@ class RoomKeysServlet(RestServlet):
         user_id = requester.user.to_string()
         version = parse_string(request, "version")
 
-        yield self.e2e_room_keys_handler.delete_room_keys(
+        ret = yield self.e2e_room_keys_handler.delete_room_keys(
             user_id, version, room_id, session_id
         )
-        return (200, {})
+        return (200, ret)
 
 
 class RoomKeysNewVersionServlet(RestServlet):

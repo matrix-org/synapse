@@ -101,12 +101,24 @@ class E2eRoomKeysHandler(object):
             session_id(string): session ID to delete keys for, for None to delete keys
                 for all sessions
         Returns:
-            A deferred of the deletion transaction
+            A dict containing the count and hash for the backup version
         """
 
         # lock for consistency with uploading
         with (yield self._upload_linearizer.queue(user_id)):
+            # make sure the backup version exists
+            try:
+                version_info = yield self.store.get_e2e_room_keys_version_info(user_id, version)
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError("Unknown backup version")
+                else:
+                    raise
+
             yield self.store.delete_e2e_room_keys(user_id, version, room_id, session_id)
+
+            count = yield self.store.count_e2e_room_keys(user_id, version)
+            return {"count": count, "hash": version_info["hash"]}
 
     @defer.inlineCallbacks
     def upload_room_keys(self, user_id, version, room_keys):
@@ -133,6 +145,9 @@ class E2eRoomKeysHandler(object):
                 }
             }
         }
+
+        Returns:
+            A dict containing the count and hash for the backup version
 
         Raises:
             NotFoundError: if there are no versions defined
