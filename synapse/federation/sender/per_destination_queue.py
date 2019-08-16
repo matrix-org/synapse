@@ -206,9 +206,10 @@ class PerDestinationQueue(object):
 
                 pending_edus = device_update_edus + to_device_edus
 
-                # Make a transaction sending span, this span follows on from all the
-                # edus in that transaction. This needs to be done because if the edus
-                # are never received on the remote the span effectively has no causality.
+                # Make a transaction sending opentracing span, this span follows on from
+                # all the  edus in that transaction. This needs to be done since there is
+                # no active span here and if the edus are not received by the remote the
+                # span would have no causality and it would be forgotten.
 
                 span_contexts = [
                     extract_text_map(
