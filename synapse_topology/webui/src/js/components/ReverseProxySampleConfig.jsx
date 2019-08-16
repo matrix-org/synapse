@@ -8,7 +8,7 @@ import { REVERSE_PROXY_TYPES } from '../actions/constants';
 export default ({ proxyType, sampleConfig, fileName, onClick }) => {
 
     return <ContentWrapper>
-        <h1>Configure the ReverseProxy</h1>
+        <h1 className='setupCompleteTitle'>Configure the ReverseProxy</h1>
         <p>
             It's time for you to setup the reverse proxy outside of this installer.
         </p>

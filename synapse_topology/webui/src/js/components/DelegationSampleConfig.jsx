@@ -19,7 +19,7 @@ export default ({
     if (delegationType == DELEGATION_TYPES.DNS) {
 
         return <ContentWrapper>
-            <h1>ConfigureDelegation</h1>
+            <h1 className='setupCompleteTitle'>Configure Delegation</h1>
             <p>
                 You will need to add the following SRV record to your DNS zone.
       </p>
@@ -34,7 +34,7 @@ export default ({
     } else {
 
         return <ContentWrapper>
-            <h1>Configure delegation</h1>
+            <h1 className='setupCompleteTitle'>Configure delegation</h1>
             <p>
                 The delegation configuration needs to take place outside the installer.
             </p>
