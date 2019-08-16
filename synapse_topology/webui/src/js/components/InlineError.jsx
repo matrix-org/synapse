@@ -8,4 +8,5 @@ export default ({ error, children }) => {
         {children}
         {error ? <span>{error}</span> : undefined}
     </div>
+
 }
