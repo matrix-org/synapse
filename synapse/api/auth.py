@@ -267,8 +267,7 @@ class Auth(object):
 
             opentracing.set_tag("authenticated_entity", user.to_string())
             # there is at least one other place where authenticated entity is
-            # set. user_id is tagged incase authenticated_entity is clobbered
-            opentracing.set_tag("user_id", user.to_string())
+            # set.
 
             return synapse.types.create_requester(
                 user, token_id, is_guest, device_id, app_service=app_service
