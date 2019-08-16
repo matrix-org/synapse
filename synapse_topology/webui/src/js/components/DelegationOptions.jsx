@@ -98,27 +98,28 @@ export default ({ servername, skip, onClick }) => {
     return <Card>
         <AccordionToggle as={Card.Header} eventKey={DELEGATION_OPTIONS_UI}>
             Delegation (optional)
-      <button onClick={() => {
 
-                toggle();
-                skip();
-
-            }}>
-                Skip
-      </button>
         </AccordionToggle>
         <Accordion.Collapse eventKey={DELEGATION_OPTIONS_UI}>
             <Card.Body>
                 <p>
                     If you'd like your synapse to be hosted on a different server to the
-                    one known on the network by '{servername}' you can use delegation.
-                </p>
-                <a
-                    href="https://github.com/matrix-org/synapse/blob/master/docs/federate.md"
-                    target="_blank"
-                >
-                    Learn more
+                    one known on the network by '{servername}' you can use delegation.<br />
+                    <a
+                        href="https://github.com/matrix-org/synapse/blob/master/docs/federate.md"
+                        target="_blank"
+                    >
+                        Learn more
                 </a>
+                </p>
+                <button onClick={() => {
+
+                    toggle();
+                    skip();
+
+                }}>
+                    Skip
+                </button>
                 <p>
                     Other federation servers will connect to {servername}:8448 over the network.
                 </p>
