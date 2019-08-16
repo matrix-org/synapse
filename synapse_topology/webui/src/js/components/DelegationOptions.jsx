@@ -107,13 +107,16 @@ export default ({ servername, skip, onClick }) => {
             <Card.Body>
                 <p>
                     If you'd like your synapse to be hosted on a different server to the
-                    one known on the network by '{servername}' you can use delegation.<br />
+                    one known on the network by '{servername}' you can use delegation.&nbsp;
                     <a
                         href="https://github.com/matrix-org/synapse/blob/master/docs/federate.md"
                         target="_blank"
                     >
                         Learn more
                 </a>
+                </p>
+                <p>
+                    If you're not sure if you need delegation, we recommending skipping this step.
                 </p>
                 <button onClick={() => {
 
@@ -123,6 +126,7 @@ export default ({ servername, skip, onClick }) => {
                 }}>
                     Skip
                 </button>
+                <hr />
                 <p>
                     Other federation servers will connect to {servername}:8448 over the network.
                 </p>
