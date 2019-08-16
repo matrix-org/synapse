@@ -270,6 +270,7 @@ export const updatePortsFree =
                 synapseClientPortFree,
             });
             if (synapseFederationPortFree && synapseClientPortFree) {
+
                 callback();
                 dispatch(advanceUI());
 
@@ -299,3 +300,8 @@ export const writeConfig = (config, subConfigName) => {
     }
 
 }
+
+export const resetUI = (ui) => ({
+    type: BACK_UI,
+    ui,
+})
