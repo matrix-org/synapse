@@ -19,6 +19,7 @@ export default ({ secretKeyLoaded, secretKey, onClick }) => {
 
     const decoratedOnClick = () => {
 
+        setDownloadedOrCopied(false);
         toggle();
         onClick();
 
@@ -51,7 +52,7 @@ export default ({ secretKeyLoaded, secretKey, onClick }) => {
                 <ButtonDisplay>
                     <button
                         onClick={decoratedOnClick}
-                        disabled={downloadedOrCopied ? undefined : "true"}
+                        disabled={!downloadedOrCopied}
                     >Next</button>
                 </ButtonDisplay>
             </div>
