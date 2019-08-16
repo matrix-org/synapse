@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import Accordion from 'react-bootstrap/Accordion';
 import Card from 'react-bootstrap/Card';
@@ -14,6 +14,7 @@ import { nextUI } from '../reducers/setup-ui-reducer';
 
 export default ({ secretKeyLoaded, secretKey, onClick }) => {
 
+    const [downloadedOrCopied, setDownloadedOrCopied] = useState(false);
     const toggle = useAccordionToggle(nextUI(KEY_EXPORT_UI));
 
     const decoratedOnClick = () => {
@@ -38,11 +39,20 @@ export default ({ secretKeyLoaded, secretKey, onClick }) => {
                 is inaccessible:
       </p>
             <pre><code>{secretKey}</code></pre>
-            <p>Keep a copy of this key somewhere safe by downloading or copying the key to your clipboard to continue.</p>
-            <DownloadOrCopy content={secretKey} fileName="secret_key.txt" />
+            <p>
+                Keep a copy of this key somewhere safe by downloading or copying
+                the key to your clipboard to continue.
+            </p>
+            <DownloadOrCopy
+                content={secretKey}
+                fileName="secret_key.txt"
+                onClick={() => setDownloadedOrCopied(true)} />
             <div className='blockWrapper'>
                 <ButtonDisplay>
-                    <button onClick={decoratedOnClick}>Next</button>
+                    <button
+                        onClick={decoratedOnClick}
+                        disabled={downloadedOrCopied ? undefined : "true"}
+                    >Next</button>
                 </ButtonDisplay>
             </div>
         </Card.Body>
