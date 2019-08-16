@@ -19,7 +19,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
+from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -73,7 +73,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             "get_new_messages_for_device", get_new_messages_for_device_txn
         )
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def delete_messages_for_device(self, user_id, device_id, up_to_stream_id):
         """
@@ -90,14 +90,14 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             (user_id, device_id), None
         )
 
-        opentracing.set_tag("last_deleted_stream_id", last_deleted_stream_id)
+        set_tag("last_deleted_stream_id", last_deleted_stream_id)
 
         if last_deleted_stream_id:
             has_changed = self._device_inbox_stream_cache.has_entity_changed(
                 user_id, last_deleted_stream_id
             )
             if not has_changed:
-                opentracing.log_kv({"message": "No changes in cache since last check"})
+                log_kv({"message": "No changes in cache since last check"})
                 return 0
 
         def delete_messages_for_device_txn(txn):
@@ -113,7 +113,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             "delete_messages_for_device", delete_messages_for_device_txn
         )
 
-        opentracing.log_kv(
+        log_kv(
             {"message": "deleted {} messages for device".format(count), "count": count}
         )
 
@@ -127,7 +127,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         return count
 
-    @opentracing.trace
+    @trace
     def get_new_device_msgs_for_remote(
         self, destination, last_stream_id, current_stream_id, limit
     ):
@@ -143,23 +143,23 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 in the stream the messages got to.
         """
 
-        opentracing.set_tag("destination", destination)
-        opentracing.set_tag("last_stream_id", last_stream_id)
-        opentracing.set_tag("current_stream_id", current_stream_id)
-        opentracing.set_tag("limit", limit)
+        set_tag("destination", destination)
+        set_tag("last_stream_id", last_stream_id)
+        set_tag("current_stream_id", current_stream_id)
+        set_tag("limit", limit)
 
         has_changed = self._device_federation_outbox_stream_cache.has_entity_changed(
             destination, last_stream_id
         )
         if not has_changed or last_stream_id == current_stream_id:
-            opentracing.log_kv({"message": "No new messages in stream"})
+            log_kv({"message": "No new messages in stream"})
             return defer.succeed(([], current_stream_id))
 
         if limit <= 0:
             # This can happen if we run out of room for EDUs in the transaction.
             return defer.succeed(([], last_stream_id))
 
-        @opentracing.trace
+        @trace
         def get_new_messages_for_remote_destination_txn(txn):
             sql = (
                 "SELECT stream_id, messages_json FROM device_federation_outbox"
@@ -174,9 +174,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 stream_pos = row[0]
                 messages.append(json.loads(row[1]))
             if len(messages) < limit:
-                opentracing.log_kv(
-                    {"message": "Set stream position to current position"}
-                )
+                log_kv({"message": "Set stream position to current position"})
                 stream_pos = current_stream_id
             return (messages, stream_pos)
 
@@ -185,7 +183,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             get_new_messages_for_remote_destination_txn,
         )
 
-    @opentracing.trace
+    @trace
     def delete_device_msgs_for_remote(self, destination, up_to_stream_id):
         """Used to delete messages when the remote destination acknowledges
         their receipt.
@@ -236,7 +234,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, BackgroundUpdateStore):
             expiry_ms=30 * 60 * 1000,
         )
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def add_messages_to_device_inbox(
         self, local_messages_by_user_then_device, remote_messages_by_destination

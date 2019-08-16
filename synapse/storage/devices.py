@@ -20,10 +20,10 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import (
     get_active_span_text_map,
+    set_tag,
     trace,
     whitelisted_homeserver,
 )
@@ -354,8 +354,8 @@ class DeviceWorkerStore(SQLBaseStore):
             else:
                 results[user_id] = yield self._get_cached_devices_for_user(user_id)
 
-        opentracing.set_tag("in_cache", results)
-        opentracing.set_tag("not_in_cache", user_ids_not_in_cache)
+        set_tag("in_cache", results)
+        set_tag("not_in_cache", user_ids_not_in_cache)
 
         return (user_ids_not_in_cache, results)
 

@@ -18,7 +18,6 @@ from six import iteritems, itervalues
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
 from synapse.api import errors
 from synapse.api.constants import EventTypes
 from synapse.api.errors import (
@@ -26,6 +25,7 @@ from synapse.api.errors import (
     HttpResponseException,
     RequestSendFailed,
 )
+from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
@@ -46,7 +46,7 @@ class DeviceWorkerHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self._auth_handler = hs.get_auth_handler()
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
         """
@@ -58,7 +58,7 @@ class DeviceWorkerHandler(BaseHandler):
             defer.Deferred: list[dict[str, X]]: info on each device
         """
 
-        opentracing.set_tag("user_id", user_id)
+        set_tag("user_id", user_id)
         device_map = yield self.store.get_devices_by_user(user_id)
 
         ips = yield self.store.get_last_client_ip_by_device(user_id, device_id=None)
@@ -67,10 +67,10 @@ class DeviceWorkerHandler(BaseHandler):
         for device in devices:
             _update_device_from_client_ips(device, ips)
 
-        opentracing.log_kv(device_map)
+        log_kv(device_map)
         return devices
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def get_device(self, user_id, device_id):
         """ Retrieve the given device
@@ -91,13 +91,13 @@ class DeviceWorkerHandler(BaseHandler):
         ips = yield self.store.get_last_client_ip_by_device(user_id, device_id)
         _update_device_from_client_ips(device, ips)
 
-        opentracing.set_tag("device", device)
-        opentracing.set_tag("ips", ips)
+        set_tag("device", device)
+        set_tag("ips", ips)
 
         return device
 
     @measure_func("device.get_user_ids_changed")
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def get_user_ids_changed(self, user_id, from_token):
         """Get list of users that have had the devices updated, or have newly
@@ -108,8 +108,8 @@ class DeviceWorkerHandler(BaseHandler):
             from_token (StreamToken)
         """
 
-        opentracing.set_tag("user_id", user_id)
-        opentracing.set_tag("from_token", from_token)
+        set_tag("user_id", user_id)
+        set_tag("from_token", from_token)
         now_room_key = yield self.store.get_room_events_max_id()
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
@@ -161,7 +161,7 @@ class DeviceWorkerHandler(BaseHandler):
             # special-case for an empty prev state: include all members
             # in the changed list
             if not event_ids:
-                opentracing.log_kv(
+                log_kv(
                     {"event": "encountered empty previous state", "room_id": room_id}
                 )
                 for key, event_id in iteritems(current_state_ids):
@@ -218,7 +218,7 @@ class DeviceWorkerHandler(BaseHandler):
 
         result = {"changed": list(possibly_joined), "left": list(possibly_left)}
 
-        opentracing.log_kv(result)
+        log_kv(result)
 
         return result
 
@@ -287,7 +287,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def delete_device(self, user_id, device_id):
         """ Delete the given device
@@ -305,8 +305,8 @@ class DeviceHandler(DeviceWorkerHandler):
         except errors.StoreError as e:
             if e.code == 404:
                 # no match
-                opentracing.set_tag("error", True)
-                opentracing.log_kv(
+                set_tag("error", True)
+                log_kv(
                     {"reason": "User doesn't have device id.", "device_id": device_id}
                 )
                 pass
@@ -321,7 +321,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         yield self.notify_device_update(user_id, [device_id])
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def delete_all_devices_for_user(self, user_id, except_device_id=None):
         """Delete all of the user's devices
@@ -357,8 +357,8 @@ class DeviceHandler(DeviceWorkerHandler):
         except errors.StoreError as e:
             if e.code == 404:
                 # no match
-                opentracing.set_tag("error", True)
-                opentracing.set_tag("reason", "User doesn't have that device id.")
+                set_tag("error", True)
+                set_tag("reason", "User doesn't have that device id.")
                 pass
             else:
                 raise
@@ -399,7 +399,7 @@ class DeviceHandler(DeviceWorkerHandler):
             else:
                 raise
 
-    @opentracing.trace
+    @trace
     @measure_func("notify_device_update")
     @defer.inlineCallbacks
     def notify_device_update(self, user_id, device_ids):
@@ -415,7 +415,7 @@ class DeviceHandler(DeviceWorkerHandler):
             hosts.update(get_domain_from_id(u) for u in users_who_share_room)
             hosts.discard(self.server_name)
 
-        opentracing.set_tag("hosts to update", hosts)
+        set_tag("hosts to update", hosts)
 
         position = yield self.store.add_device_change_to_streams(
             user_id, device_ids, list(hosts)
@@ -436,9 +436,7 @@ class DeviceHandler(DeviceWorkerHandler):
             )
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
-                opentracing.log_kv(
-                    {"message": "sent device update to host", "host": host}
-                )
+                log_kv({"message": "sent device update to host", "host": host})
 
     @defer.inlineCallbacks
     def on_federation_query_user_devices(self, user_id):
@@ -485,15 +483,15 @@ class DeviceListUpdater(object):
             iterable=True,
         )
 
-    @opentracing.trace
+    @trace
     @defer.inlineCallbacks
     def incoming_device_list_update(self, origin, edu_content):
         """Called on incoming device list update from federation. Responsible
         for parsing the EDU and adding to pending updates list.
         """
 
-        opentracing.set_tag("origin", origin)
-        opentracing.set_tag("edu_content", edu_content)
+        set_tag("origin", origin)
+        set_tag("edu_content", edu_content)
         user_id = edu_content.pop("user_id")
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
@@ -509,8 +507,8 @@ class DeviceListUpdater(object):
                 origin,
             )
 
-            opentracing.set_tag("error", True)
-            opentracing.log_kv(
+            set_tag("error", True)
+            log_kv(
                 {
                     "message": "Got a device list update edu from a user and "
                     "device which does not match the origin of the request.",
@@ -524,8 +522,8 @@ class DeviceListUpdater(object):
         if not room_ids:
             # We don't share any rooms with this user. Ignore update, as we
             # probably won't get any further updates.
-            opentracing.set_tag("error", True)
-            opentracing.log_kv(
+            set_tag("error", True)
+            log_kv(
                 {
                     "message": "Got an update from a user for which "
                     "we don't share any rooms",
@@ -633,7 +631,7 @@ class DeviceListUpdater(object):
             request:
             https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
         """
-        opentracing.log_kv({"message": "Doing resync to update device list."})
+        log_kv({"message": "Doing resync to update device list."})
         # Fetch all devices for the user.
         origin = get_domain_from_id(user_id)
         try:
@@ -650,20 +648,20 @@ class DeviceListUpdater(object):
             # eventually become consistent.
             return
         except FederationDeniedError as e:
-            opentracing.set_tag("error", True)
-            opentracing.log_kv({"reason": "FederationDeniedError"})
+            set_tag("error", True)
+            log_kv({"reason": "FederationDeniedError"})
             logger.info(e)
             return
         except Exception as e:
             # TODO: Remember that we are now out of sync and try again
             # later
-            opentracing.set_tag("error", True)
-            opentracing.log_kv(
+            set_tag("error", True)
+            log_kv(
                 {"message": "Exception raised by federation request", "exception": e}
             )
             logger.exception("Failed to handle device list update for %s", user_id)
             return
-        opentracing.log_kv({"result": result})
+        log_kv({"result": result})
         stream_id = result["stream_id"]
         devices = result["devices"]
 
