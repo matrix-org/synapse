@@ -1,1 +1,1 @@
-Remove user_id opentracing tag and add a servlet_name tag.
+Tag authenticated entity and servlet_name.
