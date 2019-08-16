@@ -126,7 +126,12 @@ class Mailer(object):
 
     @defer.inlineCallbacks
     def send_threepid_validation(
-        self, email_address, client_secret, send_attempt, send_email_func, next_link=None
+        self,
+        email_address,
+        client_secret,
+        send_attempt,
+        send_email_func,
+        next_link=None,
     ):
         """Send a threepid validation email for password reset or
         registration purposes
@@ -175,7 +180,9 @@ class Mailer(object):
         try:
             yield send_email_func(email_address, token, client_secret, session_id)
         except Exception:
-            logger.exception("Error sending threepid validation email to %s", email_address)
+            logger.exception(
+                "Error sending threepid validation email to %s", email_address
+            )
             raise SynapseError(500, "An error was encountered when sending the email")
 
         token_expires = (
@@ -194,7 +201,6 @@ class Mailer(object):
         )
 
         return session_id
-
 
     @defer.inlineCallbacks
     def send_password_reset_mail(self, email_address, token, client_secret, sid):

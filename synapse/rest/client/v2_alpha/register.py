@@ -29,8 +29,8 @@ from synapse.api.errors import (
     Codes,
     LimitExceededError,
     SynapseError,
-    UnrecognizedRequestError,
     ThreepidValidationError,
+    UnrecognizedRequestError,
 )
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
@@ -130,8 +130,11 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         else:
             # Send the registration email from Synapse
             sid = yield self.mailer.send_threepid_validation(
-                email, client_secret, send_attempt, self.mailer.send_registration_mail,
-                next_link
+                email,
+                client_secret,
+                send_attempt,
+                self.mailer.send_registration_mail,
+                next_link,
             )
 
             # Wrap the session id in a JSON object
@@ -187,9 +190,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
     """Handles registration 3PID validation token submission"""
 
     PATTERNS = client_patterns(
-        "/registration/(?P<medium>[^/]*)/submit_token/*$",
-        releases=(),
-        unstable=True,
+        "/registration/(?P<medium>[^/]*)/submit_token/*$", releases=(), unstable=True
     )
 
     def __init__(self, hs):
@@ -722,4 +723,5 @@ def register_servlets(hs, http_server):
     EmailRegisterRequestTokenRestServlet(hs).register(http_server)
     MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
     UsernameAvailabilityRestServlet(hs).register(http_server)
+    RegistrationSubmitTokenServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)

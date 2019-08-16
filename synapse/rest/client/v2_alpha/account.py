@@ -110,8 +110,11 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         else:
             # Send password reset emails from Synapse
             sid = yield self.mailer.send_threepid_validation(
-                email, client_secret, send_attempt, self.mailer.send_password_reset_mail,
-                next_link
+                email,
+                client_secret,
+                send_attempt,
+                self.mailer.send_password_reset_mail,
+                next_link,
             )
 
             # Wrap the session id in a JSON object
@@ -155,13 +158,12 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         ret = yield self.identity_handler.requestMsisdnToken(**body)
         return (200, ret)
 
+
 class PasswordResetSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
 
     PATTERNS = client_patterns(
-        "/password_reset/(?P<medium>[^/]*)/submit_token/*$",
-        releases=(),
-        unstable=True,
+        "/password_reset/(?P<medium>[^/]*)/submit_token/*$", releases=(), unstable=True
     )
 
     def __init__(self, hs):
@@ -408,9 +410,6 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             body, ["id_server", "client_secret", "email", "send_attempt"]
         )
         email = body["email"]
-        client_secret = body["client_secret"]
-        send_attempt = body["send_attempt"]
-        next_link = body.get("next_link")
 
         if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
@@ -423,6 +422,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
+
+        # TODO: Figure out what to do here based on what the client sends
+        ret = yield self.identity_handler.requestEmailToken(**body)
 
         return (200, ret)
 
@@ -566,7 +568,7 @@ class WhoamiRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
     MsisdnPasswordRequestTokenRestServlet(hs).register(http_server)
-    ThreepidSubmitTokenServlet(hs).register(http_server)
+    PasswordResetSubmitTokenServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
