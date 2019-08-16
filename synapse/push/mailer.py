@@ -195,6 +195,7 @@ class Mailer(object):
 
         return session_id
 
+
     @defer.inlineCallbacks
     def send_password_reset_mail(self, email_address, token, client_secret, sid):
         """Send an email with a password reset link to a user

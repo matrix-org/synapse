@@ -30,9 +30,11 @@ from synapse.api.errors import (
     LimitExceededError,
     SynapseError,
     UnrecognizedRequestError,
+    ThreepidValidationError,
 )
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
+from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -179,6 +181,83 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
         return (200, ret)
+
+
+class RegistrationSubmitTokenServlet(RestServlet):
+    """Handles registration 3PID validation token submission"""
+
+    PATTERNS = client_patterns(
+        "/registration/(?P<medium>[^/]*)/submit_token/*$",
+        releases=(),
+        unstable=True,
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(RegistrationSubmitTokenServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.config = hs.config
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, purpose, medium):
+        if medium != "email":
+            raise SynapseError(
+                400, "This medium is currently not supported for registration"
+            )
+        if self.config.email_threepid_behaviour == "off":
+            if self.config.local_threepid_emails_disabled_due_to_config:
+                logger.warn(
+                    "User registration has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration is disabled on this server"
+            )
+
+        sid = parse_string(request, "sid")
+        client_secret = parse_string(request, "client_secret")
+        token = parse_string(request, "token")
+
+        # Attempt to validate a 3PID session
+        try:
+            # Mark the session as valid
+            next_link = yield self.store.validate_threepid_session(
+                sid, client_secret, token, self.clock.time_msec()
+            )
+
+            # Perform a 302 redirect if next_link is set
+            if next_link:
+                if next_link.startswith("file:///"):
+                    logger.warn(
+                        "Not redirecting to next_link as it is a local file: address"
+                    )
+                else:
+                    request.setResponseCode(302)
+                    request.setHeader("Location", next_link)
+                    finish_request(request)
+                    return None
+
+            # Otherwise show the success template
+            html = self.config.email_registration_template_success_html
+
+            request.setResponseCode(200)
+        except ThreepidValidationError as e:
+            # Show a failure page with a reason
+            html = self.load_jinja2_template(
+                self.config.email_template_dir,
+                self.config.email_registration_template_failure_html,
+                template_vars={"failure_reason": e.msg},
+            )
+            request.setResponseCode(e.code)
+
+        request.write(html.encode("utf-8"))
+        finish_request(request)
+        return None
 
 
 class UsernameAvailabilityRestServlet(RestServlet):

@@ -155,12 +155,11 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         ret = yield self.identity_handler.requestMsisdnToken(**body)
         return (200, ret)
 
-
-class ThreepidSubmitTokenServlet(RestServlet):
+class PasswordResetSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
 
     PATTERNS = client_patterns(
-        "/(?P<purpose>registration|password_reset)/(?P<medium>[^/]*)/submit_token/*$",
+        "/password_reset/(?P<medium>[^/]*)/submit_token/*$",
         releases=(),
         unstable=True,
     )
@@ -170,41 +169,36 @@ class ThreepidSubmitTokenServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(ThreepidSubmitTokenServlet, self).__init__()
+        super(PasswordResetSubmitTokenServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.config = hs.config
         self.clock = hs.get_clock()
-        self.datastore = hs.get_datastore()
+        self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_GET(self, request, purpose, medium):
-        if purpose == "password_reset":
-            purpose = "password resets"
-        elif purpose != "registration":
-            raise SynapseError(404, "Unknown endpoint")
-
         if medium != "email":
             raise SynapseError(
-                400, "This medium is currently not supported for %s" % purpose
+                400, "This medium is currently not supported for password resets"
             )
         if self.config.email_threepid_behaviour == "off":
             if self.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
-                    "User %s have been disabled due to lack of email config", purpose
+                    "Password reset emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
-                400, "Email-based %s is disabled on this server", purpose
+                400, "Email-based password resets are disabled on this server"
             )
 
         sid = parse_string(request, "sid")
         client_secret = parse_string(request, "client_secret")
         token = parse_string(request, "token")
 
-        # Attempt to validate a 3PID sesssion
+        # Attempt to validate a 3PID session
         try:
             # Mark the session as valid
-            next_link = yield self.datastore.validate_threepid_session(
+            next_link = yield self.store.validate_threepid_session(
                 sid, client_secret, token, self.clock.time_msec()
             )
 
@@ -221,26 +215,16 @@ class ThreepidSubmitTokenServlet(RestServlet):
                     return None
 
             # Otherwise show the success template
-            if purpose == "password resets":
-                html = self.config.email_password_reset_template_success_html
-            elif purpose == "registration":
-                html = self.config.email_registration_template_success_html
+            html = self.config.email_password_reset_template_success_html
 
             request.setResponseCode(200)
         except ThreepidValidationError as e:
             # Show a failure page with a reason
-            if purpose == "password resets":
-                html = self.load_jinja2_template(
-                    self.config.email_template_dir,
-                    self.config.email_password_reset_template_failure_html,
-                    template_vars={"failure_reason": e.msg},
-                )
-            elif purpose == "registration":
-                html = self.load_jinja2_template(
-                    self.config.email_template_dir,
-                    self.config.email_registration_template_failure_html,
-                    template_vars={"failure_reason": e.msg},
-                )
+            html = self.load_jinja2_template(
+                self.config.email_template_dir,
+                self.config.email_password_reset_template_failure_html,
+                template_vars={"failure_reason": e.msg},
+            )
             request.setResponseCode(e.code)
 
         request.write(html.encode("utf-8"))
