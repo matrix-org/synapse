@@ -64,8 +64,8 @@ const mapStateToProps = state => ({
     serverName: state.baseConfig.servername,
 });
 
-const mapDispatchToProps = dispatch => ({
-    onClick: () => dispatch(advanceUI()),
+const mapDispatchToProps = (dispatch, { onClick }) => ({
+    onClick,
 });
 
 export default connect(

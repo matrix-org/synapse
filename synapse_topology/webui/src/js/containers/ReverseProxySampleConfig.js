@@ -47,8 +47,8 @@ const mapStateToProps = state => ({
     fileName: "synapse_reverse_proxy.conf",
 });
 
-const mapDispatchToProps = dispatch => ({
-    onClick: () => dispatch(advanceUI()),
+const mapDispatchToProps = (dispatch, { onClick }) => ({
+    onClick,
 });
 
 export default connect(

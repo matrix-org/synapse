@@ -5,7 +5,7 @@ import ButtonDisplay from './ButtonDisplay';
 import DownloadOrCopy from './DownloadOrCopy';
 import { REVERSE_PROXY_TYPES } from '../actions/constants';
 
-export default ({ proxyType, sampleConfig, fileName }) => {
+export default ({ proxyType, sampleConfig, fileName, onClick }) => {
 
     return <ContentWrapper>
         <h1>Configure the ReverseProxy</h1>
@@ -30,7 +30,7 @@ export default ({ proxyType, sampleConfig, fileName }) => {
                 {sampleConfig}
             </code>
         </pre>
-        <DownloadOrCopy content={sampleConfig} fileName={fileName} />
+        <DownloadOrCopy content={sampleConfig} fileName={fileName} onClick={onClick} />
     </ContentWrapper>;
 
 }

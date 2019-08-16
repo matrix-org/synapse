@@ -28,7 +28,7 @@ export default ({
                     {clientConfig}
                 </code>
             </pre>
-            <DownloadOrCopy content={clientConfig} fileName={clientConfigFileName} />
+            <DownloadOrCopy content={clientConfig} fileName={clientConfigFileName} onClick={onClick} />
         </ContentWrapper>
 
     } else {
@@ -46,7 +46,7 @@ export default ({
                     {serverConfig}
                 </code>
             </pre>
-            <DownloadOrCopy content={serverConfig} fileName={serverConfigFileName} />
+            <DownloadOrCopy content={serverConfig} fileName={serverConfigFileName} onClick={onClick} />
             <p>
                 You'll also need to host the following at https://{serverName}/.well-known/matrix/client
             </p>
@@ -55,7 +55,7 @@ export default ({
                     {clientConfig}
                 </code>
             </pre>
-            <DownloadOrCopy content={clientConfig} fileName={clientConfigFileName} />
+            <DownloadOrCopy content={clientConfig} fileName={clientConfigFileName} onClick={onClick} />
         </ContentWrapper>;
 
     }

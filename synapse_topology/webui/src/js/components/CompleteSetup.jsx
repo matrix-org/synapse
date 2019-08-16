@@ -16,17 +16,21 @@ export default ({
     onClick,
 }) => {
 
+    const [revProxyDownloaded, setRevProxyDownloaded] = useState(false);
+    const [delegationDownloaded, setDelegationDownloaded] = useState(false);
 
     const revProxyBody = <Card.Body>
-        <ReverseProxySampleConfig />
+        <ReverseProxySampleConfig onClick={() => setRevProxyDownloaded(true)} />
         <button
+            disabled={!revProxyDownloaded}
             onClick={() => setBody(body + 1)}
         >Next</button>
     </Card.Body >
 
     const delegationBody = <Card.Body>
-        <DelegationSampleConfig />
+        <DelegationSampleConfig onClick={() => setDelegationDownloaded(true)} />
         <button
+            disabled={!delegationDownloaded}
             onClick={() => setBody(body + 1)}
         >Next</button>
     </Card.Body>
