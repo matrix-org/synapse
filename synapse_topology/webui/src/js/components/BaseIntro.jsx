@@ -8,7 +8,7 @@ import useAccordionToggle from 'react-bootstrap/useAccordionToggle';
 import { nextUI } from '../reducers/setup-ui-reducer';
 
 export default ({ started, servername, onClick }) => {
-    console.log(useAccordionToggle)
+
     const toggle = useAccordionToggle(nextUI())
     const wrappedOnClick = () => {
 
