@@ -147,9 +147,9 @@ export default ({ servername, skip, onClick }) => {
                         <p>
                             {servername} provides the url
                             https://{servername}/.well-known/matrix/server which gives
-                                    federating servers information about how to contact the actual
-                                    server hosting the synapse install. (Don't worry! We'll print out
-                                    the .well-known file for you later.)
+                            federating servers information about how to contact the actual
+                            server hosting the synapse install. (Don't worry! We'll print out
+                            the .well-known file for you later.)
                         </p>
                         {portSelection}
                     </Tab>
