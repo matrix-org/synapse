@@ -308,14 +308,11 @@ def setup_sdnotify(hs):
     # Tell systemd our state, if we're using it. This will silently fail if
     # we're not using systemd.
     hs.get_reactor().addSystemEventTrigger(
-        "after",
-        "startup",
-        sdnotify,
-        b"READY=1\nMAINPID=%i" % (os.getpid(), ),
+        "after", "startup", sdnotify, b"READY=1\nMAINPID=%i" % (os.getpid(),)
     )
 
     hs.get_reactor().addSystemEventTrigger(
-        "before", "shutdown", sdnotify, b"STOPPING=1",
+        "before", "shutdown", sdnotify, b"STOPPING=1"
     )
 
 
@@ -414,7 +411,7 @@ class _DeferredResolutionReceiver(object):
         self._receiver.resolutionComplete()
 
 
-sdnotify_sockaddr = os.getenv('NOTIFY_SOCKET')
+sdnotify_sockaddr = os.getenv("NOTIFY_SOCKET")
 
 
 def sdnotify(state):
@@ -433,8 +430,8 @@ def sdnotify(state):
     if not sdnotify_sockaddr:
         return
     addr = sdnotify_sockaddr
-    if addr[0] == '@':
-        addr = '\0' + addr[1:]
+    if addr[0] == "@":
+        addr = "\0" + addr[1:]
 
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
