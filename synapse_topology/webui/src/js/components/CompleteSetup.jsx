@@ -16,25 +16,18 @@ export default ({
     onClick,
 }) => {
 
-    const [body, setBody] = useState();
 
     const revProxyBody = <Card.Body>
         <ReverseProxySampleConfig />
         <button
-            onClick={
-                () => delegationType != DELEGATION_TYPES.LOCAL ?
-                    setBody(delegationBody) :
-                    setBody(finishedBody)
-            }
+            onClick={() => setBody(body + 1)}
         >Next</button>
     </Card.Body >
 
     const delegationBody = <Card.Body>
         <DelegationSampleConfig />
         <button
-            onClick={
-                () => setBody(finishedBody)
-            }
+            onClick={() => setBody(body + 1)}
         >Next</button>
     </Card.Body>
 
@@ -43,24 +36,30 @@ export default ({
         <button onClick={onClick}>Start Synapse</button>
     </Card.Body>
 
-    if (!body) {
+    const show = [];
+    const [body, setBody] = useState(0);
 
-        setBody(
-            tlsType == TLS_TYPES.REVERSE_PROXY ?
-                revProxyBody :
-                delegationType != DELEGATION_TYPES.LOCAL ?
-                    delegationBody :
-                    finishedBody,
-        )
+
+
+    if (tlsType == TLS_TYPES.REVERSE_PROXY) {
+
+        show.push(revProxyBody);
 
     }
+    if (delegationType != DELEGATION_TYPES.LOCAL) {
+
+        show.push(delegationBody)
+
+    }
+    show.push(finishedBody)
+
 
     return <Card>
         <AccordionToggle as={Card.Header} eventKey={COMPLETE_UI}>
             Setup Complete
         </AccordionToggle>
         <Accordion.Collapse eventKey={COMPLETE_UI}>
-            {body}
+            {show[body]}
         </Accordion.Collapse>
     </Card>
 

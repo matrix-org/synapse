@@ -29,9 +29,6 @@ export default ({
                 </code>
             </pre>
             <DownloadOrCopy content={clientConfig} fileName={clientConfigFileName} />
-            <ButtonDisplay>
-                <button onClick={onClick}>Continue</button>
-            </ButtonDisplay>
         </ContentWrapper>
 
     } else {
@@ -59,9 +56,6 @@ export default ({
                 </code>
             </pre>
             <DownloadOrCopy content={clientConfig} fileName={clientConfigFileName} />
-            <ButtonDisplay>
-                <button onClick={onClick}>Continue</button>
-            </ButtonDisplay>
         </ContentWrapper>;
 
     }
