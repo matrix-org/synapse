@@ -108,7 +108,9 @@ class E2eRoomKeysHandler(object):
         with (yield self._upload_linearizer.queue(user_id)):
             # make sure the backup version exists
             try:
-                version_info = yield self.store.get_e2e_room_keys_version_info(user_id, version)
+                version_info = yield self.store.get_e2e_room_keys_version_info(
+                    user_id, version
+                )
             except StoreError as e:
                 if e.code == 404:
                     raise NotFoundError("Unknown backup version")
