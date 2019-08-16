@@ -1,1 +1,1 @@
-Remove references to trace_deferred in opetnracing docs.
+Update opentracing docs to use the unified `trace` method.
