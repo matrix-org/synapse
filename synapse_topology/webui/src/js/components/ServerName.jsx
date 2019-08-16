@@ -20,8 +20,8 @@ export default ({ onClick }) => {
     const toggle = useAccordionToggle(nextUI(SERVER_NAME_UI));
     const decoratedOnClick = () => {
 
-        toggle();
         onClick(servername);
+        toggle();
 
     }
 
