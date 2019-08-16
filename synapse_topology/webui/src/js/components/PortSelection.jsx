@@ -73,7 +73,7 @@ export default ({
 
     return <Card>
         <AccordionToggle as={Card.Header} eventKey={PORT_SELECTION_UI}>
-            {servername}'s ports
+            {servername ? servername + "'s ports" : "Ports"}
         </AccordionToggle>
         <Accordion.Collapse eventKey={PORT_SELECTION_UI}>
             <Card.Body>
