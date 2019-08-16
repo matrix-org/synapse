@@ -163,9 +163,7 @@ class WellKnownResolver(object):
             Deferred[Tuple[bytes,int]]: The lookup result and cache period.
         """
 
-        had_valid_well_known = bool(
-            self._had_valid_well_known_cache.get(server_name, False)
-        )
+        had_valid_well_known = self._had_valid_well_known_cache.get(server_name, False)
 
         # We do this in two steps to differentiate between possibly transient
         # errors (e.g. can't connect to host, 503 response) and more permenant
@@ -247,7 +245,6 @@ class WellKnownResolver(object):
                 # Bail if we've been cancelled
                 raise
             except Exception as e:
-                logger.info("Retry: %s", retry)
                 if not retry or i >= WELL_KNOWN_RETRY_ATTEMPTS:
                     logger.info("Error fetching %s: %s", uri_str, e)
                     raise _FetchWellKnownFailure(temporary=True)
