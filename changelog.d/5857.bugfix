@@ -1,1 +1,1 @@
-Add missing version field to e2e_room_keys database index.
+Fix database index so that different backup versions can have the same sessions.
