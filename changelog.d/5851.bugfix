@@ -1,2 +1,0 @@
-Fix 500 Internal Server Error on `publicRooms` when the public room list was
-cached.
