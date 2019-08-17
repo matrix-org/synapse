@@ -349,6 +349,14 @@ sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
 ```
 
+### Void Linux
+
+Synapse can be found in the void repositories as 'synapse'.  
+synchronize your repository databases and update your system to the most recent packages, including their dependencies. Then install synapse.
+
+    xbps-install -Su
+    xbps-install -S synapse
+
 ### FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
