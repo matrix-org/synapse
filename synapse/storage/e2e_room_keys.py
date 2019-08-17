@@ -82,11 +82,11 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             table="e2e_room_keys",
             keyvalues={
                 "user_id": user_id,
+                "version": version,
                 "room_id": room_id,
                 "session_id": session_id,
             },
             values={
-                "version": version,
                 "first_message_index": room_key["first_message_index"],
                 "forwarded_count": room_key["forwarded_count"],
                 "is_verified": room_key["is_verified"],
