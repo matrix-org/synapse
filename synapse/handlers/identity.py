@@ -233,6 +233,7 @@ class IdentityHandler(BaseHandler):
             send_attempt (int): Which attempt this is
             next_link: A link to redirect the user to once they submit the token
             kwargs: extra arguments to send to the server
+
         Returns:
             The json response body from the server
         """
