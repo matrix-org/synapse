@@ -693,7 +693,14 @@ def tag_args(func):
 
 def trace_servlet(servlet_name, extract_context=False):
     """Decorator which traces a serlet. It starts a span with some servlet specific
-    tags such as the servlet_name and request information"""
+    tags such as the servlet_name and request information
+
+    Args:
+        servlet_name (str): The name to be used for the span's operation_name
+        extract_context (bool): Whether to attempt to extract the opentracing
+            context from the request the servlet is handling.
+
+    """
 
     def _trace_servlet_inner_1(func):
         if not opentracing:
