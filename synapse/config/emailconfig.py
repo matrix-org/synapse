@@ -94,8 +94,8 @@ class EmailConfig(Config):
                     'The config option "trust_identity_server_for_password_resets" '
                     'has been replaced by "account_threepid_delegate". Attempted to use an '
                     'identity server from "trusted_third_party_id_servers" but it is empty. '
-                    'Please consult the sample config at docs/sample_config.yaml for '
-                    'details and update your config file.'
+                    "Please consult the sample config at docs/sample_config.yaml for "
+                    "details and update your config file."
                 )
 
         self.local_threepid_emails_disabled_due_to_config = False
