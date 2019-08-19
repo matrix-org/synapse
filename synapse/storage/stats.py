@@ -44,15 +44,9 @@ class StatsStore(StateDeltasStore):
         self.stats_enabled = hs.config.stats_enabled
         self.stats_bucket_size = hs.config.stats_bucket_size
 
-        self.register_noop_background_update(
-            "populate_stats_createtables"
-        )
-        self.register_noop_background_update(
-            "populate_stats_process_rooms"
-        )
-        self.register_noop_background_update(
-            "populate_stats_cleanup"
-        )
+        self.register_noop_background_update("populate_stats_createtables")
+        self.register_noop_background_update("populate_stats_process_rooms")
+        self.register_noop_background_update("populate_stats_cleanup")
 
     def update_room_state(self, room_id, fields):
         """
