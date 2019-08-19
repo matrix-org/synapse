@@ -226,12 +226,14 @@ class IdentityHandler(BaseHandler):
         """
         Request an external server send an email on our behalf for the purposes of threepid
         validation.
+
         Args:
             email (str): The email to send the message to
             client_secret (str): The unique client_secret sends by the user
             send_attempt (int): Which attempt this is
             next_link: A link to redirect the user to once they submit the token
             kwargs: extra arguments to send to the server
+
         Returns:
             The json response body from the server
         """
