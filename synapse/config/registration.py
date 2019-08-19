@@ -52,7 +52,7 @@ class AccountValidityConfig(Config):
 
         if not template_dir:
             template_dir = pkg_resources.resource_filename(
-                "synapse", "res/emailtemplates"
+                "synapse", "res/templates"
             )
 
         if "account_renewed_html_path" in config:

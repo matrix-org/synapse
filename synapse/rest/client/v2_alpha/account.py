@@ -179,7 +179,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def on_GET(self, request, purpose, medium):
+    def on_GET(self, request, medium):
         if medium != "email":
             raise SynapseError(
                 400, "This medium is currently not supported for password resets"
