@@ -895,16 +895,10 @@ uploads_path: "DATADIR/uploads"
 #  - vector.im
 
 # Handle threepid (email/phone etc) registration and password resets
-# through an identity server. Only change if you know what you are
-# doing
+# through a *trusted* identity server. Note that this allows the configured
+# identity server to reset passwords for accounts.
 #
-# IMPORTANT! This will give a malicious or overtaken identity server
-# the ability to reset passwords for your users and/or learn your
-# user's email/phone numbers! Make absolutely sure that you want to do
-# this! It is strongly recommended that these messages be sent by the
-# homeserver instead
-#
-# If this option is an empty string and SMTP options have not been
+# If this option is not defined and SMTP options have not been
 # configured, registration by email and resetting user passwords via
 # email will be disabled
 #

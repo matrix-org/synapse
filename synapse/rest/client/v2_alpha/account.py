@@ -68,7 +68,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         if self.config.email_threepid_behaviour == "off":
-            if self.config.password_resets_were_disabled_due_to_email_config:
+            if self.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"
                 )
@@ -127,6 +127,8 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             email (str): The user's email address
             client_secret (str): The provided client secret
             send_attempt (int): Which send attempt this is
+            next_link (str|None): The link to redirect the user to upon success. No redirect
+                occurs if None
 
         Returns:
             The new session_id upon success
@@ -250,7 +252,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
                 400, "This medium is currently not supported for password resets"
             )
         if self.config.email_threepid_behaviour == "off":
-            if self.config.password_resets_were_disabled_due_to_email_config:
+            if self.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"
                 )

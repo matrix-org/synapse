@@ -81,18 +81,22 @@ class EmailConfig(Config):
             if self.account_threepid_delegate
             else "local"
         )
-        # Prior to Synapse v1.4.0, there used to be another option that defined whether Synapse
-        # would use an identity server to password reset tokens on its behalf. We now warn the
-        # user if they have this set and tell them to use the updated option.
-        # TODO: Eventually we want to remove the functionality of having an identity server
-        #  send tokens on behalf of the homeserver. At that point, we should remove this check
+        # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
+        # use an identity server to password reset tokens on its behalf. We now warn the user
+        # if they have this set and tell them to use the updated option, while using a default
+        # identity server in the process.
         if config.get("trust_identity_server_for_password_resets", False) is True:
-            raise ConfigError(
-                'The config option "trust_identity_server_for_password_resets" '
-                'has been replaced by "account_threepid_delegate". Please '
-                "consult the default config at docs/sample_config.yaml for "
-                "details and update your config file."
-            )
+            # Use the first entry in self.trusted_third_party_id_servers instead
+            if len(self.trusted_third_party_id_servers):
+                self.account_threepid_delegate = self.trusted_third_party_id_servers[0]
+            else:
+                raise ConfigError(
+                    'The config option "trust_identity_server_for_password_resets" '
+                    'has been replaced by "account_threepid_delegate". Attempted to use an '
+                    'identity server from "trusted_third_party_id_servers" but it is empty. '
+                    'Please consult the sample config at docs/sample_config.yaml for '
+                    'details and update your config file.'
+                )
 
         self.local_threepid_emails_disabled_due_to_config = False
         if self.email_threepid_behaviour == "local" and email_config == {}:
