@@ -39,9 +39,9 @@ from synapse.http.servlet import (
 )
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
+    get_tags,
     start_active_span,
     start_active_span_from_request,
-    tags,
     whitelisted_homeserver,
 )
 from synapse.types import ThirdPartyInstanceID, get_domain_from_id
@@ -293,6 +293,7 @@ class BaseFederationServlet(object):
                 logger.warn("authenticate_request failed: %s", e)
                 raise
 
+            tags = get_tags()
             _tags = {
                 "request_id": request.get_request_id(),
                 tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,

@@ -769,3 +769,7 @@ class _DummyTagNames(object):
 
 
 tags = _DummyTagNames
+
+
+def get_tags():
+    return tags
