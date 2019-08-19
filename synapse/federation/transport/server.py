@@ -310,7 +310,7 @@ class BaseFederationServlet(object):
                     request, "incoming-federation-request", tags=_tags
                 )
             else:
-                scope = start_active_span("incoming-federation-request", tags=tags)
+                scope = start_active_span("incoming-federation-request", tags=_tags)
 
             with scope:
                 if origin:
