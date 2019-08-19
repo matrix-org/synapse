@@ -23,12 +23,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import (
-    CodeMessageException,
-    Codes,
-    HttpResponseException,
-    SynapseError,
-)
+from synapse.api.errors import CodeMessageException, HttpResponseException, SynapseError
 
 from ._base import BaseHandler
 
@@ -227,14 +222,19 @@ class IdentityHandler(BaseHandler):
         return changed
 
     @defer.inlineCallbacks
-    def requestEmailToken(
-        self, id_server, email, client_secret, send_attempt, next_link=None
-    ):
-        if not self._should_trust_id_server(id_server):
-            raise SynapseError(
-                400, "Untrusted ID server '%s'" % id_server, Codes.SERVER_NOT_TRUSTED
-            )
-
+    def requestEmailToken(self, email, client_secret, send_attempt, next_link=None, **kwargs):
+        """
+        Request an external server send an email on our behalf for the purposes of threepid
+        validation.
+        Args:
+            email (str): The email to send the message to
+            client_secret (str): The unique client_secret sends by the user
+            send_attempt (int): Which attempt this is
+            next_link: A link to redirect the user to once they submit the token
+            kwargs: extra arguments to send to the server
+        Returns:
+            The json response body from the server
+        """
         params = {
             "email": email,
             "client_secret": client_secret,
@@ -245,9 +245,9 @@ class IdentityHandler(BaseHandler):
             params.update({"next_link": next_link})
 
         try:
+            id_server = self.hs.config.account_threepid_delegate
             data = yield self.http_client.post_json_get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/validate/email/requestToken"),
+                id_server + "/_matrix/identity/api/v1/validate/email/requestToken",
                 params,
             )
             return data
@@ -257,13 +257,20 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
-        self, id_server, country, phone_number, client_secret, send_attempt, **kwargs
+        self, country, phone_number, client_secret, send_attempt, **kwargs
     ):
-        if not self._should_trust_id_server(id_server):
-            raise SynapseError(
-                400, "Untrusted ID server '%s'" % id_server, Codes.SERVER_NOT_TRUSTED
-            )
-
+        """
+        Request an external server send an SMS message on our behalf for the purposes of
+        threepid validation.
+        Args:
+            country (str): The country code of the phone number
+            phone_number (str): The number to send the message to
+            client_secret (str): The unique client_secret sends by the user
+            send_attempt (int): Which attempt this is
+            kwargs: extra arguments to send to the server
+        Returns:
+            The json response body from the server
+        """
         params = {
             "country": country,
             "phone_number": phone_number,
@@ -273,9 +280,9 @@ class IdentityHandler(BaseHandler):
         params.update(kwargs)
 
         try:
+            id_server = self.hs.config.account_threepid_delegate
             data = yield self.http_client.post_json_get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/validate/msisdn/requestToken"),
+                id_server + "/_matrix/identity/api/v1/validate/msisdn/requestToken",
                 params,
             )
             return data

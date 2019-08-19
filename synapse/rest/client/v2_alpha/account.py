@@ -50,7 +50,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if self.config.email_password_reset_behaviour == "local":
+        if self.config.email_threepid_behaviour == "local":
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -67,7 +67,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.config.email_password_reset_behaviour == "off":
+        if self.config.email_threepid_behaviour == "off":
             if self.config.password_resets_were_disabled_due_to_email_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"
@@ -100,7 +100,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         if existingUid is None:
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
-        if self.config.email_password_reset_behaviour == "remote":
+        if self.config.email_threepid_behaviour == "remote":
             if "id_server" not in body:
                 raise SynapseError(400, "Missing 'id_server' param in body")
 
@@ -249,7 +249,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for password resets"
             )
-        if self.config.email_password_reset_behaviour == "off":
+        if self.config.email_threepid_behaviour == "off":
             if self.config.password_resets_were_disabled_due_to_email_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"
