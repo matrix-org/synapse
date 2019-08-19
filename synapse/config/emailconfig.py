@@ -81,7 +81,7 @@ class EmailConfig(Config):
             if self.account_threepid_delegate
             else "local"
         )
-        # Prior to Synapse v1.4.0, there used to be another option that defined whether Synapse
+        # Prior to Synapse v1.4.0 there used to be another option that defined whether Synapse
         # would use an identity server to password reset tokens on its behalf. We now warn the
         # user if they have this set and tell them to use the updated option.
         # TODO: Eventually we want to remove the functionality of having an identity server
