@@ -23,7 +23,7 @@ from synapse.rest.admin import assert_requester_is_admin
 
 
 class PurgeRoomServlet(RestServlet):
-    """Servlet which will remove all trace of an a room from the database
+    """Servlet which will remove all trace of a room from the database
 
     POST /_synapse/admin/v1/purge_room
     {
@@ -32,8 +32,7 @@ class PurgeRoomServlet(RestServlet):
 
     returns:
 
-    {
-    }
+    {}
     """
 
     PATTERNS = (re.compile("^/_synapse/admin/v1/purge_room$"),)
