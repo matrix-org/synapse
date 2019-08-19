@@ -1,1 +1,0 @@
-Cache result of get_version_string to reduce overhead of `/version` federation requests.

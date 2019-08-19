@@ -25,17 +25,19 @@ from twisted.internet._sslverify import ClientTLSOptions, OpenSSLCertificateOpti
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web._newclient import ResponseNeverReceived
+from twisted.web.client import Agent
 from twisted.web.http import HTTPChannel
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IPolicyForHTTPS
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto.context_factory import ClientTLSOptionsFactory
-from synapse.http.federation.matrix_federation_agent import (
-    MatrixFederationAgent,
+from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.http.federation.srv_resolver import Server
+from synapse.http.federation.well_known_resolver import (
+    WellKnownResolver,
     _cache_period_from_headers,
 )
-from synapse.http.federation.srv_resolver import Server
 from synapse.logging.context import LoggingContext
 from synapse.util.caches.ttlcache import TTLCache
 
@@ -79,9 +81,10 @@ class MatrixFederationAgentTests(TestCase):
         self._config = config = HomeServerConfig()
         config.parse_config_dict(config_dict, "", "")
 
+        self.tls_factory = ClientTLSOptionsFactory(config)
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
-            tls_client_options_factory=ClientTLSOptionsFactory(config),
+            tls_client_options_factory=self.tls_factory,
             _srv_resolver=self.mock_resolver,
             _well_known_cache=self.well_known_cache,
         )
@@ -928,20 +931,16 @@ class MatrixFederationAgentTests(TestCase):
         self.reactor.pump((0.1,))
         self.successResultOf(test_d)
 
-    @defer.inlineCallbacks
-    def do_get_well_known(self, serv):
-        try:
-            result = yield self.agent._get_well_known(serv)
-            logger.info("Result from well-known fetch: %s", result)
-        except Exception as e:
-            logger.warning("Error fetching well-known: %s", e)
-            raise
-        return result
-
     def test_well_known_cache(self):
+        well_known_resolver = WellKnownResolver(
+            self.reactor,
+            Agent(self.reactor, contextFactory=self.tls_factory),
+            well_known_cache=self.well_known_cache,
+        )
+
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
-        fetch_d = self.do_get_well_known(b"testserv")
+        fetch_d = well_known_resolver.get_well_known(b"testserv")
 
         # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
@@ -953,26 +952,26 @@ class MatrixFederationAgentTests(TestCase):
         well_known_server = self._handle_well_known_connection(
             client_factory,
             expected_sni=b"testserv",
-            response_headers={b"Cache-Control": b"max-age=10"},
+            response_headers={b"Cache-Control": b"max-age=1000"},
             content=b'{ "m.server": "target-server" }',
         )
 
         r = self.successResultOf(fetch_d)
-        self.assertEqual(r, b"target-server")
+        self.assertEqual(r.delegated_server, b"target-server")
 
         # close the tcp connection
         well_known_server.loseConnection()
 
         # repeat the request: it should hit the cache
-        fetch_d = self.do_get_well_known(b"testserv")
+        fetch_d = well_known_resolver.get_well_known(b"testserv")
         r = self.successResultOf(fetch_d)
-        self.assertEqual(r, b"target-server")
+        self.assertEqual(r.delegated_server, b"target-server")
 
         # expire the cache
-        self.reactor.pump((10.0,))
+        self.reactor.pump((1000.0,))
 
         # now it should connect again
-        fetch_d = self.do_get_well_known(b"testserv")
+        fetch_d = well_known_resolver.get_well_known(b"testserv")
 
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
@@ -986,7 +985,76 @@ class MatrixFederationAgentTests(TestCase):
         )
 
         r = self.successResultOf(fetch_d)
-        self.assertEqual(r, b"other-server")
+        self.assertEqual(r.delegated_server, b"other-server")
+
+    def test_well_known_cache_with_temp_failure(self):
+        """Test that we refetch well-known before the cache expires, and that
+        it ignores transient errors.
+        """
+
+        well_known_resolver = WellKnownResolver(
+            self.reactor,
+            Agent(self.reactor, contextFactory=self.tls_factory),
+            well_known_cache=self.well_known_cache,
+        )
+
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+
+        fetch_d = well_known_resolver.get_well_known(b"testserv")
+
+        # there should be an attempt to connect on port 443 for the .well-known
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
+        self.assertEqual(host, "1.2.3.4")
+        self.assertEqual(port, 443)
+
+        well_known_server = self._handle_well_known_connection(
+            client_factory,
+            expected_sni=b"testserv",
+            response_headers={b"Cache-Control": b"max-age=1000"},
+            content=b'{ "m.server": "target-server" }',
+        )
+
+        r = self.successResultOf(fetch_d)
+        self.assertEqual(r.delegated_server, b"target-server")
+
+        # close the tcp connection
+        well_known_server.loseConnection()
+
+        # Get close to the cache expiry, this will cause the resolver to do
+        # another lookup.
+        self.reactor.pump((900.0,))
+
+        fetch_d = well_known_resolver.get_well_known(b"testserv")
+        clients = self.reactor.tcpClients
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
+
+        # fonx the connection attempt, this will be treated as a temporary
+        # failure.
+        client_factory.clientConnectionFailed(None, Exception("nope"))
+
+        # attemptdelay on the hostnameendpoint is 0.3, so takes that long before the
+        # .well-known request fails.
+        self.reactor.pump((0.4,))
+
+        # Resolver should return cached value, despite the lookup failing.
+        r = self.successResultOf(fetch_d)
+        self.assertEqual(r.delegated_server, b"target-server")
+
+        # Expire the cache and repeat the request
+        self.reactor.pump((100.0,))
+
+        # Repated the request, this time it should fail if the lookup fails.
+        fetch_d = well_known_resolver.get_well_known(b"testserv")
+
+        clients = self.reactor.tcpClients
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
+        client_factory.clientConnectionFailed(None, Exception("nope"))
+        self.reactor.pump((0.4,))
+
+        r = self.successResultOf(fetch_d)
+        self.assertEqual(r.delegated_server, None)
 
 
 class TestCachePeriodFromHeaders(TestCase):

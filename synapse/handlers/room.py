@@ -560,6 +560,18 @@ class RoomCreationHandler(BaseHandler):
 
         yield self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
+        power_level_content_override = config.get("power_level_content_override")
+        if (
+            power_level_content_override
+            and "users" in power_level_content_override
+            and user_id not in power_level_content_override["users"]
+        ):
+            raise SynapseError(
+                400,
+                "Not a valid power_level_content_override: 'users' did not contain %s"
+                % (user_id,),
+            )
+
         invite_3pid_list = config.get("invite_3pid", [])
 
         visibility = config.get("visibility", None)
@@ -604,7 +616,7 @@ class RoomCreationHandler(BaseHandler):
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
-            power_level_content_override=config.get("power_level_content_override"),
+            power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
         )
 
