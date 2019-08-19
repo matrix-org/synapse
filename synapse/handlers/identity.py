@@ -37,25 +37,6 @@ class IdentityHandler(BaseHandler):
         self.http_client = hs.get_simple_http_client()
         self.federation_http_client = hs.get_http_client()
 
-        self.trusted_id_servers = set(hs.config.trusted_third_party_id_servers)
-        self.trust_any_id_server_just_for_testing_do_not_use = (
-            hs.config.use_insecure_ssl_client_just_for_testing_do_not_use
-        )
-
-    def _should_trust_id_server(self, id_server):
-        if id_server not in self.trusted_id_servers:
-            if self.trust_any_id_server_just_for_testing_do_not_use:
-                logger.warn(
-                    "Trusting untrustworthy ID server %r even though it isn't"
-                    " in the trusted id list for testing because"
-                    " 'use_insecure_ssl_client_just_for_testing_do_not_use'"
-                    " is set in the config",
-                    id_server,
-                )
-            else:
-                return False
-        return True
-
     @defer.inlineCallbacks
     def threepid_from_creds(self, creds):
         if "id_server" in creds:
@@ -71,13 +52,6 @@ class IdentityHandler(BaseHandler):
             client_secret = creds["clientSecret"]
         else:
             raise SynapseError(400, "No client_secret in creds")
-
-        if not self._should_trust_id_server(id_server):
-            logger.warn(
-                "%s is not a trusted ID server: rejecting 3pid " + "credentials",
-                id_server,
-            )
-            return None
 
         try:
             data = yield self.http_client.get_json(
@@ -222,7 +196,9 @@ class IdentityHandler(BaseHandler):
         return changed
 
     @defer.inlineCallbacks
-    def requestEmailToken(self, email, client_secret, send_attempt, next_link=None, **kwargs):
+    def requestEmailToken(
+        self, email, client_secret, send_attempt, next_link=None, **kwargs
+    ):
         """
         Request an external server send an email on our behalf for the purposes of threepid
         validation.
