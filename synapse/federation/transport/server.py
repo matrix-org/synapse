@@ -19,8 +19,9 @@ import functools
 import logging
 import re
 
+from twisted.internet.defer import maybeDeferred
+
 import synapse
-import synapse.logging.opentracing as opentracing
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import (
@@ -37,6 +38,7 @@ from synapse.http.servlet import (
     parse_string_from_args,
 )
 from synapse.logging.context import run_in_background
+from synapse.logging.opentracing import start_active_span_from_context, tags
 from synapse.types import ThirdPartyInstanceID, get_domain_from_id
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
@@ -287,16 +289,17 @@ class BaseFederationServlet(object):
                 raise
 
             # Start an opentracing span
-            with opentracing.start_active_span_from_context(
+            with start_active_span_from_context(
                 request.requestHeaders,
                 "incoming-federation-request",
                 tags={
                     "request_id": request.get_request_id(),
-                    opentracing.tags.SPAN_KIND: opentracing.tags.SPAN_KIND_RPC_SERVER,
-                    opentracing.tags.HTTP_METHOD: request.get_method(),
-                    opentracing.tags.HTTP_URL: request.get_redacted_uri(),
-                    opentracing.tags.PEER_HOST_IPV6: request.getClientIP(),
+                    tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
+                    tags.HTTP_METHOD: request.get_method(),
+                    tags.HTTP_URL: request.get_redacted_uri(),
+                    tags.PEER_HOST_IPV6: request.getClientIP(),
                     "authenticated_entity": origin,
+                    "servlet_name": request.request_metrics.name,
                 },
             ):
                 if origin:
@@ -745,8 +748,12 @@ class PublicRoomList(BaseFederationServlet):
         else:
             network_tuple = ThirdPartyInstanceID(None, None)
 
-        data = await self.handler.get_local_public_room_list(
-            limit, since_token, network_tuple=network_tuple, from_federation=True
+        data = await maybeDeferred(
+            self.handler.get_local_public_room_list,
+            limit,
+            since_token,
+            network_tuple=network_tuple,
+            from_federation=True,
         )
         return 200, data
 
