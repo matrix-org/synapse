@@ -104,10 +104,12 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
             # Have the configured identity server handle the request
             if not self.hs.config.account_threepid_delegate:
+                logger.warn(
+                    "No upstream account_threepid_delegate configured on the server to handle "
+                    "this request",
+                )
                 raise SynapseError(
-                    400,
-                    "No upstream identity server configured on the server to handle this "
-                    "request",
+                    400, "Registration by MSISDN is not supported on this homeserver"
                 )
 
             ret = yield self.identity_handler.requestEmailToken(
@@ -243,10 +245,12 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
 
         if not self.hs.config.account_threepid_delegate:
+            logger.warn(
+                "No upstream account_threepid_delegate configured on the server to handle "
+                "this request",
+            )
             raise SynapseError(
-                400,
-                "No upstream identity server configured on the server to handle this "
-                "request",
+                400, "Registration by MSISDN is not supported on this homeserver"
             )
 
         if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:

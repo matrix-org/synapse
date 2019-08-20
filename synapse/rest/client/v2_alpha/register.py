@@ -100,10 +100,12 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if not self.hs.config.account_threepid_delegate:
+            logger.warn(
+                "No upstream account_threepid_delegate configured on the server to handle "
+                "this request",
+            )
             raise SynapseError(
-                400,
-                "No upstream identity server configured on the server to handle this "
-                "request",
+                400, "Registration by MSISDN is not supported on this homeserver"
             )
 
         ret = yield self.identity_handler.requestEmailToken(
