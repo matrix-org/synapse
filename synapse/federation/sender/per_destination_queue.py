@@ -212,11 +212,7 @@ class PerDestinationQueue(object):
                 # span would have no causality and it would be forgotten.
 
                 span_contexts = (
-                    extract_text_map(
-                        json.loads(
-                            edu.get_dict().get("content", {}).get("context", "{}")
-                        )
-                    )
+                    extract_text_map(json.loads(edu.get_context()))
                     for edu in pending_edus
                 )
 
