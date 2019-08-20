@@ -98,8 +98,15 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
+        if not self.hs.config.account_threepid_delegate:
+            raise SynapseError(
+                400, "No upstream identity server configured on the server to handle this "
+                     "request"
+            )
+
         ret = yield self.identity_handler.requestEmailToken(
-            None, email, client_secret, send_attempt, next_link
+            self.hs.config.account_threepid_delegate,
+            email, client_secret, send_attempt, next_link
         )
 
         return (200, ret)

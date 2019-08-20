@@ -204,8 +204,7 @@ class IdentityHandler(BaseHandler):
         validation.
 
         Args:
-            id_server (str|None): The identity server to send this through. If None,
-                use the server specified by the account_threepid_delegate config option
+            id_server (str): The identity server to proxy to
             email (str): The email to send the message to
             client_secret (str): The unique client_secret sends by the user
             send_attempt (int): Which attempt this is
@@ -224,17 +223,6 @@ class IdentityHandler(BaseHandler):
 
         if next_link:
             params.update({"next_link": next_link})
-
-        if not id_server:
-            if not self.hs.config.account_threepid_delegate:
-                raise SynapseError(
-                    400, "No id_server provided and none configured on the server"
-                )
-            id_server = self.hs.config.account_threepid_delegate
-        else:
-            # Assume "https://" is the protocol we're using to contact the id_server
-            # provided by the client
-            id_server = "https://" + id_server
 
         try:
             data = yield self.http_client.post_json_get_json(
@@ -260,6 +248,7 @@ class IdentityHandler(BaseHandler):
         Request an external server send an SMS message on our behalf for the purposes of
         threepid validation.
         Args:
+            id_server (str): The identity server to proxy to
             country (str): The country code of the phone number
             phone_number (str): The number to send the message to
             client_secret (str): The unique client_secret sends by the user
@@ -277,17 +266,6 @@ class IdentityHandler(BaseHandler):
         }
         if next_link:
             params["next_link"] = next_link
-
-        if not id_server:
-            if not self.hs.config.account_threepid_delegate:
-                raise SynapseError(
-                    400, "No id_server provided and none configured on the " "server"
-                )
-            id_server = self.hs.config.account_threepid_delegate
-        else:
-            # Assume "https://" is the protocol we're using to contact the id_server
-            # provided by the client
-            id_server = "https://" + id_server
 
         try:
             data = yield self.http_client.post_json_get_json(

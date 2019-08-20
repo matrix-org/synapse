@@ -102,9 +102,15 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
-            # Have an identity server handle the password reset flow
+            # Have the configured identity server handle the request
+            if not self.hs.config.account_threepid_delegate:
+                raise SynapseError(
+                    400, "No upstream identity server configured on the server to handle this "
+                         "request"
+                )
+
             ret = yield self.identity_handler.requestEmailToken(
-                None, email, client_secret, send_attempt, next_link
+                self.hs.config.account_threepid_delegate, email, client_secret, send_attempt, next_link
             )
         else:
             # Send password reset emails from Synapse
@@ -467,6 +473,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         assert_params_in_dict(
             body, ["id_server", "client_secret", "email", "send_attempt"]
         )
+        id_server = "https://" + body["id_server"]  # Assume https
+        client_secret = body["client_secret"]
+        email = body["email"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
         if not check_3pid_allowed(self.hs, "email", body["email"]):
             raise SynapseError(
@@ -482,7 +493,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestEmailToken(**body)
+        ret = yield self.identity_handler.requestEmailToken(
+            id_server, email, client_secret, send_attempt, next_link
+        )
         return (200, ret)
 
 
