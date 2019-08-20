@@ -228,7 +228,7 @@ class IdentityHandler(BaseHandler):
         if not id_server:
             if not self.hs.config.account_threepid_delegate:
                 raise SynapseError(
-                    400, "No id_server provided and none configured on the " "server"
+                    400, "No id_server provided and none configured on the server"
                 )
             id_server = self.hs.config.account_threepid_delegate
         else:
