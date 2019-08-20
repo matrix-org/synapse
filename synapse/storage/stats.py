@@ -15,10 +15,12 @@
 # limitations under the License.
 
 import logging
+from itertools import chain
 from threading import Lock
 
 from twisted.internet import defer
 
+from synapse.storage.engines import Sqlite3Engine
 from synapse.storage.state_deltas import StateDeltasStore
 from synapse.util.caches.descriptors import cached
 
