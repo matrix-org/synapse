@@ -552,7 +552,7 @@ def get_active_span_text_map(destination=None):
         destination (str): the name of the remote server.
 
     Returns:
-        A dict - it contains the active span's context if opentracing is enabled.
+        dict: the active span's context if opentracing is enabled, otherwise empty.
     """
 
     if not opentracing or (destination and not whitelisted_homeserver(destination)):
