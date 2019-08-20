@@ -86,17 +86,16 @@ class EmailConfig(Config):
         # use an identity server to password reset tokens on its behalf. We now warn the user
         # if they have this set and tell them to use the updated option, while using a default
         # identity server in the process.
+        self.using_identity_server_from_trusted_list = False
         if config.get("trust_identity_server_for_password_resets", False) is True:
             # Use the first entry in self.trusted_third_party_id_servers instead
             if self.trusted_third_party_id_servers:
                 self.account_threepid_delegate = self.trusted_third_party_id_servers[0]
+                self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
-                    'The config option "trust_identity_server_for_password_resets" '
-                    'has been replaced by "account_threepid_delegate". Attempted to use an '
-                    'identity server from "trusted_third_party_id_servers" but it is empty. '
-                    "Please consult the sample config at docs/sample_config.yaml for "
-                    "details and update your config file."
+                    "Attempted to use an identity server from"
+                    '"trusted_third_party_id_servers" but it is empty.'
                 )
 
         self.local_threepid_emails_disabled_due_to_config = False

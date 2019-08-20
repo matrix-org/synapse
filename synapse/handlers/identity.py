@@ -36,6 +36,7 @@ class IdentityHandler(BaseHandler):
 
         self.http_client = hs.get_simple_http_client()
         self.federation_http_client = hs.get_http_client()
+        self.hs = hs
 
     @defer.inlineCallbacks
     def threepid_from_creds(self, creds):
@@ -221,8 +222,14 @@ class IdentityHandler(BaseHandler):
         if next_link:
             params["next_link"] = next_link
 
-        if next_link:
-            params.update({"next_link": next_link})
+        if self.hs.config.using_identity_server_from_trusted_list:
+            # Warn that a deprecated config option is in use
+            logger.warn(
+                'The config option "trust_identity_server_for_password_resets" '
+                'has been replaced by "account_threepid_delegate". '
+                "Please consult the sample config at docs/sample_config.yaml for "
+                "details and update your config file."
+            )
 
         try:
             data = yield self.http_client.post_json_get_json(
@@ -266,6 +273,15 @@ class IdentityHandler(BaseHandler):
         }
         if next_link:
             params["next_link"] = next_link
+
+        if self.hs.config.using_identity_server_from_trusted_list:
+            # Warn that a deprecated config option is in use
+            logger.warn(
+                'The config option "trust_identity_server_for_password_resets" '
+                'has been replaced by "account_threepid_delegate". '
+                "Please consult the sample config at docs/sample_config.yaml for "
+                "details and update your config file."
+            )
 
         try:
             data = yield self.http_client.post_json_get_json(

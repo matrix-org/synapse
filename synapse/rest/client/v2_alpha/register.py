@@ -102,7 +102,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if not self.hs.config.account_threepid_delegate:
             logger.warn(
                 "No upstream account_threepid_delegate configured on the server to handle "
-                "this request",
+                "this request"
             )
             raise SynapseError(
                 400, "Registration by MSISDN is not supported on this homeserver"
@@ -166,7 +166,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             if not self.hs.config.account_threepid_delegate:
                 logger.warn(
                     "No upstream account_threepid_delegate configured on the server to handle "
-                    "this request",
+                    "this request"
                 )
                 raise SynapseError(
                     400, "Registration by MSISDN is not supported on this homeserver"
