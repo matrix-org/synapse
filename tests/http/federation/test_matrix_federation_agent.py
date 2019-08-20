@@ -67,7 +67,6 @@ def get_connection_factory():
     return test_server_connection_factory
 
 
-@unittest.DEBUG
 class MatrixFederationAgentTests(unittest.TestCase):
     def setUp(self):
         self.reactor = ThreadedMemoryReactorClock()
