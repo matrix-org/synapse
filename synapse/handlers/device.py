@@ -415,7 +415,7 @@ class DeviceHandler(DeviceWorkerHandler):
             hosts.update(get_domain_from_id(u) for u in users_who_share_room)
             hosts.discard(self.server_name)
 
-        set_tag("hosts to update", hosts)
+        set_tag("target_hosts", hosts)
 
         position = yield self.store.add_device_change_to_streams(
             user_id, device_ids, list(hosts)
