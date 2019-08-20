@@ -19,7 +19,7 @@ Log formatters that output terse JSON.
 
 import sys
 from collections import deque
-from typing.io import TextIO
+from typing import TextIO
 
 import attr
 from simplejson import dumps

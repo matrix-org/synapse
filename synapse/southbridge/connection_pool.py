@@ -15,25 +15,35 @@
 
 import attr
 
+from zope.interface import Interface, implementer
+
+from typing import List, Mapping, Optional, Tuple
+
+from collections import defaultdict
+
+from twisted.internet.interfaces import IProtocol
 from twisted.internet.endpoints import TCP4ClientEndpoint, wrapClientTLS
 from twisted.internet.protocol import Factory
+from twisted.python.failure import Failure
 
 from synapse.crypto.context_factory import ClientTLSOptionsFactory
 from synapse.logging.ids import readable_id
 
-from .objects import Protocols, ResolvedFederationAddress
+from .objects import Protocols, RemoteAddress
+from .interfaces import IConnection, IConnectionPool, IAddress, IClient
 
 
 @attr.s
+@implementer(IConnection)
 class Connection:
 
-    pool = attr.ib()
-    address = attr.ib()
+    pool = attr.ib(type=IConnectionPool)
+    address = attr.ib(type=IAddress)
     chosen_address = attr.ib()
     _bound = attr.ib(default=False, repr=False)
-    _client = attr.ib(default=None, repr=False)
-    _connected = attr.ib(default=False)
-    _write_buffer = attr.ib(default=attr.Factory(list), repr=False)
+    _client = attr.ib(default=None, repr=False, type=Optional[IClient])
+    _connected = attr.ib(default=False, type=bool)
+    _write_buffer = attr.ib(default=attr.Factory(list), repr=False, type=List[bytes])
     name = attr.ib(default=attr.Factory(readable_id))
 
     def relinquish(self) -> None:
@@ -57,7 +67,7 @@ class Connection:
         if self._write_buffer:
             self._flush()
 
-    def reset_client(self, unused_data: str = b"") -> None:
+    def reset_client(self, unused_data: bytes = b"") -> None:
         """
         Reset the listening client. Done before relinquishing back to the
         connection pool.
@@ -77,7 +87,7 @@ class Connection:
             self._client.data_received(data)
         self._write_buffer.clear()
 
-    def write(self, data: str) -> None:
+    def write(self, data: bytes) -> None:
         if self._connected:
             self.transport.write(data)
         else:
@@ -91,13 +101,13 @@ class Connection:
     def can_be_bound(self) -> bool:
         return self._connected and not self._bound
 
-    def unbind(self) -> bool:
+    def unbind(self) -> None:
         """
         Unbind this connection. This can be done multiple times.
         """
         self._bound = False
 
-    def bind(self) -> bool:
+    def bind(self) -> None:
         if self._bound:
             raise Exception("Can't bind twice")
         self._bound = True
@@ -125,7 +135,7 @@ class Connection:
 
         self.pool.connection_lost(self, reason)
 
-    def dataReceived(self, data: str) -> None:
+    def dataReceived(self, data: bytes) -> None:
         if self._client:
             self._client.data_received(data)
         else:
@@ -161,16 +171,20 @@ class ConnectionPool:
     # TODO: Timeout configuration in config
     timeout = attr.ib(default=60, repr=False)
     # TODO: Local bind address in config
-    local_bind_address = attr.ib(default=None, repr=False)
+    local_bind_address = attr.ib(
+        default=None, repr=False, type=Optional[Tuple[str, int]]
+    )
 
     # Active connections.
-    _connections = attr.ib(default=attr.Factory(dict), repr=False)
+    _connections = attr.ib(
+        default=attr.Factory(lambda: defaultdict(list)),
+        repr=False,
+        type=Mapping[IAddress, List[IConnection]],
+    )
 
     name = attr.ib(default=attr.Factory(readable_id))
 
-    async def request_connection(
-        self, address: ResolvedFederationAddress
-    ) -> Connection:
+    async def request_connection(self, address: IAddress) -> IConnection:
         """
         Request a connection from this connection pool.
         """
@@ -215,14 +229,11 @@ class ConnectionPool:
             # TODO: Catch exceptions here.
             raise
 
-        if address in self._connections:
-            self._connections[address].append(connection)
-        else:
-            self._connections[address] = [connection]
+        self._connections[address].append(connection)
 
         return connection
 
-    def connection_lost(self, connection: Connection, reason) -> None:
+    def connection_lost(self, connection: IConnection, reason: Failure) -> None:
         """
         Called when a connection has had its underlying transport lost, and
         needs to be removed from the pool.

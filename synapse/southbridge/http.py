@@ -13,27 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from zope.interface import implementer
+
+from typing import List, Optional, Union, Tuple
+
 import attr
 import h11
 import hyperlink
 
 from twisted.internet._resolver import FirstOneWins
+from twisted.internet.interfaces import IPushProducer, IReactorPluggableNameResolver
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
 from twisted.web.client import ResponseDone
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import UNKNOWN_LENGTH
+from twisted.web.iweb import UNKNOWN_LENGTH, IBodyProducer, IResponse, IRequest
 
-from .connection_pool import ConnectionPool
+from .connection_pool import ConnectionPool, Connection
 from .objects import Protocols, RemoteAddress
+from .interfaces import IClient, IConnection, IAddress
 
 
 @attr.s(slots=True)
+@implementer(IPushProducer)
 class BodyProducer:
     producer = attr.ib()
-    _data = attr.ib()
+    _data = attr.ib(type=List[h11.Data])
 
-    def resumeProducing(self):
+    def resumeProducing(self) -> None:
 
         for body_data in self._data:
             self.producer.dataReceived(body_data.data)
@@ -43,19 +50,24 @@ class BodyProducer:
     def pauseProducing(self):
         pass
 
+    def stopProducing(self):
+        pass
+
 
 @attr.s(slots=True)
+@implementer(IRequest)
 class HTTPRequest:
 
     host = attr.ib(type=bytes)
-    protocol = attr.ib()
+    protocol = attr.ib(type=Protocols)
     method = attr.ib(type=bytes)
     uri = attr.ib(type=bytes)
-    headers = attr.ib()
-    body = attr.ib()
+    headers = attr.ib(type=Headers)
+    body = attr.ib(type=IBodyProducer)
 
 
 @attr.s(slots=True)
+@implementer(IResponse)
 class _HTTPResponse:
 
     version = attr.ib()
@@ -65,7 +77,7 @@ class _HTTPResponse:
     length = attr.ib()
     _body = attr.ib(repr=False)
     request = attr.ib(default=None)
-    previousResponse = attr.ib(default=None)
+    previousResponse = attr.ib(default=None, type=Optional[IResponse])
 
     def deliverBody(self, protocol):
         producer = BodyProducer(protocol, self._body)
@@ -78,8 +90,8 @@ class _HTTPResponse:
 @attr.s
 class BodyConsumer:
 
-    producer = attr.ib()
-    _sender = attr.ib(default=attr.Factory(Deferred))
+    producer = attr.ib(type=IBodyProducer)
+    _sender = attr.ib(default=attr.Factory(Deferred), type=Deferred)
     _started = attr.ib(default=False)
 
     def start(self):
@@ -90,35 +102,34 @@ class BodyConsumer:
         def _(ign):
             self._sender.callback(None)
 
-    def write(self, content):
+    def write(self, content: bytes) -> None:
         sender = self._sender
         self._sender = Deferred()
         sender.callback(content)
 
-    def next_content(self):
+    def next_content(self) -> Deferred:
         if not self._started:
             self.start()
         return self._sender
 
 
 @attr.s(slots=True)
+@implementer(IClient)
 class H11Protocol:
 
-    connection = attr.ib()
+    connection = attr.ib(type=IConnection)
     _done = attr.ib(default=attr.Factory(Deferred))
-    _parser = attr.ib(default=None)
+    _parser = attr.ib(default=None, type=h11.Connection)
     _response = attr.ib(default=attr.Factory(list), repr=False)
     _finished = attr.ib(default=True)
-
-    @property
-    def done(self):
-        return self._done
 
     def __attrs_post_init__(self):
         self.connection.set_client(self)
         self._parser = h11.Connection(our_role=h11.CLIENT)
 
-    async def send_request(self, request):
+    async def send_request(self, request: HTTPRequest) -> _HTTPResponse:
+
+        print(self.connection)
 
         header_list = []
         for key, val in request.headers.getAllRawHeaders():
@@ -160,11 +171,14 @@ class H11Protocol:
         end = h11.EndOfMessage()
         self._send(end)
 
-    def _send(self, part):
+        result = await self._done
+        return result
+
+    def _send(self, part: Union[h11.Request, h11.Data, h11.EndOfMessage]) -> None:
         resp = self._parser.send(part)
         self.connection.write(resp)
 
-    def _check(self):
+    def _check(self) -> None:
 
         event = self._parser.next_event()
 
@@ -181,14 +195,20 @@ class H11Protocol:
 
             event = self._parser.next_event()
 
-    def _finish(self):
+    def _get_response(self) -> Tuple[h11.Response, List[h11.Data]]:
+        response = list(filter(lambda x: isinstance(x, h11.Response), self._response))[
+            0
+        ]
+
+        data = list(filter(lambda x: isinstance(x, h11.Data), self._response))
+
+        return (response, data)
+
+    def _finish(self) -> None:
         self._finished = True
         self.connection.reset_client()
 
-        response = list(
-            filter(lambda x: isinstance(x, h11.Response), self._response)
-        ).pop()
-        data = list(filter(lambda x: isinstance(x, h11.Data), self._response))
+        response, data = self._get_response()
 
         # Convert the HTTP version
         http_version = (b"HTTP", *list(map(int, response.http_version.split(b"."))))
@@ -216,11 +236,11 @@ class H11Protocol:
 
         self._done.callback(returned)
 
-    def data_received(self, data: str) -> None:
+    def data_received(self, data: bytes) -> None:
         self._parser.receive_data(data)
         self._check()
 
-    def connection_lost(self, reason) -> None:
+    def connection_lost(self, reason: Failure) -> None:
         # We need to care about it here...
         self._parser.receive_data()
         self._check()
@@ -229,25 +249,24 @@ class H11Protocol:
 @attr.s(slots=True)
 class HTTP11Client:
 
-    reactor = attr.ib()
+    reactor = attr.ib(type=IReactorPluggableNameResolver)
     pool = attr.ib(type=ConnectionPool)
 
     async def send_request(
-        self, address: RemoteAddress, request: HTTPRequest
+        self, address: IAddress, request: HTTPRequest
     ) -> _HTTPResponse:
 
         connection = await self.pool.request_connection(address)
 
         protocol = H11Protocol(connection)
-        await protocol.send_request(request)
-
-        done = await protocol.done
-
+        response = await protocol.send_request(request)
         connection.relinquish()
 
-        return done
+        return response
 
-    async def _request(self, method, uri, headers=None, bodyProducer=None):
+    async def _request(
+        self, method, uri, headers=None, bodyProducer=None
+    ) -> _HTTPResponse:
 
         url = hyperlink.URL.from_text(uri.decode("ascii")).to_uri()
         uri_path = url.replace(scheme=None, host=None, port=None).to_text() or "/"

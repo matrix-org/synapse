@@ -13,22 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from zope.interface import implementer
+
 import attr
 from constantly import NamedConstant, Names
+
+from .interfaces import IAddress
 
 
 class Protocols(Names):
     HTTP = NamedConstant()
     HTTPS = NamedConstant()
 
-    def from_scheme(self, scheme: str):
+    @staticmethod
+    def from_scheme(scheme: str):
         if scheme == "http":
-            return self.HTTP
+            return Protocols.HTTP
         elif scheme == "https":
-            return self.HTTPS
+            return Protocols.HTTPS
+
+        raise ValueError("Don't know about %s" % (scheme,))
 
 
 @attr.s(frozen=True)
+@implementer(IAddress)
 class RemoteAddress:
     name = attr.ib(cmp=True, repr=False)
     addresses = attr.ib(cmp=False, repr=False)

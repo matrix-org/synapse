@@ -133,7 +133,7 @@ class PythonStdlibToTwistedLogger(logging.Handler):
         )
 
 
-def SynapseFileLogObserver(outFile: typing.io.TextIO) -> FileLogObserver:
+def SynapseFileLogObserver(outFile: typing.IO[str]) -> FileLogObserver:
     """
     A log observer that formats events like the traditional log formatter and
     sends them to `outFile`.
