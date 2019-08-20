@@ -115,7 +115,7 @@ class BodyConsumer:
 
 @attr.s(slots=True)
 @implementer(IClient)
-class H11Protocol:
+class HTTP11Client:
 
     connection = attr.ib(type=IConnection)
     _done = attr.ib(default=attr.Factory(Deferred))
@@ -247,7 +247,7 @@ class H11Protocol:
 
 
 @attr.s(slots=True)
-class HTTP11Client:
+class HTTP11Agent:
 
     reactor = attr.ib(type=IReactorPluggableNameResolver)
     pool = attr.ib(type=ConnectionPool)
@@ -258,7 +258,7 @@ class HTTP11Client:
 
         connection = await self.pool.request_connection(address)
 
-        protocol = H11Protocol(connection)
+        protocol = HTTP11Client(connection)
         response = await protocol.send_request(request)
         connection.relinquish()
 
@@ -313,8 +313,7 @@ if __name__ == "__main__":
         copts = BrowserLikePolicyForHTTPS()
 
         pool = ConnectionPool(reactor=reactor, tls_factory=copts)
-        agent = HTTP11Client(reactor, pool)
-
+        agent = HTTP11Agent(reactor, pool)
         client = HTTPClient(agent)
 
         res = await client.get("https://google.com")
