@@ -32,8 +32,8 @@ from synapse.util.metrics import Measure
 # period to cache .well-known results for by default
 WELL_KNOWN_DEFAULT_CACHE_PERIOD = 24 * 3600
 
-# jitter to add to the .well-known default cache ttl
-WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER = 10 * 60
+# jitter factor to add to the .well-known default cache ttls
+WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER = 0.1
 
 # period to cache failure to fetch .well-known for
 WELL_KNOWN_INVALID_CACHE_PERIOD = 1 * 3600
@@ -133,16 +133,14 @@ class WellKnownResolver(object):
                 # We have recently seen a valid well-known record for this
                 # server, so we cache the lack of well-known for a shorter time.
                 cache_period = WELL_KNOWN_DOWN_CACHE_PERIOD
-                cache_period += random.uniform(
-                    0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER
-                )
             else:
-                # add some randomness to the TTL to avoid a stampeding herd every hour
-                # after startup
                 cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
-                cache_period += random.uniform(
-                    0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER
-                )
+
+            # add some randomness to the TTL to avoid a stampeding herd
+            cache_period *= random.uniform(
+                1 - WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER,
+                1 + WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER,
+            )
 
         if cache_period > 0:
             self._well_known_cache.set(server_name, result, cache_period)
@@ -194,7 +192,10 @@ class WellKnownResolver(object):
             cache_period = WELL_KNOWN_DEFAULT_CACHE_PERIOD
             # add some randomness to the TTL to avoid a stampeding herd every 24 hours
             # after startup
-            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
+            cache_period *= random.uniform(
+                1 - WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER,
+                1 + WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER,
+            )
         else:
             cache_period = min(cache_period, WELL_KNOWN_MAX_CACHE_PERIOD)
             cache_period = max(cache_period, WELL_KNOWN_MIN_CACHE_PERIOD)

@@ -551,7 +551,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(self.well_known_cache[b"testserv"], b"target-server")
 
         # check the cache expires
-        self.reactor.pump((25 * 3600,))
+        self.reactor.pump((48 * 3600,))
         self.well_known_cache.expire()
         self.assertNotIn(b"testserv", self.well_known_cache)
 
@@ -639,7 +639,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(self.well_known_cache[b"testserv"], b"target-server")
 
         # check the cache expires
-        self.reactor.pump((25 * 3600,))
+        self.reactor.pump((48 * 3600,))
         self.well_known_cache.expire()
         self.assertNotIn(b"testserv", self.well_known_cache)
 
