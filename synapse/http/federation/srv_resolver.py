@@ -53,36 +53,6 @@ class Server(object):
     expires = attr.ib(default=0)
 
 
-def pick_server_from_list(server_list):
-    """Randomly choose a server from the server list
-
-    Args:
-        server_list (list[Server]): list of candidate servers
-
-    Returns:
-        Tuple[bytes, int]: (host, port) pair for the chosen server
-    """
-    if not server_list:
-        raise RuntimeError("pick_server_from_list called with empty list")
-
-    # TODO: currently we only use the lowest-priority servers. We should maintain a
-    # cache of servers known to be "down" and filter them out
-
-    min_priority = min(s.priority for s in server_list)
-    eligible_servers = list(s for s in server_list if s.priority == min_priority)
-    total_weight = sum(s.weight for s in eligible_servers)
-    target_weight = random.randint(0, total_weight)
-
-    for s in eligible_servers:
-        target_weight -= s.weight
-
-        if target_weight <= 0:
-            return s.host, s.port
-
-    # this should be impossible.
-    raise RuntimeError("pick_server_from_list got to end of eligible server list.")
-
-
 def _sort_server_list(server_list):
     """Given a list of SRV records sort them into priority order and shuffle
     each priority with the given weight.
