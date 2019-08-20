@@ -328,8 +328,8 @@ class TransportLayerClient(object):
         third_party_instance_id=None,
     ):
         if search_filter:
-            # TODO(MSC2197): Move to V1 prefix
-            path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/publicRooms")
+            # this uses MSC2197 (Search Filtering over Federation)
+            path = _create_v1_path("/publicRooms")
 
             data = {"include_all_networks": "true" if include_all_networks else "false"}
             if third_party_instance_id:

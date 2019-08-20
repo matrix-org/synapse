@@ -750,30 +750,8 @@ class PublicRoomList(BaseFederationServlet):
         )
         return 200, data
 
-
-class UnstablePublicRoomList(BaseFederationServlet):
-    """
-    Fetch the public room list for this server.
-
-    This API returns information in the same format as /publicRooms on the
-    client API, but will only ever include local public rooms and hence is
-    intended for consumption by other home servers.
-
-    This is the unstable-prefixed version which adds support for MSC2197, which
-    is still undergoing review.
-    """
-
-    PATH = "/publicRooms"
-    PREFIX = FEDERATION_UNSTABLE_PREFIX
-
-    def __init__(self, handler, authenticator, ratelimiter, server_name, allow_access):
-        super(UnstablePublicRoomList, self).__init__(
-            handler, authenticator, ratelimiter, server_name
-        )
-        self.allow_access = allow_access
-
-    # TODO(MSC2197): Move away from Unstable prefix and back to normal prefix
     async def on_POST(self, origin, content, query):
+        # This implements MSC2197 (Search Filtering over Federation)
         if not self.allow_access:
             raise FederationDeniedError(origin)
 
@@ -1373,7 +1351,7 @@ FEDERATION_SERVLET_CLASSES = (
 
 OPENID_SERVLET_CLASSES = (OpenIdUserInfo,)
 
-ROOM_LIST_CLASSES = (PublicRoomList, UnstablePublicRoomList)
+ROOM_LIST_CLASSES = (PublicRoomList,)
 
 GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsProfileServlet,
