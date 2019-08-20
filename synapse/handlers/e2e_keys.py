@@ -231,7 +231,7 @@ class E2eKeysHandler(object):
                 opentracing.log_kv(
                     {
                         "message": "Requested a local key for a user which"
-                        + " was not local to the homeserver",
+                        " was not local to the homeserver",
                         "user_id": user_id,
                     }
                 )
