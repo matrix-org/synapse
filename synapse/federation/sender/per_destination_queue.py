@@ -211,14 +211,14 @@ class PerDestinationQueue(object):
                 # no active span here, so if the edus were not received by the remote the
                 # span would have no causality and it would be forgotten.
 
-                span_contexts = [
+                span_contexts = (
                     extract_text_map(
                         json.loads(
                             edu.get_dict().get("content", {}).get("context", "{}")
                         )
                     )
                     for edu in pending_edus
-                ]
+                )
 
                 with start_active_span_follows_from("send_transaction", span_contexts):
                     # BEGIN CRITICAL SECTION
