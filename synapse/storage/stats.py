@@ -183,6 +183,14 @@ class StatsStore(StateDeltasStore):
             field_sqls.append("completed_delta_stream_id = ?")
             field_values.append(complete_with_stream_id)
 
+        # update current row, but only if it is either:
+        # - dirty and complete but not old
+        #       If it is old, we should old-collect it first and retry.
+        # - dirty and incomplete
+        #       Incomplete rows can't be old-collected (as this would commit
+        #       false statistics into the _historical table).
+        #       Instead, their `end_ts` is extended, whilst we wait for them to
+        #       become complete at the hand of the stats regenerator.
         sql = (
             "UPDATE %s_current SET end_ts = ?, %s"
             " WHERE (end_ts IS NOT NULL AND (end_ts >= ? OR completed_delta_stream_id IS NULL))"
@@ -209,6 +217,8 @@ class StatsStore(StateDeltasStore):
         )
 
         if current_row is None:
+            # Failure reason: There is no row.
+            # Solution:
             # we need to insert a row! (insert a dirty, incomplete row)
             insertee = {
                 id_col: stats_id,
@@ -234,7 +244,9 @@ class StatsStore(StateDeltasStore):
             self._simple_insert_txn(txn, table + "_current", insertee)
 
         elif current_row["end_ts"] is None:
-            # update the row, including start_ts
+            # Failure reason: The row is not dirty.
+            # Solution:
+            # update the row, including `start_ts`, to make it dirty.
             sql = (
                 "UPDATE %s_current SET start_ts = ?, end_ts = ?, %s"
                 " WHERE end_ts IS NULL AND %s = ?"
@@ -254,5 +266,6 @@ class StatsStore(StateDeltasStore):
                 )
 
         elif current_row["end_ts"] < end_ts:
-            # we need to perform old collection first
+            # Failure reason: The row is complete and old.
+            # Solution: We need to perform old collection first
             raise OldCollectionRequired()
