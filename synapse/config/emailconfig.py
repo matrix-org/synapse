@@ -87,7 +87,7 @@ class EmailConfig(Config):
         # identity server in the process.
         if config.get("trust_identity_server_for_password_resets", False) is True:
             # Use the first entry in self.trusted_third_party_id_servers instead
-            if len(self.trusted_third_party_id_servers):
+            if self.trusted_third_party_id_servers:
                 self.account_threepid_delegate = self.trusted_third_party_id_servers[0]
             else:
                 raise ConfigError(
