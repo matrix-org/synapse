@@ -16,7 +16,6 @@
 import datetime
 import logging
 
-from canonicaljson import json
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -29,7 +28,6 @@ from synapse.api.errors import (
 from synapse.events import EventBase
 from synapse.federation.units import Edu
 from synapse.handlers.presence import format_user_presence_state
-from synapse.logging.opentracing import extract_text_map, start_active_span_follows_from
 from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage import UserPresenceState
@@ -211,108 +209,100 @@ class PerDestinationQueue(object):
                 # no active span here, so if the edus were not received by the remote the
                 # span would have no causality and it would be forgotten.
 
-                span_contexts = (
-                    extract_text_map(json.loads(edu.get_context()))
-                    for edu in pending_edus
+                # BEGIN CRITICAL SECTION
+                #
+                # In order to avoid a race condition, we need to make sure that
+                # the following code (from popping the queues up to the point
+                # where we decide if we actually have any pending messages) is
+                # atomic - otherwise new PDUs or EDUs might arrive in the
+                # meantime, but not get sent because we hold the
+                # transmission_loop_running flag.
+
+                pending_pdus = self._pending_pdus
+
+                # We can only include at most 50 PDUs per transactions
+                pending_pdus, self._pending_pdus = (
+                    pending_pdus[:50],
+                    pending_pdus[50:],
                 )
 
-                with start_active_span_follows_from("send_transaction", span_contexts):
-                    # BEGIN CRITICAL SECTION
-                    #
-                    # In order to avoid a race condition, we need to make sure that
-                    # the following code (from popping the queues up to the point
-                    # where we decide if we actually have any pending messages) is
-                    # atomic - otherwise new PDUs or EDUs might arrive in the
-                    # meantime, but not get sent because we hold the
-                    # transmission_loop_running flag.
-
-                    pending_pdus = self._pending_pdus
-
-                    # We can only include at most 50 PDUs per transactions
-                    pending_pdus, self._pending_pdus = (
-                        pending_pdus[:50],
-                        pending_pdus[50:],
-                    )
-
-                    pending_edus.extend(self._get_rr_edus(force_flush=False))
-                    pending_presence = self._pending_presence
-                    self._pending_presence = {}
-                    if pending_presence:
-                        pending_edus.append(
-                            Edu(
-                                origin=self._server_name,
-                                destination=self._destination,
-                                edu_type="m.presence",
-                                content={
-                                    "push": [
-                                        format_user_presence_state(
-                                            presence, self._clock.time_msec()
-                                        )
-                                        for presence in pending_presence.values()
-                                    ]
-                                },
-                            )
-                        )
-
-                    pending_edus.extend(
-                        self._pop_pending_edus(
-                            MAX_EDUS_PER_TRANSACTION - len(pending_edus)
+                pending_edus.extend(self._get_rr_edus(force_flush=False))
+                pending_presence = self._pending_presence
+                self._pending_presence = {}
+                if pending_presence:
+                    pending_edus.append(
+                        Edu(
+                            origin=self._server_name,
+                            destination=self._destination,
+                            edu_type="m.presence",
+                            content={
+                                "push": [
+                                    format_user_presence_state(
+                                        presence, self._clock.time_msec()
+                                    )
+                                    for presence in pending_presence.values()
+                                ]
+                            },
                         )
                     )
-                    while (
-                        len(pending_edus) < MAX_EDUS_PER_TRANSACTION
-                        and self._pending_edus_keyed
-                    ):
-                        _, val = self._pending_edus_keyed.popitem()
-                        pending_edus.append(val)
 
-                    if pending_pdus:
-                        logger.debug(
-                            "TX [%s] len(pending_pdus_by_dest[dest]) = %d",
-                            self._destination,
-                            len(pending_pdus),
+                pending_edus.extend(
+                    self._pop_pending_edus(MAX_EDUS_PER_TRANSACTION - len(pending_edus))
+                )
+                while (
+                    len(pending_edus) < MAX_EDUS_PER_TRANSACTION
+                    and self._pending_edus_keyed
+                ):
+                    _, val = self._pending_edus_keyed.popitem()
+                    pending_edus.append(val)
+
+                if pending_pdus:
+                    logger.debug(
+                        "TX [%s] len(pending_pdus_by_dest[dest]) = %d",
+                        self._destination,
+                        len(pending_pdus),
+                    )
+
+                if not pending_pdus and not pending_edus:
+                    logger.debug("TX [%s] Nothing to send", self._destination)
+                    self._last_device_stream_id = device_stream_id
+                    return
+
+                # if we've decided to send a transaction anyway, and we have room, we
+                # may as well send any pending RRs
+                if len(pending_edus) < MAX_EDUS_PER_TRANSACTION:
+                    pending_edus.extend(self._get_rr_edus(force_flush=True))
+
+                # END CRITICAL SECTION
+
+                success = yield self._transaction_manager.send_new_transaction(
+                    self._destination, pending_pdus, pending_edus
+                )
+                if success:
+                    sent_transactions_counter.inc()
+                    sent_edus_counter.inc(len(pending_edus))
+                    for edu in pending_edus:
+                        sent_edus_by_type.labels(edu.edu_type).inc()
+                    # Remove the acknowledged device messages from the database
+                    # Only bother if we actually sent some device messages
+                    if to_device_edus:
+                        yield self._store.delete_device_msgs_for_remote(
+                            self._destination, device_stream_id
                         )
 
-                    if not pending_pdus and not pending_edus:
-                        logger.debug("TX [%s] Nothing to send", self._destination)
-                        self._last_device_stream_id = device_stream_id
-                        return
+                    # also mark the device updates as sent
+                    if device_update_edus:
+                        logger.info(
+                            "Marking as sent %r %r", self._destination, dev_list_id
+                        )
+                        yield self._store.mark_as_sent_devices_by_remote(
+                            self._destination, dev_list_id
+                        )
 
-                    # if we've decided to send a transaction anyway, and we have room, we
-                    # may as well send any pending RRs
-                    if len(pending_edus) < MAX_EDUS_PER_TRANSACTION:
-                        pending_edus.extend(self._get_rr_edus(force_flush=True))
-
-                    # END CRITICAL SECTION
-
-                    success = yield self._transaction_manager.send_new_transaction(
-                        self._destination, pending_pdus, pending_edus
-                    )
-                    if success:
-                        sent_transactions_counter.inc()
-                        sent_edus_counter.inc(len(pending_edus))
-                        for edu in pending_edus:
-                            sent_edus_by_type.labels(edu.edu_type).inc()
-                        # Remove the acknowledged device messages from the database
-                        # Only bother if we actually sent some device messages
-                        if to_device_edus:
-                            yield self._store.delete_device_msgs_for_remote(
-                                self._destination, device_stream_id
-                            )
-
-                        # also mark the device updates as sent
-                        if device_update_edus:
-                            logger.info(
-                                "Marking as sent %r %r", self._destination, dev_list_id
-                            )
-                            yield self._store.mark_as_sent_devices_by_remote(
-                                self._destination, dev_list_id
-                            )
-
-                        self._last_device_stream_id = device_stream_id
-                        self._last_device_list_stream_id = dev_list_id
-                    else:
-                        break
+                    self._last_device_stream_id = device_stream_id
+                    self._last_device_list_stream_id = dev_list_id
+                else:
+                    break
         except NotRetryingDestination as e:
             logger.debug(
                 "TX [%s] not ready for retry yet (next retry at %s) - "
