@@ -76,9 +76,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(
-            body, ["client_secret", "email", "send_attempt"]
-        )
+        assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
 
         # Extract params from body
         client_secret = body["client_secret"]

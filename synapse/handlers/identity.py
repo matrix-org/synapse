@@ -227,9 +227,14 @@ class IdentityHandler(BaseHandler):
 
         if not id_server:
             if not self.hs.config.account_threepid_delegate:
-                raise SynapseError(400, "No id_server provided and none configured on the "
-                                        "server")
+                raise SynapseError(
+                    400, "No id_server provided and none configured on the " "server"
+                )
             id_server = self.hs.config.account_threepid_delegate
+        else:
+            # Assume "https://" is the protocol we're using to contact the id_server
+            # provided by the client
+            id_server = "https://" + id_server
 
         try:
             data = yield self.http_client.post_json_get_json(
@@ -243,7 +248,13 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
-        self, id_server, country, phone_number, client_secret, send_attempt, next_link=None
+        self,
+        id_server,
+        country,
+        phone_number,
+        client_secret,
+        send_attempt,
+        next_link=None,
     ):
         """
         Request an external server send an SMS message on our behalf for the purposes of
@@ -269,9 +280,14 @@ class IdentityHandler(BaseHandler):
 
         if not id_server:
             if not self.hs.config.account_threepid_delegate:
-                raise SynapseError(400, "No id_server provided and none configured on the "
-                                        "server")
+                raise SynapseError(
+                    400, "No id_server provided and none configured on the " "server"
+                )
             id_server = self.hs.config.account_threepid_delegate
+        else:
+            # Assume "https://" is the protocol we're using to contact the id_server
+            # provided by the client
+            id_server = "https://" + id_server
 
         try:
             data = yield self.http_client.post_json_get_json(

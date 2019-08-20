@@ -16,11 +16,11 @@
 # limitations under the License.
 
 from __future__ import print_function
-from enum import Enum
 
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
 import os
+from enum import Enum
 
 import pkg_resources
 
@@ -100,7 +100,10 @@ class EmailConfig(Config):
                 )
 
         self.local_threepid_emails_disabled_due_to_config = False
-        if self.email_threepid_behaviour == ThreepidBehaviour.LOCAL and email_config == {}:
+        if (
+            self.email_threepid_behaviour == ThreepidBehaviour.LOCAL
+            and email_config == {}
+        ):
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
             self.local_threepid_emails_disabled_due_to_config = True
@@ -306,6 +309,7 @@ class ThreepidBehaviour(Enum):
     LOCAL = send tokens ourselves
     OFF = disable registration via 3pid and password resets
     """
+
     REMOTE = "remote"
     LOCAL = "local"
     OFF = "off"

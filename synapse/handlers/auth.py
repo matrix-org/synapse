@@ -26,7 +26,6 @@ from canonicaljson import json
 from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
-from synapse.config.emailconfig import ThreepidBehaviour
 import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -39,6 +38,7 @@ from synapse.api.errors import (
     UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.logging.context import defer_to_thread
 from synapse.module_api import ModuleApi
 from synapse.types import UserID

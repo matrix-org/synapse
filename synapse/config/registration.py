@@ -279,7 +279,8 @@ class RegistrationConfig(Config):
         # email will be disabled
         #
         # Otherwise, to enable set this option to the reachable domain name, including protocol
-        # definition, for an identity server (e.g "https://matrix.org")
+        # definition, for an identity server
+        # (e.g "https://matrix.org", "http://localhost:8090")
         #
         #account_threepid_delegate: ""
 
