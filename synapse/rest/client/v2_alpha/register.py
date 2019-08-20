@@ -31,6 +31,7 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
@@ -130,8 +131,13 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
         assert_params_in_dict(
             body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            ["client_secret", "country", "phone_number", "send_attempt"],
         )
+        client_secret = body["client_secret"]
+        country = body["country"]
+        phone_number = body["phone_number"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
         msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
 
@@ -151,8 +157,22 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
 
-        ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
+            if not self.hs.config.account_threepid_delegate:
+                raise SynapseError(
+                    400, "No upstream identity server configured on the server to handle this "
+                         "request"
+                )
+
+            ret = yield self.identity_handler.requestMsisdnToken(
+                self.config.account_threepid_delegate, country, phone_number, client_secret,
+                send_attempt, next_link
+            )
+            return (200, ret)
+
+        raise SynapseError(
+            400, "Registration by MSISDN is not supported on this homeserver"
+        )
 
 
 class UsernameAvailabilityRestServlet(RestServlet):

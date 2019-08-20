@@ -209,10 +209,15 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
         assert_params_in_dict(
             body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            ["client_secret", "country", "phone_number", "send_attempt"],
         )
+        client_secret = body["client_secret"]
+        country = body["country"]
+        phone_number = body["phone_number"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
-        msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
+        msisdn = phone_number_to_msisdn(country, phone_number)
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
@@ -228,8 +233,28 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         if existing_user_id is None:
             raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
 
-        ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        if not self.hs.config.account_threepid_delegate:
+            raise SynapseError(
+                400, "No upstream identity server configured on the server to handle this "
+                     "request"
+            )
+
+        if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
+            if not self.hs.config.account_threepid_delegate:
+                raise SynapseError(
+                    400, "No upstream identity server configured on the server to handle this "
+                         "request"
+                )
+
+            ret = yield self.identity_handler.requestMsisdnToken(
+                self.config.account_threepid_delegate, country, phone_number, client_secret,
+                send_attempt, next_link
+            )
+            return (200, ret)
+
+        raise SynapseError(
+            400, "Password reset by MSISDN is not supported on this homeserver"
+        )
 
 
 class PasswordResetSubmitTokenServlet(RestServlet):
@@ -515,6 +540,12 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             body,
             ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
         )
+        id_server = "https://" + body["id_server"]  # Assume https
+        client_secret = body["client_secret"]
+        country = body["country"]
+        phone_number = body["phone_number"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
         msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
 
@@ -530,7 +561,9 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestMsisdnToken(**body)
+        ret = yield self.identity_handler.requestMsisdnToken(
+            id_server, country, phone_number, client_secret, send_attempt, next_link
+        )
         return (200, ret)
 
 
