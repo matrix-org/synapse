@@ -26,6 +26,7 @@ from canonicaljson import json
 from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
+from synapse.config.emailconfig import ThreepidBehaviour
 import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -458,9 +459,12 @@ class AuthHandler(BaseHandler):
         identity_handler = self.hs.get_handlers().identity_handler
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
-        if not password_servlet or self.hs.config.email_threepid_behaviour == "remote":
+        if (
+            not password_servlet
+            or self.hs.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE
+        ):
             threepid = yield identity_handler.threepid_from_creds(threepid_creds)
-        elif self.hs.config.email_threepid_behaviour == "local":
+        elif self.hs.config.email_threepid_behaviour == ThreepidBehaviour.LOCAL:
             row = yield self.store.get_threepid_validation_session(
                 medium,
                 threepid_creds["client_secret"],

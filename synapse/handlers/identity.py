@@ -197,18 +197,19 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def requestEmailToken(
-        self, email, client_secret, send_attempt, next_link=None, **kwargs
+        self, id_server, email, client_secret, send_attempt, next_link=None
     ):
         """
         Request an external server send an email on our behalf for the purposes of threepid
         validation.
 
         Args:
+            id_server (str|None): The identity server to send this through. If None,
+                use the server specified by the account_threepid_delegate config option
             email (str): The email to send the message to
             client_secret (str): The unique client_secret sends by the user
             send_attempt (int): Which attempt this is
             next_link: A link to redirect the user to once they submit the token
-            kwargs: extra arguments to send to the server
 
         Returns:
             The json response body from the server
@@ -218,12 +219,19 @@ class IdentityHandler(BaseHandler):
             "client_secret": client_secret,
             "send_attempt": send_attempt,
         }
+        if next_link:
+            params["next_link"] = next_link
 
         if next_link:
             params.update({"next_link": next_link})
 
-        try:
+        if not id_server:
+            if not self.hs.config.account_threepid_delegate:
+                raise SynapseError(400, "No id_server provided and none configured on the "
+                                        "server")
             id_server = self.hs.config.account_threepid_delegate
+
+        try:
             data = yield self.http_client.post_json_get_json(
                 id_server + "/_matrix/identity/api/v1/validate/email/requestToken",
                 params,
@@ -235,7 +243,7 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
-        self, country, phone_number, client_secret, send_attempt, **kwargs
+        self, id_server, country, phone_number, client_secret, send_attempt, next_link=None
     ):
         """
         Request an external server send an SMS message on our behalf for the purposes of
@@ -245,7 +253,8 @@ class IdentityHandler(BaseHandler):
             phone_number (str): The number to send the message to
             client_secret (str): The unique client_secret sends by the user
             send_attempt (int): Which attempt this is
-            kwargs: extra arguments to send to the server
+            next_link: A link to redirect the user to once they submit the token
+
         Returns:
             The json response body from the server
         """
@@ -255,10 +264,16 @@ class IdentityHandler(BaseHandler):
             "client_secret": client_secret,
             "send_attempt": send_attempt,
         }
-        params.update(kwargs)
+        if next_link:
+            params["next_link"] = next_link
+
+        if not id_server:
+            if not self.hs.config.account_threepid_delegate:
+                raise SynapseError(400, "No id_server provided and none configured on the "
+                                        "server")
+            id_server = self.hs.config.account_threepid_delegate
 
         try:
-            id_server = self.hs.config.account_threepid_delegate
             data = yield self.http_client.post_json_get_json(
                 id_server + "/_matrix/identity/api/v1/validate/msisdn/requestToken",
                 params,

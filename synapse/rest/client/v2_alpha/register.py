@@ -77,8 +77,14 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(
-            body, ["id_server", "client_secret", "email", "send_attempt"]
+            body, ["client_secret", "email", "send_attempt"]
         )
+
+        # Extract params from body
+        client_secret = body["client_secret"]
+        email = body["email"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
         if not check_3pid_allowed(self.hs, "email", body["email"]):
             raise SynapseError(
@@ -87,14 +93,17 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "email", body["email"]
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestEmailToken(**body)
+        ret = yield self.identity_handler.requestEmailToken(
+            None, email, client_secret, send_attempt, next_link
+        )
+
         return (200, ret)
 
 
@@ -128,11 +137,11 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "msisdn", msisdn
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
@@ -453,11 +462,11 @@ class RegisterRestServlet(RestServlet):
                         medium = auth_result[login_type]["medium"]
                         address = auth_result[login_type]["address"]
 
-                        existingUid = yield self.store.get_user_id_by_threepid(
+                        existing_user_id = yield self.store.get_user_id_by_threepid(
                             medium, address
                         )
 
-                        if existingUid is not None:
+                        if existing_user_id is not None:
                             raise SynapseError(
                                 400,
                                 "%s is already in use" % medium,

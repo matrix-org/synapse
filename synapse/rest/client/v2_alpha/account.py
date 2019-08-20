@@ -24,6 +24,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -50,7 +51,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if self.config.email_threepid_behaviour == "local":
+        if self.config.email_threepid_behaviour == ThreepidBehaviour.LOCAL:
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -67,7 +68,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.config.email_threepid_behaviour == "off":
+        if self.config.email_threepid_behaviour == ThreepidBehaviour.OFF:
             if self.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"
@@ -93,20 +94,17 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "email", email
         )
 
-        if existingUid is None:
+        if existing_user_id is None:
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
-        if self.config.email_threepid_behaviour == "remote":
-            if "id_server" not in body:
-                raise SynapseError(400, "Missing 'id_server' param in body")
-
-            # Have the identity server handle the password reset flow
+        if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE
+            # Have an identity server handle the password reset flow
             ret = yield self.identity_handler.requestEmailToken(
-                body["id_server"], email, client_secret, send_attempt, next_link
+                None, email, client_secret, send_attempt, next_link
             )
         else:
             # Send password reset emails from Synapse
@@ -217,9 +215,9 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.datastore.get_user_id_by_threepid("msisdn", msisdn)
+        existing_user_id = yield self.datastore.get_user_id_by_threepid("msisdn", msisdn)
 
-        if existingUid is None:
+        if existing_user_id is None:
             raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
@@ -251,7 +249,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for password resets"
             )
-        if self.config.email_threepid_behaviour == "off":
+        if self.config.email_threepid_behaviour == ThreepidBehaviour.OFF:
             if self.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"
@@ -459,7 +457,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         self.hs = hs
         super(EmailThreepidRequestTokenRestServlet, self).__init__()
         self.identity_handler = hs.get_handlers().identity_handler
-        self.datastore = self.hs.get_datastore()
+        self.store = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -475,11 +473,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.datastore.get_user_id_by_threepid(
+        existing_user_id = yield self.store.get_user_id_by_threepid(
             "email", body["email"]
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
@@ -493,14 +491,13 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         self.hs = hs
         super(MsisdnThreepidRequestTokenRestServlet, self).__init__()
         self.identity_handler = hs.get_handlers().identity_handler
-        self.datastore = self.hs.get_datastore()
+        self.store = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(
-            body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            body, ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
         )
 
         msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
@@ -512,9 +509,9 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.datastore.get_user_id_by_threepid("msisdn", msisdn)
+        existing_user_id = yield self.store.get_user_id_by_threepid("msisdn", msisdn)
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)

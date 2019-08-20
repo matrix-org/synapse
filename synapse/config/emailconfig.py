@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from __future__ import print_function
+from enum import Enum
 
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
@@ -77,9 +78,9 @@ class EmailConfig(Config):
         self.email_threepid_behaviour = (
             # Have Synapse handle the email sending if account_threepid_delegate
             # is not defined
-            "remote"
+            ThreepidBehaviour.REMOTE
             if self.account_threepid_delegate
-            else "local"
+            else ThreepidBehaviour.LOCAL
         )
         # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
         # use an identity server to password reset tokens on its behalf. We now warn the user
@@ -99,12 +100,12 @@ class EmailConfig(Config):
                 )
 
         self.local_threepid_emails_disabled_due_to_config = False
-        if self.email_threepid_behaviour == "local" and email_config == {}:
+        if self.email_threepid_behaviour == ThreepidBehaviour.LOCAL and email_config == {}:
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
             self.local_threepid_emails_disabled_due_to_config = True
 
-            self.email_threepid_behaviour = "off"
+            self.email_threepid_behaviour = ThreepidBehaviour.OFF
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
@@ -114,7 +115,7 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.email_threepid_behaviour == "local"
+            or self.email_threepid_behaviour == ThreepidBehaviour.LOCAL
         ):
             # make sure we can import the required deps
             import jinja2
@@ -124,7 +125,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.email_threepid_behaviour == "local":
+        if self.email_threepid_behaviour == ThreepidBehaviour.LOCAL:
             required = ["smtp_host", "smtp_port", "notif_from"]
 
             missing = []
@@ -294,3 +295,17 @@ class EmailConfig(Config):
         #   #password_reset_template_success_html: password_reset_success.html
         #   #password_reset_template_failure_html: password_reset_failure.html
         """
+
+
+class ThreepidBehaviour(Enum):
+    """
+    Enum to define the behaviour of Synapse with regards to when it contacts an identity
+    server for 3pid registration and password resets
+
+    REMOTE = use an external server to send tokens
+    LOCAL = send tokens ourselves
+    OFF = disable registration via 3pid and password resets
+    """
+    REMOTE = "remote"
+    LOCAL = "local"
+    OFF = "off"
