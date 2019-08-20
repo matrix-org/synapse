@@ -260,7 +260,7 @@ class E2eKeysHandler(object):
                     r["unsigned"]["device_display_name"] = display_name
                 result_dict[user_id][device_id] = r
 
-        opentracing.log_kv(results)
+        opentracing.log_kv(result_dict)
         return result_dict
 
     @defer.inlineCallbacks
