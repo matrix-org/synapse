@@ -1302,15 +1302,11 @@ class EventsStore(
             "event_reference_hashes",
             "event_search",
             "event_to_state_groups",
-            "guest_access",
-            "history_visibility",
             "local_invites",
-            "room_names",
             "state_events",
             "rejections",
             "redactions",
             "room_memberships",
-            "topics",
         ):
             txn.executemany(
                 "DELETE FROM %s WHERE event_id = ?" % (table,),
@@ -1454,10 +1450,10 @@ class EventsStore(
 
         for event, _ in events_and_contexts:
             if event.type == EventTypes.Name:
-                # Insert into the room_names and event_search tables.
+                # Insert into the event_search table.
                 self._store_room_name_txn(txn, event)
             elif event.type == EventTypes.Topic:
-                # Insert into the topics table and event_search table.
+                # Insert into the event_search table.
                 self._store_room_topic_txn(txn, event)
             elif event.type == EventTypes.Message:
                 # Insert into the event_search table.
@@ -1465,12 +1461,6 @@ class EventsStore(
             elif event.type == EventTypes.Redaction:
                 # Insert into the redactions table.
                 self._store_redaction(txn, event)
-            elif event.type == EventTypes.RoomHistoryVisibility:
-                # Insert into the event_search table.
-                self._store_history_visibility_txn(txn, event)
-            elif event.type == EventTypes.GuestAccess:
-                # Insert into the event_search table.
-                self._store_guest_access_txn(txn, event)
 
             self._handle_event_relations(txn, event)
 
