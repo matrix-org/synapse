@@ -2205,11 +2205,12 @@ class EventsStore(
         logger.info("[purge] removing %s from state_groups_state", room_id)
 
         txn.execute(
-            "DELETE FROM state_groups_state "
-            "WHERE state_group IN ("
-            "SELECT state_group FROM events JOIN event_to_state_groups USING(event_id) "
-            "WHERE events.room_id=?"
-            ")",
+            """
+            DELETE FROM state_groups_state WHERE state_group IN (
+              SELECT state_group FROM events JOIN event_to_state_groups USING(event_id)
+              WHERE events.room_id=?
+            )
+            """,
             (room_id,),
         )
 
@@ -2217,11 +2218,12 @@ class EventsStore(
         logger.info("[purge] removing %s from state_group_edges", room_id)
 
         txn.execute(
-            "DELETE FROM state_group_edges "
-            "WHERE state_group IN ("
-            "SELECT state_group FROM events JOIN event_to_state_groups USING(event_id) "
-            "WHERE events.room_id=?"
-            ")",
+            """
+            DELETE FROM state_group_edges WHERE state_group IN (
+              SELECT state_group FROM events JOIN event_to_state_groups USING(event_id)
+              WHERE events.room_id=?
+            )
+            """,
             (room_id,),
         )
 
@@ -2229,11 +2231,12 @@ class EventsStore(
         logger.info("[purge] removing %s from state_groups", room_id)
 
         txn.execute(
-            "DELETE FROM state_groups "
-            "WHERE id IN ("
-            "SELECT state_group FROM events JOIN event_to_state_groups USING(event_id) "
-            "WHERE events.room_id=?"
-            ")",
+            """
+            DELETE FROM state_groups WHERE id IN (
+              SELECT state_group FROM events JOIN event_to_state_groups USING(event_id)
+              WHERE events.room_id=?
+            )
+            """,
             (room_id,),
         )
 
@@ -2249,8 +2252,12 @@ class EventsStore(
             logger.info("[purge] removing %s from %s", room_id, table)
 
             txn.execute(
-                "DELETE FROM %s WHERE event_id IN (SELECT event_id FROM events "
-                "WHERE room_id=?)" % (table,),
+                """
+                DELETE FROM %s WHERE event_id IN (
+                  SELECT event_id FROM events WHERE room_id=?
+                )
+                """
+                % (table,),
                 (room_id,),
             )
 
