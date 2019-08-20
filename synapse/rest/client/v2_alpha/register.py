@@ -142,7 +142,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
+        msisdn = phone_number_to_msisdn(country, phone_number)
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
