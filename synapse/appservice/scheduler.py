@@ -224,7 +224,9 @@ class _Recoverer(object):
                 "as-recoverer-%s" % (self.service.id,), self.retry
             )
 
-        self.clock.call_later((2 ** self.backoff_counter), _retry)
+        delay = 2 ** self.backoff_counter
+        logger.info("Scheduling retries on %s in %fs", self.service.id, delay)
+        self.clock.call_later(delay, _retry)
 
     def _backoff(self):
         # cap the backoff to be around 8.5min => (2^9) = 512 secs
@@ -234,25 +236,28 @@ class _Recoverer(object):
 
     @defer.inlineCallbacks
     def retry(self):
+        logger.info("Starting retries on %s", self.service.id)
         try:
-            txn = yield self.store.get_oldest_unsent_txn(self.service)
-            if txn:
+            while True:
+                txn = yield self.store.get_oldest_unsent_txn(self.service)
+                if not txn:
+                    # nothing left: we're done!
+                    self.callback(self)
+                    return
+
                 logger.info(
                     "Retrying transaction %s for AS ID %s", txn.id, txn.service.id
                 )
                 sent = yield txn.send(self.as_api)
-                if sent:
-                    yield txn.complete(self.store)
-                    # reset the backoff counter and retry immediately
-                    self.backoff_counter = 1
-                    yield self.retry()
-                else:
-                    self._backoff()
-            else:
-                self._set_service_recovered()
-        except Exception as e:
-            logger.exception(e)
-            self._backoff()
+                if not sent:
+                    break
 
-    def _set_service_recovered(self):
-        self.callback(self)
+                # reset the backoff counter and then process the next transaction
+                self.backoff_counter = 1
+
+        except Exception:
+            logger.exception("Unexpected error running retries")
+
+        # we didn't manage to send all of the transactions before we got an error of
+        # some flavour: reschedule the next retry.
+        self._backoff()
