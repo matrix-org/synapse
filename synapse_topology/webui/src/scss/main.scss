@@ -72,26 +72,15 @@ h1 {
     margin: 1rem;
 }
 
-@mixin select {
-    padding: 0.4rem;
-    font-size: 1rem;
-    background-color: $secondary;
-    border-width: 0.1rem;
-    border-radius: 0.5rem;
-    color: lighten($font, 20%);
-    margin-bottom: 1rem;
-    border-style: solid;
-    border-color: darken($secondary, 50%);
-}
-
 input {
-    @include select;
+    padding: 0.4rem;
     font-size: 0.6rem;
     border-style: none;
     background: white;
     border-radius: 4rem;
     color: $font;
     padding: 0.4rem 1.2rem;
+    margin-bottom: 1rem;
 }
 
 input[type=checkbox] {
@@ -119,7 +108,6 @@ pre {
 }
 
 select {
-    @include select;
     height: 1.6rem;
     font-size: 0.6rem;
     border-style: none;
