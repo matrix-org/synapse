@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS stats_incremental_position (
     -- (this is positive)
     total_events_max_stream_ordering BIGINT,
 
-    -- If true, this represents the contract agreed upon by the background
-    -- population processor.
+    -- If true, this represents the contract agreed upon by the stats
+    -- regenerator.
     -- If false, this is suitable for use by the delta/incremental processor.
     is_background_contract BOOLEAN NOT NULL PRIMARY KEY
 );
@@ -78,8 +78,8 @@ CREATE TABLE IF NOT EXISTS room_stats_current (
     left_members INT NOT NULL DEFAULT 0,
     banned_members INT NOT NULL DEFAULT 0,
 
-    -- If initial background count is still to be performed: NULL
-    -- If initial background count has been performed: the maximum delta stream
+    -- If initial stats regen is still to be performed: NULL
+    -- If initial stats regen has been performed: the maximum delta stream
     --  position that this row takes into account.
     completed_delta_stream_id BIGINT,
 
@@ -123,8 +123,8 @@ CREATE TABLE IF NOT EXISTS user_stats_current (
     public_rooms INT DEFAULT 0 NOT NULL,
     private_rooms INT DEFAULT 0 NOT NULL,
 
-    -- If initial background count is still to be performed: NULL
-    -- If initial background count has been performed: the maximum delta stream
+    -- If initial stats regen is still to be performed: NULL
+    -- If initial stats regen has been performed: the maximum delta stream
     --  position that this row takes into account.
     completed_delta_stream_id BIGINT
 );
