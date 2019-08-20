@@ -1027,6 +1027,14 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #
 #trusted_key_servers:
 #  - server_name: "matrix.org"
+#
+
+# The additional signing keys to use when acting as a trusted key server, on
+# top of the normal signing keys.
+#
+# Can contain multiple keys, one per line.
+#
+#key_server_signing_keys_path: "key_server_signing_keys.key"
 
 
 # Enable SAML2 for registration and login. Uses pysaml2.

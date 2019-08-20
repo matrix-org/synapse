@@ -76,7 +76,7 @@ class KeyConfig(Config):
                     config_dir_path, config["server_name"] + ".signing.key"
                 )
 
-            self.signing_key = self.read_signing_key(signing_key_path)
+            self.signing_key = self.read_signing_keys(signing_key_path, "signing_key")
 
         self.old_signing_keys = self.read_old_signing_keys(
             config.get("old_signing_keys", {})
@@ -84,6 +84,15 @@ class KeyConfig(Config):
         self.key_refresh_interval = self.parse_duration(
             config.get("key_refresh_interval", "1d")
         )
+
+        self.key_server_signing_keys = list(self.signing_key)
+        key_server_signing_keys_path = config.get("key_server_signing_keys_path")
+        if key_server_signing_keys_path:
+            self.key_server_signing_keys.extend(
+                self.read_signing_keys(
+                    key_server_signing_keys_path, "key_server_signing_keys_path"
+                )
+            )
 
         # if neither trusted_key_servers nor perspectives are given, use the default.
         if "perspectives" not in config and "trusted_key_servers" not in config:
@@ -210,16 +219,34 @@ class KeyConfig(Config):
         #
         #trusted_key_servers:
         #  - server_name: "matrix.org"
+        #
+
+        # The additional signing keys to use when acting as a trusted key server, on
+        # top of the normal signing keys.
+        #
+        # Can contain multiple keys, one per line.
+        #
+        #key_server_signing_keys_path: "key_server_signing_keys.key"
         """
             % locals()
         )
 
-    def read_signing_key(self, signing_key_path):
-        signing_keys = self.read_file(signing_key_path, "signing_key")
+    def read_signing_keys(self, signing_key_path, name):
+        """Read the signing keys in the given path.
+
+        Args:
+            signing_key_path (str)
+            name (str): Associated config key name
+
+        Returns:
+            list[SigningKey]
+        """
+
+        signing_keys = self.read_file(signing_key_path, name)
         try:
             return read_signing_keys(signing_keys.splitlines(True))
         except Exception as e:
-            raise ConfigError("Error reading signing_key: %s" % (str(e)))
+            raise ConfigError("Error reading %s: %s" % (name, str(e)))
 
     def read_old_signing_keys(self, old_signing_keys):
         keys = {}
