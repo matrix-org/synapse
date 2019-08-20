@@ -16,8 +16,9 @@
 
 import logging
 
-from synapse.storage.state_deltas import StateDeltasStore
 from twisted.internet import defer
+
+from synapse.storage.state_deltas import StateDeltasStore
 
 logger = logging.getLogger(__name__)
 
