@@ -124,7 +124,9 @@ const acme = config => {
 const database = config => ({
     database: {
         name: config.database,
-        args: config.configDir + "/data/homeserver.db",
+        args: {
+            database: config.configDir + "/data/homeserver.db",
+        },
     },
 })
 
