@@ -71,12 +71,12 @@ CREATE TABLE IF NOT EXISTS room_stats_current (
     start_ts BIGINT,
     end_ts BIGINT,
 
-    current_state_events INT NOT NULL DEFAULT 0,
-    total_events INT NOT NULL DEFAULT 0,
-    joined_members INT NOT NULL DEFAULT 0,
-    invited_members INT NOT NULL DEFAULT 0,
-    left_members INT NOT NULL DEFAULT 0,
-    banned_members INT NOT NULL DEFAULT 0,
+    current_state_events INT NOT NULL,
+    total_events INT NOT NULL,
+    joined_members INT NOT NULL,
+    invited_members INT NOT NULL,
+    left_members INT NOT NULL,
+    banned_members INT NOT NULL,
 
     -- If initial stats regen is still to be performed: NULL
     -- If initial stats regen has been performed: the maximum delta stream
@@ -120,8 +120,8 @@ CREATE TABLE IF NOT EXISTS user_stats_current (
     start_ts BIGINT,
     end_ts BIGINT,
 
-    public_rooms INT DEFAULT 0 NOT NULL,
-    private_rooms INT DEFAULT 0 NOT NULL,
+    public_rooms INT NOT NULL,
+    private_rooms INT NOT NULL,
 
     -- If initial stats regen is still to be performed: NULL
     -- If initial stats regen has been performed: the maximum delta stream
