@@ -2248,7 +2248,6 @@ class EventsStore(
             "event_reference_hashes",
             "event_relations",
             "event_to_state_groups",
-            "group_rooms",
             "redactions",
             "rejections",
             "state_events",
