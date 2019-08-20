@@ -252,6 +252,8 @@ class _Recoverer(object):
                 if not sent:
                     break
 
+                yield txn.complete(self.store)
+
                 # reset the backoff counter and then process the next transaction
                 self.backoff_counter = 1
 
