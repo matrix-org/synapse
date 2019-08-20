@@ -69,8 +69,8 @@ class UserAdminServlet(RestServlet):
         if target_user == auth_user and not set_admin_to:
             raise SynapseError(400, "You may not demote yourself.")
 
-        ret = yield self.handlers.admin_handler.set_user_server_admin(
+        yield self.handlers.admin_handler.set_user_server_admin(
             target_user, set_admin_to
         )
 
-        return (200, ret)
+        return (200, {})
