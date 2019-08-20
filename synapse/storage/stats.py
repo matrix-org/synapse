@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from itertools import chain
 
 from twisted.internet import defer
 
@@ -159,6 +160,17 @@ class StatsStore(StateDeltasStore):
 
         quantised_ts = self.quantise_stats_time(int(ts))
         end_ts = quantised_ts + self.stats_bucket_size
+
+        for field in chain(fields.keys(), absolute_fields.keys()):
+            if (
+                field not in ABSOLUTE_STATS_FIELDS[stats_type]
+                and field not in PER_SLICE_FIELDS[stats_type]
+            ):
+                # guard against potential SQL injection dodginess
+                raise ValueError(
+                    "%s is not a recognised field"
+                    " for stats type %s" % (field, stats_type)
+                )
 
         field_sqls = ["%s = %s + ?" % (field, field) for field in fields.keys()]
         field_values = list(fields.values())
