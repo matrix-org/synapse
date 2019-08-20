@@ -32,7 +32,7 @@ It is up to the remote server to decide what it does with the spans
 it creates. This is called the sampling policy and it can be configured
 through Jaeger's settings.
 
-For OpenTracing concepts see 
+For OpenTracing concepts see
 https://opentracing.io/docs/overview/what-is-tracing/.
 
 For more information about Jaeger's implementation see
@@ -79,7 +79,7 @@ Homeserver whitelisting
 
 The homeserver whitelist is configured using regular expressions. A list of regular
 expressions can be given and their union will be compared when propagating any
-spans contexts to another homeserver. 
+spans contexts to another homeserver.
 
 Though it's mostly safe to send and receive span contexts to and from
 untrusted users since span contexts are usually opaque ids it can lead to
@@ -103,13 +103,13 @@ Edu format:
 
 .. code-block:: json
 
-   edu: {
-     edu_type: "type"
-     content: {
-       context: {
+   {
+     "edu_type": "type",
+     "content": {
+       "context": {
          ...opentracing_context
-       }
-     }
+       },
+     },
    }
 
 ==================
