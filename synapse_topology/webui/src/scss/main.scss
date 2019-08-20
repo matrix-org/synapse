@@ -108,13 +108,8 @@ pre {
 }
 
 select {
-    height: 1.6rem;
-    font-size: 0.6rem;
-    border-style: none;
-    background: white;
-    border-radius: 14rem;
-    color: $font;
-    padding: 0.6rem 1rem;
+    font-size: 0.7rem
+    margin-bottom: 1rem;
 
     &:after {
         content: ▸;
