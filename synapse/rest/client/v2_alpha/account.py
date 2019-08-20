@@ -105,12 +105,17 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             # Have the configured identity server handle the request
             if not self.hs.config.account_threepid_delegate:
                 raise SynapseError(
-                    400, "No upstream identity server configured on the server to handle this "
-                         "request"
+                    400,
+                    "No upstream identity server configured on the server to handle this "
+                    "request",
                 )
 
             ret = yield self.identity_handler.requestEmailToken(
-                self.hs.config.account_threepid_delegate, email, client_secret, send_attempt, next_link
+                self.hs.config.account_threepid_delegate,
+                email,
+                client_secret,
+                send_attempt,
+                next_link,
             )
         else:
             # Send password reset emails from Synapse
@@ -208,8 +213,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(
-            body,
-            ["client_secret", "country", "phone_number", "send_attempt"],
+            body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
         client_secret = body["client_secret"]
         country = body["country"]
@@ -235,20 +239,26 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
         if not self.hs.config.account_threepid_delegate:
             raise SynapseError(
-                400, "No upstream identity server configured on the server to handle this "
-                     "request"
+                400,
+                "No upstream identity server configured on the server to handle this "
+                "request",
             )
 
         if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
             if not self.hs.config.account_threepid_delegate:
                 raise SynapseError(
-                    400, "No upstream identity server configured on the server to handle this "
-                         "request"
+                    400,
+                    "No upstream identity server configured on the server to handle this "
+                    "request",
                 )
 
             ret = yield self.identity_handler.requestMsisdnToken(
-                self.config.account_threepid_delegate, country, phone_number, client_secret,
-                send_attempt, next_link
+                self.config.account_threepid_delegate,
+                country,
+                phone_number,
+                client_secret,
+                send_attempt,
+                next_link,
             )
             return (200, ret)
 
