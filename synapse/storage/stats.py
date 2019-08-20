@@ -68,7 +68,7 @@ class StatsStore(StateDeltasStore):
             ts: the timestamp to quantise, in seconds since the Unix Epoch
 
         Returns:
-            a timestamp which
+            int: a timestamp which
               - is divisible by the bucket size;
               - is no later than `ts`; and
               - is the largest such timestamp.
