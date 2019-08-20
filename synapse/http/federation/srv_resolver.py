@@ -94,10 +94,18 @@ def _sort_server_list(server_list):
 
     results = []
     for priority in sorted(priority_map):
-        servers = priority_map.pop(priority)
+        servers = priority_map[priority]
 
+        # This algorithms follows the algorithm described in RFC2782.
+        #
+        # N.B. Weights can be zero, which means that you should pick that server
+        # last *or* that its the only server in this priority.
+
+        # We sort to ensure zero weighted items are first.
+        servers.sort(key=lambda s: s.weight)
+
+        total_weight = sum(s.weight for s in servers)
         while servers:
-            total_weight = sum(s.weight for s in servers)
             target_weight = random.randint(0, total_weight)
 
             for s in servers:
@@ -108,6 +116,7 @@ def _sort_server_list(server_list):
 
             results.append(s)
             servers.remove(s)
+            total_weight -= s.weight
 
     return results
 
