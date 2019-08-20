@@ -133,6 +133,7 @@ class HomeServer(object):
         "db_pool",
         "federation_client",
         "federation_server",
+        "federation_tls_options",
         "handlers",
         "auth",
         "room_creation_handler",
@@ -399,6 +400,9 @@ class HomeServer(object):
 
     def build_pusherpool(self):
         return PusherPool(self)
+
+    def build_federation_tls_options(self):
+        return context_factory.ClientTLSOptionsFactory(self.config)
 
     def build_http_client(self):
         tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
