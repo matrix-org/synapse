@@ -83,7 +83,7 @@ export default ({
                             If you choose to use a Reverse Proxy we'll provide you with
                             configuration templates later.
                         </p>
-                        <p>More information about Reverse Proxies
+                        <p>More information about Reverse Proxies{' '}
                             <a href="https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst">
                                 in the docs</a>.
                         </p>
