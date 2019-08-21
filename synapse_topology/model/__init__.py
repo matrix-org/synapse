@@ -18,7 +18,9 @@ import subprocess
 
 def set_config_dir(conf_dir):
     global config_dir
+    global data_dir
     config_dir = path.abspath(conf_dir)
+    data_dir = path.abspath(path.join(config_dir, "./data"))
 
 
 def get_config(sub_config=BASE_CONFIG):
@@ -35,6 +37,10 @@ def get_config(sub_config=BASE_CONFIG):
 
 def get_config_dir():
     return config_dir
+
+
+def get_data_dir():
+    return data_dir
 
 
 def set_config(config, sub_config=BASE_CONFIG):
