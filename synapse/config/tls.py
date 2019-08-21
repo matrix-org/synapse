@@ -245,26 +245,27 @@ class TlsConfig(Config):
         data_dir_path,
         tls_certificate_path=None,
         tls_private_key_path=None,
+        acme_domain=None,
         **kwargs
     ):
         base_key_name = os.path.join(config_dir_path, server_name)
 
-        if tls_certificate_path:
-            tls_certificate_path = (
-                'tls_certificate_path: "' + tls_certificate_path + '"'
+        if bool(tls_certificate_path) ^ bool(tls_private_key_path):
+            raise ConfigError(
+                "Please specify both a cert path and a key path or neither."
             )
-        else:
-            tls_certificate_path = (
-                '#tls_certificate_path: "' + base_key_name + ".tls.crt" + '"'
-            )
-        if tls_private_key_path:
-            tls_private_key_path = (
-                'tls_private_key_path: "' + tls_private_key_path + '"'
-            )
-        else:
-            tls_private_key_path = (
-                '#tls_private_key_path: "' + base_key_name + ".tls.key" + '"'
-            )
+
+        tls_enabled = (
+            "" if tls_certificate_path and tls_private_key_path or acme_domain else "#"
+        )
+
+        if not tls_certificate_path:
+            tls_certificate_path = base_key_name + ".tls.crt"
+        if not tls_private_key_path:
+            tls_private_key_path = base_key_name + ".tls.key"
+
+        acme_enabled = "" if acme_domain else "#"
+        acme_domain = "matrix.example.com"
 
         default_acme_account_file = os.path.join(data_dir_path, "acme_account.key")
 
@@ -290,11 +291,11 @@ class TlsConfig(Config):
         # instance, if using certbot, use `fullchain.pem` as your certificate,
         # not `cert.pem`).
         #
-        %(tls_certificate_path)s
+        %(tls_enabled)stls_certificate_path: %(tls_certificate_path)s
 
         # PEM-encoded private key for TLS
         #
-        %(tls_private_key_path)s
+        %(tls_enabled)stls_private_key_path: %(tls_private_key_path)s
 
         # Whether to verify TLS server certificates for outbound federation requests.
         #
@@ -364,7 +365,7 @@ class TlsConfig(Config):
             # ACME support is disabled by default. Uncomment the following line
             # (and tls_certificate_path and tls_private_key_path above) to enable it.
             #
-            #enabled: true
+            %(acme_enabled)senabled: true
 
             # Endpoint to use to request certificates. If you only want to test,
             # use Let's Encrypt's staging url:
@@ -375,17 +376,17 @@ class TlsConfig(Config):
             # Port number to listen on for the HTTP-01 challenge. Change this if
             # you are forwarding connections through Apache/Nginx/etc.
             #
-            #port: 80
+            %(acme_enabled)sport: 80
 
             # Local addresses to listen on for incoming connections.
             # Again, you may want to change this if you are forwarding connections
             # through Apache/Nginx/etc.
             #
-            #bind_addresses: ['::', '0.0.0.0']
+            %(acme_enabled)sbind_addresses: ['::', '0.0.0.0']
 
             # How many days remaining on a certificate before it is renewed.
             #
-            #reprovision_threshold: 30
+            %(acme_enabled)sreprovision_threshold: 30
 
             # The domain that the certificate should be for. Normally this
             # should be the same as your Matrix domain (i.e., 'server_name'), but,
@@ -399,7 +400,7 @@ class TlsConfig(Config):
             #
             # If not set, defaults to your 'server_name'.
             #
-            #domain: matrix.example.com
+            %(acme_enabled)sdomain: %(acme_domain)s
 
             # file to use for the account key. This will be generated if it doesn't
             # exist.
