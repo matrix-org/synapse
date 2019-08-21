@@ -20,6 +20,7 @@ from __future__ import print_function
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
 import os
+from enum import Enum
 
 import pkg_resources
 
@@ -74,19 +75,39 @@ class EmailConfig(Config):
             "renew_at"
         )
 
-        email_trust_identity_server_for_password_resets = email_config.get(
-            "trust_identity_server_for_password_resets", False
+        self.email_threepid_behaviour = (
+            # Have Synapse handle the email sending if account_threepid_delegate
+            # is not defined
+            ThreepidBehaviour.REMOTE
+            if self.account_threepid_delegate
+            else ThreepidBehaviour.LOCAL
         )
-        self.email_password_reset_behaviour = (
-            "remote" if email_trust_identity_server_for_password_resets else "local"
-        )
-        self.password_resets_were_disabled_due_to_email_config = False
-        if self.email_password_reset_behaviour == "local" and email_config == {}:
+        # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
+        # use an identity server to password reset tokens on its behalf. We now warn the user
+        # if they have this set and tell them to use the updated option, while using a default
+        # identity server in the process.
+        self.using_identity_server_from_trusted_list = False
+        if config.get("trust_identity_server_for_password_resets", False) is True:
+            # Use the first entry in self.trusted_third_party_id_servers instead
+            if self.trusted_third_party_id_servers:
+                self.account_threepid_delegate = self.trusted_third_party_id_servers[0]
+                self.using_identity_server_from_trusted_list = True
+            else:
+                raise ConfigError(
+                    "Attempted to use an identity server from"
+                    '"trusted_third_party_id_servers" but it is empty.'
+                )
+
+        self.local_threepid_emails_disabled_due_to_config = False
+        if (
+            self.email_threepid_behaviour == ThreepidBehaviour.LOCAL
+            and email_config == {}
+        ):
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
-            self.password_resets_were_disabled_due_to_email_config = True
+            self.local_threepid_emails_disabled_due_to_config = True
 
-            self.email_password_reset_behaviour = "off"
+            self.email_threepid_behaviour = ThreepidBehaviour.OFF
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
@@ -96,7 +117,7 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.email_password_reset_behaviour == "local"
+            or self.email_threepid_behaviour == ThreepidBehaviour.LOCAL
         ):
             # make sure we can import the required deps
             import jinja2
@@ -106,7 +127,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.email_password_reset_behaviour == "local":
+        if self.email_threepid_behaviour == ThreepidBehaviour.LOCAL:
             required = ["smtp_host", "smtp_port", "notif_from"]
 
             missing = []
@@ -239,19 +260,6 @@ class EmailConfig(Config):
         #   #
         #   riot_base_url: "http://localhost/riot"
         #
-        #   # Enable sending password reset emails via the configured, trusted
-        #   # identity servers
-        #   #
-        #   # IMPORTANT! This will give a malicious or overtaken identity server
-        #   # the ability to reset passwords for your users! Make absolutely sure
-        #   # that you want to do this! It is strongly recommended that password
-        #   # reset emails be sent by the homeserver instead
-        #   #
-        #   # If this option is set to false and SMTP options have not been
-        #   # configured, resetting user passwords via email will be disabled
-        #   #
-        #   #trust_identity_server_for_password_resets: false
-        #
         #   # Configure the time that a validation email or text message code
         #   # will expire after sending
         #   #
@@ -289,3 +297,18 @@ class EmailConfig(Config):
         #   #password_reset_template_success_html: password_reset_success.html
         #   #password_reset_template_failure_html: password_reset_failure.html
         """
+
+
+class ThreepidBehaviour(Enum):
+    """
+    Enum to define the behaviour of Synapse with regards to when it contacts an identity
+    server for 3pid registration and password resets
+
+    REMOTE = use an external server to send tokens
+    LOCAL = send tokens ourselves
+    OFF = disable registration via 3pid and password resets
+    """
+
+    REMOTE = "remote"
+    LOCAL = "local"
+    OFF = "off"

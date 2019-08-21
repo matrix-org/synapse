@@ -902,6 +902,20 @@ uploads_path: "DATADIR/uploads"
 #  - matrix.org
 #  - vector.im
 
+# Handle threepid (email/phone etc) registration and password resets
+# through a *trusted* identity server. Note that this allows the configured
+# identity server to reset passwords for accounts.
+#
+# If this option is not defined and SMTP options have not been
+# configured, registration by email and resetting user passwords via
+# email will be disabled
+#
+# Otherwise, to enable set this option to the reachable domain name, including protocol
+# definition, for an identity server
+# (e.g "https://matrix.org", "http://localhost:8090")
+#
+#account_threepid_delegate: ""
+
 # Users who register on this homeserver will automatically be joined
 # to these rooms
 #
@@ -1162,19 +1176,6 @@ password_config:
 #   # the "app_name" setting is ignored
 #   #
 #   riot_base_url: "http://localhost/riot"
-#
-#   # Enable sending password reset emails via the configured, trusted
-#   # identity servers
-#   #
-#   # IMPORTANT! This will give a malicious or overtaken identity server
-#   # the ability to reset passwords for your users! Make absolutely sure
-#   # that you want to do this! It is strongly recommended that password
-#   # reset emails be sent by the homeserver instead
-#   #
-#   # If this option is set to false and SMTP options have not been
-#   # configured, resetting user passwords via email will be disabled
-#   #
-#   #trust_identity_server_for_password_resets: false
 #
 #   # Configure the time that a validation email or text message code
 #   # will expire after sending

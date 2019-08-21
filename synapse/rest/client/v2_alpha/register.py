@@ -31,6 +31,7 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
@@ -76,9 +77,13 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(
-            body, ["id_server", "client_secret", "email", "send_attempt"]
-        )
+        assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
+
+        # Extract params from body
+        client_secret = body["client_secret"]
+        email = body["email"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
         if not check_3pid_allowed(self.hs, "email", body["email"]):
             raise SynapseError(
@@ -87,14 +92,30 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "email", body["email"]
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestEmailToken(**body)
+        if not self.hs.config.account_threepid_delegate:
+            logger.warn(
+                "No upstream account_threepid_delegate configured on the server to handle "
+                "this request"
+            )
+            raise SynapseError(
+                400, "Registration by email is not supported on this homeserver"
+            )
+
+        ret = yield self.identity_handler.requestEmailToken(
+            self.hs.config.account_threepid_delegate,
+            email,
+            client_secret,
+            send_attempt,
+            next_link,
+        )
+
         return (200, ret)
 
 
@@ -115,11 +136,15 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(
-            body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
+        client_secret = body["client_secret"]
+        country = body["country"]
+        phone_number = body["phone_number"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
-        msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
+        msisdn = phone_number_to_msisdn(country, phone_number)
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
@@ -128,17 +153,39 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "msisdn", msisdn
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
 
-        ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
+            if not self.hs.config.account_threepid_delegate:
+                logger.warn(
+                    "No upstream account_threepid_delegate configured on the server to handle "
+                    "this request"
+                )
+                raise SynapseError(
+                    400,
+                    "Registration by phone number is not supported on this homeserver",
+                )
+
+            ret = yield self.identity_handler.requestMsisdnToken(
+                self.config.account_threepid_delegate,
+                country,
+                phone_number,
+                client_secret,
+                send_attempt,
+                next_link,
+            )
+            return (200, ret)
+
+        raise SynapseError(
+            400, "Registration by phone number is not supported on this homeserver"
+        )
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -453,11 +500,11 @@ class RegisterRestServlet(RestServlet):
                         medium = auth_result[login_type]["medium"]
                         address = auth_result[login_type]["address"]
 
-                        existingUid = yield self.store.get_user_id_by_threepid(
+                        existing_user_id = yield self.store.get_user_id_by_threepid(
                             medium, address
                         )
 
-                        if existingUid is not None:
+                        if existing_user_id is not None:
                             raise SynapseError(
                                 400,
                                 "%s is already in use" % medium,

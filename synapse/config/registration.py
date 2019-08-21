@@ -99,6 +99,7 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config.get(
             "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
+        self.account_threepid_delegate = config.get("account_threepid_delegate")
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
@@ -268,6 +269,20 @@ class RegistrationConfig(Config):
         #trusted_third_party_id_servers:
         #  - matrix.org
         #  - vector.im
+
+        # Handle threepid (email/phone etc) registration and password resets
+        # through a *trusted* identity server. Note that this allows the configured
+        # identity server to reset passwords for accounts.
+        #
+        # If this option is not defined and SMTP options have not been
+        # configured, registration by email and resetting user passwords via
+        # email will be disabled
+        #
+        # Otherwise, to enable set this option to the reachable domain name, including protocol
+        # definition, for an identity server
+        # (e.g "https://matrix.org", "http://localhost:8090")
+        #
+        #account_threepid_delegate: ""
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms

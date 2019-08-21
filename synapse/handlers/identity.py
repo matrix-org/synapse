@@ -36,6 +36,7 @@ class IdentityHandler(BaseHandler):
 
         self.http_client = hs.get_simple_http_client()
         self.federation_http_client = hs.get_http_client()
+        self.hs = hs
 
     @defer.inlineCallbacks
     def threepid_from_creds(self, creds):
@@ -199,19 +200,40 @@ class IdentityHandler(BaseHandler):
     def requestEmailToken(
         self, id_server, email, client_secret, send_attempt, next_link=None
     ):
+        """
+        Request an external server send an email on our behalf for the purposes of threepid
+        validation.
+
+        Args:
+            id_server (str): The identity server to proxy to
+            email (str): The email to send the message to
+            client_secret (str): The unique client_secret sends by the user
+            send_attempt (int): Which attempt this is
+            next_link: A link to redirect the user to once they submit the token
+
+        Returns:
+            The json response body from the server
+        """
         params = {
             "email": email,
             "client_secret": client_secret,
             "send_attempt": send_attempt,
         }
-
         if next_link:
-            params.update({"next_link": next_link})
+            params["next_link"] = next_link
+
+        if self.hs.config.using_identity_server_from_trusted_list:
+            # Warn that a deprecated config option is in use
+            logger.warn(
+                'The config option "trust_identity_server_for_password_resets" '
+                'has been replaced by "account_threepid_delegate". '
+                "Please consult the sample config at docs/sample_config.yaml for "
+                "details and update your config file."
+            )
 
         try:
             data = yield self.http_client.post_json_get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/validate/email/requestToken"),
+                id_server + "/_matrix/identity/api/v1/validate/email/requestToken",
                 params,
             )
             return data
@@ -221,20 +243,49 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
-        self, id_server, country, phone_number, client_secret, send_attempt, **kwargs
+        self,
+        id_server,
+        country,
+        phone_number,
+        client_secret,
+        send_attempt,
+        next_link=None,
     ):
+        """
+        Request an external server send an SMS message on our behalf for the purposes of
+        threepid validation.
+        Args:
+            id_server (str): The identity server to proxy to
+            country (str): The country code of the phone number
+            phone_number (str): The number to send the message to
+            client_secret (str): The unique client_secret sends by the user
+            send_attempt (int): Which attempt this is
+            next_link: A link to redirect the user to once they submit the token
+
+        Returns:
+            The json response body from the server
+        """
         params = {
             "country": country,
             "phone_number": phone_number,
             "client_secret": client_secret,
             "send_attempt": send_attempt,
         }
-        params.update(kwargs)
+        if next_link:
+            params["next_link"] = next_link
+
+        if self.hs.config.using_identity_server_from_trusted_list:
+            # Warn that a deprecated config option is in use
+            logger.warn(
+                'The config option "trust_identity_server_for_password_resets" '
+                'has been replaced by "account_threepid_delegate". '
+                "Please consult the sample config at docs/sample_config.yaml for "
+                "details and update your config file."
+            )
 
         try:
             data = yield self.http_client.post_json_get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/validate/msisdn/requestToken"),
+                id_server + "/_matrix/identity/api/v1/validate/msisdn/requestToken",
                 params,
             )
             return data
