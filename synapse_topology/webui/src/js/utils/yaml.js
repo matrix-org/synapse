@@ -136,8 +136,6 @@ export const baseConfigToSynapseConfig = config => {
         server_name: config.servername,
         report_stats: config.reportStats,
         log_config: config.configDir + "/" + config.servername + ".log.config",
-        media_store_path: config.configDir + "/data/media_store",
-        uploads_path: config.configDir + "/data/uploads",
         pid_file: config.configDir + "/data/homeserver.pid",
         ...listeners(config),
         ...tlsPaths(config),
