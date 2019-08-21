@@ -109,7 +109,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                     "this request"
                 )
                 raise SynapseError(
-                    400, "Registration by MSISDN is not supported on this homeserver"
+                    400, "Password reset by email is not supported on this homeserver"
                 )
 
             ret = yield self.identity_handler.requestEmailToken(
@@ -129,7 +129,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             ret = {"sid": sid}
         else:
             raise SynapseError(
-                400, "Password resets via email are disabled on this homeserver"
+                400, "Password reset by email is not supported on this homeserver"
             )
 
         return (200, ret)
@@ -250,7 +250,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
                     "this request"
                 )
                 raise SynapseError(
-                    400, "Registration by MSISDN is not supported on this homeserver"
+                    400, "Password reset by phone number is not supported on this homeserver"
                 )
 
             ret = yield self.identity_handler.requestMsisdnToken(
@@ -264,7 +264,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
             return (200, ret)
 
         raise SynapseError(
-            400, "Password reset by MSISDN is not supported on this homeserver"
+            400, "Password reset by phone number is not supported on this homeserver"
         )
 
 

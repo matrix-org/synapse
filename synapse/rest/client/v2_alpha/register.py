@@ -105,7 +105,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 "this request"
             )
             raise SynapseError(
-                400, "Registration by MSISDN is not supported on this homeserver"
+                400, "Registration by email is not supported on this homeserver"
             )
 
         ret = yield self.identity_handler.requestEmailToken(
@@ -169,7 +169,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                     "this request"
                 )
                 raise SynapseError(
-                    400, "Registration by MSISDN is not supported on this homeserver"
+                    400, "Registration by phone number is not supported on this homeserver"
                 )
 
             ret = yield self.identity_handler.requestMsisdnToken(
@@ -183,7 +183,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             return (200, ret)
 
         raise SynapseError(
-            400, "Registration by MSISDN is not supported on this homeserver"
+            400, "Registration by phone number is not supported on this homeserver"
         )
 
 
