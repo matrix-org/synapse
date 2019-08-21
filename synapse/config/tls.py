@@ -239,12 +239,33 @@ class TlsConfig(Config):
                 self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
     def generate_config_section(
-        self, config_dir_path, server_name, data_dir_path, **kwargs
+        self,
+        config_dir_path,
+        server_name,
+        data_dir_path,
+        tls_certificate_path=None,
+        tls_private_key_path=None,
+        **kwargs
     ):
         base_key_name = os.path.join(config_dir_path, server_name)
 
-        tls_certificate_path = base_key_name + ".tls.crt"
-        tls_private_key_path = base_key_name + ".tls.key"
+        if tls_certificate_path:
+            tls_certificate_path = (
+                'tls_certificate_path: "' + tls_certificate_path + '"'
+            )
+        else:
+            tls_certificate_path = (
+                '#tls_certificate_path: "' + base_key_name + ".tls.crt" + '"'
+            )
+        if tls_private_key_path:
+            tls_private_key_path = (
+                'tls_private_key_path: "' + tls_private_key_path + '"'
+            )
+        else:
+            tls_private_key_path = (
+                '#tls_private_key_path: "' + base_key_name + ".tls.key" + '"'
+            )
+
         default_acme_account_file = os.path.join(data_dir_path, "acme_account.key")
 
         # this is to avoid the max line length. Sorrynotsorry
@@ -269,11 +290,11 @@ class TlsConfig(Config):
         # instance, if using certbot, use `fullchain.pem` as your certificate,
         # not `cert.pem`).
         #
-        #tls_certificate_path: "%(tls_certificate_path)s"
+        %(tls_certificate_path)s
 
         # PEM-encoded private key for TLS
         #
-        #tls_private_key_path: "%(tls_private_key_path)s"
+        %(tls_private_key_path)s
 
         # Whether to verify TLS server certificates for outbound federation requests.
         #

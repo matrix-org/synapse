@@ -38,7 +38,7 @@ class DatabaseConfig(Config):
 
         self.set_databasepath(config.get("database_path"))
 
-    def generate_config_section(self, data_dir_path, **kwargs):
+    def generate_config_section(self, data_dir_path, database="sqlite3", **kwargs):
         database_path = os.path.join(data_dir_path, "homeserver.db")
         return (
             """\
@@ -46,7 +46,7 @@ class DatabaseConfig(Config):
 
         database:
           # The database engine name
-          name: "sqlite3"
+          name: "%(database)s"
           # Arguments to pass to the engine
           args:
             # Path to the database
