@@ -5,11 +5,11 @@ import { CONFIG_LOCK } from '../api/constants';
 const listeners = config => {
 
     const listeners = [];
-    if (config.tls == TLS_TYPES.TLS) {
+    if (config.tls == TLS_TYPES.REVERSE_PROXY) {
 
         listeners.push({
             port: config.synapseFederationPort,
-            tls: true,
+            tls: false,
             bind_addresses: ['::1', '127.0.0.1'],
             type: "http",
             x_forwarded: true,
@@ -38,11 +38,11 @@ const listeners = config => {
 
         listeners[0].resources[0].names.push("client");
 
-    } else if (config.tls == TLS_TYPES.TLS) {
+    } else if (config.tls == TLS_TYPES.REVERSE_PROXY) {
 
         listeners.push({
             port: config.synapseClientPort,
-            tls: true,
+            tls: false,
             bind_addresses: ['::1', '127.0.0.1'],
             type: "http",
             x_forwarded: true,
