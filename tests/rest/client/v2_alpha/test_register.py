@@ -323,6 +323,8 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             "renew_at": 172800000,  # Time in ms for 2 days
             "renew_by_email_enabled": True,
             "renew_email_subject": "Renew your account",
+            "account_renewed_html_path": "account_renewed.html",
+            "invalid_token_html_path": "invalid_token.html",
         }
 
         # Email config.
@@ -335,7 +337,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         config["email"] = {
             "enable_notifs": True,
             "template_dir": os.path.abspath(
-                pkg_resources.resource_filename('synapse', 'res/templates')
+                pkg_resources.resource_filename("synapse", "res/templates")
             ),
             "expiry_template_html": "notice_expiry.html",
             "expiry_template_text": "notice_expiry.txt",
@@ -373,6 +375,19 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+        # Check that we're getting HTML back.
+        content_type = None
+        for header in channel.result.get("headers", []):
+            if header[0] == b"Content-Type":
+                content_type = header[1]
+        self.assertEqual(content_type, b"text/html; charset=utf-8", channel.result)
+
+        # Check that the HTML we're getting is the one we expect on a successful renewal.
+        expected_html = self.hs.config.account_validity.account_renewed_html_content
+        self.assertEqual(
+            channel.result["body"], expected_html.encode("utf8"), channel.result
+        )
+
         # Move 3 days forward. If the renewal failed, every authed request with
         # our access token should be denied from now, otherwise they should
         # succeed.
@@ -380,6 +395,28 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_renewal_invalid_token(self):
+        # Hit the renewal endpoint with an invalid token and check that it behaves as
+        # expected, i.e. that it responds with 404 Not Found and the correct HTML.
+        url = "/_matrix/client/unstable/account_validity/renew?token=123"
+        request, channel = self.make_request(b"GET", url)
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"404", channel.result)
+
+        # Check that we're getting HTML back.
+        content_type = None
+        for header in channel.result.get("headers", []):
+            if header[0] == b"Content-Type":
+                content_type = header[1]
+        self.assertEqual(content_type, b"text/html; charset=utf-8", channel.result)
+
+        # Check that the HTML we're getting is the one we expect when using an
+        # invalid/unknown token.
+        expected_html = self.hs.config.account_validity.invalid_token_html_content
+        self.assertEqual(
+            channel.result["body"], expected_html.encode("utf8"), channel.result
+        )
 
     def test_manual_email_send(self):
         self.email_attempts = []
@@ -400,19 +437,18 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         (user_id, tok) = self.create_user()
 
-        request_data = json.dumps({
-            "auth": {
-                "type": "m.login.password",
-                "user": user_id,
-                "password": "monkey",
-            },
-            "erase": False,
-        })
+        request_data = json.dumps(
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "user": user_id,
+                    "password": "monkey",
+                },
+                "erase": False,
+            }
+        )
         request, channel = self.make_request(
-            "POST",
-            "account/deactivate",
-            request_data,
-            access_token=tok,
+            "POST", "account/deactivate", request_data, access_token=tok
         )
         self.render(request)
         self.assertEqual(request.code, 200)
@@ -476,20 +512,16 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
 class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
 
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-    ]
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
 
     def make_homeserver(self, reactor, clock):
         self.validity_period = 10
-        self.max_delta = self.validity_period * 10. / 100.
+        self.max_delta = self.validity_period * 10.0 / 100.0
 
         config = self.default_config()
 
         config["enable_registration"] = True
-        config["account_validity"] = {
-            "enabled": False,
-        }
+        config["account_validity"] = {"enabled": False}
 
         self.hs = self.setup_test_homeserver(config=config)
         self.hs.config.account_validity.period = self.validity_period

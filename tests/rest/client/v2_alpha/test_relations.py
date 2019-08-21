@@ -56,7 +56,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         creates the right shape of event.
         """
 
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key=u"👍")
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
         self.assertEquals(200, channel.code, channel.json_body)
 
         event_id = channel.json_body["event_id"]
@@ -76,7 +76,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 "content": {
                     "m.relates_to": {
                         "event_id": self.parent_id,
-                        "key": u"👍",
+                        "key": "👍",
                         "rel_type": RelationTypes.ANNOTATION,
                     }
                 },
@@ -93,7 +93,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
     def test_deny_double_react(self):
         """Test that we deny relations on membership events
         """
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
         self.assertEquals(200, channel.code, channel.json_body)
 
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
@@ -124,6 +124,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assert_dict(
             {"event_id": annotation_id, "sender": self.user_id, "type": "m.reaction"},
             channel.json_body["chunk"][0],
+        )
+
+        # We also expect to get the original event (the id of which is self.parent_id)
+        self.assertEquals(
+            channel.json_body["original_event"]["event_id"], self.parent_id
         )
 
         # Make sure next_batch has something in it that looks like it could be a
@@ -187,7 +192,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_tokens.append(token)
 
         idx = 0
-        sent_groups = {u"👍": 10, u"a": 7, u"b": 5, u"c": 3, u"d": 2, u"e": 1}
+        sent_groups = {"👍": 10, "a": 7, "b": 5, "c": 3, "d": 2, "e": 1}
         for key in itertools.chain.from_iterable(
             itertools.repeat(key, num) for key, num in sent_groups.items()
         ):
@@ -259,7 +264,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             channel = self._send_relation(
                 RelationTypes.ANNOTATION,
                 "m.reaction",
-                key=u"👍",
+                key="👍",
                 access_token=access_tokens[idx],
             )
             self.assertEquals(200, channel.code, channel.json_body)
@@ -273,7 +278,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         prev_token = None
         found_event_ids = []
-        encoded_key = six.moves.urllib.parse.quote_plus(u"👍".encode("utf-8"))
+        encoded_key = six.moves.urllib.parse.quote_plus("👍".encode("utf-8"))
         for _ in range(20):
             from_token = ""
             if prev_token:
@@ -466,9 +471,15 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.json_body["content"], new_body)
 
-        self.assertEquals(
-            channel.json_body["unsigned"].get("m.relations"),
-            {RelationTypes.REPLACE: {"event_id": edit_event_id}},
+        relations_dict = channel.json_body["unsigned"].get("m.relations")
+        self.assertIn(RelationTypes.REPLACE, relations_dict)
+
+        m_replace_dict = relations_dict[RelationTypes.REPLACE]
+        for key in ["event_id", "sender", "origin_server_ts"]:
+            self.assertIn(key, m_replace_dict)
+
+        self.assert_dict(
+            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
         )
 
     def test_multi_edit(self):
@@ -518,19 +529,133 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.json_body["content"], new_body)
 
-        self.assertEquals(
-            channel.json_body["unsigned"].get("m.relations"),
-            {RelationTypes.REPLACE: {"event_id": edit_event_id}},
+        relations_dict = channel.json_body["unsigned"].get("m.relations")
+        self.assertIn(RelationTypes.REPLACE, relations_dict)
+
+        m_replace_dict = relations_dict[RelationTypes.REPLACE]
+        for key in ["event_id", "sender", "origin_server_ts"]:
+            self.assertIn(key, m_replace_dict)
+
+        self.assert_dict(
+            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
         )
 
+    def test_relations_redaction_redacts_edits(self):
+        """Test that edits of an event are redacted when the original event
+        is redacted.
+        """
+        # Send a new event
+        res = self.helper.send(self.room, body="Heyo!", tok=self.user_token)
+        original_event_id = res["event_id"]
+
+        # Add a relation
+        channel = self._send_relation(
+            RelationTypes.REPLACE,
+            "m.room.message",
+            parent_id=original_event_id,
+            content={
+                "msgtype": "m.text",
+                "body": "Wibble",
+                "m.new_content": {"msgtype": "m.text", "body": "First edit"},
+            },
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # Check the relation is returned
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/unstable/rooms/%s/relations/%s/m.replace/m.room.message"
+            % (self.room, original_event_id),
+            access_token=self.user_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        self.assertIn("chunk", channel.json_body)
+        self.assertEquals(len(channel.json_body["chunk"]), 1)
+
+        # Redact the original event
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/%s/redact/%s/%s"
+            % (self.room, original_event_id, "test_relations_redaction_redacts_edits"),
+            access_token=self.user_token,
+            content="{}",
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # Try to check for remaining m.replace relations
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/unstable/rooms/%s/relations/%s/m.replace/m.room.message"
+            % (self.room, original_event_id),
+            access_token=self.user_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # Check that no relations are returned
+        self.assertIn("chunk", channel.json_body)
+        self.assertEquals(channel.json_body["chunk"], [])
+
+    def test_aggregations_redaction_prevents_access_to_aggregations(self):
+        """Test that annotations of an event are redacted when the original event
+        is redacted.
+        """
+        # Send a new event
+        res = self.helper.send(self.room, body="Hello!", tok=self.user_token)
+        original_event_id = res["event_id"]
+
+        # Add a relation
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", key="👍", parent_id=original_event_id
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # Redact the original
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/%s/redact/%s/%s"
+            % (
+                self.room,
+                original_event_id,
+                "test_aggregations_redaction_prevents_access_to_aggregations",
+            ),
+            access_token=self.user_token,
+            content="{}",
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # Check that aggregations returns zero
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/unstable/rooms/%s/aggregations/%s/m.annotation/m.reaction"
+            % (self.room, original_event_id),
+            access_token=self.user_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        self.assertIn("chunk", channel.json_body)
+        self.assertEquals(channel.json_body["chunk"], [])
+
     def _send_relation(
-        self, relation_type, event_type, key=None, content={}, access_token=None
+        self,
+        relation_type,
+        event_type,
+        key=None,
+        content={},
+        access_token=None,
+        parent_id=None,
     ):
         """Helper function to send a relation pointing at `self.parent_id`
 
         Args:
             relation_type (str): One of `RelationTypes`
             event_type (str): The type of the event to create
+            parent_id (str): The event_id this relation relates to. If None, then self.parent_id
             key (str|None): The aggregation key used for m.annotation relation
                 type.
             content(dict|None): The content of the created event.
@@ -547,10 +672,12 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         if key:
             query = "?key=" + six.moves.urllib.parse.quote_plus(key.encode("utf-8"))
 
+        original_id = parent_id if parent_id else self.parent_id
+
         request, channel = self.make_request(
             "POST",
             "/_matrix/client/unstable/rooms/%s/send_relation/%s/%s/%s%s"
-            % (self.room, self.parent_id, relation_type, event_type, query),
+            % (self.room, original_id, relation_type, event_type, query),
             json.dumps(content).encode("utf-8"),
             access_token=access_token,
         )

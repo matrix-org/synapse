@@ -49,13 +49,10 @@ class ReceiptRestServlet(RestServlet):
         yield self.presence_handler.bump_presence_active_time(requester.user)
 
         yield self.receipts_handler.received_client_receipt(
-            room_id,
-            receipt_type,
-            user_id=requester.user.to_string(),
-            event_id=event_id
+            room_id, receipt_type, user_id=requester.user.to_string(), event_id=event_id
         )
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
 
 def register_servlets(hs, http_server):

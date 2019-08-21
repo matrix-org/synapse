@@ -1,9 +1,13 @@
-Dockerfile
-.travis.yml
-.gitignore
-demo/etc
-tox.ini
-.git/*
-.tox/*
-debian/matrix-synapse/
-debian/matrix-synapse-*/
+# ignore everything by default
+*
+
+# things to include
+!docker
+!scripts
+!synapse
+!MANIFEST.in
+!README.rst
+!setup.py
+!synctl
+
+**/__pycache__

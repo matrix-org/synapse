@@ -79,8 +79,6 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             db_conn.cursor(),
             name="_find_stream_orderings_for_times_txn",
             database_engine=self.database_engine,
-            after_callbacks=[],
-            exception_callbacks=[],
         )
         self._find_stream_orderings_for_times_txn(cur)
         cur.close()
@@ -102,7 +100,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             user_id,
             last_read_event_id,
         )
-        defer.returnValue(ret)
+        return ret
 
     def _get_unread_counts_by_receipt_txn(
         self, txn, room_id, user_id, last_read_event_id
@@ -180,7 +178,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             return [r[0] for r in txn]
 
         ret = yield self.runInteraction("get_push_action_users_in_range", f)
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def get_unread_push_actions_for_user_in_range_for_http(
@@ -277,11 +275,11 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # contain results from the first query, correctly ordered, followed
         # by results from the second query, but we want them all ordered
         # by stream_ordering, oldest first.
-        notifs.sort(key=lambda r: r['stream_ordering'])
+        notifs.sort(key=lambda r: r["stream_ordering"])
 
         # Take only up to the limit. We have to stop at the limit because
         # one of the subqueries may have hit the limit.
-        defer.returnValue(notifs[:limit])
+        return notifs[:limit]
 
     @defer.inlineCallbacks
     def get_unread_push_actions_for_user_in_range_for_email(
@@ -379,10 +377,10 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # contain results from the first query, correctly ordered, followed
         # by results from the second query, but we want them all ordered
         # by received_ts (most recent first)
-        notifs.sort(key=lambda r: -(r['received_ts'] or 0))
+        notifs.sort(key=lambda r: -(r["received_ts"] or 0))
 
         # Now return the first `limit`
-        defer.returnValue(notifs[:limit])
+        return notifs[:limit]
 
     def get_if_maybe_push_in_range_for_user(self, user_id, min_stream_ordering):
         """A fast check to see if there might be something to push for the
@@ -479,7 +477,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 keyvalues={"event_id": event_id},
                 desc="remove_push_actions_from_staging",
             )
-            defer.returnValue(res)
+            return res
         except Exception:
             # this method is called from an exception handler, so propagating
             # another exception here really isn't helpful - there's nothing
@@ -734,7 +732,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         push_actions = yield self.runInteraction("get_push_actions_for_user", f)
         for pa in push_actions:
             pa["actions"] = _deserialize_action(pa["actions"], pa["highlight"])
-        defer.returnValue(push_actions)
+        return push_actions
 
     @defer.inlineCallbacks
     def get_time_of_last_push_action_before(self, stream_ordering):
@@ -751,7 +749,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             return txn.fetchone()
 
         result = yield self.runInteraction("get_time_of_last_push_action_before", f)
-        defer.returnValue(result[0] if result else None)
+        return result[0] if result else None
 
     @defer.inlineCallbacks
     def get_latest_push_action_stream_ordering(self):
@@ -760,7 +758,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             return txn.fetchone()
 
         result = yield self.runInteraction("get_latest_push_action_stream_ordering", f)
-        defer.returnValue(result[0] or 0)
+        return result[0] or 0
 
     def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
         # Sad that we have to blow away the cache for the whole room here

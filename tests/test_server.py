@@ -26,8 +26,8 @@ from twisted.web.server import NOT_DONE_YET
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite, logger
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock
-from synapse.util.logcontext import make_deferred_yieldable
 
 from tests import unittest
 from tests.server import (
@@ -61,7 +61,10 @@ class JsonResourceTests(unittest.TestCase):
 
         res = JsonResource(self.homeserver)
         res.register_paths(
-            "GET", [re.compile("^/_matrix/foo/(?P<room_id>[^/]*)$")], _callback
+            "GET",
+            [re.compile("^/_matrix/foo/(?P<room_id>[^/]*)$")],
+            _callback,
+            "test_servlet",
         )
 
         request, channel = make_request(
@@ -69,8 +72,8 @@ class JsonResourceTests(unittest.TestCase):
         )
         render(request, res, self.reactor)
 
-        self.assertEqual(request.args, {b'a': [u"\N{SNOWMAN}".encode('utf8')]})
-        self.assertEqual(got_kwargs, {u"room_id": u"\N{SNOWMAN}"})
+        self.assertEqual(request.args, {b"a": ["\N{SNOWMAN}".encode("utf8")]})
+        self.assertEqual(got_kwargs, {"room_id": "\N{SNOWMAN}"})
 
     def test_callback_direct_exception(self):
         """
@@ -82,12 +85,14 @@ class JsonResourceTests(unittest.TestCase):
             raise Exception("boo")
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
+        )
 
         request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
 
-        self.assertEqual(channel.result["code"], b'500')
+        self.assertEqual(channel.result["code"], b"500")
 
     def test_callback_indirect_exception(self):
         """
@@ -105,12 +110,14 @@ class JsonResourceTests(unittest.TestCase):
             return make_deferred_yieldable(d)
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
+        )
 
         request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
 
-        self.assertEqual(channel.result["code"], b'500')
+        self.assertEqual(channel.result["code"], b"500")
 
     def test_callback_synapseerror(self):
         """
@@ -122,12 +129,14 @@ class JsonResourceTests(unittest.TestCase):
             raise SynapseError(403, "Forbidden!!one!", Codes.FORBIDDEN)
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
+        )
 
         request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
 
-        self.assertEqual(channel.result["code"], b'403')
+        self.assertEqual(channel.result["code"], b"403")
         self.assertEqual(channel.json_body["error"], "Forbidden!!one!")
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
@@ -143,12 +152,14 @@ class JsonResourceTests(unittest.TestCase):
             self.fail("shouldn't ever get here")
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet"
+        )
 
         request, channel = make_request(self.reactor, b"GET", b"/_matrix/foobar")
         render(request, res, self.reactor)
 
-        self.assertEqual(channel.result["code"], b'400')
+        self.assertEqual(channel.result["code"], b"400")
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
 
@@ -180,7 +191,7 @@ class SiteTestCase(unittest.HomeserverTestCase):
         # Make a resource and a Site, the resource will hang and allow us to
         # time out the request while it's 'processing'
         base_resource = Resource()
-        base_resource.putChild(b'', HangingResource())
+        base_resource.putChild(b"", HangingResource())
         site = SynapseSite("test", "site_tag", {}, base_resource, "1.0")
 
         server = site.buildProtocol(None)

@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from prometheus_client.exposition import generate_latest
-
-from synapse.metrics import REGISTRY
+from synapse.metrics import REGISTRY, generate_latest
 from synapse.types import Requester, UserID
 
 from tests.unittest import HomeserverTestCase
@@ -61,22 +59,24 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
             )
         )
 
-        expected = set([
-            b'synapse_forward_extremities_bucket{le="1.0"} 0.0',
-            b'synapse_forward_extremities_bucket{le="2.0"} 2.0',
-            b'synapse_forward_extremities_bucket{le="3.0"} 2.0',
-            b'synapse_forward_extremities_bucket{le="5.0"} 2.0',
-            b'synapse_forward_extremities_bucket{le="7.0"} 3.0',
-            b'synapse_forward_extremities_bucket{le="10.0"} 3.0',
-            b'synapse_forward_extremities_bucket{le="15.0"} 3.0',
-            b'synapse_forward_extremities_bucket{le="20.0"} 3.0',
-            b'synapse_forward_extremities_bucket{le="50.0"} 3.0',
-            b'synapse_forward_extremities_bucket{le="100.0"} 3.0',
-            b'synapse_forward_extremities_bucket{le="200.0"} 3.0',
-            b'synapse_forward_extremities_bucket{le="500.0"} 3.0',
-            b'synapse_forward_extremities_bucket{le="+Inf"} 3.0',
-            b'synapse_forward_extremities_count 3.0',
-            b'synapse_forward_extremities_sum 10.0',
-        ])
+        expected = set(
+            [
+                b'synapse_forward_extremities_bucket{le="1.0"} 0.0',
+                b'synapse_forward_extremities_bucket{le="2.0"} 2.0',
+                b'synapse_forward_extremities_bucket{le="3.0"} 2.0',
+                b'synapse_forward_extremities_bucket{le="5.0"} 2.0',
+                b'synapse_forward_extremities_bucket{le="7.0"} 3.0',
+                b'synapse_forward_extremities_bucket{le="10.0"} 3.0',
+                b'synapse_forward_extremities_bucket{le="15.0"} 3.0',
+                b'synapse_forward_extremities_bucket{le="20.0"} 3.0',
+                b'synapse_forward_extremities_bucket{le="50.0"} 3.0',
+                b'synapse_forward_extremities_bucket{le="100.0"} 3.0',
+                b'synapse_forward_extremities_bucket{le="200.0"} 3.0',
+                b'synapse_forward_extremities_bucket{le="500.0"} 3.0',
+                b'synapse_forward_extremities_bucket{le="+Inf"} 3.0',
+                b"synapse_forward_extremities_count 3.0",
+                b"synapse_forward_extremities_sum 10.0",
+            ]
+        )
 
         self.assertEqual(items, expected)

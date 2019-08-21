@@ -29,9 +29,8 @@ class TagListServlet(RestServlet):
     """
     GET /user/{user_id}/rooms/{room_id}/tags HTTP/1.1
     """
-    PATTERNS = client_patterns(
-        "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags"
-    )
+
+    PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags")
 
     def __init__(self, hs):
         super(TagListServlet, self).__init__()
@@ -46,7 +45,7 @@ class TagListServlet(RestServlet):
 
         tags = yield self.store.get_tags_for_room(user_id, room_id)
 
-        defer.returnValue((200, {"tags": tags}))
+        return (200, {"tags": tags})
 
 
 class TagServlet(RestServlet):
@@ -54,6 +53,7 @@ class TagServlet(RestServlet):
     PUT /user/{user_id}/rooms/{room_id}/tags/{tag} HTTP/1.1
     DELETE /user/{user_id}/rooms/{room_id}/tags/{tag} HTTP/1.1
     """
+
     PATTERNS = client_patterns(
         "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags/(?P<tag>[^/]*)"
     )
@@ -74,11 +74,9 @@ class TagServlet(RestServlet):
 
         max_id = yield self.store.add_tag_to_room(user_id, room_id, tag, body)
 
-        self.notifier.on_new_event(
-            "account_data_key", max_id, users=[user_id]
-        )
+        self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, user_id, room_id, tag):
@@ -88,11 +86,9 @@ class TagServlet(RestServlet):
 
         max_id = yield self.store.remove_tag_from_room(user_id, room_id, tag)
 
-        self.notifier.on_new_event(
-            "account_data_key", max_id, users=[user_id]
-        )
+        self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
 
 def register_servlets(hs, http_server):

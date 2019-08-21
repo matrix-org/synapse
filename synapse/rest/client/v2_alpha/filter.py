@@ -53,11 +53,10 @@ class GetFilterRestServlet(RestServlet):
 
         try:
             filter = yield self.filtering.get_user_filter(
-                user_localpart=target_user.localpart,
-                filter_id=filter_id,
+                user_localpart=target_user.localpart, filter_id=filter_id
             )
 
-            defer.returnValue((200, filter.get_filter_json()))
+            return (200, filter.get_filter_json())
         except (KeyError, StoreError):
             raise SynapseError(400, "No such filter", errcode=Codes.NOT_FOUND)
 
@@ -84,17 +83,13 @@ class CreateFilterRestServlet(RestServlet):
             raise AuthError(403, "Can only create filters for local users")
 
         content = parse_json_object_from_request(request)
-        set_timeline_upper_limit(
-            content,
-            self.hs.config.filter_timeline_limit
-        )
+        set_timeline_upper_limit(content, self.hs.config.filter_timeline_limit)
 
         filter_id = yield self.filtering.add_user_filter(
-            user_localpart=target_user.localpart,
-            user_filter=content,
+            user_localpart=target_user.localpart, user_filter=content
         )
 
-        defer.returnValue((200, {"filter_id": str(filter_id)}))
+        return (200, {"filter_id": str(filter_id)})
 
 
 def register_servlets(hs, http_server):

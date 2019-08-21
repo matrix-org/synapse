@@ -61,7 +61,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         row["session_data"] = json.loads(row["session_data"])
 
-        defer.returnValue(row)
+        return row
 
     @defer.inlineCallbacks
     def set_e2e_room_key(self, user_id, version, room_id, session_id, room_key):
@@ -82,15 +82,15 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             table="e2e_room_keys",
             keyvalues={
                 "user_id": user_id,
+                "version": version,
                 "room_id": room_id,
                 "session_id": session_id,
             },
             values={
-                "version": version,
-                "first_message_index": room_key['first_message_index'],
-                "forwarded_count": room_key['forwarded_count'],
-                "is_verified": room_key['is_verified'],
-                "session_data": json.dumps(room_key['session_data']),
+                "first_message_index": room_key["first_message_index"],
+                "forwarded_count": room_key["forwarded_count"],
+                "is_verified": room_key["is_verified"],
+                "session_data": json.dumps(room_key["session_data"]),
             },
             lock=False,
         )
@@ -118,13 +118,13 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         try:
             version = int(version)
         except ValueError:
-            defer.returnValue({'rooms': {}})
+            return {"rooms": {}}
 
         keyvalues = {"user_id": user_id, "version": version}
         if room_id:
-            keyvalues['room_id'] = room_id
+            keyvalues["room_id"] = room_id
             if session_id:
-                keyvalues['session_id'] = session_id
+                keyvalues["session_id"] = session_id
 
         rows = yield self._simple_select_list(
             table="e2e_room_keys",
@@ -141,17 +141,17 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="get_e2e_room_keys",
         )
 
-        sessions = {'rooms': {}}
+        sessions = {"rooms": {}}
         for row in rows:
-            room_entry = sessions['rooms'].setdefault(row['room_id'], {"sessions": {}})
-            room_entry['sessions'][row['session_id']] = {
+            room_entry = sessions["rooms"].setdefault(row["room_id"], {"sessions": {}})
+            room_entry["sessions"][row["session_id"]] = {
                 "first_message_index": row["first_message_index"],
                 "forwarded_count": row["forwarded_count"],
                 "is_verified": row["is_verified"],
                 "session_data": json.loads(row["session_data"]),
             }
 
-        defer.returnValue(sessions)
+        return sessions
 
     @defer.inlineCallbacks
     def delete_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):
@@ -174,9 +174,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         keyvalues = {"user_id": user_id, "version": int(version)}
         if room_id:
-            keyvalues['room_id'] = room_id
+            keyvalues["room_id"] = room_id
             if session_id:
-                keyvalues['session_id'] = session_id
+                keyvalues["session_id"] = session_id
 
         yield self._simple_delete(
             table="e2e_room_keys", keyvalues=keyvalues, desc="delete_e2e_room_keys"
@@ -191,7 +191,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         )
         row = txn.fetchone()
         if not row:
-            raise StoreError(404, 'No current backup version')
+            raise StoreError(404, "No current backup version")
         return row[0]
 
     def get_e2e_room_keys_version_info(self, user_id, version=None):
@@ -255,7 +255,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             )
             current_version = txn.fetchone()[0]
             if current_version is None:
-                current_version = '0'
+                current_version = "0"
 
             new_version = str(int(current_version) + 1)
 

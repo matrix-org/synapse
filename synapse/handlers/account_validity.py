@@ -22,9 +22,10 @@ from email.mime.text import MIMEText
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.logging.context import make_deferred_yieldable
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils
-from synapse.util.logcontext import make_deferred_yieldable
 
 try:
     from synapse.push.mailer import load_jinja2_templates
@@ -49,12 +50,10 @@ class AccountValidityHandler(object):
                 app_name = self.hs.config.email_app_name
 
                 self._subject = self._account_validity.renew_email_subject % {
-                    "app": app_name,
+                    "app": app_name
                 }
 
-                self._from_string = self.hs.config.email_notif_from % {
-                    "app": app_name,
-                }
+                self._from_string = self.hs.config.email_notif_from % {"app": app_name}
             except Exception:
                 # If substitution failed, fall back to the bare strings.
                 self._subject = self._account_validity.renew_email_subject
@@ -69,10 +68,14 @@ class AccountValidityHandler(object):
             )
 
             # Check the renewal emails to send and send them every 30min.
-            self.clock.looping_call(
-                self.send_renewal_emails,
-                30 * 60 * 1000,
-            )
+            def send_emails():
+                # run as a background process to make sure that the database transactions
+                # have a logcontext to report to
+                return run_as_background_process(
+                    "send_renewals", self.send_renewal_emails
+                )
+
+            self.clock.looping_call(send_emails, 30 * 60 * 1000)
 
     @defer.inlineCallbacks
     def send_renewal_emails(self):
@@ -86,8 +89,7 @@ class AccountValidityHandler(object):
         if expiring_users:
             for user in expiring_users:
                 yield self._send_renewal_email(
-                    user_id=user["user_id"],
-                    expiration_ts=user["expiration_ts_ms"],
+                    user_id=user["user_id"], expiration_ts=user["expiration_ts_ms"]
                 )
 
     @defer.inlineCallbacks
@@ -146,32 +148,33 @@ class AccountValidityHandler(object):
         for address in addresses:
             raw_to = email.utils.parseaddr(address)[1]
 
-            multipart_msg = MIMEMultipart('alternative')
-            multipart_msg['Subject'] = self._subject
-            multipart_msg['From'] = self._from_string
-            multipart_msg['To'] = address
-            multipart_msg['Date'] = email.utils.formatdate()
-            multipart_msg['Message-ID'] = email.utils.make_msgid()
+            multipart_msg = MIMEMultipart("alternative")
+            multipart_msg["Subject"] = self._subject
+            multipart_msg["From"] = self._from_string
+            multipart_msg["To"] = address
+            multipart_msg["Date"] = email.utils.formatdate()
+            multipart_msg["Message-ID"] = email.utils.make_msgid()
             multipart_msg.attach(text_part)
             multipart_msg.attach(html_part)
 
             logger.info("Sending renewal email to %s", address)
 
-            yield make_deferred_yieldable(self.sendmail(
-                self.hs.config.email_smtp_host,
-                self._raw_from, raw_to, multipart_msg.as_string().encode('utf8'),
-                reactor=self.hs.get_reactor(),
-                port=self.hs.config.email_smtp_port,
-                requireAuthentication=self.hs.config.email_smtp_user is not None,
-                username=self.hs.config.email_smtp_user,
-                password=self.hs.config.email_smtp_pass,
-                requireTransportSecurity=self.hs.config.require_transport_security
-            ))
+            yield make_deferred_yieldable(
+                self.sendmail(
+                    self.hs.config.email_smtp_host,
+                    self._raw_from,
+                    raw_to,
+                    multipart_msg.as_string().encode("utf8"),
+                    reactor=self.hs.get_reactor(),
+                    port=self.hs.config.email_smtp_port,
+                    requireAuthentication=self.hs.config.email_smtp_user is not None,
+                    username=self.hs.config.email_smtp_user,
+                    password=self.hs.config.email_smtp_pass,
+                    requireTransportSecurity=self.hs.config.require_transport_security,
+                )
+            )
 
-        yield self.store.set_renewal_mail_status(
-            user_id=user_id,
-            email_sent=True,
-        )
+        yield self.store.set_renewal_mail_status(user_id=user_id, email_sent=True)
 
     @defer.inlineCallbacks
     def _get_email_addresses_for_user(self, user_id):
@@ -190,7 +193,7 @@ class AccountValidityHandler(object):
             if threepid["medium"] == "email":
                 addresses.append(threepid["address"])
 
-        defer.returnValue(addresses)
+        return addresses
 
     @defer.inlineCallbacks
     def _get_renewal_token(self, user_id):
@@ -211,7 +214,7 @@ class AccountValidityHandler(object):
             try:
                 renewal_token = stringutils.random_string(32)
                 yield self.store.set_renewal_token_for_user(user_id, renewal_token)
-                defer.returnValue(renewal_token)
+                return renewal_token
             except StoreError:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a unique string as refresh string.")
@@ -223,10 +226,18 @@ class AccountValidityHandler(object):
 
         Args:
             renewal_token (str): Token sent with the renewal request.
+        Returns:
+            bool: Whether the provided token is valid.
         """
-        user_id = yield self.store.get_user_from_renewal_token(renewal_token)
+        try:
+            user_id = yield self.store.get_user_from_renewal_token(renewal_token)
+        except StoreError:
+            defer.returnValue(False)
+
         logger.debug("Renewing an account for user %s", user_id)
         yield self.renew_account_for_user(user_id)
+
+        defer.returnValue(True)
 
     @defer.inlineCallbacks
     def renew_account_for_user(self, user_id, expiration_ts=None, email_sent=False):
@@ -248,9 +259,7 @@ class AccountValidityHandler(object):
             expiration_ts = self.clock.time_msec() + self._account_validity.period
 
         yield self.store.set_account_validity_for_user(
-            user_id=user_id,
-            expiration_ts=expiration_ts,
-            email_sent=email_sent,
+            user_id=user_id, expiration_ts=expiration_ts, email_sent=email_sent
         )
 
-        defer.returnValue(expiration_ts)
+        return expiration_ts

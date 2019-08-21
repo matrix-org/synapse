@@ -60,9 +60,12 @@ class TestCommand(Command):
         pass
 
     def run(self):
-        print ("""Synapse's tests cannot be run via setup.py. To run them, try:
+        print(
+            """Synapse's tests cannot be run via setup.py. To run them, try:
      PYTHONPATH="." trial tests
-""")
+"""
+        )
+
 
 def read_file(path_segments):
     """Read a file from the package. Takes a list of strings to join to
@@ -84,9 +87,9 @@ version = exec_file(("synapse", "__init__.py"))["__version__"]
 dependencies = exec_file(("synapse", "python_dependencies.py"))
 long_description = read_file(("README.rst",))
 
-REQUIREMENTS = dependencies['REQUIREMENTS']
-CONDITIONAL_REQUIREMENTS = dependencies['CONDITIONAL_REQUIREMENTS']
-ALL_OPTIONAL_REQUIREMENTS = dependencies['ALL_OPTIONAL_REQUIREMENTS']
+REQUIREMENTS = dependencies["REQUIREMENTS"]
+CONDITIONAL_REQUIREMENTS = dependencies["CONDITIONAL_REQUIREMENTS"]
+ALL_OPTIONAL_REQUIREMENTS = dependencies["ALL_OPTIONAL_REQUIREMENTS"]
 
 # Make `pip install matrix-synapse[all]` install all the optional dependencies.
 CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
@@ -102,16 +105,16 @@ setup(
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
-    python_requires='~=3.5',
+    python_requires="~=3.5",
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'Topic :: Communications :: Chat',
-        'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
+        "Development Status :: 5 - Production/Stable",
+        "Topic :: Communications :: Chat",
+        "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
     ],
     scripts=["synctl"] + glob.glob("scripts/*"),
-    cmdclass={'test': TestCommand},
+    cmdclass={"test": TestCommand},
 )

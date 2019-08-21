@@ -139,7 +139,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             builder
         )
         yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def inject_room_member(self, user_id, membership="join", extra_content={}):
@@ -161,7 +161,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         )
 
         yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def inject_message(self, user_id, content=None):
@@ -182,7 +182,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         )
 
         yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def test_large_room(self):
@@ -265,7 +265,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         pr.disable()
         with open("filter_events_for_server.profile", "w+") as f:
-            ps = pstats.Stats(pr, stream=f).sort_stats('cumulative')
+            ps = pstats.Stats(pr, stream=f).sort_stats("cumulative")
             ps.print_stats()
 
         # the result should be 5 redacted events, and 5 unredacted events.

@@ -16,8 +16,7 @@ from ._base import Config
 
 
 class CaptchaConfig(Config):
-
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.recaptcha_private_key = config.get("recaptcha_private_key")
         self.recaptcha_public_key = config.get("recaptcha_public_key")
         self.enable_registration_captcha = config.get(
@@ -29,7 +28,7 @@ class CaptchaConfig(Config):
             "https://www.recaptcha.net/recaptcha/api/siteverify",
         )
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         ## Captcha ##
         # See docs/CAPTCHA_SETUP for full details of configuring this.

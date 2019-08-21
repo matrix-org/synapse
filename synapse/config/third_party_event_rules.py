@@ -19,14 +19,14 @@ from ._base import Config
 
 
 class ThirdPartyRulesConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.third_party_event_rules = None
 
         provider = config.get("third_party_event_rules", None)
         if provider is not None:
             self.third_party_event_rules = load_module(provider)
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         # Server admins can define a Python module that implements extra rules for
         # allowing or denying incoming events. In order to work, this module needs to

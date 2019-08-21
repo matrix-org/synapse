@@ -65,7 +65,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         yield self.store.persist_event(event, context)
 
-        defer.returnValue(event)
+        return event
 
     def assertStateMapEqual(self, s1, s2):
         for t in s1:
@@ -76,10 +76,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_state_groups_ids(self):
         e1 = yield self.inject_state_event(
-            self.room, self.u_alice, EventTypes.Create, '', {}
+            self.room, self.u_alice, EventTypes.Create, "", {}
         )
         e2 = yield self.inject_state_event(
-            self.room, self.u_alice, EventTypes.Name, '', {"name": "test room"}
+            self.room, self.u_alice, EventTypes.Name, "", {"name": "test room"}
         )
 
         state_group_map = yield self.store.get_state_groups_ids(
@@ -89,16 +89,16 @@ class StateStoreTestCase(tests.unittest.TestCase):
         state_map = list(state_group_map.values())[0]
         self.assertDictEqual(
             state_map,
-            {(EventTypes.Create, ''): e1.event_id, (EventTypes.Name, ''): e2.event_id},
+            {(EventTypes.Create, ""): e1.event_id, (EventTypes.Name, ""): e2.event_id},
         )
 
     @defer.inlineCallbacks
     def test_get_state_groups(self):
         e1 = yield self.inject_state_event(
-            self.room, self.u_alice, EventTypes.Create, '', {}
+            self.room, self.u_alice, EventTypes.Create, "", {}
         )
         e2 = yield self.inject_state_event(
-            self.room, self.u_alice, EventTypes.Name, '', {"name": "test room"}
+            self.room, self.u_alice, EventTypes.Name, "", {"name": "test room"}
         )
 
         state_group_map = yield self.store.get_state_groups(self.room, [e2.event_id])
@@ -113,10 +113,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
         # this defaults to a linear DAG as each new injection defaults to whatever
         # forward extremities are currently in the DB for this room.
         e1 = yield self.inject_state_event(
-            self.room, self.u_alice, EventTypes.Create, '', {}
+            self.room, self.u_alice, EventTypes.Create, "", {}
         )
         e2 = yield self.inject_state_event(
-            self.room, self.u_alice, EventTypes.Name, '', {"name": "test room"}
+            self.room, self.u_alice, EventTypes.Name, "", {"name": "test room"}
         )
         e3 = yield self.inject_state_event(
             self.room,
@@ -158,7 +158,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # check we can filter to the m.room.name event (with a '' state key)
         state = yield self.store.get_state_for_event(
-            e5.event_id, StateFilter.from_types([(EventTypes.Name, '')])
+            e5.event_id, StateFilter.from_types([(EventTypes.Name, "")])
         )
 
         self.assertStateMapEqual({(e2.type, e2.state_key): e2}, state)

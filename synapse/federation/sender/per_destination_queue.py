@@ -360,7 +360,7 @@ class PerDestinationQueue(object):
 
         # Retrieve list of new device updates to send to the destination
         now_stream_id, results = yield self._store.get_devices_by_remote(
-            self._destination, last_device_list, limit=limit,
+            self._destination, last_device_list, limit=limit
         )
         edus = [
             Edu(
@@ -374,17 +374,14 @@ class PerDestinationQueue(object):
 
         assert len(edus) <= limit, "get_devices_by_remote returned too many EDUs"
 
-        defer.returnValue((edus, now_stream_id))
+        return (edus, now_stream_id)
 
     @defer.inlineCallbacks
     def _get_to_device_message_edus(self, limit):
         last_device_stream_id = self._last_device_stream_id
         to_device_stream_id = self._store.get_to_device_stream_token()
         contents, stream_id = yield self._store.get_new_device_msgs_for_remote(
-            self._destination,
-            last_device_stream_id,
-            to_device_stream_id,
-            limit,
+            self._destination, last_device_stream_id, to_device_stream_id, limit
         )
         edus = [
             Edu(
@@ -396,4 +393,4 @@ class PerDestinationQueue(object):
             for content in contents
         ]
 
-        defer.returnValue((edus, stream_id))
+        return (edus, stream_id)

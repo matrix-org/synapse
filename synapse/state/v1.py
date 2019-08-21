@@ -55,25 +55,19 @@ def resolve_events_with_store(state_sets, event_map, state_map_factory):
             a map from (type, state_key) to event_id.
     """
     if len(state_sets) == 1:
-        defer.returnValue(state_sets[0])
+        return state_sets[0]
 
-    unconflicted_state, conflicted_state = _seperate(
-        state_sets,
-    )
+    unconflicted_state, conflicted_state = _seperate(state_sets)
 
     needed_events = set(
-        event_id
-        for event_ids in itervalues(conflicted_state)
-        for event_id in event_ids
+        event_id for event_ids in itervalues(conflicted_state) for event_id in event_ids
     )
     needed_event_count = len(needed_events)
     if event_map is not None:
         needed_events -= set(iterkeys(event_map))
 
     logger.info(
-        "Asking for %d/%d conflicted events",
-        len(needed_events),
-        needed_event_count,
+        "Asking for %d/%d conflicted events", len(needed_events), needed_event_count
     )
 
     # dict[str, FrozenEvent]: a map from state event id to event. Only includes
@@ -97,17 +91,15 @@ def resolve_events_with_store(state_sets, event_map, state_map_factory):
         new_needed_events -= set(iterkeys(event_map))
 
     logger.info(
-        "Asking for %d/%d auth events",
-        len(new_needed_events),
-        new_needed_event_count,
+        "Asking for %d/%d auth events", len(new_needed_events), new_needed_event_count
     )
 
     state_map_new = yield state_map_factory(new_needed_events)
     state_map.update(state_map_new)
 
-    defer.returnValue(_resolve_with_state(
+    return _resolve_with_state(
         unconflicted_state, conflicted_state, auth_events, state_map
-    ))
+    )
 
 
 def _seperate(state_sets):
@@ -173,8 +165,9 @@ def _create_auth_events_from_maps(unconflicted_state, conflicted_state, state_ma
     return auth_events
 
 
-def _resolve_with_state(unconflicted_state_ids, conflicted_state_ids, auth_event_ids,
-                        state_map):
+def _resolve_with_state(
+    unconflicted_state_ids, conflicted_state_ids, auth_event_ids, state_map
+):
     conflicted_state = {}
     for key, event_ids in iteritems(conflicted_state_ids):
         events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
@@ -190,9 +183,7 @@ def _resolve_with_state(unconflicted_state_ids, conflicted_state_ids, auth_event
     }
 
     try:
-        resolved_state = _resolve_state_events(
-            conflicted_state, auth_events
-        )
+        resolved_state = _resolve_state_events(conflicted_state, auth_events)
     except Exception:
         logger.exception("Failed to resolve state")
         raise
@@ -218,37 +209,28 @@ def _resolve_state_events(conflicted_state, auth_events):
     if POWER_KEY in conflicted_state:
         events = conflicted_state[POWER_KEY]
         logger.debug("Resolving conflicted power levels %r", events)
-        resolved_state[POWER_KEY] = _resolve_auth_events(
-            events, auth_events)
+        resolved_state[POWER_KEY] = _resolve_auth_events(events, auth_events)
 
     auth_events.update(resolved_state)
 
     for key, events in iteritems(conflicted_state):
         if key[0] == EventTypes.JoinRules:
             logger.debug("Resolving conflicted join rules %r", events)
-            resolved_state[key] = _resolve_auth_events(
-                events,
-                auth_events
-            )
+            resolved_state[key] = _resolve_auth_events(events, auth_events)
 
     auth_events.update(resolved_state)
 
     for key, events in iteritems(conflicted_state):
         if key[0] == EventTypes.Member:
             logger.debug("Resolving conflicted member lists %r", events)
-            resolved_state[key] = _resolve_auth_events(
-                events,
-                auth_events
-            )
+            resolved_state[key] = _resolve_auth_events(events, auth_events)
 
     auth_events.update(resolved_state)
 
     for key, events in iteritems(conflicted_state):
         if key not in resolved_state:
             logger.debug("Resolving conflicted state %r:%r", key, events)
-            resolved_state[key] = _resolve_normal_events(
-                events, auth_events
-            )
+            resolved_state[key] = _resolve_normal_events(events, auth_events)
 
     return resolved_state
 
@@ -257,9 +239,7 @@ def _resolve_auth_events(events, auth_events):
     reverse = [i for i in reversed(_ordered_events(events))]
 
     auth_keys = set(
-        key
-        for event in events
-        for key in event_auth.auth_types_for_event(event)
+        key for event in events for key in event_auth.auth_types_for_event(event)
     )
 
     new_auth_events = {}
@@ -313,6 +293,6 @@ def _ordered_events(events):
     def key_func(e):
         # we have to use utf-8 rather than ascii here because it turns out we allow
         # people to send us events with non-ascii event IDs :/
-        return -int(e.depth), hashlib.sha1(e.event_id.encode('utf-8')).hexdigest()
+        return -int(e.depth), hashlib.sha1(e.event_id.encode("utf-8")).hexdigest()
 
     return sorted(events, key=key_func)

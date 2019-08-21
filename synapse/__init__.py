@@ -28,10 +28,11 @@ try:
     from twisted.internet import protocol
     from twisted.internet.protocol import Factory
     from twisted.names.dns import DNSDatagramProtocol
+
     protocol.Factory.noisy = False
     Factory.noisy = False
     DNSDatagramProtocol.noisy = False
 except ImportError:
     pass
 
-__version__ = "1.0.0"
+__version__ = "1.3.1"

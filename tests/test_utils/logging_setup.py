@@ -17,7 +17,7 @@ import os
 
 import twisted.logger
 
-from synapse.util.logcontext import LoggingContextFilter
+from synapse.logging.context import LoggingContextFilter
 
 
 class ToTwistedHandler(logging.Handler):
@@ -27,7 +27,7 @@ class ToTwistedHandler(logging.Handler):
 
     def emit(self, record):
         log_entry = self.format(record)
-        log_level = record.levelname.lower().replace('warning', 'warn')
+        log_level = record.levelname.lower().replace("warning", "warn")
         self.tx_log.emit(
             twisted.logger.LogLevel.levelWithName(log_level),
             log_entry.replace("{", r"(").replace("}", r")"),

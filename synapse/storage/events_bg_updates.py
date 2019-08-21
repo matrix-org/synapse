@@ -64,8 +64,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         )
 
         self.register_background_update_handler(
-            self.DELETE_SOFT_FAILED_EXTREMITIES,
-            self._cleanup_extremities_bg_update,
+            self.DELETE_SOFT_FAILED_EXTREMITIES, self._cleanup_extremities_bg_update
         )
 
     @defer.inlineCallbacks
@@ -136,7 +135,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _background_reindex_origin_server_ts(self, progress, batch_size):
@@ -213,7 +212,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_ORIGIN_SERVER_TS_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _cleanup_extremities_bg_update(self, progress, batch_size):
@@ -269,7 +268,8 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 LEFT JOIN events USING (event_id)
                 LEFT JOIN event_json USING (event_id)
                 LEFT JOIN rejections USING (event_id)
-                """, (batch_size,)
+                """,
+                (batch_size,),
             )
 
             for prev_event_id, event_id, metadata, rejected, outlier in txn:
@@ -364,13 +364,12 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     column="event_id",
                     iterable=to_delete,
                     keyvalues={},
-                    retcols=("room_id",)
+                    retcols=("room_id",),
                 )
                 room_ids = set(row["room_id"] for row in rows)
                 for room_id in room_ids:
                     txn.call_after(
-                        self.get_latest_event_ids_in_room.invalidate,
-                        (room_id,)
+                        self.get_latest_event_ids_in_room.invalidate, (room_id,)
                     )
 
             self._simple_delete_many_txn(
@@ -384,7 +383,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             return len(original_set)
 
         num_handled = yield self.runInteraction(
-            "_cleanup_extremities_bg_update", _cleanup_extremities_bg_update_txn,
+            "_cleanup_extremities_bg_update", _cleanup_extremities_bg_update_txn
         )
 
         if not num_handled:
@@ -394,8 +393,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 txn.execute("DROP TABLE _extremities_to_check")
 
             yield self.runInteraction(
-                "_cleanup_extremities_bg_update_drop_table",
-                _drop_table_txn,
+                "_cleanup_extremities_bg_update_drop_table", _drop_table_txn
             )
 
-        defer.returnValue(num_handled)
+        return num_handled

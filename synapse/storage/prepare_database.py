@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 55
+SCHEMA_VERSION = 56
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -133,7 +133,7 @@ def _setup_new_database(cur, database_engine):
             if ver <= SCHEMA_VERSION:
                 valid_dirs.append((ver, abs_path))
         else:
-            logger.warn("Unexpected entry in 'full_schemas': %s", filename)
+            logger.debug("Ignoring entry '%s' in 'full_schemas'", filename)
 
     if not valid_dirs:
         raise PrepareDatabaseException(
@@ -146,9 +146,10 @@ def _setup_new_database(cur, database_engine):
 
     directory_entries = os.listdir(sql_dir)
 
-    for filename in sorted(fnmatch.filter(directory_entries, "*.sql") + fnmatch.filter(
-        directory_entries, "*.sql." + specific
-    )):
+    for filename in sorted(
+        fnmatch.filter(directory_entries, "*.sql")
+        + fnmatch.filter(directory_entries, "*.sql." + specific)
+    ):
         sql_loc = os.path.join(sql_dir, filename)
         logger.debug("Applying schema %s", sql_loc)
         executescript(cur, sql_loc)
@@ -313,7 +314,7 @@ def _apply_module_schemas(txn, database_engine, config):
             application config
     """
     for (mod, _config) in config.password_providers:
-        if not hasattr(mod, 'get_db_schema_files'):
+        if not hasattr(mod, "get_db_schema_files"):
             continue
         modname = ".".join((mod.__module__, mod.__name__))
         _apply_module_schema_files(
@@ -343,7 +344,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
             continue
 
         root_name, ext = os.path.splitext(name)
-        if ext != '.sql':
+        if ext != ".sql":
             raise PrepareDatabaseException(
                 "only .sql files are currently supported for module schemas"
             )
@@ -407,7 +408,7 @@ def get_statements(f):
 
 
 def executescript(txn, schema_path):
-    with open(schema_path, 'r') as f:
+    with open(schema_path, "r") as f:
         for statement in get_statements(f):
             txn.execute(statement)
 

@@ -133,34 +133,6 @@ class TransactionStore(SQLBaseStore):
             desc="set_received_txn_response",
         )
 
-    def prep_send_transaction(self, transaction_id, destination, origin_server_ts):
-        """Persists an outgoing transaction and calculates the values for the
-        previous transaction id list.
-
-        This should be called before sending the transaction so that it has the
-        correct value for the `prev_ids` key.
-
-        Args:
-            transaction_id (str)
-            destination (str)
-            origin_server_ts (int)
-
-        Returns:
-            list: A list of previous transaction ids.
-        """
-        return defer.succeed([])
-
-    def delivered_txn(self, transaction_id, destination, code, response_dict):
-        """Persists the response for an outgoing transaction.
-
-        Args:
-            transaction_id (str)
-            destination (str)
-            code (int)
-            response_json (str)
-        """
-        pass
-
     @defer.inlineCallbacks
     def get_destination_retry_timings(self, destination):
         """Gets the current retry timings (if any) for a given destination.
@@ -175,7 +147,7 @@ class TransactionStore(SQLBaseStore):
 
         result = self._destination_retry_cache.get(destination, SENTINEL)
         if result is not SENTINEL:
-            defer.returnValue(result)
+            return result
 
         result = yield self.runInteraction(
             "get_destination_retry_timings",
@@ -186,7 +158,7 @@ class TransactionStore(SQLBaseStore):
         # We don't hugely care about race conditions between getting and
         # invalidating the cache, since we time out fairly quickly anyway.
         self._destination_retry_cache[destination] = result
-        defer.returnValue(result)
+        return result
 
     def _get_destination_retry_timings(self, txn, destination):
         result = self._simple_select_one_txn(
@@ -224,6 +196,26 @@ class TransactionStore(SQLBaseStore):
     def _set_destination_retry_timings(
         self, txn, destination, retry_last_ts, retry_interval
     ):
+
+        if self.database_engine.can_native_upsert:
+            # Upsert retry time interval if retry_interval is zero (i.e. we're
+            # resetting it) or greater than the existing retry interval.
+
+            sql = """
+                INSERT INTO destinations (destination, retry_last_ts, retry_interval)
+                    VALUES (?, ?, ?)
+                ON CONFLICT (destination) DO UPDATE SET
+                        retry_last_ts = EXCLUDED.retry_last_ts,
+                        retry_interval = EXCLUDED.retry_interval
+                    WHERE
+                        EXCLUDED.retry_interval = 0
+                        OR destinations.retry_interval < EXCLUDED.retry_interval
+            """
+
+            txn.execute(sql, (destination, retry_last_ts, retry_interval))
+
+            return
+
         self.database_engine.lock_table(txn, "destinations")
 
         # We need to be careful here as the data may have changed from under us

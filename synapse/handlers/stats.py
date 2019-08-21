@@ -86,7 +86,7 @@ class StatsHandler(StateDeltasHandler):
 
         # If still None then the initial background update hasn't happened yet
         if self.pos is None:
-            defer.returnValue(None)
+            return None
 
         # Loop round handling deltas until we're up to date
         while True:
@@ -156,7 +156,7 @@ class StatsHandler(StateDeltasHandler):
                 prev_event_content = {}
                 if prev_event_id is not None:
                     prev_event = yield self.store.get_event(
-                        prev_event_id, allow_none=True,
+                        prev_event_id, allow_none=True
                     )
                     if prev_event:
                         prev_event_content = prev_event.content
@@ -328,6 +328,6 @@ class StatsHandler(StateDeltasHandler):
                 == "world_readable"
             )
         ):
-            defer.returnValue(True)
+            return True
         else:
-            defer.returnValue(False)
+            return False

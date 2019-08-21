@@ -29,13 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 class AppServiceConfig(Config):
-
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
 
-    def default_config(cls, **kwargs):
+    def generate_config_section(cls, **kwargs):
         return """\
         # A list of application service config files to use
         #
@@ -53,9 +52,7 @@ class AppServiceConfig(Config):
 def load_appservices(hostname, config_files):
     """Returns a list of Application Services from the config files."""
     if not isinstance(config_files, list):
-        logger.warning(
-            "Expected %s to be a list of AS config files.", config_files
-        )
+        logger.warning("Expected %s to be a list of AS config files.", config_files)
         return []
 
     # Dicts of value -> filename
@@ -66,22 +63,20 @@ def load_appservices(hostname, config_files):
 
     for config_file in config_files:
         try:
-            with open(config_file, 'r') as f:
-                appservice = _load_appservice(
-                    hostname, yaml.safe_load(f), config_file
-                )
+            with open(config_file, "r") as f:
+                appservice = _load_appservice(hostname, yaml.safe_load(f), config_file)
                 if appservice.id in seen_ids:
                     raise ConfigError(
                         "Cannot reuse ID across application services: "
-                        "%s (files: %s, %s)" % (
-                            appservice.id, config_file, seen_ids[appservice.id],
-                        )
+                        "%s (files: %s, %s)"
+                        % (appservice.id, config_file, seen_ids[appservice.id])
                     )
                 seen_ids[appservice.id] = config_file
                 if appservice.token in seen_as_tokens:
                     raise ConfigError(
                         "Cannot reuse as_token across application services: "
-                        "%s (files: %s, %s)" % (
+                        "%s (files: %s, %s)"
+                        % (
                             appservice.token,
                             config_file,
                             seen_as_tokens[appservice.token],
@@ -98,28 +93,26 @@ def load_appservices(hostname, config_files):
 
 
 def _load_appservice(hostname, as_info, config_filename):
-    required_string_fields = [
-        "id", "as_token", "hs_token", "sender_localpart"
-    ]
+    required_string_fields = ["id", "as_token", "hs_token", "sender_localpart"]
     for field in required_string_fields:
         if not isinstance(as_info.get(field), string_types):
-            raise KeyError("Required string field: '%s' (%s)" % (
-                field, config_filename,
-            ))
+            raise KeyError(
+                "Required string field: '%s' (%s)" % (field, config_filename)
+            )
 
     # 'url' must either be a string or explicitly null, not missing
     # to avoid accidentally turning off push for ASes.
-    if (not isinstance(as_info.get("url"), string_types) and
-            as_info.get("url", "") is not None):
+    if (
+        not isinstance(as_info.get("url"), string_types)
+        and as_info.get("url", "") is not None
+    ):
         raise KeyError(
             "Required string field or explicit null: 'url' (%s)" % (config_filename,)
         )
 
     localpart = as_info["sender_localpart"]
     if urlparse.quote(localpart) != localpart:
-        raise ValueError(
-            "sender_localpart needs characters which are not URL encoded."
-        )
+        raise ValueError("sender_localpart needs characters which are not URL encoded.")
     user = UserID(localpart, hostname)
     user_id = user.to_string()
 
@@ -138,13 +131,12 @@ def _load_appservice(hostname, as_info, config_filename):
             for regex_obj in as_info["namespaces"][ns]:
                 if not isinstance(regex_obj, dict):
                     raise ValueError(
-                        "Expected namespace entry in %s to be an object,"
-                        " but got %s", ns, regex_obj
+                        "Expected namespace entry in %s to be an object," " but got %s",
+                        ns,
+                        regex_obj,
                     )
                 if not isinstance(regex_obj.get("regex"), string_types):
-                    raise ValueError(
-                        "Missing/bad type 'regex' key in %s", regex_obj
-                    )
+                    raise ValueError("Missing/bad type 'regex' key in %s", regex_obj)
                 if not isinstance(regex_obj.get("exclusive"), bool):
                     raise ValueError(
                         "Missing/bad type 'exclusive' key in %s", regex_obj
@@ -167,10 +159,8 @@ def _load_appservice(hostname, as_info, config_filename):
         )
 
     ip_range_whitelist = None
-    if as_info.get('ip_range_whitelist'):
-        ip_range_whitelist = IPSet(
-            as_info.get('ip_range_whitelist')
-        )
+    if as_info.get("ip_range_whitelist"):
+        ip_range_whitelist = IPSet(as_info.get("ip_range_whitelist"))
 
     return ApplicationService(
         token=as_info["as_token"],

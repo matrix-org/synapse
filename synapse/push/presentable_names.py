@@ -28,8 +28,13 @@ ALL_ALONE = "Empty Room"
 
 
 @defer.inlineCallbacks
-def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True,
-                        fallback_to_single_member=True):
+def calculate_room_name(
+    store,
+    room_state_ids,
+    user_id,
+    fallback_to_members=True,
+    fallback_to_single_member=True,
+):
     """
     Works out a user-facing name for the given room as per Matrix
     spec recommendations.
@@ -50,7 +55,7 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
             room_state_ids[("m.room.name", "")], allow_none=True
         )
         if m_room_name and m_room_name.content and m_room_name.content["name"]:
-            defer.returnValue(m_room_name.content["name"])
+            return m_room_name.content["name"]
 
     # does it have a canonical alias?
     if ("m.room.canonical_alias", "") in room_state_ids:
@@ -58,10 +63,12 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
             room_state_ids[("m.room.canonical_alias", "")], allow_none=True
         )
         if (
-            canon_alias and canon_alias.content and canon_alias.content["alias"] and
-            _looks_like_an_alias(canon_alias.content["alias"])
+            canon_alias
+            and canon_alias.content
+            and canon_alias.content["alias"]
+            and _looks_like_an_alias(canon_alias.content["alias"])
         ):
-            defer.returnValue(canon_alias.content["alias"])
+            return canon_alias.content["alias"]
 
     # at this point we're going to need to search the state by all state keys
     # for an event type, so rearrange the data structure
@@ -71,16 +78,14 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
     if "m.room.aliases" in room_state_bytype_ids:
         m_room_aliases = room_state_bytype_ids["m.room.aliases"]
         for alias_id in m_room_aliases.values():
-            alias_event = yield store.get_event(
-                alias_id, allow_none=True
-            )
+            alias_event = yield store.get_event(alias_id, allow_none=True)
             if alias_event and alias_event.content.get("aliases"):
                 the_aliases = alias_event.content["aliases"]
                 if len(the_aliases) > 0 and _looks_like_an_alias(the_aliases[0]):
-                    defer.returnValue(the_aliases[0])
+                    return the_aliases[0]
 
     if not fallback_to_members:
-        defer.returnValue(None)
+        return None
 
     my_member_event = None
     if ("m.room.member", user_id) in room_state_ids:
@@ -89,8 +94,8 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
         )
 
     if (
-        my_member_event is not None and
-        my_member_event.content['membership'] == "invite"
+        my_member_event is not None
+        and my_member_event.content["membership"] == "invite"
     ):
         if ("m.room.member", my_member_event.sender) in room_state_ids:
             inviter_member_event = yield store.get_event(
@@ -99,15 +104,13 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
             )
             if inviter_member_event:
                 if fallback_to_single_member:
-                    defer.returnValue(
-                        "Invite from %s" % (
-                            name_from_member_event(inviter_member_event),
-                        )
+                    return "Invite from %s" % (
+                        name_from_member_event(inviter_member_event),
                     )
                 else:
                     return
         else:
-            defer.returnValue("Room Invite")
+            return "Room Invite"
 
     # we're going to have to generate a name based on who's in the room,
     # so find out who is in the room that isn't the user.
@@ -116,8 +119,10 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
             list(room_state_bytype_ids["m.room.member"].values())
         )
         all_members = [
-            ev for ev in member_events.values()
-            if ev.content['membership'] == "join" or ev.content['membership'] == "invite"
+            ev
+            for ev in member_events.values()
+            if ev.content["membership"] == "join"
+            or ev.content["membership"] == "invite"
         ]
         # Sort the member events oldest-first so the we name people in the
         # order the joined (it should at least be deterministic rather than
@@ -134,9 +139,9 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
             # or inbound invite, or outbound 3PID invite.
             if all_members[0].sender == user_id:
                 if "m.room.third_party_invite" in room_state_bytype_ids:
-                    third_party_invites = (
-                        room_state_bytype_ids["m.room.third_party_invite"].values()
-                    )
+                    third_party_invites = room_state_bytype_ids[
+                        "m.room.third_party_invite"
+                    ].values()
 
                     if len(third_party_invites) > 0:
                         # technically third party invite events are not member
@@ -148,17 +153,17 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
                         # return "Inviting %s" % (
                         #     descriptor_from_member_events(third_party_invites)
                         # )
-                        defer.returnValue("Inviting email address")
+                        return "Inviting email address"
                     else:
-                        defer.returnValue(ALL_ALONE)
+                        return ALL_ALONE
             else:
-                defer.returnValue(name_from_member_event(all_members[0]))
+                return name_from_member_event(all_members[0])
         else:
-            defer.returnValue(ALL_ALONE)
+            return ALL_ALONE
     elif len(other_members) == 1 and not fallback_to_single_member:
         return
     else:
-        defer.returnValue(descriptor_from_member_events(other_members))
+        return descriptor_from_member_events(other_members)
 
 
 def descriptor_from_member_events(member_events):
@@ -191,8 +196,9 @@ def descriptor_from_member_events(member_events):
 
 def name_from_member_event(member_event):
     if (
-        member_event.content and "displayname" in member_event.content and
-        member_event.content["displayname"]
+        member_event.content
+        and "displayname" in member_event.content
+        and member_event.content["displayname"]
     ):
         return member_event.content["displayname"]
     return member_event.state_key

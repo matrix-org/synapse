@@ -31,8 +31,8 @@ from .background_updates import BackgroundUpdateStore
 logger = logging.getLogger(__name__)
 
 SearchEntry = namedtuple(
-    'SearchEntry',
-    ['key', 'value', 'event_id', 'room_id', 'stream_ordering', 'origin_server_ts'],
+    "SearchEntry",
+    ["key", "value", "event_id", "room_id", "stream_ordering", "origin_server_ts"],
 )
 
 
@@ -166,7 +166,7 @@ class SearchStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _background_reindex_gin_search(self, progress, batch_size):
@@ -209,14 +209,14 @@ class SearchStore(BackgroundUpdateStore):
             yield self.runWithConnection(create_index)
 
         yield self._end_background_update(self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME)
-        defer.returnValue(1)
+        return 1
 
     @defer.inlineCallbacks
     def _background_reindex_search_order(self, progress, batch_size):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
         rows_inserted = progress.get("rows_inserted", 0)
-        have_added_index = progress['have_added_indexes']
+        have_added_index = progress["have_added_indexes"]
 
         if not have_added_index:
 
@@ -287,7 +287,7 @@ class SearchStore(BackgroundUpdateStore):
         if not finished:
             yield self._end_background_update(self.EVENT_SEARCH_ORDER_UPDATE_NAME)
 
-        defer.returnValue(num_rows)
+        return num_rows
 
     def store_event_search_txn(self, txn, event, key, value):
         """Add event to the search table
@@ -454,17 +454,15 @@ class SearchStore(BackgroundUpdateStore):
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 
-        defer.returnValue(
-            {
-                "results": [
-                    {"event": event_map[r["event_id"]], "rank": r["rank"]}
-                    for r in results
-                    if r["event_id"] in event_map
-                ],
-                "highlights": highlights,
-                "count": count,
-            }
-        )
+        return {
+            "results": [
+                {"event": event_map[r["event_id"]], "rank": r["rank"]}
+                for r in results
+                if r["event_id"] in event_map
+            ],
+            "highlights": highlights,
+            "count": count,
+        }
 
     @defer.inlineCallbacks
     def search_rooms(self, room_ids, search_term, keys, limit, pagination_token=None):
@@ -599,22 +597,20 @@ class SearchStore(BackgroundUpdateStore):
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 
-        defer.returnValue(
-            {
-                "results": [
-                    {
-                        "event": event_map[r["event_id"]],
-                        "rank": r["rank"],
-                        "pagination_token": "%s,%s"
-                        % (r["origin_server_ts"], r["stream_ordering"]),
-                    }
-                    for r in results
-                    if r["event_id"] in event_map
-                ],
-                "highlights": highlights,
-                "count": count,
-            }
-        )
+        return {
+            "results": [
+                {
+                    "event": event_map[r["event_id"]],
+                    "rank": r["rank"],
+                    "pagination_token": "%s,%s"
+                    % (r["origin_server_ts"], r["stream_ordering"]),
+                }
+                for r in results
+                if r["event_id"] in event_map
+            ],
+            "highlights": highlights,
+            "count": count,
+        }
 
     def _find_highlights_in_postgres(self, search_query, events):
         """Given a list of events and a search term, return a list of words

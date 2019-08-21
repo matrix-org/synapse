@@ -25,6 +25,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, ThreepidValidationError
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.types import UserID
@@ -74,12 +75,12 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         info = yield self.get_user_by_id(user_id)
         if not info:
-            defer.returnValue(False)
+            return False
 
         now = self.clock.time_msec()
         trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
-        defer.returnValue(is_trial)
+        return is_trial
 
     @cached()
     def get_user_by_access_token(self, token):
@@ -89,7 +90,8 @@ class RegistrationWorkerStore(SQLBaseStore):
             token (str): The access token of a user.
         Returns:
             defer.Deferred: None, if the token did not match, otherwise dict
-                including the keys `name`, `is_guest`, `device_id`, `token_id`.
+                including the keys `name`, `is_guest`, `device_id`, `token_id`,
+                `valid_until_ms`.
         """
         return self.runInteraction(
             "get_user_by_access_token", self._query_for_auth, token
@@ -113,11 +115,12 @@ class RegistrationWorkerStore(SQLBaseStore):
             allow_none=True,
             desc="get_expiration_ts_for_user",
         )
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
-    def set_account_validity_for_user(self, user_id, expiration_ts, email_sent,
-                                      renewal_token=None):
+    def set_account_validity_for_user(
+        self, user_id, expiration_ts, email_sent, renewal_token=None
+    ):
         """Updates the account validity properties of the given account, with the
         given values.
 
@@ -131,6 +134,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             renewal_token (str): Renewal token the user can use to extend the validity
                 of their account. Defaults to no token.
         """
+
         def set_account_validity_for_user_txn(txn):
             self._simple_update_txn(
                 txn=txn,
@@ -143,12 +147,11 @@ class RegistrationWorkerStore(SQLBaseStore):
                 },
             )
             self._invalidate_cache_and_stream(
-                txn, self.get_expiration_ts_for_user, (user_id,),
+                txn, self.get_expiration_ts_for_user, (user_id,)
             )
 
         yield self.runInteraction(
-            "set_account_validity_for_user",
-            set_account_validity_for_user_txn,
+            "set_account_validity_for_user", set_account_validity_for_user_txn
         )
 
     @defer.inlineCallbacks
@@ -187,7 +190,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="get_user_from_renewal_token",
         )
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def get_renewal_token_for_user(self, user_id):
@@ -206,7 +209,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="get_renewal_token_for_user",
         )
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def get_users_expiring_soon(self):
@@ -217,6 +220,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             Deferred: Resolves to a list[dict[user_id (str), expiration_ts_ms (int)]]
         """
+
         def select_users_txn(txn, now_ms, renew_at):
             sql = (
                 "SELECT user_id, expiration_ts_ms FROM account_validity"
@@ -229,10 +233,11 @@ class RegistrationWorkerStore(SQLBaseStore):
         res = yield self.runInteraction(
             "get_users_expiring_soon",
             select_users_txn,
-            self.clock.time_msec(), self.config.account_validity.renew_at,
+            self.clock.time_msec(),
+            self.config.account_validity.renew_at,
         )
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def set_renewal_mail_status(self, user_id, email_sent):
@@ -275,12 +280,12 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="is_server_admin",
         )
 
-        defer.returnValue(res if res else False)
+        return res if res else False
 
     def _query_for_auth(self, txn, token):
         sql = (
             "SELECT users.name, users.is_guest, access_tokens.id as token_id,"
-            " access_tokens.device_id"
+            " access_tokens.device_id, access_tokens.valid_until_ms"
             " FROM users"
             " INNER JOIN access_tokens on users.name = access_tokens.user_id"
             " WHERE token = ?"
@@ -306,7 +311,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         res = yield self.runInteraction(
             "is_support_user", self.is_support_user_txn, user_id
         )
-        defer.returnValue(res)
+        return res
 
     def is_support_user_txn(self, txn, user_id):
         res = self._simple_select_one_onecol_txn(
@@ -344,7 +349,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             return 0
 
         ret = yield self.runInteraction("count_users", _count_users)
-        defer.returnValue(ret)
+        return ret
 
     def count_daily_user_type(self):
         """
@@ -369,7 +374,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                     WHERE creation_ts > ?
                 ) AS t GROUP BY user_type
             """
-            results = {'native': 0, 'guest': 0, 'bridged': 0}
+            results = {"native": 0, "guest": 0, "bridged": 0}
             txn.execute(sql, (yesterday,))
             for row in txn:
                 results[row[0]] = row[1]
@@ -390,7 +395,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             return count
 
         ret = yield self.runInteraction("count_users", _count_users)
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def find_next_generated_user_id_localpart(self):
@@ -420,26 +425,13 @@ class RegistrationWorkerStore(SQLBaseStore):
                 if i not in found:
                     return i
 
-        defer.returnValue(
+        return (
             (
                 yield self.runInteraction(
                     "find_next_generated_user_id", _find_next_generated_user_id
                 )
             )
         )
-
-    @defer.inlineCallbacks
-    def get_3pid_guest_access_token(self, medium, address):
-        ret = yield self._simple_select_one(
-            "threepid_guest_access_tokens",
-            {"medium": medium, "address": address},
-            ["guest_access_token"],
-            True,
-            'get_3pid_guest_access_token',
-        )
-        if ret:
-            defer.returnValue(ret["guest_access_token"])
-        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def get_user_id_by_threepid(self, medium, address, require_verified=False):
@@ -455,7 +447,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         user_id = yield self.runInteraction(
             "get_user_id_by_threepid", self.get_user_id_by_threepid_txn, medium, address
         )
-        defer.returnValue(user_id)
+        return user_id
 
     def get_user_id_by_threepid_txn(self, txn, medium, address):
         """Returns user id from threepid
@@ -472,11 +464,11 @@ class RegistrationWorkerStore(SQLBaseStore):
             txn,
             "user_threepids",
             {"medium": medium, "address": address},
-            ['user_id'],
+            ["user_id"],
             True,
         )
         if ret:
-            return ret['user_id']
+            return ret["user_id"]
         return None
 
     @defer.inlineCallbacks
@@ -492,10 +484,10 @@ class RegistrationWorkerStore(SQLBaseStore):
         ret = yield self._simple_select_list(
             "user_threepids",
             {"user_id": user_id},
-            ['medium', 'address', 'validated_at', 'added_at'],
-            'user_get_threepids',
+            ["medium", "address", "validated_at", "added_at"],
+            "user_get_threepids",
         )
-        defer.returnValue(ret)
+        return ret
 
     def user_delete_threepid(self, user_id, medium, address):
         return self._simple_delete(
@@ -572,14 +564,31 @@ class RegistrationWorkerStore(SQLBaseStore):
         """
         return self._simple_select_onecol(
             table="user_threepid_id_server",
-            keyvalues={
-                "user_id": user_id,
-                "medium": medium,
-                "address": address,
-            },
+            keyvalues={"user_id": user_id, "medium": medium, "address": address},
             retcol="id_server",
             desc="get_id_servers_user_bound",
         )
+
+    @cachedInlineCallbacks()
+    def get_user_deactivated_status(self, user_id):
+        """Retrieve the value for the `deactivated` property for the provided user.
+
+        Args:
+            user_id (str): The ID of the user to retrieve the status for.
+
+        Returns:
+            defer.Deferred(bool): The requested value.
+        """
+
+        res = yield self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="deactivated",
+            desc="get_user_deactivated_status",
+        )
+
+        # Convert the integer into a boolean.
+        return res == 1
 
 
 class RegistrationStore(
@@ -612,27 +621,33 @@ class RegistrationStore(
         self.register_noop_background_update("refresh_tokens_device_index")
 
         self.register_background_update_handler(
-            "user_threepids_grandfather", self._bg_user_threepids_grandfather,
+            "user_threepids_grandfather", self._bg_user_threepids_grandfather
         )
 
         self.register_background_update_handler(
-            "users_set_deactivated_flag", self._backgroud_update_set_deactivated_flag,
+            "users_set_deactivated_flag", self._background_update_set_deactivated_flag
         )
 
         # Create a background job for culling expired 3PID validity tokens
-        hs.get_clock().looping_call(
-            self.cull_expired_threepid_validation_tokens, THIRTY_MINUTES_IN_MS,
-        )
+        def start_cull():
+            # run as a background process to make sure that the database transactions
+            # have a logcontext to report to
+            return run_as_background_process(
+                "cull_expired_threepid_validation_tokens",
+                self.cull_expired_threepid_validation_tokens,
+            )
+
+        hs.get_clock().looping_call(start_cull, THIRTY_MINUTES_IN_MS)
 
     @defer.inlineCallbacks
-    def _backgroud_update_set_deactivated_flag(self, progress, batch_size):
+    def _background_update_set_deactivated_flag(self, progress, batch_size):
         """Retrieves a list of all deactivated users and sets the 'deactivated' flag to 1
         for each of them.
         """
 
         last_user = progress.get("user_id", "")
 
-        def _backgroud_update_set_deactivated_flag_txn(txn):
+        def _background_update_set_deactivated_flag_txn(txn):
             txn.execute(
                 """
                 SELECT
@@ -662,7 +677,7 @@ class RegistrationStore(
 
             for user in rows:
                 if not user["count_tokens"] and not user["count_threepids"]:
-                    self.set_user_deactivated_status_txn(txn, user["user_id"], True)
+                    self.set_user_deactivated_status_txn(txn, user["name"], True)
                     rows_processed_nb += 1
 
             logger.info("Marked %d rows as deactivated", rows_processed_nb)
@@ -677,24 +692,25 @@ class RegistrationStore(
                 return False
 
         end = yield self.runInteraction(
-            "users_set_deactivated_flag",
-            _backgroud_update_set_deactivated_flag_txn,
+            "users_set_deactivated_flag", _background_update_set_deactivated_flag_txn
         )
 
         if end:
             yield self._end_background_update("users_set_deactivated_flag")
 
-        defer.returnValue(batch_size)
+        return batch_size
 
     @defer.inlineCallbacks
-    def add_access_token_to_user(self, user_id, token, device_id=None):
+    def add_access_token_to_user(self, user_id, token, device_id, valid_until_ms):
         """Adds an access token for the given user.
 
         Args:
             user_id (str): The user ID.
             token (str): The new access token to add.
             device_id (str): ID of the device to associate with the access
-               token
+                token
+            valid_until_ms (int|None): when the token is valid until. None for
+                no expiry.
         Raises:
             StoreError if there was a problem adding this.
         """
@@ -702,14 +718,19 @@ class RegistrationStore(
 
         yield self._simple_insert(
             "access_tokens",
-            {"id": next_id, "user_id": user_id, "token": token, "device_id": device_id},
+            {
+                "id": next_id,
+                "user_id": user_id,
+                "token": token,
+                "device_id": device_id,
+                "valid_until_ms": valid_until_ms,
+            },
             desc="add_access_token_to_user",
         )
 
-    def register(
+    def register_user(
         self,
         user_id,
-        token=None,
         password_hash=None,
         was_guest=False,
         make_guest=False,
@@ -722,9 +743,6 @@ class RegistrationStore(
 
         Args:
             user_id (str): The desired user ID to register.
-            token (str): The desired access token to use for this user. If this
-                is not None, the given access token is associated with the user
-                id.
             password_hash (str): Optional. The password hash for this user.
             was_guest (bool): Optional. Whether this is a guest account being
                 upgraded to a non-guest account.
@@ -741,10 +759,9 @@ class RegistrationStore(
             StoreError if the user_id could not be registered.
         """
         return self.runInteraction(
-            "register",
-            self._register,
+            "register_user",
+            self._register_user,
             user_id,
-            token,
             password_hash,
             was_guest,
             make_guest,
@@ -754,11 +771,10 @@ class RegistrationStore(
             user_type,
         )
 
-    def _register(
+    def _register_user(
         self,
         txn,
         user_id,
-        token,
         password_hash,
         was_guest,
         make_guest,
@@ -770,8 +786,6 @@ class RegistrationStore(
         user_id_obj = UserID.from_string(user_id)
 
         now = int(self.clock.time())
-
-        next_id = self._access_tokens_id_gen.get_next()
 
         try:
             if was_guest:
@@ -820,14 +834,6 @@ class RegistrationStore(
         if self._account_validity.enabled:
             self.set_expiration_date_for_user_txn(txn, user_id)
 
-        if token:
-            # it's possible for this to get a conflict, but only for a single user
-            # since tokens are namespaced based on their user ID
-            txn.execute(
-                "INSERT INTO access_tokens(id, user_id, token)" " VALUES (?,?,?)",
-                (next_id, user_id, token),
-            )
-
         if create_profile_with_displayname:
             # set a default displayname serverside to avoid ugly race
             # between auto-joins and clients trying to set displaynames
@@ -851,7 +857,7 @@ class RegistrationStore(
 
         def user_set_password_hash_txn(txn):
             self._simple_update_one_txn(
-                txn, 'users', {'name': user_id}, {'password_hash': password_hash}
+                txn, "users", {"name": user_id}, {"password_hash": password_hash}
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
@@ -872,9 +878,9 @@ class RegistrationStore(
         def f(txn):
             self._simple_update_one_txn(
                 txn,
-                table='users',
-                keyvalues={'name': user_id},
-                updatevalues={'consent_version': consent_version},
+                table="users",
+                keyvalues={"name": user_id},
+                updatevalues={"consent_version": consent_version},
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
@@ -896,9 +902,9 @@ class RegistrationStore(
         def f(txn):
             self._simple_update_one_txn(
                 txn,
-                table='users',
-                keyvalues={'name': user_id},
-                updatevalues={'consent_server_notice_sent': consent_version},
+                table="users",
+                keyvalues={"name": user_id},
+                updatevalues={"consent_server_notice_sent": consent_version},
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
@@ -972,41 +978,7 @@ class RegistrationStore(
             desc="is_guest",
         )
 
-        defer.returnValue(res if res else False)
-
-    @defer.inlineCallbacks
-    def save_or_get_3pid_guest_access_token(
-        self, medium, address, access_token, inviter_user_id
-    ):
-        """
-        Gets the 3pid's guest access token if exists, else saves access_token.
-
-        Args:
-            medium (str): Medium of the 3pid. Must be "email".
-            address (str): 3pid address.
-            access_token (str): The access token to persist if none is
-                already persisted.
-            inviter_user_id (str): User ID of the inviter.
-
-        Returns:
-            deferred str: Whichever access token is persisted at the end
-            of this function call.
-        """
-
-        def insert(txn):
-            txn.execute(
-                "INSERT INTO threepid_guest_access_tokens "
-                "(medium, address, guest_access_token, first_inviter) "
-                "VALUES (?, ?, ?, ?)",
-                (medium, address, access_token, inviter_user_id),
-            )
-
-        try:
-            yield self.runInteraction("save_3pid_guest_access_token", insert)
-            defer.returnValue(access_token)
-        except self.database_engine.module.IntegrityError:
-            ret = yield self.get_3pid_guest_access_token(medium, address)
-            defer.returnValue(ret)
+        return res if res else False
 
     def add_user_pending_deactivation(self, user_id):
         """
@@ -1068,20 +1040,15 @@ class RegistrationStore(
 
         if id_servers:
             yield self.runInteraction(
-                "_bg_user_threepids_grandfather", _bg_user_threepids_grandfather_txn,
+                "_bg_user_threepids_grandfather", _bg_user_threepids_grandfather_txn
             )
 
         yield self._end_background_update("user_threepids_grandfather")
 
-        defer.returnValue(1)
+        return 1
 
     def get_threepid_validation_session(
-        self,
-        medium,
-        client_secret,
-        address=None,
-        sid=None,
-        validated=True,
+        self, medium, client_secret, address=None, sid=None, validated=True
     ):
         """Gets a session_id and last_send_attempt (if available) for a
         client_secret/medium/(address|session_id) combo
@@ -1101,23 +1068,22 @@ class RegistrationStore(
                 latest session_id and send_attempt count for this 3PID.
                 Otherwise None if there hasn't been a previous attempt
         """
-        keyvalues = {
-            "medium": medium,
-            "client_secret": client_secret,
-        }
+        keyvalues = {"medium": medium, "client_secret": client_secret}
         if address:
             keyvalues["address"] = address
         if sid:
             keyvalues["session_id"] = sid
 
-        assert(address or sid)
+        assert address or sid
 
         def get_threepid_validation_session_txn(txn):
             sql = """
                 SELECT address, session_id, medium, client_secret,
                 last_send_attempt, validated_at
                 FROM threepid_validation_session WHERE %s
-                """ % (" AND ".join("%s = ?" % k for k in iterkeys(keyvalues)),)
+                """ % (
+                " AND ".join("%s = ?" % k for k in iterkeys(keyvalues)),
+            )
 
             if validated is not None:
                 sql += " AND validated_at IS " + ("NOT NULL" if validated else "NULL")
@@ -1132,17 +1098,10 @@ class RegistrationStore(
             return rows[0]
 
         return self.runInteraction(
-            "get_threepid_validation_session",
-            get_threepid_validation_session_txn,
+            "get_threepid_validation_session", get_threepid_validation_session_txn
         )
 
-    def validate_threepid_session(
-        self,
-        session_id,
-        client_secret,
-        token,
-        current_ts,
-    ):
+    def validate_threepid_session(self, session_id, client_secret, token, current_ts):
         """Attempt to validate a threepid session using a token
 
         Args:
@@ -1174,7 +1133,7 @@ class RegistrationStore(
 
             if retrieved_client_secret != client_secret:
                 raise ThreepidValidationError(
-                    400, "This client_secret does not match the provided session_id",
+                    400, "This client_secret does not match the provided session_id"
                 )
 
             row = self._simple_select_one_txn(
@@ -1187,7 +1146,7 @@ class RegistrationStore(
 
             if not row:
                 raise ThreepidValidationError(
-                    400, "Validation token not found or has expired",
+                    400, "Validation token not found or has expired"
                 )
             expires = row["expires"]
             next_link = row["next_link"]
@@ -1198,7 +1157,7 @@ class RegistrationStore(
 
             if expires <= current_ts:
                 raise ThreepidValidationError(
-                    400, "This token has expired. Please request a new one",
+                    400, "This token has expired. Please request a new one"
                 )
 
             # Looks good. Validate the session
@@ -1213,8 +1172,7 @@ class RegistrationStore(
 
         # Return next_link if it exists
         return self.runInteraction(
-            "validate_threepid_session_txn",
-            validate_threepid_session_txn,
+            "validate_threepid_session_txn", validate_threepid_session_txn
         )
 
     def upsert_threepid_validation_session(
@@ -1281,6 +1239,7 @@ class RegistrationStore(
             token_expires (int): The timestamp for which after the token
                 will no longer be valid
         """
+
         def start_or_continue_validation_session_txn(txn):
             # Create or update a validation session
             self._simple_upsert_txn(
@@ -1314,6 +1273,7 @@ class RegistrationStore(
 
     def cull_expired_threepid_validation_tokens(self):
         """Remove threepid validation tokens with expiry dates that have passed"""
+
         def cull_expired_threepid_validation_tokens_txn(txn, ts):
             sql = """
             DELETE FROM threepid_validation_token WHERE
@@ -1335,6 +1295,7 @@ class RegistrationStore(
         Args:
             session_id (str): The ID of the session to delete
         """
+
         def delete_threepid_session_txn(txn):
             self._simple_delete_txn(
                 txn,
@@ -1348,8 +1309,7 @@ class RegistrationStore(
             )
 
         return self.runInteraction(
-            "delete_threepid_session",
-            delete_threepid_session_txn,
+            "delete_threepid_session", delete_threepid_session_txn
         )
 
     def set_user_deactivated_status_txn(self, txn, user_id, deactivated):
@@ -1360,7 +1320,7 @@ class RegistrationStore(
             updatevalues={"deactivated": 1 if deactivated else 0},
         )
         self._invalidate_cache_and_stream(
-            txn, self.get_user_deactivated_status, (user_id,),
+            txn, self.get_user_deactivated_status, (user_id,)
         )
 
     @defer.inlineCallbacks
@@ -1375,26 +1335,6 @@ class RegistrationStore(
         yield self.runInteraction(
             "set_user_deactivated_status",
             self.set_user_deactivated_status_txn,
-            user_id, deactivated,
+            user_id,
+            deactivated,
         )
-
-    @cachedInlineCallbacks()
-    def get_user_deactivated_status(self, user_id):
-        """Retrieve the value for the `deactivated` property for the provided user.
-
-        Args:
-            user_id (str): The ID of the user to retrieve the status for.
-
-        Returns:
-            defer.Deferred(bool): The requested value.
-        """
-
-        res = yield self._simple_select_one_onecol(
-            table="users",
-            keyvalues={"name": user_id},
-            retcol="deactivated",
-            desc="get_user_deactivated_status",
-        )
-
-        # Convert the integer into a boolean.
-        defer.returnValue(res == 1)

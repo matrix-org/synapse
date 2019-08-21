@@ -28,8 +28,8 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.logging.context import LoggingContext, run_in_background
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
@@ -46,7 +46,6 @@ from synapse.storage.engines import create_engine
 from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.logcontext import LoggingContext, run_in_background
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 
@@ -66,14 +65,16 @@ class UserDirectorySlaveStore(
 
         events_max = self._stream_id_gen.get_current_token()
         curr_state_delta_prefill, min_curr_state_delta_id = self._get_cache_dict(
-            db_conn, "current_state_delta_stream",
+            db_conn,
+            "current_state_delta_stream",
             entity_column="room_id",
             stream_column="stream_id",
             max_value=events_max,  # As we share the stream id with events token
             limit=1000,
         )
         self._curr_state_delta_stream_cache = StreamChangeCache(
-            "_curr_state_delta_stream_cache", min_curr_state_delta_id,
+            "_curr_state_delta_stream_cache",
+            min_curr_state_delta_id,
             prefilled_cache=curr_state_delta_prefill,
         )
 
@@ -110,12 +111,14 @@ class UserDirectoryServer(HomeServer):
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
                     user_directory.register_servlets(self, resource)
-                    resources.update({
-                        "/_matrix/client/r0": resource,
-                        "/_matrix/client/unstable": resource,
-                        "/_matrix/client/v2_alpha": resource,
-                        "/_matrix/client/api/v1": resource,
-                    })
+                    resources.update(
+                        {
+                            "/_matrix/client/r0": resource,
+                            "/_matrix/client/unstable": resource,
+                            "/_matrix/client/v2_alpha": resource,
+                            "/_matrix/client/api/v1": resource,
+                        }
+                    )
 
         root_resource = create_resource_tree(resources, NoResource())
 
@@ -128,7 +131,7 @@ class UserDirectoryServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            )
+            ),
         )
 
         logger.info("Synapse user_dir now listening on port %d", port)
@@ -142,18 +145,19 @@ class UserDirectoryServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    )
+                        username="matrix", password="rabbithole", globals={"hs": self}
+                    ),
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(("Metrics listener configured, but "
-                                 "enable_metrics is not True!"))
+                    logger.warn(
+                        (
+                            "Metrics listener configured, but "
+                            "enable_metrics is not True!"
+                        )
+                    )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"],
-                                         listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -186,9 +190,7 @@ class UserDirectoryReplicationHandler(ReplicationClientHandler):
 
 def start(config_options):
     try:
-        config = HomeServerConfig.load_config(
-            "Synapse user directory", config_options
-        )
+        config = HomeServerConfig.load_config("Synapse user directory", config_options)
     except ConfigError as e:
         sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
@@ -222,11 +224,13 @@ def start(config_options):
     )
 
     ss.setup()
-    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ss, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-user-dir", config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with LoggingContext("main"):
         start(sys.argv[1:])

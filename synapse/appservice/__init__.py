@@ -48,9 +48,7 @@ class AppServiceTransaction(object):
             A Deferred which resolves to True if the transaction was sent.
         """
         return as_api.push_bulk(
-            service=self.service,
-            events=self.events,
-            txn_id=self.id
+            service=self.service, events=self.events, txn_id=self.id
         )
 
     def complete(self, store):
@@ -64,10 +62,7 @@ class AppServiceTransaction(object):
         Returns:
             A Deferred which resolves to True if the transaction was completed.
         """
-        return store.complete_appservice_txn(
-            service=self.service,
-            txn_id=self.id
-        )
+        return store.complete_appservice_txn(service=self.service, txn_id=self.id)
 
 
 class ApplicationService(object):
@@ -76,6 +71,7 @@ class ApplicationService(object):
 
     Provides methods to check if this service is "interested" in events.
     """
+
     NS_USERS = "users"
     NS_ALIASES = "aliases"
     NS_ROOMS = "rooms"
@@ -84,9 +80,19 @@ class ApplicationService(object):
     # values.
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
-    def __init__(self, token, hostname, url=None, namespaces=None, hs_token=None,
-                 sender=None, id=None, protocols=None, rate_limited=True,
-                 ip_range_whitelist=None):
+    def __init__(
+        self,
+        token,
+        hostname,
+        url=None,
+        namespaces=None,
+        hs_token=None,
+        sender=None,
+        id=None,
+        protocols=None,
+        rate_limited=True,
+        ip_range_whitelist=None,
+    ):
         self.token = token
         self.url = url
         self.hs_token = hs_token
@@ -128,9 +134,7 @@ class ApplicationService(object):
                 if not isinstance(regex_obj, dict):
                     raise ValueError("Expected dict regex for ns '%s'" % ns)
                 if not isinstance(regex_obj.get("exclusive"), bool):
-                    raise ValueError(
-                        "Expected bool for 'exclusive' in ns '%s'" % ns
-                    )
+                    raise ValueError("Expected bool for 'exclusive' in ns '%s'" % ns)
                 group_id = regex_obj.get("group_id")
                 if group_id:
                     if not isinstance(group_id, str):
@@ -153,9 +157,7 @@ class ApplicationService(object):
                 if isinstance(regex, string_types):
                     regex_obj["regex"] = re.compile(regex)  # Pre-compile regex
                 else:
-                    raise ValueError(
-                        "Expected string for 'regex' in ns '%s'" % ns
-                    )
+                    raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
         return namespaces
 
     def _matches_regex(self, test_string, namespace_key):
@@ -173,20 +175,21 @@ class ApplicationService(object):
     @defer.inlineCallbacks
     def _matches_user(self, event, store):
         if not event:
-            defer.returnValue(False)
+            return False
 
         if self.is_interested_in_user(event.sender):
-            defer.returnValue(True)
+            return True
         # also check m.room.member state key
-        if (event.type == EventTypes.Member and
-                self.is_interested_in_user(event.state_key)):
-            defer.returnValue(True)
+        if event.type == EventTypes.Member and self.is_interested_in_user(
+            event.state_key
+        ):
+            return True
 
         if not store:
-            defer.returnValue(False)
+            return False
 
         does_match = yield self._matches_user_in_member_list(event.room_id, store)
-        defer.returnValue(does_match)
+        return does_match
 
     @cachedInlineCallbacks(num_args=1, cache_context=True)
     def _matches_user_in_member_list(self, room_id, store, cache_context):
@@ -197,8 +200,8 @@ class ApplicationService(object):
         # check joined member events
         for user_id in member_list:
             if self.is_interested_in_user(user_id):
-                defer.returnValue(True)
-        defer.returnValue(False)
+                return True
+        return False
 
     def _matches_room_id(self, event):
         if hasattr(event, "room_id"):
@@ -208,13 +211,13 @@ class ApplicationService(object):
     @defer.inlineCallbacks
     def _matches_aliases(self, event, store):
         if not store or not event:
-            defer.returnValue(False)
+            return False
 
         alias_list = yield store.get_aliases_for_room(event.room_id)
         for alias in alias_list:
             if self.is_interested_in_alias(alias):
-                defer.returnValue(True)
-        defer.returnValue(False)
+                return True
+        return False
 
     @defer.inlineCallbacks
     def is_interested(self, event, store=None):
@@ -228,15 +231,15 @@ class ApplicationService(object):
         """
         # Do cheap checks first
         if self._matches_room_id(event):
-            defer.returnValue(True)
+            return True
 
         if (yield self._matches_aliases(event, store)):
-            defer.returnValue(True)
+            return True
 
         if (yield self._matches_user(event, store)):
-            defer.returnValue(True)
+            return True
 
-        defer.returnValue(False)
+        return False
 
     def is_interested_in_user(self, user_id):
         return (

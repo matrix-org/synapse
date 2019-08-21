@@ -15,8 +15,6 @@
 
 from canonicaljson import encode_canonical_json
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
@@ -41,7 +39,7 @@ class FilteringStore(SQLBaseStore):
             desc="get_user_filter",
         )
 
-        defer.returnValue(db_to_json(def_json))
+        return db_to_json(def_json)
 
     def add_user_filter(self, user_localpart, user_filter):
         def_json = encode_canonical_json(user_filter)

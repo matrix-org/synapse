@@ -52,6 +52,7 @@ from ._base import client_patterns, interactive_auth_handler
 if hasattr(hmac, "compare_digest"):
     compare_digest = hmac.compare_digest
 else:
+
     def compare_digest(a, b):
         return a == b
 
@@ -75,11 +76,11 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(body, [
-            'id_server', 'client_secret', 'email', 'send_attempt'
-        ])
+        assert_params_in_dict(
+            body, ["id_server", "client_secret", "email", "send_attempt"]
+        )
 
-        if not check_3pid_allowed(self.hs, "email", body['email']):
+        if not check_3pid_allowed(self.hs, "email", body["email"]):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized to register on this server",
@@ -87,14 +88,14 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
-            'email', body['email']
+            "email", body["email"]
         )
 
         if existingUid is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -113,13 +114,12 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(body, [
-            'id_server', 'client_secret',
-            'country', 'phone_number',
-            'send_attempt',
-        ])
+        assert_params_in_dict(
+            body,
+            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+        )
 
-        msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
+        msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
@@ -129,7 +129,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
-            'msisdn', msisdn
+            "msisdn", msisdn
         )
 
         if existingUid is not None:
@@ -138,7 +138,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -165,7 +165,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
                 reject_limit=1,
                 # Allow 1 request at a time
                 concurrent_requests=1,
-            )
+            ),
         )
 
     @defer.inlineCallbacks
@@ -178,7 +178,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
             yield self.registration_handler.check_username(username)
 
-            defer.returnValue((200, {"available": True}))
+            return (200, {"available": True})
 
 
 class RegisterRestServlet(RestServlet):
@@ -212,7 +212,8 @@ class RegisterRestServlet(RestServlet):
         time_now = self.clock.time()
 
         allowed, time_allowed = self.ratelimiter.can_do_action(
-            client_addr, time_now_s=time_now,
+            client_addr,
+            time_now_s=time_now,
             rate_hz=self.hs.config.rc_registration.per_second,
             burst_count=self.hs.config.rc_registration.burst_count,
             update=False,
@@ -220,7 +221,7 @@ class RegisterRestServlet(RestServlet):
 
         if not allowed:
             raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now)),
+                retry_after_ms=int(1000 * (time_allowed - time_now))
             )
 
         kind = b"user"
@@ -229,7 +230,7 @@ class RegisterRestServlet(RestServlet):
 
         if kind == b"guest":
             ret = yield self._do_guest_registration(body, address=client_addr)
-            defer.returnValue(ret)
+            return ret
             return
         elif kind != b"user":
             raise UnrecognizedRequestError(
@@ -239,18 +240,22 @@ class RegisterRestServlet(RestServlet):
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the username/password provided to us.
         desired_password = None
-        if 'password' in body:
-            if (not isinstance(body['password'], string_types) or
-                    len(body['password']) > 512):
+        if "password" in body:
+            if (
+                not isinstance(body["password"], string_types)
+                or len(body["password"]) > 512
+            ):
                 raise SynapseError(400, "Invalid password")
             desired_password = body["password"]
 
         desired_username = None
-        if 'username' in body:
-            if (not isinstance(body['username'], string_types) or
-                    len(body['username']) > 512):
+        if "username" in body:
+            if (
+                not isinstance(body["username"], string_types)
+                or len(body["username"]) > 512
+            ):
                 raise SynapseError(400, "Invalid username")
-            desired_username = body['username']
+            desired_username = body["username"]
 
         appservice = None
         if self.auth.has_access_token(request):
@@ -277,7 +282,7 @@ class RegisterRestServlet(RestServlet):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
-            defer.returnValue((200, result))  # we throw for non 200 responses
+            return (200, result)  # we throw for non 200 responses
             return
 
         # for either shared secret or regular registration, downcase the
@@ -290,13 +295,13 @@ class RegisterRestServlet(RestServlet):
             desired_username = desired_username.lower()
 
         # == Shared Secret Registration == (e.g. create new user scripts)
-        if 'mac' in body:
+        if "mac" in body:
             # FIXME: Should we really be determining if this is shared secret
             # auth based purely on the 'mac' key?
             result = yield self._do_shared_secret_registration(
                 desired_username, desired_password, body
             )
-            defer.returnValue((200, result))  # we throw for non 200 responses
+            return (200, result)  # we throw for non 200 responses
             return
 
         # == Normal User Registration == (everyone else)
@@ -305,16 +310,13 @@ class RegisterRestServlet(RestServlet):
 
         guest_access_token = body.get("guest_access_token", None)
 
-        if (
-            'initial_device_display_name' in body and
-            'password' not in body
-        ):
+        if "initial_device_display_name" in body and "password" not in body:
             # ignore 'initial_device_display_name' if sent without
             # a password to work around a client bug where it sent
             # the 'initial_device_display_name' param alone, wiping out
             # the original registration params
             logger.warn("Ignoring initial_device_display_name without password")
-            del body['initial_device_display_name']
+            del body["initial_device_display_name"]
 
         session_id = self.auth_handler.get_session_id(body)
         registered_user_id = None
@@ -336,8 +338,8 @@ class RegisterRestServlet(RestServlet):
 
         # FIXME: need a better error than "no auth flow found" for scenarios
         # where we required 3PID for registration but the user didn't give one
-        require_email = 'email' in self.hs.config.registrations_require_3pid
-        require_msisdn = 'msisdn' in self.hs.config.registrations_require_3pid
+        require_email = "email" in self.hs.config.registrations_require_3pid
+        require_msisdn = "msisdn" in self.hs.config.registrations_require_3pid
 
         show_msisdn = True
         if self.hs.config.disable_msisdn_registration:
@@ -362,9 +364,9 @@ class RegisterRestServlet(RestServlet):
                 if not require_email:
                     flows.extend([[LoginType.RECAPTCHA, LoginType.MSISDN]])
                 # always let users provide both MSISDN & email
-                flows.extend([
-                    [LoginType.RECAPTCHA, LoginType.MSISDN, LoginType.EMAIL_IDENTITY],
-                ])
+                flows.extend(
+                    [[LoginType.RECAPTCHA, LoginType.MSISDN, LoginType.EMAIL_IDENTITY]]
+                )
         else:
             # only support 3PIDless registration if no 3PIDs are required
             if not require_email and not require_msisdn:
@@ -378,9 +380,7 @@ class RegisterRestServlet(RestServlet):
                 if not require_email or require_msisdn:
                     flows.extend([[LoginType.MSISDN]])
                 # always let users provide both MSISDN & email
-                flows.extend([
-                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY]
-                ])
+                flows.extend([[LoginType.MSISDN, LoginType.EMAIL_IDENTITY]])
 
         # Append m.login.terms to all flows if we're requiring consent
         if self.hs.config.user_consent_at_registration:
@@ -410,21 +410,20 @@ class RegisterRestServlet(RestServlet):
         if auth_result:
             for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
                 if login_type in auth_result:
-                    medium = auth_result[login_type]['medium']
-                    address = auth_result[login_type]['address']
+                    medium = auth_result[login_type]["medium"]
+                    address = auth_result[login_type]["address"]
 
                     if not check_3pid_allowed(self.hs, medium, address):
                         raise SynapseError(
                             403,
-                            "Third party identifiers (email/phone numbers)" +
-                            " are not authorized on this server",
+                            "Third party identifiers (email/phone numbers)"
+                            + " are not authorized on this server",
                             Codes.THREEPID_DENIED,
                         )
 
         if registered_user_id is not None:
             logger.info(
-                "Already registered user ID %r for this session",
-                registered_user_id
+                "Already registered user ID %r for this session", registered_user_id
             )
             # don't re-register the threepids
             registered = False
@@ -451,11 +450,11 @@ class RegisterRestServlet(RestServlet):
                 # the two activation emails, they would register the same 3pid twice.
                 for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
                     if login_type in auth_result:
-                        medium = auth_result[login_type]['medium']
-                        address = auth_result[login_type]['address']
+                        medium = auth_result[login_type]["medium"]
+                        address = auth_result[login_type]["address"]
 
                         existingUid = yield self.store.get_user_id_by_threepid(
-                            medium, address,
+                            medium, address
                         )
 
                         if existingUid is not None:
@@ -465,11 +464,10 @@ class RegisterRestServlet(RestServlet):
                                 Codes.THREEPID_IN_USE,
                             )
 
-            (registered_user_id, _) = yield self.registration_handler.register(
+            registered_user_id = yield self.registration_handler.register_user(
                 localpart=desired_username,
                 password=new_password,
                 guest_access_token=guest_access_token,
-                generate_token=False,
                 threepid=threepid,
                 address=client_addr,
             )
@@ -502,7 +500,7 @@ class RegisterRestServlet(RestServlet):
                 bind_msisdn=params.get("bind_msisdn"),
             )
 
-        defer.returnValue((200, return_dict))
+        return (200, return_dict)
 
     def on_OPTIONS(self, _):
         return 200, {}
@@ -512,7 +510,7 @@ class RegisterRestServlet(RestServlet):
         user_id = yield self.registration_handler.appservice_register(
             username, as_token
         )
-        defer.returnValue((yield self._create_registration_details(user_id, body)))
+        return (yield self._create_registration_details(user_id, body))
 
     @defer.inlineCallbacks
     def _do_shared_secret_registration(self, username, password, body):
@@ -520,7 +518,7 @@ class RegisterRestServlet(RestServlet):
             raise SynapseError(400, "Shared secret registration is not enabled")
         if not username:
             raise SynapseError(
-                400, "username must be specified", errcode=Codes.BAD_JSON,
+                400, "username must be specified", errcode=Codes.BAD_JSON
             )
 
         # use the username from the original request rather than the
@@ -541,16 +539,14 @@ class RegisterRestServlet(RestServlet):
         ).hexdigest()
 
         if not compare_digest(want_mac, got_mac):
-            raise SynapseError(
-                403, "HMAC incorrect",
-            )
+            raise SynapseError(403, "HMAC incorrect")
 
-        (user_id, _) = yield self.registration_handler.register(
-            localpart=username, password=password, generate_token=False,
+        user_id = yield self.registration_handler.register_user(
+            localpart=username, password=password
         )
 
         result = yield self._create_registration_details(user_id, body)
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _create_registration_details(self, user_id, params):
@@ -565,31 +561,23 @@ class RegisterRestServlet(RestServlet):
         Returns:
             defer.Deferred: (object) dictionary for response from /register
         """
-        result = {
-            "user_id": user_id,
-            "home_server": self.hs.hostname,
-        }
+        result = {"user_id": user_id, "home_server": self.hs.hostname}
         if not params.get("inhibit_login", False):
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
             device_id, access_token = yield self.registration_handler.register_device(
-                user_id, device_id, initial_display_name, is_guest=False,
+                user_id, device_id, initial_display_name, is_guest=False
             )
 
-            result.update({
-                "access_token": access_token,
-                "device_id": device_id,
-            })
-        defer.returnValue(result)
+            result.update({"access_token": access_token, "device_id": device_id})
+        return result
 
     @defer.inlineCallbacks
     def _do_guest_registration(self, params, address=None):
         if not self.hs.config.allow_guest_access:
             raise SynapseError(403, "Guest access is disabled")
-        user_id, _ = yield self.registration_handler.register(
-            generate_token=False,
-            make_guest=True,
-            address=address,
+        user_id = yield self.registration_handler.register_user(
+            make_guest=True, address=address
         )
 
         # we don't allow guests to specify their own device_id, because
@@ -597,15 +585,18 @@ class RegisterRestServlet(RestServlet):
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
         device_id, access_token = yield self.registration_handler.register_device(
-            user_id, device_id, initial_display_name, is_guest=True,
+            user_id, device_id, initial_display_name, is_guest=True
         )
 
-        defer.returnValue((200, {
-            "user_id": user_id,
-            "device_id": device_id,
-            "access_token": access_token,
-            "home_server": self.hs.hostname,
-        }))
+        return (
+            200,
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+            },
+        )
 
 
 def register_servlets(hs, http_server):

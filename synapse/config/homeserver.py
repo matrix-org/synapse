@@ -40,6 +40,7 @@ from .spam_checker import SpamCheckerConfig
 from .stats import StatsConfig
 from .third_party_event_rules import ThirdPartyRulesConfig
 from .tls import TlsConfig
+from .tracer import TracerConfig
 from .user_directory import UserDirectoryConfig
 from .voip import VoipConfig
 from .workers import WorkerConfig
@@ -75,5 +76,6 @@ class HomeServerConfig(
     ServerNoticesConfig,
     RoomDirectoryConfig,
     ThirdPartyRulesConfig,
+    TracerConfig,
 ):
     pass

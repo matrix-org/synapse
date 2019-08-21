@@ -193,14 +193,12 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
         if row:
-            defer.returnValue(
-                RatelimitOverride(
-                    messages_per_second=row["messages_per_second"],
-                    burst_count=row["burst_count"],
-                )
+            return RatelimitOverride(
+                messages_per_second=row["messages_per_second"],
+                burst_count=row["burst_count"],
             )
         else:
-            defer.returnValue(None)
+            return None
 
 
 class RoomStore(RoomWorkerStore, SearchStore):
@@ -388,32 +386,12 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
     def _store_room_topic_txn(self, txn, event):
         if hasattr(event, "content") and "topic" in event.content:
-            self._simple_insert_txn(
-                txn,
-                "topics",
-                {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "topic": event.content["topic"],
-                },
-            )
-
             self.store_event_search_txn(
                 txn, event, "content.topic", event.content["topic"]
             )
 
     def _store_room_name_txn(self, txn, event):
         if hasattr(event, "content") and "name" in event.content:
-            self._simple_insert_txn(
-                txn,
-                "room_names",
-                {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "name": event.content["name"],
-                },
-            )
-
             self.store_event_search_txn(
                 txn, event, "content.name", event.content["name"]
             )
@@ -423,21 +401,6 @@ class RoomStore(RoomWorkerStore, SearchStore):
             self.store_event_search_txn(
                 txn, event, "content.body", event.content["body"]
             )
-
-    def _store_history_visibility_txn(self, txn, event):
-        self._store_content_index_txn(txn, event, "history_visibility")
-
-    def _store_guest_access_txn(self, txn, event):
-        self._store_content_index_txn(txn, event, "guest_access")
-
-    def _store_content_index_txn(self, txn, event, key):
-        if hasattr(event, "content") and key in event.content:
-            sql = (
-                "INSERT INTO %(key)s"
-                " (event_id, room_id, %(key)s)"
-                " VALUES (?, ?, ?)" % {"key": key}
-            )
-            txn.execute(sql, (event.event_id, event.room_id, event.content[key]))
 
     def add_event_report(
         self, room_id, event_id, user_id, reason, content, received_ts

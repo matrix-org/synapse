@@ -49,16 +49,23 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
-Upgrading to v1.1
-=================
+Upgrading to v1.2.0
+===================
 
-Synapse 1.1 removes support for older Python and PostgreSQL versions, as
+Some counter metrics have been renamed, with the old names deprecated. See
+`the metrics documentation <docs/metrics-howto.rst#renaming-of-metrics--deprecation-of-old-names-in-12>`_
+for details.
+
+Upgrading to v1.1.0
+===================
+
+Synapse v1.1.0 removes support for older Python and PostgreSQL versions, as
 outlined in `our deprecation notice <https://matrix.org/blog/2019/04/08/synapse-deprecating-postgres-9-4-and-python-2-x>`_.
 
 Minimum Python Version
 ----------------------
 
-Synapse v1.1 has a minimum Python requirement of Python 3.5. Python 3.6 or
+Synapse v1.1.0 has a minimum Python requirement of Python 3.5. Python 3.6 or
 Python 3.7 are recommended as they have improved internal string handling,
 significantly reducing memory usage.
 
