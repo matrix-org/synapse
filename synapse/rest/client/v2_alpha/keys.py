@@ -263,7 +263,7 @@ class SigningKeyUploadServlet(RestServlet):
         )
 
         result = yield self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)
-        defer.returnValue((200, result))
+        return (200, result)
 
 
 def register_servlets(hs, http_server):

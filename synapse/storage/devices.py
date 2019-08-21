@@ -317,7 +317,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 user_ids,
                 stream_id,
             )
-        defer.returnValue(stream_id)
+        return stream_id
 
     def _add_user_signature_change_txn(self, txn, from_user_id, user_ids, stream_id):
         txn.call_after(
@@ -491,9 +491,9 @@ class DeviceWorkerStore(SQLBaseStore):
             rows = yield self._execute(
                 "get_users_whose_signatures_changed", None, sql, user_id, from_key
             )
-            defer.returnValue(set(user for row in rows for user in json.loads(row[0])))
+            return set(user for row in rows for user in json.loads(row[0]))
         else:
-            defer.returnValue(set())
+            return set()
 
     def get_all_device_list_changes_for_remotes(self, from_key, to_key):
         """Return a list of `(stream_id, user_id, destination)` which is the

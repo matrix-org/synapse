@@ -14,8 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import time
-
 from six import iteritems
 
 from canonicaljson import encode_canonical_json, json
@@ -284,7 +282,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             "delete_e2e_keys_by_device", delete_e2e_keys_by_device_txn
         )
 
-    def _set_e2e_cross_signing_key_txn(self, txn, user_id, key_type, key):
+    def _set_e2e_cross_signing_key_txn(self, txn, user_id, key_type, key, added_ts):
         """Set a user's cross-signing key.
 
         Args:
@@ -294,6 +292,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 for a master key, 'self_signing' for a self-signing key, or
                 'user_signing' for a user-signing key
             key (dict): the key data
+            added_ts (int): the timestamp for when the key was added
         """
         # the cross-signing keys need to occupy the same namespace as devices,
         # since signatures are identified by device ID.  So add an entry to the
@@ -334,18 +333,19 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 "user_id": user_id,
                 "keytype": key_type,
                 "keydata": json.dumps(key),
-                "added_ts": time.time() * 1000,
+                "added_ts": added_ts,
             },
             desc="store_master_key",
         )
 
-    def set_e2e_cross_signing_key(self, user_id, key_type, key):
+    def set_e2e_cross_signing_key(self, user_id, key_type, key, added_ts):
         """Set a user's cross-signing key.
 
         Args:
             user_id (str): the user to set the user-signing key for
             key_type (str): the type of cross-signing key to set
             key (dict): the key data
+            added_ts (int): the timestamp for when the key was added
         """
         return self.runInteraction(
             "add_e2e_cross_signing_key",
@@ -353,6 +353,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             user_id,
             key_type,
             key,
+            added_ts,
         )
 
     def _get_e2e_cross_signing_key_txn(self, txn, user_id, key_type, from_user_id=None):
@@ -368,7 +369,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 the key will be included in the result
 
         Returns:
-            dict of the key data
+            dict of the key data or None if not found
         """
         sql = (
             "SELECT keydata "
@@ -412,7 +413,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 the self-signing key will be included in the result
 
         Returns:
-            dict of the key data
+            dict of the key data or None if not found
         """
         return self.runInteraction(
             "get_e2e_cross_signing_key",
