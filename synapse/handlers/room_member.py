@@ -32,13 +32,15 @@ from synapse.api.errors import AuthError, Codes, HttpResponseException, SynapseE
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
+from synapse.util.hash import sha256_and_url_safe_base64
 
 from ._base import BaseHandler
+
+from synapse.handlers.identity import LookupAlgorithm
 
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
-
 
 class RoomMemberHandler(object):
     # TODO(paul): This handler currently contains a messy conflation of
@@ -697,21 +699,65 @@ class RoomMemberHandler(object):
             raise SynapseError(
                 403, "Looking up third-party identifiers is denied from this server"
             )
+
+        # Check what hashing details are supported by this identity server
         try:
-            data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
-                {"medium": medium, "address": address},
+            hash_details = yield self.simple_http_client.get_json(
+                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server)
             )
-
-            if "mxid" in data:
-                if "signatures" not in data:
-                    raise AuthError(401, "No signatures on 3pid binding")
-                yield self._verify_any_signature(data, id_server)
-                return data["mxid"]
-
-        except IOError as e:
-            logger.warn("Error from identity server lookup: %s" % (e,))
+            supported_lookup_algorithms = hash_details["algorithms"]
+            lookup_pepper = hash_details["lookup_pepper"]
+        except (HttpResponseException, ValueError) as e:
+            logger.warn("Error when looking up hashing details: %s" % (e,))
             return None
+
+        # Check if none of the supported lookup algorithms are present
+        if not any(i in supported_lookup_algorithms for i in [LookupAlgorithm.SHA256,
+                                                              LookupAlgorithm.NONE]):
+            logger.warn("No supported lookup algorithms found for %s%s" %
+                        (id_server_scheme, id_server))
+
+            return None
+
+        if LookupAlgorithm.SHA256 in supported_lookup_algorithms:
+            # Perform a hashed lookup
+            lookup_algorithm = LookupAlgorithm.SHA256
+
+            # Hash address, medium and the pepper with sha256
+            to_hash = "%s %s %s" % (address, medium, lookup_pepper)
+            lookup_value = sha256_and_url_safe_base64(to_hash)
+
+        elif LookupAlgorithm.NONE in supported_lookup_algorithms:
+            # Perform a non-hashed lookup
+            lookup_algorithm = LookupAlgorithm.NONE
+
+            # Combine together plaintext address and medium
+            lookup_value = "%s %s" % (address, medium)
+
+        try:
+            lookup_results = yield self.simple_http_client.post_json_get_json(
+                "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
+                {
+                    "addresses": [lookup_value],
+                    "algorithm": lookup_algorithm,
+                    "pepper": lookup_pepper,
+                },
+            )
+        except (HttpResponseException, ValueError) as e:
+            logger.warn("Error when performing a 3pid lookup: %s" % (e,))
+            return None
+
+        # Check for a mapping from what we looked up to an MXID
+        if (
+            "mappings" not in lookup_results
+            or not isinstance(lookup_results["mappings"], dict)
+        ):
+            logger.debug("No results from 3pid lookup")
+            return None
+
+        # Return the MXID if it's available, or None otherwise
+        return lookup_results["mappings"].get(lookup_value)
+
 
     @defer.inlineCallbacks
     def _verify_any_signature(self, data, server_hostname):

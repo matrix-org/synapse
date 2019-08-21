@@ -31,6 +31,7 @@ from synapse.api.errors import (
 )
 
 from ._base import BaseHandler
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -282,3 +283,14 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
+
+class LookupAlgorithm(Enum):
+    """
+    Supported hashing algorithms when performing a 3PID lookup.
+
+    SHA256 - Hashing an (address, medium, pepper) combo with sha256, then url-safe base64
+        encoding
+    NONE - Not performing any hashing. Simply sending an (address, medium) combo in plaintext
+    """
+    SHA256 = "sha256"
+    NONE = "none"
