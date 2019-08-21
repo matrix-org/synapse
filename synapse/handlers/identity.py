@@ -18,6 +18,7 @@
 """Utilities for interacting with Identity Servers"""
 
 import logging
+from enum import Enum
 
 from canonicaljson import json
 
@@ -31,7 +32,6 @@ from synapse.api.errors import (
 )
 
 from ._base import BaseHandler
-from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -284,6 +284,7 @@ class IdentityHandler(BaseHandler):
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
 
+
 class LookupAlgorithm(Enum):
     """
     Supported hashing algorithms when performing a 3PID lookup.
@@ -292,5 +293,6 @@ class LookupAlgorithm(Enum):
         encoding
     NONE - Not performing any hashing. Simply sending an (address, medium) combo in plaintext
     """
+
     SHA256 = "sha256"
     NONE = "none"

@@ -29,6 +29,7 @@ from twisted.internet import defer
 from synapse import types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, HttpResponseException, SynapseError
+from synapse.handlers.identity import LookupAlgorithm
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -36,11 +37,10 @@ from synapse.util.hash import sha256_and_url_safe_base64
 
 from ._base import BaseHandler
 
-from synapse.handlers.identity import LookupAlgorithm
-
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
+
 
 class RoomMemberHandler(object):
     # TODO(paul): This handler currently contains a messy conflation of
@@ -712,10 +712,14 @@ class RoomMemberHandler(object):
             return None
 
         # Check if none of the supported lookup algorithms are present
-        if not any(i in supported_lookup_algorithms for i in [LookupAlgorithm.SHA256,
-                                                              LookupAlgorithm.NONE]):
-            logger.warn("No supported lookup algorithms found for %s%s" %
-                        (id_server_scheme, id_server))
+        if not any(
+            i in supported_lookup_algorithms
+            for i in [LookupAlgorithm.SHA256, LookupAlgorithm.NONE]
+        ):
+            logger.warn(
+                "No supported lookup algorithms found for %s%s"
+                % (id_server_scheme, id_server)
+            )
 
             return None
 
@@ -748,16 +752,14 @@ class RoomMemberHandler(object):
             return None
 
         # Check for a mapping from what we looked up to an MXID
-        if (
-            "mappings" not in lookup_results
-            or not isinstance(lookup_results["mappings"], dict)
+        if "mappings" not in lookup_results or not isinstance(
+            lookup_results["mappings"], dict
         ):
             logger.debug("No results from 3pid lookup")
             return None
 
         # Return the MXID if it's available, or None otherwise
         return lookup_results["mappings"].get(lookup_value)
-
 
     @defer.inlineCallbacks
     def _verify_any_signature(self, data, server_hostname):

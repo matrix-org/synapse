@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import hashlib
+
 import unpaddedbase64
 
 
@@ -30,4 +31,3 @@ def sha256_and_url_safe_base64(input_text):
     """
     digest = hashlib.sha256(input_text.encode()).digest()
     return unpaddedbase64.encode_base64(digest, urlsafe=True)
-
