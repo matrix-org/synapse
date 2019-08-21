@@ -734,7 +734,7 @@ class RoomMemberHandler(object):
             data = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
                 {"medium": medium, "address": address},
-                )
+            )
 
             if "mxid" in data:
                 if "signatures" not in data:
