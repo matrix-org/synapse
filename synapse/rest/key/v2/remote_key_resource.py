@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import logging
-from io import BytesIO
+
+from canonicaljson import json
+from signedjson.sign import sign_json
 
 from twisted.internet import defer
 
@@ -95,6 +97,7 @@ class RemoteKey(DirectServeResource):
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.config = hs.config
 
     @wrap_json_request_handler
     async def _async_render_GET(self, request):
@@ -214,15 +217,14 @@ class RemoteKey(DirectServeResource):
             yield self.fetcher.get_keys(cache_misses)
             yield self.query_keys(request, query, query_remote_on_cache_miss=False)
         else:
-            result_io = BytesIO()
-            result_io.write(b'{"server_keys":')
-            sep = b"["
-            for json_bytes in json_results:
-                result_io.write(sep)
-                result_io.write(json_bytes)
-                sep = b","
-            if sep == b"[":
-                result_io.write(sep)
-            result_io.write(b"]}")
+            signed_keys = []
+            for key_json in json_results:
+                key_json = json.loads(key_json)
+                for signing_key in self.config.key_server_signing_keys:
+                    key_json = sign_json(key_json, self.config.server_name, signing_key)
 
-            respond_with_json_bytes(request, 200, result_io.getvalue())
+                signed_keys.append(key_json)
+
+            results = {"server_keys": signed_keys}
+
+            respond_with_json_bytes(request, 200, json.dumps(results).encode("utf-8"))

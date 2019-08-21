@@ -30,7 +30,6 @@ from signedjson.key import (
 from signedjson.sign import (
     SignatureVerifyException,
     encode_canonical_json,
-    sign_json,
     signature_ids,
     verify_signed_json,
 )
@@ -540,15 +539,7 @@ class BaseV2KeyFetcher(object):
                     verify_key=verify_key, valid_until_ts=key_data["expired_ts"]
                 )
 
-        # re-sign the json with our own keys, so that it is ready if we are
-        # asked to give it out as a notary server
-        signed_key_json = response_json
-        for signing_key in self.config.key_server_signing_keys:
-            signed_key_json = sign_json(
-                signed_key_json, self.config.server_name, signing_key
-            )
-
-        signed_key_json_bytes = encode_canonical_json(signed_key_json)
+        signed_key_json_bytes = encode_canonical_json(response_json)
 
         yield make_deferred_yieldable(
             defer.gatherResults(
