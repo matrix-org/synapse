@@ -135,8 +135,6 @@ export const baseConfigToSynapseConfig = config => {
     const conf = {
         server_name: config.servername,
         report_stats: config.reportStats,
-        log_config: config.configDir + "/" + config.servername + ".log.config",
-        pid_file: config.configDir + "/data/homeserver.pid",
         ...listeners(config),
         ...tlsPaths(config),
         ...acme(config),
