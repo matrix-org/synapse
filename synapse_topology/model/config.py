@@ -2,6 +2,7 @@ from synapse.config.database import DatabaseConfig
 from synapse.config.server import ServerConfig
 from synapse.config.tls import TlsConfig
 from synapse.config.logger import LoggingConfig
+from synapse.config.homeserver import HomeServerConfig
 from model import get_config_dir, get_data_dir, set_config_dir
 
 
@@ -15,7 +16,23 @@ def create_config(conf):
     tls = TlsConfig().generate_config_section(
         get_config_dir(), server_name, get_data_dir(), **conf
     )
-    return "\n\n".join([server, database, tls])
+    basic_config = "\n\n".join([server, database, tls])
+
+    unintialised_configs = list(HomeServerConfig.__bases__)
+    for config in [ServerConfig, DatabaseConfig, TlsConfig]:
+        unintialised_configs.remove(config)
+
+    class Configs(*unintialised_configs):
+        pass
+
+    rest_of_config = Configs().generate_config(
+        get_config_dir(),
+        get_data_dir(),
+        server_name,
+        generate_secrets=True,
+        report_stats=conf["report_stats"],
+    )
+    return basic_config, rest_of_config
 
 
 set_config_dir("/exampledir/")
@@ -41,6 +58,7 @@ print(
             "tls_certificate_path": "asdfasfdasdfadf",
             "tls_private_key_path": "asdfasfdha;kdfjhafd",
             "acme_domain": "asdfaklhsadfkj",
+            "report_stats": True,
         }
     )
 )
