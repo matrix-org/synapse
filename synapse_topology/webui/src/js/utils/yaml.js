@@ -72,14 +72,14 @@ const listeners = config => {
 
 const tlsPaths = config => {
 
-    if (config.reverseProxy == REVERSE_PROXY_TYPES.TLS) {
+    if (config.tls == TLS_TYPES.TLS) {
 
         return {
             tls_certificate_path: config.tlsCertPath,
             tls_private_key_path: config.tlsCertKeyPath,
         }
 
-    } else if (config.reverseProxy == REVERSE_PROXY_TYPES.ACME) {
+    } else if (config.tls == TLS_TYPES.ACME) {
 
         return {
             tls_certificate_path:
@@ -108,7 +108,7 @@ const acme = config => {
                 reprovision_threshold: 30,
                 domain: config.delegationServerName ?
                     config.delegationServerName :
-                    servername,
+                    config.servername,
                 account_key_file: config.configDir + "/data/acme_account.key",
             },
         }
