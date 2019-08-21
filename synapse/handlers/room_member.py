@@ -705,11 +705,66 @@ class RoomMemberHandler(object):
             hash_details = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server)
             )
-            supported_lookup_algorithms = hash_details["algorithms"]
-            lookup_pepper = hash_details["lookup_pepper"]
         except (HttpResponseException, ValueError) as e:
+            # Check if this identity server does not know about v2 lookups
+            if HttpResponseException.code == 404:
+                # This is an old identity server that does not yet support v2 lookups
+                return self._lookup_3pid_v1(id_server, medium, address)
+
             logger.warn("Error when looking up hashing details: %s" % (e,))
             return None
+
+        res = yield self._lookup_3pid_v2(id_server, medium, address, hash_details)
+        return res
+
+    @defer.inlineCallbacks
+    def _lookup_3pid_v1(self, id_server, medium, address):
+        """Looks up a 3pid in the passed identity server using v1 lookup.
+
+        Args:
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            medium (str): The type of the third party identifier (e.g. "email").
+            address (str): The third party identifier (e.g. "foo@example.com").
+
+        Returns:
+            str: the matrix ID of the 3pid, or None if it is not recognized.
+        """
+        try:
+            data = yield self.simple_http_client.get_json(
+                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
+                {"medium": medium, "address": address},
+                )
+
+            if "mxid" in data:
+                if "signatures" not in data:
+                    raise AuthError(401, "No signatures on 3pid binding")
+                yield self._verify_any_signature(data, id_server)
+                return data["mxid"]
+
+        except IOError as e:
+            logger.warn("Error from identity server lookup: %s" % (e,))
+
+        return None
+
+    @defer.inlineCallbacks
+    def _lookup_3pid_v2(self, id_server, medium, address, hash_details):
+        """Looks up a 3pid in the passed identity server using v2 lookup.
+
+        Args:
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            medium (str): The type of the third party identifier (e.g. "email").
+            address (str): The third party identifier (e.g. "foo@example.com").
+            hash_details (dict[str, str]): A dictionary containing hashing information
+                provided by an identity server.
+
+        Returns:
+            str: the matrix ID of the 3pid, or None if it is not recognized.
+        """
+        # Extract information from hash_details
+        supported_lookup_algorithms = hash_details["algorithms"]
+        lookup_pepper = hash_details["lookup_pepper"]
 
         # Check if none of the supported lookup algorithms are present
         if not any(
