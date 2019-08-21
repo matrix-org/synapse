@@ -16,7 +16,6 @@
 # limitations under the License.
 
 import logging
-
 import time
 
 from six import iteritems
