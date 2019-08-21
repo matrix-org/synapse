@@ -79,13 +79,13 @@ const tlsPaths = config => {
             tls_private_key_path: config.tlsCertKeyPath,
         }
 
-    } else if (config.reverser_proxy == REVERSE_PROXY_TYPES.ACME) {
+    } else if (config.reverseProxy == REVERSE_PROXY_TYPES.ACME) {
 
         return {
             tls_certificate_path:
-                config.configDir + "/" + config.server_name + ".tls.cert",
+                config.configDir + "/" + config.servername + ".tls.cert",
             tls_private_key_path:
-                config.configDir + "/" + config.server_name + ".tls.key",
+                config.configDir + "/" + config.servername + ".tls.key",
         }
 
     } else {
