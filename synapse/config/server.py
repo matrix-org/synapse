@@ -355,7 +355,7 @@ class ServerConfig(Config):
         return any(l["tls"] for l in self.listeners)
 
     def generate_config_section(
-        self, server_name, data_dir_path, open_private_ports, listeners=None, **kwargs
+        self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
     ):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:

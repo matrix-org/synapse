@@ -181,6 +181,11 @@ class Config(object):
         generate_secrets=False,
         report_stats=None,
         open_private_ports=False,
+        listeners=None,
+        database=None,
+        tls_certificate_path=None,
+        tls_private_key_path=None,
+        acme_domain=None,
     ):
         """Build a default configuration file
 

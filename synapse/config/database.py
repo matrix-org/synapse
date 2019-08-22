@@ -38,7 +38,9 @@ class DatabaseConfig(Config):
 
         self.set_databasepath(config.get("database_path"))
 
-    def generate_config_section(self, data_dir_path, database="sqlite3", **kwargs):
+    def generate_config_section(self, data_dir_path, database, **kwargs):
+        if not database:
+            database = "sqlite3"
         database_path = os.path.join(data_dir_path, "homeserver.db")
         return (
             """\
