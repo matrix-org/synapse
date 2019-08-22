@@ -10,57 +10,61 @@ def create_config(conf):
     server_name = conf["server_name"]
     del conf["server_name"]
 
-    server = ServerConfig().generate_config_section(
-        server_name, get_data_dir(), False, **conf
-    )
-    database = DatabaseConfig().generate_config_section(get_data_dir(), **conf)
-    tls = TlsConfig().generate_config_section(
-        get_config_dir(), server_name, get_data_dir(), **conf
-    )
-    basic_config = "\n\n".join([server, database, tls])
+    config_dir_path = get_config_dir()
+    data_dir_path = get_data_dir()
 
-    unintialised_configs = list(HomeServerConfig.__bases__)
-    for config in [ServerConfig, DatabaseConfig, TlsConfig]:
-        unintialised_configs.remove(config)
+    base_configs = [ServerConfig, DatabaseConfig, TlsConfig]
 
-    class Configs(*unintialised_configs):
+    # Generate configs for all the ones we didn't cover explicitely
+    uninitialized_configs = [
+        x for x in list(HomeServerConfig.__bases__) if x not in base_configs
+    ]
+
+    class BaseConfig(*base_configs):
         pass
 
-    rest_of_config = Configs().generate_config(
-        get_config_dir(),
-        get_data_dir(),
-        server_name,
-        generate_secrets=True,
-        report_stats=conf["report_stats"],
-    )
-    return basic_config, rest_of_config
+    class Configs(*uninitialized_configs):
+        pass
+
+    config_args = {
+        "config_dir_path": config_dir_path,
+        "data_dir_path": data_dir_path,
+        "server_name": server_name,
+        **conf,
+    }
+
+    base_config = BaseConfig().generate_config(**config_args)
+
+    rest_of_config = Configs().generate_config(**config_args)
+
+    return {"homeserver.yaml": base_config, "the_rest.yaml": rest_of_config}
 
 
 set_config_dir("/exampledir/")
-print(
-    create_config(
-        {
-            "server_name": "banterserver",
-            "database": "sqlcrap",
-            "listeners": [
-                {
-                    "port": 8448,
-                    "resources": [{"names": ["federation"]}],
-                    "tls": True,
-                    "type": "http",
-                },
-                {
-                    "port": 443,
-                    "resources": [{"names": ["client"]}],
-                    "tls": False,
-                    "type": "http",
-                },
-            ],
-            "tls_certificate_path": "asdfasfdasdfadf",
-            "tls_private_key_path": "asdfasfdha;kdfjhafd",
-            "acme_domain": "asdfaklhsadfkj",
-            "report_stats": True,
-        }
-    )
+confs = create_config(
+    {
+        "server_name": "banterserver",
+        "database": "sqlcrap",
+        "listeners": [
+            {
+                "port": 8448,
+                "resources": [{"names": ["federation"]}],
+                "tls": True,
+                "type": "http",
+            },
+            {
+                "port": 443,
+                "resources": [{"names": ["client"]}],
+                "tls": False,
+                "type": "http",
+            },
+        ],
+        "tls_certificate_path": "asdfasfdasdfadf",
+        "tls_private_key_path": "asdfasfdha;kdfjhafd",
+        "acme_domain": "asdfaklhsadfkj",
+        "report_stats": True,
+    }
 )
-
+for conf_name, conf in confs.items():
+    with open(conf_name, "w") as f:
+        f.write(conf)
