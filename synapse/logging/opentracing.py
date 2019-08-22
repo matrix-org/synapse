@@ -765,4 +765,3 @@ def trace_servlet(servlet_name, extract_context=False):
         return _trace_servlet_inner
 
     return _trace_servlet_inner_1
-
