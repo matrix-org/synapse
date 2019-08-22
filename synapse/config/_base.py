@@ -220,6 +220,11 @@ class Config(object):
                 generate_secrets=generate_secrets,
                 report_stats=report_stats,
                 open_private_ports=open_private_ports,
+                listeners=listeners,
+                database=database,
+                tls_certificate_path=tls_certificate_path,
+                tls_private_key_path=tls_private_key_path,
+                acme_domain=acme_domain,
             )
         )
 
