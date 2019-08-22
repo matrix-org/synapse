@@ -174,10 +174,48 @@ from twisted.internet import defer
 
 from synapse.config import ConfigError
 
+# Helper class
+
+
+class _DummyTagNames(object):
+    """wrapper of opentracings tags. We need to have them if we
+    want to reference them without opentracing around. Clearly they
+    should never actually show up in a trace. `set_tags` overwrites
+    these with the correct ones."""
+
+    INVALID_TAG = "invalid-tag"
+    COMPONENT = INVALID_TAG
+    DATABASE_INSTANCE = INVALID_TAG
+    DATABASE_STATEMENT = INVALID_TAG
+    DATABASE_TYPE = INVALID_TAG
+    DATABASE_USER = INVALID_TAG
+    ERROR = INVALID_TAG
+    HTTP_METHOD = INVALID_TAG
+    HTTP_STATUS_CODE = INVALID_TAG
+    HTTP_URL = INVALID_TAG
+    MESSAGE_BUS_DESTINATION = INVALID_TAG
+    PEER_ADDRESS = INVALID_TAG
+    PEER_HOSTNAME = INVALID_TAG
+    PEER_HOST_IPV4 = INVALID_TAG
+    PEER_HOST_IPV6 = INVALID_TAG
+    PEER_PORT = INVALID_TAG
+    PEER_SERVICE = INVALID_TAG
+    SAMPLING_PRIORITY = INVALID_TAG
+    SERVICE = INVALID_TAG
+    SPAN_KIND = INVALID_TAG
+    SPAN_KIND_CONSUMER = INVALID_TAG
+    SPAN_KIND_PRODUCER = INVALID_TAG
+    SPAN_KIND_RPC_CLIENT = INVALID_TAG
+    SPAN_KIND_RPC_SERVER = INVALID_TAG
+
+
 try:
     import opentracing
+
+    tags = opentracing.tags
 except ImportError:
     opentracing = None
+    tags = _DummyTagNames
 try:
     from jaeger_client import Config as JaegerConfig
     from synapse.logging.scopecontextmanager import LogContextScopeManager
@@ -251,10 +289,6 @@ def init_tracer(config):
         service_name="{} {}".format(config.server_name, name),
         scope_manager=LogContextScopeManager(config),
     ).initialize_tracer()
-
-    # Set up tags to be opentracing's tags
-    global tags
-    tags = opentracing.tags
 
 
 # Whitelisting
@@ -732,44 +766,3 @@ def trace_servlet(servlet_name, extract_context=False):
 
     return _trace_servlet_inner_1
 
-
-# Helper class
-
-
-class _DummyTagNames(object):
-    """wrapper of opentracings tags. We need to have them if we
-    want to reference them without opentracing around. Clearly they
-    should never actually show up in a trace. `set_tags` overwrites
-    these with the correct ones."""
-
-    INVALID_TAG = "invalid-tag"
-    COMPONENT = INVALID_TAG
-    DATABASE_INSTANCE = INVALID_TAG
-    DATABASE_STATEMENT = INVALID_TAG
-    DATABASE_TYPE = INVALID_TAG
-    DATABASE_USER = INVALID_TAG
-    ERROR = INVALID_TAG
-    HTTP_METHOD = INVALID_TAG
-    HTTP_STATUS_CODE = INVALID_TAG
-    HTTP_URL = INVALID_TAG
-    MESSAGE_BUS_DESTINATION = INVALID_TAG
-    PEER_ADDRESS = INVALID_TAG
-    PEER_HOSTNAME = INVALID_TAG
-    PEER_HOST_IPV4 = INVALID_TAG
-    PEER_HOST_IPV6 = INVALID_TAG
-    PEER_PORT = INVALID_TAG
-    PEER_SERVICE = INVALID_TAG
-    SAMPLING_PRIORITY = INVALID_TAG
-    SERVICE = INVALID_TAG
-    SPAN_KIND = INVALID_TAG
-    SPAN_KIND_CONSUMER = INVALID_TAG
-    SPAN_KIND_PRODUCER = INVALID_TAG
-    SPAN_KIND_RPC_CLIENT = INVALID_TAG
-    SPAN_KIND_RPC_SERVER = INVALID_TAG
-
-
-tags = _DummyTagNames
-
-
-def get_tags():
-    return tags
