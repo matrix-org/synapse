@@ -101,16 +101,9 @@ const acme = config => {
     if (config.tls == TLS_TYPES.ACME) {
 
         return {
-            acme: {
-                url: "https://acme-v01.api.letsencrypt.org/directory",
-                port: 80,
-                bind_addresses: ['::', '0.0.0.0'],
-                reprovision_threshold: 30,
-                domain: config.delegationServerName ?
-                    config.delegationServerName :
-                    config.servername,
-                account_key_file: config.configDir + "/data/acme_account.key",
-            },
+            acme_domain: config.delegationServerName ?
+                config.delegationServerName :
+                config.servername,
         }
 
     } else {
