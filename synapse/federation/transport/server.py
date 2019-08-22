@@ -293,7 +293,7 @@ class BaseFederationServlet(object):
                 logger.warn("authenticate_request failed: %s", e)
                 raise
 
-            _tags = {
+            request_tags = {
                 "request_id": request.get_request_id(),
                 tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
                 tags.HTTP_METHOD: request.get_method(),
@@ -307,10 +307,10 @@ class BaseFederationServlet(object):
             # and whitelisted
             if origin and whitelisted_homeserver(origin):
                 scope = start_active_span_from_request(
-                    request, "incoming-federation-request", tags=_tags
+                    request, "incoming-federation-request", tags=request_tags
                 )
             else:
-                scope = start_active_span("incoming-federation-request", tags=_tags)
+                scope = start_active_span("incoming-federation-request", tags=request_tags)
 
             with scope:
                 if origin:
