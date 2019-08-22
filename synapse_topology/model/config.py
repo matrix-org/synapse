@@ -9,6 +9,7 @@ from model import get_config_dir, get_data_dir, set_config_dir
 def create_config(conf):
     server_name = conf["server_name"]
     del conf["server_name"]
+
     server = ServerConfig().generate_config_section(
         server_name, get_data_dir(), False, **conf
     )
