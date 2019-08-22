@@ -295,11 +295,11 @@ class TlsConfig(Config):
         # instance, if using certbot, use `fullchain.pem` as your certificate,
         # not `cert.pem`).
         #
-        %(tls_enabled)stls_certificate_path: %(tls_certificate_path)s
+        %(tls_enabled)stls_certificate_path: "%(tls_certificate_path)s"
 
         # PEM-encoded private key for TLS
         #
-        %(tls_enabled)stls_private_key_path: %(tls_private_key_path)s
+        %(tls_enabled)stls_private_key_path: "%(tls_private_key_path)s"
 
         # Whether to verify TLS server certificates for outbound federation requests.
         #
