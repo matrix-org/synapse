@@ -56,6 +56,8 @@ class TransactionManager(object):
         # all the edus in that transaction. This needs to be done since there is
         # no active span here, so if the edus were not received by the remote the
         # span would have no causality and it would be forgotten.
+        # The span_contexts is a generator so that it won't be evaluated if
+        # opentracing is disabled. (Yay speed!)
 
         span_contexts = (
             extract_text_map(json.loads(edu.get_context())) for edu in pending_edus
