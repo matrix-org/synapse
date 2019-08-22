@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS room_stats_current (
     -- If initial stats regen is still to be performed: NULL
     -- If initial stats regen has been performed: the maximum delta stream
     --  position that this row takes into account.
-    completed_delta_stream_id BIGINT,
+    completed_delta_stream_id BIGINT
 );
 
 
