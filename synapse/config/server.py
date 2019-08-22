@@ -17,16 +17,16 @@
 
 import logging
 import os.path
-import yaml
 import re
+from textwrap import indent
 
 import attr
+import yaml
 from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.python_dependencies import DependencyException, check_requirements
-from textwrap import indent
 
 from ._base import Config, ConfigError
 
