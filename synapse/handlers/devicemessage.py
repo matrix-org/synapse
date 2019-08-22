@@ -119,7 +119,7 @@ class DeviceMessageHandler(object):
                     "sender": sender_user_id,
                     "type": message_type,
                     "message_id": message_id,
-                    "org.matrix.context": json.dumps(context)
+                    "org.matrix.opentracing_context": json.dumps(context)
                     if whitelisted_homeserver(destination)
                     else None,
                 }

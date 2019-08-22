@@ -39,7 +39,7 @@ class Edu(JsonEncodedObject):
     internal_keys = ["origin", "destination"]
 
     def get_context(self):
-        return getattr(self, "content", {}).get("org.matrix.context", "{}")
+        return getattr(self, "content", {}).get("org.matrix.opentracing_context", "{}")
 
 
 class Transaction(JsonEncodedObject):

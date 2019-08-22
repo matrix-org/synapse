@@ -106,7 +106,7 @@ Edu format (if you're using jaeger):
    {
      "edu_type": "type",
      "content": {
-       "org.matrix.context": {
+       "org.matrix.opentracing_context": {
          "uber-trace-id": "fe57cf3e65083289"
        }
      }
