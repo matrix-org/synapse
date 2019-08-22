@@ -34,29 +34,13 @@ def _run_create_generic(stats_type, cursor, database_engine):
         # partial index are not a big concern.
         cursor.execute(
             """
-                CREATE INDEX IF NOT EXISTS %s_stats_current_dirty
-                    ON %s_stats_current (end_ts);
-            """
-            % (stats_type, stats_type)
-        )
-        cursor.execute(
-            """
                 CREATE INDEX IF NOT EXISTS %s_stats_not_complete
                     ON %s_stats_current (completed_delta_stream_id, %s_id);
             """
             % (stats_type, stats_type, stats_type)
         )
     elif isinstance(database_engine, PostgresEngine):
-        # This partial index helps us with finding dirty stats rows
-        cursor.execute(
-            """
-                CREATE INDEX IF NOT EXISTS %s_stats_current_dirty
-                    ON %s_stats_current (end_ts)
-                    WHERE end_ts IS NOT NULL;
-            """
-            % (stats_type, stats_type)
-        )
-        # This partial index helps us with old collection
+        # This partial index helps us with finding incomplete stats rows
         cursor.execute(
             """
                 CREATE INDEX IF NOT EXISTS %s_stats_not_complete
