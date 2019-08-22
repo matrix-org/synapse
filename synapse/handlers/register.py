@@ -150,7 +150,6 @@ class RegistrationHandler(BaseHandler):
         threepid=None,
         user_type=None,
         default_display_name=None,
-        require_consent=True,
         address=None,
         bind_emails=[],
     ):
@@ -168,7 +167,6 @@ class RegistrationHandler(BaseHandler):
               will be set to this. Defaults to 'localpart'.
             address (str|None): the IP address used to perform the registration.
             bind_emails (List[str]): list of emails to bind to this account.
-            require_consent (bool): Should the user be required to give consent.
         Returns:
             Deferred[str]: user_id
         Raises:
@@ -213,7 +211,6 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
-                require_consent=require_consent,
             )
 
             if self.hs.config.user_directory_search_all_users:
@@ -247,7 +244,7 @@ class RegistrationHandler(BaseHandler):
                     user_id = None
                     attempts += 1
 
-        if not self.hs.config.user_consent_at_registration and require_consent:
+        if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
         else:
             logger.info(
@@ -528,7 +525,6 @@ class RegistrationHandler(BaseHandler):
             ratelimit=False,
         )
 
-    @defer.inlineCallbacks
     def register_with_store(
         self,
         user_id,
@@ -540,7 +536,6 @@ class RegistrationHandler(BaseHandler):
         admin=False,
         user_type=None,
         address=None,
-        require_consent=True,
     ):
         """Register user in the datastore.
 
@@ -558,7 +553,7 @@ class RegistrationHandler(BaseHandler):
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
             address (str|None): the IP address used to perform the registration.
-            require_consent (bool): Should the user be required to give consent.
+
         Returns:
             Deferred
         """
@@ -589,12 +584,8 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
-                require_consent=require_consent,
             )
         else:
-            if require_consent is False:
-                yield self.store.user_set_consent_version(user_id, "no-consent-required")
-
             return self.store.register_user(
                 user_id=user_id,
                 password_hash=password_hash,
@@ -605,7 +596,6 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
             )
-
 
     @defer.inlineCallbacks
     def register_device(self, user_id, device_id, initial_display_name, is_guest=False):

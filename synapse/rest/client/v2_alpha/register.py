@@ -525,9 +525,6 @@ class RegisterRestServlet(RestServlet):
         # downcased one in `username` for the mac calculation
         user = body["username"].encode("utf-8")
 
-        # do not require consent for this user (for example, bots)
-        require_consent = body.get("require_consent", True)
-
         # str() because otherwise hmac complains that 'unicode' does not
         # have the buffer interface
         got_mac = str(body["mac"])
@@ -545,7 +542,7 @@ class RegisterRestServlet(RestServlet):
             raise SynapseError(403, "HMAC incorrect")
 
         user_id = yield self.registration_handler.register_user(
-            localpart=username, password=password, require_consent=require_consent,
+            localpart=username, password=password
         )
 
         result = yield self._create_registration_details(user_id, body)
