@@ -80,6 +80,10 @@ class ConsentServerNotices(object):
         try:
             u = yield self._store.get_user_by_id(user_id)
 
+            if u["consent_version"] == "no-consent-required":
+                # user is exempt
+                return
+
             if u["is_guest"] and not self._send_to_guests:
                 # don't send to guests
                 return
