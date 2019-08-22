@@ -99,18 +99,21 @@ EDU FORMAT
 EDUs can contain tracing data in their content. This is not specced but
 it could be of interest for other homeservers.
 
-Edu format:
+Edu format (if you're using jaeger):
 
 .. code-block:: json
 
    {
      "edu_type": "type",
      "content": {
-       "context": {
-         ...opentracing_context
+       "org.matrix.context": {
+         "uber-trace-id": "fe57cf3e65083289"
        }
      }
    }
+
+Though you don't have to use jaeger you must inject the span context into
+`context` using the opentracing `Format.TEXT_MAP` inject method.
 
 ==================
 Configuring Jaeger
