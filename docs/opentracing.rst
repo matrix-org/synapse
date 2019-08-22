@@ -113,7 +113,7 @@ Edu format (if you're using jaeger):
    }
 
 Though you don't have to use jaeger you must inject the span context into
-`context` using the opentracing `Format.TEXT_MAP` inject method.
+`org.matrix.opentracing_context` using the opentracing `Format.TEXT_MAP` inject method.
 
 ==================
 Configuring Jaeger
