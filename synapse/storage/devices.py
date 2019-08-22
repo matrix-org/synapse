@@ -844,7 +844,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "device_id": device_id,
                     "sent": False,
                     "ts": now,
-                    "context": json.dumps(context)
+                    "opentracing_context": json.dumps(context)
                     if whitelisted_homeserver(destination)
                     else None,
                 }
