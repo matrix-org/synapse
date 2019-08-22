@@ -21,7 +21,6 @@ from six import raise_from
 from six.moves import urllib
 
 from twisted.internet import defer
-from twisted.web.http_headers import Headers
 
 import synapse.logging.opentracing as opentracing
 from synapse.api.errors import (
