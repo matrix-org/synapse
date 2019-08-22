@@ -371,13 +371,22 @@ class ServerConfig(Config):
         default_room_version = DEFAULT_ROOM_VERSION
         secure_listeners = []
         unsecure_listeners = []
+        private_addresses = ["::1", "127.0.0.1"]
         if listeners:
             for listener in listeners:
                 if listener["tls"]:
                     secure_listeners.append(listener)
                 else:
-                    if open_private_ports and not listener["bind_addresses"]:
-                        listener["bind_addresses"] = ["::1", "127.0.0.1"]
+                    # The open_private_ports option kind of conflicts with the
+                    # idea of passing in your own listener config however
+                    # the local addresses need to be bound if open_private_ports is
+                    # specified.
+                    if open_private_ports:
+                        bind_addresses = listener.setdefault("bind_addresses", [])
+                        for address in private_addresses:
+                            if address not in bind_addresses:
+                                bind_addresses.append(address)
+
                     unsecure_listeners.append(listener)
 
             secure_http_bindings = indent(
