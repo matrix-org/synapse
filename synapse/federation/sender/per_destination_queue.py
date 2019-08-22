@@ -221,10 +221,7 @@ class PerDestinationQueue(object):
                 pending_pdus = self._pending_pdus
 
                 # We can only include at most 50 PDUs per transactions
-                pending_pdus, self._pending_pdus = (
-                    pending_pdus[:50],
-                    pending_pdus[50:],
-                )
+                pending_pdus, self._pending_pdus = pending_pdus[:50], pending_pdus[50:]
 
                 pending_edus.extend(self._get_rr_edus(force_flush=False))
                 pending_presence = self._pending_presence
