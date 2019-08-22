@@ -248,6 +248,10 @@ class TlsConfig(Config):
         acme_domain,
         **kwargs
     ):
+        """If the acme_domain is specified acme will be enabled.
+        If the TLS paths are not specified the default will be certs in the
+        config directory"""
+
         base_key_name = os.path.join(config_dir_path, server_name)
 
         if bool(tls_certificate_path) ^ bool(tls_private_key_path):
