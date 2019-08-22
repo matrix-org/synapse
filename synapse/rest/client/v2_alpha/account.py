@@ -282,13 +282,13 @@ class PasswordResetSubmitTokenServlet(RestServlet):
                     return None
 
             # Otherwise show the success template
-            html = self.config.email_password_reset_success_html_content
+            html = self.config.email_password_reset_template_success_html_content
             request.setResponseCode(200)
         except ThreepidValidationError as e:
             # Show a failure page with a reason
             html = self.load_jinja2_template(
                 self.config.email_template_dir,
-                self.config.email_password_reset_failure_template,
+                self.config.email_password_reset_template_failure_html,
                 template_vars={"failure_reason": e.msg},
             )
             request.setResponseCode(e.code)

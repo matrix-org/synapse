@@ -43,6 +43,9 @@ OpenTracing to be easily disabled in Synapse and thereby have OpenTracing as
 an optional dependency. This does however limit the number of modifiable spans
 at any point in the code to one. From here out references to `opentracing`
 in the code snippets refer to the Synapses module.
+Most methods provided in the module have a direct correlation to those provided
+by opentracing. Refer to docs there for a more in-depth documentation on some of
+the args and methods.
 
 Tracing
 -------
@@ -68,52 +71,62 @@ set a tag on the current active span.
 Tracing functions
 -----------------
 
-Functions can be easily traced using decorators. There is a decorator for
-'normal' function and for functions which are actually deferreds. The name of
+Functions can be easily traced using decorators. The name of
 the function becomes the operation name for the span.
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import trace, trace_deferred
+   from synapse.logging.opentracing import trace
 
-   # Start a span using 'normal_function' as the operation name
+   # Start a span using 'interesting_function' as the operation name
    @trace
-   def normal_function(*args, **kwargs):
+   def interesting_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
 
-   # Start a span using 'deferred_function' as the operation name
-   @trace_deferred
-   @defer.inlineCallbacks
-   def deferred_function(*args, **kwargs):
-       # We start
-       yield we_wait
-       # we finish
-       return something_usual_and_useful
 
 Operation names can be explicitly set for functions by using
-``trace_using_operation_name`` and
-``trace_deferred_using_operation_name``
+``trace_using_operation_name``
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import (
-       trace_using_operation_name,
-       trace_deferred_using_operation_name
-   )
+   from synapse.logging.opentracing import trace_using_operation_name
 
    @trace_using_operation_name("A *much* better operation name")
-   def normal_function(*args, **kwargs):
+   def interesting_badly_named_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
 
-   @trace_deferred_using_operation_name("Another exciting operation name!")
-   @defer.inlineCallbacks
-   def deferred_function(*args, **kwargs):
-       # We start
-       yield we_wait
-       # we finish
-       return something_usual_and_useful
+Setting Tags
+------------
+
+To set a tag on the active span do
+
+.. code-block:: python
+
+   from synapse.logging.opentracing import set_tag
+
+   set_tag(tag_name, tag_value)
+
+There's a convenient decorator to tag all the args of the method. It uses
+inspection in order to use the formal parameter names prefixed with 'ARG_' as
+tag names. It uses kwarg names as tag names without the prefix.
+
+.. code-block:: python
+
+   from synapse.logging.opentracing import tag_args
+
+   @tag_args
+   def set_fates(clotho, lachesis, atropos, father="Zues", mother="Themis"):
+       pass
+
+   set_fates("the story", "the end", "the act")
+   # This will have the following tags
+   #  - ARG_clotho: "the story"
+   #  - ARG_lachesis: "the end"
+   #  - ARG_atropos: "the act"
+   #  - father: "Zues"
+   #  - mother: "Themis"
 
 Contexts and carriers
 ---------------------

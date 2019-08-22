@@ -52,9 +52,9 @@ class MatrixFederationAgent(object):
             SRVResolver impl to use for looking up SRV records. None to use a default
             implementation.
 
-        _well_known_cache (TTLCache|None):
-            TTLCache impl for storing cached well-known lookups. None to use a default
-            implementation.
+        _well_known_resolver (WellKnownResolver|None):
+            WellKnownResolver to use to perform well-known lookups. None to use a
+            default implementation.
     """
 
     def __init__(
@@ -62,7 +62,7 @@ class MatrixFederationAgent(object):
         reactor,
         tls_client_options_factory,
         _srv_resolver=None,
-        _well_known_cache=None,
+        _well_known_resolver=None,
     ):
         self._reactor = reactor
         self._clock = Clock(reactor)
@@ -79,15 +79,17 @@ class MatrixFederationAgent(object):
             pool=self._pool,
         )
 
-        self._well_known_resolver = WellKnownResolver(
-            self._reactor,
-            agent=Agent(
+        if _well_known_resolver is None:
+            _well_known_resolver = WellKnownResolver(
                 self._reactor,
-                contextFactory=tls_client_options_factory,
-                pool=self._pool,
-            ),
-            well_known_cache=_well_known_cache,
-        )
+                agent=Agent(
+                    self._reactor,
+                    pool=self._pool,
+                    contextFactory=tls_client_options_factory,
+                ),
+            )
+
+        self._well_known_resolver = _well_known_resolver
 
     @defer.inlineCallbacks
     def request(self, method, uri, headers=None, bodyProducer=None):
