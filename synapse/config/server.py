@@ -372,7 +372,6 @@ class ServerConfig(Config):
         secure_listeners = []
         unsecure_listeners = []
         if listeners:
-            print(listeners)
             for listener in listeners:
                 if listener["tls"]:
                     secure_listeners.append(listener)
