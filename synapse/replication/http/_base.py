@@ -167,8 +167,8 @@ class ReplicationEndpoint(object):
                 # have a good idea that the request has either succeeded or failed on
                 # the master, and so whether we should clean up or not.
                 while True:
-                    headers = Headers()
-                    opentracing.inject_active_span_twisted_headers(
+                    headers = {}
+                    opentracing.inject_active_span_byte_dict(
                         headers, None, check_destination=False
                     )
                     try:
