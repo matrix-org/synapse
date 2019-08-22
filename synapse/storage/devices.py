@@ -226,13 +226,13 @@ class DeviceWorkerStore(SQLBaseStore):
                 destination, user_id, from_stream_id
             )
             for device_id, device in iteritems(user_devices):
-                stream_id, _ = query_map[(user_id, device_id)]
+                stream_id, context = query_map[(user_id, device_id)]
                 result = {
                     "user_id": user_id,
                     "device_id": device_id,
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
-                    "org.matrix.context": query_map[(user_id, device_id)][1],
+                    "org.matrix.context": context,
                 }
 
                 prev_id = stream_id
