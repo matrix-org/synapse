@@ -108,8 +108,8 @@ Edu format:
      "content": {
        "context": {
          ...opentracing_context
-       },
-     },
+       }
+     }
    }
 
 ==================
