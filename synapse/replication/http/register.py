@@ -72,6 +72,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             "admin": admin,
             "user_type": user_type,
             "address": address,
+            "require_consent": require_consent,
         }
 
     @defer.inlineCallbacks
@@ -88,6 +89,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             admin=content["admin"],
             user_type=content["user_type"],
             address=content["address"],
+            require_consent=content["require_consent"],
         )
 
         return (200, {})
