@@ -99,7 +99,7 @@ EDU FORMAT
 EDUs can contain tracing data in their content. This is not specced but
 it could be of interest for other homeservers.
 
-Edu format (if you're using jaeger):
+EDU format (if you're using jaeger):
 
 .. code-block:: json
 
