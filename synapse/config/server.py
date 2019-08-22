@@ -402,17 +402,21 @@ class ServerConfig(Config):
                 """- port: %(unsecure_port)s
             tls: false
             type: http
-            x_forwarded: true
-
-            resources:
-              - names: [client, federation]
-                compress: false"""
+            x_forwarded: true"""
                 % locals()
             )
+
             if not open_private_ports:
                 unsecure_http_bindings += (
                     "\n            bind_addresses: ['::1', '127.0.0.1']"
                 )
+
+            unsecure_http_bindings += """
+
+            resources:
+              - names: [client, federation]
+                compress: false"""
+
             if listeners:
                 # comment out this block
                 unsecure_http_bindings = "#" + re.sub(
@@ -427,7 +431,7 @@ class ServerConfig(Config):
           #  type: http
           #  tls: true
           #  resources:
-          #  - names: [client, federation]"""
+          #    - names: [client, federation]"""
                 % locals()
             )
 

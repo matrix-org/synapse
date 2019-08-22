@@ -205,9 +205,9 @@ listeners:
   #
   - port: 8008
     tls: false
-    bind_addresses: ['::1', '127.0.0.1']
     type: http
     x_forwarded: true
+    bind_addresses: ['::1', '127.0.0.1']
 
     resources:
       - names: [client, federation]
