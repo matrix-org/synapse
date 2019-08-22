@@ -22,6 +22,7 @@ from six.moves import urllib
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 from synapse.api.errors import (
     CodeMessageException,
     HttpResponseException,
@@ -165,8 +166,12 @@ class ReplicationEndpoint(object):
                 # have a good idea that the request has either succeeded or failed on
                 # the master, and so whether we should clean up or not.
                 while True:
+                    headers = {}
+                    opentracing.inject_active_span_byte_dict(
+                        headers, None, check_destination=False
+                    )
                     try:
-                        result = yield request_func(uri, data)
+                        result = yield request_func(uri, data, headers=headers)
                         break
                     except CodeMessageException as e:
                         if e.code != 504 or not cls.RETRY_ON_TIMEOUT:
@@ -205,7 +210,14 @@ class ReplicationEndpoint(object):
         args = "/".join("(?P<%s>[^/]+)" % (arg,) for arg in url_args)
         pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
 
-        http_server.register_paths(method, [pattern], handler, self.__class__.__name__)
+        http_server.register_paths(
+            method,
+            [pattern],
+            opentracing.trace_servlet(self.__class__.__name__, extract_context=True)(
+                handler
+            ),
+            self.__class__.__name__,
+        )
 
     def _cached_handler(self, request, txn_id, **kwargs):
         """Called on new incoming requests when caching is enabled. Checks
