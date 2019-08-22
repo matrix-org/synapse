@@ -1,1 +1,1 @@
-Opentracing in worker mode.
+Make Opentracing work in worker mode.
