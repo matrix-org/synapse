@@ -67,18 +67,6 @@ def set_config(request, body):
     model.set_config(body)
 
 
-with app.subroute("/config") as app:
-    for config in model.constants.CONFIGS:
-
-        @app.route("/config/{}".format(config), methods=["GET"])
-        def get_sub_config(request, sub_config):
-            return model.get_config(sub_config=config)
-
-        @app.route("/config/{}".format(config), methods=["POST"])
-        def set_sub_config(request, sub_config):
-            model.set_config(json.loads(request.content.read()), sub_config=config)
-
-
 @app.route("/testcertpaths", methods=["POST"])
 @log_body_if_fail
 @validate_schema(CERT_PATHS_SCHEMA)
