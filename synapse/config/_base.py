@@ -213,8 +213,8 @@ class Config(object):
                 HTTP listener) open to the internet.
 
             listeners (list(dict)|None): A list of descriptions of the listeners
-                synapse should start with each of which specifies a port, a list of resources,
-                tls (bool) and type (str). For example:
+                synapse should start with each of which specifies a port (str), a list of
+                resources (list(str)), tls (bool) and type (str). For example:
                 [{
                     "port": 8448,
                     "resources": [{"names": ["federation"]}],
