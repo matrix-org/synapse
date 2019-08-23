@@ -42,5 +42,6 @@ def base_config_in_use(request, failure):
 
 @app.handle_errors(Exception)
 def handle_generic_error(request, failure):
+    print(failure)
     request.setResponseCode(500)
     return "Internal server error\n{}".format(failure)
