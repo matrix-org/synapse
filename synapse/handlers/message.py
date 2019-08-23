@@ -469,8 +469,8 @@ class EventCreationHandler(object):
 
         u = yield self.store.get_user_by_id(user_id)
         assert u is not None
-        if u["user_type"] == UserTypes.SUPPORT or u["user_type"] == UserTypes.BOT:
-            # support users are not required to consent
+        if u["user_type"] in (UserTypes.SUPPORT, UserTypes.BOT):
+            # support and bot users are not required to consent
             return
         if u["appservice_id"] is not None:
             # users registered by an appservice are exempt
