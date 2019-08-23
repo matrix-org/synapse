@@ -28,7 +28,7 @@ from twisted.web.iweb import IAgent, IAgentEndpointFactory
 
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
-from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.util import Clock
 
 logger = logging.getLogger(__name__)
@@ -158,8 +158,9 @@ class MatrixFederationAgent(object):
         if not headers.hasHeader(b"host"):
             headers.addRawHeader(b"host", parsed_uri.netloc)
 
-        with PreserveLoggingContext():
-            res = yield self._agent.request(method, uri, headers, bodyProducer)
+        res = yield make_deferred_yieldable(
+            self._agent.request(method, uri, headers, bodyProducer)
+        )
 
         return res
 
@@ -214,11 +215,14 @@ class MatrixHostnameEndpoint(object):
 
         self._srv_resolver = srv_resolver
 
-    @defer.inlineCallbacks
     def connect(self, protocol_factory):
         """Implements IStreamClientEndpoint interface
         """
 
+        return run_in_background(self._do_connect, protocol_factory)
+
+    @defer.inlineCallbacks
+    def _do_connect(self, protocol_factory):
         first_exception = None
 
         server_list = yield self._resolve_server()
