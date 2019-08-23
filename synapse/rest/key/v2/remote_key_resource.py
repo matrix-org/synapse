@@ -14,7 +14,7 @@
 
 import logging
 
-from canonicaljson import json
+from canonicaljson import encode_canonical_json, json
 from signedjson.sign import sign_json
 
 from twisted.internet import defer
@@ -227,4 +227,4 @@ class RemoteKey(DirectServeResource):
 
             results = {"server_keys": signed_keys}
 
-            respond_with_json_bytes(request, 200, json.dumps(results).encode("utf-8"))
+            respond_with_json_bytes(request, 200, encode_canonical_json(results))

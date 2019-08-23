@@ -1029,8 +1029,8 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #  - server_name: "matrix.org"
 #
 
-# The additional signing keys to use when acting as a trusted key server, on
-# top of the normal signing keys.
+# The signing keys to use when acting as a trusted key server. If not specified
+# defaults to the server signing key.
 #
 # Can contain multiple keys, one per line.
 #
