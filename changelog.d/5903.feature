@@ -1,0 +1,1 @@
+Add bot user type.
