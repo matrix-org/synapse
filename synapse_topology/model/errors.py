@@ -9,10 +9,9 @@ class ConfigNotFoundError(FileNotFoundError):
         return self.config_name
 
 
-class BaseConfigNotFoundError(ConfigNotFoundError):
-    def __init__(self):
-        super().__init__(BASE_CONFIG)
+class ServernameNotSetError(Exception):
+    pass
 
 
-class BasConfigInUseError(Exception):
+class BaseConfigInUseError(Exception):
     pass

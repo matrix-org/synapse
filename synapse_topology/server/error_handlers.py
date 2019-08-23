@@ -2,8 +2,8 @@ from jsonschema import ValidationError
 from simplejson.errors import JSONDecodeError
 from synapse_topology.model.errors import (
     BasConfigInUseError,
-    BaseConfigNotFoundError,
     ConfigNotFoundError,
+    ServernameNotSetError,
 )
 
 from . import app
@@ -22,8 +22,8 @@ def json_decode_error(request, failure):
     return "Invalid post json"
 
 
-@app.handle_errors(BaseConfigNotFoundError)
-def base_config_not_found(request, failure):
+@app.handle_errors(ServernameNotSetError)
+def not_initialised(request, failure):
     request.setResponseCode(500)
     return "Config file not setup, please initialise it using the /servername endpoint"
 
