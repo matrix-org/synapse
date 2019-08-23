@@ -254,7 +254,7 @@ class TlsConfig(Config):
 
         base_key_name = os.path.join(config_dir_path, server_name)
 
-        if bool(tls_certificate_path) ^ bool(tls_private_key_path):
+        if bool(tls_certificate_path) != bool(tls_private_key_path):
             raise ConfigError(
                 "Please specify both a cert path and a key path or neither."
             )
