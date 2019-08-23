@@ -114,24 +114,15 @@ const acme = config => {
 
 }
 
-const database = config => ({
-    database: {
-        name: config.database,
-        args: {
-            database: config.configDir + "/data/homeserver.db",
-        },
-    },
-})
-
 export const baseConfigToSynapseConfig = config => {
 
     const conf = {
         server_name: config.servername,
         report_stats: config.reportStats,
+        database: config.database,
         ...listeners(config),
         ...tlsPaths(config),
         ...acme(config),
-        ...database(config),
         [CONFIG_LOCK]: true,
     }
     console.log(conf)

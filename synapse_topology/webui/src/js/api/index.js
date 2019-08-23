@@ -89,4 +89,9 @@ export const postConfig = (config, subConfigName) =>
 export const getServerSetup = () => fetchAbs(SETUP_CHECK)
     .then(res => res.json())
 
-export const startSynapse = () => fetchAbs(START)
+export const startSynapse = () => fetchAbs(
+    START,
+    {
+        method: 'POST',
+    }
+)
