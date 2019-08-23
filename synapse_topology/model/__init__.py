@@ -92,15 +92,3 @@ def get_secret_key():
     subprocess.run(["generate_signing_key.py", "-o", signing_key_path])
     with open(signing_key_path, "r") as f:
         return f.read()
-
-
-def verify_yaml():
-    pass
-
-
-def add_certs(cert, cert_key):
-    with open(join(config_dir, get_server_name() + ".tls.crt"), "w") as cert_file, open(
-        join(config_dir, get_server_name() + ".tls.key"), "w"
-    ) as key_file:
-        cert_file.write(cert)
-        key_file.write(cert_key)
