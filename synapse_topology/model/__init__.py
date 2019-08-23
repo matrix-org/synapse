@@ -31,16 +31,13 @@ def get_data_dir():
     return data_dir
 
 
-def get_config(sub_config=BASE_CONFIG):
-    if sub_config:
-        conf_path = join(config_dir, sub_config)
+def get_config():
+    conf_path = join(config_dir, BASE_CONFIG)
     try:
         with open(conf_path, "r") as f:
             return yaml.safe_load(f)
     except FileNotFoundError:
-        raise BaseConfigNotFoundError() if sub_config == BASE_CONFIG else ConfigNotFoundError(
-            sub_config
-        )
+        raise BaseConfigNotFoundError()
 
 
 def set_config(config):
