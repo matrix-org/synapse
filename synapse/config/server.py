@@ -381,7 +381,7 @@ class ServerConfig(Config):
                     # idea of passing in your own listener config however
                     # the local addresses need to be bound if open_private_ports is
                     # specified.
-                    if open_private_ports:
+                    if not open_private_ports:
                         bind_addresses = listener.setdefault("bind_addresses", [])
                         for address in private_addresses:
                             if address not in bind_addresses:
