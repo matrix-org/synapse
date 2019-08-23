@@ -47,8 +47,8 @@ def set_config(config):
     if config_in_use():
         raise BasConfigInUseError()
 
-    for conf_name, conf in create_config(config).items():
-        with open(abspath(join(get_config_dir, conf_name)), "w") as f:
+    for conf_name, conf in create_config(config_dir, data_dir, config).items():
+        with open(abspath(join(get_config_dir(), conf_name)), "w") as f:
             f.write(conf)
 
 
@@ -69,7 +69,6 @@ def generate_base_config(server_name, report_stats):
     if config_in_use():
         raise BasConfigInUseError()
 
-    print(config_dir)
     conf = HomeServerConfig().generate_config(
         config_dir,
         join(config_dir, DATA_SUBDIR),
