@@ -5,13 +5,7 @@ from os.path import abspath, join, exists, isdir
 
 from synapse.config.homeserver import HomeServerConfig
 
-from .constants import (
-    BASE_CONFIG,
-    CONFIG_LOCK,
-    CONFIG_LOCK_DATA,
-    DATA_SUBDIR,
-    SERVER_NAME,
-)
+from .constants import CONFIG_LOCK, CONFIG_LOCK_DATA, DATA_SUBDIR, SERVER_NAME
 from .errors import BaseConfigInUseError, ConfigNotFoundError, ServernameNotSetError
 from .config import create_config
 from .util import is_subpath
@@ -44,7 +38,7 @@ class Model:
         """
         conf_path = abspath(join(self.config_dir, config_path))
 
-        if not is_subpath(config_dir, conf_path):
+        if not is_subpath(self.config_dir, conf_path):
             raise FileNotFoundError()
 
         with open(conf_path, "r") as f:
