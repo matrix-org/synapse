@@ -24,7 +24,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.logging.opentracing import log_kv, set_tag, trace_using_operation_name
+from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.types import StreamToken
 
 from ._base import client_patterns
@@ -69,7 +69,7 @@ class KeyUploadServlet(RestServlet):
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
-    @trace_using_operation_name("upload_keys")
+    @trace("upload_keys")
     @defer.inlineCallbacks
     def on_POST(self, request, device_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
