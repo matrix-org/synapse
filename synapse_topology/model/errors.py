@@ -1,6 +1,3 @@
-from .constants import BASE_CONFIG
-
-
 class ConfigNotFoundError(FileNotFoundError):
     def __init__(self, config_name):
         self.config_name = config_name

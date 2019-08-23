@@ -3,8 +3,8 @@ import argparse
 import os.path as path
 import sys
 
-from synapse_topology.server import app
-import synapse_topology.model as model
+from synapse_topology.server import Server
+from synapse_topology.model import Model
 
 from twisted.internet import endpoints, reactor
 from twisted.web.server import Site
@@ -33,13 +33,8 @@ if not path.isdir(args.config_dir):
     exit(1)
 
 
-model.set_config_dir(args.config_dir)
+model = Model(args.config_dir)
 
+server = Server(model)
 
-backend_endpoint = endpoints.serverFromString(
-    reactor, "tcp6:port=8888:interface=localhost"
-)
-backend_endpoint.listen(Site(app.resource()))
-
-
-reactor.run()
+server.app.run("localhost", 8888)

@@ -1,7 +1,3 @@
-from klein import Klein
+# from .error_handlers import ErrorHandledServer as Server
 
-app = Klein()
-
-from . import server
-from . import error_handlers
-
+from .error_handlers import ErrorHandledServer as Server

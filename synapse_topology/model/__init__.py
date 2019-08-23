@@ -10,7 +10,7 @@ from .errors import BaseConfigInUseError, ConfigNotFoundError, ServernameNotSetE
 from .config import create_config
 from .util import is_subpath
 
-from synapse.config import find_config_files, read_config_files
+# from synapse.config import find_config_files, read_config_files
 
 
 class Model:
@@ -70,9 +70,10 @@ class Model:
         the config is in use.
         """
         try:
-            return read_config_files(find_config_files(self.config_dir)).get(
-                CONFIG_LOCK, True
-            )
+            pass
+            # return read_config_files(find_config_files(self.config_dir)).get(
+            # CONFIG_LOCK, True
+            # )
         except FileNotFoundError:
             return False
 
