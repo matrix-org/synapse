@@ -1,21 +1,20 @@
 from os.path import abspath, dirname, join
 
 from canonicaljson import json
-from synapse_topology.model import Model
 
 from twisted.web.static import File
 
 from klein import Klein
 
 from .utils import port_checker
-
-from . import error_handlers
+from synapse_topology.model import constants
 from .schemas import (
     BASE_CONFIG_SCHEMA,
     SERVERNAME_SCHEMA,
     CERT_PATHS_SCHEMA,
     CERTS_SCHEMA,
     PORTS_SCHEMA,
+    SECRET_KEY_SCHEMA,
 )
 from .utils import validate_schema, log_body_if_fail
 
@@ -42,23 +41,15 @@ class Server:
     def get_config_setup(self, request):
         return json.dumps(
             {
-                self.model.constants.CONFIG_LOCK: self.model.config_in_use(),
-                "config_dir": self.model.get_config_dir(),
+                constants.CONFIG_LOCK: self.model.config_in_use(),
+                "config_dir": self.model.config_dir,
             }
         )
 
-    @app.route("/servername", methods=["GET"])
-    def get_server_name(self, request):
-        return self.model.get_server_name()
-
-    @app.route("/servername", methods=["POST"])
-    @validate_schema(SERVERNAME_SCHEMA)
-    def set_server_name(self, request, body):
-        self.model.generate_base_config(**body)
-
     @app.route("/secretkey", methods=["GET"])
+    @validate_schema(SECRET_KEY_SCHEMA)
     def get_secret_key(self, request):
-        return json.dumps({"secret_key": self.model.get_secret_key()})
+        return json.dumps({"secret_key": self.model.generate_secret_key()})
 
     @app.route("/config", methods=["GET"])
     def get_config(self, request):

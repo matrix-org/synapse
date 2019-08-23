@@ -49,3 +49,9 @@ PORTS_SCHEMA = {
     "properties": {"ports": {"type": "array"}},
     "required": ["ports"],
 }
+
+SECRET_KEY_SCHEMA = {
+    "type": "object",
+    "properties": {"server_name": {"type": "string", "minlength": "1"}},
+    "required": ["server_name"],
+}

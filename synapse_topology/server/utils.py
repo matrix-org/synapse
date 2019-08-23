@@ -10,7 +10,7 @@ import socket
 def validate_schema(schema):
     def _wrap_validate(func):
         @wraps(func)
-        def _do_validate(request):
+        def _do_validate(self, request):
             body = json.loads(request.content.read())
             validate(instance=body, schema=schema)
             return func(request, body)
