@@ -268,7 +268,7 @@ class TlsConfig(Config):
         if not tls_private_key_path:
             tls_private_key_path = base_key_name + ".tls.key"
 
-        acme_enabled = "" if acme_domain else "#"
+        acme_enabled = bool(acme_domain)
         acme_domain = "matrix.example.com"
 
         default_acme_account_file = os.path.join(data_dir_path, "acme_account.key")
@@ -369,7 +369,7 @@ class TlsConfig(Config):
             # ACME support is disabled by default. Uncomment the following line
             # (and tls_certificate_path and tls_private_key_path above) to enable it.
             #
-            %(acme_enabled)senabled: true
+            enabled: %(acme_enabled)s
 
             # Endpoint to use to request certificates. If you only want to test,
             # use Let's Encrypt's staging url:
@@ -380,17 +380,17 @@ class TlsConfig(Config):
             # Port number to listen on for the HTTP-01 challenge. Change this if
             # you are forwarding connections through Apache/Nginx/etc.
             #
-            %(acme_enabled)sport: 80
+            port: 80
 
             # Local addresses to listen on for incoming connections.
             # Again, you may want to change this if you are forwarding connections
             # through Apache/Nginx/etc.
             #
-            %(acme_enabled)sbind_addresses: ['::', '0.0.0.0']
+            bind_addresses: ['::', '0.0.0.0']
 
             # How many days remaining on a certificate before it is renewed.
             #
-            %(acme_enabled)sreprovision_threshold: 30
+            reprovision_threshold: 30
 
             # The domain that the certificate should be for. Normally this
             # should be the same as your Matrix domain (i.e., 'server_name'), but,
@@ -404,7 +404,7 @@ class TlsConfig(Config):
             #
             # If not set, defaults to your 'server_name'.
             #
-            %(acme_enabled)sdomain: %(acme_domain)s
+            domain: %(acme_domain)s
 
             # file to use for the account key. This will be generated if it doesn't
             # exist.

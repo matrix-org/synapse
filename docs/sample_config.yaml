@@ -395,7 +395,7 @@ acme:
     # ACME support is disabled by default. Uncomment the following line
     # (and tls_certificate_path and tls_private_key_path above) to enable it.
     #
-    #enabled: true
+    enabled: False
 
     # Endpoint to use to request certificates. If you only want to test,
     # use Let's Encrypt's staging url:
@@ -406,17 +406,17 @@ acme:
     # Port number to listen on for the HTTP-01 challenge. Change this if
     # you are forwarding connections through Apache/Nginx/etc.
     #
-    #port: 80
+    port: 80
 
     # Local addresses to listen on for incoming connections.
     # Again, you may want to change this if you are forwarding connections
     # through Apache/Nginx/etc.
     #
-    #bind_addresses: ['::', '0.0.0.0']
+    bind_addresses: ['::', '0.0.0.0']
 
     # How many days remaining on a certificate before it is renewed.
     #
-    #reprovision_threshold: 30
+    reprovision_threshold: 30
 
     # The domain that the certificate should be for. Normally this
     # should be the same as your Matrix domain (i.e., 'server_name'), but,
@@ -430,7 +430,7 @@ acme:
     #
     # If not set, defaults to your 'server_name'.
     #
-    #domain: matrix.example.com
+    domain: matrix.example.com
 
     # file to use for the account key. This will be generated if it doesn't
     # exist.
