@@ -366,8 +366,8 @@ class TlsConfig(Config):
         #    permission to listen on port 80.
         #
         acme:
-            # ACME support is disabled by default. Uncomment the following line
-            # (and tls_certificate_path and tls_private_key_path above) to enable it.
+            # ACME support is disabled by default. Set this to `true` and uncomment
+            # tls_certificate_path and tls_private_key_path above to enable it.
             #
             enabled: %(acme_enabled)s
 
