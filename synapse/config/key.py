@@ -85,14 +85,13 @@ class KeyConfig(Config):
             config.get("key_refresh_interval", "1d")
         )
 
-        self.key_server_signing_keys = list(self.signing_key)
         key_server_signing_keys_path = config.get("key_server_signing_keys_path")
         if key_server_signing_keys_path:
-            self.key_server_signing_keys.extend(
-                self.read_signing_keys(
-                    key_server_signing_keys_path, "key_server_signing_keys_path"
-                )
+            self.key_server_signing_keys = self.read_signing_keys(
+                key_server_signing_keys_path, "key_server_signing_keys_path"
             )
+        else:
+            self.key_server_signing_keys = list(self.signing_key)
 
         # if neither trusted_key_servers nor perspectives are given, use the default.
         if "perspectives" not in config and "trusted_key_servers" not in config:
@@ -221,8 +220,8 @@ class KeyConfig(Config):
         #  - server_name: "matrix.org"
         #
 
-        # The additional signing keys to use when acting as a trusted key server, on
-        # top of the normal signing keys.
+        # The signing keys to use when acting as a trusted key server. If not specified
+        # defaults to the server signing key.
         #
         # Can contain multiple keys, one per line.
         #
