@@ -24,7 +24,7 @@ from twisted.internet import defer
 from twisted.internet.defer import succeed
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RelationTypes
+from synapse.api.constants import EventTypes, Membership, RelationTypes, UserTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -469,6 +469,9 @@ class EventCreationHandler(object):
 
         u = yield self.store.get_user_by_id(user_id)
         assert u is not None
+        if u["user_type"] == UserTypes.SUPPORT:
+            # support users are not required to consent
+            return
         if u["appservice_id"] is not None:
             # users registered by an appservice are exempt
             return
