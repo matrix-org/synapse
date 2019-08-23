@@ -1,0 +1,1 @@
+Support users are no longer required to consent.
