@@ -192,12 +192,19 @@ class MatrixHostnameEndpointFactory(object):
 class MatrixHostnameEndpoint(object):
     """An endpoint that resolves matrix:// URLs using Matrix server name
     resolution (i.e. via SRV). Does not check for well-known delegation.
+
+    Args:
+        reactor (IReactor)
+        tls_client_options_factory (ClientTLSOptionsFactory|None):
+            factory to use for fetching client tls options, or none to disable TLS.
+        srv_resolver (SrvResolver): The SRV resolver to use
+        parsed_uri (twisted.web.client.URI): The parsed URI that we're wanting
+            to connect to.
     """
 
     def __init__(self, reactor, tls_client_options_factory, srv_resolver, parsed_uri):
         self._reactor = reactor
 
-        # We reparse the URI so that defaultPort is -1 rather than 80
         self._parsed_uri = parsed_uri
 
         # set up the TLS connection params
@@ -272,6 +279,7 @@ class MatrixHostnameEndpoint(object):
         # before now, due to needing to rewrite the Host header of the HTTP
         # request.
 
+        # We reparse the URI so that defaultPort is -1 rather than 80
         parsed_uri = urllib.parse.urlparse(self._parsed_uri.toBytes())
 
         host = parsed_uri.hostname
