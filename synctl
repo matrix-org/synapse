@@ -30,6 +30,8 @@ from six import iteritems
 
 import yaml
 
+from synapse.config import find_config_files, read_config_files
+
 SYNAPSE = [sys.executable, "-B", "-m", "synapse.app.homeserver"]
 
 GREEN = "\x1b[1;32m"
@@ -135,7 +137,8 @@ def main():
         "configfile",
         nargs="?",
         default="homeserver.yaml",
-        help="the homeserver config file, defaults to homeserver.yaml",
+        help="the homeserver config file, defaults to homeserver.yaml, may also specify"
+        " a directory with *.yaml files",
     )
     parser.add_argument(
         "-w", "--worker", metavar="WORKERCONFIG", help="start or stop a single worker"
@@ -176,8 +179,7 @@ def main():
         )
         sys.exit(1)
 
-    with open(configfile) as stream:
-        config = yaml.safe_load(stream)
+    config = read_config_files(find_config_files([configfile]))
 
     pidfile = config["pid_file"]
     cache_factor = config.get("synctl_cache_factor")
