@@ -212,6 +212,33 @@ class Config(object):
             open_private_ports (bool): True to leave private ports (such as the non-TLS
                 HTTP listener) open to the internet.
 
+            listeners (list(dict)|None): A list of descriptions of the listeners
+                synapse should start with each of which specifies a port, a list of resources,
+                tls (bool) and type (str). For example:
+                [{
+                    "port": 8448,
+                    "resources": [{"names": ["federation"]}],
+                    "tls": True,
+                    "type": "http",
+                },
+                {
+                    "port": 443,
+                    "resources": [{"names": ["client"]}],
+                    "tls": False,
+                    "type": "http",
+                }],
+
+
+            database (str|None): The database type to configure, either `psycog2`
+                or `sqlite3`.
+
+            tls_certificate_path (str|None): The path to the tls certificate.
+
+            tls_private_key_path (str|None): The path to the tls private key.
+
+            acme_domain (str|None): The domain acme will try to validate. If
+                specified acme will be enabled.
+
         Returns:
             str: the yaml config file
         """
