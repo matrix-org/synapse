@@ -377,15 +377,13 @@ class ServerConfig(Config):
                 if listener["tls"]:
                     secure_listeners.append(listener)
                 else:
-                    # The open_private_ports option kind of conflicts with the
-                    # idea of passing in your own listener config however
-                    # the local addresses need to be bound if open_private_ports is
-                    # specified.
+                    # If we don't want open ports we need to bind the listeners
+                    # to some address other than 0.0.0.0. Here we chose to use
+                    # localhost.
+                    # If the addresses are already bound we won't overwrite them
+                    # however.
                     if not open_private_ports:
-                        bind_addresses = listener.setdefault("bind_addresses", [])
-                        for address in private_addresses:
-                            if address not in bind_addresses:
-                                bind_addresses.append(address)
+                        listener.setdefault("bind_addresses", private_addresses)
 
                     unsecure_listeners.append(listener)
 
