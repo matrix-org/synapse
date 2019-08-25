@@ -338,7 +338,7 @@ class ServerConfig(Config):
                 (
                     "The metrics_port configuration option is deprecated in Synapse 0.31 "
                     "in favour of a listener. Please see "
-                    "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.rst"
+                    "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md"
                     " on how to configure the new listener."
                 )
             )
@@ -571,8 +571,8 @@ class ServerConfig(Config):
         #
         #   type: the type of listener. Normally 'http', but other valid options are:
         #       'manhole' (see docs/manhole.md),
-        #       'metrics' (see docs/metrics-howto.rst),
-        #       'replication' (see docs/workers.rst).
+        #       'metrics' (see docs/metrics-howto.md),
+        #       'replication' (see docs/workers.md).
         #
         #   tls: set to true to enable TLS for this listener. Will use the TLS
         #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -607,12 +607,12 @@ class ServerConfig(Config):
         #
         #   media: the media API (/_matrix/media).
         #
-        #   metrics: the metrics interface. See docs/metrics-howto.rst.
+        #   metrics: the metrics interface. See docs/metrics-howto.md.
         #
         #   openid: OpenID authentication.
         #
         #   replication: the HTTP replication API (/_synapse/replication). See
-        #       docs/workers.rst.
+        #       docs/workers.md.
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
@@ -632,7 +632,7 @@ class ServerConfig(Config):
           # that unwraps TLS.
           #
           # If you plan to use a reverse proxy, please see
-          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
           #
           %(unsecure_http_bindings)s
 

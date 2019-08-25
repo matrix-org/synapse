@@ -148,7 +148,7 @@ We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.
 
-See [reverse_proxy.rst](reverse_proxy.rst) for information on setting up a
+See [reverse_proxy.md](reverse_proxy.md) for information on setting up a
 reverse proxy.
 
 #### Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?
@@ -184,7 +184,7 @@ a complicated dance which requires connections in both directions).
 
 Another common problem is that people on other servers can't join rooms that
 you invite them to. This can be caused by an incorrectly-configured reverse
-proxy: see [reverse_proxy.rst](<reverse_proxy.rst>) for instructions on how to correctly
+proxy: see [reverse_proxy.md](<reverse_proxy.md>) for instructions on how to correctly
 configure a reverse proxy.
 
 ## Running a Demo Federation of Synapses

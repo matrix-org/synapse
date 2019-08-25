@@ -136,8 +136,8 @@ federation_ip_range_blacklist:
 #
 #   type: the type of listener. Normally 'http', but other valid options are:
 #       'manhole' (see docs/manhole.md),
-#       'metrics' (see docs/metrics-howto.rst),
-#       'replication' (see docs/workers.rst).
+#       'metrics' (see docs/metrics-howto.md),
+#       'replication' (see docs/workers.md).
 #
 #   tls: set to true to enable TLS for this listener. Will use the TLS
 #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -172,12 +172,12 @@ federation_ip_range_blacklist:
 #
 #   media: the media API (/_matrix/media).
 #
-#   metrics: the metrics interface. See docs/metrics-howto.rst.
+#   metrics: the metrics interface. See docs/metrics-howto.md.
 #
 #   openid: OpenID authentication.
 #
 #   replication: the HTTP replication API (/_synapse/replication). See
-#       docs/workers.rst.
+#       docs/workers.md.
 #
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
@@ -201,7 +201,7 @@ listeners:
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
-  # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+  # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
   #
   - port: 8008
     tls: false
@@ -1520,7 +1520,7 @@ opentracing:
     #enabled: true
 
     # The list of homeservers we wish to send and receive span contexts and span baggage.
-    # See docs/opentracing.rst
+    # See docs/opentracing.md
     # This is a list of regexes which are matched against the server_name of the
     # homeserver.
     #
