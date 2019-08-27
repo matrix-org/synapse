@@ -64,7 +64,8 @@ class StatsStore(StateDeltasStore):
         Quantises a timestamp to be a multiple of the bucket size.
 
         Args:
-            ts (int): the timestamp to quantise, in seconds since the Unix Epoch
+            ts (int): the timestamp to quantise, in milliseconds since the Unix
+                Epoch
 
         Returns:
             int: a timestamp which

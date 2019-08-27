@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS room_stats_current (
 -- represents HISTORICAL room statistics for a room
 CREATE TABLE IF NOT EXISTS room_stats_historical (
     room_id TEXT NOT NULL,
-    -- These stats cover the time from (end_ts - bucket_size)...end_ts (in seconds).
+    -- These stats cover the time from (end_ts - bucket_size)...end_ts (in ms).
     -- Note that end_ts is quantised.
     end_ts BIGINT NOT NULL,
     bucket_size INT NOT NULL,
