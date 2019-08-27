@@ -22,11 +22,9 @@ const nginxLink = "https://www.nginx.com/";
 
 export default ({
     testingCertPaths,
-    uploadingCerts,
     certPathInvalid,
     certKeyPathInvalid,
     onClickCertPath,
-    onClickCertUpload,
     onClickACME,
     onClickReverseProxy,
 }) => {
@@ -37,8 +35,6 @@ export default ({
 
     const [certPath, setCertPath] = useState("");
     const [certKeyPath, setCertKeyPath] = useState("");
-    const [certFile, setCertFile] = useState();
-    const [certKeyFile, setCertKeyFile] = useState();
 
     const defaultValue = REVERSE_PROXY_TYPES.NGINX;
     const [reverseProxy, setReverseProxy] = useState(defaultValue);
@@ -72,8 +68,8 @@ export default ({
                         <p>
                             You need root to listen on ports 0 to 1024 inclusive and running
                             synapse with root privileges is <b>strongly discouraged</b>.
-                                                                                                                    Reverse proxies are more secure, run with root and pass things on
-                                                                                                                    like nobody's business.
+                            Reverse proxies are more secure, run with root and pass things on
+                            like nobody's business.
                         </p>
                         <p>
                             (Note: you can also have synapse use a non privileged port by
@@ -157,17 +153,6 @@ export default ({
                             onClick={() => onClickCertPath(certPath, certKeyPath, toggle)}
                         >Use TLS Path</button>
 
-                        <hr />
-
-                        <p>Or, upload a cert file.</p>
-                        <input type="file" name="cert" onChange={e => setCertFile(e.target.files[0])} />
-                        <p>Upload the cert's private key file.</p>
-                        <input type="file" name="certkey" onChange={e => setCertKeyFile(e.target.files[0])} />
-                        <button
-                            className="inputButton"
-                            disabled={certFile && certKeyFile ? undefined : true}
-                            onClick={() => onClickCertUpload(certFile, certKeyFile, toggle)}
-                        >Upload cert</button>
                     </Tab>
                 </Tabs>
             </Card.Body>
