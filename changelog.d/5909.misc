@@ -1,0 +1,1 @@
+Fix error message which referred to public_base_url instead of public_baseurl.
