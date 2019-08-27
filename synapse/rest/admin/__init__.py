@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 class UsersRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/users")
 
     def __init__(self, hs):
         self.hs = hs
@@ -60,15 +60,14 @@ class UsersRestServlet(RestServlet):
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
-        target_user = UserID.from_string(user_id)
-        yield assert_requester_is_admin(self.auth, request)
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        yield assert_user_is_admin(self.auth, requester.user)
 
-        if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "Can only users a local user")
+        if not self.hs.is_mine(requester.user):
+            raise SynapseError(400, "Can only list local users")
 
         ret = yield self.handlers.admin_handler.get_users()
-
         return (200, ret)
 
 

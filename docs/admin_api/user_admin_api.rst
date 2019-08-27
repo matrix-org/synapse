@@ -1,3 +1,34 @@
+List Accounts
+=============
+
+This API returns all local user accounts.
+
+The api is::
+
+    GET /_synapse/admin/v1/users
+
+including an ``access_token`` of a server admin.
+
+It returns a JSON body like the following:
+
+.. code:: json
+    [
+        {
+            "name": "<user_id1>",
+            "password_hash": "<password_hash1>",
+            "is_guest": 0,
+            "admin": 0,
+            "user_type": null
+        }, {
+            "name": "<user_id2>",
+            "password_hash": "<password_hash2>",
+            "is_guest": 0,
+            "admin": 1,
+            "user_type": null
+        }
+    ]
+
+
 Query Account
 =============
 
