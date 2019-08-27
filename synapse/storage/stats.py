@@ -16,7 +16,8 @@
 
 import logging
 from itertools import chain
-from threading import Lock
+
+from twisted.internet.defer import DeferredLock
 
 from synapse.storage.state_deltas import StateDeltasStore
 from synapse.util.caches.descriptors import cached
@@ -57,7 +58,7 @@ class StatsStore(StateDeltasStore):
         self.stats_enabled = hs.config.stats_enabled
         self.stats_bucket_size = hs.config.stats_bucket_size
 
-        self.stats_delta_processing_lock = Lock()
+        self.stats_delta_processing_lock = DeferredLock()
 
         self.register_noop_background_update("populate_stats_createtables")
         self.register_noop_background_update("populate_stats_process_rooms")

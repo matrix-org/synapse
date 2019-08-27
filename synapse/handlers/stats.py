@@ -66,12 +66,13 @@ class StatsHandler(StateDeltasHandler):
 
         @defer.inlineCallbacks
         def process():
+            yield lock.acquire()
             try:
                 yield self._unsafe_process()
             finally:
-                lock.release()
+                yield lock.release()
 
-        if lock.acquire(blocking=False):
+        if not lock.locked:
             # we only want to run this process one-at-a-time,
             # and also, if the initial background updater wants us to keep out,
             # we should respect that.
