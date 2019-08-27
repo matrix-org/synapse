@@ -92,7 +92,7 @@ class Server:
     @app.route("/start", methods=["POST"])
     def start_synapse(self, request):
         print("Starting synapse")
-        subprocess.Popen(["synctl", "start", self.model.config_dir])
+        subprocess.check_output(["synctl", "start", self.model.config_dir])
         sys.exit()
 
     @app.route("/favicon.ico")
