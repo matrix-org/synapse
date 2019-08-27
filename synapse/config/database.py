@@ -45,12 +45,13 @@ class DatabaseConfig(Config):
         if not database_conf:
             database_path = os.path.join(data_dir_path, "homeserver.db")
             database_conf = (
-                """  # The database engine name
+                """# The database engine name
           name: "sqlite3"
           # Arguments to pass to the engine
           args:
             # Path to the database
-            database: "%(database_path)s" """
+            database: "%(database_path)s"
+            """
                 % locals()
             )
         else:
@@ -62,7 +63,6 @@ class DatabaseConfig(Config):
 
         database:
           %(database_conf)s
-
         # Number of events to cache in memory.
         #
         #event_cache_size: 10K
