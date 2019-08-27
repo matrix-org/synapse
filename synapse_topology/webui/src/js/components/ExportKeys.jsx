@@ -38,7 +38,7 @@ export default ({ secretKeyLoaded, secretKey, onClick }) => {
                 Your server uses a secret key to identify itself to other servers. Keep
                 a copy of it to retain ownership of the server name in case the server
                 is inaccessible:
-      </p>
+            </p>
             <pre><code>{secretKey}</code></pre>
             <p>
                 Keep a copy of this key somewhere safe by downloading or copying
