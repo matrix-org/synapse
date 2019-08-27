@@ -13,6 +13,7 @@ import { TLS_UI } from '../reducers/ui-constants';
 import { TLS_TYPES, REVERSE_PROXY_TYPES } from '../actions/constants';
 import AccordionToggle from '../containers/AccordionToggle';
 import { nextUI } from '../reducers/setup-ui-reducer';
+import InlineError from './InlineError';
 
 const tlsLink = "https://en.wikipedia.org/wiki/Transport_Layer_Security";
 const apacheLink = "http://httpd.apache.org/";
@@ -31,8 +32,6 @@ export default ({
 
     const defaultType = TLS_TYPES.REVERSE_PROXY;
 
-    const [type, setType] = useState(defaultType);
-
     const [certPath, setCertPath] = useState("");
     const [certKeyPath, setCertKeyPath] = useState("");
 
@@ -41,6 +40,8 @@ export default ({
 
     const toggle = useAccordionToggle(nextUI(TLS_UI));
 
+    console.log(certKeyPathInvalid)
+    console.log(certPathInvalid)
     return <Card>
         <AccordionToggle as={Card.Header} eventKey={TLS_UI}>
             TLS
@@ -53,7 +54,7 @@ export default ({
                     ACME, providing your own certificates, or reverse proxy handling TLS
                     certificates.
                 </p>
-                <Tabs defaultActiveKey={defaultType} onSelect={k => setType(k)}>
+                <Tabs defaultActiveKey={defaultType}>
                     <Tab eventKey={TLS_TYPES.REVERSE_PROXY} title="Reverse Proxy">
                         <p>
                             It is recommended to run Synapse behind a reverse proxy such
@@ -129,23 +130,26 @@ export default ({
                         <p>
                             Specify a path to or upload TLS certs for the domain.
                         </p>
-                        <p>Please enter {certPathInvalid ? "a valid" : "the"} path to the cert</p>
-                        <input
-                            className={certPathInvalid ? style.invalidInput : undefined}
-                            type="text"
-                            placeholder="/path/to/your/cert.pem"
-                            value={certPath ? certPath : undefined}
-                            onChange={e => setCertPath(e.target.value)}
-                        />
+                        <InlineError error={certPathInvalid ? "The file doesn't exist or can't be accessed." : undefined}>
+                            <input
+                                className={certPathInvalid ? style.invalidInput : undefined}
+                                type="text"
+                                placeholder="/path/to/your/cert.pem"
+                                value={certPath ? certPath : undefined}
+                                onChange={e => setCertPath(e.target.value)}
+                            />
+                        </InlineError>
 
-                        <p>Please enter {certKeyPathInvalid ? "a valid" : "the"} path to the cert's key</p>
-                        <input
-                            className={certKeyPathInvalid ? style.invalidInput : undefined}
-                            type="text"
-                            placeholder="/path/to/your/cert/key.tls.key"
-                            value={certKeyPath ? certKeyPath : undefined}
-                            onChange={e => setCertKeyPath(e.target.value)}
-                        />
+                        <p>Please enter path to the cert's key</p>
+                        <InlineError error={certKeyPathInvalid ? "The file doesn't exist or can't be accessed." : undefined}>
+                            <input
+                                className={certKeyPathInvalid ? style.invalidInput : undefined}
+                                type="text"
+                                placeholder="/path/to/your/cert/key.tls.key"
+                                value={certKeyPath ? certKeyPath : undefined}
+                                onChange={e => setCertKeyPath(e.target.value)}
+                            />
+                        </InlineError>
 
                         <button
                             className="inputButton"

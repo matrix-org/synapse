@@ -47,6 +47,6 @@ const mapDispathToProps = (dispatch) => ({
 });
 
 export default connect(
-    null,
+    mapStateToProps,
     mapDispathToProps,
 )(TLS)
