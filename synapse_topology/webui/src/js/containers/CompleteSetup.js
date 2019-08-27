@@ -5,7 +5,9 @@ import { writeConfig } from '../actions';
 
 const mapStateToProps = (state) => ({
     tlsType: state.baseConfig.tls,
+    synapseStartFailed: state.baseConfig.synapseStartFailed,
     delegationType: state.baseConfig.delegationType,
+    configDir: state.baseConfig.configDir,
 });
 
 

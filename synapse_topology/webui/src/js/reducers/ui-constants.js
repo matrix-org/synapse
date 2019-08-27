@@ -9,6 +9,7 @@ export const REVERSE_PROXY_TEMPLATE_UI = "reverse_proxy_tamplate_ui";
 export const DELEGATION_TEMPLATE_UI = "delegation_tamplate_ui";
 export const DATABASE_UI = "database_ui";
 export const COMPLETE_UI = "complete_ui";
+export const DONE_UI = "done_ui";
 
 // Setup order
 export const SETUP_ORDER = [
@@ -20,6 +21,7 @@ export const SETUP_ORDER = [
     PORT_SELECTION_UI,
     DATABASE_UI,
     COMPLETE_UI,
+    DONE_UI,
 ];
 
 

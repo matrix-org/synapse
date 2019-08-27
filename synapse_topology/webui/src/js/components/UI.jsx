@@ -19,6 +19,7 @@ import {
     DATABASE_UI,
     COMPLETE_UI,
     SETUP_ORDER,
+    DONE_UI,
 } from '../reducers/ui-constants';
 
 import Error from './Error';
@@ -37,6 +38,7 @@ import Database from '../containers/Database';
 import ConfigSelector from './ConfigSelector';
 import CompleteSetup from '../containers/CompleteSetup';
 import ContentWrapper from '../containers/ContentWrapper';
+import Done from '../containers/Done';
 
 const blockMapping = uiBlock => {
 
@@ -66,6 +68,8 @@ const blockMapping = uiBlock => {
             return <Database key={uiBlock} />
         case COMPLETE_UI:
             return <CompleteSetup key={uiBlock} />
+        case DONE_UI:
+            return <Done key={uiBlock} />
         default:
             return <h1>how did i get here?</h1>
 
