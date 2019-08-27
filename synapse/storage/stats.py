@@ -221,10 +221,7 @@ class StatsStore(StateDeltasStore):
         """
         if self.database_engine.can_native_upsert:
             ins_columns = chain(
-                keyvalues,
-                copy_columns,
-                additive_relatives,
-                extra_dst_keyvalues,
+                keyvalues, copy_columns, additive_relatives, extra_dst_keyvalues
             )
             sel_exprs = chain(
                 keyvalues,
@@ -349,7 +346,10 @@ class StatsStore(StateDeltasStore):
                 txn=txn,
                 into_table=table + "_historical",
                 keyvalues={id_col: stats_id},
-                extra_dst_keyvalues={"end_ts": end_ts, "bucket_size": self.stats_bucket_size},
+                extra_dst_keyvalues={
+                    "end_ts": end_ts,
+                    "bucket_size": self.stats_bucket_size,
+                },
                 additive_relatives=per_slice_additive_relatives,
                 src_table=table + "_current",
                 copy_columns=abs_field_names,
