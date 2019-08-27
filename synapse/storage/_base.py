@@ -30,13 +30,21 @@ from prometheus_client import Histogram
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.logging.context import LoggingContext, PreserveLoggingContext
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id
 from synapse.util import batch_iter
 from synapse.util.caches.descriptors import Cache
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
+
+# import a function which will return a monotonic time, in seconds
+try:
+    # on python 3, use time.monotonic, since time.clock can go backwards
+    from time import monotonic as monotonic_time
+except ImportError:
+    # ... but python 2 doesn't have it
+    from time import clock as monotonic_time
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +86,21 @@ _CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 class LoggingTransaction(object):
     """An object that almost-transparently proxies for the 'txn' object
     passed to the constructor. Adds logging and metrics to the .execute()
-    method."""
+    method.
+
+    Args:
+        txn: The database transcation object to wrap.
+        name (str): The name of this transactions for logging.
+        database_engine (Sqlite3Engine|PostgresEngine)
+        after_callbacks(list|None): A list that callbacks will be appended to
+            that have been added by `call_after` which should be run on
+            successful completion of the transaction. None indicates that no
+            callbacks should be allowed to be scheduled to run.
+        exception_callbacks(list|None): A list that callbacks will be appended
+            to that have been added by `call_on_exception` which should be run
+            if transaction ends with an error. None indicates that no callbacks
+            should be allowed to be scheduled to run.
+    """
 
     __slots__ = [
         "txn",
@@ -89,7 +111,7 @@ class LoggingTransaction(object):
     ]
 
     def __init__(
-        self, txn, name, database_engine, after_callbacks, exception_callbacks
+        self, txn, name, database_engine, after_callbacks=None, exception_callbacks=None
     ):
         object.__setattr__(self, "txn", txn)
         object.__setattr__(self, "name", name)
@@ -167,22 +189,22 @@ class PerformanceCounters(object):
         self.current_counters = {}
         self.previous_counters = {}
 
-    def update(self, key, start_time, end_time=None):
-        if end_time is None:
-            end_time = time.time()
-        duration = end_time - start_time
+    def update(self, key, duration_secs):
         count, cum_time = self.current_counters.get(key, (0, 0))
         count += 1
-        cum_time += duration
+        cum_time += duration_secs
         self.current_counters[key] = (count, cum_time)
-        return end_time
 
-    def interval(self, interval_duration, limit=3):
+    def interval(self, interval_duration_secs, limit=3):
         counters = []
         for name, (count, cum_time) in iteritems(self.current_counters):
             prev_count, prev_time = self.previous_counters.get(name, (0, 0))
             counters.append(
-                ((cum_time - prev_time) / interval_duration, count - prev_count, name)
+                (
+                    (cum_time - prev_time) / interval_duration_secs,
+                    count - prev_count,
+                    name,
+                )
             )
 
         self.previous_counters = dict(self.current_counters)
@@ -213,7 +235,6 @@ class SQLBaseStore(object):
         #   is running in mainline, and we have some nice monitoring frontends
         #   to watch it
         self._txn_perf_counters = PerformanceCounters()
-        self._get_event_counters = PerformanceCounters()
 
         self._get_event_cache = Cache(
             "*getEvent*", keylen=3, max_entries=hs.config.event_cache_size
@@ -299,12 +320,12 @@ class SQLBaseStore(object):
 
         def select_users_with_no_expiration_date_txn(txn):
             """Retrieves the list of registered users with no expiration date from the
-            database.
+            database, filtering out deactivated users.
             """
             sql = (
                 "SELECT users.name FROM users"
                 " LEFT JOIN account_validity ON (users.name = account_validity.user_id)"
-                " WHERE account_validity.user_id is NULL;"
+                " WHERE account_validity.user_id is NULL AND users.deactivated = 0;"
             )
             txn.execute(sql, [])
 
@@ -312,9 +333,7 @@ class SQLBaseStore(object):
             if res:
                 for user in res:
                     self.set_expiration_date_for_user_txn(
-                        txn,
-                        user["name"],
-                        use_delta=True,
+                        txn, user["name"], use_delta=True
                     )
 
         yield self.runInteraction(
@@ -352,32 +371,24 @@ class SQLBaseStore(object):
         )
 
     def start_profiling(self):
-        self._previous_loop_ts = self._clock.time_msec()
+        self._previous_loop_ts = monotonic_time()
 
         def loop():
             curr = self._current_txn_total_time
             prev = self._previous_txn_total_time
             self._previous_txn_total_time = curr
 
-            time_now = self._clock.time_msec()
+            time_now = monotonic_time()
             time_then = self._previous_loop_ts
             self._previous_loop_ts = time_now
 
-            ratio = (curr - prev) / (time_now - time_then)
+            duration = time_now - time_then
+            ratio = (curr - prev) / duration
 
-            top_three_counters = self._txn_perf_counters.interval(
-                time_now - time_then, limit=3
-            )
-
-            top_3_event_counters = self._get_event_counters.interval(
-                time_now - time_then, limit=3
-            )
+            top_three_counters = self._txn_perf_counters.interval(duration, limit=3)
 
             perf_logger.info(
-                "Total database time: %.3f%% {%s} {%s}",
-                ratio * 100,
-                top_three_counters,
-                top_3_event_counters,
+                "Total database time: %.3f%% {%s}", ratio * 100, top_three_counters
             )
 
         self._clock.looping_call(loop, 10000)
@@ -385,7 +396,7 @@ class SQLBaseStore(object):
     def _new_transaction(
         self, conn, desc, after_callbacks, exception_callbacks, func, *args, **kwargs
     ):
-        start = time.time()
+        start = monotonic_time()
         txn_id = self._TXN_ID
 
         # We don't really need these to be unique, so lets stop it from
@@ -451,7 +462,7 @@ class SQLBaseStore(object):
             logger.debug("[TXN FAIL] {%s} %s", name, e)
             raise
         finally:
-            end = time.time()
+            end = monotonic_time()
             duration = end - start
 
             LoggingContext.current_context().add_database_transaction(duration)
@@ -459,7 +470,7 @@ class SQLBaseStore(object):
             transaction_logger.debug("[TXN END] {%s} %f sec", name, duration)
 
             self._current_txn_total_time += duration
-            self._txn_perf_counters.update(desc, start, end)
+            self._txn_perf_counters.update(desc, duration)
             sql_txn_timer.labels(desc).observe(duration)
 
     @defer.inlineCallbacks
@@ -502,7 +513,7 @@ class SQLBaseStore(object):
                 after_callback(*after_args, **after_kwargs)
             raise
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def runWithConnection(self, func, *args, **kwargs):
@@ -525,11 +536,11 @@ class SQLBaseStore(object):
             )
             parent_context = None
 
-        start_time = time.time()
+        start_time = monotonic_time()
 
         def inner_func(conn, *args, **kwargs):
             with LoggingContext("runWithConnection", parent_context) as context:
-                sched_duration_sec = time.time() - start_time
+                sched_duration_sec = monotonic_time() - start_time
                 sql_scheduling_timer.observe(sched_duration_sec)
                 context.add_database_scheduled(sched_duration_sec)
 
@@ -542,7 +553,7 @@ class SQLBaseStore(object):
         with PreserveLoggingContext():
             result = yield self._db_pool.runWithConnection(inner_func, *args, **kwargs)
 
-        defer.returnValue(result)
+        return result
 
     @staticmethod
     def cursor_to_dict(cursor):
@@ -604,8 +615,8 @@ class SQLBaseStore(object):
             # a cursor after we receive an error from the db.
             if not or_ignore:
                 raise
-            defer.returnValue(False)
-        defer.returnValue(True)
+            return False
+        return True
 
     @staticmethod
     def _simple_insert_txn(txn, table, values):
@@ -697,7 +708,7 @@ class SQLBaseStore(object):
                     insertion_values,
                     lock=lock,
                 )
-                defer.returnValue(result)
+                return result
             except self.database_engine.module.IntegrityError as e:
                 attempts += 1
                 if attempts >= 5:
@@ -1110,7 +1121,7 @@ class SQLBaseStore(object):
         results = []
 
         if not iterable:
-            defer.returnValue(results)
+            return results
 
         # iterables can not be sliced, so convert it to a list first
         it_list = list(iterable)
@@ -1131,7 +1142,7 @@ class SQLBaseStore(object):
 
             results.extend(rows)
 
-        defer.returnValue(results)
+        return results
 
     @classmethod
     def _simple_select_many_txn(cls, txn, table, column, iterable, keyvalues, retcols):
@@ -1667,7 +1678,7 @@ def db_to_json(db_content):
     # Decode it to a Unicode string before feeding it to json.loads, so we
     # consistenty get a Unicode-containing object out.
     if isinstance(db_content, (bytes, bytearray)):
-        db_content = db_content.decode('utf8')
+        db_content = db_content.decode("utf8")
 
     try:
         return json.loads(db_content)

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +16,10 @@
 
 import os
 
-from synapse.config.tls import TlsConfig
+from OpenSSL import SSL
+
+from synapse.config.tls import ConfigError, TlsConfig
+from synapse.crypto.context_factory import ClientTLSOptionsFactory
 
 from tests.unittest import TestCase
 
@@ -32,7 +36,7 @@ class TLSConfigTests(TestCase):
         """
         config_dir = self.mktemp()
         os.mkdir(config_dir)
-        with open(os.path.join(config_dir, "cert.pem"), 'w') as f:
+        with open(os.path.join(config_dir, "cert.pem"), "w") as f:
             f.write(
                 """-----BEGIN CERTIFICATE-----
 MIID6DCCAtACAws9CjANBgkqhkiG9w0BAQUFADCBtzELMAkGA1UEBhMCVFIxDzAN
@@ -65,7 +69,7 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         }
 
         t = TestConfig()
-        t.read_config(config)
+        t.read_config(config, config_dir_path="", data_dir_path="")
         t.read_certificate_from_disk(require_cert_and_key=False)
 
         warnings = self.flushWarnings()
@@ -78,3 +82,112 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
                 "or use Synapse's ACME support to provision one."
             ),
         )
+
+    def test_tls_client_minimum_default(self):
+        """
+        The default client TLS version is 1.0.
+        """
+        config = {}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        self.assertEqual(t.federation_client_minimum_tls_version, "1")
+
+    def test_tls_client_minimum_set(self):
+        """
+        The default client TLS version can be set to 1.0, 1.1, and 1.2.
+        """
+        config = {"federation_client_minimum_tls_version": 1}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_client_minimum_tls_version, "1")
+
+        config = {"federation_client_minimum_tls_version": 1.1}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_client_minimum_tls_version, "1.1")
+
+        config = {"federation_client_minimum_tls_version": 1.2}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_client_minimum_tls_version, "1.2")
+
+        # Also test a string version
+        config = {"federation_client_minimum_tls_version": "1"}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_client_minimum_tls_version, "1")
+
+        config = {"federation_client_minimum_tls_version": "1.2"}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_client_minimum_tls_version, "1.2")
+
+    def test_tls_client_minimum_1_point_3_missing(self):
+        """
+        If TLS 1.3 support is missing and it's configured, it will raise a
+        ConfigError.
+        """
+        # thanks i hate it
+        if hasattr(SSL, "OP_NO_TLSv1_3"):
+            OP_NO_TLSv1_3 = SSL.OP_NO_TLSv1_3
+            delattr(SSL, "OP_NO_TLSv1_3")
+            self.addCleanup(setattr, SSL, "SSL.OP_NO_TLSv1_3", OP_NO_TLSv1_3)
+            assert not hasattr(SSL, "OP_NO_TLSv1_3")
+
+        config = {"federation_client_minimum_tls_version": 1.3}
+        t = TestConfig()
+        with self.assertRaises(ConfigError) as e:
+            t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(
+            e.exception.args[0],
+            (
+                "federation_client_minimum_tls_version cannot be 1.3, "
+                "your OpenSSL does not support it"
+            ),
+        )
+
+    def test_tls_client_minimum_1_point_3_exists(self):
+        """
+        If TLS 1.3 support exists and it's configured, it will be settable.
+        """
+        # thanks i hate it, still
+        if not hasattr(SSL, "OP_NO_TLSv1_3"):
+            SSL.OP_NO_TLSv1_3 = 0x00
+            self.addCleanup(lambda: delattr(SSL, "OP_NO_TLSv1_3"))
+            assert hasattr(SSL, "OP_NO_TLSv1_3")
+
+        config = {"federation_client_minimum_tls_version": 1.3}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.federation_client_minimum_tls_version, "1.3")
+
+    def test_tls_client_minimum_set_passed_through_1_2(self):
+        """
+        The configured TLS version is correctly configured by the ContextFactory.
+        """
+        config = {"federation_client_minimum_tls_version": 1.2}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        cf = ClientTLSOptionsFactory(t)
+
+        # The context has had NO_TLSv1_1 and NO_TLSv1_0 set, but not NO_TLSv1_2
+        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
+        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
+
+    def test_tls_client_minimum_set_passed_through_1_0(self):
+        """
+        The configured TLS version is correctly configured by the ContextFactory.
+        """
+        config = {"federation_client_minimum_tls_version": 1}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        cf = ClientTLSOptionsFactory(t)
+
+        # The context has not had any of the NO_TLS set.
+        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
+        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)

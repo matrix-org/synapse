@@ -42,10 +42,10 @@ from signedjson.sign import sign_json
 
 from twisted.internet import defer
 
-from synapse.api.errors import RequestSendFailed, SynapseError
+from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
+from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
-from synapse.util.logcontext import run_in_background
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,7 @@ UPDATE_ATTESTATION_TIME_MS = 1 * 24 * 60 * 60 * 1000
 class GroupAttestationSigning(object):
     """Creates and verifies group attestations.
     """
+
     def __init__(self, hs):
         self.keyring = hs.get_keyring()
         self.clock = hs.get_clock()
@@ -113,11 +114,15 @@ class GroupAttestationSigning(object):
         validity_period *= random.uniform(*DEFAULT_ATTESTATION_JITTER)
         valid_until_ms = int(self.clock.time_msec() + validity_period)
 
-        return sign_json({
-            "group_id": group_id,
-            "user_id": user_id,
-            "valid_until_ms": valid_until_ms,
-        }, self.server_name, self.signing_key)
+        return sign_json(
+            {
+                "group_id": group_id,
+                "user_id": user_id,
+                "valid_until_ms": valid_until_ms,
+            },
+            self.server_name,
+            self.signing_key,
+        )
 
 
 class GroupAttestionRenewer(object):
@@ -132,9 +137,10 @@ class GroupAttestionRenewer(object):
         self.is_mine_id = hs.is_mine_id
         self.attestations = hs.get_groups_attestation_signing()
 
-        self._renew_attestations_loop = self.clock.looping_call(
-            self._start_renew_attestations, 30 * 60 * 1000,
-        )
+        if not hs.config.worker_app:
+            self._renew_attestations_loop = self.clock.looping_call(
+                self._start_renew_attestations, 30 * 60 * 1000
+            )
 
     @defer.inlineCallbacks
     def on_renew_attestation(self, group_id, user_id, content):
@@ -146,14 +152,12 @@ class GroupAttestionRenewer(object):
             raise SynapseError(400, "Neither user not group are on this server")
 
         yield self.attestations.verify_attestation(
-            attestation,
-            user_id=user_id,
-            group_id=group_id,
+            attestation, user_id=user_id, group_id=group_id
         )
 
         yield self.store.update_remote_attestion(group_id, user_id, attestation)
 
-        defer.returnValue({})
+        return {}
 
     def _start_renew_attestations(self):
         return run_as_background_process("renew_attestations", self._renew_attestations)
@@ -179,7 +183,8 @@ class GroupAttestionRenewer(object):
                 else:
                     logger.warn(
                         "Incorrectly trying to do attestations for user: %r in %r",
-                        user_id, group_id,
+                        user_id,
+                        group_id,
                     )
                     yield self.store.remove_attestation_renewal(group_id, user_id)
                     return
@@ -187,21 +192,20 @@ class GroupAttestionRenewer(object):
                 attestation = self.attestations.create_attestation(group_id, user_id)
 
                 yield self.transport_client.renew_group_attestation(
-                    destination, group_id, user_id,
-                    content={"attestation": attestation},
+                    destination, group_id, user_id, content={"attestation": attestation}
                 )
 
                 yield self.store.update_attestation_renewal(
                     group_id, user_id, attestation
                 )
-            except RequestSendFailed as e:
+            except (RequestSendFailed, HttpResponseException) as e:
                 logger.warning(
-                    "Failed to renew attestation of %r in %r: %s",
-                    user_id, group_id, e,
+                    "Failed to renew attestation of %r in %r: %s", user_id, group_id, e
                 )
             except Exception:
-                logger.exception("Error renewing attestation of %r in %r",
-                                 user_id, group_id)
+                logger.exception(
+                    "Error renewing attestation of %r in %r", user_id, group_id
+                )
 
         for row in rows:
             group_id = row["group_id"]

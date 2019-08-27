@@ -66,12 +66,13 @@ class StatsStore(StateDeltasStore):
 
         if not self.stats_enabled:
             yield self._end_background_update("populate_stats_createtables")
-            defer.returnValue(1)
+            return 1
 
         # Get all the rooms that we want to process.
         def _make_staging_area(txn):
             # Create the temporary tables
-            stmts = get_statements("""
+            stmts = get_statements(
+                """
                 -- We just recreate the table, we'll be reinserting the
                 -- correct entries again later anyway.
                 DROP TABLE IF EXISTS {temp}_rooms;
@@ -85,7 +86,10 @@ class StatsStore(StateDeltasStore):
                     ON {temp}_rooms(events);
                 CREATE INDEX {temp}_rooms_id
                     ON {temp}_rooms(room_id);
-            """.format(temp=TEMP_TABLE).splitlines())
+            """.format(
+                    temp=TEMP_TABLE
+                ).splitlines()
+            )
 
             for statement in stmts:
                 txn.execute(statement)
@@ -105,7 +109,9 @@ class StatsStore(StateDeltasStore):
                 LEFT JOIN room_stats_earliest_token AS t USING (room_id)
                 WHERE t.room_id IS NULL
                 GROUP BY c.room_id
-            """ % (TEMP_TABLE,)
+            """ % (
+                TEMP_TABLE,
+            )
             txn.execute(sql)
 
         new_pos = yield self.get_max_stream_id_in_current_state_deltas()
@@ -114,7 +120,7 @@ class StatsStore(StateDeltasStore):
         self.get_earliest_token_for_room_stats.invalidate_all()
 
         yield self._end_background_update("populate_stats_createtables")
-        defer.returnValue(1)
+        return 1
 
     @defer.inlineCallbacks
     def _populate_stats_cleanup(self, progress, batch_size):
@@ -123,7 +129,7 @@ class StatsStore(StateDeltasStore):
         """
         if not self.stats_enabled:
             yield self._end_background_update("populate_stats_cleanup")
-            defer.returnValue(1)
+            return 1
 
         position = yield self._simple_select_one_onecol(
             TEMP_TABLE + "_position", None, "position"
@@ -137,14 +143,14 @@ class StatsStore(StateDeltasStore):
         yield self.runInteraction("populate_stats_cleanup", _delete_staging_area)
 
         yield self._end_background_update("populate_stats_cleanup")
-        defer.returnValue(1)
+        return 1
 
     @defer.inlineCallbacks
     def _populate_stats_process_rooms(self, progress, batch_size):
 
         if not self.stats_enabled:
             yield self._end_background_update("populate_stats_process_rooms")
-            defer.returnValue(1)
+            return 1
 
         # If we don't have progress filed, delete everything.
         if not progress:
@@ -180,11 +186,12 @@ class StatsStore(StateDeltasStore):
         # No more rooms -- complete the transaction.
         if not rooms_to_work_on:
             yield self._end_background_update("populate_stats_process_rooms")
-            defer.returnValue(1)
+            return 1
 
         logger.info(
             "Processing the next %d rooms of %d remaining",
-            len(rooms_to_work_on), progress["remaining"],
+            len(rooms_to_work_on),
+            progress["remaining"],
         )
 
         # Number of state events we've processed by going through each room
@@ -204,10 +211,19 @@ class StatsStore(StateDeltasStore):
             avatar_id = current_state_ids.get((EventTypes.RoomAvatar, ""))
             canonical_alias_id = current_state_ids.get((EventTypes.CanonicalAlias, ""))
 
-            state_events = yield self.get_events([
-                join_rules_id, history_visibility_id, encryption_id, name_id,
-                topic_id, avatar_id, canonical_alias_id,
-            ])
+            event_ids = [
+                join_rules_id,
+                history_visibility_id,
+                encryption_id,
+                name_id,
+                topic_id,
+                avatar_id,
+                canonical_alias_id,
+            ]
+
+            state_events = yield self.get_events(
+                [ev for ev in event_ids if ev is not None]
+            )
 
             def _get_or_none(event_id, arg):
                 event = state_events.get(event_id)
@@ -271,7 +287,7 @@ class StatsStore(StateDeltasStore):
 
                 # We've finished a room. Delete it from the table.
                 self._simple_delete_one_txn(
-                    txn, TEMP_TABLE + "_rooms", {"room_id": room_id},
+                    txn, TEMP_TABLE + "_rooms", {"room_id": room_id}
                 )
 
             yield self.runInteraction("update_room_stats", _fetch_data)
@@ -289,9 +305,9 @@ class StatsStore(StateDeltasStore):
 
             if processed_event_count > batch_size:
                 # Don't process any more rooms, we've hit our batch size.
-                defer.returnValue(processed_event_count)
+                return processed_event_count
 
-        defer.returnValue(processed_event_count)
+        return processed_event_count
 
     def delete_all_stats(self):
         """
@@ -338,7 +354,7 @@ class StatsStore(StateDeltasStore):
             "name",
             "topic",
             "avatar",
-            "canonical_alias"
+            "canonical_alias",
         ):
             field = fields.get(col)
             if field and "\0" in field:

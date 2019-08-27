@@ -42,7 +42,15 @@ RUN cd dh-virtualenv-1.1 && dpkg-buildpackage -us -uc -b
 ###
 FROM ${distro}
 
+# Get the distro we want to pull from as a dynamic build variable
+# (We need to define it in each build stage)
+ARG distro=""
+ENV distro ${distro}
+
 # Install the build dependencies
+#
+# NB: keep this list in sync with the list of build-deps in debian/control
+# TODO: it would be nice to do that automatically.
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \

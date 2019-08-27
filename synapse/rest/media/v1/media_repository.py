@@ -33,8 +33,9 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.config._base import ConfigError
+from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util import logcontext
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import random_string
@@ -100,17 +101,16 @@ class MediaRepository(object):
             storage_providers.append(provider)
 
         self.media_storage = MediaStorage(
-            self.hs, self.primary_base_path, self.filepaths, storage_providers,
+            self.hs, self.primary_base_path, self.filepaths, storage_providers
         )
 
         self.clock.looping_call(
-            self._start_update_recently_accessed,
-            UPDATE_RECENTLY_ACCESSED_TS,
+            self._start_update_recently_accessed, UPDATE_RECENTLY_ACCESSED_TS
         )
 
     def _start_update_recently_accessed(self):
         return run_as_background_process(
-            "update_recently_accessed_media", self._update_recently_accessed,
+            "update_recently_accessed_media", self._update_recently_accessed
         )
 
     @defer.inlineCallbacks
@@ -138,8 +138,9 @@ class MediaRepository(object):
             self.recently_accessed_locals.add(media_id)
 
     @defer.inlineCallbacks
-    def create_content(self, media_type, upload_name, content, content_length,
-                       auth_user):
+    def create_content(
+        self, media_type, upload_name, content, content_length, auth_user
+    ):
         """Store uploaded content for a local user and return the mxc URL
 
         Args:
@@ -154,10 +155,7 @@ class MediaRepository(object):
         """
         media_id = random_string(24)
 
-        file_info = FileInfo(
-            server_name=None,
-            file_id=media_id,
-        )
+        file_info = FileInfo(server_name=None, file_id=media_id)
 
         fname = yield self.media_storage.store_file(content, file_info)
 
@@ -172,11 +170,9 @@ class MediaRepository(object):
             user_id=auth_user,
         )
 
-        yield self._generate_thumbnails(
-            None, media_id, media_id, media_type,
-        )
+        yield self._generate_thumbnails(None, media_id, media_id, media_type)
 
-        defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
+        return "mxc://%s/%s" % (self.server_name, media_id)
 
     @defer.inlineCallbacks
     def get_local_media(self, request, media_id, name):
@@ -205,14 +201,11 @@ class MediaRepository(object):
         upload_name = name if name else media_info["upload_name"]
         url_cache = media_info["url_cache"]
 
-        file_info = FileInfo(
-            None, media_id,
-            url_cache=url_cache,
-        )
+        file_info = FileInfo(None, media_id, url_cache=url_cache)
 
         responder = yield self.media_storage.fetch_media(file_info)
         yield respond_with_responder(
-            request, responder, media_type, media_length, upload_name,
+            request, responder, media_type, media_length, upload_name
         )
 
     @defer.inlineCallbacks
@@ -232,8 +225,8 @@ class MediaRepository(object):
                 to request
         """
         if (
-            self.federation_domain_whitelist is not None and
-            server_name not in self.federation_domain_whitelist
+            self.federation_domain_whitelist is not None
+            and server_name not in self.federation_domain_whitelist
         ):
             raise FederationDeniedError(server_name)
 
@@ -244,7 +237,7 @@ class MediaRepository(object):
         key = (server_name, media_id)
         with (yield self.remote_media_linearizer.queue(key)):
             responder, media_info = yield self._get_remote_media_impl(
-                server_name, media_id,
+                server_name, media_id
             )
 
         # We deliberately stream the file outside the lock
@@ -253,7 +246,7 @@ class MediaRepository(object):
             media_length = media_info["media_length"]
             upload_name = name if name else media_info["upload_name"]
             yield respond_with_responder(
-                request, responder, media_type, media_length, upload_name,
+                request, responder, media_type, media_length, upload_name
             )
         else:
             respond_404(request)
@@ -272,8 +265,8 @@ class MediaRepository(object):
             Deferred[dict]: The media_info of the file
         """
         if (
-            self.federation_domain_whitelist is not None and
-            server_name not in self.federation_domain_whitelist
+            self.federation_domain_whitelist is not None
+            and server_name not in self.federation_domain_whitelist
         ):
             raise FederationDeniedError(server_name)
 
@@ -282,7 +275,7 @@ class MediaRepository(object):
         key = (server_name, media_id)
         with (yield self.remote_media_linearizer.queue(key)):
             responder, media_info = yield self._get_remote_media_impl(
-                server_name, media_id,
+                server_name, media_id
             )
 
         # Ensure we actually use the responder so that it releases resources
@@ -290,7 +283,7 @@ class MediaRepository(object):
             with responder:
                 pass
 
-        defer.returnValue(media_info)
+        return media_info
 
     @defer.inlineCallbacks
     def _get_remote_media_impl(self, server_name, media_id):
@@ -305,9 +298,7 @@ class MediaRepository(object):
         Returns:
             Deferred[(Responder, media_info)]
         """
-        media_info = yield self.store.get_cached_remote_media(
-            server_name, media_id
-        )
+        media_info = yield self.store.get_cached_remote_media(server_name, media_id)
 
         # file_id is the ID we use to track the file locally. If we've already
         # seen the file then reuse the existing ID, otherwise genereate a new
@@ -327,16 +318,14 @@ class MediaRepository(object):
 
             responder = yield self.media_storage.fetch_media(file_info)
             if responder:
-                defer.returnValue((responder, media_info))
+                return (responder, media_info)
 
         # Failed to find the file anywhere, lets download it.
 
-        media_info = yield self._download_remote_file(
-            server_name, media_id, file_id
-        )
+        media_info = yield self._download_remote_file(server_name, media_id, file_id)
 
         responder = yield self.media_storage.fetch_media(file_info)
-        defer.returnValue((responder, media_info))
+        return (responder, media_info)
 
     @defer.inlineCallbacks
     def _download_remote_file(self, server_name, media_id, file_id):
@@ -354,52 +343,60 @@ class MediaRepository(object):
             Deferred[MediaInfo]
         """
 
-        file_info = FileInfo(
-            server_name=server_name,
-            file_id=file_id,
-        )
+        file_info = FileInfo(server_name=server_name, file_id=file_id)
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
-            request_path = "/".join((
-                "/_matrix/media/v1/download", server_name, media_id,
-            ))
+            request_path = "/".join(
+                ("/_matrix/media/v1/download", server_name, media_id)
+            )
             try:
                 length, headers = yield self.client.get_file(
-                    server_name, request_path, output_stream=f,
-                    max_size=self.max_upload_size, args={
+                    server_name,
+                    request_path,
+                    output_stream=f,
+                    max_size=self.max_upload_size,
+                    args={
                         # tell the remote server to 404 if it doesn't
                         # recognise the server_name, to make sure we don't
                         # end up with a routing loop.
-                        "allow_remote": "false",
-                    }
+                        "allow_remote": "false"
+                    },
                 )
             except RequestSendFailed as e:
-                logger.warn("Request failed fetching remote media %s/%s: %r",
-                            server_name, media_id, e)
+                logger.warn(
+                    "Request failed fetching remote media %s/%s: %r",
+                    server_name,
+                    media_id,
+                    e,
+                )
                 raise SynapseError(502, "Failed to fetch remote media")
 
             except HttpResponseException as e:
-                logger.warn("HTTP error fetching remote media %s/%s: %s",
-                            server_name, media_id, e.response)
+                logger.warn(
+                    "HTTP error fetching remote media %s/%s: %s",
+                    server_name,
+                    media_id,
+                    e.response,
+                )
                 if e.code == twisted.web.http.NOT_FOUND:
                     raise e.to_synapse_error()
                 raise SynapseError(502, "Failed to fetch remote media")
 
             except SynapseError:
-                logger.exception("Failed to fetch remote media %s/%s",
-                                 server_name, media_id)
+                logger.warn("Failed to fetch remote media %s/%s", server_name, media_id)
                 raise
             except NotRetryingDestination:
                 logger.warn("Not retrying destination %r", server_name)
                 raise SynapseError(502, "Failed to fetch remote media")
             except Exception:
-                logger.exception("Failed to fetch remote media %s/%s",
-                                 server_name, media_id)
+                logger.exception(
+                    "Failed to fetch remote media %s/%s", server_name, media_id
+                )
                 raise SynapseError(502, "Failed to fetch remote media")
 
             yield finish()
 
-        media_type = headers[b"Content-Type"][0].decode('ascii')
+        media_type = headers[b"Content-Type"][0].decode("ascii")
         upload_name = get_filename_from_headers(headers)
         time_now_ms = self.clock.time_msec()
 
@@ -423,24 +420,23 @@ class MediaRepository(object):
             "filesystem_id": file_id,
         }
 
-        yield self._generate_thumbnails(
-            server_name, media_id, file_id, media_type,
-        )
+        yield self._generate_thumbnails(server_name, media_id, file_id, media_type)
 
-        defer.returnValue(media_info)
+        return media_info
 
     def _get_thumbnail_requirements(self, media_type):
         return self.thumbnail_requirements.get(media_type, ())
 
-    def _generate_thumbnail(self, thumbnailer, t_width, t_height,
-                            t_method, t_type):
+    def _generate_thumbnail(self, thumbnailer, t_width, t_height, t_method, t_type):
         m_width = thumbnailer.width
         m_height = thumbnailer.height
 
         if m_width * m_height >= self.max_image_pixels:
             logger.info(
                 "Image too large to thumbnail %r x %r > %r",
-                m_width, m_height, self.max_image_pixels
+                m_width,
+                m_height,
+                self.max_image_pixels,
             )
             return
 
@@ -460,17 +456,22 @@ class MediaRepository(object):
         return t_byte_source
 
     @defer.inlineCallbacks
-    def generate_local_exact_thumbnail(self, media_id, t_width, t_height,
-                                       t_method, t_type, url_cache):
-        input_path = yield self.media_storage.ensure_media_is_in_local_cache(FileInfo(
-            None, media_id, url_cache=url_cache,
-        ))
+    def generate_local_exact_thumbnail(
+        self, media_id, t_width, t_height, t_method, t_type, url_cache
+    ):
+        input_path = yield self.media_storage.ensure_media_is_in_local_cache(
+            FileInfo(None, media_id, url_cache=url_cache)
+        )
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield logcontext.defer_to_thread(
+        t_byte_source = yield defer_to_thread(
             self.hs.get_reactor(),
             self._generate_thumbnail,
-            thumbnailer, t_width, t_height, t_method, t_type
+            thumbnailer,
+            t_width,
+            t_height,
+            t_method,
+            t_type,
         )
 
         if t_byte_source:
@@ -487,7 +488,7 @@ class MediaRepository(object):
                 )
 
                 output_path = yield self.media_storage.store_file(
-                    t_byte_source, file_info,
+                    t_byte_source, file_info
                 )
             finally:
                 t_byte_source.close()
@@ -500,20 +501,25 @@ class MediaRepository(object):
                 media_id, t_width, t_height, t_type, t_method, t_len
             )
 
-            defer.returnValue(output_path)
+            return output_path
 
     @defer.inlineCallbacks
-    def generate_remote_exact_thumbnail(self, server_name, file_id, media_id,
-                                        t_width, t_height, t_method, t_type):
-        input_path = yield self.media_storage.ensure_media_is_in_local_cache(FileInfo(
-            server_name, file_id, url_cache=False,
-        ))
+    def generate_remote_exact_thumbnail(
+        self, server_name, file_id, media_id, t_width, t_height, t_method, t_type
+    ):
+        input_path = yield self.media_storage.ensure_media_is_in_local_cache(
+            FileInfo(server_name, file_id, url_cache=False)
+        )
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield logcontext.defer_to_thread(
+        t_byte_source = yield defer_to_thread(
             self.hs.get_reactor(),
             self._generate_thumbnail,
-            thumbnailer, t_width, t_height, t_method, t_type
+            thumbnailer,
+            t_width,
+            t_height,
+            t_method,
+            t_type,
         )
 
         if t_byte_source:
@@ -529,7 +535,7 @@ class MediaRepository(object):
                 )
 
                 output_path = yield self.media_storage.store_file(
-                    t_byte_source, file_info,
+                    t_byte_source, file_info
                 )
             finally:
                 t_byte_source.close()
@@ -539,15 +545,22 @@ class MediaRepository(object):
             t_len = os.path.getsize(output_path)
 
             yield self.store.store_remote_media_thumbnail(
-                server_name, media_id, file_id,
-                t_width, t_height, t_type, t_method, t_len
+                server_name,
+                media_id,
+                file_id,
+                t_width,
+                t_height,
+                t_type,
+                t_method,
+                t_len,
             )
 
-            defer.returnValue(output_path)
+            return output_path
 
     @defer.inlineCallbacks
-    def _generate_thumbnails(self, server_name, media_id, file_id, media_type,
-                             url_cache=False):
+    def _generate_thumbnails(
+        self, server_name, media_id, file_id, media_type, url_cache=False
+    ):
         """Generate and store thumbnails for an image.
 
         Args:
@@ -566,9 +579,9 @@ class MediaRepository(object):
         if not requirements:
             return
 
-        input_path = yield self.media_storage.ensure_media_is_in_local_cache(FileInfo(
-            server_name, file_id, url_cache=url_cache,
-        ))
+        input_path = yield self.media_storage.ensure_media_is_in_local_cache(
+            FileInfo(server_name, file_id, url_cache=url_cache)
+        )
 
         thumbnailer = Thumbnailer(input_path)
         m_width = thumbnailer.width
@@ -577,14 +590,15 @@ class MediaRepository(object):
         if m_width * m_height >= self.max_image_pixels:
             logger.info(
                 "Image too large to thumbnail %r x %r > %r",
-                m_width, m_height, self.max_image_pixels
+                m_width,
+                m_height,
+                self.max_image_pixels,
             )
             return
 
         if thumbnailer.transpose_method is not None:
-            m_width, m_height = yield logcontext.defer_to_thread(
-                self.hs.get_reactor(),
-                thumbnailer.transpose
+            m_width, m_height = yield defer_to_thread(
+                self.hs.get_reactor(), thumbnailer.transpose
             )
 
         # We deduplicate the thumbnail sizes by ignoring the cropped versions if
@@ -603,16 +617,12 @@ class MediaRepository(object):
         for (t_width, t_height, t_type), t_method in iteritems(thumbnails):
             # Generate the thumbnail
             if t_method == "crop":
-                t_byte_source = yield logcontext.defer_to_thread(
-                    self.hs.get_reactor(),
-                    thumbnailer.crop,
-                    t_width, t_height, t_type,
+                t_byte_source = yield defer_to_thread(
+                    self.hs.get_reactor(), thumbnailer.crop, t_width, t_height, t_type
                 )
             elif t_method == "scale":
-                t_byte_source = yield logcontext.defer_to_thread(
-                    self.hs.get_reactor(),
-                    thumbnailer.scale,
-                    t_width, t_height, t_type,
+                t_byte_source = yield defer_to_thread(
+                    self.hs.get_reactor(), thumbnailer.scale, t_width, t_height, t_type
                 )
             else:
                 logger.error("Unrecognized method: %r", t_method)
@@ -634,7 +644,7 @@ class MediaRepository(object):
                 )
 
                 output_path = yield self.media_storage.store_file(
-                    t_byte_source, file_info,
+                    t_byte_source, file_info
                 )
             finally:
                 t_byte_source.close()
@@ -644,18 +654,21 @@ class MediaRepository(object):
             # Write to database
             if server_name:
                 yield self.store.store_remote_media_thumbnail(
-                    server_name, media_id, file_id,
-                    t_width, t_height, t_type, t_method, t_len
+                    server_name,
+                    media_id,
+                    file_id,
+                    t_width,
+                    t_height,
+                    t_type,
+                    t_method,
+                    t_len,
                 )
             else:
                 yield self.store.store_local_thumbnail(
                     media_id, t_width, t_height, t_type, t_method, t_len
                 )
 
-        defer.returnValue({
-            "width": m_width,
-            "height": m_height,
-        })
+        return {"width": m_width, "height": m_height}
 
     @defer.inlineCallbacks
     def delete_old_remote_media(self, before_ts):
@@ -692,7 +705,7 @@ class MediaRepository(object):
                 yield self.store.delete_remote_media(origin, media_id)
                 deleted += 1
 
-        defer.returnValue({"deleted": deleted})
+        return {"deleted": deleted}
 
 
 class MediaRepositoryResource(Resource):
@@ -741,17 +754,21 @@ class MediaRepositoryResource(Resource):
     """
 
     def __init__(self, hs):
-        Resource.__init__(self)
+        # If we're not configured to use it, raise if we somehow got here.
+        if not hs.config.can_load_media_repo:
+            raise ConfigError("Synapse is not configured to use a media repo.")
 
+        super().__init__()
         media_repo = hs.get_media_repository()
 
         self.putChild(b"upload", UploadResource(hs, media_repo))
         self.putChild(b"download", DownloadResource(hs, media_repo))
-        self.putChild(b"thumbnail", ThumbnailResource(
-            hs, media_repo, media_repo.media_storage,
-        ))
+        self.putChild(
+            b"thumbnail", ThumbnailResource(hs, media_repo, media_repo.media_storage)
+        )
         if hs.config.url_preview_enabled:
-            self.putChild(b"preview_url", PreviewUrlResource(
-                hs, media_repo, media_repo.media_storage,
-            ))
+            self.putChild(
+                b"preview_url",
+                PreviewUrlResource(hs, media_repo, media_repo.media_storage),
+            )
         self.putChild(b"config", MediaConfigResource(hs))

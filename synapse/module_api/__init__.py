@@ -12,15 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+
 from twisted.internet import defer
 
 from synapse.types import UserID
+
+logger = logging.getLogger(__name__)
 
 
 class ModuleApi(object):
     """A proxy object that gets passed to password auth providers so they
     can register new users etc if necessary.
     """
+
     def __init__(self, hs, auth_handler):
         self.hs = hs
 
@@ -57,7 +62,7 @@ class ModuleApi(object):
         Returns:
             str: qualified @user:id
         """
-        if username.startswith('@'):
+        if username.startswith("@"):
             return username
         return UserID(username, self.hs.hostname).to_string()
 
@@ -75,8 +80,13 @@ class ModuleApi(object):
 
     @defer.inlineCallbacks
     def register(self, localpart, displayname=None, emails=[]):
-        """Registers a new user with given localpart and optional
-           displayname, emails.
+        """Registers a new user with given localpart and optional displayname, emails.
+
+        Also returns an access token for the new user.
+
+        Deprecated: avoid this, as it generates a new device with no way to
+        return that device to the user. Prefer separate calls to register_user and
+        register_device.
 
         Args:
             localpart (str): The localpart of the new user.
@@ -84,16 +94,48 @@ class ModuleApi(object):
             emails (List[str]): Emails to bind to the new user.
 
         Returns:
-            Deferred: a 2-tuple of (user_id, access_token)
+            Deferred[tuple[str, str]]: a 2-tuple of (user_id, access_token)
         """
-        # Register the user
-        reg = self.hs.get_registration_handler()
-        user_id, access_token = yield reg.register(
-            localpart=localpart, default_display_name=displayname,
-            bind_emails=emails,
+        logger.warning(
+            "Using deprecated ModuleApi.register which creates a dummy user device."
+        )
+        user_id = yield self.register_user(localpart, displayname, emails)
+        _, access_token = yield self.register_device(user_id)
+        return (user_id, access_token)
+
+    def register_user(self, localpart, displayname=None, emails=[]):
+        """Registers a new user with given localpart and optional displayname, emails.
+
+        Args:
+            localpart (str): The localpart of the new user.
+            displayname (str|None): The displayname of the new user.
+            emails (List[str]): Emails to bind to the new user.
+
+        Returns:
+            Deferred[str]: user_id
+        """
+        return self.hs.get_registration_handler().register_user(
+            localpart=localpart, default_display_name=displayname, bind_emails=emails
         )
 
-        defer.returnValue((user_id, access_token))
+    def register_device(self, user_id, device_id=None, initial_display_name=None):
+        """Register a device for a user and generate an access token.
+
+        Args:
+            user_id (str): full canonical @user:id
+            device_id (str|None): The device ID to check, or None to generate
+                a new one.
+            initial_display_name (str|None): An optional display name for the
+                device.
+
+        Returns:
+            defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
+        """
+        return self.hs.get_registration_handler().register_device(
+            user_id=user_id,
+            device_id=device_id,
+            initial_display_name=initial_display_name,
+        )
 
     @defer.inlineCallbacks
     def invalidate_access_token(self, access_token):

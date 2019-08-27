@@ -49,6 +49,40 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
+Upgrading to v1.2.0
+===================
+
+Some counter metrics have been renamed, with the old names deprecated. See
+`the metrics documentation <docs/metrics-howto.rst#renaming-of-metrics--deprecation-of-old-names-in-12>`_
+for details.
+
+Upgrading to v1.1.0
+===================
+
+Synapse v1.1.0 removes support for older Python and PostgreSQL versions, as
+outlined in `our deprecation notice <https://matrix.org/blog/2019/04/08/synapse-deprecating-postgres-9-4-and-python-2-x>`_.
+
+Minimum Python Version
+----------------------
+
+Synapse v1.1.0 has a minimum Python requirement of Python 3.5. Python 3.6 or
+Python 3.7 are recommended as they have improved internal string handling,
+significantly reducing memory usage.
+
+If you use current versions of the Matrix.org-distributed Debian packages or
+Docker images, action is not required.
+
+If you install Synapse in a Python virtual environment, please see "Upgrading to
+v0.34.0" for notes on setting up a new virtualenv under Python 3.
+
+Minimum PostgreSQL Version
+--------------------------
+
+If using PostgreSQL under Synapse, you will need to use PostgreSQL 9.5 or above.
+Please see the
+`PostgreSQL documentation <https://www.postgresql.org/docs/11/upgrading.html>`_
+for more details on upgrading your database.
+
 Upgrading to v1.0
 =================
 
@@ -71,11 +105,11 @@ server in a closed federation. This can be done in one of two ways:-
 * Configure a whitelist of server domains to trust via ``federation_certificate_verification_whitelist``.
 
 See the `sample configuration file <docs/sample_config.yaml>`_
-for more details on these settings. 
+for more details on these settings.
 
 Email
 -----
-When a user requests a password reset, Synapse will send an email to the 
+When a user requests a password reset, Synapse will send an email to the
 user to confirm the request.
 
 Previous versions of Synapse delegated the job of sending this email to an

@@ -115,7 +115,7 @@ class BackgroundUpdateStore(SQLBaseStore):
                         " Unscheduling background update task."
                     )
                     self._all_done = True
-                    defer.returnValue(None)
+                    return None
 
     @defer.inlineCallbacks
     def has_completed_background_updates(self):
@@ -127,11 +127,11 @@ class BackgroundUpdateStore(SQLBaseStore):
         # if we've previously determined that there is nothing left to do, that
         # is easy
         if self._all_done:
-            defer.returnValue(True)
+            return True
 
         # obviously, if we have things in our queue, we're not done.
         if self._background_update_queue:
-            defer.returnValue(False)
+            return False
 
         # otherwise, check if there are updates to be run. This is important,
         # as we may be running on a worker which doesn't perform the bg updates
@@ -144,9 +144,9 @@ class BackgroundUpdateStore(SQLBaseStore):
         )
         if not updates:
             self._all_done = True
-            defer.returnValue(True)
+            return True
 
-        defer.returnValue(False)
+        return False
 
     @defer.inlineCallbacks
     def do_next_background_update(self, desired_duration_ms):
@@ -169,18 +169,18 @@ class BackgroundUpdateStore(SQLBaseStore):
             in_flight = set(update["update_name"] for update in updates)
             for update in updates:
                 if update["depends_on"] not in in_flight:
-                    self._background_update_queue.append(update['update_name'])
+                    self._background_update_queue.append(update["update_name"])
 
         if not self._background_update_queue:
             # no work left to do
-            defer.returnValue(None)
+            return None
 
         # pop from the front, and add back to the back
         update_name = self._background_update_queue.pop(0)
         self._background_update_queue.append(update_name)
 
         res = yield self._do_background_update(update_name, desired_duration_ms)
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def _do_background_update(self, update_name, desired_duration_ms):
@@ -231,7 +231,7 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         performance.update(items_updated, duration_ms)
 
-        defer.returnValue(len(self._background_update_performance))
+        return len(self._background_update_performance)
 
     def register_background_update_handler(self, update_name, update_handler):
         """Register a handler for doing a background update.
@@ -266,7 +266,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         @defer.inlineCallbacks
         def noop_update(progress, batch_size):
             yield self._end_background_update(update_name)
-            defer.returnValue(1)
+            return 1
 
         self.register_background_update_handler(update_name, noop_update)
 
@@ -370,7 +370,7 @@ class BackgroundUpdateStore(SQLBaseStore):
                 logger.info("Adding index %s to %s", index_name, table)
                 yield self.runWithConnection(runner)
             yield self._end_background_update(update_name)
-            defer.returnValue(1)
+            return 1
 
         self.register_background_update_handler(update_name, updater)
 

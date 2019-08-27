@@ -19,7 +19,7 @@ from frozendict import frozendict
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 
 
 class EventContext(object):
@@ -88,8 +88,9 @@ class EventContext(object):
         self.app_service = None
 
     @staticmethod
-    def with_state(state_group, current_state_ids, prev_state_ids,
-                   prev_group=None, delta_ids=None):
+    def with_state(
+        state_group, current_state_ids, prev_state_ids, prev_group=None, delta_ids=None
+    ):
         context = EventContext()
 
         # The current state including the current event
@@ -132,7 +133,7 @@ class EventContext(object):
         else:
             prev_state_id = None
 
-        defer.returnValue({
+        return {
             "prev_state_id": prev_state_id,
             "event_type": event.type,
             "event_state_key": event.state_key if event.is_state() else None,
@@ -141,8 +142,8 @@ class EventContext(object):
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
             "prev_state_events": self.prev_state_events,
-            "app_service_id": self.app_service.id if self.app_service else None
-        })
+            "app_service_id": self.app_service.id if self.app_service else None,
+        }
 
     @staticmethod
     def deserialize(store, input):
@@ -194,12 +195,12 @@ class EventContext(object):
 
         if not self._fetching_state_deferred:
             self._fetching_state_deferred = run_in_background(
-                self._fill_out_state, store,
+                self._fill_out_state, store
             )
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
-        defer.returnValue(self._current_state_ids)
+        return self._current_state_ids
 
     @defer.inlineCallbacks
     def get_prev_state_ids(self, store):
@@ -214,12 +215,12 @@ class EventContext(object):
 
         if not self._fetching_state_deferred:
             self._fetching_state_deferred = run_in_background(
-                self._fill_out_state, store,
+                self._fill_out_state, store
             )
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
-        defer.returnValue(self._prev_state_ids)
+        return self._prev_state_ids
 
     def get_cached_current_state_ids(self):
         """Gets the current state IDs if we have them already cached.
@@ -240,9 +241,7 @@ class EventContext(object):
         if self.state_group is None:
             return
 
-        self._current_state_ids = yield store.get_state_ids_for_group(
-            self.state_group,
-        )
+        self._current_state_ids = yield store.get_state_ids_for_group(self.state_group)
         if self._prev_state_id and self._event_state_key is not None:
             self._prev_state_ids = dict(self._current_state_ids)
 
@@ -252,8 +251,9 @@ class EventContext(object):
             self._prev_state_ids = self._current_state_ids
 
     @defer.inlineCallbacks
-    def update_state(self, state_group, prev_state_ids, current_state_ids,
-                     prev_group, delta_ids):
+    def update_state(
+        self, state_group, prev_state_ids, current_state_ids, prev_group, delta_ids
+    ):
         """Replace the state in the context
         """
 
@@ -279,10 +279,7 @@ def _encode_state_dict(state_dict):
     if state_dict is None:
         return None
 
-    return [
-        (etype, state_key, v)
-        for (etype, state_key), v in iteritems(state_dict)
-    ]
+    return [(etype, state_key, v) for (etype, state_key), v in iteritems(state_dict)]
 
 
 def _decode_state_dict(input):
@@ -291,4 +288,4 @@ def _decode_state_dict(input):
     if input is None:
         return None
 
-    return frozendict({(etype, state_key,): v for etype, state_key, v in input})
+    return frozendict({(etype, state_key): v for etype, state_key, v in input})

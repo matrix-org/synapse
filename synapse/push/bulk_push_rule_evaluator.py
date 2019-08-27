@@ -39,9 +39,11 @@ rules_by_room = {}
 
 
 push_rules_invalidation_counter = Counter(
-    "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter", "")
+    "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter", ""
+)
 push_rules_state_size_counter = Counter(
-    "synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter", "")
+    "synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter", ""
+)
 
 # Measures whether we use the fast path of using state deltas, or if we have to
 # recalculate from scratch
@@ -83,7 +85,7 @@ class BulkPushRuleEvaluator(object):
 
         # if this event is an invite event, we may need to run rules for the user
         # who's been invited, otherwise they won't get told they've been invited
-        if event.type == 'm.room.member' and event.content['membership'] == 'invite':
+        if event.type == "m.room.member" and event.content["membership"] == "invite":
             invited = event.state_key
             if invited and self.hs.is_mine_id(invited):
                 has_pusher = yield self.store.user_has_pusher(invited)
@@ -93,7 +95,7 @@ class BulkPushRuleEvaluator(object):
                         invited
                     )
 
-        defer.returnValue(rules_by_user)
+        return rules_by_user
 
     @cached()
     def _get_rules_for_room(self, room_id):
@@ -106,7 +108,9 @@ class BulkPushRuleEvaluator(object):
         # before any lookup methods get called on it as otherwise there may be
         # a race if invalidate_all gets called (which assumes its in the cache)
         return RulesForRoom(
-            self.hs, room_id, self._get_rules_for_room.cache,
+            self.hs,
+            room_id,
+            self._get_rules_for_room.cache,
             self.room_push_rule_cache_metrics,
         )
 
@@ -121,18 +125,16 @@ class BulkPushRuleEvaluator(object):
             auth_events = {POWER_KEY: pl_event}
         else:
             auth_events_ids = yield self.auth.compute_auth_events(
-                event, prev_state_ids, for_verification=False,
+                event, prev_state_ids, for_verification=False
             )
             auth_events = yield self.store.get_events(auth_events_ids)
-            auth_events = {
-                (e.type, e.state_key): e for e in itervalues(auth_events)
-            }
+            auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
 
         sender_level = get_user_power_level(event.sender, auth_events)
 
         pl_event = auth_events.get(POWER_KEY)
 
-        defer.returnValue((pl_event.content if pl_event else {}, sender_level))
+        return (pl_event.content if pl_event else {}, sender_level)
 
     @defer.inlineCallbacks
     def action_for_event_by_user(self, event, context):
@@ -145,16 +147,14 @@ class BulkPushRuleEvaluator(object):
         rules_by_user = yield self._get_rules_for_event(event, context)
         actions_by_user = {}
 
-        room_members = yield self.store.get_joined_users_from_context(
-            event, context
-        )
+        room_members = yield self.store.get_joined_users_from_context(event, context)
 
         (power_levels, sender_power_level) = (
             yield self._get_power_levels_and_sender_level(event, context)
         )
 
         evaluator = PushRuleEvaluatorForEvent(
-            event, len(room_members), sender_power_level, power_levels,
+            event, len(room_members), sender_power_level, power_levels
         )
 
         condition_cache = {}
@@ -180,15 +180,15 @@ class BulkPushRuleEvaluator(object):
                     display_name = event.content.get("displayname", None)
 
             for rule in rules:
-                if 'enabled' in rule and not rule['enabled']:
+                if "enabled" in rule and not rule["enabled"]:
                     continue
 
                 matches = _condition_checker(
-                    evaluator, rule['conditions'], uid, display_name, condition_cache
+                    evaluator, rule["conditions"], uid, display_name, condition_cache
                 )
                 if matches:
-                    actions = [x for x in rule['actions'] if x != 'dont_notify']
-                    if actions and 'notify' in actions:
+                    actions = [x for x in rule["actions"] if x != "dont_notify"]
+                    if actions and "notify" in actions:
                         # Push rules say we should notify the user of this event
                         actions_by_user[uid] = actions
                     break
@@ -196,9 +196,7 @@ class BulkPushRuleEvaluator(object):
         # Mark in the DB staging area the push actions for users who should be
         # notified for this event. (This will then get handled when we persist
         # the event)
-        yield self.store.add_push_actions_to_staging(
-            event.event_id, actions_by_user,
-        )
+        yield self.store.add_push_actions_to_staging(event.event_id, actions_by_user)
 
 
 def _condition_checker(evaluator, conditions, uid, display_name, cache):
@@ -285,13 +283,13 @@ class RulesForRoom(object):
         if state_group and self.state_group == state_group:
             logger.debug("Using cached rules for %r", self.room_id)
             self.room_push_rule_cache_metrics.inc_hits()
-            defer.returnValue(self.rules_by_user)
+            return self.rules_by_user
 
         with (yield self.linearizer.queue(())):
             if state_group and self.state_group == state_group:
                 logger.debug("Using cached rules for %r", self.room_id)
                 self.room_push_rule_cache_metrics.inc_hits()
-                defer.returnValue(self.rules_by_user)
+                return self.rules_by_user
 
             self.room_push_rule_cache_metrics.inc_misses()
 
@@ -361,19 +359,19 @@ class RulesForRoom(object):
                     self.sequence,
                     members={},  # There were no membership changes
                     rules_by_user=ret_rules_by_user,
-                    state_group=state_group
+                    state_group=state_group,
                 )
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
-                "Returning push rules for %r %r",
-                self.room_id, ret_rules_by_user.keys(),
+                "Returning push rules for %r %r", self.room_id, ret_rules_by_user.keys()
             )
-        defer.returnValue(ret_rules_by_user)
+        return ret_rules_by_user
 
     @defer.inlineCallbacks
-    def _update_rules_with_member_event_ids(self, ret_rules_by_user, member_event_ids,
-                                            state_group, event):
+    def _update_rules_with_member_event_ids(
+        self, ret_rules_by_user, member_event_ids, state_group, event
+    ):
         """Update the partially filled rules_by_user dict by fetching rules for
         any newly joined users in the `member_event_ids` list.
 
@@ -391,16 +389,13 @@ class RulesForRoom(object):
             table="room_memberships",
             column="event_id",
             iterable=member_event_ids.values(),
-            retcols=('user_id', 'membership', 'event_id'),
+            retcols=("user_id", "membership", "event_id"),
             keyvalues={},
             batch_size=500,
             desc="_get_rules_for_member_event_ids",
         )
 
-        members = {
-            row["event_id"]: (row["user_id"], row["membership"])
-            for row in rows
-        }
+        members = {row["event_id"]: (row["user_id"], row["membership"]) for row in rows}
 
         # If the event is a join event then it will be in current state evnts
         # map but not in the DB, so we have to explicitly insert it.
@@ -413,15 +408,15 @@ class RulesForRoom(object):
             logger.debug("Found members %r: %r", self.room_id, members.values())
 
         interested_in_user_ids = set(
-            user_id for user_id, membership in itervalues(members)
+            user_id
+            for user_id, membership in itervalues(members)
             if membership == Membership.JOIN
         )
 
         logger.debug("Joined: %r", interested_in_user_ids)
 
         if_users_with_pushers = yield self.store.get_if_users_have_pushers(
-            interested_in_user_ids,
-            on_invalidate=self.invalidate_all_cb,
+            interested_in_user_ids, on_invalidate=self.invalidate_all_cb
         )
 
         user_ids = set(
@@ -431,7 +426,7 @@ class RulesForRoom(object):
         logger.debug("With pushers: %r", user_ids)
 
         users_with_receipts = yield self.store.get_users_with_read_receipts_in_room(
-            self.room_id, on_invalidate=self.invalidate_all_cb,
+            self.room_id, on_invalidate=self.invalidate_all_cb
         )
 
         logger.debug("With receipts: %r", users_with_receipts)
@@ -442,7 +437,7 @@ class RulesForRoom(object):
                 user_ids.add(uid)
 
         rules_by_user = yield self.store.bulk_get_push_rules(
-            user_ids, on_invalidate=self.invalidate_all_cb,
+            user_ids, on_invalidate=self.invalidate_all_cb
         )
 
         ret_rules_by_user.update(

@@ -38,17 +38,14 @@ class EventStreamRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(
-            request,
-            allow_guest=True,
-        )
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         is_guest = requester.is_guest
         room_id = None
         if is_guest:
             if b"room_id" not in request.args:
                 raise SynapseError(400, "Guest users must specify room_id param")
         if b"room_id" in request.args:
-            room_id = request.args[b"room_id"][0].decode('ascii')
+            room_id = request.args[b"room_id"][0].decode("ascii")
 
         pagin_config = PaginationConfig.from_request(request)
         timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
@@ -70,7 +67,7 @@ class EventStreamRestServlet(RestServlet):
             is_guest=is_guest,
         )
 
-        defer.returnValue((200, chunk))
+        return (200, chunk)
 
     def on_OPTIONS(self, request):
         return (200, {})
@@ -94,9 +91,9 @@ class EventRestServlet(RestServlet):
         time_now = self.clock.time_msec()
         if event:
             event = yield self._event_serializer.serialize_event(event, time_now)
-            defer.returnValue((200, event))
+            return (200, event)
         else:
-            defer.returnValue((404, "Event not found."))
+            return (404, "Event not found.")
 
 
 def register_servlets(hs, http_server):

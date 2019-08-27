@@ -1,7 +1,7 @@
 Using Postgres
 --------------
 
-Postgres version 9.4 or later is known to work.
+Postgres version 9.5 or later is known to work.
 
 Install postgres client libraries
 =================================
@@ -11,12 +11,14 @@ a postgres database.
 
 * If you are using the `matrix.org debian/ubuntu
   packages <../INSTALL.md#matrixorg-packages>`_,
-  the necessary libraries will already be installed.
+  the necessary python library will already be installed, but you will need to
+  ensure the low-level postgres library is installed, which you can do with
+  ``apt install libpq5``.
 
 * For other pre-built packages, please consult the documentation from the
   relevant package.
 
-* If you installed synapse `in a virtualenv 
+* If you installed synapse `in a virtualenv
   <../INSTALL.md#installing-from-source>`_, you can install the library with::
 
       ~/synapse/env/bin/pip install matrix-synapse[postgres]
@@ -34,9 +36,14 @@ Assuming your PostgreSQL database user is called ``postgres``, create a user
    su - postgres
    createuser --pwprompt synapse_user
 
-The PostgreSQL database used *must* have the correct encoding set, otherwise it
-would not be able to store UTF8 strings. To create a database with the correct
-encoding use, e.g.::
+Before you can authenticate with the ``synapse_user``, you must create a
+database that it can access. To create a database, first connect to the database
+with your database user::
+
+   su - postgres
+   psql
+
+and then run::
 
    CREATE DATABASE synapse
     ENCODING 'UTF8'
@@ -46,7 +53,13 @@ encoding use, e.g.::
     OWNER synapse_user;
 
 This would create an appropriate database named ``synapse`` owned by the
-``synapse_user`` user (which must already exist).
+``synapse_user`` user (which must already have been created as above).
+
+Note that the PostgreSQL database *must* have the correct encoding set (as
+shown above), otherwise it will not be able to store UTF8 strings.
+
+You may need to enable password authentication so ``synapse_user`` can connect
+to the database. See https://www.postgresql.org/docs/11/auth-pg-hba-conf.html.
 
 Tuning Postgres
 ===============

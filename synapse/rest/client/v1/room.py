@@ -24,7 +24,12 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientCredentialsError,
+    SynapseError,
+)
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
@@ -61,18 +66,22 @@ class RoomCreateRestServlet(TransactionRestServlet):
         PATTERNS = "/createRoom"
         register_txn_path(self, PATTERNS, http_server)
         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
-        http_server.register_paths("OPTIONS",
-                                   client_patterns("/rooms(?:/.*)?$", v1=True),
-                                   self.on_OPTIONS)
+        http_server.register_paths(
+            "OPTIONS",
+            client_patterns("/rooms(?:/.*)?$", v1=True),
+            self.on_OPTIONS,
+            self.__class__.__name__,
+        )
         # define CORS for /createRoom[/txnid]
-        http_server.register_paths("OPTIONS",
-                                   client_patterns("/createRoom(?:/.*)?$", v1=True),
-                                   self.on_OPTIONS)
+        http_server.register_paths(
+            "OPTIONS",
+            client_patterns("/createRoom(?:/.*)?$", v1=True),
+            self.on_OPTIONS,
+            self.__class__.__name__,
+        )
 
     def on_PUT(self, request, txn_id):
-        return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request
-        )
+        return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -82,7 +91,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
             requester, self.get_room_config(request)
         )
 
-        defer.returnValue((200, info))
+        return (200, info)
 
     def get_room_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
@@ -107,21 +116,35 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
 
         # /room/$roomid/state/$eventtype/$statekey
-        state_key = ("/rooms/(?P<room_id>[^/]*)/state/"
-                     "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$")
+        state_key = (
+            "/rooms/(?P<room_id>[^/]*)/state/"
+            "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$"
+        )
 
-        http_server.register_paths("GET",
-                                   client_patterns(state_key, v1=True),
-                                   self.on_GET)
-        http_server.register_paths("PUT",
-                                   client_patterns(state_key, v1=True),
-                                   self.on_PUT)
-        http_server.register_paths("GET",
-                                   client_patterns(no_state_key, v1=True),
-                                   self.on_GET_no_state_key)
-        http_server.register_paths("PUT",
-                                   client_patterns(no_state_key, v1=True),
-                                   self.on_PUT_no_state_key)
+        http_server.register_paths(
+            "GET",
+            client_patterns(state_key, v1=True),
+            self.on_GET,
+            self.__class__.__name__,
+        )
+        http_server.register_paths(
+            "PUT",
+            client_patterns(state_key, v1=True),
+            self.on_PUT,
+            self.__class__.__name__,
+        )
+        http_server.register_paths(
+            "GET",
+            client_patterns(no_state_key, v1=True),
+            self.on_GET_no_state_key,
+            self.__class__.__name__,
+        )
+        http_server.register_paths(
+            "PUT",
+            client_patterns(no_state_key, v1=True),
+            self.on_PUT_no_state_key,
+            self.__class__.__name__,
+        )
 
     def on_GET_no_state_key(self, request, room_id, event_type):
         return self.on_GET(request, room_id, event_type, "")
@@ -132,8 +155,9 @@ class RoomStateEventRestServlet(TransactionRestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_type, state_key):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        format = parse_string(request, "format", default="content",
-                              allowed_values=["content", "event"])
+        format = parse_string(
+            request, "format", default="content", allowed_values=["content", "event"]
+        )
 
         msg_handler = self.message_handler
         data = yield msg_handler.get_room_data(
@@ -145,15 +169,13 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         )
 
         if not data:
-            raise SynapseError(
-                404, "Event not found.", errcode=Codes.NOT_FOUND
-            )
+            raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         if format == "event":
             event = format_event_for_client_v2(data.get_dict())
-            defer.returnValue((200, event))
+            return (200, event)
         elif format == "content":
-            defer.returnValue((200, data.get_dict()["content"]))
+            return (200, data.get_dict()["content"])
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, state_key, txn_id=None):
@@ -182,20 +204,17 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             )
         else:
             event = yield self.event_creation_handler.create_and_send_nonmember_event(
-                requester,
-                event_dict,
-                txn_id=txn_id,
+                requester, event_dict, txn_id=txn_id
             )
 
         ret = {}
         if event:
             ret = {"event_id": event.event_id}
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(TransactionRestServlet):
-
     def __init__(self, hs):
         super(RoomSendEventRestServlet, self).__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -203,7 +222,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 
     def register(self, http_server):
         # /rooms/$roomid/send/$event_type[/$txn_id]
-        PATTERNS = ("/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)")
+        PATTERNS = "/rooms/(?P<room_id>[^/]*)/send/(?P<event_type>[^/]*)"
         register_txn_path(self, PATTERNS, http_server, with_get=True)
 
     @defer.inlineCallbacks
@@ -218,16 +237,14 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             "sender": requester.user.to_string(),
         }
 
-        if b'ts' in request.args and requester.app_service:
-            event_dict['origin_server_ts'] = parse_integer(request, "ts", 0)
+        if b"ts" in request.args and requester.app_service:
+            event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
         event = yield self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            event_dict,
-            txn_id=txn_id,
+            requester, event_dict, txn_id=txn_id
         )
 
-        defer.returnValue((200, {"event_id": event.event_id}))
+        return (200, {"event_id": event.event_id})
 
     def on_GET(self, request, room_id, event_type, txn_id):
         return (200, "Not implemented")
@@ -247,15 +264,12 @@ class JoinRoomAliasServlet(TransactionRestServlet):
 
     def register(self, http_server):
         # /join/$room_identifier[/$txn_id]
-        PATTERNS = ("/join/(?P<room_identifier>[^/]*)")
+        PATTERNS = "/join/(?P<room_identifier>[^/]*)"
         register_txn_path(self, PATTERNS, http_server)
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_identifier, txn_id=None):
-        requester = yield self.auth.get_user_by_req(
-            request,
-            allow_guest=True,
-        )
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         try:
             content = parse_json_object_from_request(request)
@@ -268,7 +282,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             room_id = room_identifier
             try:
                 remote_room_hosts = [
-                    x.decode('ascii') for x in request.args[b"server_name"]
+                    x.decode("ascii") for x in request.args[b"server_name"]
                 ]
             except Exception:
                 remote_room_hosts = None
@@ -278,9 +292,9 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             room_id, remote_room_hosts = yield handler.lookup_room_alias(room_alias)
             room_id = room_id.to_string()
         else:
-            raise SynapseError(400, "%s was not legal room ID or room alias" % (
-                room_identifier,
-            ))
+            raise SynapseError(
+                400, "%s was not legal room ID or room alias" % (room_identifier,)
+            )
 
         yield self.room_member_handler.update_membership(
             requester=requester,
@@ -293,7 +307,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             third_party_signed=content.get("third_party_signed", None),
         )
 
-        defer.returnValue((200, {"room_id": room_id}))
+        return (200, {"room_id": room_id})
 
     def on_PUT(self, request, room_identifier, txn_id):
         return self.txns.fetch_or_execute_request(
@@ -316,11 +330,11 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
         try:
             yield self.auth.get_user_by_req(request, allow_guest=True)
-        except AuthError as e:
+        except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
             # federations.
-            if self.hs.config.restrict_public_rooms_to_local_users:
+            if not self.hs.config.allow_public_rooms_without_auth:
                 raise
 
             # We allow people to not be authed if they're just looking at our
@@ -339,17 +353,14 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         handler = self.hs.get_room_list_handler()
         if server:
             data = yield handler.get_remote_public_room_list(
-                server,
-                limit=limit,
-                since_token=since_token,
+                server, limit=limit, since_token=since_token
             )
         else:
             data = yield handler.get_local_public_room_list(
-                limit=limit,
-                since_token=since_token,
+                limit=limit, since_token=since_token
             )
 
-        defer.returnValue((200, data))
+        return (200, data)
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -394,7 +405,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                 network_tuple=network_tuple,
             )
 
-        defer.returnValue((200, data))
+        return (200, data)
 
 
 # TODO: Needs unit testing
@@ -439,16 +450,13 @@ class RoomMemberListRestServlet(RestServlet):
         chunk = []
 
         for event in events:
-            if (
-                (membership and event['content'].get("membership") != membership) or
-                (not_membership and event['content'].get("membership") == not_membership)
+            if (membership and event["content"].get("membership") != membership) or (
+                not_membership and event["content"].get("membership") == not_membership
             ):
                 continue
             chunk.append(event)
 
-        defer.returnValue((200, {
-            "chunk": chunk
-        }))
+        return (200, {"chunk": chunk})
 
 
 # deprecated in favour of /members?membership=join?
@@ -466,12 +474,10 @@ class JoinedRoomMemberListRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
 
         users_with_profile = yield self.message_handler.get_joined_members(
-            requester, room_id,
+            requester, room_id
         )
 
-        defer.returnValue((200, {
-            "joined": users_with_profile,
-        }))
+        return (200, {"joined": users_with_profile})
 
 
 # TODO: Needs better unit testing
@@ -486,9 +492,7 @@ class RoomMessageListRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        pagination_config = PaginationConfig.from_request(
-            request, default_limit=10,
-        )
+        pagination_config = PaginationConfig.from_request(request, default_limit=10)
         as_client_event = b"raw" not in request.args
         filter_bytes = parse_string(request, b"filter", encoding=None)
         if filter_bytes:
@@ -506,7 +510,7 @@ class RoomMessageListRestServlet(RestServlet):
             event_filter=event_filter,
         )
 
-        defer.returnValue((200, msgs))
+        return (200, msgs)
 
 
 # TODO: Needs unit testing
@@ -527,7 +531,7 @@ class RoomStateRestServlet(RestServlet):
             user_id=requester.user.to_string(),
             is_guest=requester.is_guest,
         )
-        defer.returnValue((200, events))
+        return (200, events)
 
 
 # TODO: Needs unit testing
@@ -544,11 +548,9 @@ class RoomInitialSyncRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = PaginationConfig.from_request(request)
         content = yield self.initial_sync_handler.room_initial_sync(
-            room_id=room_id,
-            requester=requester,
-            pagin_config=pagination_config,
+            room_id=room_id, requester=requester, pagin_config=pagination_config
         )
-        defer.returnValue((200, content))
+        return (200, content)
 
 
 class RoomEventServlet(RestServlet):
@@ -566,14 +568,22 @@ class RoomEventServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        event = yield self.event_handler.get_event(requester.user, room_id, event_id)
+        try:
+            event = yield self.event_handler.get_event(
+                requester.user, room_id, event_id
+            )
+        except AuthError:
+            # This endpoint is supposed to return a 404 when the requester does
+            # not have permission to access the event
+            # https://matrix.org/docs/spec/client_server/r0.5.0#get-matrix-client-r0-rooms-roomid-event-eventid
+            raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
         if event:
             event = yield self._event_serializer.serialize_event(event, time_now)
-            defer.returnValue((200, event))
-        else:
-            defer.returnValue((404, "Event not found."))
+            return (200, event)
+
+        return SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
 
 class RoomEventContextServlet(RestServlet):
@@ -603,33 +613,27 @@ class RoomEventContextServlet(RestServlet):
             event_filter = None
 
         results = yield self.room_context_handler.get_event_context(
-            requester.user,
-            room_id,
-            event_id,
-            limit,
-            event_filter,
+            requester.user, room_id, event_id, limit, event_filter
         )
 
         if not results:
-            raise SynapseError(
-                404, "Event not found.", errcode=Codes.NOT_FOUND
-            )
+            raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
         results["events_before"] = yield self._event_serializer.serialize_events(
-            results["events_before"], time_now,
+            results["events_before"], time_now
         )
         results["event"] = yield self._event_serializer.serialize_event(
-            results["event"], time_now,
+            results["event"], time_now
         )
         results["events_after"] = yield self._event_serializer.serialize_events(
-            results["events_after"], time_now,
+            results["events_after"], time_now
         )
         results["state"] = yield self._event_serializer.serialize_events(
-            results["state"], time_now,
+            results["state"], time_now
         )
 
-        defer.returnValue((200, results))
+        return (200, results)
 
 
 class RoomForgetRestServlet(TransactionRestServlet):
@@ -639,22 +643,16 @@ class RoomForgetRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server):
-        PATTERNS = ("/rooms/(?P<room_id>[^/]*)/forget")
+        PATTERNS = "/rooms/(?P<room_id>[^/]*)/forget"
         register_txn_path(self, PATTERNS, http_server)
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, txn_id=None):
-        requester = yield self.auth.get_user_by_req(
-            request,
-            allow_guest=False,
-        )
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
 
-        yield self.room_member_handler.forget(
-            user=requester.user,
-            room_id=room_id,
-        )
+        yield self.room_member_handler.forget(user=requester.user, room_id=room_id)
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
     def on_PUT(self, request, room_id, txn_id):
         return self.txns.fetch_or_execute_request(
@@ -664,7 +662,6 @@ class RoomForgetRestServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(TransactionRestServlet):
-
     def __init__(self, hs):
         super(RoomMembershipRestServlet, self).__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
@@ -672,20 +669,19 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
-        PATTERNS = ("/rooms/(?P<room_id>[^/]*)/"
-                    "(?P<membership_action>join|invite|leave|ban|unban|kick)")
+        PATTERNS = (
+            "/rooms/(?P<room_id>[^/]*)/"
+            "(?P<membership_action>join|invite|leave|ban|unban|kick)"
+        )
         register_txn_path(self, PATTERNS, http_server)
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, membership_action, txn_id=None):
-        requester = yield self.auth.get_user_by_req(
-            request,
-            allow_guest=True,
-        )
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         if requester.is_guest and membership_action not in {
             Membership.JOIN,
-            Membership.LEAVE
+            Membership.LEAVE,
         }:
             raise AuthError(403, "Guest access not allowed")
 
@@ -704,9 +700,9 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 content["address"],
                 content["id_server"],
                 requester,
-                txn_id
+                txn_id,
             )
-            defer.returnValue((200, {}))
+            return (200, {})
             return
 
         target = requester.user
@@ -715,8 +711,8 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             target = UserID.from_string(content["user_id"])
 
         event_content = None
-        if 'reason' in content and membership_action in ['kick', 'ban']:
-            event_content = {'reason': content['reason']}
+        if "reason" in content and membership_action in ["kick", "ban"]:
+            event_content = {"reason": content["reason"]}
 
         yield self.room_member_handler.update_membership(
             requester=requester,
@@ -733,7 +729,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         if membership_action == "join":
             return_value["room_id"] = room_id
 
-        defer.returnValue((200, return_value))
+        return (200, return_value)
 
     def _has_3pid_invite_keys(self, content):
         for key in {"id_server", "medium", "address"}:
@@ -755,7 +751,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server):
-        PATTERNS = ("/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)")
+        PATTERNS = "/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)"
         register_txn_path(self, PATTERNS, http_server)
 
     @defer.inlineCallbacks
@@ -775,7 +771,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
             txn_id=txn_id,
         )
 
-        defer.returnValue((200, {"event_id": event.event_id}))
+        return (200, {"event_id": event.event_id})
 
     def on_PUT(self, request, room_id, event_id, txn_id):
         return self.txns.fetch_or_execute_request(
@@ -817,12 +813,10 @@ class RoomTypingRestServlet(RestServlet):
             )
         else:
             yield self.typing_handler.stopped_typing(
-                target_user=target_user,
-                auth_user=requester.user,
-                room_id=room_id,
+                target_user=target_user, auth_user=requester.user, room_id=room_id
             )
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
 
 class SearchRestServlet(RestServlet):
@@ -841,12 +835,10 @@ class SearchRestServlet(RestServlet):
 
         batch = parse_string(request, "next_batch")
         results = yield self.handlers.search_handler.search(
-            requester.user,
-            content,
-            batch,
+            requester.user, content, batch
         )
 
-        defer.returnValue((200, results))
+        return (200, results)
 
 
 class JoinedRoomsRestServlet(RestServlet):
@@ -862,7 +854,7 @@ class JoinedRoomsRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         room_ids = yield self.store.get_rooms_for_user(requester.user.to_string())
-        defer.returnValue((200, {"joined_rooms": list(room_ids)}))
+        return (200, {"joined_rooms": list(room_ids)})
 
 
 def register_txn_path(servlet, regex_string, http_server, with_get=False):
@@ -881,18 +873,21 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
     http_server.register_paths(
         "POST",
         client_patterns(regex_string + "$", v1=True),
-        servlet.on_POST
+        servlet.on_POST,
+        servlet.__class__.__name__,
     )
     http_server.register_paths(
         "PUT",
         client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
-        servlet.on_PUT
+        servlet.on_PUT,
+        servlet.__class__.__name__,
     )
     if with_get:
         http_server.register_paths(
             "GET",
             client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
-            servlet.on_GET
+            servlet.on_GET,
+            servlet.__class__.__name__,
         )
 
 

@@ -23,7 +23,7 @@ class RateLimitConfig(object):
 
 class FederationRateLimitConfig(object):
     _items_and_default = {
-        "window_size": 10000,
+        "window_size": 1000,
         "sleep_limit": 10,
         "sleep_delay": 500,
         "reject_limit": 50,
@@ -36,7 +36,7 @@ class FederationRateLimitConfig(object):
 
 
 class RatelimitConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
 
         # Load the new-style messages config if it exists. Otherwise fall back
         # to the old method.
@@ -54,7 +54,7 @@ class RatelimitConfig(Config):
 
         # Load the new-style federation config, if it exists. Otherwise, fall
         # back to the old method.
-        if "federation_rc" in config:
+        if "rc_federation" in config:
             self.rc_federation = FederationRateLimitConfig(**config["rc_federation"])
         else:
             self.rc_federation = FederationRateLimitConfig(
@@ -80,7 +80,7 @@ class RatelimitConfig(Config):
             "federation_rr_transactions_per_room_per_second", 50
         )
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         ## Ratelimiting ##
 

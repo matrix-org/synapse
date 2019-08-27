@@ -30,21 +30,19 @@ use github's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
-We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Travis CI
-<https://travis-ci.org/matrix-org/synapse>`_ for continuous integration. All
-pull requests to synapse get automatically tested by Travis and CircleCI.
-If your change breaks the build, this will be shown in GitHub, so please
-keep an eye on the pull request for feedback.
+We use `Buildkite <https://buildkite.com/matrix-dot-org/synapse>`_ for
+continuous integration.  Buildkite builds need to be authorised by a
+maintainer. If your change breaks the build, this will be shown in GitHub, so
+please keep an eye on the pull request for feedback.
 
 To run unit tests in a local development environment, you can use:
 
-- ``tox -e py27`` (requires tox to be installed by ``pip install tox``) for
-  SQLite-backed Synapse on Python 2.7.
-- ``tox -e py35`` for SQLite-backed Synapse on Python 3.5.
+- ``tox -e py35`` (requires tox to be installed by ``pip install tox``)
+  for SQLite-backed Synapse on Python 3.5.
 - ``tox -e py36`` for SQLite-backed Synapse on Python 3.6.
-- ``tox -e py27-postgres`` for PostgreSQL-backed Synapse on Python 2.7
+- ``tox -e py36-postgres`` for PostgreSQL-backed Synapse on Python 3.6
   (requires a running local PostgreSQL with access to create databases).
-- ``./test_postgresql.sh`` for PostgreSQL-backed Synapse on Python 2.7
+- ``./test_postgresql.sh`` for PostgreSQL-backed Synapse on Python 3.5
   (requires Docker). Entirely self-contained, recommended if you don't want to
   set up PostgreSQL yourself.
 
@@ -71,13 +69,21 @@ All changes, even minor ones, need a corresponding changelog / newsfragment
 entry. These are managed by Towncrier
 (https://github.com/hawkowl/towncrier).
 
-To create a changelog entry, make a new file in the ``changelog.d``
-file named in the format of ``PRnumber.type``. The type can be
-one of ``feature``, ``bugfix``, ``removal`` (also used for
-deprecations), or ``misc`` (for internal-only changes).
+To create a changelog entry, make a new file in the ``changelog.d`` file named
+in the format of ``PRnumber.type``. The type can be one of the following:
 
-The content of the file is your changelog entry, which can contain Markdown
-formatting. The entry should end with a full stop ('.') for consistency.
+* ``feature``.
+* ``bugfix``.
+* ``docker`` (for updates to the Docker image).
+* ``doc`` (for updates to the documentation).
+* ``removal`` (also used for deprecations).
+* ``misc`` (for internal-only changes).
+
+The content of the file is your changelog entry, which should be a short
+description of your change in the same style as the rest of our `changelog
+<https://github.com/matrix-org/synapse/blob/master/CHANGES.md>`_. The file can
+contain Markdown formatting, and should end with a full stop ('.') for
+consistency.
 
 Adding credits to the changelog is encouraged, we value your
 contributions and would like to have you shouted out in the release notes!

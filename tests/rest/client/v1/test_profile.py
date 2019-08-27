@@ -183,7 +183,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     def test_set_displayname(self):
         request, channel = self.make_request(
             "PUT",
-            "/profile/%s/displayname" % (self.owner, ),
+            "/profile/%s/displayname" % (self.owner,),
             content=json.dumps({"displayname": "test"}),
             access_token=self.owner_tok,
         )
@@ -197,7 +197,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         """Attempts to set a stupid displayname should get a 400"""
         request, channel = self.make_request(
             "PUT",
-            "/profile/%s/displayname" % (self.owner, ),
+            "/profile/%s/displayname" % (self.owner,),
             content=json.dumps({"displayname": "test" * 100}),
             access_token=self.owner_tok,
         )
@@ -209,8 +209,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def get_displayname(self):
         request, channel = self.make_request(
-            "GET",
-            "/profile/%s/displayname" % (self.owner, ),
+            "GET", "/profile/%s/displayname" % (self.owner,)
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
@@ -289,3 +288,50 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
             # if the user isn't already in the room), because we only want to
             # make sure the user isn't in the room.
             pass
+
+
+class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        profile.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config["require_auth_for_profile_requests"] = True
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def prepare(self, reactor, clock, hs):
+        # User requesting the profile.
+        self.requester = self.register_user("requester", "pass")
+        self.requester_tok = self.login("requester", "pass")
+
+    def test_can_lookup_own_profile(self):
+        """Tests that a user can lookup their own profile without having to be in a room
+        if 'require_auth_for_profile_requests' is set to true in the server's config.
+        """
+        request, channel = self.make_request(
+            "GET", "/profile/" + self.requester, access_token=self.requester_tok
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        request, channel = self.make_request(
+            "GET",
+            "/profile/" + self.requester + "/displayname",
+            access_token=self.requester_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        request, channel = self.make_request(
+            "GET",
+            "/profile/" + self.requester + "/avatar_url",
+            access_token=self.requester_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)

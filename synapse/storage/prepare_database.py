@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 55
+SCHEMA_VERSION = 56
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -133,7 +133,7 @@ def _setup_new_database(cur, database_engine):
             if ver <= SCHEMA_VERSION:
                 valid_dirs.append((ver, abs_path))
         else:
-            logger.warn("Unexpected entry in 'full_schemas': %s", filename)
+            logger.debug("Ignoring entry '%s' in 'full_schemas'", filename)
 
     if not valid_dirs:
         raise PrepareDatabaseException(
@@ -146,9 +146,10 @@ def _setup_new_database(cur, database_engine):
 
     directory_entries = os.listdir(sql_dir)
 
-    for filename in sorted(fnmatch.filter(directory_entries, "*.sql") + fnmatch.filter(
-        directory_entries, "*.sql." + specific
-    )):
+    for filename in sorted(
+        fnmatch.filter(directory_entries, "*.sql")
+        + fnmatch.filter(directory_entries, "*.sql." + specific)
+    ):
         sql_loc = os.path.join(sql_dir, filename)
         logger.debug("Applying schema %s", sql_loc)
         executescript(cur, sql_loc)
@@ -237,6 +238,13 @@ def _upgrade_existing_database(
 
     logger.debug("applied_delta_files: %s", applied_delta_files)
 
+    if isinstance(database_engine, PostgresEngine):
+        specific_engine_extension = ".postgres"
+    else:
+        specific_engine_extension = ".sqlite"
+
+    specific_engine_extensions = (".sqlite", ".postgres")
+
     for v in range(start_ver, SCHEMA_VERSION + 1):
         logger.info("Upgrading schema to v%d", v)
 
@@ -273,15 +281,22 @@ def _upgrade_existing_database(
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package
                 # installers. Silently skip it
-                pass
+                continue
             elif ext == ".sql":
                 # A plain old .sql file, just read and execute it
                 logger.info("Applying schema %s", relative_path)
                 executescript(cur, absolute_path)
+            elif ext == specific_engine_extension and root_name.endswith(".sql"):
+                # A .sql file specific to our engine; just read and execute it
+                logger.info("Applying engine-specific schema %s", relative_path)
+                executescript(cur, absolute_path)
+            elif ext in specific_engine_extensions and root_name.endswith(".sql"):
+                # A .sql file for a different engine; skip it.
+                continue
             else:
                 # Not a valid delta file.
-                logger.warn(
-                    "Found directory entry that did not end in .py or" " .sql: %s",
+                logger.warning(
+                    "Found directory entry that did not end in .py or .sql: %s",
                     relative_path,
                 )
                 continue
@@ -289,7 +304,7 @@ def _upgrade_existing_database(
             # Mark as done.
             cur.execute(
                 database_engine.convert_param_style(
-                    "INSERT INTO applied_schema_deltas (version, file)" " VALUES (?,?)"
+                    "INSERT INTO applied_schema_deltas (version, file) VALUES (?,?)"
                 ),
                 (v, relative_path),
             )
@@ -297,7 +312,7 @@ def _upgrade_existing_database(
             cur.execute("DELETE FROM schema_version")
             cur.execute(
                 database_engine.convert_param_style(
-                    "INSERT INTO schema_version (version, upgraded)" " VALUES (?,?)"
+                    "INSERT INTO schema_version (version, upgraded) VALUES (?,?)"
                 ),
                 (v, True),
             )
@@ -313,7 +328,7 @@ def _apply_module_schemas(txn, database_engine, config):
             application config
     """
     for (mod, _config) in config.password_providers:
-        if not hasattr(mod, 'get_db_schema_files'):
+        if not hasattr(mod, "get_db_schema_files"):
             continue
         modname = ".".join((mod.__module__, mod.__name__))
         _apply_module_schema_files(
@@ -343,7 +358,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
             continue
 
         root_name, ext = os.path.splitext(name)
-        if ext != '.sql':
+        if ext != ".sql":
             raise PrepareDatabaseException(
                 "only .sql files are currently supported for module schemas"
             )
@@ -407,7 +422,7 @@ def get_statements(f):
 
 
 def executescript(txn, schema_path):
-    with open(schema_path, 'r') as f:
+    with open(schema_path, "r") as f:
         for statement in get_statements(f):
             txn.execute(statement)
 

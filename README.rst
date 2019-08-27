@@ -272,7 +272,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python3 env
     source env/bin/activate
-    python -m pip install --no-pep-517 -e .[all]
+    python -m pip install --no-use-pep517 -e .[all]
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -340,8 +340,11 @@ log lines and looking for any 'Processed request' lines which take more than
 a few seconds to execute. Please let us know at #synapse:matrix.org if
 you see this failure mode so we can help debug it, however.
 
-Help!! Synapse eats all my RAM!
--------------------------------
+Help!! Synapse is slow and eats all my RAM/CPU!
+-----------------------------------------------
+
+First, ensure you are running the latest version of Synapse, using Python 3
+with a PostgreSQL database.
 
 Synapse's architecture is quite RAM hungry currently - we deliberately
 cache a lot of recent room data and metadata in RAM in order to speed up
@@ -352,14 +355,29 @@ variable. The default is 0.5, which can be decreased to reduce RAM usage
 in memory constrained enviroments, or increased if performance starts to
 degrade.
 
+However, degraded performance due to a low cache factor, common on
+machines with slow disks, often leads to explosions in memory use due
+backlogged requests. In this case, reducing the cache factor will make
+things worse. Instead, try increasing it drastically. 2.0 is a good
+starting value.
+
 Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
-improvement in overall amount, and especially in terms of giving back RAM
-to the OS. To use it, the library must simply be put in the LD_PRELOAD
-environment variable when launching Synapse. On Debian, this can be done
-by installing the ``libjemalloc1`` package and adding this line to
-``/etc/default/matrix-synapse``::
+improvement in overall memory use, and especially in terms of giving back
+RAM to the OS. To use it, the library must simply be put in the
+LD_PRELOAD environment variable when launching Synapse. On Debian, this
+can be done by installing the ``libjemalloc1`` package and adding this
+line to ``/etc/default/matrix-synapse``::
 
     LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 This can make a significant difference on Python 2.7 - it's unclear how
 much of an improvement it provides on Python 3.x.
+
+If you're encountering high CPU use by the Synapse process itself, you
+may be affected by a bug with presence tracking that leads to a
+massive excess of outgoing federation requests (see `discussion
+<https://github.com/matrix-org/synapse/issues/3971>`_). If metrics
+indicate that your server is also issuing far more outgoing federation
+requests than can be accounted for by your users' activity, this is a
+likely cause. The misbehavior can be worked around by setting
+``use_presence: false`` in the Synapse config file.
