@@ -17,6 +17,7 @@ import logging
 import os.path
 import sys
 import typing
+import warnings
 
 import attr
 from constantly import NamedConstant, Names, ValueConstant, Values
@@ -172,6 +173,7 @@ class DrainConfiguration(object):
     name = attr.ib()
     type = attr.ib()
     location = attr.ib()
+    options = attr.ib(default=attr.Factory(dict))
 
 
 DEFAULT_LOGGERS = {"synapse": {"level": "INFO"}}
@@ -239,8 +241,12 @@ def parse_drain_configs(
         elif logging_type in [DrainType.NETWORK_JSON_TERSE]:
             host = config.get("host")
             port = config.get("port")
+            maximum_buffer = config.get("maximum_buffer", 1000)
             yield DrainConfiguration(
-                name=name, type=logging_type, location=(host, port)
+                name=name,
+                type=logging_type,
+                location=(host, port),
+                options={"maximum_buffer": maximum_buffer},
             )
 
         else:
@@ -280,12 +286,12 @@ def setup_structured_logging(
                 "Starting up the {name} console logger drain", name=observer.name
             )
             observers.append(SynapseFileLogObserver(observer.location))
-        if observer.type == DrainType.CONSOLE_JSON:
+        elif observer.type == DrainType.CONSOLE_JSON:
             logger.debug(
                 "Starting up the {name} JSON console logger drain", name=observer.name
             )
             observers.append(jsonFileLogObserver(observer.location))
-        if observer.type == DrainType.CONSOLE_JSON_TERSE:
+        elif observer.type == DrainType.CONSOLE_JSON_TERSE:
             logger.debug(
                 "Starting up the {name} terse JSON console logger drain",
                 name=observer.name,
@@ -295,24 +301,31 @@ def setup_structured_logging(
             )
 
         # File drains
-        if observer.type == DrainType.FILE:
+        elif observer.type == DrainType.FILE:
             logger.debug("Starting up the {name} file logger drain", name=observer.name)
             log_file = open(observer.location, "at", buffering=1, encoding="utf8")
             observers.append(SynapseFileLogObserver(log_file))
-        if observer.type == DrainType.FILE_JSON:
+        elif observer.type == DrainType.FILE_JSON:
             logger.debug(
                 "Starting up the {name} JSON file logger drain", name=observer.name
             )
             log_file = open(observer.location, "at", buffering=1, encoding="utf8")
             observers.append(jsonFileLogObserver(log_file))
 
-        if observer.type == DrainType.NETWORK_JSON_TERSE:
+        elif observer.type == DrainType.NETWORK_JSON_TERSE:
             metadata = {"server_name": hs.config.server_name}
             log_observer = TerseJSONToTCPLogObserver(
-                hs, observer.location[0], observer.location[1], metadata
+                hs,
+                observer.location[0],
+                observer.location[1],
+                metadata,
+                **observer.options
             )
             log_observer.start()
             observers.append(log_observer)
+        else:
+            # We should never get here, but, just in case, throw an error.
+            raise ConfigError("%s drain type cannot be configured" % (observer.type,))
 
     publisher = LogPublisher(*observers)
     log_filter = LogLevelFilterPredicate()
@@ -335,7 +348,7 @@ def setup_structured_logging(
     lco = LogContextObserver(f)
     stuff_into_twisted = PythonStdlibToTwistedLogger(lco)
 
-    stdliblogger = logging.getLogger("")
+    stdliblogger = logging.getLogger()
     stdliblogger.addHandler(stuff_into_twisted)
 
     # Always redirect standard I/O, otherwise other logging outputs might miss
@@ -346,6 +359,6 @@ def setup_structured_logging(
 
 
 def reload_structured_logging(*args, log_config=None) -> None:
-    # TODO: Reload the structured logging system. Since we don't implement any
-    # sort of file rotation, we don't need to worry about doing that here.
-    pass
+    warnings.warn(
+        "Currently the structured logging system can not be reloaded, doing nothing"
+    )

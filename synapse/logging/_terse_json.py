@@ -19,19 +19,24 @@ Log formatters that output terse JSON.
 
 import sys
 from collections import deque
+from ipaddress import IPv4Address, IPv6Address, ip_address
 from typing.io import TextIO
 
 import attr
 from simplejson import dumps
 
 from twisted.application.internet import ClientService
-from twisted.internet.endpoints import HostnameEndpoint
+from twisted.internet.endpoints import (
+    HostnameEndpoint,
+    TCP4ClientEndpoint,
+    TCP6ClientEndpoint,
+)
 from twisted.internet.protocol import Factory, Protocol
 from twisted.logger import FileLogObserver
 from twisted.python.failure import Failure
 
 
-def flatten_event(_event: dict, metadata: dict, include_time: bool = False):
+def flatten_event(event: dict, metadata: dict, include_time: bool = False):
     """
     Flatten a Twisted logging event to an dictionary capable of being sent
     as a log event to a logging aggregation system.
@@ -42,7 +47,7 @@ def flatten_event(_event: dict, metadata: dict, include_time: bool = False):
     keys.
 
     Args:
-        _event (dict): The Twisted logging event we are flattening.
+        event (dict): The Twisted logging event we are flattening.
         metadata (dict): Additional data to include with each log message. This
             can be information like the server name. Since the target log
             consumer does not know who we are other than by host IP, this
@@ -50,33 +55,33 @@ def flatten_event(_event: dict, metadata: dict, include_time: bool = False):
         include_time (bool): Should we include the `time` key? If False, the
             event time is stripped from the event.
     """
-    event = {}
+    new_event = {}
 
     # If it's a failure, make the new event's log_failure be the traceback text.
-    if "log_failure" in _event:
-        event["log_failure"] = _event["log_failure"].getTraceback()
+    if "log_failure" in event:
+        new_event["log_failure"] = event["log_failure"].getTraceback()
 
     # If it's a warning, copy over a string representation of the warning.
-    if "warning" in _event:
-        event["warning"] = str(_event["warning"])
+    if "warning" in event:
+        new_event["warning"] = str(event["warning"])
 
     # Stdlib logging events have "log_text" as their human-readable portion,
     # Twisted ones have "log_format". For now, include the log_format, so that
     # context only given in the log format (e.g. what is being logged) is
     # available.
-    if "log_text" in _event:
-        event["log"] = _event["log_text"]
+    if "log_text" in event:
+        new_event["log"] = event["log_text"]
     else:
-        event["log"] = _event["log_format"]
+        new_event["log"] = event["log_format"]
 
     # We want to include the timestamp when forwarding over the network, but
     # exclude it when we are writing to stdout. This is because the log ingester
     # (e.g. logstash, fluentd) can add its own timestamp.
     if include_time:
-        event["time"] = _event["log_time"]
+        new_event["time"] = round(event["log_time"], 2)
 
     # Convert the log level to a textual representation.
-    event["level"] = _event["log_level"].name.upper()
+    new_event["level"] = event["log_level"].name.upper()
 
     # Ignore these keys, and do not transfer them over to the new log object.
     # They are either useless (isError), transferred manually above (log_time,
@@ -98,29 +103,29 @@ def flatten_event(_event: dict, metadata: dict, include_time: bool = False):
 
     # If it's from the Twisted legacy logger (twisted.python.log), it adds some
     # more keys we want to purge.
-    if _event.get("log_namespace") == "log_legacy":
+    if event.get("log_namespace") == "log_legacy":
         keys_to_delete.extend(["message", "system", "time"])
 
     # Rather than modify the dictionary in place, construct a new one with only
     # the content we want. The original event should be considered 'frozen'.
-    for key in _event.keys():
+    for key in event.keys():
 
         if key in keys_to_delete:
             continue
 
-        if isinstance(_event[key], (str, int, bool, float)) or _event[key] is None:
+        if isinstance(event[key], (str, int, bool, float)) or event[key] is None:
             # If it's a plain type, include it as is.
-            event[key] = _event[key]
+            new_event[key] = event[key]
         else:
             # If it's not one of those basic types, write out a string
             # representation. This should probably be a warning in development,
             # so that we are sure we are only outputting useful data.
-            event[key] = str(_event[key])
+            new_event[key] = str(event[key])
 
     # Add the metadata information to the event (e.g. the server_name).
-    event.update(metadata)
+    new_event.update(metadata)
 
-    return event
+    return new_event
 
 
 def TerseJSONToConsoleLogObserver(outFile: TextIO, metadata: dict) -> FileLogObserver:
@@ -155,13 +160,28 @@ class TerseJSONToTCPLogObserver(object):
     host = attr.ib(type=str)
     port = attr.ib(type=int)
     metadata = attr.ib(type=dict)
+    maximum_buffer = attr.ib(type=int)
     _buffer = attr.ib(default=attr.Factory(deque), type=deque)
     _writer = attr.ib(default=None)
 
     def start(self) -> None:
-        endpoint = HostnameEndpoint(self.hs.get_reactor(), self.host, self.port)
+
+        # Connect without DNS lookups if it's a direct IP.
+        try:
+            ip = ip_address(self.host)
+            if isinstance(ip, IPv4Address):
+                endpoint = TCP4ClientEndpoint(
+                    self.hs.get_reactor(), self.host, self.port
+                )
+            elif isinstance(ip, IPv6Address):
+                endpoint = TCP6ClientEndpoint(
+                    self.hs.get_reactor(), self.host, self.port
+                )
+        except ValueError:
+            endpoint = HostnameEndpoint(self.hs.get_reactor(), self.host, self.port)
+
         factory = Factory.forProtocol(Protocol)
-        self._service = ClientService(endpoint, factory)
+        self._service = ClientService(endpoint, factory, clock=self.hs.get_reactor())
         self._service.startService()
 
     def _write_loop(self) -> None:
@@ -174,7 +194,7 @@ class TerseJSONToTCPLogObserver(object):
         self._writer = self._service.whenConnected()
 
         @self._writer.addBoth
-        def _(r):
+        def writer(r):
             if isinstance(r, Failure):
                 r.printTraceback(file=sys.__stderr__)
                 self._writer = None
@@ -182,7 +202,13 @@ class TerseJSONToTCPLogObserver(object):
                 return
 
             try:
-                r.transport.write(b"\n".join(reversed(self._buffer)) + b"\n")
+                for event in reversed(self._buffer):
+                    r.transport.write(
+                        dumps(event, ensure_ascii=False, separators=(",", ":")).encode(
+                            "utf8"
+                        )
+                    )
+                    r.transport.write(b"\n")
                 self._buffer.clear()
             except Exception as e:
                 sys.__stderr__.write("Failed writing out logs with %s\n" % (str(e),))
@@ -190,10 +216,11 @@ class TerseJSONToTCPLogObserver(object):
             self._writer = False
             self.hs.get_reactor().callLater(1, self._write_loop)
 
-    def __call__(self, _event: dict) -> None:
-        flattened = flatten_event(_event, self.metadata, include_time=True)
-        self._buffer.append(
-            dumps(flattened, ensure_ascii=False, separators=(",", ":")).encode("utf8")
-        )
+    def _handle_pressure(self) -> None:
+        pass
+
+    def __call__(self, event: dict) -> None:
+        flattened = flatten_event(event, self.metadata, include_time=True)
+        self._buffer.append(flattened)
         # Try and write immediately
         self._write_loop()
