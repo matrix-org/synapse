@@ -311,6 +311,9 @@ class StatsStore(StateDeltasStore):
                     " for stats type %s" % (field, stats_type)
                 )
 
+        # only absolute stats fields are tracked in the `_current` stats tables,
+        # so those are the only ones that we process deltas for when
+        # we upsert against the `_current` table.
         additive_relatives = {
             key: fields.get(key, 0)
             for key in abs_field_names
@@ -321,34 +324,33 @@ class StatsStore(StateDeltasStore):
             absolute_fields = {}
         elif complete_with_stream_id is not None:
             absolute_fields = absolute_fields.copy()
-
             absolute_fields["completed_delta_stream_id"] = complete_with_stream_id
 
-        # first upsert the current table
+        # first upsert the `_current` table
         self._upsert_with_additive_relatives_txn(
-            txn,
-            table + "_current",
-            {id_col: stats_id},
-            absolute_fields,
-            additive_relatives,
+            txn=txn,
+            table=table + "_current",
+            keyvalues={id_col: stats_id},
+            absolutes=absolute_fields,
+            additive_relatives=additive_relatives,
         )
 
         if self.has_completed_background_updates():
             # TODO want to check specifically for stats regenerator, not all
             #   background updates…
-            # then upsert the historical table.
-            # we don't support absolute_fields for slice_field_names as it makes
+            # then upsert the `_historical` table.
+            # we don't support absolute_fields for per-slice fields as it makes
             # no sense.
             per_slice_additive_relatives = {
                 key: fields.get(key, 0) for key in slice_field_names
             }
             self._upsert_copy_from_table_with_additive_relatives_txn(
-                txn,
-                table + "_historical",
-                {id_col: stats_id},
-                {"end_ts": end_ts, "bucket_size": self.stats_bucket_size},
-                per_slice_additive_relatives,
-                table + "_current",
-                abs_field_names,
+                txn=txn,
+                into_table=table + "_historical",
+                keyvalues={id_col: stats_id},
+                extra_dst_keyvalues={"end_ts": end_ts, "bucket_size": self.stats_bucket_size},
+                additive_relatives=per_slice_additive_relatives,
+                src_table=table + "_current",
+                copy_columns=abs_field_names,
                 additional_where=" AND completed_delta_stream_id IS NOT NULL",
             )
