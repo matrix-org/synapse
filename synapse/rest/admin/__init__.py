@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 
 class UsersRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)$")
 
     def __init__(self, hs):
         self.hs = hs
