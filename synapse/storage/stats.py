@@ -433,6 +433,7 @@ class StatsStore(StateDeltasStore):
         elif complete_with_stream_id is not None:
             absolute_fields = absolute_fields.copy()
             absolute_fields["completed_delta_stream_id"] = complete_with_stream_id
+            self.get_earliest_token_for_stats.invalidate(stats_type, stats_id)
 
         # first upsert the `_current` table
         self._upsert_with_additive_relatives_txn(
