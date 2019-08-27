@@ -217,19 +217,23 @@ class StatsHandler(StateDeltasHandler):
                     raise ValueError(err)
 
                 user_id = state_key
-                if self.is_mine_id(user_id) and membership in (
-                    Membership.JOIN,
-                    Membership.LEAVE,
-                ) and prev_membership != membership:
-                    # update user_stats as it's one of our users
-                    public = yield self._is_public_room(room_id)
-
-                    field = "public_rooms" if public else "private_rooms"
-                    delta = +1 if membership == Membership.JOIN else -1
-
-                    yield self.store.update_stats_delta(
-                        now, "user", user_id, {field: delta}
+                if self.is_mine_id(user_id):
+                    # this accounts for transitions like leave → ban and so on.
+                    has_changed_joinedness = (
+                        (prev_membership == Membership.JOIN) !=
+                        (membership == Membership.JOIN)
                     )
+
+                    if has_changed_joinedness:
+                        # update user_stats as it's one of our users
+                        public = yield self._is_public_room(room_id)
+
+                        field = "public_rooms" if public else "private_rooms"
+                        delta = +1 if membership == Membership.JOIN else -1
+
+                        yield self.store.update_stats_delta(
+                            now, "user", user_id, {field: delta}
+                        )
 
             elif typ == EventTypes.Create:
                 # Newly created room. Add it with all blank portions.
