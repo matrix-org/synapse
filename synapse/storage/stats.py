@@ -134,7 +134,7 @@ class StatsStore(StateDeltasStore):
     def _upsert_with_additive_relatives_txn(
         self, txn, table, keyvalues, absolutes, additive_relatives
     ):
-        """
+        """Used to update values in the stats tables.
 
         Args:
             txn: Transaction
@@ -322,7 +322,7 @@ class StatsStore(StateDeltasStore):
         elif complete_with_stream_id is not None:
             absolute_fields = absolute_fields.copy()
 
-        absolute_fields["completed_delta_stream_id"] = complete_with_stream_id
+            absolute_fields["completed_delta_stream_id"] = complete_with_stream_id
 
         # first upsert the current table
         self._upsert_with_additive_relatives_txn(
