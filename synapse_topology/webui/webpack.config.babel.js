@@ -66,7 +66,7 @@ export default {
             title: 'Topology - The synapse configuration tool',
         }),
         new HtmlWebpackTagsPlugin({
-            tags: ['css/bootstrap.min.css', 'css/main.css'],
+            tags: ['css/bootstrap.min.css'],
         }),
     ],
 };
