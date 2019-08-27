@@ -219,9 +219,8 @@ class StatsHandler(StateDeltasHandler):
                 user_id = state_key
                 if self.is_mine_id(user_id):
                     # this accounts for transitions like leave → ban and so on.
-                    has_changed_joinedness = (
-                        (prev_membership == Membership.JOIN) !=
-                        (membership == Membership.JOIN)
+                    has_changed_joinedness = (prev_membership == Membership.JOIN) != (
+                        membership == Membership.JOIN
                     )
 
                     if has_changed_joinedness:
