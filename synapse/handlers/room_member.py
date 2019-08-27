@@ -701,18 +701,25 @@ class RoomMemberHandler(object):
             )
 
         # Check what hashing details are supported by this identity server
+        use_v1 = False
         try:
             hash_details = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server)
             )
         except (HttpResponseException, ValueError) as e:
+            # Catch HttpResponseExcept for a non-200 response code
+            # Catch ValueError for non-JSON response body
+
             # Check if this identity server does not know about v2 lookups
-            if HttpResponseException.code == 404:
+            if e.code == 404:
                 # This is an old identity server that does not yet support v2 lookups
-                return self._lookup_3pid_v1(id_server, medium, address)
+                use_v1 = True
 
             logger.warn("Error when looking up hashing details: %s" % (e,))
             return None
+
+        if use_v1:
+            return self._lookup_3pid_v1(id_server, medium, address)
 
         res = yield self._lookup_3pid_v2(id_server, medium, address, hash_details)
         return res
@@ -766,18 +773,7 @@ class RoomMemberHandler(object):
         supported_lookup_algorithms = hash_details["algorithms"]
         lookup_pepper = hash_details["lookup_pepper"]
 
-        # Check if none of the supported lookup algorithms are present
-        if not any(
-            i in supported_lookup_algorithms
-            for i in [LookupAlgorithm.SHA256, LookupAlgorithm.NONE]
-        ):
-            logger.warn(
-                "No supported lookup algorithms found for %s%s"
-                % (id_server_scheme, id_server)
-            )
-
-            return None
-
+        # Check if any of the supported lookup algorithms are present
         if LookupAlgorithm.SHA256 in supported_lookup_algorithms:
             # Perform a hashed lookup
             lookup_algorithm = LookupAlgorithm.SHA256
@@ -793,6 +789,11 @@ class RoomMemberHandler(object):
             # Combine together plaintext address and medium
             lookup_value = "%s %s" % (address, medium)
 
+        else:
+            logger.warn("No supported lookup algorithms provided by %s%s: %s",
+                        id_server_scheme, id_server, hash_details["algorithms"])
+            return None
+
         try:
             lookup_results = yield self.simple_http_client.post_json_get_json(
                 "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
@@ -803,6 +804,8 @@ class RoomMemberHandler(object):
                 },
             )
         except (HttpResponseException, ValueError) as e:
+            # Catch HttpResponseExcept for a non-200 response code
+            # Catch ValueError for non-JSON response body
             logger.warn("Error when performing a 3pid lookup: %s" % (e,))
             return None
 
