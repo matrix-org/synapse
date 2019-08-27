@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS stats_incremental_position (
     -- (this is positive)
     total_events_max_stream_ordering BIGINT,
 
-    -- If true, this represents the contract agreed upon by the background
-    -- population processor.
+    -- If true, this represents the contract agreed upon by the stats
+    -- regenerator.
     -- If false, this is suitable for use by the delta/incremental processor.
     is_background_contract BOOLEAN NOT NULL PRIMARY KEY
 );
@@ -63,35 +63,29 @@ INSERT INTO stats_incremental_position (
 ) VALUES (NULL, NULL, NULL, (0 = 1)), (NULL, NULL, NULL, (1 = 1));
 
 -- represents PRESENT room statistics for a room
+-- only holds absolute fields
 CREATE TABLE IF NOT EXISTS room_stats_current (
     room_id TEXT NOT NULL PRIMARY KEY,
 
-    -- These starts cover the time from start_ts...end_ts (in seconds).
-    -- Note that end_ts is quantised, and start_ts usually so.
-    start_ts BIGINT,
-    end_ts BIGINT,
+    current_state_events INT NOT NULL,
+    total_events INT NOT NULL,
+    joined_members INT NOT NULL,
+    invited_members INT NOT NULL,
+    left_members INT NOT NULL,
+    banned_members INT NOT NULL,
 
-    current_state_events INT NOT NULL DEFAULT 0,
-    total_events INT NOT NULL DEFAULT 0,
-    joined_members INT NOT NULL DEFAULT 0,
-    invited_members INT NOT NULL DEFAULT 0,
-    left_members INT NOT NULL DEFAULT 0,
-    banned_members INT NOT NULL DEFAULT 0,
-
-    -- If initial background count is still to be performed: NULL
-    -- If initial background count has been performed: the maximum delta stream
+    -- If initial stats regen is still to be performed: NULL
+    -- If initial stats regen has been performed: the maximum delta stream
     --  position that this row takes into account.
-    completed_delta_stream_id BIGINT,
-
-    CONSTRAINT timestamp_nullity_equality CHECK ((start_ts IS NULL) = (end_ts IS NULL))
+    completed_delta_stream_id BIGINT
 );
 
 
 -- represents HISTORICAL room statistics for a room
 CREATE TABLE IF NOT EXISTS room_stats_historical (
     room_id TEXT NOT NULL,
-    -- These stats cover the time from (end_ts - bucket_size)...end_ts (in seconds).
-    -- Note that end_ts is quantised, and start_ts usually so.
+    -- These stats cover the time from (end_ts - bucket_size)...end_ts (in ms).
+    -- Note that end_ts is quantised.
     end_ts BIGINT NOT NULL,
     bucket_size INT NOT NULL,
 
@@ -113,18 +107,15 @@ CREATE INDEX IF NOT EXISTS room_stats_historical_end_ts ON room_stats_historical
 
 
 -- represents PRESENT statistics for a user
+-- only holds absolute fields
 CREATE TABLE IF NOT EXISTS user_stats_current (
     user_id TEXT NOT NULL PRIMARY KEY,
 
-    -- The timestamp that represents the start of the
-    start_ts BIGINT,
-    end_ts BIGINT,
+    public_rooms INT NOT NULL,
+    private_rooms INT NOT NULL,
 
-    public_rooms INT DEFAULT 0 NOT NULL,
-    private_rooms INT DEFAULT 0 NOT NULL,
-
-    -- If initial background count is still to be performed: NULL
-    -- If initial background count has been performed: the maximum delta stream
+    -- If initial stats regen is still to be performed: NULL
+    -- If initial stats regen has been performed: the maximum delta stream
     --  position that this row takes into account.
     completed_delta_stream_id BIGINT
 );
