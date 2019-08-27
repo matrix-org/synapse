@@ -28,7 +28,6 @@ from synapse.api.errors import (
 from synapse.events import EventBase
 from synapse.federation.units import Edu
 from synapse.handlers.presence import format_user_presence_state
-from synapse.logging.opentracing import extract_text_map, start_active_span_follows_from
 from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage import UserPresenceState
