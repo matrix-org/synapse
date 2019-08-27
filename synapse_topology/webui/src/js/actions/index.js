@@ -26,7 +26,6 @@ import {
 
 import {
     getServerSetup,
-    postServerName,
     getSecretkey,
     postCertPaths,
     postCerts,
@@ -61,17 +60,10 @@ const setConfigDir = dir => ({
     configDir: dir,
 });
 
-export const generateSecretKeys = consent => {
+export const generateSecretKeys = serverName => {
 
-    return (dispatch, getState) => {
-
-        dispatch(gettingSecretKeys());
-        postServerName(getState().baseConfig.servername, consent)
-            .then(
-                result => dispatch(getSecretKey()),
-                error => dispatch(fail(error)),
-            );
-
+    return dispatch => {
+        dispatch(getSecretKey(serverName))
     };
 
 };
@@ -162,11 +154,11 @@ export const gettingSecretKeys = () => ({
     type: GETTING_SECRET_KEY,
 });
 
-export const getSecretKey = () => {
+export const getSecretKey = serverName => {
 
     return dispatch => {
 
-        getSecretkey().then(
+        getSecretkey(serverName).then(
             result => dispatch(setSecretKey(result)),
             error => dispatch(fail(error)),
         )

@@ -10,7 +10,6 @@ from .utils import port_checker
 from synapse_topology.model import constants
 from .schemas import (
     BASE_CONFIG_SCHEMA,
-    SERVERNAME_SCHEMA,
     CERT_PATHS_SCHEMA,
     CERTS_SCHEMA,
     PORTS_SCHEMA,
@@ -46,10 +45,12 @@ class Server:
             }
         )
 
-    @app.route("/secretkey", methods=["GET"])
+    @app.route("/secretkey", methods=["POST"])
     @validate_schema(SECRET_KEY_SCHEMA)
-    def get_secret_key(self, request):
-        return json.dumps({"secret_key": self.model.generate_secret_key()})
+    def get_secret_key(self, request, body):
+        return json.dumps(
+            {"secret_key": self.model.generate_secret_key(body["server_name"])}
+        )
 
     @app.route("/config", methods=["GET"])
     def get_config(self, request):

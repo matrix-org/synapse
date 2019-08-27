@@ -16,17 +16,6 @@ export const getServerName = () =>
     fetchAbs(SERVER_NAME)
         .then(res => res.json())
 
-export const postServerName = (servername, consent) =>
-    fetchAbs(
-        SERVER_NAME,
-        {
-            method: 'POST',
-            body: JSON.stringify({
-                "server_name": servername,
-                "report_stats": consent,
-            }),
-        },
-    )
 
 export const postCertPaths = (certPath, certKeyPath) =>
     fetchAbs(
@@ -66,8 +55,16 @@ export const testPorts = (ports) =>
         },
     ).then(res => res.json())
 
-export const getSecretkey = () =>
-    fetchAbs(SECRET_KEY)
+export const getSecretkey = serverName =>
+    fetchAbs(
+        SECRET_KEY,
+        {
+            method: 'POST',
+            body: JSON.stringify({
+                server_name: serverName,
+            })
+        }
+    )
         .then(res => res.json())
         .then(json => json.secret_key)
 
