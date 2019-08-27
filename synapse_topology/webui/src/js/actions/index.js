@@ -287,11 +287,31 @@ export const writeConfig = (config, subConfigName) => {
     return (dispatch, getState) => {
 
         postConfig(baseConfigToSynapseConfig(getState().baseConfig), subConfigName)
-            .then(res => startSynapse(), error => dispatch(fail(error)))
+            .then(
+                res => startSynapse().then(
+                    res => dispatch(advanceUI()),
+                    error => {
+
+                        fail(error);
+                        dispatch(synapseStartFailed());
+
+                    }
+                ),
+                error => {
+
+                    dispatch(fail(error));
+                    dispatch(synapseStartStartFailed())
+
+                }
+            )
 
     }
 
 }
+
+export const synapseStartFailed = () => ({
+    type: SYNAPSE_START_FAILED,
+})
 
 export const resetUI = (ui) => ({
     type: BACK_UI,
