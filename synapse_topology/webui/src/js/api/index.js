@@ -68,9 +68,6 @@ export const getSecretkey = serverName =>
         .then(res => res.json())
         .then(json => json.secret_key)
 
-export const getConfig = () => {
-
-};
 
 export const postConfig = (config, subConfigName) =>
     fetchAbs(
