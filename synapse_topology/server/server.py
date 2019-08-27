@@ -1,4 +1,4 @@
-from os.path import abspath, dirname, join
+from os.path import abspath, dirname, join, isabs
 
 from canonicaljson import json
 
@@ -62,13 +62,13 @@ class Server:
         self.model.set_config(body)
 
     @app.route("/testcertpaths", methods=["POST"])
-    @log_body_if_fail
-    @validate_schema(CERT_PATHS_SCHEMA)
-    def test_cert_paths(self, request, body):
+    def test_cert_paths(self, request):
+        body = json.loads(request.content.read())
         result = {}
-        config_path = self.model.get_config_dir()
+        config_path = self.model.config_dir
         for name, path in body.items():
-            path = abspath(join(config_path, path))
+            if not isabs(path):
+                path = abspath(join(config_path, path))
             try:
                 with open(path, "r"):
                     result[name] = {"invalid": False, "absolute_path": path}
@@ -92,7 +92,7 @@ class Server:
     @app.route("/start", methods=["POST"])
     def start_synapse(self, request):
         print("Starting synapse")
-        subprocess.Popen(["synctl", "start", self.model.get_config_dir()])
+        subprocess.Popen(["synctl", "start", self.model.config_dir])
         sys.exit()
 
     @app.route("/favicon.ico")

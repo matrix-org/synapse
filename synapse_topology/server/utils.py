@@ -12,6 +12,7 @@ def validate_schema(schema):
         @wraps(func)
         def _do_validate(self, request):
             body = json.loads(request.content.read())
+            print(body)
             validate(instance=body, schema=schema)
             return func(self, request, body)
 
@@ -36,9 +37,9 @@ def port_checker(port):
 
 def log_body_if_fail(func):
     @wraps(func)
-    def _log_wrapper(request):
+    def _log_wrapper(self, request):
         try:
-            return func(request)
+            return func(self, request)
         except Exception:
             body = json.loads(request.content.read())
             print(body)
