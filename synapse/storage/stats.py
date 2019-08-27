@@ -40,12 +40,6 @@ PER_SLICE_FIELDS = {"room": (), "user": ()}
 TYPE_TO_TABLE = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user_id")}
 
 
-class OldCollectionRequired(Exception):
-    """ Signal that we need to collect old stats rows and retry. """
-
-    pass
-
-
 class StatsStore(StateDeltasStore):
     def __init__(self, db_conn, hs):
         super(StatsStore, self).__init__(db_conn, hs)
