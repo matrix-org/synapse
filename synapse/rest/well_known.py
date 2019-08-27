@@ -34,7 +34,7 @@ class WellKnownBuilder(object):
         self._config = hs.config
 
     def get_well_known(self):
-        # if we don't have a public_base_url, we can't help much here.
+        # if we don't have a public_baseurl, we can't help much here.
         if self._config.public_baseurl is None:
             return None
 
