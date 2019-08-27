@@ -13,7 +13,7 @@ def validate_schema(schema):
         def _do_validate(self, request):
             body = json.loads(request.content.read())
             validate(instance=body, schema=schema)
-            return func(request, body)
+            return func(self, request, body)
 
         return _do_validate
 
