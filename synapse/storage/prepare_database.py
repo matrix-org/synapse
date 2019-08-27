@@ -243,9 +243,7 @@ def _upgrade_existing_database(
     else:
         specific_engine_extension = ".sqlite"
 
-    specific_engine_extensions = (
-        ".sqlite", ".postgres"
-    )
+    specific_engine_extensions = (".sqlite", ".postgres")
 
     for v in range(start_ver, SCHEMA_VERSION + 1):
         logger.info("Upgrading schema to v%d", v)
