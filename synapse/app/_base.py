@@ -17,10 +17,10 @@ import gc
 import logging
 import os
 import signal
+import socket
 import sys
 import traceback
 
-import sdnotify
 from daemonize import Daemonize
 
 from twisted.internet import defer, error, reactor
@@ -248,13 +248,12 @@ def start(hs, listeners=None):
             def handle_sighup(*args, **kwargs):
                 # Tell systemd our state, if we're using it. This will silently fail if
                 # we're not using systemd.
-                sd_channel = sdnotify.SystemdNotifier()
-                sd_channel.notify("RELOADING=1")
+                sdnotify(b"RELOADING=1")
 
                 for i, args, kwargs in _sighup_callbacks:
                     i(hs, *args, **kwargs)
 
-                sd_channel.notify("READY=1")
+                sdnotify(b"READY=1")
 
             signal.signal(signal.SIGHUP, handle_sighup)
 
@@ -310,16 +309,12 @@ def setup_sdnotify(hs):
 
     # Tell systemd our state, if we're using it. This will silently fail if
     # we're not using systemd.
-    sd_channel = sdnotify.SystemdNotifier()
-
     hs.get_reactor().addSystemEventTrigger(
-        "after",
-        "startup",
-        lambda: sd_channel.notify("READY=1\nMAINPID=%s" % (os.getpid())),
+        "after", "startup", sdnotify, b"READY=1\nMAINPID=%i" % (os.getpid(),)
     )
 
     hs.get_reactor().addSystemEventTrigger(
-        "before", "shutdown", lambda: sd_channel.notify("STOPPING=1")
+        "before", "shutdown", sdnotify, b"STOPPING=1"
     )
 
 
@@ -416,3 +411,35 @@ class _DeferredResolutionReceiver(object):
     def resolutionComplete(self):
         self._deferred.callback(())
         self._receiver.resolutionComplete()
+
+
+sdnotify_sockaddr = os.getenv("NOTIFY_SOCKET")
+
+
+def sdnotify(state):
+    """
+    Send a notification to systemd, if the NOTIFY_SOCKET env var is set.
+
+    This function is based on the sdnotify python package, but since it's only a few
+    lines of code, it's easier to duplicate it here than to add a dependency on a
+    package which many OSes don't include as a matter of principle.
+
+    Args:
+        state (bytes): notification to send
+    """
+    if not isinstance(state, bytes):
+        raise TypeError("sdnotify should be called with a bytes")
+    if not sdnotify_sockaddr:
+        return
+    addr = sdnotify_sockaddr
+    if addr[0] == "@":
+        addr = "\0" + addr[1:]
+
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+            sock.connect(addr)
+            sock.sendall(state)
+    except Exception as e:
+        # this is a bit surprising, since we don't expect to have a NOTIFY_SOCKET
+        # unless systemd is expecting us to notify it.
+        logger.warning("Unable to send notification to systemd: %s", e)

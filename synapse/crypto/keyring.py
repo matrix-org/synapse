@@ -18,7 +18,6 @@ import logging
 from collections import defaultdict
 
 import six
-from six import raise_from
 from six.moves import urllib
 
 import attr
@@ -657,9 +656,10 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 },
             )
         except (NotRetryingDestination, RequestSendFailed) as e:
-            raise_from(KeyLookupError("Failed to connect to remote server"), e)
+            # these both have str() representations which we can't really improve upon
+            raise KeyLookupError(str(e))
         except HttpResponseException as e:
-            raise_from(KeyLookupError("Remote server returned an error"), e)
+            raise KeyLookupError("Remote server returned an error: %s" % (e,))
 
         keys = {}
         added_keys = []
@@ -821,9 +821,11 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                     timeout=10000,
                 )
             except (NotRetryingDestination, RequestSendFailed) as e:
-                raise_from(KeyLookupError("Failed to connect to remote server"), e)
+                # these both have str() representations which we can't really improve
+                # upon
+                raise KeyLookupError(str(e))
             except HttpResponseException as e:
-                raise_from(KeyLookupError("Remote server returned an error"), e)
+                raise KeyLookupError("Remote server returned an error: %s" % (e,))
 
             if response["server_name"] != server_name:
                 raise KeyLookupError(
