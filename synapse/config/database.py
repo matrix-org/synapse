@@ -62,6 +62,7 @@ class DatabaseConfig(Config):
 
         database:
           %(database_conf)s
+
         # Number of events to cache in memory.
         #
         #event_cache_size: 10K
