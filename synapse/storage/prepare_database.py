@@ -238,6 +238,15 @@ def _upgrade_existing_database(
 
     logger.debug("applied_delta_files: %s", applied_delta_files)
 
+    if isinstance(database_engine, PostgresEngine):
+        specific_engine_extension = ".postgres"
+    else:
+        specific_engine_extension = ".sqlite"
+
+    specific_engine_extensions = (
+        ".sqlite", ".postgres"
+    )
+
     for v in range(start_ver, SCHEMA_VERSION + 1):
         logger.info("Upgrading schema to v%d", v)
 
@@ -274,15 +283,22 @@ def _upgrade_existing_database(
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package
                 # installers. Silently skip it
-                pass
+                continue
             elif ext == ".sql":
                 # A plain old .sql file, just read and execute it
                 logger.info("Applying schema %s", relative_path)
                 executescript(cur, absolute_path)
+            elif ext == specific_engine_extension and root_name.endswith(".sql"):
+                # A .sql file specific to our engine; just read and execute it
+                logger.info("Applying engine-specific schema %s", relative_path)
+                executescript(cur, absolute_path)
+            elif ext in specific_engine_extensions and root_name.endswith(".sql"):
+                # A .sql file for a different engine; skip it.
+                continue
             else:
                 # Not a valid delta file.
-                logger.warn(
-                    "Found directory entry that did not end in .py or" " .sql: %s",
+                logger.warning(
+                    "Found directory entry that did not end in .py or .sql: %s",
                     relative_path,
                 )
                 continue
@@ -290,7 +306,7 @@ def _upgrade_existing_database(
             # Mark as done.
             cur.execute(
                 database_engine.convert_param_style(
-                    "INSERT INTO applied_schema_deltas (version, file)" " VALUES (?,?)"
+                    "INSERT INTO applied_schema_deltas (version, file) VALUES (?,?)"
                 ),
                 (v, relative_path),
             )
@@ -298,7 +314,7 @@ def _upgrade_existing_database(
             cur.execute("DELETE FROM schema_version")
             cur.execute(
                 database_engine.convert_param_style(
-                    "INSERT INTO schema_version (version, upgraded)" " VALUES (?,?)"
+                    "INSERT INTO schema_version (version, upgraded) VALUES (?,?)"
                 ),
                 (v, True),
             )
