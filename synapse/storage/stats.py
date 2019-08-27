@@ -92,7 +92,7 @@ class StatsStore(StateDeltasStore):
                 fields[col] = None
 
         return self._simple_upsert(
-            table="room_state",
+            table="room_stats_state",
             keyvalues={"room_id": room_id},
             values=fields,
             desc="update_room_state",

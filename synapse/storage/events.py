@@ -2270,7 +2270,7 @@ class EventsStore(
             "room_aliases",
             "room_depth",
             "room_memberships",
-            "room_state",
+            "room_stats_state",
             "room_stats",
             "room_stats_earliest_token",
             "rooms",
