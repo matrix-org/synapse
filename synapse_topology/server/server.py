@@ -59,7 +59,7 @@ class Server:
     @app.route("/config", methods=["POST"])
     @validate_schema(BASE_CONFIG_SCHEMA)
     def set_config(self, request, body):
-        self.model.set_config(body)
+        self.model.write_config(body)
 
     @app.route("/testcertpaths", methods=["POST"])
     def test_cert_paths(self, request):
