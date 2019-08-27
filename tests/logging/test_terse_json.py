@@ -131,20 +131,20 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
         self.pump()
 
         # Send a bunch of messages that hits the maximum limit
-        logger.debug("debug 1")
-        logger.debug("debug 2")
+        for i in range(0, 5):
+            logger.debug("debug")
 
         for i in range(0, 7):
             logger.info("test message")
 
-        logger.debug("debug 3")
-        logger.debug("debug 4")
+        for i in range(0, 5):
+            logger.debug("debug")
 
         # Assert they're not sent
         self.pump(1)
         self.assertEqual(server.data, b"")
 
-        # Reconnect
+        # Allow the reconnection
         client, server = connect_client(self.reactor, 0)
         self.pump()
 
