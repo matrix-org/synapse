@@ -180,6 +180,7 @@ class StatsStore(StateDeltasStore):
 
             txn.execute(sql, qargs)
         else:
+            self.database_engine.lock_table(txn, table)
             retcols = chain(absolutes.keys(), additive_relatives.keys())
             current_row = self._simple_select_one_txn(
                 txn, table, keyvalues, retcols, allow_none=True
@@ -260,6 +261,7 @@ class StatsStore(StateDeltasStore):
             qargs = chain(additive_relatives.values(), keyvalues.values())
             txn.execute(sql, qargs)
         else:
+            self.database_engine.lock_table(txn, into_table)
             src_row = self._simple_select_one_txn(
                 txn, src_table, keyvalues, copy_columns
             )
