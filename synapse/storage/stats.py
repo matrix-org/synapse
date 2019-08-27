@@ -190,8 +190,7 @@ class StatsStore(StateDeltasStore):
             else:
                 for (key, val) in additive_relatives.items():
                     current_row[key] += val
-                for (key, val) in absolutes.items():
-                    current_row[key] = val
+                current_row.update(absolutes)
                 self._simple_update_one_txn(txn, table, keyvalues, current_row)
 
     def _upsert_copy_from_table_with_additive_relatives_txn(
@@ -223,8 +222,8 @@ class StatsStore(StateDeltasStore):
             ins_columns = chain(
                 keyvalues,
                 copy_columns,
-                additive_relatives.keys(),
-                extra_dst_keyvalues.keys(),
+                additive_relatives,
+                extra_dst_keyvalues,
             )
             sel_exprs = chain(
                 keyvalues,
