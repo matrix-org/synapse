@@ -153,7 +153,7 @@ class StatsHandler(StateDeltasHandler):
             # We use stream_pos here rather than fetch by event_id as event_id
             # may be None
             now = yield self.store.get_received_ts_by_stream_pos(stream_pos)
-            now = int(now) // 1000
+            now = int(now)
 
             room_stats_delta = {}
             room_stats_complete = False
