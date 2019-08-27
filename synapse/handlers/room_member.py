@@ -790,8 +790,12 @@ class RoomMemberHandler(object):
             lookup_value = "%s %s" % (address, medium)
 
         else:
-            logger.warn("No supported lookup algorithms provided by %s%s: %s",
-                        id_server_scheme, id_server, hash_details["algorithms"])
+            logger.warn(
+                "No supported lookup algorithms provided by %s%s: %s",
+                id_server_scheme,
+                id_server,
+                hash_details["algorithms"],
+            )
             return None
 
         try:
