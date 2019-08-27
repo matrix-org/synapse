@@ -471,7 +471,7 @@ class FakeTransport(object):
             self._reactor.callLater(0.0, self.flush)
 
 
-def connect_client(reactor: IReactorTCP, factory) -> AccumulatingProtocol:
+def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol:
     """
     Connect a client to a fake TCP transport.
 
@@ -479,9 +479,12 @@ def connect_client(reactor: IReactorTCP, factory) -> AccumulatingProtocol:
         reactor
         factory: The connecting factory to build.
     """
+    factory = reactor.tcpClients[client_id][2]
     client = factory.buildProtocol(None)
     server = AccumulatingProtocol()
     server.makeConnection(FakeTransport(client, reactor))
     client.makeConnection(FakeTransport(server, reactor))
 
-    return server
+    reactor.tcpClients.pop(client_id)
+
+    return client, server

@@ -257,7 +257,11 @@ def parse_drain_configs(
 
 
 def setup_structured_logging(
-    hs, config, log_config: dict, logBeginner: LogBeginner = globalLogBeginner
+    hs,
+    config,
+    log_config: dict,
+    logBeginner: LogBeginner = globalLogBeginner,
+    redirect_stdlib_logging: bool = True,
 ) -> LogPublisher:
     """
     Set up Twisted's structured logging system.
@@ -346,10 +350,11 @@ def setup_structured_logging(
 
     f = FilteringLogObserver(publisher, [log_filter])
     lco = LogContextObserver(f)
-    stuff_into_twisted = PythonStdlibToTwistedLogger(lco)
 
-    stdliblogger = logging.getLogger()
-    stdliblogger.addHandler(stuff_into_twisted)
+    if redirect_stdlib_logging:
+        stuff_into_twisted = PythonStdlibToTwistedLogger(lco)
+        stdliblogger = logging.getLogger()
+        stdliblogger.addHandler(stuff_into_twisted)
 
     # Always redirect standard I/O, otherwise other logging outputs might miss
     # it.

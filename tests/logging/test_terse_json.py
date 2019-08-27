@@ -26,8 +26,9 @@ from .test_structured import FakeBeginner
 
 
 class TerseJSONTCPTestCase(HomeserverTestCase):
-    def test_write_loop(self):
+    def test_log_output(self):
         """
+        The Terse JSON outputter delivers simplified structured logs over TCP.
         """
         log_config = {
             "drains": {
@@ -53,18 +54,19 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
         # Trigger the connection
         self.pump()
 
-        server = connect_client(self.reactor, self.reactor.tcpClients[0][2])
+        _, server = connect_client(self.reactor, 0)
 
         # Trigger data being sent
         self.pump()
 
         # One log message, with a single trailing newline
-        logs = b"\n".split(server.data)
+        logs = server.data.splitlines()
         self.assertEqual(len(logs), 1)
-        self.assertEqual(server.data.count(b"\n"))
+        self.assertEqual(server.data.count(b"\n"), 1)
 
         log = json.loads(logs[0])
 
+        # The terse logger should give us these keys.
         expected_log_keys = [
             "log",
             "time",
@@ -75,10 +77,77 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
             "server_name",
             "name",
         ]
-
         self.assertEqual(set(log.keys()), set(expected_log_keys))
 
         # It contains the data we expect.
         self.assertEqual(log["name"], "wally")
 
-        print(server.data)
+    def test_log_backpressure(self):
+
+        log_config = {
+            "loggers": {"synapse": {"level": "DEBUG"}},
+            "drains": {
+                "tersejson": {
+                    "type": "network_json_terse",
+                    "host": "127.0.0.1",
+                    "port": 8000,
+                    "maximum_buffer": 10,
+                }
+            },
+        }
+
+        # Begin the logger with our config
+        beginner = FakeBeginner()
+        setup_structured_logging(
+            self.hs,
+            self.hs.config,
+            log_config,
+            logBeginner=beginner,
+            redirect_stdlib_logging=False,
+        )
+
+        logger = Logger(
+            namespace="synapse.logging.test_terse_json", observer=beginner.observers[0]
+        )
+        logger.info("Hello there, {name}!", name="wally")
+
+        # Trigger the connection
+        self.pump()
+
+        client, server = connect_client(self.reactor, 0)
+
+        # Trigger data being sent
+        self.pump()
+
+        # One log message, with a single trailing newline
+        logs = server.data.splitlines()
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(server.data.count(b"\n"), 1)
+        server.data = b""
+
+        # Disconnect the server
+        client.connectionLost(None)
+
+        self.pump()
+
+        # Send a bunch of messages that hits the maximum limit
+        logger.debug("debug 1")
+        logger.debug("debug 2")
+
+        for i in range(0, 7):
+            logger.info("test message")
+
+        logger.debug("debug 3")
+        logger.debug("debug 4")
+
+        # Assert they're not sent
+        self.pump(1)
+        self.assertEqual(server.data, b"")
+
+        # Reconnect
+        client, server = connect_client(self.reactor, 0)
+        self.pump()
+
+        # Only the 7 infos made it through, the debugs were elided
+        logs = server.data.splitlines()
+        self.assertEqual(len(logs), 7)
