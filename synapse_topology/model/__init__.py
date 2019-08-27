@@ -1,6 +1,7 @@
 import yaml
 import subprocess
 
+from os import mkdir
 from os.path import abspath, join, exists, isdir
 
 from synapse.config.homeserver import HomeServerConfig
@@ -22,8 +23,11 @@ class Model:
     def __init__(self, config_dir):
         self.config_dir = abspath(config_dir)
         self.data_dir = abspath(join(self.config_dir, DATA_SUBDIR))
-        if not isdir(self.config_dir) or not isdir(self.data_dir):
-            raise FileNotFoundError()
+        if not isdir(self.config_dir):
+            mkdir(self.config_dir)
+
+        if not isdir(self.data_dir):
+            mkdir(self.data_dir)
 
     def get_config(self, config_path):
         """
