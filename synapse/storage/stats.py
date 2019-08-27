@@ -315,7 +315,8 @@ class StatsStore(StateDeltasStore):
 
         if absolute_fields is None:
             absolute_fields = {}
-        elif complete_with_stream_id is not None:
+
+        if complete_with_stream_id is not None:
             absolute_fields = absolute_fields.copy()
             absolute_fields["completed_delta_stream_id"] = complete_with_stream_id
 
