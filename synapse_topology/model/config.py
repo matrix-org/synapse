@@ -1,5 +1,7 @@
 from os.path import join
 
+import yaml
+
 from synapse.config.database import DatabaseConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import LoggingConfig
@@ -32,7 +34,7 @@ def create_config(config_dir_path, data_dir_path, conf):
     class BaseConfig(*base_configs):
         pass
 
-    class Configs(*uninitialized_configs):
+    class AdvancedConfig(*uninitialized_configs):
         pass
 
     config_args = {
@@ -43,12 +45,21 @@ def create_config(config_dir_path, data_dir_path, conf):
         "database_conf": database_conf,
     }
 
-    base_config = BaseConfig().generate_config(**config_args)
+    base_config = BaseConfig()
+    advanced_config = AdvancedConfig()
 
-    rest_of_config = Configs().generate_config(**config_args)
+    base_config_text = base_config.generate_config(**config_args)
+    advanced_config_text = advanced_config.generate_config(**config_args)
+
+    config = {}
+    config.update(yaml.safe_load(base_config_text))
+    config.update(yaml.safe_load(advanced_config_text))
+
+    base_config.generate_missing_files(config, config_dir_path)
+    advanced_config.generate_missing_files(config, config_dir_path)
 
     return {
-        "homeserver.yaml": base_config
+        "homeserver_basic_config.yaml": base_config_text
         + "\n\nserver_config_in_use: {}".format(server_config_in_use),
-        "the_rest.yaml": rest_of_config,
+        "homeserver_advanced_config.yaml": advanced_config_text,
     }
