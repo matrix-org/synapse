@@ -483,7 +483,14 @@ class DataStore(
         return self._simple_select_list(
             table="users",
             keyvalues={},
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
+            retcols=[
+                "name",
+                "password_hash",
+                "is_guest",
+                "admin",
+                "user_type",
+                "deactivated",
+            ],
             desc="get_users",
         )
 
