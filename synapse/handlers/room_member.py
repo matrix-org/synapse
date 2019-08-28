@@ -796,8 +796,11 @@ class RoomMemberHandler(object):
                 id_server,
                 hash_details["algorithms"],
             )
-            raise SynapseError(400, "Provided identity server does not support any v2 lookup "
-                                    "algorithms that this homeserver supports.")
+            raise SynapseError(
+                400,
+                "Provided identity server does not support any v2 lookup "
+                "algorithms that this homeserver supports.",
+            )
 
         try:
             lookup_results = yield self.simple_http_client.post_json_get_json(
