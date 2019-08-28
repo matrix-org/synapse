@@ -3,14 +3,16 @@ Backend
 ::
 
   Make sure you have synapse and klein installed in your pip env
-  Windows Right click __init__.py and select run with python
-  *nix: ./__init__.py
+ ```
+  ./__init__.py config_dir
+  ```
 
 Frontend
 ========
-Start the Backend and
+Start the Backend and then
 
 .. code:: bash
 
   cd view/webui
+  yarn install
   yarn watch
