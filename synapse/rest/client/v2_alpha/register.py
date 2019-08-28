@@ -75,7 +75,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if self.hs.config.email_threepid_behaviour == "local":
+        if self.hs.config.threepid_behaviour == "local":
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -92,7 +92,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.hs.config.email_threepid_behaviour == "off":
+        if self.hs.config.threepid_behaviour == "off":
             if self.hs.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "Email registration has been disabled due to lack of email config"
@@ -187,7 +187,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
 
-        if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
+        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
             if not self.hs.config.account_threepid_delegate:
                 logger.warn(
                     "No upstream account_threepid_delegate configured on the server to handle "
@@ -238,7 +238,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
             )
-        if self.config.email_threepid_behaviour == "off":
+        if self.config.threepid_behaviour == "off":
             if self.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "User registration has been disabled due to lack of email config"

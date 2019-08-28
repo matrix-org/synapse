@@ -51,7 +51,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if self.config.email_threepid_behaviour == ThreepidBehaviour.LOCAL:
+        if self.config.threepid_behaviour == ThreepidBehaviour.LOCAL:
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -68,7 +68,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.config.email_threepid_behaviour == ThreepidBehaviour.OFF:
+        if self.config.threepid_behaviour == ThreepidBehaviour.OFF:
             if self.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"
@@ -101,7 +101,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         if existing_user_id is None:
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
-        if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
+        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
             # Have the configured identity server handle the request
             if not self.hs.config.account_threepid_delegate:
                 logger.warn(
@@ -119,7 +119,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 send_attempt,
                 next_link,
             )
-        elif self.config.email_threepid_behaviour == ThreepidBehaviour.LOCAL:
+        elif self.config.threepid_behaviour == ThreepidBehaviour.LOCAL:
             # Send password reset emails from Synapse
             sid = yield self.mailer.send_threepid_validation(
                 email,
@@ -247,7 +247,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         if existing_user_id is None:
             raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
 
-        if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
+        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
             if not self.hs.config.account_threepid_delegate:
                 logger.warn(
                     "No upstream account_threepid_delegate configured on the server to handle "
@@ -298,7 +298,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for password resets"
             )
-        if self.config.email_threepid_behaviour == ThreepidBehaviour.OFF:
+        if self.config.threepid_behaviour == ThreepidBehaviour.OFF:
             if self.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "Password reset emails have been disabled due to lack of an email config"
@@ -509,7 +509,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.config.email_threepid_behaviour == "off":
+        if self.config.threepid_behaviour == "off":
             if self.config.local_threepid_emails_disabled_due_to_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"

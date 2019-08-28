@@ -75,7 +75,7 @@ class EmailConfig(Config):
             "renew_at"
         )
 
-        self.email_threepid_behaviour = (
+        self.threepid_behaviour = (
             # Have Synapse handle the email sending if account_threepid_delegate
             # is not defined
             ThreepidBehaviour.REMOTE
@@ -100,14 +100,14 @@ class EmailConfig(Config):
 
         self.local_threepid_emails_disabled_due_to_config = False
         if (
-            self.email_threepid_behaviour == ThreepidBehaviour.LOCAL
+            self.threepid_behaviour == ThreepidBehaviour.LOCAL
             and email_config == {}
         ):
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
             self.local_threepid_emails_disabled_due_to_config = True
 
-            self.email_threepid_behaviour = ThreepidBehaviour.OFF
+            self.threepid_behaviour = ThreepidBehaviour.OFF
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
@@ -117,7 +117,7 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.email_threepid_behaviour == ThreepidBehaviour.LOCAL
+            or self.threepid_behaviour == ThreepidBehaviour.LOCAL
         ):
             # make sure we can import the required deps
             import jinja2
@@ -127,7 +127,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.email_threepid_behaviour == ThreepidBehaviour.LOCAL:
+        if self.threepid_behaviour == ThreepidBehaviour.LOCAL:
             required = ["smtp_host", "smtp_port", "notif_from"]
 
             missing = []
