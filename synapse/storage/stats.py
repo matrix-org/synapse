@@ -258,6 +258,10 @@ class StatsStore(StateDeltasStore):
                 (i.e. not deltas) of absolute fields.
                 Does not work with per-slice fields.
         """
+
+        if absolute_field_overrides is None:
+            absolute_field_overrides = {}
+
         table, id_col = TYPE_TO_TABLE[stats_type]
 
         quantised_ts = self.quantise_stats_time(int(ts))
@@ -287,9 +291,6 @@ class StatsStore(StateDeltasStore):
             for key in abs_field_names
             if key not in absolute_field_overrides
         }
-
-        if absolute_field_overrides is None:
-            absolute_field_overrides = {}
 
         if complete_with_stream_id is not None:
             absolute_field_overrides = absolute_field_overrides.copy()
