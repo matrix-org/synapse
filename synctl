@@ -137,7 +137,7 @@ def main():
         "configfile",
         nargs="?",
         default="homeserver.yaml",
-        help="the homeserver config file, defaults to homeserver.yaml, may also specify"
+        help="the homeserver config file. Defaults to homeserver.yaml. May also be"
         " a directory with *.yaml files",
     )
     parser.add_argument(
