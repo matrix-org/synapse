@@ -99,10 +99,7 @@ class EmailConfig(Config):
                 )
 
         self.local_threepid_emails_disabled_due_to_config = False
-        if (
-            self.threepid_behaviour == ThreepidBehaviour.LOCAL
-            and email_config == {}
-        ):
+        if self.threepid_behaviour == ThreepidBehaviour.LOCAL and email_config == {}:
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
             self.local_threepid_emails_disabled_due_to_config = True
