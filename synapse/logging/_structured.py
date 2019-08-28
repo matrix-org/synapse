@@ -173,7 +173,12 @@ class DrainConfiguration(object):
     name = attr.ib()
     type = attr.ib()
     location = attr.ib()
-    options = attr.ib(default=attr.Factory(dict))
+    options = attr.ib(default=None)
+
+
+@attr.s
+class NetworkJSONTerseOptions(object):
+    maximum_buffer = attr.ib(type=int)
 
 
 DEFAULT_LOGGERS = {"synapse": {"level": "INFO"}}
@@ -246,7 +251,7 @@ def parse_drain_configs(
                 name=name,
                 type=logging_type,
                 location=(host, port),
-                options={"maximum_buffer": maximum_buffer},
+                options=NetworkJSONTerseOptions(maximum_buffer=maximum_buffer),
             )
 
         else:
@@ -319,11 +324,11 @@ def setup_structured_logging(
         elif observer.type == DrainType.NETWORK_JSON_TERSE:
             metadata = {"server_name": hs.config.server_name}
             log_observer = TerseJSONToTCPLogObserver(
-                hs,
-                observer.location[0],
-                observer.location[1],
-                metadata,
-                **observer.options
+                hs=hs,
+                host=observer.location[0],
+                port=observer.location[1],
+                metadata=metadata,
+                maximum_buffer=observer.options.maximum_buffer,
             )
             log_observer.start()
             observers.append(log_observer)
