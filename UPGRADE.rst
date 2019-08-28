@@ -52,6 +52,9 @@ returned by the Client-Server API:
 Upgrading to v1.4.0
 ===================
 
+Config options
+--------------
+
 Synapse v1.4.0 deprecates the ``email.trust_identity_server_for_password_resets`` option and
 replaces it with ``account_threepid_delegate``. These options define whether the homeserver
 should use an external server (typically an `identity server
@@ -71,6 +74,16 @@ password reset and registration tokens itself. Currently Synapse only supports s
 and does not have support for phone-based password reset or account registration. If Synapse is
 configured to handle these on its own, the ``email`` block of the config must be configured. If
 not, then password resets and registration via third-party IDs will be disabled.
+
+Email templates
+---------------
+
+If you have configured a custom email template directory with the ``email.template_dir``
+option, be aware that templates ``registration.html`` and ``registration.txt`` have been
+added, and Synapse will expect them to exist inside the configured template directory.
+
+To view the default email templates, see `synapse/res/templates
+<https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
 
 Upgrading to v1.2.0
 ===================
