@@ -20,6 +20,7 @@ Log formatters that output terse JSON.
 import sys
 from collections import deque
 from ipaddress import IPv4Address, IPv6Address, ip_address
+from math import floor
 from typing.io import TextIO
 
 import attr
@@ -202,7 +203,7 @@ class TerseJSONToTCPLogObserver(object):
                 return
 
             try:
-                for event in reversed(self._buffer):
+                for event in self._buffer:
                     r.transport.write(
                         dumps(event, ensure_ascii=False, separators=(",", ":")).encode(
                             "utf8"
@@ -217,10 +218,59 @@ class TerseJSONToTCPLogObserver(object):
             self.hs.get_reactor().callLater(1, self._write_loop)
 
     def _handle_pressure(self) -> None:
-        pass
+        """
+        Handle backpressure by shedding events.
+
+        The buffer will, in this order, until the buffer is below the maximum:
+            - Shed DEBUG events
+            - Shed INFO events
+            - Shed the middle 50% of the events.
+        """
+        if len(self._buffer) <= self.maximum_buffer:
+            return
+
+        # Strip out DEBUGs
+        self._buffer = deque(
+            filter(lambda event: event["level"] != "DEBUG", self._buffer)
+        )
+
+        if len(self._buffer) <= self.maximum_buffer:
+            return
+
+        # Strip out INFOs
+        self._buffer = deque(
+            filter(lambda event: event["level"] != "INFO", self._buffer)
+        )
+
+        if len(self._buffer) <= self.maximum_buffer:
+            return
+
+        # Cut the middle entries out
+        buffer_split = floor(self.maximum_buffer / 2)
+
+        old_buffer = self._buffer
+        self._buffer = deque()
+
+        for i in range(buffer_split):
+            self._buffer.append(old_buffer.popleft())
+
+        end_buffer = []
+        for i in range(buffer_split):
+            end_buffer.append(old_buffer.pop())
+
+        self._buffer.extend(reversed(end_buffer))
 
     def __call__(self, event: dict) -> None:
         flattened = flatten_event(event, self.metadata, include_time=True)
         self._buffer.append(flattened)
+
+        # Handle backpressure, if it exists.
+        try:
+            self._handle_pressure()
+        except Exception as e:
+            print(e)
+        finally:
+            pass
+
         # Try and write immediately
         self._write_loop()

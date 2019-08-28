@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import json
+from collections import Counter
 
 from twisted.logger import Logger
 
@@ -82,8 +83,10 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
         # It contains the data we expect.
         self.assertEqual(log["name"], "wally")
 
-    def test_log_backpressure(self):
-
+    def test_log_backpressure_debug(self):
+        """
+        When backpressure is hit, DEBUG logs will be shed.
+        """
         log_config = {
             "loggers": {"synapse": {"level": "DEBUG"}},
             "drains": {
@@ -109,40 +112,17 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
         logger = Logger(
             namespace="synapse.logging.test_terse_json", observer=beginner.observers[0]
         )
-        logger.info("Hello there, {name}!", name="wally")
 
-        # Trigger the connection
-        self.pump()
+        # Send some debug messages
+        for i in range(0, 3):
+            logger.debug("debug %s" % (i,))
 
-        client, server = connect_client(self.reactor, 0)
-
-        # Trigger data being sent
-        self.pump()
-
-        # One log message, with a single trailing newline
-        logs = server.data.splitlines()
-        self.assertEqual(len(logs), 1)
-        self.assertEqual(server.data.count(b"\n"), 1)
-        server.data = b""
-
-        # Disconnect the server
-        client.connectionLost(None)
-
-        self.pump()
-
-        # Send a bunch of messages that hits the maximum limit
-        for i in range(0, 5):
-            logger.debug("debug")
-
+        # Send a bunch of useful messages
         for i in range(0, 7):
-            logger.info("test message")
+            logger.info("test message %s" % (i,))
 
-        for i in range(0, 5):
-            logger.debug("debug")
-
-        # Assert they're not sent
-        self.pump(1)
-        self.assertEqual(server.data, b"")
+        # The last debug message pushes it past the maximum buffer
+        logger.debug("too much debug")
 
         # Allow the reconnection
         client, server = connect_client(self.reactor, 0)
@@ -151,3 +131,104 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
         # Only the 7 infos made it through, the debugs were elided
         logs = server.data.splitlines()
         self.assertEqual(len(logs), 7)
+
+    def test_log_backpressure_info(self):
+        """
+        When backpressure is hit, DEBUG and INFO logs will be shed.
+        """
+        log_config = {
+            "loggers": {"synapse": {"level": "DEBUG"}},
+            "drains": {
+                "tersejson": {
+                    "type": "network_json_terse",
+                    "host": "127.0.0.1",
+                    "port": 8000,
+                    "maximum_buffer": 10,
+                }
+            },
+        }
+
+        # Begin the logger with our config
+        beginner = FakeBeginner()
+        setup_structured_logging(
+            self.hs,
+            self.hs.config,
+            log_config,
+            logBeginner=beginner,
+            redirect_stdlib_logging=False,
+        )
+
+        logger = Logger(
+            namespace="synapse.logging.test_terse_json", observer=beginner.observers[0]
+        )
+
+        # Send some debug messages
+        for i in range(0, 3):
+            logger.debug("debug %s" % (i,))
+
+        # Send a bunch of useful messages
+        for i in range(0, 10):
+            logger.warn("test warn %s" % (i,))
+
+        # Send a bunch of info messages
+        for i in range(0, 3):
+            logger.info("test message %s" % (i,))
+
+        # The last debug message pushes it past the maximum buffer
+        logger.debug("too much debug")
+
+        # Allow the reconnection
+        client, server = connect_client(self.reactor, 0)
+        self.pump()
+
+        # The 10 warnings made it through, the debugs and infos were elided
+        logs = list(map(json.loads, server.data.splitlines()))
+        self.assertEqual(len(logs), 10)
+
+        self.assertEqual(Counter([x["level"] for x in logs]), {"WARN": 10})
+
+    def test_log_backpressure_cut_middle(self):
+        """
+        When backpressure is hit, and DEBUG and INFOs cannot be culled, it will
+        cut the middle 50% out.
+        """
+        log_config = {
+            "loggers": {"synapse": {"level": "DEBUG"}},
+            "drains": {
+                "tersejson": {
+                    "type": "network_json_terse",
+                    "host": "127.0.0.1",
+                    "port": 8000,
+                    "maximum_buffer": 10,
+                }
+            },
+        }
+
+        # Begin the logger with our config
+        beginner = FakeBeginner()
+        setup_structured_logging(
+            self.hs,
+            self.hs.config,
+            log_config,
+            logBeginner=beginner,
+            redirect_stdlib_logging=False,
+        )
+
+        logger = Logger(
+            namespace="synapse.logging.test_terse_json", observer=beginner.observers[0]
+        )
+
+        # Send a bunch of useful messages
+        for i in range(0, 20):
+            logger.warn("test warn", num=i)
+
+        # Allow the reconnection
+        client, server = connect_client(self.reactor, 0)
+        self.pump()
+
+        # The first five and last five warnings made it through, the debugs and
+        # infos were elided
+        logs = list(map(json.loads, server.data.splitlines()))
+        self.assertEqual(len(logs), 10)
+        self.assertEqual(Counter([x["level"] for x in logs]), {"WARN": 10})
+        self.assertEqual([0, 1, 2, 3, 4, 15, 16, 17, 18, 19], [x["num"] for x in logs])
