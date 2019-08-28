@@ -61,7 +61,7 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
         self.pump()
 
         # One log message, with a single trailing newline
-        logs = server.data.decode('utf8').splitlines()
+        logs = server.data.decode("utf8").splitlines()
         self.assertEqual(len(logs), 1)
         self.assertEqual(server.data.count(b"\n"), 1)
 
@@ -182,7 +182,7 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
         self.pump()
 
         # The 10 warnings made it through, the debugs and infos were elided
-        logs = list(map(json.loads, server.data.decode('utf8').splitlines()))
+        logs = list(map(json.loads, server.data.decode("utf8").splitlines()))
         self.assertEqual(len(logs), 10)
 
         self.assertEqual(Counter([x["level"] for x in logs]), {"WARN": 10})
@@ -228,7 +228,7 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
 
         # The first five and last five warnings made it through, the debugs and
         # infos were elided
-        logs = list(map(json.loads, server.data.decode('utf8').splitlines()))
+        logs = list(map(json.loads, server.data.decode("utf8").splitlines()))
         self.assertEqual(len(logs), 10)
         self.assertEqual(Counter([x["level"] for x in logs]), {"WARN": 10})
         self.assertEqual([0, 1, 2, 3, 4, 15, 16, 17, 18, 19], [x["num"] for x in logs])
