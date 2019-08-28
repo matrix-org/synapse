@@ -73,7 +73,7 @@ class ClientRestResource(JsonResource):
 
     @staticmethod
     def register_servlets(client_resource, hs):
-        versions.register_servlets(client_resource)
+        versions.register_servlets(hs, client_resource)
 
         # Deprecated in r0
         initial_sync.register_servlets(hs, client_resource)
