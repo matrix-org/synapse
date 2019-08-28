@@ -30,7 +30,7 @@ from six import iteritems
 
 import yaml
 
-from synapse.config import find_config_files, read_config_files
+from synapse.config import find_config_files
 
 SYNAPSE = [sys.executable, "-B", "-m", "synapse.app.homeserver"]
 
@@ -179,7 +179,12 @@ def main():
         )
         sys.exit(1)
 
-    config = read_config_files(find_config_files([configfile]))
+    config_files = find_config_files([configfile])
+    config = {}
+    for config_file in config_files:
+        with open(config_file) as file_stream:
+            yaml_config = yaml.safe_load(file_stream)
+        config.update(yaml_config)
 
     pidfile = config["pid_file"]
     cache_factor = config.get("synctl_cache_factor")
