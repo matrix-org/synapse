@@ -49,6 +49,29 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
+Upgrading to v1.4.0
+===================
+
+Synapse v1.4.0 deprecates the ``email.trust_identity_server_for_password_resets`` option and
+replaces it with ``account_threepid_delegate``. These options define whether the homeserver
+should use an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset
+tokens and (as of this Synapse release) registration via a third-party address (email or phone
+number).
+
+If ``email.trust_identity_server_for_password_resets`` was changed from its default to
+``true``, and ``account_threepid_delegate`` is not set to an identity server domain, then the
+server handling password resets and registration via third-party address will be set to the
+first entry in your config's ``trusted_third_party_id_servers`` entry. If no domains are
+configured, Synapse will throw an error on startup.
+
+If ``email.trust_identity_server_for_password_resets`` is not set to ``true`` and
+``account_threepid_delegate`` is not set to a domain, then Synapse will attempt to send
+password reset and registration tokens itself. Currently Synapse only supports sending emails,
+and does not have support for phone-based password reset or account registration. If Synapse is
+configured to handle these on its own, the ``email`` block of the config must be configured. If
+not, then password resets and registration via third-party IDs will be disabled.
+
 Upgrading to v1.2.0
 ===================
 

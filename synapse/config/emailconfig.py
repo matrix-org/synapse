@@ -87,7 +87,10 @@ class EmailConfig(Config):
         # if they have this set and tell them to use the updated option, while using a default
         # identity server in the process.
         self.using_identity_server_from_trusted_list = False
-        if config.get("trust_identity_server_for_password_resets", False) is True:
+        if (
+            not self.account_threepid_delegate
+            and config.get("trust_identity_server_for_password_resets", False) is True
+        ):
             # Use the first entry in self.trusted_third_party_id_servers instead
             if self.trusted_third_party_id_servers:
                 self.account_threepid_delegate = self.trusted_third_party_id_servers[0]
