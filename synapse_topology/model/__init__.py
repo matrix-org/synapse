@@ -11,7 +11,7 @@ from .errors import BaseConfigInUseError, ConfigNotFoundError, ServernameNotSetE
 from .config import create_config
 from .util import is_subpath
 
-# from synapse.config import find_config_files, read_config_files
+from synapse.config import find_config_files
 
 
 class Model:
@@ -73,13 +73,17 @@ class Model:
         it's not present we assume someone else has set up synapse before so we assume
         the config is in use.
         """
-        try:
-            pass
-            # return read_config_files(find_config_files(self.config_dir)).get(
-            # CONFIG_LOCK, True
-            # )
-        except FileNotFoundError:
+        config = {}
+        config_files = find_config_files([self.config_dir])
+        for config_file in config_files:
+            with open(config_file) as stream:
+                config.update(yaml.safe_load(stream))
+
+        if not config:
             return False
+
+        print(config.get(CONFIG_LOCK))
+        return config.get(CONFIG_LOCK, True)
 
     def generate_secret_key(self, server_name):
         if self.config_in_use():
