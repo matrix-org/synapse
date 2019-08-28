@@ -43,6 +43,7 @@ def create_config(config_dir_path, data_dir_path, conf):
         "server_name": server_name,
         **conf,
         "database_conf": database_conf,
+        "generate_secrets": True,
     }
 
     base_config = BaseConfig()

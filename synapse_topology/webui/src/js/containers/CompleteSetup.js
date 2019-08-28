@@ -12,7 +12,7 @@ const mapStateToProps = (state) => ({
 
 
 const mapDispatchToProps = (dispatch) => ({
-    onClick: () => dispatch(writeConfig()),
+    onClick: (callback) => dispatch(writeConfig(callback)),
 });
 
 export default connect(

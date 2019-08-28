@@ -22,6 +22,7 @@ import {
     SET_SYNAPSE_PORTS_FREE,
     SET_DATABASE,
     SET_CONFIG_DIR,
+    SYNAPSE_START_FAILED,
 } from './types';
 
 import {
@@ -282,14 +283,23 @@ export const setDatabase = databaseConfig => ({
     databaseConfig,
 })
 
-export const writeConfig = (config, subConfigName) => {
+export const writeConfig = (callback) => {
 
     return (dispatch, getState) => {
 
-        postConfig(baseConfigToSynapseConfig(getState().baseConfig), subConfigName)
+        postConfig(baseConfigToSynapseConfig(getState().baseConfig))
             .then(
                 res => startSynapse().then(
-                    res => dispatch(advanceUI()),
+                    res => {
+                        if (Response.ok) {
+
+                            dispatch(advanceUI());
+                            callback();
+
+                        } else {
+                            dispatch(synapseStartFailed());
+                        }
+                    },
                     error => {
 
                         fail(error);

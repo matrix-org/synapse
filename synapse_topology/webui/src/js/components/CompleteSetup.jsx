@@ -23,8 +23,7 @@ export default ({
     const toggle = useAccordionToggle(nextUI(COMPLETE_UI));
 
     const decoratedOnClick = () => {
-        toggle();
-        onClick();
+        onClick(toggle);
     }
 
     const [revProxyDownloaded, setRevProxyDownloaded] = useState(false);

@@ -19,7 +19,7 @@ import {
     SET_DATABASE,
     SET_CONFIG_DIR,
     BASE_CONFIG_CHECKED,
-    SYNAPSE_START,
+    SYNAPSE_START_FAILED,
 } from "../actions/types";
 
 export default (state, action) => {
@@ -134,10 +134,10 @@ export default (state, action) => {
                 ...state,
                 configDir: action.configDir,
             }
-        case SYNAPSE_START:
+        case SYNAPSE_START_FAILED:
             return {
                 ...state,
-                synapseStartedFailed: true,
+                synapseStartFailed: true,
             }
         default:
             return state;

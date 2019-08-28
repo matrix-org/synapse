@@ -69,9 +69,9 @@ export const getSecretkey = serverName =>
         .then(json => json.secret_key)
 
 
-export const postConfig = (config, subConfigName) =>
+export const postConfig = (config) =>
     fetchAbs(
-        subConfigName ? CONFIG + "/" + subConfigName : CONFIG,
+        CONFIG,
         {
             method: 'POST',
             body: JSON.stringify(config),
