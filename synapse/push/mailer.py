@@ -28,7 +28,7 @@ import jinja2
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import StoreError, SynapseError
+from synapse.api.errors import StoreError
 from synapse.logging.context import make_deferred_yieldable
 from synapse.push.presentable_names import (
     calculate_room_name,

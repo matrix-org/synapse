@@ -33,7 +33,6 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
-from synapse.util.stringutils import random_string
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler

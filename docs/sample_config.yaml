@@ -1208,6 +1208,11 @@ password_config:
 #   #password_reset_template_html: password_reset.html
 #   #password_reset_template_text: password_reset.txt
 #
+#   # Templates for registration emails sent by the homeserver
+#   #
+#   #registration_template_html: registration.html
+#   #registration_template_text: registration.txt
+#
 #   # Templates for password reset success and failure pages that a user
 #   # will see after attempting to reset their password
 #   #
