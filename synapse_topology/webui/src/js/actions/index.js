@@ -291,7 +291,7 @@ export const writeConfig = (callback) => {
             .then(
                 res => startSynapse().then(
                     res => {
-                        if (Response.ok) {
+                        if (res.ok) {
 
                             dispatch(advanceUI());
                             callback();

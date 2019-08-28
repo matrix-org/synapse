@@ -93,7 +93,6 @@ class Server:
     def start_synapse(self, request):
         print("Starting synapse")
         subprocess.check_output(["synctl", "start", self.model.config_dir])
-        sys.exit()
 
     @app.route("/favicon.ico")
     def noop(self, request):
