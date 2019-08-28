@@ -111,6 +111,12 @@ class StatsHandler(StateDeltasHandler):
                 if self.pos is not None:
                     yield self.store.update_stats_positions(self.pos)
 
+        # Then count deltas for total_events and total_event_bytes.
+        with Measure(self.clock, "stats_total_events_and_bytes"):
+            self.pos = yield self.store.incremental_update_total_events_and_bytes(
+                self.pos
+            )
+
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
         """
