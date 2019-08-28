@@ -10,6 +10,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
+          mount-buildkite-agent: false
 
   - command:
       - "python -m pip install tox"
@@ -18,6 +19,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
+          mount-buildkite-agent: false
 
   - command:
       - "python -m pip install tox"
@@ -26,6 +28,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
+          mount-buildkite-agent: false
 
   - command:
       - "python -m pip install tox"
@@ -36,6 +39,7 @@ steps:
       - docker#v3.0.1:
           image: "python:3.6"
           propagate-environment: true
+          mount-buildkite-agent: false
 
   - command:
       - "python -m pip install tox"
@@ -44,6 +48,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
+          mount-buildkite-agent: false
 
   - command:
       - "python -m pip install tox"
@@ -52,6 +57,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.5"
+          mount-buildkite-agent: false
 
   - wait
 
@@ -65,7 +71,8 @@ steps:
       LANG: "C.UTF-8"
     plugins:
       - docker#v3.0.1:
-          image: "ubuntu:xenial"  # We use xenail to get an old sqlite and python
+          image: "ubuntu:xenial"  # We use xenial to get an old sqlite and python
+          mount-buildkite-agent: false
           propagate-environment: true
     retry:
       automatic:
@@ -83,6 +90,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.5"
+          mount-buildkite-agent: false
           propagate-environment: true
     retry:
       automatic:
@@ -100,6 +108,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
+          mount-buildkite-agent: false
           propagate-environment: true
     retry:
       automatic:
@@ -117,6 +126,7 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.7"
+          mount-buildkite-agent: false
           propagate-environment: true
     retry:
       automatic:
