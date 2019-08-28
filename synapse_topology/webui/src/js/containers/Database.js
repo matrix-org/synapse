@@ -8,9 +8,9 @@ const mapStateToProps = (state) => {
 
 
 const mapDispatchToProps = (dispatch) => ({
-    onClick: database => {
+    onClick: databaseConfig => {
 
-        dispatch(setDatabase(database));
+        dispatch(setDatabase(databaseConfig));
         dispatch(advanceUI());
 
     },

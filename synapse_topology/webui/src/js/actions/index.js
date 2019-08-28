@@ -277,9 +277,9 @@ export const testingSynapsePorts = verifying => ({
     verifying,
 })
 
-export const setDatabase = database => ({
+export const setDatabase = databaseConfig => ({
     type: SET_DATABASE,
-    database,
+    databaseConfig,
 })
 
 export const writeConfig = (config, subConfigName) => {

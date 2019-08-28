@@ -1,5 +1,5 @@
 /* eslint-disable camelcase */
-import { TLS_TYPES, REVERSE_PROXY_TYPES } from '../actions/constants';
+import { TLS_TYPES, REVERSE_PROXY_TYPES, DATABASE_TYPES } from '../actions/constants';
 import { CONFIG_LOCK } from '../api/constants';
 
 const listeners = config => {
@@ -114,12 +114,35 @@ const acme = config => {
 
 }
 
+const database = config => {
+
+    if (config.databaseType == DATABASE_TYPES.SQLITE3) {
+        return {
+            database: {
+                name: config.databaseType,
+            }
+        }
+    } else {
+        return {
+            database: {
+                name: config.databaseType,
+                args: {
+                    user: config.databaseUsername,
+                    password: config.databasePassword,
+                    host: config.databaseHost,
+                    database: config.database,
+                }
+            }
+        }
+    }
+}
+
 export const baseConfigToSynapseConfig = config => {
 
     const conf = {
         server_name: config.servername,
         report_stats: config.reportStats,
-        database: config.database,
+        ...database(config),
         ...listeners(config),
         ...tlsPaths(config),
         ...acme(config),

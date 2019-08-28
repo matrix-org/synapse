@@ -127,7 +127,7 @@ export default (state, action) => {
         case SET_DATABASE:
             return {
                 ...state,
-                database: action.database,
+                ...action.databaseConfig,
             }
         case SET_CONFIG_DIR:
             return {

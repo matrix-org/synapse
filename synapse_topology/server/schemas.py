@@ -9,7 +9,14 @@ BASE_CONFIG_SCHEMA = {
         "pid_file": {"type": "string", "minlength": 1},
         "listeners": {"type": "array"},
         "acme": {"type": "object"},
-        "database": {"type": "string", "minlength": 1},
+        "database": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "minlength": 1},
+                "args": {"type": "object"},
+            },
+            "required": ["name"],
+        },
         "tls_certificate_path": {"type": "string", "minlength": 1},
         "tls_private_key_path": {"type": "string", "minlength": 1},
         "server_config_in_use": {"type": "boolean"},
