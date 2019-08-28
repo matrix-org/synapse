@@ -195,7 +195,7 @@ steps:
           propagate-environment: true
           always-pull: true
           workdir: "/src"
-          entrypoint: false
+          entrypoint: ["/bin/sh", "-e", "-c"]
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
       - artifacts#v1.2.0:
@@ -224,7 +224,7 @@ steps:
           propagate-environment: true
           always-pull: true
           workdir: "/src"
-          entrypoint: false
+          entrypoint: ["/bin/sh", "-e", "-c"]
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
       - artifacts#v1.2.0:
@@ -256,7 +256,7 @@ steps:
           propagate-environment: true
           always-pull: true
           workdir: "/src"
-          entrypoint: false
+          entrypoint: ["/bin/sh", "-e", "-c"]
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
       - artifacts#v1.2.0:
