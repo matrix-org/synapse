@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS room_stats_current (
 
     current_state_events INT NOT NULL,
     total_events INT NOT NULL,
+    total_event_bytes BIGINT NOT NULL,
     joined_members INT NOT NULL,
     invited_members INT NOT NULL,
     left_members INT NOT NULL,
@@ -91,6 +92,7 @@ CREATE TABLE IF NOT EXISTS room_stats_historical (
 
     current_state_events INT NOT NULL,
     total_events INT NOT NULL,
+    total_event_bytes BIGINT NOT NULL,
     joined_members INT NOT NULL,
     invited_members INT NOT NULL,
     left_members INT NOT NULL,

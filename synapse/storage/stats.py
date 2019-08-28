@@ -36,6 +36,7 @@ ABSOLUTE_STATS_FIELDS = {
         "left_members",
         "banned_members",
         "total_events",
+        "total_event_bytes",
     ),
     "user": ("public_rooms", "private_rooms"),
 }
