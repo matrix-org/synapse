@@ -774,7 +774,7 @@ class RoomMemberHandler(object):
         lookup_pepper = hash_details["lookup_pepper"]
 
         # Check if any of the supported lookup algorithms are present
-        if str(LookupAlgorithm.SHA256) in supported_lookup_algorithms:
+        if LookupAlgorithm.SHA256 in supported_lookup_algorithms:
             # Perform a hashed lookup
             lookup_algorithm = LookupAlgorithm.SHA256
 
@@ -782,7 +782,7 @@ class RoomMemberHandler(object):
             to_hash = "%s %s %s" % (address, medium, lookup_pepper)
             lookup_value = sha256_and_url_safe_base64(to_hash)
 
-        elif str(LookupAlgorithm.NONE) in supported_lookup_algorithms:
+        elif LookupAlgorithm.NONE in supported_lookup_algorithms:
             # Perform a non-hashed lookup
             lookup_algorithm = LookupAlgorithm.NONE
 
@@ -796,7 +796,8 @@ class RoomMemberHandler(object):
                 id_server,
                 hash_details["algorithms"],
             )
-            return None
+            raise SynapseError(400, "Provided identity server does not support any v2 lookup "
+                                    "algorithms that this homeserver supports.")
 
         try:
             lookup_results = yield self.simple_http_client.post_json_get_json(
