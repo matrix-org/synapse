@@ -20,6 +20,7 @@ from __future__ import print_function
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
 import os
+from enum import Enum
 
 import pkg_resources
 
@@ -77,31 +78,36 @@ class EmailConfig(Config):
         self.email_threepid_behaviour = (
             # Have Synapse handle the email sending if account_threepid_delegate
             # is not defined
-            "remote"
+            ThreepidBehaviour.REMOTE
             if self.account_threepid_delegate
-            else "local"
+            else ThreepidBehaviour.LOCAL
         )
-
-        # Prior to Synapse v1.4.0, there used to be another option that defined whether you
-        # wanted an identity server to send emails on your behalf. We now warn the user if
-        # they have this set and tell them to use the updated option.
-        # TODO: Eventually we want to remove the functionality of having an identity server
-        #  send emails on behalf of the homeserver. At that point, we should remove this check
+        # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
+        # use an identity server to password reset tokens on its behalf. We now warn the user
+        # if they have this set and tell them to use the updated option, while using a default
+        # identity server in the process.
+        self.using_identity_server_from_trusted_list = False
         if config.get("trust_identity_server_for_password_resets", False) is True:
-            raise ConfigError(
-                'The config option "trust_identity_server_for_password_resets" '
-                'has been replaced by "account_threepid_delegate". Please '
-                "consult the default config at docs/sample_config.yaml for "
-                "details and update your config file."
-            )
+            # Use the first entry in self.trusted_third_party_id_servers instead
+            if self.trusted_third_party_id_servers:
+                self.account_threepid_delegate = self.trusted_third_party_id_servers[0]
+                self.using_identity_server_from_trusted_list = True
+            else:
+                raise ConfigError(
+                    "Attempted to use an identity server from"
+                    '"trusted_third_party_id_servers" but it is empty.'
+                )
 
         self.local_threepid_emails_disabled_due_to_config = False
-        if self.email_threepid_behaviour == "local" and email_config == {}:
+        if (
+            self.email_threepid_behaviour == ThreepidBehaviour.LOCAL
+            and email_config == {}
+        ):
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
             self.local_threepid_emails_disabled_due_to_config = True
 
-            self.email_threepid_behaviour = "off"
+            self.email_threepid_behaviour = ThreepidBehaviour.OFF
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
@@ -111,7 +117,7 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.email_threepid_behaviour == "local"
+            or self.email_threepid_behaviour == ThreepidBehaviour.LOCAL
         ):
             # make sure we can import the required deps
             import jinja2
@@ -121,7 +127,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.email_threepid_behaviour == "local":
+        if self.email_threepid_behaviour == ThreepidBehaviour.LOCAL:
             required = ["smtp_host", "smtp_port", "notif_from"]
 
             missing = []
@@ -320,3 +326,18 @@ class EmailConfig(Config):
         #   #registration_template_success_html: registration_success.html
         #   #registration_template_failure_html: registration_failure.html
         """
+
+
+class ThreepidBehaviour(Enum):
+    """
+    Enum to define the behaviour of Synapse with regards to when it contacts an identity
+    server for 3pid registration and password resets
+
+    REMOTE = use an external server to send tokens
+    LOCAL = send tokens ourselves
+    OFF = disable registration via 3pid and password resets
+    """
+
+    REMOTE = "remote"
+    LOCAL = "local"
+    OFF = "off"

@@ -38,6 +38,7 @@ from synapse.api.errors import (
     UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.logging.context import defer_to_thread
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
@@ -458,9 +459,12 @@ class AuthHandler(BaseHandler):
         identity_handler = self.hs.get_handlers().identity_handler
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
-        if not password_servlet or self.hs.config.email_threepid_behaviour == "remote":
+        if (
+            not password_servlet
+            or self.hs.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE
+        ):
             threepid = yield identity_handler.threepid_from_creds(threepid_creds)
-        elif self.hs.config.email_threepid_behaviour == "local":
+        elif self.hs.config.email_threepid_behaviour == ThreepidBehaviour.LOCAL:
             row = yield self.store.get_threepid_validation_session(
                 medium,
                 threepid_creds["client_secret"],

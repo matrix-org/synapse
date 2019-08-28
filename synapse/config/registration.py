@@ -51,9 +51,7 @@ class AccountValidityConfig(Config):
         template_dir = config.get("template_dir")
 
         if not template_dir:
-            template_dir = pkg_resources.resource_filename(
-                "synapse", "res/templates"
-            )
+            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
 
         if "account_renewed_html_path" in config:
             file_path = os.path.join(template_dir, config["account_renewed_html_path"])
@@ -260,26 +258,29 @@ class RegistrationConfig(Config):
         # Also defines the ID server which will be called when an account is
         # deactivated (one will be picked arbitrarily).
         #
+        # Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
+        # server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
+        # background migration script, informing itself that the identity server all of its
+        # 3PIDs have been bound to is likely one of the below.
+        #
+        # As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
+        # it is now solely used for the purposes of the background migration script, and can be
+        # removed once it has run.
         #trusted_third_party_id_servers:
         #  - matrix.org
         #  - vector.im
 
         # Handle threepid (email/phone etc) registration and password resets
-        # through an identity server. Only change if you know what you are
-        # doing
+        # through a *trusted* identity server. Note that this allows the configured
+        # identity server to reset passwords for accounts.
         #
-        # IMPORTANT! This will give a malicious or overtaken identity server
-        # the ability to reset passwords for your users and/or learn your
-        # user's email/phone numbers! Make absolutely sure that you want to do
-        # this! It is strongly recommended that these messages be sent by the
-        # homeserver instead
-        #
-        # If this option is an empty string and SMTP options have not been
+        # If this option is not defined and SMTP options have not been
         # configured, registration by email and resetting user passwords via
         # email will be disabled
         #
-        # Otherwise, to enable set this option to the reachable URL for
-        # an identity server (e.g "https://matrix.org")
+        # Otherwise, to enable set this option to the reachable domain name, including protocol
+        # definition, for an identity server
+        # (e.g "https://matrix.org", "http://localhost:8090")
         #
         #account_threepid_delegate: ""
 
