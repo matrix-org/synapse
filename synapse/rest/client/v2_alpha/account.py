@@ -118,7 +118,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 send_attempt,
                 next_link,
             )
-        elif self.config.threepid_behaviour == ThreepidBehaviour.LOCAL:
+        else:
             # Send password reset emails from Synapse
             sid = yield self.identity_handler.send_threepid_validation(
                 email,
@@ -130,10 +130,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
-        else:
-            raise SynapseError(
-                400, "Password reset by email is not supported on this homeserver"
-            )
 
         return 200, ret
 

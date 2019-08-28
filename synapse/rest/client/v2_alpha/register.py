@@ -74,6 +74,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         super(EmailRegisterRequestTokenRestServlet, self).__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
+        self.config = hs.config
 
         if self.hs.config.threepid_behaviour == ThreepidBehaviour.LOCAL:
             from synapse.push.mailer import Mailer, load_jinja2_templates
@@ -124,24 +125,37 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        if not self.hs.config.account_threepid_delegate:
-            logger.warn(
-                "No upstream account_threepid_delegate configured on the server to handle "
-                "this request"
+        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
+            if not self.hs.config.account_threepid_delegate:
+                logger.warn(
+                    "No upstream account_threepid_delegate configured on the server to handle "
+                    "this request"
+                )
+                raise SynapseError(
+                    400, "Registration by email is not supported on this homeserver"
+                )
+
+            ret = yield self.identity_handler.requestEmailToken(
+                self.hs.config.account_threepid_delegate,
+                email,
+                client_secret,
+                send_attempt,
+                next_link,
             )
-            raise SynapseError(
-                400, "Registration by email is not supported on this homeserver"
+        else:
+            # Send registration emails from Synapse
+            sid = yield self.identity_handler.send_threepid_validation(
+                email,
+                client_secret,
+                send_attempt,
+                self.mailer.send_registration_mail,
+                next_link,
             )
 
-        ret = yield self.identity_handler.requestEmailToken(
-            self.hs.config.account_threepid_delegate,
-            email,
-            client_secret,
-            send_attempt,
-            next_link,
-        )
+            # Wrap the session id in a JSON object
+            ret = {"sid": sid}
 
-        return (200, ret)
+        return 200, ret
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -233,7 +247,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def on_GET(self, request, purpose, medium):
+    def on_GET(self, request, medium):
         if medium != "email":
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
