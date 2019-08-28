@@ -39,7 +39,7 @@ const synapseFederationPortFree = "synapseFederationPortFree";
 const synapseClientPortFree = "synapseClientPortFree";
 const synapseFederationPort = "synapseFederationPort";
 const synapseClientPort = "synapseClientPort";
-const database = "database";
+const databaseConf = "databaseConf";
 const configDir = "configDir";
 
 const state = {
@@ -76,7 +76,7 @@ const state = {
         [synapseClientPortFree]: true,
         [synapseFederationPort]: 1234,
         [synapseClientPort]: 1234,
-        [database]: "sqlite3|postgres",
+        [databaseConf]: "{dadtabaseType, databaseUsername, databasePassword, database}",
     },
 }
 
@@ -122,7 +122,7 @@ export const uiStateMapping = {
         synapseFederationPortFree,
     ],
     [DATABASE_UI]: [
-        database,
+        databaseConf,
     ],
     [COMPLETE_UI]: [
     ],
