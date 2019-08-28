@@ -183,7 +183,9 @@ class StatsStore(StateDeltasStore):
 
         if complete_with_stream_id is not None:
             absolute_field_overrides = absolute_field_overrides.copy()
-            absolute_field_overrides["completed_delta_stream_id"] = complete_with_stream_id
+            absolute_field_overrides[
+                "completed_delta_stream_id"
+            ] = complete_with_stream_id
 
         # first upsert the `_current` table
         self._upsert_with_additive_relatives_txn(
