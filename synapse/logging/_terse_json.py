@@ -33,7 +33,7 @@ from twisted.internet.endpoints import (
     TCP6ClientEndpoint,
 )
 from twisted.internet.protocol import Factory, Protocol
-from twisted.logger import FileLogObserver
+from twisted.logger import FileLogObserver, Logger
 from twisted.python.failure import Failure
 
 
@@ -164,6 +164,7 @@ class TerseJSONToTCPLogObserver(object):
     maximum_buffer = attr.ib(type=int)
     _buffer = attr.ib(default=attr.Factory(deque), type=deque)
     _writer = attr.ib(default=None)
+    _logger = attr.ib(default=attr.Factory(Logger))
 
     def start(self) -> None:
 
@@ -267,10 +268,11 @@ class TerseJSONToTCPLogObserver(object):
         # Handle backpressure, if it exists.
         try:
             self._handle_pressure()
-        except Exception as e:
-            print(e)
-        finally:
-            pass
+        except Exception:
+            # If handling backpressure fails,clear the buffer and log the
+            # exception.
+            self._buffer.clear()
+            self._logger.failure("Failed clearing backpressure")
 
-        # Try and write immediately
+        # Try and write immediately.
         self._write_loop()
