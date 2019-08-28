@@ -75,7 +75,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if self.hs.config.threepid_behaviour == "local":
+        if self.hs.config.threepid_behaviour == ThreepidBehaviour.LOCAL:
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -92,8 +92,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.hs.config.threepid_behaviour == "off":
-            if self.hs.config.local_threepid_emails_disabled_due_to_config:
+        if self.hs.config.threepid_behaviour == ThreepidBehaviour.OFF:
+            if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
                     "Email registration has been disabled due to lack of email config"
                 )
@@ -238,18 +238,18 @@ class RegistrationSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
             )
-        if self.config.threepid_behaviour == "off":
-            if self.config.local_threepid_emails_disabled_due_to_config:
+        if self.config.threepid_behaviour == ThreepidBehaviour.OFF:
+            if self.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
-                    "User registration has been disabled due to lack of email config"
+                    "User registration via email has been disabled due to lack of email config"
                 )
             raise SynapseError(
                 400, "Email-based registration is disabled on this server"
             )
 
-        sid = parse_string(request, "sid")
-        client_secret = parse_string(request, "client_secret")
-        token = parse_string(request, "token")
+        sid = parse_string(request, "sid", required=True)
+        client_secret = parse_string(request, "client_secret", required=True)
+        token = parse_string(request, "token", required=True)
 
         # Attempt to validate a 3PID session
         try:
@@ -271,7 +271,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
                     return None
 
             # Otherwise show the success template
-            html = self.config.email_registration_template_success_html
+            html = self.config.email_registration_template_success_html_content
 
             request.setResponseCode(200)
         except ThreepidValidationError as e:

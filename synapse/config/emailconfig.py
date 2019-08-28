@@ -98,11 +98,11 @@ class EmailConfig(Config):
                     '"trusted_third_party_id_servers" but it is empty.'
                 )
 
-        self.local_threepid_emails_disabled_due_to_config = False
+        self.local_threepid_handling_disabled_due_to_email_config = False
         if self.threepid_behaviour == ThreepidBehaviour.LOCAL and email_config == {}:
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
-            self.local_threepid_emails_disabled_due_to_config = True
+            self.local_threepid_handling_disabled_due_to_email_config = True
 
             self.threepid_behaviour = ThreepidBehaviour.OFF
 
@@ -197,7 +197,7 @@ class EmailConfig(Config):
             filepath = os.path.join(
                 self.email_template_dir, email_registration_template_success_html
             )
-            self.email_registration_template_success_html = self.read_file(
+            self.email_registration_template_success_html_content = self.read_file(
                 filepath, "email.registration_template_success_html"
             )
 
@@ -310,6 +310,11 @@ class EmailConfig(Config):
         #   #
         #   #password_reset_template_html: password_reset.html
         #   #password_reset_template_text: password_reset.txt
+        #
+        #   # Templates for registration emails sent by the homeserver
+        #   #
+        #   #registration_template_html: registration.html
+        #   #registration_template_text: registration.txt
         #
         #   # Templates for password reset success and failure pages that a user
         #   # will see after attempting to reset their password

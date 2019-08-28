@@ -24,6 +24,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.errors import CodeMessageException, HttpResponseException, SynapseError
+from synapse.util.stringutils import random_string
 
 from ._base import BaseHandler
 
@@ -195,6 +196,84 @@ class IdentityHandler(BaseHandler):
         )
 
         return changed
+
+    @defer.inlineCallbacks
+    def send_threepid_validation(
+        self,
+        email_address,
+        client_secret,
+        send_attempt,
+        send_email_func,
+        next_link=None,
+    ):
+        """Send a threepid validation email for password reset or
+        registration purposes
+
+        Args:
+            email_address (str): The user's email address
+            client_secret (str): The provided client secret
+            send_attempt (int): Which send attempt this is
+            send_email_func (func): A function that takes an email address, token,
+                                    client_secret and session_id, sends an email
+                                    and returns a Deferred.
+            next_link (str|None): The URL to redirect the user to after validation
+
+        Returns:
+            The new session_id upon success
+
+        Raises:
+            SynapseError is an error occurred when sending the email
+        """
+        # Check that this email/client_secret/send_attempt combo is new or
+        # greater than what we've seen previously
+        session = yield self.store.get_threepid_validation_session(
+            "email", client_secret, address=email_address, validated=False
+        )
+
+        # Check to see if a session already exists and that it is not yet
+        # marked as validated
+        if session and session.get("validated_at") is None:
+            session_id = session["session_id"]
+            last_send_attempt = session["last_send_attempt"]
+
+            # Check that the send_attempt is higher than previous attempts
+            if send_attempt <= last_send_attempt:
+                # If not, just return a success without sending an email
+                return session_id
+        else:
+            # An non-validated session does not exist yet.
+            # Generate a session id
+            session_id = random_string(16)
+
+        # Generate a new validation token
+        token = random_string(32)
+
+        # Send the mail with the link containing the token, client_secret
+        # and session_id
+        try:
+            yield send_email_func(email_address, token, client_secret, session_id)
+        except Exception:
+            logger.exception(
+                "Error sending threepid validation email to %s", email_address
+            )
+            raise SynapseError(500, "An error was encountered when sending the email")
+
+        token_expires = (
+            self.hs.clock.time_msec() + self.hs.config.email_validation_token_lifetime
+        )
+
+        yield self.store.start_or_continue_validation_session(
+            "email",
+            email_address,
+            session_id,
+            client_secret,
+            send_attempt,
+            next_link,
+            token,
+            token_expires,
+        )
+
+        return session_id
 
     @defer.inlineCallbacks
     def requestEmailToken(
