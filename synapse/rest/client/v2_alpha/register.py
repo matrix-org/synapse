@@ -217,7 +217,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
     """Handles registration 3PID validation token submission"""
 
     PATTERNS = client_patterns(
-        "/registration/(?P<medium>[^/]*)/submit_token/*$", releases=(), unstable=True
+        "/registration/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
     )
 
     def __init__(self, hs):
