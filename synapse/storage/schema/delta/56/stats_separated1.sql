@@ -137,3 +137,6 @@ CREATE INDEX IF NOT EXISTS user_stats_historical_end_ts ON user_stats_historical
 
 -- We don't need an index on (user_id, end_ts) because PRIMARY KEY sorts that
 -- out for us. (We would want it to review stats for a particular user.)
+
+-- Also rename room_state to room_stats_state to make its ownership clear.
+ALTER TABLE room_state RENAME TO room_stats_state;
