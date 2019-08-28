@@ -6,4 +6,3 @@ def is_subpath(superpath, subpath):
     superpath = realpath(superpath)
     relative = relpath(subpath, superpath)
     return not relative.startswith(pardir + sep)
-

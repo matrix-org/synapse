@@ -46,4 +46,3 @@ def log_body_if_fail(func):
             raise
 
     return _log_wrapper
-
