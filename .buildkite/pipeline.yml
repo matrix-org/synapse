@@ -195,6 +195,14 @@ steps:
           propagate-environment: true
           always-pull: true
           workdir: "/src"
+          entrypoint: false
+          mount-buildkite-agent: false
+          volumes: ["./logs:/logs"]
+      - artifacts#v1.2.0:
+          upload: [ "logs/**/*.log", "logs/**/*.log.*" ]
+      - matrix-org/annotate:
+          path: "logs/annotate.md"
+          class: "error"
     retry:
       automatic:
         - exit_status: -1
@@ -216,6 +224,14 @@ steps:
           propagate-environment: true
           always-pull: true
           workdir: "/src"
+          entrypoint: false
+          mount-buildkite-agent: false
+          volumes: ["./logs:/logs"]
+      - artifacts#v1.2.0:
+          upload: [ "logs/**/*.log", "logs/**/*.log.*" ]
+      - matrix-org/annotate:
+          path: "logs/annotate.md"
+          class: "error"
     retry:
       automatic:
         - exit_status: -1
@@ -240,6 +256,14 @@ steps:
           propagate-environment: true
           always-pull: true
           workdir: "/src"
+          entrypoint: false
+          mount-buildkite-agent: false
+          volumes: ["./logs:/logs"]
+      - artifacts#v1.2.0:
+          upload: [ "logs/**/*.log", "logs/**/*.log.*" ]
+      - matrix-org/annotate:
+          path: "logs/annotate.md"
+          class: "error"
     retry:
       automatic:
         - exit_status: -1
