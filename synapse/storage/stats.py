@@ -144,7 +144,7 @@ class StatsStore(StateDeltasStore):
         """
         See L{update_stats_delta}
         Additional Args:
-            absolute_fields (dict[str, int]): Current stats values
+            absolute_field_overrides (dict[str, int]): Current stats values
                 (i.e. not deltas) of absolute fields.
                 Does not work with per-slice fields.
         """
