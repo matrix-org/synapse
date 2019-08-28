@@ -525,7 +525,7 @@ class RoomMemberHandler(object):
             event (SynapseEvent): The membership event.
             context: The context of the event.
             is_guest (bool): Whether the sender is a guest.
-            room_hosts ([str]): Homeservers which are likely to already be in
+            remote_room_hosts ([str]): Homeservers which are likely to already be in
                 the room, and could be danced with in order to join this
                 homeserver for the first time.
             ratelimit (bool): Whether to rate limit this request.
@@ -636,7 +636,7 @@ class RoomMemberHandler(object):
             servers.remove(room_alias.domain)
         servers.insert(0, room_alias.domain)
 
-        return (RoomID.from_string(room_id), servers)
+        return RoomID.from_string(room_id), servers
 
     @defer.inlineCallbacks
     def _get_inviter(self, user_id, room_id):
@@ -702,6 +702,7 @@ class RoomMemberHandler(object):
 
         # Check what hashing details are supported by this identity server
         use_v1 = False
+        hash_details = None
         try:
             hash_details = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server)
@@ -714,15 +715,14 @@ class RoomMemberHandler(object):
             if e.code == 404:
                 # This is an old identity server that does not yet support v2 lookups
                 use_v1 = True
-
-            logger.warn("Error when looking up hashing details: %s" % (e,))
-            return None
+            else:
+                logger.warn("Error when looking up hashing details: %s" % (e,))
+                return None
 
         if use_v1:
-            return self._lookup_3pid_v1(id_server, medium, address)
+            return (yield self._lookup_3pid_v1(id_server, medium, address))
 
-        res = yield self._lookup_3pid_v2(id_server, medium, address, hash_details)
-        return res
+        return (yield self._lookup_3pid_v2(id_server, medium, address, hash_details))
 
     @defer.inlineCallbacks
     def _lookup_3pid_v1(self, id_server, medium, address):
@@ -763,18 +763,18 @@ class RoomMemberHandler(object):
                 of the identity server to use.
             medium (str): The type of the third party identifier (e.g. "email").
             address (str): The third party identifier (e.g. "foo@example.com").
-            hash_details (dict[str, str]): A dictionary containing hashing information
+            hash_details (dict[str, str|list]): A dictionary containing hashing information
                 provided by an identity server.
 
         Returns:
-            str: the matrix ID of the 3pid, or None if it is not recognized.
+            str: the matrix ID of the 3pid, or None if it is not recognised.
         """
         # Extract information from hash_details
         supported_lookup_algorithms = hash_details["algorithms"]
         lookup_pepper = hash_details["lookup_pepper"]
 
         # Check if any of the supported lookup algorithms are present
-        if LookupAlgorithm.SHA256 in supported_lookup_algorithms:
+        if str(LookupAlgorithm.SHA256) in supported_lookup_algorithms:
             # Perform a hashed lookup
             lookup_algorithm = LookupAlgorithm.SHA256
 
@@ -782,7 +782,7 @@ class RoomMemberHandler(object):
             to_hash = "%s %s %s" % (address, medium, lookup_pepper)
             lookup_value = sha256_and_url_safe_base64(to_hash)
 
-        elif LookupAlgorithm.NONE in supported_lookup_algorithms:
+        elif str(LookupAlgorithm.NONE) in supported_lookup_algorithms:
             # Perform a non-hashed lookup
             lookup_algorithm = LookupAlgorithm.NONE
 
@@ -791,7 +791,7 @@ class RoomMemberHandler(object):
 
         else:
             logger.warn(
-                "No supported lookup algorithms provided by %s%s: %s",
+                "None of the provided lookup algorithms of %s%s are supported: %s",
                 id_server_scheme,
                 id_server,
                 hash_details["algorithms"],
@@ -821,7 +821,8 @@ class RoomMemberHandler(object):
             return None
 
         # Return the MXID if it's available, or None otherwise
-        return lookup_results["mappings"].get(lookup_value)
+        mxid = lookup_results["mappings"].get(lookup_value)
+        return mxid
 
     @defer.inlineCallbacks
     def _verify_any_signature(self, data, server_hostname):
@@ -1072,9 +1073,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         )
 
         if complexity:
-            if complexity["v1"] > max_complexity:
-                return True
-            return False
+            return complexity["v1"] > max_complexity
         return None
 
     @defer.inlineCallbacks
@@ -1090,10 +1089,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         max_complexity = self.hs.config.limit_remote_rooms.complexity
         complexity = yield self.store.get_room_complexity(room_id)
 
-        if complexity["v1"] > max_complexity:
-            return True
-
-        return False
+        return complexity["v1"] > max_complexity
 
     @defer.inlineCallbacks
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):

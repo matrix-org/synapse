@@ -18,7 +18,6 @@
 """Utilities for interacting with Identity Servers"""
 
 import logging
-from enum import Enum
 
 from canonicaljson import json
 
@@ -285,7 +284,7 @@ class IdentityHandler(BaseHandler):
             raise e.to_synapse_error()
 
 
-class LookupAlgorithm(Enum):
+class LookupAlgorithm:
     """
     Supported hashing algorithms when performing a 3PID lookup.
 
