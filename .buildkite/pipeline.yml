@@ -203,6 +203,8 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
+      - matrix-org/codecov:
+          path: "logs/coverage.xml"
     retry:
       automatic:
         - exit_status: -1
@@ -232,6 +234,8 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
+      - matrix-org/codecov:
+          path: "logs/coverage.xml"
     retry:
       automatic:
         - exit_status: -1
@@ -264,6 +268,8 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
+      - matrix-org/codecov:
+          path: "logs/coverage.xml"
     retry:
       automatic:
         - exit_status: -1
