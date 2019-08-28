@@ -92,6 +92,12 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
 
     erased_senders = yield store.are_users_erased((e.sender for e in events))
 
+    room_ids = set(e.room_id for e in events)
+    retention_policies = {}
+
+    for room_id in room_ids:
+        retention_policies[room_id] = yield store.get_retention_policy_for_room(room_id)
+
     def allowed(event):
         """
         Args:
@@ -108,6 +114,15 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
         """
         if not event.is_state() and event.sender in ignore_list:
             return None
+
+        retention_policy = retention_policies[event.room_id]
+        max_lifetime = retention_policy.get("max_lifetime")
+
+        if max_lifetime is not None:
+            oldest_allowed_ts = store.clock.time_msec() - max_lifetime
+
+            if event.origin_server_ts < oldest_allowed_ts:
+                return None
 
         if event.event_id in always_include_ids:
             return event

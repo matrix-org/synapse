@@ -1405,6 +1405,9 @@ class EventsStore(
             elif event.type == EventTypes.GuestAccess:
                 # Insert into the event_search table.
                 self._store_guest_access_txn(txn, event)
+            elif event.type == EventTypes.Retention:
+                # Update the room_retention table.
+                self._store_retention_policy_for_room_txn(txn, event)
 
             self._handle_event_relations(txn, event)
 
