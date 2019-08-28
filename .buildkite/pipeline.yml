@@ -45,8 +45,15 @@ steps:
       - docker#v3.0.1:
           image: "python:3.6"
 
-  - wait
+  - command:
+      - "python -m pip install tox"
+      - "tox -e mypy"
+    label: ":mypy: mypy"
+    plugins:
+      - docker#v3.0.1:
+          image: "python:3.5"
 
+  - wait
 
   - command:
       - "apt-get update && apt-get install -y python3.5 python3.5-dev python3-pip libxml2-dev libxslt-dev zlib1g-dev"
@@ -55,6 +62,7 @@ steps:
     label: ":python: 3.5 / SQLite / Old Deps"
     env:
       TRIAL_FLAGS: "-j 2"
+      LANG: "C.UTF-8"
     plugins:
       - docker#v3.0.1:
           image: "ubuntu:xenial"  # We use xenail to get an old sqlite and python
