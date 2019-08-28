@@ -189,8 +189,8 @@ class TerseJSONTCPTestCase(HomeserverTestCase):
 
     def test_log_backpressure_cut_middle(self):
         """
-        When backpressure is hit, and DEBUG and INFOs cannot be culled, it will
-        cut the middle 50% out.
+        When backpressure is hit, and no more DEBUG and INFOs cannot be culled,
+        it will cut the middle messages out.
         """
         log_config = {
             "loggers": {"synapse": {"level": "DEBUG"}},
