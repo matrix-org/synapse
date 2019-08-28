@@ -525,7 +525,7 @@ class RoomMemberHandler(object):
             event (SynapseEvent): The membership event.
             context: The context of the event.
             is_guest (bool): Whether the sender is a guest.
-            remote_room_hosts ([str]): Homeservers which are likely to already be in
+            remote_room_hosts (list[str]|None): Homeservers which are likely to already be in
                 the room, and could be danced with in order to join this
                 homeserver for the first time.
             ratelimit (bool): Whether to rate limit this request.
@@ -767,7 +767,7 @@ class RoomMemberHandler(object):
                 provided by an identity server.
 
         Returns:
-            str: the matrix ID of the 3pid, or None if it is not recognised.
+            Deferred[str|None]: the matrix ID of the 3pid, or None if it is not recognised.
         """
         # Extract information from hash_details
         supported_lookup_algorithms = hash_details["algorithms"]
