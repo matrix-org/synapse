@@ -74,7 +74,7 @@ steps:
           image: "ubuntu:xenial"  # We use xenial to get an old sqlite and python
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#9f02b2ab50b681780e2443e7ba9b52ea579bcc00:
+      - matrix-org/codecov#b31e1fca74356c0e4d1eb55c848fe0dd3ec17b73:
           parallel: "true"
     retry:
       automatic:
