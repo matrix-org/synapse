@@ -16,6 +16,8 @@
 
 import os
 
+import yaml
+
 from OpenSSL import SSL
 
 from synapse.config.tls import ConfigError, TlsConfig
@@ -191,3 +193,45 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
         self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
         self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
+
+    def test_acme_disabled_in_generated_config_no_acme_domain_provied(self):
+        """
+        Checks acme is disabled by default.
+        """
+        conf = TestConfig()
+        conf.read_config(
+            yaml.safe_load(
+                TestConfig().generate_config_section(
+                    "/config_dir_path",
+                    "my_super_secure_server",
+                    "/data_dir_path",
+                    "/tls_cert_path",
+                    "tls_private_key",
+                    None,  # This is the acme_domain
+                )
+            ),
+            "/config_dir_path",
+        )
+
+        self.assertFalse(conf.acme_enabled)
+
+    def test_acme_enabled_in_generated_config_domain_provided(self):
+        """
+        Checks acme is enabled if the acme_domain arg is set to some string.
+        """
+        conf = TestConfig()
+        conf.read_config(
+            yaml.safe_load(
+                TestConfig().generate_config_section(
+                    "/config_dir_path",
+                    "my_super_secure_server",
+                    "/data_dir_path",
+                    "/tls_cert_path",
+                    "tls_private_key",
+                    "my_supe_secure_server",  # This is the acme_domain
+                )
+            ),
+            "/config_dir_path",
+        )
+
+        self.assertTrue(conf.acme_enabled)
