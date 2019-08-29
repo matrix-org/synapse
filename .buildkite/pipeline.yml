@@ -303,7 +303,8 @@ steps:
         - exit_status: 2
           limit: 2
 
-  - wait
+  - wait: ~
+    continue_on_failure: true
 
   - label: Trigger webhook
     command: "curl -k https://coveralls.io/webhook?repo_token=$COVERALLS_REPO_TOKEN -d \"payload[build_num]=$BUILDKITE_BUILD_NUMBER&payload[status]=done\""
