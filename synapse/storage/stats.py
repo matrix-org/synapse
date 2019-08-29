@@ -487,9 +487,12 @@ class StatsStore(StateDeltasStore):
             in_positions (dict): Positions,
                 as retrieved from L{get_stats_positions}.
 
-        Returns (dict):
-            The new positions. Note that this is for reference only –
-            the new positions WILL be committed by this function.
+        Returns (Deferred[tuple[dict, bool]]):
+            First element (dict):
+                The new positions. Note that this is for reference only –
+                the new positions WILL be committed by this function.
+            Second element (bool):
+                true iff there was a change to the positions, false otherwise
         """
 
         def incremental_update_total_events_and_bytes_txn(txn):
@@ -518,7 +521,9 @@ class StatsStore(StateDeltasStore):
 
                 self._update_stats_positions_txn(txn, positions)
 
-            return positions
+                return positions, True
+            else:
+                return positions, False
 
         return self.runInteraction(
             "stats_incremental_total_events_and_bytes",
