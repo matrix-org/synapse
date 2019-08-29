@@ -86,10 +86,16 @@ Email templates
 ---------------
 
 If you have configured a custom email template directory with the ``email.template_dir``
-option, be aware that templates ``registration.html`` and ``registration.txt`` have been
-added, and Synapse will expect them to exist inside the configured template directory.
+option, be aware that there are new templates regarding registration. ``registration.html`` and
+``registration.txt`` have been added and contain the text that is sent to a client upon
+registering via email address.
 
-To view the default email templates, see `synapse/res/templates
+``registration_success.html`` and ``registration_failure.html`` are templates containing HTML
+that will be shown to the user when they click the link in their registration email (if a
+redirect URL is not configured), either showing them a success or failure page.
+
+Synapse will expect these files to exist inside the configured template directory. To view the
+default email templates, see `synapse/res/templates
 <https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
 
 Upgrading to v1.2.0
