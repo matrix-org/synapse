@@ -17,6 +17,8 @@
 
 from mock import Mock
 
+from canonicaljson import json
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -286,3 +288,72 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             fetched.unsigned["redacted_because"].event_id, redaction_event_id2
         )
+
+    def test_redact_censor(self):
+        """Test that a redacted event gets censored in the DB after a month
+        """
+
+        self.get_success(
+            self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
+        )
+
+        msg_event = self.get_success(self.inject_message(self.room1, self.u_alice, "t"))
+
+        # Check event has not been redacted:
+        event = self.get_success(self.store.get_event(msg_event.event_id))
+
+        self.assertObjectHasAttributes(
+            {
+                "type": EventTypes.Message,
+                "user_id": self.u_alice.to_string(),
+                "content": {"body": "t", "msgtype": "message"},
+            },
+            event,
+        )
+
+        self.assertFalse("redacted_because" in event.unsigned)
+
+        # Redact event
+        reason = "Because I said so"
+        self.get_success(
+            self.inject_redaction(self.room1, msg_event.event_id, self.u_alice, reason)
+        )
+
+        event = self.get_success(self.store.get_event(msg_event.event_id))
+
+        self.assertTrue("redacted_because" in event.unsigned)
+
+        self.assertObjectHasAttributes(
+            {
+                "type": EventTypes.Message,
+                "user_id": self.u_alice.to_string(),
+                "content": {},
+            },
+            event,
+        )
+
+        event_json = self.get_success(
+            self.store._simple_select_one_onecol(
+                table="event_json",
+                keyvalues={"event_id": msg_event.event_id},
+                retcol="json",
+            )
+        )
+
+        self.assert_dict(
+            {"content": {"body": "t", "msgtype": "message"}}, json.loads(event_json)
+        )
+
+        # Advance by 30 days
+        self.reactor.advance(60 * 60 * 24 * 31)
+        self.reactor.advance(60 * 60 * 2)
+
+        event_json = self.get_success(
+            self.store._simple_select_one_onecol(
+                table="event_json",
+                keyvalues={"event_id": msg_event.event_id},
+                retcol="json",
+            )
+        )
+
+        self.assert_dict({"content": {}}, json.loads(event_json))
