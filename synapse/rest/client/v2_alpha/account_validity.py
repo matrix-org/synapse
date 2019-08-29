@@ -15,6 +15,8 @@
 
 import logging
 
+from six import ensure_binary
+
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError
@@ -63,7 +65,7 @@ class AccountValidityRenewServlet(RestServlet):
         request.setResponseCode(status_code)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
         request.setHeader(b"Content-Length", b"%d" % (len(response),))
-        request.write(response.encode("utf8"))
+        request.write(ensure_binary(response))
         finish_request(request)
         defer.returnValue(None)
 
