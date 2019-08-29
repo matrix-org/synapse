@@ -20,11 +20,11 @@ CREATE TABLE IF NOT EXISTS e2e_cross_signing_keys (
     keytype TEXT NOT NULL,
     -- the full key information, as a json-encoded dict
     keydata TEXT NOT NULL,
-    -- time that the key was added
-    added_ts BIGINT NOT NULL
+    -- for keeping the keys in order, so that we can fetch the latest one
+    stream_id BIGINT NOT NULL
 );
 
-CREATE UNIQUE INDEX e2e_cross_signing_keys_idx ON e2e_cross_signing_keys(user_id, keytype, added_ts);
+CREATE UNIQUE INDEX e2e_cross_signing_keys_idx ON e2e_cross_signing_keys(user_id, keytype, stream_id);
 
 -- cross-signing signatures
 CREATE TABLE IF NOT EXISTS e2e_cross_signing_signatures (

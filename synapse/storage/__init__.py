@@ -136,6 +136,9 @@ class DataStore(
         self._device_list_id_gen = StreamIdGenerator(
             db_conn, "device_lists_stream", "stream_id"
         )
+        self._cross_signing_id_gen = StreamIdGenerator(
+            db_conn, "e2e_cross_signing_keys", "stream_id"
+        )
 
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")

@@ -282,7 +282,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             "delete_e2e_keys_by_device", delete_e2e_keys_by_device_txn
         )
 
-    def _set_e2e_cross_signing_key_txn(self, txn, user_id, key_type, key, added_ts):
+    def _set_e2e_cross_signing_key_txn(self, txn, user_id, key_type, key):
         """Set a user's cross-signing key.
 
         Args:
@@ -292,7 +292,6 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 for a master key, 'self_signing' for a self-signing key, or
                 'user_signing' for a user-signing key
             key (dict): the key data
-            added_ts (int): the timestamp for when the key was added
         """
         # the cross-signing keys need to occupy the same namespace as devices,
         # since signatures are identified by device ID.  So add an entry to the
@@ -327,25 +326,25 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         )
 
         # and finally, store the key itself
-        self._simple_insert(
-            "e2e_cross_signing_keys",
-            values={
-                "user_id": user_id,
-                "keytype": key_type,
-                "keydata": json.dumps(key),
-                "added_ts": added_ts,
-            },
-            desc="store_master_key",
-        )
+        with self._cross_signing_id_gen.get_next() as stream_id:
+            self._simple_insert(
+                "e2e_cross_signing_keys",
+                values={
+                    "user_id": user_id,
+                    "keytype": key_type,
+                    "keydata": json.dumps(key),
+                    "stream_id": stream_id,
+                },
+                desc="store_master_key",
+            )
 
-    def set_e2e_cross_signing_key(self, user_id, key_type, key, added_ts):
+    def set_e2e_cross_signing_key(self, user_id, key_type, key):
         """Set a user's cross-signing key.
 
         Args:
             user_id (str): the user to set the user-signing key for
             key_type (str): the type of cross-signing key to set
             key (dict): the key data
-            added_ts (int): the timestamp for when the key was added
         """
         return self.runInteraction(
             "add_e2e_cross_signing_key",
@@ -353,7 +352,6 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             user_id,
             key_type,
             key,
-            added_ts,
         )
 
     def _get_e2e_cross_signing_key_txn(self, txn, user_id, key_type, from_user_id=None):
@@ -374,7 +372,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         sql = (
             "SELECT keydata "
             "  FROM e2e_cross_signing_keys "
-            " WHERE user_id = ? AND keytype = ? ORDER BY added_ts DESC LIMIT 1"
+            " WHERE user_id = ? AND keytype = ? ORDER BY stream_id DESC LIMIT 1"
         )
         txn.execute(sql, (user_id, key_type))
         row = txn.fetchone()

@@ -16,7 +16,6 @@
 # limitations under the License.
 
 import logging
-import time
 
 from six import iteritems
 
@@ -532,12 +531,12 @@ class E2eKeysHandler(object):
         deviceids = []
         if "master_key" in keys:
             yield self.store.set_e2e_cross_signing_key(
-                user_id, "master", master_key, time.time() * 1000
+                user_id, "master", master_key
             )
             deviceids.append(master_verify_key.version)
         if "self_signing_key" in keys:
             yield self.store.set_e2e_cross_signing_key(
-                user_id, "self_signing", self_signing_key, time.time() * 1000
+                user_id, "self_signing", self_signing_key
             )
             try:
                 deviceids.append(
@@ -547,7 +546,7 @@ class E2eKeysHandler(object):
                 raise SynapseError(400, "Invalid self-signing key", Codes.INVALID_PARAM)
         if "user_signing_key" in keys:
             yield self.store.set_e2e_cross_signing_key(
-                user_id, "user_signing", user_signing_key, time.time() * 1000
+                user_id, "user_signing", user_signing_key
             )
             # the signature stream matches the semantics that we want for
             # user-signing key updates: only the user themselves is notified of
