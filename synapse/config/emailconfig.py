@@ -93,6 +93,8 @@ class EmailConfig(Config):
         ):
             # Use the first entry in self.trusted_third_party_id_servers instead
             if self.trusted_third_party_id_servers:
+                # XXX: It's a little confusing that account_threepid_delegate is modifed
+                # both in RegistrationConfig and here. We should factor this bit out
                 self.account_threepid_delegate = self.trusted_third_party_id_servers[0]
                 self.using_identity_server_from_trusted_list = True
             else:
