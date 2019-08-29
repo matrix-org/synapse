@@ -320,11 +320,8 @@ class StatsStore(StateDeltasStore):
                 txn=txn,
                 into_table=table + "_historical",
                 keyvalues={id_col: stats_id},
-                extra_dst_insvalues={"bucket_size": self.stats_bucket_size, },
-                extra_dst_keyvalues={
-                    "end_ts": end_ts,
-
-                },
+                extra_dst_insvalues={"bucket_size": self.stats_bucket_size},
+                extra_dst_keyvalues={"end_ts": end_ts},
                 additive_relatives=per_slice_additive_relatives,
                 src_table=table + "_current",
                 copy_columns=abs_field_names,
@@ -425,18 +422,28 @@ class StatsStore(StateDeltasStore):
         """
         if self.database_engine.can_native_upsert:
             ins_columns = chain(
-                keyvalues, copy_columns, additive_relatives, extra_dst_keyvalues, extra_dst_insvalues
+                keyvalues,
+                copy_columns,
+                additive_relatives,
+                extra_dst_keyvalues,
+                extra_dst_insvalues,
             )
             sel_exprs = chain(
                 keyvalues,
                 copy_columns,
-                ("?" for _ in chain(additive_relatives, extra_dst_keyvalues, extra_dst_insvalues)),
+                (
+                    "?"
+                    for _ in chain(
+                        additive_relatives, extra_dst_keyvalues, extra_dst_insvalues
+                    )
+                ),
             )
             keyvalues_where = ("%s = ?" % f for f in keyvalues)
 
             sets_cc = ("%s = EXCLUDED.%s" % (f, f) for f in copy_columns)
             sets_ar = (
-                "%s = EXCLUDED.%s + %s.%s" % (f, f, into_table, f) for f in additive_relatives
+                "%s = EXCLUDED.%s + %s.%s" % (f, f, into_table, f)
+                for f in additive_relatives
             )
 
             sql = """
@@ -459,8 +466,14 @@ class StatsStore(StateDeltasStore):
                 "additional_where": additional_where,
             }
 
-            qargs = list(chain(additive_relatives.values(), extra_dst_keyvalues.values(), extra_dst_insvalues.values(),
-                               keyvalues.values()))
+            qargs = list(
+                chain(
+                    additive_relatives.values(),
+                    extra_dst_keyvalues.values(),
+                    extra_dst_insvalues.values(),
+                    keyvalues.values(),
+                )
+            )
             txn.execute(sql, qargs)
         else:
             self.database_engine.lock_table(txn, into_table)
@@ -476,8 +489,13 @@ class StatsStore(StateDeltasStore):
             )
 
             if dest_current_row is None:
-                merged_dict = {**keyvalues, **extra_dst_keyvalues, **extra_dst_insvalues, **src_row,
-                               **additive_relatives}
+                merged_dict = {
+                    **keyvalues,
+                    **extra_dst_keyvalues,
+                    **extra_dst_insvalues,
+                    **src_row,
+                    **additive_relatives,
+                }
                 self._simple_insert_txn(txn, into_table, merged_dict)
             else:
                 for (key, val) in additive_relatives.items():
