@@ -1018,7 +1018,7 @@ class RoomMemberHandler(object):
         if not public_keys:
             public_keys.append(fallback_public_key)
         display_name = data["display_name"]
-        return (token, public_keys, fallback_public_key, display_name)
+        return token, public_keys, fallback_public_key, display_name
 
     @defer.inlineCallbacks
     def _is_host_in_room(self, current_state_ids):

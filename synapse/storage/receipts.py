@@ -279,7 +279,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 args.append(limit)
             txn.execute(sql, args)
 
-            return (r[0:5] + (json.loads(r[5]),) for r in txn)
+            return r[0:5] + (json.loads(r[5]),) for r in txn
 
         return self.runInteraction(
             "get_all_updated_receipts", get_all_updated_receipts_txn
@@ -478,7 +478,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
 
         max_persisted_id = self._receipts_id_gen.get_current_token()
 
-        return (stream_id, max_persisted_id)
+        return stream_id, max_persisted_id
 
     def insert_graph_receipt(self, room_id, receipt_type, user_id, event_ids, data):
         return self.runInteraction(
