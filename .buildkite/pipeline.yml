@@ -213,7 +213,7 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#514a1479ea364294ea52d344f5273c0dc2f031b5:
+      - matrix-org/codecov#ca72767fe7804bca83259c7a19095ffafda7abe3:
           path: "logs/coverage.xml"
     retry:
       automatic:
@@ -244,7 +244,7 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#514a1479ea364294ea52d344f5273c0dc2f031b5:
+      - matrix-org/codecov#ca72767fe7804bca83259c7a19095ffafda7abe3:
           path: "logs/coverage.xml"
     retry:
       automatic:
@@ -278,7 +278,7 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#514a1479ea364294ea52d344f5273c0dc2f031b5:
+      - matrix-org/codecov#ca72767fe7804bca83259c7a19095ffafda7abe3:
           path: "logs/coverage.xml"
     retry:
       automatic:
