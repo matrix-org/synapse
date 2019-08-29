@@ -106,7 +106,7 @@ class StateGroupStore(object):
         }
 
     def get_state_group_delta(self, name):
-        return (None, None)
+        return None, None
 
     def register_events(self, events):
         for e in events:
@@ -152,7 +152,7 @@ class Graph(object):
         return iter(self._events)
 
     def get_leaves(self):
-        return (self._events[i] for i in self._leaves)
+        return self._events[i] for i in self._leaves
 
 
 class StateTestCase(unittest.TestCase):

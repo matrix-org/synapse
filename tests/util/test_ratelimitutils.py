@@ -86,7 +86,7 @@ def _await_resolution(reactor, d):
     start_time = reactor.seconds()
     while not d.called:
         reactor.advance(0.01)
-    return (reactor.seconds() - start_time) * 1000
+    return reactor.seconds() - start_time * 1000
 
 
 def build_rc_config(settings={}):
