@@ -70,7 +70,7 @@ This release also deprecates the ``email.trust_identity_server_for_password_rese
 and replaces it with ``account_threepid_delegate``. This option defines whether the homeserver
 should delegate an external server (typically an `identity server
 <https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset
-or registration tokens via email or SMS.
+or registration messages via email or SMS.
 
 If ``email.trust_identity_server_for_password_resets`` was changed from its default to
 ``true``, and ``account_threepid_delegate`` is not set to an identity server domain, then the
@@ -80,7 +80,7 @@ configured, Synapse will throw an error on startup.
 
 If ``email.trust_identity_server_for_password_resets`` is not set to ``true`` and
 ``account_threepid_delegate`` is not set to a domain, then Synapse will attempt to send
-password reset and registration tokens itself.
+password reset and registration messages itself.
 
 Email templates
 ---------------
