@@ -181,6 +181,19 @@ server for password resets, set ``trust_identity_server_for_password_resets`` to
 See the `sample configuration file <docs/sample_config.yaml>`_
 for more details on these settings.
 
+New email templates
+---------------
+Some new templates have been added to the default template directory for the purpose of the
+homeserver sending its own password reset emails. If you have configured a custom
+``template_dir`` in your Synapse config, these files will need to be added.
+
+``password_reset.html`` and ``password_reset.txt`` are HTML and plain text templates
+respectively that contain the contents of what will be emailed to the user upon attempting to
+reset their password via email. ``password_reset_success.html`` and
+``password_reset_failure.html`` are HTML files that the content of which (assuming no redirect
+URL is set) will be shown to the user after they attempt to click the link in the email sent
+to them.
+
 Upgrading to v0.99.0
 ====================
 
