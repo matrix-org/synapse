@@ -2324,7 +2324,7 @@ class EventsStore(
         """
         to_1, so_1 = yield self._get_event_ordering(event_id1)
         to_2, so_2 = yield self._get_event_ordering(event_id2)
-        return to_1, so_1) > (to_2, so_2
+        return (to_1, so_1) > (to_2, so_2)
 
     @cachedInlineCallbacks(max_entries=5000)
     def _get_event_ordering(self, event_id):

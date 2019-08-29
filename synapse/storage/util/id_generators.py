@@ -49,7 +49,7 @@ def _load_current_id(db_conn, table, column, step=1):
     val, = cur.fetchone()
     cur.close()
     current_id = int(val) if val else step
-    return max if step > 0 else min)(current_id, step
+    return (max if step > 0 else min)(current_id, step)
 
 
 class StreamIdGenerator(object):
