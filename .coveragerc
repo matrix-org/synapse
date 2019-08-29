@@ -2,6 +2,7 @@
 branch = True
 parallel = True
 include = synapse/*
+data_file = $TOP/.coverage
 
 [report]
 precision = 2
