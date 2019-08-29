@@ -2,7 +2,6 @@ env:
   COVERALLS_REPO_TOKEN: wsJWOby6j0uCYFiCes3r0XauxO27mx8lD
 
 steps:
-
   - command:
       - "python -m pip install tox"
       - "tox -e check_codestyle"
