@@ -72,9 +72,10 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "ubuntu:xenial"  # We use xenial to get an old sqlite and python
+          workdir: "/src"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
@@ -92,9 +93,10 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.5"
+          workdir: "/src"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
@@ -112,9 +114,10 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
+          workdir: "/src"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
@@ -132,9 +135,10 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "python:3.7"
+          workdir: "/src"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
@@ -155,7 +159,7 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py35.pg95.yaml
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
@@ -176,7 +180,7 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg95.yaml
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
@@ -197,7 +201,7 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg11.yaml
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
@@ -227,7 +231,7 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
@@ -258,7 +262,7 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
@@ -292,7 +296,7 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#d146618ffd21c541bb0d15d82d11b7aac6f0a8f0:
+      - matrix-org/codecov#208e8463e225bd8e40d42f3b3dbfaa603f3507aa:
           parallel: "true"
     retry:
       automatic:
