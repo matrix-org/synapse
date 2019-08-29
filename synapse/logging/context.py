@@ -25,6 +25,7 @@ See doc/log_contexts.rst for details on how this works.
 import logging
 import threading
 import types
+from typing import Any, List
 
 from twisted.internet import defer, threads
 
@@ -194,13 +195,17 @@ class LoggingContext(object):
     class Sentinel(object):
         """Sentinel to represent the root context"""
 
-        __slots__ = []
+        __slots__ = []  # type: List[Any]
 
         def __str__(self):
             return "sentinel"
 
         def copy_to(self, record):
             pass
+
+        def copy_to_twisted_log_entry(self, record):
+            record["request"] = None
+            record["scope"] = None
 
         def start(self):
             pass
@@ -329,6 +334,13 @@ class LoggingContext(object):
 
         # we also track the current scope:
         record.scope = self.scope
+
+    def copy_to_twisted_log_entry(self, record):
+        """
+        Copy logging fields from this context to a Twisted log record.
+        """
+        record["request"] = self.request
+        record["scope"] = self.scope
 
     def start(self):
         if get_thread_id() != self.main_thread:

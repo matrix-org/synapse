@@ -22,24 +22,34 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_json_object_from_request,
 )
-from synapse.rest.admin import assert_requester_is_admin
+from synapse.rest.admin import assert_requester_is_admin, assert_user_is_admin
 from synapse.types import UserID
 
 
 class UserAdminServlet(RestServlet):
     """
-    Set whether or not a user is a server administrator.
+    Get or set whether or not a user is a server administrator.
 
     Note that only local users can be server administrators, and that an
     administrator may not demote themselves.
 
     Only server administrators can use this API.
 
-    Example:
-        PUT /_synapse/admin/v1/users/@reivilibre:librepush.net/admin
-        {
-            "admin": true
-        }
+    Examples:
+        * Get
+            GET /_synapse/admin/v1/users/@nonadmin:example.com/admin
+            response on success:
+                {
+                    "admin": false
+                }
+        * Set
+            PUT /_synapse/admin/v1/users/@reivilibre:librepush.net/admin
+            request body:
+                {
+                    "admin": true
+                }
+            response on success:
+                {}
     """
 
     PATTERNS = (re.compile("^/_synapse/admin/v1/users/(?P<user_id>@[^/]*)/admin$"),)
@@ -50,9 +60,23 @@ class UserAdminServlet(RestServlet):
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
-    def on_PUT(self, request, user_id):
+    def on_GET(self, request, user_id):
         yield assert_requester_is_admin(self.auth, request)
+
+        target_user = UserID.from_string(user_id)
+
+        if not self.hs.is_mine(target_user):
+            raise SynapseError(400, "Only local users can be admins of this homeserver")
+
+        is_admin = yield self.handlers.admin_handler.get_user_server_admin(target_user)
+        is_admin = bool(is_admin)
+
+        return (200, {"admin": is_admin})
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, user_id):
         requester = yield self.auth.get_user_by_req(request)
+        yield assert_user_is_admin(self.auth, requester.user)
         auth_user = requester.user
 
         target_user = UserID.from_string(user_id)
