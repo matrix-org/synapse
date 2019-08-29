@@ -6,6 +6,7 @@ services:
     image: postgres:9.5
     environment:
       POSTGRES_PASSWORD: postgres
+    command: -c fsync=off
 
   testenv:
     image: python:3.7
