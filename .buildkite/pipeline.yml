@@ -64,7 +64,7 @@ steps:
   - command:
       - "apt-get update && apt-get install -y python3.5 python3.5-dev python3-pip libxml2-dev libxslt-dev zlib1g-dev"
       - "python3.5 -m pip install tox"
-      - "tox -e py35-old,codecov"
+      - "tox -e py35-old,combine"
     label: ":python: 3.5 / SQLite / Old Deps"
     env:
       TRIAL_FLAGS: "-j 2"
@@ -74,6 +74,8 @@ steps:
           image: "ubuntu:xenial"  # We use xenial to get an old sqlite and python
           mount-buildkite-agent: false
           propagate-environment: true
+      - matrix-org/codecov#c343c5a7f44194321db41ae6f06cf4278bb59f73:
+          path: "coverage.xml"
     retry:
       automatic:
         - exit_status: -1
@@ -83,7 +85,7 @@ steps:
 
   - command:
       - "python -m pip install tox"
-      - "tox -e py35,codecov"
+      - "tox -e py35,combine"
     label: ":python: 3.5 / SQLite"
     env:
       TRIAL_FLAGS: "-j 2"
@@ -92,6 +94,8 @@ steps:
           image: "python:3.5"
           mount-buildkite-agent: false
           propagate-environment: true
+      - matrix-org/codecov#c343c5a7f44194321db41ae6f06cf4278bb59f73:
+          path: "coverage.xml"
     retry:
       automatic:
         - exit_status: -1
@@ -101,7 +105,7 @@ steps:
 
   - command:
       - "python -m pip install tox"
-      - "tox -e py36,codecov"
+      - "tox -e py36,combine"
     label: ":python: 3.6 / SQLite"
     env:
       TRIAL_FLAGS: "-j 2"
@@ -110,6 +114,8 @@ steps:
           image: "python:3.6"
           mount-buildkite-agent: false
           propagate-environment: true
+      - matrix-org/codecov#c343c5a7f44194321db41ae6f06cf4278bb59f73:
+          path: "coverage.xml"
     retry:
       automatic:
         - exit_status: -1
@@ -119,7 +125,7 @@ steps:
 
   - command:
       - "python -m pip install tox"
-      - "tox -e py37,codecov"
+      - "tox -e py37,combine"
     label: ":python: 3.7 / SQLite"
     env:
       TRIAL_FLAGS: "-j 2"
@@ -128,6 +134,8 @@ steps:
           image: "python:3.7"
           mount-buildkite-agent: false
           propagate-environment: true
+      - matrix-org/codecov#c343c5a7f44194321db41ae6f06cf4278bb59f73:
+          path: "coverage.xml"
     retry:
       automatic:
         - exit_status: -1
@@ -141,12 +149,14 @@ steps:
     env:
       TRIAL_FLAGS: "-j 8"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
+      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,combine'"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
           config:
             - .buildkite/docker-compose.py35.pg95.yaml
+      - matrix-org/codecov#c343c5a7f44194321db41ae6f06cf4278bb59f73:
+          path: "coverage.xml"
     retry:
       automatic:
         - exit_status: -1
@@ -160,12 +170,14 @@ steps:
     env:
       TRIAL_FLAGS: "-j 8"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
+      - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,combine'"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg95.yaml
+      - matrix-org/codecov#c343c5a7f44194321db41ae6f06cf4278bb59f73:
+          path: "coverage.xml"
     retry:
       automatic:
         - exit_status: -1
@@ -179,12 +191,14 @@ steps:
     env:
       TRIAL_FLAGS: "-j 8"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
+      - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,combine'"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg11.yaml
+      - matrix-org/codecov#c343c5a7f44194321db41ae6f06cf4278bb59f73:
+          path: "coverage.xml"
     retry:
       automatic:
         - exit_status: -1
@@ -209,7 +223,7 @@ steps:
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
       - artifacts#v1.2.0:
-          upload: [ "logs/**/*.log", "logs/**/*.log.*" ]
+          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/coverage.xml" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
@@ -240,7 +254,7 @@ steps:
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
       - artifacts#v1.2.0:
-          upload: [ "logs/**/*.log", "logs/**/*.log.*" ]
+          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/coverage.xml" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
@@ -274,7 +288,7 @@ steps:
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
       - artifacts#v1.2.0:
-          upload: [ "logs/**/*.log", "logs/**/*.log.*" ]
+          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/coverage.xml" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
