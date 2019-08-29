@@ -1395,14 +1395,22 @@ class SQLBaseStore(object):
         """
         txn.call_after(self._invalidate_state_caches, room_id, members_changed)
 
-        # We need to be careful that the size of the `members_changed` list
-        # isn't so large that it causes problems sending over replication, so we
-        # send them in chunks.
-        # Max line length is 16K, and max user ID length is 255, so 50 should
-        # be safe.
-        for chunk in batch_iter(members_changed, 50):
-            keys = itertools.chain([room_id], chunk)
-            self._send_invalidation_to_replication(txn, _CURRENT_STATE_CACHE_NAME, keys)
+        if members_changed:
+            # We need to be careful that the size of the `members_changed` list
+            # isn't so large that it causes problems sending over replication, so we
+            # send them in chunks.
+            # Max line length is 16K, and max user ID length is 255, so 50 should
+            # be safe.
+            for chunk in batch_iter(members_changed, 50):
+                keys = itertools.chain([room_id], chunk)
+                self._send_invalidation_to_replication(
+                    txn, _CURRENT_STATE_CACHE_NAME, keys
+                )
+        else:
+            # if no members changed, we still need to invalidate the other caches.
+            self._send_invalidation_to_replication(
+                txn, _CURRENT_STATE_CACHE_NAME, [room_id]
+            )
 
     def _invalidate_state_caches(self, room_id, members_changed):
         """Invalidates caches that are based on the current state, but does

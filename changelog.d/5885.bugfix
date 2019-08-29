@@ -1,0 +1,1 @@
+Fix stack overflow when recovering an appservice which had an outage.

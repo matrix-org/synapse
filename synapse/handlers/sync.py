@@ -789,9 +789,8 @@ class SyncHandler(object):
                         batch.events[0].event_id, state_filter=state_filter
                     )
                 else:
-                    # Its not clear how we get here, but empirically we do
-                    # (#5407). Logging has been added elsewhere to try and
-                    # figure out where this state comes from.
+                    # We can get here if the user has ignored the senders of all
+                    # the recent events.
                     state_at_timeline_start = yield self.get_state_at(
                         room_id, stream_position=now_token, state_filter=state_filter
                     )
@@ -1774,20 +1773,9 @@ class SyncHandler(object):
             newly_joined_room=newly_joined,
         )
 
-        if not batch and batch.limited:
-            # This resulted in #5407, which is weird, so lets log! We do it
-            # here as we have the maximum amount of information.
-            user_id = sync_result_builder.sync_config.user.to_string()
-            logger.info(
-                "Issue #5407: Found limited batch with no events. user %s, room %s,"
-                " sync_config %s, newly_joined %s, events %s, batch %s.",
-                user_id,
-                room_id,
-                sync_config,
-                newly_joined,
-                events,
-                batch,
-            )
+        # Note: `batch` can be both empty and limited here in the case where
+        # `_load_filtered_recents` can't find any events the user should see
+        # (e.g. due to having ignored the sender of the last 50 events).
 
         if newly_joined:
             # debug for https://github.com/matrix-org/synapse/issues/4422
