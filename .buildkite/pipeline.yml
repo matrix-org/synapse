@@ -210,7 +210,6 @@ steps:
         - exit_status: 2
           limit: 2
 
-
   - label: "SyTest - :python: 3.5 / SQLite / Monolith"
     agents:
       queue: "medium"
