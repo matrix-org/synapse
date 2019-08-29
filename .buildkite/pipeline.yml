@@ -74,7 +74,7 @@ steps:
           image: "ubuntu:xenial"  # We use xenial to get an old sqlite and python
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "coverage.xml"
     retry:
       automatic:
@@ -94,7 +94,7 @@ steps:
           image: "python:3.5"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "coverage.xml"
     retry:
       automatic:
@@ -114,7 +114,7 @@ steps:
           image: "python:3.6"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "coverage.xml"
     retry:
       automatic:
@@ -134,7 +134,7 @@ steps:
           image: "python:3.7"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "coverage.xml"
     retry:
       automatic:
@@ -155,7 +155,7 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py35.pg95.yaml
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "coverage.xml"
     retry:
       automatic:
@@ -176,7 +176,7 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg95.yaml
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "coverage.xml"
     retry:
       automatic:
@@ -197,7 +197,7 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg11.yaml
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "coverage.xml"
     retry:
       automatic:
@@ -227,7 +227,7 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "logs/coverage.xml"
     retry:
       automatic:
@@ -258,7 +258,7 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "logs/coverage.xml"
     retry:
       automatic:
@@ -292,7 +292,7 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#ee528ae1b7291d18746e44e41de899ae59477511:
+      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
           path: "logs/coverage.xml"
     retry:
       automatic:
