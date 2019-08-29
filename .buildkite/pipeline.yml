@@ -74,8 +74,8 @@ steps:
           image: "ubuntu:xenial"  # We use xenial to get an old sqlite and python
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
@@ -94,8 +94,8 @@ steps:
           image: "python:3.5"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
@@ -114,8 +114,8 @@ steps:
           image: "python:3.6"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
@@ -134,8 +134,8 @@ steps:
           image: "python:3.7"
           mount-buildkite-agent: false
           propagate-environment: true
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
@@ -155,8 +155,8 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py35.pg95.yaml
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
@@ -176,8 +176,8 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg95.yaml
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
@@ -197,8 +197,8 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg11.yaml
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
@@ -227,8 +227,8 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "logs/coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
@@ -258,8 +258,8 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "logs/coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
@@ -292,8 +292,8 @@ steps:
       - matrix-org/annotate:
           path: "logs/annotate.md"
           class: "error"
-      - matrix-org/codecov#1914398f8fa13ba098472608abad50a355ea193a:
-          path: "logs/coverage.xml"
+      - matrix-org/codecov#4262239:
+        parallel: "true"
     retry:
       automatic:
         - exit_status: -1
