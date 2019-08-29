@@ -115,7 +115,7 @@ class EmailConfig(Config):
                     missing.append("email." + k)
 
             if config.get("public_baseurl") is None:
-                missing.append("public_base_url")
+                missing.append("public_baseurl")
 
             if len(missing) > 0:
                 raise RuntimeError(
@@ -132,21 +132,21 @@ class EmailConfig(Config):
             self.email_password_reset_template_text = email_config.get(
                 "password_reset_template_text", "password_reset.txt"
             )
-            self.email_password_reset_failure_template = email_config.get(
-                "password_reset_failure_template", "password_reset_failure.html"
+            self.email_password_reset_template_failure_html = email_config.get(
+                "password_reset_template_failure_html", "password_reset_failure.html"
             )
             # This template does not support any replaceable variables, so we will
             # read it from the disk once during setup
-            email_password_reset_success_template = email_config.get(
-                "password_reset_success_template", "password_reset_success.html"
+            email_password_reset_template_success_html = email_config.get(
+                "password_reset_template_success_html", "password_reset_success.html"
             )
 
             # Check templates exist
             for f in [
                 self.email_password_reset_template_html,
                 self.email_password_reset_template_text,
-                self.email_password_reset_failure_template,
-                email_password_reset_success_template,
+                self.email_password_reset_template_failure_html,
+                email_password_reset_template_success_html,
             ]:
                 p = os.path.join(self.email_template_dir, f)
                 if not os.path.isfile(p):
@@ -154,9 +154,9 @@ class EmailConfig(Config):
 
             # Retrieve content of web templates
             filepath = os.path.join(
-                self.email_template_dir, email_password_reset_success_template
+                self.email_template_dir, email_password_reset_template_success_html
             )
-            self.email_password_reset_success_html_content = self.read_file(
+            self.email_password_reset_template_success_html_content = self.read_file(
                 filepath, "email.password_reset_template_success_html"
             )
 

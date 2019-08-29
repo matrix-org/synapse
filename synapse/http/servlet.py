@@ -166,7 +166,12 @@ def parse_string_from_args(
         value = args[name][0]
 
         if encoding:
-            value = value.decode(encoding)
+            try:
+                value = value.decode(encoding)
+            except ValueError:
+                raise SynapseError(
+                    400, "Query parameter %r must be %s" % (name, encoding)
+                )
 
         if allowed_values is not None and value not in allowed_values:
             message = "Query parameter %r must be one of [%s]" % (
@@ -295,7 +300,7 @@ class RestServlet(object):
                     http_server.register_paths(
                         method,
                         patterns,
-                        trace_servlet(servlet_classname, method_handler),
+                        trace_servlet(servlet_classname)(method_handler),
                         servlet_classname,
                     )
 

@@ -206,6 +206,13 @@ Handles the media repository. It can handle all endpoints starting with::
 
     /_matrix/media/
 
+And the following regular expressions matching media-specific administration
+APIs::
+
+    ^/_synapse/admin/v1/purge_media_cache$
+    ^/_synapse/admin/v1/room/.*/media$
+    ^/_synapse/admin/v1/quarantine_media/.*$
+
 You should also set ``enable_media_repo: False`` in the shared configuration
 file to stop the main synapse running background jobs related to managing the
 media repository.

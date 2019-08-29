@@ -47,9 +47,9 @@ REQUIREMENTS = [
     "idna>=2.5",
     # validating SSL certs for IP addresses requires service_identity 18.1.
     "service_identity>=18.1.0",
-    # our logcontext handling relies on the ability to cancel inlineCallbacks
-    # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
-    "Twisted>=18.7.0",
+    # Twisted 18.9 introduces some logger improvements that the structured
+    # logger utilises
+    "Twisted>=18.9.0",
     "treq>=15.1",
     # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
     "pyopenssl>=16.0.0",
@@ -72,7 +72,6 @@ REQUIREMENTS = [
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
     "bleach>=1.4.3",
-    "sdnotify>=0.3",
 ]
 
 CONDITIONAL_REQUIREMENTS = {

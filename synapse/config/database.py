@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+from textwrap import indent
+
+import yaml
 
 from ._base import Config
 
@@ -38,20 +41,28 @@ class DatabaseConfig(Config):
 
         self.set_databasepath(config.get("database_path"))
 
-    def generate_config_section(self, data_dir_path, **kwargs):
-        database_path = os.path.join(data_dir_path, "homeserver.db")
-        return (
-            """\
-        ## Database ##
-
-        database:
-          # The database engine name
+    def generate_config_section(self, data_dir_path, database_conf, **kwargs):
+        if not database_conf:
+            database_path = os.path.join(data_dir_path, "homeserver.db")
+            database_conf = (
+                """# The database engine name
           name: "sqlite3"
           # Arguments to pass to the engine
           args:
             # Path to the database
             database: "%(database_path)s"
+            """
+                % locals()
+            )
+        else:
+            database_conf = indent(yaml.dump(database_conf), " " * 10).lstrip()
 
+        return (
+            """\
+        ## Database ##
+
+        database:
+          %(database_conf)s
         # Number of events to cache in memory.
         #
         #event_cache_size: 10K

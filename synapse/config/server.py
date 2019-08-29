@@ -17,8 +17,11 @@
 
 import logging
 import os.path
+import re
+from textwrap import indent
 
 import attr
+import yaml
 from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -352,7 +355,7 @@ class ServerConfig(Config):
         return any(l["tls"] for l in self.listeners)
 
     def generate_config_section(
-        self, server_name, data_dir_path, open_private_ports, **kwargs
+        self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
     ):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
@@ -366,11 +369,68 @@ class ServerConfig(Config):
         # Bring DEFAULT_ROOM_VERSION into the local-scope for use in the
         # default config string
         default_room_version = DEFAULT_ROOM_VERSION
+        secure_listeners = []
+        unsecure_listeners = []
+        private_addresses = ["::1", "127.0.0.1"]
+        if listeners:
+            for listener in listeners:
+                if listener["tls"]:
+                    secure_listeners.append(listener)
+                else:
+                    # If we don't want open ports we need to bind the listeners
+                    # to some address other than 0.0.0.0. Here we chose to use
+                    # localhost.
+                    # If the addresses are already bound we won't overwrite them
+                    # however.
+                    if not open_private_ports:
+                        listener.setdefault("bind_addresses", private_addresses)
 
-        unsecure_http_binding = "port: %i\n            tls: false" % (unsecure_port,)
-        if not open_private_ports:
-            unsecure_http_binding += (
-                "\n            bind_addresses: ['::1', '127.0.0.1']"
+                    unsecure_listeners.append(listener)
+
+            secure_http_bindings = indent(
+                yaml.dump(secure_listeners), " " * 10
+            ).lstrip()
+
+            unsecure_http_bindings = indent(
+                yaml.dump(unsecure_listeners), " " * 10
+            ).lstrip()
+
+        if not unsecure_listeners:
+            unsecure_http_bindings = (
+                """- port: %(unsecure_port)s
+            tls: false
+            type: http
+            x_forwarded: true"""
+                % locals()
+            )
+
+            if not open_private_ports:
+                unsecure_http_bindings += (
+                    "\n            bind_addresses: ['::1', '127.0.0.1']"
+                )
+
+            unsecure_http_bindings += """
+
+            resources:
+              - names: [client, federation]
+                compress: false"""
+
+            if listeners:
+                # comment out this block
+                unsecure_http_bindings = "#" + re.sub(
+                    "\n {10}",
+                    lambda match: match.group(0) + "#",
+                    unsecure_http_bindings,
+                )
+
+        if not secure_listeners:
+            secure_http_bindings = (
+                """#- port: %(bind_port)s
+          #  type: http
+          #  tls: true
+          #  resources:
+          #    - names: [client, federation]"""
+                % locals()
             )
 
         return (
@@ -556,11 +616,7 @@ class ServerConfig(Config):
           # will also need to give Synapse a TLS key and certificate: see the TLS section
           # below.)
           #
-          #- port: %(bind_port)s
-          #  type: http
-          #  tls: true
-          #  resources:
-          #    - names: [client, federation]
+          %(secure_http_bindings)s
 
           # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
           # that unwraps TLS.
@@ -568,13 +624,7 @@ class ServerConfig(Config):
           # If you plan to use a reverse proxy, please see
           # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
           #
-          - %(unsecure_http_binding)s
-            type: http
-            x_forwarded: true
-
-            resources:
-              - names: [client, federation]
-                compress: false
+          %(unsecure_http_bindings)s
 
             # example additional_resources:
             #
