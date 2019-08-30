@@ -49,9 +49,6 @@ class StatsHandler(StateDeltasHandler):
         # The current position in the current_state_delta stream
         self.pos = None
 
-        # Guard to ensure we only process deltas one at a time
-        self._is_processing = False
-
         if hs.config.stats_enabled:
             self.notifier.add_replication_callback(self.notify_new_event)
 
@@ -65,43 +62,60 @@ class StatsHandler(StateDeltasHandler):
         if not self.hs.config.stats_enabled:
             return
 
-        if self._is_processing:
-            return
+        lock = self.store.stats_delta_processing_lock
 
         @defer.inlineCallbacks
         def process():
+            yield lock.acquire()
             try:
                 yield self._unsafe_process()
             finally:
-                self._is_processing = False
+                yield lock.release()
 
-        self._is_processing = True
-        run_as_background_process("stats.notify_new_event", process)
+        if not lock.locked:
+            # we only want to run this process one-at-a-time,
+            # and also, if the initial background updater wants us to keep out,
+            # we should respect that.
+            run_as_background_process("stats.notify_new_event", process)
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
         # If self.pos is None then means we haven't fetched it from DB
-        if self.pos is None:
-            self.pos = yield self.store.get_stats_stream_pos()
+        # If None is one of the values, then means that the stats regenerator has not (or had not) yet unwedged us
+        #   but note that this might be outdated, so we retrieve the positions again.
+        if self.pos is None or None in self.pos.values():
+            self.pos = yield self.store.get_stats_positions()
 
-        # If still None then the initial background update hasn't happened yet
-        if self.pos is None:
+        # If still contains a None position, then the stats regenerator hasn't started yet
+        if None in self.pos.values():
             return None
 
         # Loop round handling deltas until we're up to date
+
         while True:
             with Measure(self.clock, "stats_delta"):
-                deltas = yield self.store.get_current_state_deltas(self.pos)
-                if not deltas:
-                    return
+                deltas = yield self.store.get_current_state_deltas(
+                    self.pos["state_delta_stream_id"]
+                )
 
-                logger.info("Handling %d state deltas", len(deltas))
+                logger.debug("Handling %d state deltas", len(deltas))
                 yield self._handle_deltas(deltas)
 
-                self.pos = deltas[-1]["stream_id"]
-                yield self.store.update_stats_stream_pos(self.pos)
+                self.pos["state_delta_stream_id"] = deltas[-1]["stream_id"]
+                yield self.store.update_stats_positions(self.pos)
 
-                event_processing_positions.labels("stats").set(self.pos)
+                event_processing_positions.labels("stats").set(
+                    self.pos["state_delta_stream_id"]
+                )
+
+            # Then count deltas for total_events and total_event_bytes.
+            with Measure(self.clock, "stats_total_events_and_bytes"):
+                self.pos, had_counts = yield self.store.incremental_update_room_total_events_and_bytes(
+                    self.pos
+                )
+
+            if not deltas and not had_counts:
+                break
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
@@ -119,7 +133,7 @@ class StatsHandler(StateDeltasHandler):
 
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
-            token = yield self.store.get_earliest_token_for_room_stats(room_id)
+            token = yield self.store.get_earliest_token_for_stats("room", room_id)
 
             # If the earliest token to begin from is larger than our current
             # stream ID, skip processing this delta.
@@ -131,7 +145,10 @@ class StatsHandler(StateDeltasHandler):
                 continue
 
             if event_id is None and prev_event_id is None:
-                # Errr...
+                logger.error(
+                    "event ID is None and so is the previous event ID. stream_id: %s",
+                    stream_id,
+                )
                 continue
 
             event_content = {}
@@ -143,92 +160,87 @@ class StatsHandler(StateDeltasHandler):
 
             # We use stream_pos here rather than fetch by event_id as event_id
             # may be None
-            now = yield self.store.get_received_ts_by_stream_pos(stream_pos)
+            stream_timestamp = yield self.store.get_received_ts_by_stream_pos(
+                stream_pos
+            )
+            stream_timestamp = int(stream_timestamp)
 
-            # quantise time to the nearest bucket
-            now = (now // 1000 // self.stats_bucket_size) * self.stats_bucket_size
+            # All the values in this dict are deltas (RELATIVE changes)
+            room_stats_delta = {}
+            is_newly_created = False
+
+            if prev_event_id is None:
+                # this state event doesn't overwrite another,
+                # so it is a new effective/current state event
+                room_stats_delta["current_state_events"] = 1
 
             if typ == EventTypes.Member:
                 # we could use _get_key_change here but it's a bit inefficient
                 # given we're not testing for a specific result; might as well
                 # just grab the prev_membership and membership strings and
                 # compare them.
-                prev_event_content = {}
+                # We take None rather than leave as a previous membership
+                # in the absence of a previous event because we do not want to
+                # reduce the leave count when a new-to-the-room user joins.
+                prev_membership = None
                 if prev_event_id is not None:
                     prev_event = yield self.store.get_event(
                         prev_event_id, allow_none=True
                     )
                     if prev_event:
                         prev_event_content = prev_event.content
+                        prev_membership = prev_event_content.get(
+                            "membership", Membership.LEAVE
+                        )
 
                 membership = event_content.get("membership", Membership.LEAVE)
-                prev_membership = prev_event_content.get("membership", Membership.LEAVE)
 
-                if prev_membership == membership:
-                    continue
-
-                if prev_membership == Membership.JOIN:
-                    yield self.store.update_stats_delta(
-                        now, "room", room_id, "joined_members", -1
-                    )
+                if prev_membership is None:
+                    logger.debug("No previous membership for this user.")
+                elif membership == prev_membership:
+                    pass  # noop
+                elif prev_membership == Membership.JOIN:
+                    room_stats_delta["joined_members"] = -1
                 elif prev_membership == Membership.INVITE:
-                    yield self.store.update_stats_delta(
-                        now, "room", room_id, "invited_members", -1
-                    )
+                    room_stats_delta["invited_members"] = -1
                 elif prev_membership == Membership.LEAVE:
-                    yield self.store.update_stats_delta(
-                        now, "room", room_id, "left_members", -1
-                    )
+                    room_stats_delta["left_members"] = -1
                 elif prev_membership == Membership.BAN:
-                    yield self.store.update_stats_delta(
-                        now, "room", room_id, "banned_members", -1
-                    )
+                    room_stats_delta["banned_members"] = -1
                 else:
-                    err = "%s is not a valid prev_membership" % (repr(prev_membership),)
-                    logger.error(err)
-                    raise ValueError(err)
+                    raise ValueError(
+                        "%r is not a valid prev_membership" % (prev_membership,)
+                    )
 
+                if membership == prev_membership:
+                    pass  # noop
                 if membership == Membership.JOIN:
-                    yield self.store.update_stats_delta(
-                        now, "room", room_id, "joined_members", +1
-                    )
+                    room_stats_delta["joined_members"] = +1
                 elif membership == Membership.INVITE:
-                    yield self.store.update_stats_delta(
-                        now, "room", room_id, "invited_members", +1
-                    )
+                    room_stats_delta["invited_members"] = +1
                 elif membership == Membership.LEAVE:
-                    yield self.store.update_stats_delta(
-                        now, "room", room_id, "left_members", +1
-                    )
+                    room_stats_delta["left_members"] = +1
                 elif membership == Membership.BAN:
-                    yield self.store.update_stats_delta(
-                        now, "room", room_id, "banned_members", +1
-                    )
+                    room_stats_delta["banned_members"] = +1
                 else:
-                    err = "%s is not a valid membership" % (repr(membership),)
-                    logger.error(err)
-                    raise ValueError(err)
+                    raise ValueError("%r is not a valid membership" % (membership,))
 
                 user_id = state_key
                 if self.is_mine_id(user_id):
-                    # update user_stats as it's one of our users
-                    public = yield self._is_public_room(room_id)
+                    # this accounts for transitions like leave → ban and so on.
+                    has_changed_joinedness = (prev_membership == Membership.JOIN) != (
+                        membership == Membership.JOIN
+                    )
 
-                    if membership == Membership.LEAVE:
+                    if has_changed_joinedness:
+                        # update user_stats as it's one of our users
+                        public = yield self._is_public_room(room_id)
+
+                        field = "public_rooms" if public else "private_rooms"
+                        delta = +1 if membership == Membership.JOIN else -1
+
                         yield self.store.update_stats_delta(
-                            now,
-                            "user",
-                            user_id,
-                            "public_rooms" if public else "private_rooms",
-                            -1,
-                        )
-                    elif membership == Membership.JOIN:
-                        yield self.store.update_stats_delta(
-                            now,
-                            "user",
-                            user_id,
-                            "public_rooms" if public else "private_rooms",
-                            +1,
+                            stream_timestamp, "user", user_id, {field: delta}
                         )
 
             elif typ == EventTypes.Create:
@@ -246,28 +258,50 @@ class StatsHandler(StateDeltasHandler):
                     },
                 )
 
+                is_newly_created = True
+
             elif typ == EventTypes.JoinRules:
+                old_room_state = yield self.store.get_room_state(room_id)
                 yield self.store.update_room_state(
                     room_id, {"join_rules": event_content.get("join_rule")}
                 )
 
-                is_public = yield self._get_key_change(
-                    prev_event_id, event_id, "join_rule", JoinRules.PUBLIC
+                # whether the room would be public anyway,
+                # because of history_visibility
+                other_field_gives_publicity = (
+                    old_room_state["history_visibility"] == "world_readable"
                 )
-                if is_public is not None:
-                    yield self.update_public_room_stats(now, room_id, is_public)
+
+                if not other_field_gives_publicity:
+                    is_public = yield self._get_key_change(
+                        prev_event_id, event_id, "join_rule", JoinRules.PUBLIC
+                    )
+                    if is_public is not None:
+                        yield self.update_public_room_stats(
+                            stream_timestamp, room_id, is_public
+                        )
 
             elif typ == EventTypes.RoomHistoryVisibility:
+                old_room_state = yield self.store.get_room_state(room_id)
                 yield self.store.update_room_state(
                     room_id,
                     {"history_visibility": event_content.get("history_visibility")},
                 )
 
-                is_public = yield self._get_key_change(
-                    prev_event_id, event_id, "history_visibility", "world_readable"
+                # whether the room would be public anyway,
+                # because of join_rule
+                other_field_gives_publicity = (
+                    old_room_state["join_rules"] == JoinRules.PUBLIC
                 )
-                if is_public is not None:
-                    yield self.update_public_room_stats(now, room_id, is_public)
+
+                if not other_field_gives_publicity:
+                    is_public = yield self._get_key_change(
+                        prev_event_id, event_id, "history_visibility", "world_readable"
+                    )
+                    if is_public is not None:
+                        yield self.update_public_room_stats(
+                            stream_timestamp, room_id, is_public
+                        )
 
             elif typ == EventTypes.Encryption:
                 yield self.store.update_room_state(
@@ -290,6 +324,20 @@ class StatsHandler(StateDeltasHandler):
                     room_id, {"canonical_alias": event_content.get("alias")}
                 )
 
+            if is_newly_created:
+                yield self.store.update_stats_delta(
+                    stream_timestamp,
+                    "room",
+                    room_id,
+                    room_stats_delta,
+                    complete_with_stream_id=stream_id,
+                )
+
+            elif len(room_stats_delta) > 0:
+                yield self.store.update_stats_delta(
+                    stream_timestamp, "room", room_id, room_stats_delta
+                )
+
     @defer.inlineCallbacks
     def update_public_room_stats(self, ts, room_id, is_public):
         """
@@ -308,10 +356,13 @@ class StatsHandler(StateDeltasHandler):
         for user_id in user_ids:
             if self.hs.is_mine(UserID.from_string(user_id)):
                 yield self.store.update_stats_delta(
-                    ts, "user", user_id, "public_rooms", +1 if is_public else -1
-                )
-                yield self.store.update_stats_delta(
-                    ts, "user", user_id, "private_rooms", -1 if is_public else +1
+                    ts,
+                    "user",
+                    user_id,
+                    {
+                        "public_rooms": +1 if is_public else -1,
+                        "private_rooms": -1 if is_public else +1,
+                    },
                 )
 
     @defer.inlineCallbacks
