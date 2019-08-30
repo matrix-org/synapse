@@ -322,7 +322,7 @@ class StatsStore(StateDeltasStore):
                             ) AS is_public,
                             COUNT(*) AS count
                         FROM room_memberships
-                        JOIN room_state USING (room_id)
+                        JOIN room_stats_state USING (room_id)
                         WHERE
                             user_id = ? AND membership = 'join'
                         GROUP BY is_public
