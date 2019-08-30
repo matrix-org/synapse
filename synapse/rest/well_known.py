@@ -16,6 +16,7 @@
 import json
 import logging
 
+from six import ensure_binary
 from twisted.web.resource import Resource
 
 from synapse.http.server import set_cors_headers
@@ -70,4 +71,4 @@ class WellKnownResource(Resource):
 
         logger.debug("returning: %s", r)
         request.setHeader(b"Content-Type", b"application/json")
-        return json.dumps(r).encode("utf-8")
+        return ensure_binary(json.dumps(r))

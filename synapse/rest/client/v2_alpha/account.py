@@ -17,6 +17,7 @@
 import logging
 import re
 
+from six import ensure_binary
 from six.moves import http_client
 
 import jinja2
@@ -295,7 +296,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             )
             request.setResponseCode(e.code)
 
-        request.write(html.encode('utf-8'))
+        request.write(ensure_binary(html))
         finish_request(request)
         defer.returnValue(None)
 

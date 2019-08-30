@@ -15,6 +15,7 @@
 
 import logging
 
+from six import ensure_binary
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
@@ -144,7 +145,7 @@ class AuthRestServlet(RestServlet):
                 ),
                 'sitekey': self.hs.config.recaptcha_public_key,
             }
-            html_bytes = html.encode("utf8")
+            html_bytes = ensure_binary(html)
             request.setResponseCode(200)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
@@ -163,7 +164,7 @@ class AuthRestServlet(RestServlet):
                     CLIENT_API_PREFIX, LoginType.TERMS
                 ),
             }
-            html_bytes = html.encode("utf8")
+            html_bytes = ensure_binary(html)
             request.setResponseCode(200)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
@@ -208,7 +209,7 @@ class AuthRestServlet(RestServlet):
                     ),
                     'sitekey': self.hs.config.recaptcha_public_key,
                 }
-            html_bytes = html.encode("utf8")
+            html_bytes = ensure_binary(html)
             request.setResponseCode(200)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
@@ -244,7 +245,7 @@ class AuthRestServlet(RestServlet):
                         CLIENT_API_PREFIX, LoginType.TERMS
                     ),
                 }
-            html_bytes = html.encode("utf8")
+            html_bytes = ensure_binary(html)
             request.setResponseCode(200)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))

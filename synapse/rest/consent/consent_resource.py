@@ -18,6 +18,7 @@ import logging
 from hashlib import sha256
 from os import path
 
+from six import ensure_binary
 from six.moves import http_client
 
 import jinja2
@@ -204,7 +205,7 @@ class ConsentResource(Resource):
         template_html = self._jinja_env.get_template(
             path.join(TEMPLATE_LANGUAGE, template_name)
         )
-        html_bytes = template_html.render(**template_args).encode("utf8")
+        html_bytes = ensure_binary(template_html.render(**template_args))
 
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
         request.setHeader(b"Content-Length", b"%i" % len(html_bytes))
