@@ -308,7 +308,7 @@ class StatsStore(StateDeltasStore):
             return 1
 
         for (user_id,) in users_to_work_on:
-            now = self.hs.get_reactor().seconds()
+            now = self.clock.time_msec()
 
             def _process_user(txn):
                 # Get the current token
