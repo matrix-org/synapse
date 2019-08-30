@@ -52,8 +52,8 @@ PER_SLICE_FIELDS = {"room": (), "user": ()}
 
 TYPE_TO_TABLE = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user_id")}
 
-# these are the tables which contain our actual subjects
-TYPE_TO_ORIGIN_TABLE = {"room": "rooms", "user": "users"}
+# these are the tables (& ID columns) which contain our actual subjects
+TYPE_TO_ORIGIN_TABLE = {"room": ("rooms", "room_id"), "user": ("users", "name")}
 
 
 class StatsStore(StateDeltasStore):
@@ -173,18 +173,18 @@ class StatsStore(StateDeltasStore):
                 sql = """
                         INSERT OR IGNORE INTO %(table)s_current
                         (%(id_col)s, completed_delta_stream_id, %(zero_cols)s)
-                        SELECT %(id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
+                        SELECT %(origin_id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
                     """
             else:
                 sql = """
                         INSERT INTO %(table)s_current
                         (%(id_col)s, completed_delta_stream_id, %(zero_cols)s)
-                        SELECT %(id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
+                        SELECT %(origin_id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
                         ON CONFLICT DO NOTHING
                     """
 
             table, id_col = TYPE_TO_TABLE[stats_type]
-            origin_table = TYPE_TO_ORIGIN_TABLE[stats_type]
+            origin_table, origin_id_col = TYPE_TO_ORIGIN_TABLE[stats_type]
             zero_cols = list(
                 chain(ABSOLUTE_STATS_FIELDS[stats_type], PER_SLICE_FIELDS[stats_type])
             )
@@ -194,6 +194,7 @@ class StatsStore(StateDeltasStore):
                 % {
                     "table": table,
                     "id_col": id_col,
+                    "origin_id_col": origin_id_col,
                     "origin_table": origin_table,
                     "zero_cols": ", ".join(zero_cols),
                     "zeroes": ", ".join(["0"] * len(zero_cols)),
