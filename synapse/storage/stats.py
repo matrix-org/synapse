@@ -1064,9 +1064,9 @@ class StatsStore(StateDeltasStore):
             WHERE ? %s stream_ordering AND stream_ordering %s ?
             GROUP BY room_id
         """ % (
+            new_bytes_expression,
             low_comparator,
             high_comparator,
-            new_bytes_expression,
         )
 
         txn.execute(sql, (low_pos, high_pos))
