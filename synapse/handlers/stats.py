@@ -98,15 +98,16 @@ class StatsHandler(StateDeltasHandler):
                     self.pos["state_delta_stream_id"]
                 )
 
-                logger.debug("Handling %d state deltas", len(deltas))
-                yield self._handle_deltas(deltas)
+                if deltas:
+                    logger.debug("Handling %d state deltas", len(deltas))
+                    yield self._handle_deltas(deltas)
 
-                self.pos["state_delta_stream_id"] = deltas[-1]["stream_id"]
-                yield self.store.update_stats_positions(self.pos)
+                    self.pos["state_delta_stream_id"] = deltas[-1]["stream_id"]
+                    yield self.store.update_stats_positions(self.pos)
 
-                event_processing_positions.labels("stats").set(
-                    self.pos["state_delta_stream_id"]
-                )
+                    event_processing_positions.labels("stats").set(
+                        self.pos["state_delta_stream_id"]
+                    )
 
             # Then count deltas for total_events and total_event_bytes.
             with Measure(self.clock, "stats_total_events_and_bytes"):
