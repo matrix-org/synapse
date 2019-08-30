@@ -28,11 +28,13 @@ from synapse.api.errors import (
     Codes,
     LimitExceededError,
     SynapseError,
+    ThreepidValidationError,
     UnrecognizedRequestError,
 )
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
+from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -71,9 +73,33 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         super(EmailRegisterRequestTokenRestServlet, self).__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
+        self.config = hs.config
+
+        if self.hs.config.threepid_behaviour == ThreepidBehaviour.LOCAL:
+            from synapse.push.mailer import Mailer, load_jinja2_templates
+
+            templates = load_jinja2_templates(
+                config=hs.config,
+                template_html_name=hs.config.email_registration_template_html,
+                template_text_name=hs.config.email_registration_template_text,
+            )
+            self.mailer = Mailer(
+                hs=self.hs,
+                app_name=self.hs.config.email_app_name,
+                template_html=templates[0],
+                template_text=templates[1],
+            )
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if self.hs.config.threepid_behaviour == ThreepidBehaviour.OFF:
+            if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "Email registration has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration has been disabled on this server"
+            )
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
@@ -84,7 +110,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        if not check_3pid_allowed(self.hs, "email", body["email"]):
+        if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized to register on this server",
@@ -98,24 +124,37 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        if not self.hs.config.account_threepid_delegate:
-            logger.warn(
-                "No upstream account_threepid_delegate configured on the server to handle "
-                "this request"
+        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
+            if not self.hs.config.account_threepid_delegate:
+                logger.warn(
+                    "No upstream account_threepid_delegate configured on the server to handle "
+                    "this request"
+                )
+                raise SynapseError(
+                    400, "Registration by email is not supported on this homeserver"
+                )
+
+            ret = yield self.identity_handler.requestEmailToken(
+                self.hs.config.account_threepid_delegate,
+                email,
+                client_secret,
+                send_attempt,
+                next_link,
             )
-            raise SynapseError(
-                400, "Registration by email is not supported on this homeserver"
+        else:
+            # Send registration emails from Synapse
+            sid = yield self.identity_handler.send_threepid_validation(
+                email,
+                client_secret,
+                send_attempt,
+                self.mailer.send_registration_mail,
+                next_link,
             )
 
-        ret = yield self.identity_handler.requestEmailToken(
-            self.hs.config.account_threepid_delegate,
-            email,
-            client_secret,
-            send_attempt,
-            next_link,
-        )
+            # Wrap the session id in a JSON object
+            ret = {"sid": sid}
 
-        return (200, ret)
+        return 200, ret
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -161,7 +200,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
 
-        if self.config.email_threepid_behaviour == ThreepidBehaviour.REMOTE:
+        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
             if not self.hs.config.account_threepid_delegate:
                 logger.warn(
                     "No upstream account_threepid_delegate configured on the server to handle "
@@ -185,6 +224,81 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         raise SynapseError(
             400, "Registration by phone number is not supported on this homeserver"
         )
+
+
+class RegistrationSubmitTokenServlet(RestServlet):
+    """Handles registration 3PID validation token submission"""
+
+    PATTERNS = client_patterns(
+        "/registration/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(RegistrationSubmitTokenServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.config = hs.config
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, medium):
+        if medium != "email":
+            raise SynapseError(
+                400, "This medium is currently not supported for registration"
+            )
+        if self.config.threepid_behaviour == ThreepidBehaviour.OFF:
+            if self.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "User registration via email has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration is disabled on this server"
+            )
+
+        sid = parse_string(request, "sid", required=True)
+        client_secret = parse_string(request, "client_secret", required=True)
+        token = parse_string(request, "token", required=True)
+
+        # Attempt to validate a 3PID session
+        try:
+            # Mark the session as valid
+            next_link = yield self.store.validate_threepid_session(
+                sid, client_secret, token, self.clock.time_msec()
+            )
+
+            # Perform a 302 redirect if next_link is set
+            if next_link:
+                if next_link.startswith("file:///"):
+                    logger.warn(
+                        "Not redirecting to next_link as it is a local file: address"
+                    )
+                else:
+                    request.setResponseCode(302)
+                    request.setHeader("Location", next_link)
+                    finish_request(request)
+                    return None
+
+            # Otherwise show the success template
+            html = self.config.email_registration_template_success_html_content
+
+            request.setResponseCode(200)
+        except ThreepidValidationError as e:
+            # Show a failure page with a reason
+            html = self.load_jinja2_template(
+                self.config.email_template_dir,
+                self.config.email_registration_template_failure_html,
+                template_vars={"failure_reason": e.msg},
+            )
+            request.setResponseCode(e.code)
+
+        request.write(html.encode("utf-8"))
+        finish_request(request)
+        return None
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -601,4 +715,5 @@ def register_servlets(hs, http_server):
     EmailRegisterRequestTokenRestServlet(hs).register(http_server)
     MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
     UsernameAvailabilityRestServlet(hs).register(http_server)
+    RegistrationSubmitTokenServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)
