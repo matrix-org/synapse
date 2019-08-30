@@ -399,6 +399,7 @@ class StatsStore(StateDeltasStore):
                     SELECT COUNT(*) FROM room_stats_current
                     WHERE completed_delta_stream_id IS NULL
                 """
+            txn.execute(sql)
             progress["remaining"] = txn.fetchone()[0]
 
             return rooms_to_work_on
