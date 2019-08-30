@@ -661,6 +661,80 @@ class StatsStore(StateDeltasStore):
             desc="update_room_state",
         )
 
+
+    def get_statistics_for_subject(self, stats_type, stats_id, start, size=100):
+        """
+        Get statistics for a given subject.
+
+        Args:
+            stats_type (str): The type of subject
+            stats_id (str): The ID of the subject (e.g. room_id or user_id)
+            start (int): Pagination start. Number of entries, not timestamp.
+            size (int): How many entries to return.
+
+        Returns:
+            Deferred[list[dict]], where the dict has the keys of
+            ABSOLUTE_STATS_FIELDS[stats_type],  and "bucket_size" and "end_ts".
+        """
+        return self.runInteraction(
+            "get_statistics_for_subject",
+            self._get_statistics_for_subject_txn,
+            stats_type,
+            stats_id,
+            start,
+            size,
+        )
+
+    def _get_statistics_for_subject_txn(
+        self, txn, stats_type, stats_id, start, size=100
+    ):
+        """
+        Transaction-bound version of L{get_statistics_for_subject}.
+        """
+
+        table, id_col = TYPE_TO_TABLE[stats_type]
+        selected_columns = list(
+            ABSOLUTE_STATS_FIELDS[stats_type] + PER_SLICE_FIELDS[stats_type]
+        )
+
+        slice_list = self._simple_select_list_paginate_txn(
+            txn,
+            table + "_historical",
+            {id_col: stats_id},
+            "end_ts",
+            start,
+            size,
+            retcols=selected_columns + ["bucket_size", "end_ts"],
+            order_direction="DESC",
+        )
+
+        return slice_list
+
+    def get_room_state(self, room_id):
+        """
+        Returns the current room_state for a room.
+
+        Args:
+            room_id (str): The ID of the room to return state for.
+
+        Returns (dict):
+            Dictionary containing these keys:
+                "name", "topic", "canonical_alias", "avatar", "join_rules",
+                "history_visibility"
+        """
+        return self._simple_select_one(
+            "room_stats_state",
+            {"room_id": room_id},
+            retcols=(
+                "name",
+                "topic",
+                "canonical_alias",
+                "avatar",
+                "join_rules",
+                "history_visibility",
+            ),
+        )
+
     @cached()
     def get_earliest_token_for_stats(self, stats_type, id):
         """
