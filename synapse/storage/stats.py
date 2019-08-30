@@ -17,15 +17,12 @@
 import logging
 from itertools import chain
 
-from synapse.storage.prepare_database import get_statements
-
-from synapse.storage.engines import Sqlite3Engine
 from twisted.internet import defer
-
-from synapse.api.constants import Membership, EventTypes
 from twisted.internet.defer import DeferredLock
 
+from synapse.api.constants import EventTypes, Membership
 from synapse.storage import PostgresEngine
+from synapse.storage.engines import Sqlite3Engine
 from synapse.storage.state_deltas import StateDeltasStore
 from synapse.util.caches.descriptors import cached
 
@@ -189,15 +186,20 @@ class StatsStore(StateDeltasStore):
 
             table, id_col = TYPE_TO_TABLE[stats_type]
             origin_table = TYPE_TO_ORIGIN_TABLE[stats_type]
-            zero_cols = list(chain(ABSOLUTE_STATS_FIELDS[stats_type], PER_SLICE_FIELDS[stats_type]))
+            zero_cols = list(
+                chain(ABSOLUTE_STATS_FIELDS[stats_type], PER_SLICE_FIELDS[stats_type])
+            )
 
-            txn.execute(sql % {
-                "table": table,
-                "id_col": id_col,
-                "origin_table": origin_table,
-                "zero_cols": zero_cols,
-                "zeroes": ", ".join(["0"] * len(zero_cols))
-            })
+            txn.execute(
+                sql
+                % {
+                    "table": table,
+                    "id_col": id_col,
+                    "origin_table": origin_table,
+                    "zero_cols": zero_cols,
+                    "zeroes": ", ".join(["0"] * len(zero_cols)),
+                }
+            )
 
         def _delete_dirty_skeletons(txn):
             """
@@ -493,7 +495,7 @@ class StatsStore(StateDeltasStore):
                     room_id,
                     {
                         "total_events": room_total_event_count,
-                        "total_event_bytes": room_total_event_bytes
+                        "total_event_bytes": room_total_event_bytes,
                     },
                     complete_with_stream_id=current_token,
                     absolute_field_overrides={
@@ -503,9 +505,7 @@ class StatsStore(StateDeltasStore):
                         # tables.
                         "current_state_events": current_state_events,
                         "joined_members": membership_counts.get(Membership.JOIN, 0),
-                        "invited_members": membership_counts.get(
-                            Membership.INVITE, 0
-                        ),
+                        "invited_members": membership_counts.get(Membership.INVITE, 0),
                         "left_members": membership_counts.get(Membership.LEAVE, 0),
                         "banned_members": membership_counts.get(Membership.BAN, 0),
                     },
@@ -1072,6 +1072,8 @@ class StatsStore(StateDeltasStore):
             WHERE room_id = ?
                 AND ? <= stream_ordering
                 AND stream_ordering <= ?
-        """ % (bytes_expression,)
+        """ % (
+            bytes_expression,
+        )
         txn.execute(sql, (room_id, low_token, high_token))
         return txn.fetchone()
