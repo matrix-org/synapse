@@ -17,11 +17,11 @@
 Log formatters that output terse JSON.
 """
 
+from typing import IO
 import sys
 from collections import deque
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from math import floor
-from typing.io import TextIO
 
 import attr
 from simplejson import dumps
@@ -129,7 +129,7 @@ def flatten_event(event: dict, metadata: dict, include_time: bool = False):
     return new_event
 
 
-def TerseJSONToConsoleLogObserver(outFile: TextIO, metadata: dict) -> FileLogObserver:
+def TerseJSONToConsoleLogObserver(outFile: IO[str], metadata: dict) -> FileLogObserver:
     """
     A log observer that formats events to a flattened JSON representation.
 
