@@ -1032,7 +1032,7 @@ class PresenceEventSource(object):
                 #
                 # Hence this guard where we just return nothing so that the sync
                 # doesn't return. C.f. #5503.
-                return ([], max_token)
+                return [], max_token
 
             presence = self.get_presence_handler()
             stream_change_cache = self.store.presence_stream_cache
@@ -1279,7 +1279,7 @@ def get_interested_parties(store, states):
         # Always notify self
         users_to_states.setdefault(state.user_id, []).append(state)
 
-    return (room_ids_to_states, users_to_states)
+    return room_ids_to_states, users_to_states
 
 
 @defer.inlineCallbacks

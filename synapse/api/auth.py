@@ -276,25 +276,25 @@ class Auth(object):
             self.get_access_token_from_request(request)
         )
         if app_service is None:
-            return (None, None)
+            return None, None
 
         if app_service.ip_range_whitelist:
             ip_address = IPAddress(self.hs.get_ip_from_request(request))
             if ip_address not in app_service.ip_range_whitelist:
-                return (None, None)
+                return None, None
 
         if b"user_id" not in request.args:
-            return (app_service.sender, app_service)
+            return app_service.sender, app_service
 
         user_id = request.args[b"user_id"][0].decode("utf8")
         if app_service.sender == user_id:
-            return (app_service.sender, app_service)
+            return app_service.sender, app_service
 
         if not app_service.is_interested_in_user(user_id):
             raise AuthError(403, "Application service cannot masquerade as this user.")
         if not (yield self.store.get_user_by_id(user_id)):
             raise AuthError(403, "Application service has not registered this user")
-        return (user_id, app_service)
+        return user_id, app_service
 
     @defer.inlineCallbacks
     def get_user_by_access_token(self, token, rights="access"):
@@ -694,7 +694,7 @@ class Auth(object):
             #  * The user is a guest user, and has joined the room
             # else it will throw.
             member_event = yield self.check_user_was_in_room(room_id, user_id)
-            return (member_event.membership, member_event.event_id)
+            return member_event.membership, member_event.event_id
         except AuthError:
             visibility = yield self.state.get_current_state(
                 room_id, EventTypes.RoomHistoryVisibility, ""
@@ -703,7 +703,7 @@ class Auth(object):
                 visibility
                 and visibility.content["history_visibility"] == "world_readable"
             ):
-                return (Membership.JOIN, None)
+                return Membership.JOIN, None
                 return
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
