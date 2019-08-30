@@ -661,7 +661,6 @@ class StatsStore(StateDeltasStore):
             desc="update_room_state",
         )
 
-
     def get_statistics_for_subject(self, stats_type, stats_id, start, size=100):
         """
         Get statistics for a given subject.

@@ -130,7 +130,6 @@ class StatsHandler(StateDeltasHandler):
             event_id = delta["event_id"]
             stream_id = delta["stream_id"]
             prev_event_id = delta["prev_event_id"]
-            stream_pos = delta["stream_id"]
 
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
