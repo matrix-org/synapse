@@ -164,7 +164,8 @@ class RoomWorkerStore(SQLBaseStore):
 
     def count_public_rooms(self):
         """
-        Counts the number of public rooms as tracked in the room_stats and room_state
+        Counts the number of public rooms as tracked in the room_stats_current
+        and room_stats_state
         table.
         A public room is one who has is_public set
         AND is publicly-joinable and/or world-readable.
@@ -176,8 +177,8 @@ class RoomWorkerStore(SQLBaseStore):
         def _count_public_rooms_txn(txn):
             sql = """
                 SELECT COUNT(*)
-                FROM room_stats
-                    JOIN room_state USING (room_id)
+                FROM room_stats_current
+                    JOIN room_stats_state USING (room_id)
                     JOIN rooms USING (room_id)
                 WHERE
                     is_public
@@ -201,7 +202,8 @@ class RoomWorkerStore(SQLBaseStore):
         forwards,
         fetch_creation_event_ids=False,
     ):
-        """TODO doc this
+        """Gets the largest public rooms (where largest is in terms of joined
+        members, as tracked in the statistics table).
 
         Args:
             network_tuple (ThirdPartyInstanceID|None):
@@ -219,7 +221,7 @@ class RoomWorkerStore(SQLBaseStore):
 
         """
 
-        # TODO probably want to use ts_… on Postgres?
+        # TODO we probably want to use full text search on Postgres?
 
         sql = """
             SELECT
@@ -234,8 +236,8 @@ class RoomWorkerStore(SQLBaseStore):
 
         sql += """
             FROM
-                room_stats
-                JOIN room_state USING (room_id)
+                room_stats_current
+                JOIN room_stats_state USING (room_id)
                 JOIN rooms USING (room_id)
         """
         query_args = []
@@ -267,7 +269,7 @@ class RoomWorkerStore(SQLBaseStore):
 
         if pagination_token:
             pt_joined = yield self._simple_select_one_onecol(
-                table="room_stats",
+                table="room_stats_current",
                 keyvalues={"room_id": pagination_token},
                 retcol="joined_members",
                 desc="get_largest_public_rooms",
