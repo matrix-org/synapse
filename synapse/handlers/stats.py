@@ -91,25 +91,31 @@ class StatsHandler(StateDeltasHandler):
             return None
 
         # Loop round handling deltas until we're up to date
-        with Measure(self.clock, "stats_delta"):
-            while True:
+
+        while True:
+            with Measure(self.clock, "stats_delta"):
                 deltas = yield self.store.get_current_state_deltas(
                     self.pos["state_delta_stream_id"]
                 )
-                if not deltas:
-                    break
 
                 logger.debug("Handling %d state deltas", len(deltas))
                 yield self._handle_deltas(deltas)
 
                 self.pos["state_delta_stream_id"] = deltas[-1]["stream_id"]
+                yield self.store.update_stats_positions(self.pos)
 
                 event_processing_positions.labels("stats").set(
                     self.pos["state_delta_stream_id"]
                 )
 
-                if self.pos is not None:
-                    yield self.store.update_stats_positions(self.pos)
+            # Then count deltas for total_events and total_event_bytes.
+            with Measure(self.clock, "stats_total_events_and_bytes"):
+                self.pos, had_counts = yield self.store.incremental_update_room_total_events_and_bytes(
+                    self.pos
+                )
+
+            if not deltas and not had_counts:
+                break
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
