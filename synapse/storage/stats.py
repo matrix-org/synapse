@@ -195,7 +195,7 @@ class StatsStore(StateDeltasStore):
                     "table": table,
                     "id_col": id_col,
                     "origin_table": origin_table,
-                    "zero_cols": zero_cols,
+                    "zero_cols": ", ".join(zero_cols),
                     "zeroes": ", ".join(["0"] * len(zero_cols)),
                 }
             )
