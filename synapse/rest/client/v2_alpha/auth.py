@@ -16,6 +16,7 @@
 import logging
 
 from six import ensure_binary
+
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType

@@ -17,6 +17,7 @@ import json
 import logging
 
 from six import ensure_binary
+
 from twisted.web.resource import Resource
 
 from synapse.http.server import set_cors_headers
