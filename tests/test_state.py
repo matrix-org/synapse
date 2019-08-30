@@ -152,7 +152,7 @@ class Graph(object):
         return iter(self._events)
 
     def get_leaves(self):
-        return self._events[i] for i in self._leaves
+        return (self._events[i] for i in self._leaves)
 
 
 class StateTestCase(unittest.TestCase):
