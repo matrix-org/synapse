@@ -207,8 +207,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 "handle this request"
             )
             raise SynapseError(
-                400,
-                "Registration by phone number is not supported on this homeserver",
+                400, "Registration by phone number is not supported on this homeserver"
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(

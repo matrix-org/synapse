@@ -99,17 +99,18 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config.get(
             "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
-        account_threepid_delegates = config.get("account_threepid_delegates", {
-            "email": "",
-            "msisdn": "",
-        })
+        account_threepid_delegates = config.get(
+            "account_threepid_delegates", {"email": "", "msisdn": ""}
+        )
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
         if (
             self.account_threepid_delegate_email is None
             or self.account_threepid_delegate_msisdn is None
         ):
-            raise ConfigError("account_threepid_delegates must contain fields: email, msisdn")
+            raise ConfigError(
+                "account_threepid_delegates must contain fields: email, msisdn"
+            )
 
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)

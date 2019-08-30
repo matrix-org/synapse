@@ -97,9 +97,9 @@ class EmailConfig(Config):
             if self.trusted_third_party_id_servers:
                 # XXX: It's a little confusing that account_threepid_delegates is modified
                 # both in RegistrationConfig and here. We should factor this bit out
-                self.account_threepid_delegate_email = (
-                    self.trusted_third_party_id_servers[0]
-                )
+                self.account_threepid_delegate_email = self.trusted_third_party_id_servers[
+                    0
+                ]
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
@@ -108,7 +108,10 @@ class EmailConfig(Config):
                 )
 
         self.local_threepid_handling_disabled_due_to_email_config = False
-        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL and email_config == {}:
+        if (
+            self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
+            and email_config == {}
+        ):
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
             self.local_threepid_handling_disabled_due_to_email_config = True

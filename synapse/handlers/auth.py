@@ -238,9 +238,7 @@ class AuthHandler(BaseHandler):
         if "type" in authdict:
             login_type = authdict["type"]
             try:
-                result = yield self._check_auth_dict(
-                    authdict, clientip
-                )
+                result = yield self._check_auth_dict(authdict, clientip)
                 if result:
                     creds[login_type] = result
                     self._save_session(session)
@@ -367,9 +365,7 @@ class AuthHandler(BaseHandler):
         if checker is not None:
             # XXX: Temporary workaround for having Synapse handle password resets
             # See AuthHandler.check_auth for further details
-            res = yield checker(
-                authdict, clientip=clientip
-            )
+            res = yield checker(authdict, clientip=clientip)
             return res
 
         # build a v1-login-style dict out of the authdict and fall back to the
