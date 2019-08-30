@@ -17,18 +17,17 @@ from collections import defaultdict
 from typing import List, Mapping, Optional, Tuple
 
 import attr
-from zope.interface import Interface, implementer
+from zope.interface import implementer
 
 from twisted.internet.endpoints import TCP4ClientEndpoint, wrapClientTLS
-from twisted.internet.interfaces import IProtocol
 from twisted.internet.protocol import Factory
 from twisted.python.failure import Failure
 
 from synapse.crypto.context_factory import ClientTLSOptionsFactory
 from synapse.logging.ids import readable_id
 
-from .interfaces import IAddress, IClient, IConnection, IConnectionPool
-from .objects import Protocols, RemoteAddress
+from .interfaces import IClient, IConnection, IConnectionPool, IRemoteAddress
+from .objects import Protocols
 
 
 @attr.s
@@ -36,7 +35,7 @@ from .objects import Protocols, RemoteAddress
 class Connection:
 
     pool = attr.ib(type=IConnectionPool)
-    address = attr.ib(type=IAddress)
+    address = attr.ib(type=IRemoteAddress)
     chosen_address = attr.ib()
     _bound = attr.ib(default=False, repr=False)
     _client = attr.ib(default=None, repr=False, type=Optional[IClient])
@@ -177,12 +176,12 @@ class ConnectionPool:
     _connections = attr.ib(
         default=attr.Factory(lambda: defaultdict(list)),
         repr=False,
-        type=Mapping[IAddress, List[IConnection]],
+        type=Mapping[IRemoteAddress, List[IConnection]],
     )
 
     name = attr.ib(default=attr.Factory(readable_id))
 
-    async def request_connection(self, address: IAddress) -> IConnection:
+    async def request_connection(self, address: IRemoteAddress) -> IConnection:
         """
         Request a connection from this connection pool.
         """

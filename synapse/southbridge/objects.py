@@ -17,7 +17,7 @@ import attr
 from constantly import NamedConstant, Names
 from zope.interface import implementer
 
-from .interfaces import IAddress
+from .interfaces import IRemoteAddress
 
 
 class Protocols(Names):
@@ -35,7 +35,7 @@ class Protocols(Names):
 
 
 @attr.s(frozen=True)
-@implementer(IAddress)
+@implementer(IRemoteAddress)
 class RemoteAddress:
     name = attr.ib(cmp=True, repr=False)
     addresses = attr.ib(cmp=False, repr=False)

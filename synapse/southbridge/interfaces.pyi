@@ -12,7 +12,7 @@ from twisted.web.iweb import (
     IResponse,
 )
 
-class IAddress(Interface):
+class IRemoteAddress(Interface):
     port: int
     addresses: List[str]
     protocol: Any
@@ -20,7 +20,7 @@ class IAddress(Interface):
 
 class IConnection(IProtocol):
 
-    address: IAddress
+    address: IRemoteAddress
     def relinquish() -> None: ...
     def set_client(client) -> None: ...
     def reset_client(unused_data: bytes = ...) -> None: ...
@@ -33,7 +33,7 @@ class IConnectionPool(Interface):
     tls_factory: IPolicyForHTTPS
     timeout: int
     local_bind_address: Optional[Tuple[str, int]]
-    async def request_connection(address: IAddress) -> IConnection: ...
+    async def request_connection(address: IRemoteAddress) -> IConnection: ...
     def connection_lost(connection: IConnection, reason: Failure) -> None: ...
 
 class IClient(Interface):

@@ -28,8 +28,8 @@ from twisted.web.client import ResponseDone
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import UNKNOWN_LENGTH, IBodyProducer, IRequest, IResponse
 
-from .connection_pool import Connection, ConnectionPool
-from .interfaces import IAddress, IClient, IConnection
+from .connection_pool import ConnectionPool
+from .interfaces import IClient, IConnection, IRemoteAddress
 from .objects import Protocols, RemoteAddress
 
 
@@ -252,7 +252,7 @@ class HTTP11Agent:
     pool = attr.ib(type=ConnectionPool)
 
     async def send_request(
-        self, address: IAddress, request: HTTPRequest
+        self, address: IRemoteAddress, request: HTTPRequest
     ) -> _HTTPResponse:
 
         connection = await self.pool.request_connection(address)

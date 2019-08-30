@@ -13,16 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, List
 
 from zope.interface import Interface
 
 from twisted.internet.interfaces import IProtocol
-from twisted.python.failure import Failure
-from twisted.web.iweb import UNKNOWN_LENGTH, IBodyProducer, IRequest, IResponse
 
 
-class IAddress(Interface):
+class IRemoteAddress(Interface):
     pass
 
 
