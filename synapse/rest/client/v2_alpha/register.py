@@ -41,6 +41,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.push.mailer import load_jinja2_template
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
@@ -75,7 +76,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
         self.config = hs.config
 
-        if self.hs.config.threepid_behaviour == ThreepidBehaviour.LOCAL:
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -92,7 +93,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.hs.config.threepid_behaviour == ThreepidBehaviour.OFF:
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
                     "Email registration has been disabled due to lack of email config"
@@ -124,18 +125,18 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
-            if not self.hs.config.account_threepid_delegate:
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            if not self.hs.config.account_threepid_delegate_email:
                 logger.warn(
-                    "No upstream account_threepid_delegate configured on the server to handle "
-                    "this request"
+                    "No upstream email account_threepid_delegate configured on the server to "
+                    "handle this request"
                 )
                 raise SynapseError(
                     400, "Registration by email is not supported on this homeserver"
                 )
 
             ret = yield self.identity_handler.requestEmailToken(
-                self.hs.config.account_threepid_delegate,
+                self.hs.config.account_threepid_delegate_email,
                 email,
                 client_secret,
                 send_attempt,
@@ -200,30 +201,25 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
 
-        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
-            if not self.hs.config.account_threepid_delegate:
-                logger.warn(
-                    "No upstream account_threepid_delegate configured on the server to handle "
-                    "this request"
-                )
-                raise SynapseError(
-                    400,
-                    "Registration by phone number is not supported on this homeserver",
-                )
-
-            ret = yield self.identity_handler.requestMsisdnToken(
-                self.config.account_threepid_delegate,
-                country,
-                phone_number,
-                client_secret,
-                send_attempt,
-                next_link,
+        if not self.hs.config.account_threepid_delegate_msisdn:
+            logger.warn(
+                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "handle this request"
             )
-            return (200, ret)
+            raise SynapseError(
+                400,
+                "Registration by phone number is not supported on this homeserver",
+            )
 
-        raise SynapseError(
-            400, "Registration by phone number is not supported on this homeserver"
+        ret = yield self.identity_handler.requestMsisdnToken(
+            self.hs.config.account_threepid_delegate_msisdn,
+            country,
+            phone_number,
+            client_secret,
+            send_attempt,
+            next_link,
         )
+        return (200, ret)
 
 
 class RegistrationSubmitTokenServlet(RestServlet):
@@ -251,7 +247,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
             )
-        if self.config.threepid_behaviour == ThreepidBehaviour.OFF:
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
                     "User registration via email has been disabled due to lack of email config"
@@ -289,7 +285,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
             request.setResponseCode(200)
         except ThreepidValidationError as e:
             # Show a failure page with a reason
-            html = self.load_jinja2_template(
+            html = load_jinja2_template(
                 self.config.email_template_dir,
                 self.config.email_registration_template_failure_html,
                 template_vars={"failure_reason": e.msg},
@@ -391,7 +387,6 @@ class RegisterRestServlet(RestServlet):
         if kind == b"guest":
             ret = yield self._do_guest_registration(body, address=client_addr)
             return ret
-            return
         elif kind != b"user":
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
@@ -441,7 +436,6 @@ class RegisterRestServlet(RestServlet):
                     desired_username, access_token, body
                 )
             return (200, result)  # we throw for non 200 responses
-            return
 
         # for regular registration, downcase the provided username before
         # attempting to register it. This should mean

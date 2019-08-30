@@ -75,11 +75,13 @@ class EmailConfig(Config):
             "renew_at"
         )
 
-        self.threepid_behaviour = (
-            # Have Synapse handle the email sending if account_threepid_delegate
+        self.threepid_behaviour_email = (
+            # Have Synapse handle the email sending if account_threepid_delegates.email
             # is not defined
+            # msisdn is currently always remote while Synapse does not support any method of
+            # sending SMS messages
             ThreepidBehaviour.REMOTE
-            if self.account_threepid_delegate
+            if self.account_threepid_delegate_email
             else ThreepidBehaviour.LOCAL
         )
         # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
@@ -88,14 +90,16 @@ class EmailConfig(Config):
         # identity server in the process.
         self.using_identity_server_from_trusted_list = False
         if (
-            not self.account_threepid_delegate
+            not self.account_threepid_delegate_email
             and config.get("trust_identity_server_for_password_resets", False) is True
         ):
             # Use the first entry in self.trusted_third_party_id_servers instead
             if self.trusted_third_party_id_servers:
-                # XXX: It's a little confusing that account_threepid_delegate is modifed
+                # XXX: It's a little confusing that account_threepid_delegates is modifed
                 # both in RegistrationConfig and here. We should factor this bit out
-                self.account_threepid_delegate = self.trusted_third_party_id_servers[0]
+                self.account_threepid_delegate_email = (
+                    self.trusted_third_party_id_servers[0]
+                )
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
@@ -104,12 +108,12 @@ class EmailConfig(Config):
                 )
 
         self.local_threepid_handling_disabled_due_to_email_config = False
-        if self.threepid_behaviour == ThreepidBehaviour.LOCAL and email_config == {}:
+        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL and email_config == {}:
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
             self.local_threepid_handling_disabled_due_to_email_config = True
 
-            self.threepid_behaviour = ThreepidBehaviour.OFF
+            self.threepid_behaviour_email = ThreepidBehaviour.OFF
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
@@ -119,7 +123,7 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.threepid_behaviour == ThreepidBehaviour.LOCAL
+            or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
         ):
             # make sure we can import the required deps
             import jinja2
@@ -129,7 +133,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.threepid_behaviour == ThreepidBehaviour.LOCAL:
+        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             required = ["smtp_host", "smtp_port", "notif_from"]
 
             missing = []

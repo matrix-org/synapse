@@ -629,6 +629,27 @@ def format_ts_filter(value, format):
     return time.strftime(format, time.localtime(value / 1000))
 
 
+# XXX: This method and the next could likely be combined in a smarter way
+@staticmethod
+def load_jinja2_template(template_dir, template_filename, template_vars):
+    """Loads a jinja2 template with variables to insert
+
+    Args:
+        template_dir (str): The directory where templates are stored
+        template_filename (str): The name of the template in the template_dir
+        template_vars (Dict): Dictionary of keys in the template
+            alongside their values to insert
+
+    Returns:
+        str containing the contents of the rendered template
+    """
+    loader = jinja2.FileSystemLoader(template_dir)
+    env = jinja2.Environment(loader=loader)
+
+    template = env.get_template(template_filename)
+    return template.render(**template_vars)
+
+
 def load_jinja2_templates(config, template_html_name, template_text_name):
     """Load the jinja2 email templates from disk
 

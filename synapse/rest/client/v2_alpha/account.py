@@ -18,8 +18,6 @@ import logging
 
 from six.moves import http_client
 
-import jinja2
-
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
@@ -32,6 +30,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.push.mailer import load_jinja2_template
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import check_3pid_allowed
 
@@ -50,7 +49,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if self.config.threepid_behaviour == ThreepidBehaviour.LOCAL:
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -67,7 +66,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.config.threepid_behaviour == ThreepidBehaviour.OFF:
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
                     "User password resets have been disabled due to lack of email config"
@@ -100,19 +99,19 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         if existing_user_id is None:
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
-        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             # Have the configured identity server handle the request
-            if not self.hs.config.account_threepid_delegate:
+            if not self.hs.config.account_threepid_delegate_email:
                 logger.warn(
-                    "No upstream account_threepid_delegate configured on the server to handle "
-                    "this request"
+                    "No upstream email account_threepid_delegate configured on the server to "
+                    "handle this request"
                 )
                 raise SynapseError(
                     400, "Password reset by email is not supported on this homeserver"
                 )
 
             ret = yield self.identity_handler.requestEmailToken(
-                self.hs.config.account_threepid_delegate,
+                self.hs.config.account_threepid_delegate_email,
                 email,
                 client_secret,
                 send_attempt,
@@ -172,30 +171,25 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         if existing_user_id is None:
             raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
 
-        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
-            if not self.hs.config.account_threepid_delegate:
-                logger.warn(
-                    "No upstream account_threepid_delegate configured on the server to handle "
-                    "this request"
-                )
-                raise SynapseError(
-                    400,
-                    "Password reset by phone number is not supported on this homeserver",
-                )
-
-            ret = yield self.identity_handler.requestMsisdnToken(
-                self.config.account_threepid_delegate,
-                country,
-                phone_number,
-                client_secret,
-                send_attempt,
-                next_link,
+        if not self.hs.config.account_threepid_delegate_msisdn:
+            logger.warn(
+                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "handle this request"
             )
-            return (200, ret)
+            raise SynapseError(
+                400,
+                "Password reset by phone number is not supported on this homeserver",
+            )
 
-        raise SynapseError(
-            400, "Password reset by phone number is not supported on this homeserver"
+        ret = yield self.identity_handler.requestMsisdnToken(
+            self.config.account_threepid_delegate_msisdn,
+            country,
+            phone_number,
+            client_secret,
+            send_attempt,
+            next_link,
         )
+        return (200, ret)
 
 
 class PasswordResetSubmitTokenServlet(RestServlet):
@@ -219,11 +213,12 @@ class PasswordResetSubmitTokenServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, medium):
+        # We currently only handle threepid token submissions for email
         if medium != "email":
             raise SynapseError(
                 400, "This medium is currently not supported for password resets"
             )
-        if self.config.threepid_behaviour == ThreepidBehaviour.OFF:
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
                     "Password reset emails have been disabled due to lack of an email config"
@@ -260,7 +255,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             request.setResponseCode(200)
         except ThreepidValidationError as e:
             # Show a failure page with a reason
-            html = self.load_jinja2_template(
+            html = load_jinja2_template(
                 self.config.email_template_dir,
                 self.config.email_password_reset_template_failure_html,
                 template_vars={"failure_reason": e.msg},
@@ -269,24 +264,6 @@ class PasswordResetSubmitTokenServlet(RestServlet):
 
         request.write(html.encode("utf-8"))
         finish_request(request)
-
-    def load_jinja2_template(self, template_dir, template_filename, template_vars):
-        """Loads a jinja2 template with variables to insert
-
-        Args:
-            template_dir (str): The directory where templates are stored
-            template_filename (str): The name of the template in the template_dir
-            template_vars (Dict): Dictionary of keys in the template
-                alongside their values to insert
-
-        Returns:
-            str containing the contents of the rendered template
-        """
-        loader = jinja2.FileSystemLoader(template_dir)
-        env = jinja2.Environment(loader=loader)
-
-        template = env.get_template(template_filename)
-        return template.render(**template_vars)
 
     @defer.inlineCallbacks
     def on_POST(self, request, medium):
@@ -344,7 +321,6 @@ class PasswordRestServlet(RestServlet):
                 [[LoginType.EMAIL_IDENTITY], [LoginType.MSISDN]],
                 body,
                 self.hs.get_ip_from_request(request),
-                password_servlet=True,
             )
 
             if LoginType.EMAIL_IDENTITY in result:
