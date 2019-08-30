@@ -159,12 +159,9 @@ class StatsHandler(StateDeltasHandler):
                 if event:
                     event_content = event.content or {}
 
-            # We use stream_pos here rather than fetch by event_id as event_id
-            # may be None
-            stream_timestamp = yield self.store.get_received_ts_by_stream_pos(
-                stream_pos
-            )
-            stream_timestamp = int(stream_timestamp)
+            # We can't afford for this time to stray into the past, so we count
+            # it as now.
+            stream_timestamp = int(self.clock.time_msec())
 
             # All the values in this dict are deltas (RELATIVE changes)
             room_stats_delta = {}

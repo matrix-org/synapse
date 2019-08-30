@@ -948,10 +948,11 @@ class StatsStore(StateDeltasStore):
             src_row = self._simple_select_one_txn(
                 txn, src_table, keyvalues, copy_columns
             )
+            all_dest_keyvalues = {**keyvalues, **extra_dst_keyvalues}
             dest_current_row = self._simple_select_one_txn(
                 txn,
                 into_table,
-                keyvalues={ **keyvalues, **extra_dst_keyvalues },
+                keyvalues=all_dest_keyvalues,
                 retcols=list(chain(additive_relatives.keys(), copy_columns)),
                 allow_none=True,
             )
@@ -968,7 +969,7 @@ class StatsStore(StateDeltasStore):
             else:
                 for (key, val) in additive_relatives.items():
                     src_row[key] = dest_current_row[key] + val
-                self._simple_update_txn(txn, into_table, keyvalues, src_row)
+                self._simple_update_txn(txn, into_table, all_dest_keyvalues, src_row)
 
     def incremental_update_room_total_events_and_bytes(self, in_positions):
         """
