@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import deque
 from typing import List, Optional, Tuple, Union
 
 import attr
@@ -36,6 +37,11 @@ from .objects import Protocols, RemoteAddress
 @attr.s(slots=True)
 @implementer(IPushProducer)
 class BodyProducer:
+    """
+    An IPushProducer implementer which forwards the data from h11.Data instances
+    to a HTTP body consumer.
+    """
+
     producer = attr.ib()
     _data = attr.ib(type=List[h11.Data])
 
@@ -88,6 +94,9 @@ class _HTTPResponse:
 
 @attr.s
 class BodyConsumer:
+    """
+    A consumer for an IBodyProducer that emits h11.Data objects.
+    """
 
     producer = attr.ib(type=IBodyProducer)
     _sender = attr.ib(default=attr.Factory(Deferred), type=Deferred)
@@ -102,11 +111,17 @@ class BodyConsumer:
             self._sender.callback(None)
 
     def write(self, content: bytes) -> None:
+        """
+        Handle a write from the producer.
+        """
         sender = self._sender
         self._sender = Deferred()
-        sender.callback(content)
+        sender.callback(h11.Data(data=content))
 
-    def next_content(self) -> Deferred:
+    def next_content(self) -> Deferred[h11.Data]:
+        """
+        Wait for the next content object.
+        """
         if not self._started:
             self.start()
         return self._sender
@@ -119,17 +134,17 @@ class HTTP11Client:
     connection = attr.ib(type=IConnection)
     _done = attr.ib(default=attr.Factory(Deferred))
     _parser = attr.ib(default=None, type=h11.Connection)
-    _response = attr.ib(default=attr.Factory(list), repr=False)
+    _response = attr.ib(default=attr.Factory(deque), repr=False)
     _finished = attr.ib(default=True)
 
     def __attrs_post_init__(self):
         self.connection.set_client(self)
         self._parser = h11.Connection(our_role=h11.CLIENT)
 
-    async def send_request(self, request: HTTPRequest) -> _HTTPResponse:
-
-        print(self.connection)
-
+    async def send_request(self, request: HTTPRequest) -> IResponse:
+        """
+        Send a HTTP request over this client's connection.
+        """
         header_list = []
         for key, val in request.headers.getAllRawHeaders():
             for v in val:
@@ -163,8 +178,7 @@ class HTTP11Client:
 
             content = await consumer.next_content()
             while content:
-                body = h11.Data(data=content)
-                self._send(body)
+                self._send(content)
                 content = await consumer.next_content()
 
         end = h11.EndOfMessage()
@@ -174,11 +188,16 @@ class HTTP11Client:
         return result
 
     def _send(self, part: Union[h11.Request, h11.Data, h11.EndOfMessage]) -> None:
+        """
+        Send a h11 message while keeping the h11 parser in sync.
+        """
         resp = self._parser.send(part)
         self.connection.write(resp)
 
     def _check(self) -> None:
-
+        """
+        Process pending events from the h11 parser.
+        """
         event = self._parser.next_event()
 
         while event is not h11.NEED_DATA:
@@ -195,15 +214,31 @@ class HTTP11Client:
             event = self._parser.next_event()
 
     def _get_response(self) -> Tuple[h11.Response, List[h11.Data]]:
-        response = list(filter(lambda x: isinstance(x, h11.Response), self._response))[
-            0
-        ]
+        """
+        Fetch the h11 responses.
+        """
+        response = None
 
-        data = list(filter(lambda x: isinstance(x, h11.Data), self._response))
+        while not response:
+            entry = self._response.popleft()
+            if isinstance(entry, h11.Response):
+                response = entry
+            elif isinstance(entry, h11.Data):
+                raise Exception("No response before data?")
+
+        data = []
+        while self._response:
+            entry = self._response.popleft()
+            if not isinstance(entry, h11.Data):
+                raise Exception("Not data after response?")
+            data.append(entry)
 
         return (response, data)
 
     def _finish(self) -> None:
+        """
+        Finish receiving a request and call the done callback with the completed response.
+        """
         self._finished = True
         self.connection.reset_client()
 
@@ -253,8 +288,10 @@ class HTTP11Agent:
 
     async def send_request(
         self, address: IRemoteAddress, request: HTTPRequest
-    ) -> _HTTPResponse:
-
+    ) -> IResponse:
+        """
+        Acquire a connection to the address, and then send a request over it.
+        """
         connection = await self.pool.request_connection(address)
 
         protocol = HTTP11Client(connection)
@@ -263,10 +300,18 @@ class HTTP11Agent:
 
         return response
 
-    async def _request(
-        self, method, uri, headers=None, bodyProducer=None
-    ) -> _HTTPResponse:
+    def request(self, method, uri, headers=None, bodyProducer=None):
+        """
+        Make a request via send_request, but like an IAgent.
+        """
+        return ensureDeferred(
+            self._request(method, uri, headers=headers, bodyProducer=bodyProducer)
+        )
 
+    async def _request(self, method, uri, headers=None, bodyProducer=None) -> IResponse:
+        """
+        See request().
+        """
         url = hyperlink.URL.from_text(uri.decode("ascii")).to_uri()
         uri_path = url.replace(scheme=None, host=None, port=None).to_text() or "/"
         protocol = Protocols.from_scheme(url.scheme)
@@ -291,36 +336,4 @@ class HTTP11Agent:
         )
 
         resp = await self.send_request(address, req)
-
         return resp
-
-    def request(self, method, uri, headers=None, bodyProducer=None):
-        return ensureDeferred(
-            self._request(method, uri, headers=headers, bodyProducer=bodyProducer)
-        )
-
-
-if __name__ == "__main__":
-
-    from treq.client import HTTPClient
-
-    from twisted.internet.task import react
-    from twisted.web.client import BrowserLikePolicyForHTTPS
-
-    async def run(reactor):
-
-        copts = BrowserLikePolicyForHTTPS()
-
-        pool = ConnectionPool(reactor=reactor, tls_factory=copts)
-        agent = HTTP11Agent(reactor, pool)
-        client = HTTPClient(agent)
-
-        res = await client.get("https://google.com")
-
-        print(res)
-        print(res.headers)
-        print("?")
-
-        print(await res.content())
-
-    react(lambda reactor: ensureDeferred(run(reactor)))
