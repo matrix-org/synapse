@@ -13,24 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import attr
-
-from zope.interface import Interface, implementer
-
+from collections import defaultdict
 from typing import List, Mapping, Optional, Tuple
 
-from collections import defaultdict
+import attr
+from zope.interface import Interface, implementer
 
-from twisted.internet.interfaces import IProtocol
 from twisted.internet.endpoints import TCP4ClientEndpoint, wrapClientTLS
+from twisted.internet.interfaces import IProtocol
 from twisted.internet.protocol import Factory
 from twisted.python.failure import Failure
 
 from synapse.crypto.context_factory import ClientTLSOptionsFactory
 from synapse.logging.ids import readable_id
 
+from .interfaces import IAddress, IClient, IConnection, IConnectionPool
 from .objects import Protocols, RemoteAddress
-from .interfaces import IConnection, IConnectionPool, IAddress, IClient
 
 
 @attr.s

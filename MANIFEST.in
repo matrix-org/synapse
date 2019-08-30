@@ -18,6 +18,7 @@ recursive-include docs *
 recursive-include scripts *
 recursive-include scripts-dev *
 recursive-include synapse *.pyi
+recursive-include synapse *.txt
 recursive-include tests *.py
 include tests/http/ca.crt
 include tests/http/ca.key
@@ -46,6 +47,8 @@ prune .coveragerc
 prune debian
 prune .codecov.yml
 prune .buildkite
+prune mypy.ini
+prune stubs
 
 exclude jenkins*
 recursive-exclude jenkins *.sh

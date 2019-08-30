@@ -13,25 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from zope.interface import implementer
-
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional, Tuple, Union
 
 import attr
 import h11
 import hyperlink
+from zope.interface import implementer
 
 from twisted.internet._resolver import FirstOneWins
-from twisted.internet.interfaces import IPushProducer, IReactorPluggableNameResolver
 from twisted.internet.defer import Deferred, ensureDeferred
+from twisted.internet.interfaces import IPushProducer, IReactorPluggableNameResolver
 from twisted.python.failure import Failure
 from twisted.web.client import ResponseDone
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import UNKNOWN_LENGTH, IBodyProducer, IResponse, IRequest
+from twisted.web.iweb import UNKNOWN_LENGTH, IBodyProducer, IRequest, IResponse
 
-from .connection_pool import ConnectionPool, Connection
+from .connection_pool import Connection, ConnectionPool
+from .interfaces import IAddress, IClient, IConnection
 from .objects import Protocols, RemoteAddress
-from .interfaces import IClient, IConnection, IAddress
 
 
 @attr.s(slots=True)

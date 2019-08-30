@@ -17,11 +17,11 @@
 Log formatters that output terse JSON.
 """
 
-from typing import IO
 import sys
 from collections import deque
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from math import floor
+from typing import IO
 
 import attr
 from simplejson import dumps

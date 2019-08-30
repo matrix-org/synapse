@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from zope.interface import implementer
-
 import attr
 from constantly import NamedConstant, Names
+from zope.interface import implementer
 
 from .interfaces import IAddress
 

@@ -1,16 +1,16 @@
-from typing import List, Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from zope.interface import Interface
 
+from twisted.internet.interfaces import IProtocol
 from twisted.python.failure import Failure
 from twisted.web.iweb import (
     UNKNOWN_LENGTH,
     IBodyProducer,
-    IResponse,
-    IRequest,
     IPolicyForHTTPS,
+    IRequest,
+    IResponse,
 )
-from twisted.internet.interfaces import IProtocol
 
 class IAddress(Interface):
     port: int
