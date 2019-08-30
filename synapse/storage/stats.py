@@ -232,8 +232,12 @@ class StatsStore(StateDeltasStore):
 
         yield self._unwedge_incremental_processor(old_positions)
 
-        yield self.runInteraction("populate_stats_make_skeletons", _make_skeletons, "room")
-        yield self.runInteraction("populate_stats_make_skeletons", _make_skeletons, "user")
+        yield self.runInteraction(
+            "populate_stats_make_skeletons", _make_skeletons, "room"
+        )
+        yield self.runInteraction(
+            "populate_stats_make_skeletons", _make_skeletons, "user"
+        )
         self.get_earliest_token_for_stats.invalidate_all()
 
         yield self._end_background_update("populate_stats_prepare")
@@ -264,10 +268,11 @@ class StatsStore(StateDeltasStore):
 
             # Get how many are left to process, so we can give status on how
             # far we are in processing
-            txn.execute(
-                "SELECT COUNT(*) FROM room_stats_current"
-                " WHERE completed_delta_stream_id IS NULL"
-            )
+            sql = """
+                    SELECT COUNT(*) FROM user_stats_current
+                    WHERE completed_delta_stream_id IS NULL
+                """
+            txn.execute(sql)
             progress["remaining"] = txn.fetchone()[0]
 
             return users_to_work_on
@@ -389,10 +394,10 @@ class StatsStore(StateDeltasStore):
 
             # Get how many are left to process, so we can give status on how
             # far we are in processing
-            txn.execute(
-                "SELECT COUNT(*) FROM room_stats_current"
-                " WHERE completed_delta_stream_id IS NULL"
-            )
+            sql = """
+                    SELECT COUNT(*) FROM room_stats_current
+                    WHERE completed_delta_stream_id IS NULL
+                """
             progress["remaining"] = txn.fetchone()[0]
 
             return rooms_to_work_on
