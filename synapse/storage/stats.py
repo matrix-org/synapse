@@ -1080,7 +1080,7 @@ class StatsStore(StateDeltasStore):
             SELECT COUNT(*) AS num_events, SUM(%s) AS num_bytes
             FROM events
             JOIN event_json USING (event_id)
-            WHERE room_id = ?
+            WHERE events.room_id = ?
                 AND ? <= stream_ordering
                 AND stream_ordering <= ?
         """ % (
