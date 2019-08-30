@@ -228,7 +228,7 @@ steps:
           upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/coverage.xml" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
-          class: "error"
+          style: "error"
       - matrix-org/coveralls#v1.0:
           parallel: "true"
     retry:
@@ -259,7 +259,7 @@ steps:
           upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/coverage.xml" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
-          class: "error"
+          style: "error"
       - matrix-org/coveralls#v1.0:
           parallel: "true"
     retry:
@@ -293,7 +293,7 @@ steps:
           upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/coverage.xml" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
-          class: "error"
+          style: "error"
       - matrix-org/coveralls#v1.0:
           parallel: "true"
     retry:
