@@ -622,7 +622,7 @@ class RegistrationHandler(BaseHandler):
                 initial_display_name=initial_display_name,
                 is_guest=is_guest,
             )
-            return (r["device_id"], r["access_token"])
+            return r["device_id"], r["access_token"]
 
         valid_until_ms = None
         if self.session_lifetime is not None:
