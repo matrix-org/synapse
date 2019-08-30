@@ -84,3 +84,42 @@ with a body of:
    }
 
 including an ``access_token`` of a server admin.
+
+
+Get whether a user is a server administrator or not
+===================================================
+
+
+The api is::
+
+    GET /_synapse/admin/v1/users/<user_id>/admin
+
+including an ``access_token`` of a server admin.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+        "admin": true
+    }
+
+
+Change whether a user is a server administrator or not
+======================================================
+
+Note that you cannot demote yourself.
+
+The api is::
+
+    PUT /_synapse/admin/v1/users/<user_id>/admin
+
+with a body of:
+
+.. code:: json
+
+    {
+        "admin": true
+    }
+
+including an ``access_token`` of a server admin.
