@@ -1,0 +1,1 @@
+Users with the type of "support" or "bot" are no longer required to consent.
