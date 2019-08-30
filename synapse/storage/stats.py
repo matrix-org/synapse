@@ -951,7 +951,7 @@ class StatsStore(StateDeltasStore):
             dest_current_row = self._simple_select_one_txn(
                 txn,
                 into_table,
-                keyvalues,
+                keyvalues={ **keyvalues, **extra_dst_keyvalues },
                 retcols=list(chain(additive_relatives.keys(), copy_columns)),
                 allow_none=True,
             )
@@ -1059,10 +1059,10 @@ class StatsStore(StateDeltasStore):
             new_bytes_expression = "LENGTH(CAST(json AS BLOB))"
 
         sql = """
-            SELECT room_id, COUNT(*) AS new_events, SUM(%s) AS new_bytes
+            SELECT events.room_id, COUNT(*) AS new_events, SUM(%s) AS new_bytes
             FROM events INNER JOIN event_json USING (event_id)
             WHERE ? %s stream_ordering AND stream_ordering %s ?
-            GROUP BY room_id
+            GROUP BY events.room_id
         """ % (
             new_bytes_expression,
             low_comparator,
