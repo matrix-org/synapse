@@ -169,7 +169,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
     @staticmethod
     def _get_e2e_room_keys_multi_txn(txn, user_id, version, room_keys):
-        if not len(room_keys):
+        if not room_keys:
             return {}
 
         where_clauses = []
@@ -184,6 +184,10 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "(room_id = ? AND session_id IN (%s))"
                 % (",".join(["?" for _ in sessions]),)
             )
+
+        # check if we're actually querying something
+        if not where_clauses:
+            return {}
 
         sql = """
         SELECT room_id, session_id, first_message_index, forwarded_count,
@@ -282,6 +286,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 version(str)
                 algorithm(str)
                 auth_data(object): opaque dict supplied by the client
+                hash(int): tag of the keys in the backup
         """
 
         def _get_e2e_room_keys_version_info_txn(txn):
@@ -351,27 +356,29 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
-    def update_e2e_room_keys_version(self, user_id, version, info):
+    def update_e2e_room_keys_version(self, user_id, version, info=None, version_hash=None):
         """Update a given backup version
 
         Args:
             user_id(str): the user whose backup version we're updating
             version(str): the version ID of the backup version we're updating
             info(dict): the new backup version info to store
+            version_hash(str): tag of the keys in the backup
         """
         updatevalues = {}
 
-        if "auth_data" in info:
+        if info and "auth_data" in info:
             updatevalues["auth_data"] = json.dumps(info["auth_data"])
-        if "hash" in info:
-            updatevalues["hash"] = info["hash"]
+        if version_hash:
+            updatevalues["hash"] = version_hash
 
-        return self._simple_update(
-            table="e2e_room_keys_versions",
-            keyvalues={"user_id": user_id, "version": version},
-            updatevalues=updatevalues,
-            desc="update_e2e_room_keys_version",
-        )
+        if updatevalues:
+            return self._simple_update(
+                table="e2e_room_keys_versions",
+                keyvalues={"user_id": user_id, "version": version},
+                updatevalues=updatevalues,
+                desc="update_e2e_room_keys_version",
+            )
 
     def delete_e2e_room_keys_version(self, user_id, version=None):
         """Delete a given backup version of the user's room keys.

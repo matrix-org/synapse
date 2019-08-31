@@ -100,6 +100,8 @@ class E2eRoomKeysHandler(object):
                 rooms
             session_id(string): session ID to delete keys for, for None to delete keys
                 for all sessions
+        Raises:
+            NotFoundError: if the backup version does not exist
         Returns:
             A dict containing the count and hash for the backup version
         """
@@ -216,7 +218,7 @@ class E2eRoomKeysHandler(object):
             if changed:
                 version_hash = version_hash + 1
                 yield self.store.update_e2e_room_keys_version(
-                    user_id, version, {"hash": str(version_hash)}
+                    user_id, version, None, version_hash
                 )
 
             count = yield self.store.count_e2e_room_keys(user_id, version)
@@ -365,10 +367,6 @@ class E2eRoomKeysHandler(object):
                     raise
             if old_info["algorithm"] != version_info["algorithm"]:
                 raise SynapseError(400, "Algorithm does not match", Codes.INVALID_PARAM)
-
-            # don't allow the user to set the hash
-            if "hash" in version_info:
-                del version_info["hash"]
 
             yield self.store.update_e2e_room_keys_version(
                 user_id, version, version_info
