@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
-# Copyright 2019 Matrix.org Foundation CIC
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -156,7 +156,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 want to query
 
         Returns:
-           dict[dict[dict]]: a map of room IDs to session IDs to room key
+           Deferred[dict[dict[dict]]]: a map of room IDs to session IDs to room key
         """
 
         return self.runInteraction(
@@ -176,7 +176,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         params = [user_id, version]
         for room_id, room in room_keys.items():
             sessions = list(room["sessions"])
-            if not len(sessions):
+            if not sessions:
                 continue
             params.append(room_id)
             params.extend(sessions)
