@@ -356,7 +356,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
-    def update_e2e_room_keys_version(self, user_id, version, info=None, version_hash=None):
+    def update_e2e_room_keys_version(
+        self, user_id, version, info=None, version_hash=None
+    ):
         """Update a given backup version
 
         Args:
