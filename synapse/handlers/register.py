@@ -360,18 +360,6 @@ class RegistrationHandler(BaseHandler):
         )
         return user_id
 
-    @defer.inlineCallbacks
-    def bind_emails(self, user_id, threepidCreds):
-        """Links emails with a user ID and informs an identity server.
-
-        Used only by c/s api v1
-        """
-
-        # Now we have a matrix ID, bind it to the threepids we were given
-        for c in threepidCreds:
-            # XXX: This should be a deferred list, shouldn't it?
-            yield self.identity_handler.bind_threepid(c, user_id)
-
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
         # don't allow people to register the server notices mxid
         if self._server_notices_mxid is not None:
