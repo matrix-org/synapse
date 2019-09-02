@@ -17,3 +17,8 @@
 CREATE INDEX IF NOT EXISTS room_stats_not_complete
     ON room_stats_current (room_id)
     WHERE completed_delta_stream_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS user_stats_not_complete
+    ON user_stats_current (user_id)
+    WHERE completed_delta_stream_id IS NULL;
+
