@@ -92,7 +92,7 @@ operation name to ``trace``
 
    from synapse.logging.opentracing import trace
 
-   @trace(operation_name="A *much* better operation name")
+   @trace(operation_name="a_better_operation_name")
    def interesting_badly_named_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
@@ -641,18 +641,21 @@ def extract_text_map(carrier):
 # Tracing decorators
 
 
-def trace(func=None, operation_name=None):
+def trace(func=None, opname=None):
     """
     Decorator to trace a function.
-    Sets the operation name to that of the function's.
+    Sets the operation name to that of the function's or that given
+    as operation_name. See the module's doc string for usage
+    examples.
     """
-
-    if func and not operation_name:
-        operation_name = func.__name__
 
     def decorator(func):
         if opentracing is None:
             return func
+
+        # Doing this weird assignment thing to get around local variable
+        # referenced before assignment 'bug' raised by checkstyle
+        operation_name = opname if opname else func.__name__
 
         @wraps(func)
         def _trace_inner(self, *args, **kwargs):

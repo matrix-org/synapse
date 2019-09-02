@@ -43,7 +43,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.txns = HttpTransactionCache(hs)
         self.device_message_handler = hs.get_device_message_handler()
 
-    @trace(operation_name="sendToDevice")
+    @trace(opname="sendToDevice")
     def on_PUT(self, request, message_type, txn_id):
         set_tag("message_type", message_type)
         set_tag("txn_id", txn_id)
