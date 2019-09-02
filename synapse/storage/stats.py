@@ -99,49 +99,6 @@ class StatsStore(StateDeltasStore):
         return (ts // self.stats_bucket_size) * self.stats_bucket_size
 
     @defer.inlineCallbacks
-    def _unwedge_incremental_processor(self, forced_promise):
-        """
-        Make a promise about what this stats regeneration will handle,
-        so that we can allow the incremental processor to start doing things
-        right away – 'unwedging' it.
-
-        Args:
-            forced_promise (dict of positions):
-                If supplied, this is the promise that is made.
-                Otherwise, a promise is made that reduces the amount of work
-                that must be performed by the incremental processor.
-        """
-
-        if forced_promise is None:
-            promised_stats_delta_pos = (
-                yield self.get_max_stream_id_in_current_state_deltas()
-            )
-            promised_max = self.get_room_max_stream_ordering()
-            promised_min = self.get_room_min_stream_ordering()
-
-            promised_positions = {
-                "state_delta_stream_id": promised_stats_delta_pos,
-                "total_events_min_stream_ordering": promised_min,
-                "total_events_max_stream_ordering": promised_max,
-            }
-        else:
-            promised_positions = forced_promise
-
-        # this stores it for our reference later
-        yield self.update_stats_positions(
-            promised_positions, for_initial_processor=True
-        )
-
-        # this unwedges the incremental processor
-        yield self.update_stats_positions(
-            promised_positions, for_initial_processor=False
-        )
-
-        # with the delta processor unwedged, now let it catch up in case
-        # anything was missed during the wedge period
-        self.clock.call_later(0, self.hs.get_stats_handler().notify_new_event)
-
-    @defer.inlineCallbacks
     def _populate_stats_prepare(self, progress, batch_size):
         """
         This is a background update, which prepares the database for
@@ -151,17 +108,6 @@ class StatsStore(StateDeltasStore):
         if not self.stats_enabled:
             yield self._end_background_update("populate_stats_prepare")
             return 1
-
-        def _wedge_incremental_processor(txn):
-            """
-            Wedge the incremental processor (by setting its positions to NULL),
-            and return its previous positions – atomically.
-            """
-
-            old = self._get_stats_positions_txn(txn, for_initial_processor=False)
-            self._update_stats_positions_txn(txn, None, for_initial_processor=False)
-
-            return old
 
         def _make_skeletons(txn, stats_type):
             """
@@ -214,25 +160,11 @@ class StatsStore(StateDeltasStore):
             for _k, (table, id_col) in TYPE_TO_TABLE.items():
                 txn.execute(sql % (table,))
 
-        # first wedge the incremental processor and reset our promise
-        yield self.stats_delta_processing_lock.acquire()
-        try:
-            old_positions = yield self.runInteraction(
-                "populate_stats_wedge", _wedge_incremental_processor
-            )
-        finally:
-            yield self.stats_delta_processing_lock.release()
-
-        if None in old_positions.values():
-            old_positions = None
-
         # with the incremental processor wedged, we delete dirty skeleton rows
         # since we don't want to double-count them.
         yield self.runInteraction(
             "populate_stats_delete_dirty_skeletons", _delete_dirty_skeletons
         )
-
-        yield self._unwedge_incremental_processor(old_positions)
 
         yield self.runInteraction(
             "populate_stats_make_skeletons", _make_skeletons, "room"
@@ -296,9 +228,9 @@ class StatsStore(StateDeltasStore):
 
         processed_membership_count = 0
 
-        promised_positions = yield self.get_stats_positions(for_initial_processor=True)
+        promised_positions = yield self.get_stats_positions()
 
-        if None in promised_positions:
+        if not promised_positions:
             logger.error(
                 "There is a None in promised_positions;"
                 " dependency task must not have been run."
@@ -380,30 +312,17 @@ class StatsStore(StateDeltasStore):
             yield self._end_background_update("populate_stats_process_rooms")
             return 1
 
+        last_room_id = progress.get("last_room_id", "")
+
         def _get_next_batch(txn):
-            # Only fetch 250 rooms, so we don't fetch too many at once, even
-            # if those 250 rooms have less than batch_size state events.
             sql = """
-                    SELECT room_id FROM room_stats_current
-                    WHERE completed_delta_stream_id IS NULL
-                    LIMIT 250
+                    SELECT DISTINCT room_id FROM current_state_events
+                    WHERE room_id > ?
+                    ORDER BY room_id ASC
+                    LIMIT ?
                 """
-            txn.execute(sql)
-            rooms_to_work_on = txn.fetchall()
-
-            if not rooms_to_work_on:
-                return None
-
-            # Get how many are left to process, so we can give status on how
-            # far we are in processing
-            sql = """
-                    SELECT COUNT(*) FROM room_stats_current
-                    WHERE completed_delta_stream_id IS NULL
-                """
-            txn.execute(sql)
-            progress["remaining"] = txn.fetchone()[0]
-
-            return rooms_to_work_on
+            txn.execute(sql, (last_room_id, batch_size))
+            return [r for r, in txn]
 
         rooms_to_work_on = yield self.runInteraction(
             "populate_stats_rooms_get_batch", _get_next_batch
@@ -414,223 +333,42 @@ class StatsStore(StateDeltasStore):
             yield self._end_background_update("populate_stats_process_rooms")
             return 1
 
-        logger.info(
-            "Processing the next %d rooms of %d remaining",
-            len(rooms_to_work_on),
-            progress["remaining"],
-        )
-
-        # Number of state events we've processed by going through each room
-        processed_event_count = 0
-
-        promised_positions = yield self.get_stats_positions(for_initial_processor=True)
-
-        if None in promised_positions:
-            logger.error(
-                "There is a None in promised_positions;"
-                " dependency task must not have been run."
-                " promised_positions: %s",
-                promised_positions,
-            )
-            yield self._end_background_update("populate_stats_process_rooms")
-            return 1
-
-        for (room_id,) in rooms_to_work_on:
-            current_state_ids = yield self.get_current_state_ids(room_id)
-
-            join_rules_id = current_state_ids.get((EventTypes.JoinRules, ""))
-            history_visibility_id = current_state_ids.get(
-                (EventTypes.RoomHistoryVisibility, "")
-            )
-            encryption_id = current_state_ids.get((EventTypes.RoomEncryption, ""))
-            name_id = current_state_ids.get((EventTypes.Name, ""))
-            topic_id = current_state_ids.get((EventTypes.Topic, ""))
-            avatar_id = current_state_ids.get((EventTypes.RoomAvatar, ""))
-            canonical_alias_id = current_state_ids.get((EventTypes.CanonicalAlias, ""))
-
-            event_ids = [
-                join_rules_id,
-                history_visibility_id,
-                encryption_id,
-                name_id,
-                topic_id,
-                avatar_id,
-                canonical_alias_id,
-            ]
-
-            state_events = yield self.get_events(
-                [ev for ev in event_ids if ev is not None]
-            )
-
-            def _get_or_none(event_id, arg):
-                event = state_events.get(event_id)
-                if event:
-                    return event.content.get(arg)
-                return None
-
-            yield self.update_room_state(
-                room_id,
-                {
-                    "join_rules": _get_or_none(join_rules_id, "join_rule"),
-                    "history_visibility": _get_or_none(
-                        history_visibility_id, "history_visibility"
-                    ),
-                    "encryption": _get_or_none(encryption_id, "algorithm"),
-                    "name": _get_or_none(name_id, "name"),
-                    "topic": _get_or_none(topic_id, "topic"),
-                    "avatar": _get_or_none(avatar_id, "url"),
-                    "canonical_alias": _get_or_none(canonical_alias_id, "alias"),
-                },
-            )
-
-            now = self.clock.time_msec()
-
-            def _fetch_data(txn):
-                # Get the current token of the room
-                current_token = self._get_max_stream_id_in_current_state_deltas_txn(txn)
-
-                current_state_events = len(current_state_ids)
-
-                membership_counts = self._get_user_counts_in_room_txn(txn, room_id)
-
-                room_total_event_count, room_total_event_bytes = self._count_events_and_bytes_in_room_txn(
-                    txn,
-                    room_id,
-                    promised_positions["total_events_min_stream_ordering"],
-                    promised_positions["total_events_max_stream_ordering"],
-                )
-
-                self._update_stats_delta_txn(
-                    txn,
-                    now,
-                    "room",
-                    room_id,
-                    {
-                        "total_events": room_total_event_count,
-                        "total_event_bytes": room_total_event_bytes,
-                    },
-                    complete_with_stream_id=current_token,
-                    absolute_field_overrides={
-                        # these are counted absolutely because it is
-                        # more difficult to count them from the promised time,
-                        # because counting them now can use the quick lookup
-                        # tables.
-                        "current_state_events": current_state_events,
-                        "joined_members": membership_counts.get(Membership.JOIN, 0),
-                        "invited_members": membership_counts.get(Membership.INVITE, 0),
-                        "left_members": membership_counts.get(Membership.LEAVE, 0),
-                        "banned_members": membership_counts.get(Membership.BAN, 0),
-                    },
-                )
-
-                # we use this count for rate-limiting
-                return room_total_event_count
-
-            room_event_count = yield self.runInteraction(
-                "update_room_stats", _fetch_data
-            )
-
-            # Update the remaining counter.
-            progress["remaining"] -= 1
-
-            processed_event_count += room_event_count
-
-            if processed_event_count > batch_size:
-                # Don't process any more rooms, we've hit our batch size.
-                return processed_event_count
+        for room_id in rooms_to_work_on:
+            yield self.calculate_and_set_initial_state_for_room(room_id)
+            progress["last_room_id"] = room_id
 
         yield self.runInteraction(
-            "populate_stats",
+            "_populate_stats_process_rooms",
             self._background_update_progress_txn,
             "populate_stats_process_rooms",
             progress,
         )
 
-        return processed_event_count
+        return len(rooms_to_work_on)
 
-    def get_stats_positions(self, for_initial_processor=False):
+    def get_stats_positions(self):
         """
         Returns the stats processor positions.
-
-        Args:
-            for_initial_processor (bool, optional): If true, returns the position
-                promised by the latest stats regeneration, rather than the current
-                incremental processor's position.
-                Otherwise (if false), return the incremental processor's position.
-
-        Returns (dict):
-            Dict containing :-
-                state_delta_stream_id: stream_id of last-processed state delta
-                total_events_min_stream_ordering: stream_ordering of latest-processed
-                    backfilled event, in the context of total_events counting.
-                total_events_max_stream_ordering: stream_ordering of latest-processed
-                    non-backfilled event, in the context of total_events counting.
         """
-        return self._simple_select_one(
+        return self._simple_select_one_onecol(
             table="stats_incremental_position",
-            keyvalues={"is_background_contract": for_initial_processor},
-            retcols=(
-                "state_delta_stream_id",
-                "total_events_min_stream_ordering",
-                "total_events_max_stream_ordering",
-            ),
+            keyvalues={},
+            retcol="stream_id",
             desc="stats_incremental_position",
         )
 
-    def _get_stats_positions_txn(self, txn, for_initial_processor=False):
-        """
-        See L{get_stats_positions}.
-
-        Args:
-             txn (cursor): Database cursor
-        """
-        return self._simple_select_one_txn(
-            txn=txn,
-            table="stats_incremental_position",
-            keyvalues={"is_background_contract": for_initial_processor},
-            retcols=(
-                "state_delta_stream_id",
-                "total_events_min_stream_ordering",
-                "total_events_max_stream_ordering",
-            ),
-        )
-
-    def update_stats_positions(self, positions, for_initial_processor=False):
+    def update_stats_positions(self, pos):
         """
         Updates the stats processor positions.
 
         Args:
             positions: See L{get_stats_positions}
-            for_initial_processor: See L{get_stats_positions}
         """
-        if positions is None:
-            positions = {
-                "state_delta_stream_id": None,
-                "total_events_min_stream_ordering": None,
-                "total_events_max_stream_ordering": None,
-            }
         return self._simple_update_one(
             table="stats_incremental_position",
-            keyvalues={"is_background_contract": for_initial_processor},
-            updatevalues=positions,
+            keyvalues={},
+            updatevalues={"stream_id": pos},
             desc="update_stats_incremental_position",
-        )
-
-    def _update_stats_positions_txn(self, txn, positions, for_initial_processor=False):
-        """
-        See L{update_stats_positions}
-        """
-        if positions is None:
-            positions = {
-                "state_delta_stream_id": None,
-                "total_events_min_stream_ordering": None,
-                "total_events_max_stream_ordering": None,
-            }
-        return self._simple_update_one_txn(
-            txn,
-            table="stats_incremental_position",
-            keyvalues={"is_background_contract": for_initial_processor},
-            updatevalues=positions,
         )
 
     def update_room_state(self, room_id, fields):
@@ -750,13 +488,19 @@ class StatsStore(StateDeltasStore):
 
         return self._simple_select_one_onecol(
             "%s_current" % (table,),
-            {id_col: id},
+            keyvalues={id_col: id},
             retcol="completed_delta_stream_id",
             allow_none=True,
         )
 
     def update_stats_delta(
-        self, ts, stats_type, stats_id, fields, complete_with_stream_id=None
+        self,
+        ts,
+        stats_type,
+        stats_id,
+        fields,
+        complete_with_stream_id=None,
+        absolute_field_overrides=None,
     ):
         """
         Updates the statistics for a subject, with a delta (difference/relative
@@ -771,6 +515,9 @@ class StatsStore(StateDeltasStore):
                 If supplied, converts an incomplete row into a complete row,
                 with the supplied stream_id marked as the stream_id where the
                 row was completed.
+            absolute_field_overrides (dict[str, int]): Current stats values
+                (i.e. not deltas) of absolute fields.
+                Does not work with per-slice fields.
         """
 
         return self.runInteraction(
@@ -781,6 +528,7 @@ class StatsStore(StateDeltasStore):
             stats_id,
             fields,
             complete_with_stream_id=complete_with_stream_id,
+            absolute_field_overrides=absolute_field_overrides,
         )
 
     def _update_stats_delta_txn(
@@ -793,14 +541,6 @@ class StatsStore(StateDeltasStore):
         complete_with_stream_id=None,
         absolute_field_overrides=None,
     ):
-        """
-        See L{update_stats_delta}
-        Additional Args:
-            absolute_field_overrides (dict[str, int]): Current stats values
-                (i.e. not deltas) of absolute fields.
-                Does not work with per-slice fields.
-        """
-
         if absolute_field_overrides is None:
             absolute_field_overrides = {}
 
@@ -1045,7 +785,7 @@ class StatsStore(StateDeltasStore):
                     src_row[key] = dest_current_row[key] + val
                 self._simple_update_txn(txn, into_table, all_dest_keyvalues, src_row)
 
-    def incremental_update_room_total_events_and_bytes(self, in_positions):
+    def incremental_update_room_total_events_and_bytes(self, min_pos, max_pos):
         """
         Counts the number of events and total event bytes per-room and then adds
         these to the respective total_events and total_event_bytes room counts.
@@ -1063,34 +803,13 @@ class StatsStore(StateDeltasStore):
         """
 
         def incremental_update_total_events_and_bytes_txn(txn):
-            positions = in_positions.copy()
-
-            max_pos = self.get_room_max_stream_ordering()
-            min_pos = self.get_room_min_stream_ordering()
             self.update_total_event_and_bytes_count_between_txn(
-                txn,
-                low_pos=positions["total_events_max_stream_ordering"],
-                high_pos=max_pos,
+                txn, low_pos=min_pos, high_pos=max_pos
             )
 
             self.update_total_event_and_bytes_count_between_txn(
-                txn,
-                low_pos=min_pos,
-                high_pos=positions["total_events_min_stream_ordering"],
+                txn, low_pos=-max_pos, high_pos=-min_pos
             )
-
-            if (
-                positions["total_events_max_stream_ordering"] != max_pos
-                or positions["total_events_min_stream_ordering"] != min_pos
-            ):
-                positions["total_events_max_stream_ordering"] = max_pos
-                positions["total_events_min_stream_ordering"] = min_pos
-
-                self._update_stats_positions_txn(txn, positions)
-
-                return positions, True
-            else:
-                return positions, False
 
         return self.runInteraction(
             "stats_incremental_total_events_and_bytes",
@@ -1126,7 +845,7 @@ class StatsStore(StateDeltasStore):
 
         # we choose comparators based on the signs
         low_comparator = "<=" if low_pos < 0 else "<"
-        high_comparator = "<" if high_pos < 0 else "<="
+        high_comparator = "<" if low_pos < 0 else "<="
 
         if isinstance(self.database_engine, PostgresEngine):
             new_bytes_expression = "OCTET_LENGTH(json)"
@@ -1203,7 +922,7 @@ class StatsStore(StateDeltasStore):
         """
 
         def _fetch_current_state_stats(txn):
-            pos = self._get_max_stream_id_in_current_state_deltas_txn(txn)
+            pos = self.get_room_max_stream_ordering()
 
             rows = self._simple_select_many_txn(
                 txn,
@@ -1306,7 +1025,7 @@ class StatsStore(StateDeltasStore):
 
         local_users_in_room = [u for u in users_in_room if self.hs.is_mine_id(u)]
 
-        yield self._update_stats_delta(
+        yield self.update_stats_delta(
             ts=self.clock.time_msec(),
             stats_type="room",
             stats_id=room_id,
@@ -1320,6 +1039,6 @@ class StatsStore(StateDeltasStore):
                 "banned_members": membership_counts.get(Membership.BAN, 0),
                 "total_events": total_events,
                 "total_event_bytes": total_event_bytes,
-                "local_users_in_room": local_users_in_room,
+                "local_users_in_room": len(local_users_in_room),
             },
         )

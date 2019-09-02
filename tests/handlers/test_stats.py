@@ -181,7 +181,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.hs.config.stats_enabled = True
         self.handler.stats_enabled = True
         self.store._all_done = False
-        self.get_success(self.store.update_stats_positions(None))
+        self.get_success(self.store.update_stats_positions(0))
 
         self.get_success(
             self.store._simple_insert(

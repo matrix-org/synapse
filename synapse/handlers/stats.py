@@ -83,40 +83,36 @@ class StatsHandler(StateDeltasHandler):
         # If self.pos is None then means we haven't fetched it from DB
         # If None is one of the values, then means that the stats regenerator has not (or had not) yet unwedged us
         #   but note that this might be outdated, so we retrieve the positions again.
-        if self.pos is None or None in self.pos.values():
+        if self.pos is None:
             self.pos = yield self.store.get_stats_positions()
-
-        # If still contains a None position, then the stats regenerator hasn't started yet
-        if None in self.pos.values():
-            return None
 
         # Loop round handling deltas until we're up to date
 
         while True:
             with Measure(self.clock, "stats_delta"):
-                deltas = yield self.store.get_current_state_deltas(
-                    self.pos["state_delta_stream_id"]
-                )
+                deltas = yield self.store.get_current_state_deltas(self.pos)
 
                 if deltas:
                     logger.debug("Handling %d state deltas", len(deltas))
                     yield self._handle_deltas(deltas)
 
-                    self.pos["state_delta_stream_id"] = deltas[-1]["stream_id"]
-                    yield self.store.update_stats_positions(self.pos)
-
-                    event_processing_positions.labels("stats").set(
-                        self.pos["state_delta_stream_id"]
-                    )
+                    max_pos = deltas[-1]["stream_id"]
+                else:
+                    max_pos = yield self.store.get_room_max_stream_ordering()
 
             # Then count deltas for total_events and total_event_bytes.
             with Measure(self.clock, "stats_total_events_and_bytes"):
-                self.pos, had_counts = yield self.store.incremental_update_room_total_events_and_bytes(
-                    self.pos
+                yield self.store.incremental_update_room_total_events_and_bytes(
+                    self.pos, max_pos
                 )
 
-            if not deltas and not had_counts:
+            yield self.store.update_stats_positions(max_pos)
+            event_processing_positions.labels("stats").set(max_pos)
+
+            if self.pos == max_pos:
                 break
+
+            self.pos = max_pos
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):

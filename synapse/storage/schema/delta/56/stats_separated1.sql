@@ -36,31 +36,16 @@ DELETE FROM background_updates WHERE update_name IN (
 
 -- single-row table to track position of incremental updates
 CREATE TABLE IF NOT EXISTS stats_incremental_position (
-    -- the stream_id of the last-processed state delta
-    state_delta_stream_id BIGINT,
-
-    -- the stream_ordering of the last-processed backfilled event
-    -- (this is negative)
-    total_events_min_stream_ordering BIGINT,
-
-    -- the stream_ordering of the last-processed normally-created event
-    -- (this is positive)
-    total_events_max_stream_ordering BIGINT,
-
-    -- If true, this represents the contract agreed upon by the stats
-    -- regenerator.
-    -- If false, this is suitable for use by the delta/incremental processor.
-    is_background_contract BOOLEAN NOT NULL PRIMARY KEY
+    Lock CHAR(1) NOT NULL DEFAULT 'X' UNIQUE,  -- Makes sure this table only has one row.
+    stream_id  BIGINT NOT NULL,
+    CHECK (Lock='X')
 );
 
 -- insert a null row and make sure it is the only one.
 DELETE FROM stats_incremental_position;
 INSERT INTO stats_incremental_position (
-    state_delta_stream_id,
-    total_events_min_stream_ordering,
-    total_events_max_stream_ordering,
-    is_background_contract
-) VALUES (NULL, NULL, NULL, (0 = 1)), (NULL, NULL, NULL, (1 = 1));
+    stream_id
+) SELECT COALESCE(MAX(stream_ordering), 0) from events;
 
 -- represents PRESENT room statistics for a room
 -- only holds absolute fields
