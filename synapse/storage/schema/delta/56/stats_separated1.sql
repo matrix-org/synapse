@@ -29,8 +29,15 @@ DROP TABLE IF EXISTS stats_stream_pos;
 DELETE FROM background_updates WHERE update_name IN (
     'populate_stats_createtables',
     'populate_stats_process_rooms',
+    'populate_stats_process_users',
     'populate_stats_cleanup'
 );
+
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+    ('populate_stats_process_rooms', '{}', '');
+
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+    ('populate_stats_process_users', '{}', 'populate_stats_process_rooms');
 
 ----- Create tables for our version of room stats.
 
