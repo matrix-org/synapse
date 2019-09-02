@@ -69,19 +69,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             self.store._simple_insert(
                 "background_updates",
                 {
-                    "update_name": "populate_stats_process_users",
-                    "progress_json": "{}",
-                    "depends_on": "populate_stats_process_rooms",
-                },
-            )
-        )
-        self.get_success(
-            self.store._simple_insert(
-                "background_updates",
-                {
                     "update_name": "populate_stats_cleanup",
                     "progress_json": "{}",
-                    "depends_on": "populate_stats_process_users",
+                    "depends_on": "populate_stats_process_rooms",
                 },
             )
         )
@@ -354,24 +344,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         r = self.get_success(self.store.get_statistics_for_subject("room", room_1, 0))
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["joined_members"], 2)
-
-    def test_create_user(self):
-        """
-        When we create a user, it should have statistics already ready.
-        """
-
-        u1 = self.register_user("u1", "pass")
-
-        u1stats = self._get_current_stats("user", u1)
-
-        self.assertIsNotNone(u1stats)
-
-        # row is complete
-        self.assertIsNotNone(u1stats["completed_delta_stream_id"])
-
-        # not in any rooms by default
-        self.assertEqual(u1stats["public_rooms"], 0)
-        self.assertEqual(u1stats["private_rooms"], 0)
 
     def test_create_room(self):
         """
@@ -728,17 +700,14 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # test that these subjects, which were created during a time of disabled
         # stats, do not have stats.
         self.assertIsNone(self._get_current_stats("room", r1))
-        self.assertIsNone(self._get_current_stats("user", u1))
 
         self.hs.config.stats_enabled = True
 
         self._perform_background_initial_update()
 
         r1stats = self._get_current_stats("room", r1)
-        u1stats = self._get_current_stats("user", u1)
 
         self.assertIsNotNone(r1stats["completed_delta_stream_id"])
-        self.assertIsNotNone(u1stats["completed_delta_stream_id"])
 
         self.assertEqual(r1stats["joined_members"], 1)
         self.assertEqual(
@@ -747,8 +716,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
         )
-
-        self.assertEqual(u1stats["public_rooms"], 1)
 
     def test_incomplete_stats(self):
         """
@@ -784,18 +751,10 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 "room_stats_current", {"1": 1}, "test_delete_stats"
             )
         )
-        self.get_success(
-            self.store._simple_delete(
-                "user_stats_current", {"1": 1}, "test_delete_stats"
-            )
-        )
-
         while not self.get_success(self.store.has_completed_background_updates()):
             self.get_success(self.store.do_next_background_update(100), by=0.1)
 
         r1stats_ante = self._get_current_stats("room", r1)
-        u1stats_ante = self._get_current_stats("user", u1)
-        u2stats_ante = self._get_current_stats("user", u2)
 
         self.helper.invite(r1, u1, u2, tok=u1token)
         self.helper.join(r1, u2, tok=u2token)
@@ -803,8 +762,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.helper.send(r1, "thou shalt yield", tok=u1token)
 
         r1stats_post = self._get_current_stats("room", r1)
-        u1stats_post = self._get_current_stats("user", u1)
-        u2stats_post = self._get_current_stats("user", u2)
 
         # now let the background update continue & finish
 
@@ -823,19 +780,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             self.store._simple_insert(
                 "background_updates",
                 {
-                    "update_name": "populate_stats_process_users",
-                    "progress_json": "{}",
-                    "depends_on": "populate_stats_process_rooms",
-                },
-            )
-        )
-        self.get_success(
-            self.store._simple_insert(
-                "background_updates",
-                {
                     "update_name": "populate_stats_cleanup",
                     "progress_json": "{}",
-                    "depends_on": "populate_stats_process_users",
+                    "depends_on": "populate_stats_process_rooms",
                 },
             )
         )
@@ -844,8 +791,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             self.get_success(self.store.do_next_background_update(100), by=0.1)
 
         r1stats_complete = self._get_current_stats("room", r1)
-        u1stats_complete = self._get_current_stats("user", u1)
-        u2stats_complete = self._get_current_stats("user", u2)
 
         # now we make our assertions
 
@@ -853,10 +798,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # the background update occurred.
         self.assertIsNone(r1stats_ante["completed_delta_stream_id"])
         self.assertIsNone(r1stats_post["completed_delta_stream_id"])
-        self.assertIsNone(u1stats_ante["completed_delta_stream_id"])
-        self.assertIsNone(u1stats_post["completed_delta_stream_id"])
-        self.assertIsNone(u2stats_ante["completed_delta_stream_id"])
-        self.assertIsNone(u2stats_post["completed_delta_stream_id"])
 
         # check that _ante rows are all skeletons without any deltas applied
         self.assertEqual(r1stats_ante["joined_members"], 0)
@@ -864,21 +805,11 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(r1stats_ante["total_events"], 0)
         self.assertEqual(r1stats_ante["current_state_events"], 0)
 
-        self.assertEqual(u1stats_ante["public_rooms"], 0)
-        self.assertEqual(u1stats_ante["private_rooms"], 0)
-        self.assertEqual(u2stats_ante["public_rooms"], 0)
-        self.assertEqual(u2stats_ante["private_rooms"], 0)
-
         # check that _post rows have the expected deltas applied
         self.assertEqual(r1stats_post["joined_members"], 1)
         self.assertEqual(r1stats_post["invited_members"], 1)
         self.assertEqual(r1stats_post["total_events"], 4)
         self.assertEqual(r1stats_post["current_state_events"], 2)
-
-        self.assertEqual(u1stats_post["public_rooms"], 0)
-        self.assertEqual(u1stats_post["private_rooms"], 0)
-        self.assertEqual(u2stats_post["public_rooms"], 0)
-        self.assertEqual(u2stats_post["private_rooms"], 1)
 
         # check that _complete rows are complete and correct
         self.assertEqual(r1stats_complete["joined_members"], 2)
@@ -891,8 +822,3 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             r1stats_complete["current_state_events"],
             2 + EXPT_NUM_STATE_EVTS_IN_FRESH_PRIVATE_ROOM,
         )
-
-        self.assertEqual(u1stats_complete["public_rooms"], 0)
-        self.assertEqual(u1stats_complete["private_rooms"], 1)
-        self.assertEqual(u2stats_complete["public_rooms"], 0)
-        self.assertEqual(u2stats_complete["private_rooms"], 1)

@@ -41,19 +41,18 @@ ABSOLUTE_STATS_FIELDS = {
         "banned_members",
         "total_events",
         "total_event_bytes",
-    ),
-    "user": ("public_rooms", "private_rooms"),
+    )
 }
 
 # these fields are per-timeslice and so should be reset to 0 upon a new slice
 # You can draw these stats on a histogram.
 # Example: number of events sent locally during a time slice
-PER_SLICE_FIELDS = {"room": (), "user": ()}
+PER_SLICE_FIELDS = {"room": ()}
 
-TYPE_TO_TABLE = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user_id")}
+TYPE_TO_TABLE = {"room": ("room_stats", "room_id")}
 
 # these are the tables (& ID columns) which contain our actual subjects
-TYPE_TO_ORIGIN_TABLE = {"room": ("rooms", "room_id"), "user": ("users", "name")}
+TYPE_TO_ORIGIN_TABLE = {"room": ("rooms", "room_id")}
 
 
 class StatsStore(StateDeltasStore):
@@ -72,9 +71,6 @@ class StatsStore(StateDeltasStore):
         )
         self.register_background_update_handler(
             "populate_stats_process_rooms", self._populate_stats_process_rooms
-        )
-        self.register_background_update_handler(
-            "populate_stats_process_users", self._populate_stats_process_users
         )
         # we no longer need to perform clean-up, but we will give ourselves
         # the potential to reintroduce it in the future – so documentation
@@ -236,139 +232,10 @@ class StatsStore(StateDeltasStore):
         yield self.runInteraction(
             "populate_stats_make_skeletons", _make_skeletons, "room"
         )
-        yield self.runInteraction(
-            "populate_stats_make_skeletons", _make_skeletons, "user"
-        )
         self.get_earliest_token_for_stats.invalidate_all()
 
         yield self._end_background_update("populate_stats_prepare")
         return 1
-
-    @defer.inlineCallbacks
-    def _populate_stats_process_users(self, progress, batch_size):
-        """
-        This is a background update which regenerates statistics for users.
-        """
-        if not self.stats_enabled:
-            yield self._end_background_update("populate_stats_process_users")
-            return 1
-
-        def _get_next_batch(txn):
-            # Only fetch 250 users, so we don't fetch too many at once, even
-            # if those 250 users have less than batch_size state events.
-            sql = """
-                    SELECT user_id FROM user_stats_current
-                    WHERE completed_delta_stream_id IS NULL
-                    LIMIT 250
-                """
-            txn.execute(sql)
-            users_to_work_on = txn.fetchall()
-
-            if not users_to_work_on:
-                return None
-
-            # Get how many are left to process, so we can give status on how
-            # far we are in processing
-            sql = """
-                    SELECT COUNT(*) FROM user_stats_current
-                    WHERE completed_delta_stream_id IS NULL
-                """
-            txn.execute(sql)
-            progress["remaining"] = txn.fetchone()[0]
-
-            return users_to_work_on
-
-        users_to_work_on = yield self.runInteraction(
-            "populate_stats_users_get_batch", _get_next_batch
-        )
-
-        # No more users -- complete the transaction.
-        if not users_to_work_on:
-            yield self._end_background_update("populate_stats_process_users")
-            return 1
-
-        logger.info(
-            "Processing the next %d users of %d remaining",
-            len(users_to_work_on),
-            progress["remaining"],
-        )
-
-        processed_membership_count = 0
-
-        promised_positions = yield self.get_stats_positions(for_initial_processor=True)
-
-        if None in promised_positions:
-            logger.error(
-                "There is a None in promised_positions;"
-                " dependency task must not have been run."
-                " promised_positions: %r",
-                promised_positions,
-            )
-            yield self._end_background_update("populate_stats_process_users")
-            return 1
-
-        for (user_id,) in users_to_work_on:
-            now = self.clock.time_msec()
-
-            def _process_user(txn):
-                # Get the current token
-                current_token = self._get_max_stream_id_in_current_state_deltas_txn(txn)
-
-                sql = """
-                        SELECT
-                            (
-                                join_rules = 'public'
-                                OR history_visibility = 'world_readable'
-                            ) AS is_public,
-                            COUNT(*) AS count
-                        FROM room_memberships
-                        JOIN room_stats_state USING (room_id)
-                        WHERE
-                            user_id = ? AND membership = 'join'
-                        GROUP BY is_public
-                    """
-                txn.execute(sql, (user_id,))
-                room_counts_by_publicness = dict(txn.fetchall())
-
-                self._update_stats_delta_txn(
-                    txn,
-                    now,
-                    "user",
-                    user_id,
-                    {},
-                    complete_with_stream_id=current_token,
-                    absolute_field_overrides={
-                        # these are counted absolutely because it is
-                        # more difficult to count them from the promised time,
-                        # because counting them now can use the quick lookup
-                        # tables.
-                        "public_rooms": room_counts_by_publicness.get(True, 0),
-                        "private_rooms": room_counts_by_publicness.get(False, 0),
-                    },
-                )
-
-                # we use this count for rate-limiting
-                return sum(room_counts_by_publicness.values())
-
-            processed_membership_count += yield self.runInteraction(
-                "update_user_stats", _process_user
-            )
-
-            # Update the remaining counter.
-            progress["remaining"] -= 1
-
-            if processed_membership_count > batch_size:
-                # Don't process any more users, we've hit our batch size.
-                return processed_membership_count
-
-        yield self.runInteraction(
-            "populate_stats",
-            self._background_update_progress_txn,
-            "populate_stats_process_users",
-            progress,
-        )
-
-        return processed_membership_count
 
     @defer.inlineCallbacks
     def _populate_stats_process_rooms(self, progress, batch_size):
