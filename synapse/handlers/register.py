@@ -363,58 +363,6 @@ class RegistrationHandler(BaseHandler):
         return user_id
 
     @defer.inlineCallbacks
-    def check_recaptcha(self, ip, private_key, challenge, response):
-        """
-        Checks a recaptcha is correct.
-
-        Used only by c/s api v1
-        """
-
-        captcha_response = yield self._validate_captcha(
-            ip, private_key, challenge, response
-        )
-        if not captcha_response["valid"]:
-            logger.info(
-                "Invalid captcha entered from %s. Error: %s",
-                ip,
-                captcha_response["error_url"],
-            )
-            raise InvalidCaptchaError(error_url=captcha_response["error_url"])
-        else:
-            logger.info("Valid captcha entered from %s", ip)
-
-    @defer.inlineCallbacks
-    def register_email(self, threepidCreds):
-        """
-        Registers emails with an identity server.
-
-        Used only by c/s api v1
-        """
-
-        for c in threepidCreds:
-            logger.info(
-                "validating threepidcred sid %s on id server %s",
-                c["sid"],
-                c["idServer"],
-            )
-            try:
-                threepid = yield self.identity_handler.threepid_from_creds(c)
-            except Exception:
-                logger.exception("Couldn't validate 3pid")
-                raise RegistrationError(400, "Couldn't validate 3pid")
-
-            if not threepid:
-                raise RegistrationError(400, "Couldn't validate 3pid")
-            logger.info(
-                "got threepid with medium '%s' and address '%s'",
-                threepid["medium"],
-                threepid["address"],
-            )
-
-            if not check_3pid_allowed(self.hs, threepid["medium"], threepid["address"]):
-                raise RegistrationError(403, "Third party identifier is not allowed")
-
-    @defer.inlineCallbacks
     def bind_emails(self, user_id, threepidCreds):
         """Links emails with a user ID and informs an identity server.
 
@@ -462,42 +410,6 @@ class RegistrationHandler(BaseHandler):
         id = self._next_generated_user_id
         self._next_generated_user_id += 1
         return str(id)
-
-    @defer.inlineCallbacks
-    def _validate_captcha(self, ip_addr, private_key, challenge, response):
-        """Validates the captcha provided.
-
-        Used only by c/s api v1
-
-        Returns:
-            dict: Containing 'valid'(bool) and 'error_url'(str) if invalid.
-
-        """
-        response = yield self._submit_captcha(ip_addr, private_key, challenge, response)
-        # parse Google's response. Lovely format..
-        lines = response.split("\n")
-        json = {
-            "valid": lines[0] == "true",
-            "error_url": "http://www.recaptcha.net/recaptcha/api/challenge?"
-            + "error=%s" % lines[1],
-        }
-        return json
-
-    @defer.inlineCallbacks
-    def _submit_captcha(self, ip_addr, private_key, challenge, response):
-        """
-        Used only by c/s api v1
-        """
-        data = yield self.captcha_client.post_urlencoded_get_raw(
-            "http://www.recaptcha.net:80/recaptcha/api/verify",
-            args={
-                "privatekey": private_key,
-                "remoteip": ip_addr,
-                "challenge": challenge,
-                "response": response,
-            },
-        )
-        return data
 
     @defer.inlineCallbacks
     def _join_user_to_room(self, requester, room_identifier):
