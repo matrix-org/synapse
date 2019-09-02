@@ -60,6 +60,7 @@ class ListMediaInRoom(RestServlet):
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
