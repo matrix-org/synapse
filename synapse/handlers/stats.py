@@ -98,15 +98,16 @@ class StatsHandler(StateDeltasHandler):
                     self.pos["state_delta_stream_id"]
                 )
 
-                logger.debug("Handling %d state deltas", len(deltas))
-                yield self._handle_deltas(deltas)
+                if deltas:
+                    logger.debug("Handling %d state deltas", len(deltas))
+                    yield self._handle_deltas(deltas)
 
-                self.pos["state_delta_stream_id"] = deltas[-1]["stream_id"]
-                yield self.store.update_stats_positions(self.pos)
+                    self.pos["state_delta_stream_id"] = deltas[-1]["stream_id"]
+                    yield self.store.update_stats_positions(self.pos)
 
-                event_processing_positions.labels("stats").set(
-                    self.pos["state_delta_stream_id"]
-                )
+                    event_processing_positions.labels("stats").set(
+                        self.pos["state_delta_stream_id"]
+                    )
 
             # Then count deltas for total_events and total_event_bytes.
             with Measure(self.clock, "stats_total_events_and_bytes"):
@@ -129,7 +130,6 @@ class StatsHandler(StateDeltasHandler):
             event_id = delta["event_id"]
             stream_id = delta["stream_id"]
             prev_event_id = delta["prev_event_id"]
-            stream_pos = delta["stream_id"]
 
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
@@ -158,12 +158,9 @@ class StatsHandler(StateDeltasHandler):
                 if event:
                     event_content = event.content or {}
 
-            # We use stream_pos here rather than fetch by event_id as event_id
-            # may be None
-            stream_timestamp = yield self.store.get_received_ts_by_stream_pos(
-                stream_pos
-            )
-            stream_timestamp = int(stream_timestamp)
+            # We can't afford for this time to stray into the past, so we count
+            # it as now.
+            stream_timestamp = int(self.clock.time_msec())
 
             # All the values in this dict are deltas (RELATIVE changes)
             room_stats_delta = {}
@@ -261,7 +258,7 @@ class StatsHandler(StateDeltasHandler):
                 is_newly_created = True
 
             elif typ == EventTypes.JoinRules:
-                old_room_state = yield self.store.get_room_state(room_id)
+                old_room_state = yield self.store.get_room_stats_state(room_id)
                 yield self.store.update_room_state(
                     room_id, {"join_rules": event_content.get("join_rule")}
                 )
@@ -282,7 +279,7 @@ class StatsHandler(StateDeltasHandler):
                         )
 
             elif typ == EventTypes.RoomHistoryVisibility:
-                old_room_state = yield self.store.get_room_state(room_id)
+                old_room_state = yield self.store.get_room_stats_state(room_id)
                 yield self.store.update_room_state(
                     room_id,
                     {"history_visibility": event_content.get("history_visibility")},

@@ -661,6 +661,79 @@ class StatsStore(StateDeltasStore):
             desc="update_room_state",
         )
 
+    def get_statistics_for_subject(self, stats_type, stats_id, start, size=100):
+        """
+        Get statistics for a given subject.
+
+        Args:
+            stats_type (str): The type of subject
+            stats_id (str): The ID of the subject (e.g. room_id or user_id)
+            start (int): Pagination start. Number of entries, not timestamp.
+            size (int): How many entries to return.
+
+        Returns:
+            Deferred[list[dict]], where the dict has the keys of
+            ABSOLUTE_STATS_FIELDS[stats_type],  and "bucket_size" and "end_ts".
+        """
+        return self.runInteraction(
+            "get_statistics_for_subject",
+            self._get_statistics_for_subject_txn,
+            stats_type,
+            stats_id,
+            start,
+            size,
+        )
+
+    def _get_statistics_for_subject_txn(
+        self, txn, stats_type, stats_id, start, size=100
+    ):
+        """
+        Transaction-bound version of L{get_statistics_for_subject}.
+        """
+
+        table, id_col = TYPE_TO_TABLE[stats_type]
+        selected_columns = list(
+            ABSOLUTE_STATS_FIELDS[stats_type] + PER_SLICE_FIELDS[stats_type]
+        )
+
+        slice_list = self._simple_select_list_paginate_txn(
+            txn,
+            table + "_historical",
+            {id_col: stats_id},
+            "end_ts",
+            start,
+            size,
+            retcols=selected_columns + ["bucket_size", "end_ts"],
+            order_direction="DESC",
+        )
+
+        return slice_list
+
+    def get_room_stats_state(self, room_id):
+        """
+        Returns the current room_stats_state for a room.
+
+        Args:
+            room_id (str): The ID of the room to return state for.
+
+        Returns (dict):
+            Dictionary containing these keys:
+                "name", "topic", "canonical_alias", "avatar", "join_rules",
+                "history_visibility"
+        """
+        return self._simple_select_one(
+            "room_stats_state",
+            {"room_id": room_id},
+            retcols=(
+                "name",
+                "topic",
+                "canonical_alias",
+                "avatar",
+                "join_rules",
+                "history_visibility",
+            ),
+        )
+
     @cached()
     def get_earliest_token_for_stats(self, stats_type, id):
         """
@@ -948,10 +1021,11 @@ class StatsStore(StateDeltasStore):
             src_row = self._simple_select_one_txn(
                 txn, src_table, keyvalues, copy_columns
             )
+            all_dest_keyvalues = {**keyvalues, **extra_dst_keyvalues}
             dest_current_row = self._simple_select_one_txn(
                 txn,
                 into_table,
-                keyvalues,
+                keyvalues=all_dest_keyvalues,
                 retcols=list(chain(additive_relatives.keys(), copy_columns)),
                 allow_none=True,
             )
@@ -968,7 +1042,7 @@ class StatsStore(StateDeltasStore):
             else:
                 for (key, val) in additive_relatives.items():
                     src_row[key] = dest_current_row[key] + val
-                self._simple_update_txn(txn, into_table, keyvalues, src_row)
+                self._simple_update_txn(txn, into_table, all_dest_keyvalues, src_row)
 
     def incremental_update_room_total_events_and_bytes(self, in_positions):
         """
@@ -1059,14 +1133,14 @@ class StatsStore(StateDeltasStore):
             new_bytes_expression = "LENGTH(CAST(json AS BLOB))"
 
         sql = """
-            SELECT room_id, COUNT(*) AS new_events, SUM(%s) AS new_bytes
+            SELECT events.room_id, COUNT(*) AS new_events, SUM(%s) AS new_bytes
             FROM events INNER JOIN event_json USING (event_id)
             WHERE ? %s stream_ordering AND stream_ordering %s ?
-            GROUP BY room_id
+            GROUP BY events.room_id
         """ % (
+            new_bytes_expression,
             low_comparator,
             high_comparator,
-            new_bytes_expression,
         )
 
         txn.execute(sql, (low_pos, high_pos))
