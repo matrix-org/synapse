@@ -318,14 +318,14 @@ class MediaRepository(object):
 
             responder = yield self.media_storage.fetch_media(file_info)
             if responder:
-                return (responder, media_info)
+                return responder, media_info
 
         # Failed to find the file anywhere, lets download it.
 
         media_info = yield self._download_remote_file(server_name, media_id, file_id)
 
         responder = yield self.media_storage.fetch_media(file_info)
-        return (responder, media_info)
+        return responder, media_info
 
     @defer.inlineCallbacks
     def _download_remote_file(self, server_name, media_id, file_id):

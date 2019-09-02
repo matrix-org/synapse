@@ -94,7 +94,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -137,7 +137,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -177,7 +177,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
             yield self.registration_handler.check_username(username)
 
-            return (200, {"available": True})
+            return 200, {"available": True}
 
 
 class RegisterRestServlet(RestServlet):
@@ -279,7 +279,7 @@ class RegisterRestServlet(RestServlet):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
-            return (200, result)  # we throw for non 200 responses
+            return 200, result  # we throw for non 200 responses
             return
 
         # for regular registration, downcase the provided username before
@@ -487,7 +487,7 @@ class RegisterRestServlet(RestServlet):
                 bind_msisdn=params.get("bind_msisdn"),
             )
 
-        return (200, return_dict)
+        return 200, return_dict
 
     def on_OPTIONS(self, _):
         return 200, {}
