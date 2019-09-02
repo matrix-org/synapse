@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS room_stats_historical (
     left_members INT NOT NULL,
     banned_members INT NOT NULL,
 
+    local_users_in_room INT NOT NULL,
+
     PRIMARY KEY (room_id, end_ts)
 );
 

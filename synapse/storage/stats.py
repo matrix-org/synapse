@@ -39,6 +39,7 @@ ABSOLUTE_STATS_FIELDS = {
         "invited_members",
         "left_members",
         "banned_members",
+        "local_users_in_room",
         "total_events",
         "total_event_bytes",
     ),
@@ -98,6 +99,49 @@ class StatsStore(StateDeltasStore):
         return (ts // self.stats_bucket_size) * self.stats_bucket_size
 
     @defer.inlineCallbacks
+    def _unwedge_incremental_processor(self, forced_promise):
+        """
+        Make a promise about what this stats regeneration will handle,
+        so that we can allow the incremental processor to start doing things
+        right away – 'unwedging' it.
+
+        Args:
+            forced_promise (dict of positions):
+                If supplied, this is the promise that is made.
+                Otherwise, a promise is made that reduces the amount of work
+                that must be performed by the incremental processor.
+        """
+
+        if forced_promise is None:
+            promised_stats_delta_pos = (
+                yield self.get_max_stream_id_in_current_state_deltas()
+            )
+            promised_max = self.get_room_max_stream_ordering()
+            promised_min = self.get_room_min_stream_ordering()
+
+            promised_positions = {
+                "state_delta_stream_id": promised_stats_delta_pos,
+                "total_events_min_stream_ordering": promised_min,
+                "total_events_max_stream_ordering": promised_max,
+            }
+        else:
+            promised_positions = forced_promise
+
+        # this stores it for our reference later
+        yield self.update_stats_positions(
+            promised_positions, for_initial_processor=True
+        )
+
+        # this unwedges the incremental processor
+        yield self.update_stats_positions(
+            promised_positions, for_initial_processor=False
+        )
+
+        # with the delta processor unwedged, now let it catch up in case
+        # anything was missed during the wedge period
+        self.clock.call_later(0, self.hs.get_stats_handler().notify_new_event)
+
+    @defer.inlineCallbacks
     def _populate_stats_prepare(self, progress, batch_size):
         """
         This is a background update, which prepares the database for
@@ -128,15 +172,15 @@ class StatsStore(StateDeltasStore):
 
             if isinstance(self.database_engine, Sqlite3Engine):
                 sql = """
-                        INSERT OR IGNORE INTO room_stats_current
-                        (room_id, completed_delta_stream_id, %(zero_cols)s)
-                        SELECT DISTINCT room_id, NULL, %(zeroes)s FROM current_state_events
+                        INSERT OR IGNORE INTO %(table)s_current
+                        (%(id_col)s, completed_delta_stream_id, %(zero_cols)s)
+                        SELECT %(origin_id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
                     """
             else:
                 sql = """
-                        INSERT INTO room_stats_current
-                        (room_id, completed_delta_stream_id, %(zero_cols)s)
-                        SELECT DISTINCT room_id, NULL, %(zeroes)s FROM current_state_events
+                        INSERT INTO %(table)s_current
+                        (%(id_col)s, completed_delta_stream_id, %(zero_cols)s)
+                        SELECT %(origin_id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
                         ON CONFLICT DO NOTHING
                     """
 
@@ -805,20 +849,26 @@ class StatsStore(StateDeltasStore):
             additive_relatives=deltas_of_absolute_fields,
         )
 
-        per_slice_additive_relatives = {
-            key: fields.get(key, 0) for key in slice_field_names
-        }
-        self._upsert_copy_from_table_with_additive_relatives_txn(
-            txn=txn,
-            into_table=table + "_historical",
-            keyvalues={id_col: stats_id},
-            extra_dst_insvalues={"bucket_size": self.stats_bucket_size},
-            extra_dst_keyvalues={"end_ts": end_ts},
-            additive_relatives=per_slice_additive_relatives,
-            src_table=table + "_current",
-            copy_columns=abs_field_names,
-            additional_where=" AND completed_delta_stream_id IS NOT NULL",
-        )
+        if self.has_completed_background_updates():
+            # TODO want to check specifically for stats regenerator, not all
+            #   background updates…
+            # then upsert the `_historical` table.
+            # we don't support absolute_fields for per-slice fields as it makes
+            # no sense.
+            per_slice_additive_relatives = {
+                key: fields.get(key, 0) for key in slice_field_names
+            }
+            self._upsert_copy_from_table_with_additive_relatives_txn(
+                txn=txn,
+                into_table=table + "_historical",
+                keyvalues={id_col: stats_id},
+                extra_dst_insvalues={"bucket_size": self.stats_bucket_size},
+                extra_dst_keyvalues={"end_ts": end_ts},
+                additive_relatives=per_slice_additive_relatives,
+                src_table=table + "_current",
+                copy_columns=abs_field_names,
+                additional_where=" AND completed_delta_stream_id IS NOT NULL",
+            )
 
     def _upsert_with_additive_relatives_txn(
         self, txn, table, keyvalues, absolutes, additive_relatives
@@ -1260,21 +1310,16 @@ class StatsStore(StateDeltasStore):
             ts=self.clock.time_msec(),
             stats_type="room",
             stats_id=room_id,
-            fields={
-                "total_events": total_events,
-                "total_event_bytes": total_event_bytes,
-            },
+            fields={},
             complete_with_stream_id=pos,
             absolute_field_overrides={
-                # these are counted absolutely because it is
-                # more difficult to count them from the promised time,
-                # because counting them now can use the quick lookup
-                # tables.
                 "current_state_events": current_state_events_count,
                 "joined_members": membership_counts.get(Membership.JOIN, 0),
                 "invited_members": membership_counts.get(Membership.INVITE, 0),
                 "left_members": membership_counts.get(Membership.LEAVE, 0),
                 "banned_members": membership_counts.get(Membership.BAN, 0),
-                "local_users_in_room": len(local_users_in_room),
+                "total_events": total_events,
+                "total_event_bytes": total_event_bytes,
+                "local_users_in_room": local_users_in_room,
             },
         )

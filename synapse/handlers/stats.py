@@ -240,6 +240,8 @@ class StatsHandler(StateDeltasHandler):
                             stream_timestamp, "user", user_id, {field: delta}
                         )
 
+                        room_stats_delta["local_users_in_room"] = delta
+
             elif typ == EventTypes.Create:
                 # Newly created room. Add it with all blank portions.
                 yield self.store.update_room_state(
