@@ -599,38 +599,6 @@ def _readBodyToFile(response, stream, max_size):
     return d
 
 
-class CaptchaServerHttpClient(SimpleHttpClient):
-    """
-    Separate HTTP client for talking to google's captcha servers
-    Only slightly special because accepts partial download responses
-
-    used only by c/s api v1
-    """
-
-    @defer.inlineCallbacks
-    def post_urlencoded_get_raw(self, url, args={}):
-        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True)
-
-        response = yield self.request(
-            "POST",
-            url,
-            data=query_bytes,
-            headers=Headers(
-                {
-                    b"Content-Type": [b"application/x-www-form-urlencoded"],
-                    b"User-Agent": [self.user_agent],
-                }
-            ),
-        )
-
-        try:
-            body = yield make_deferred_yieldable(readBody(response))
-            return body
-        except PartialDownloadError as e:
-            # twisted dislikes google's response, no content length.
-            return e.response
-
-
 def encode_urlencode_args(args):
     return {k: encode_urlencode_arg(v) for k, v in args.items()}
 
