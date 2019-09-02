@@ -258,7 +258,7 @@ class StatsHandler(StateDeltasHandler):
                 is_newly_created = True
 
             elif typ == EventTypes.JoinRules:
-                old_room_state = yield self.store.get_room_state(room_id)
+                old_room_state = yield self.store.get_room_stats_state(room_id)
                 yield self.store.update_room_state(
                     room_id, {"join_rules": event_content.get("join_rule")}
                 )
@@ -279,7 +279,7 @@ class StatsHandler(StateDeltasHandler):
                         )
 
             elif typ == EventTypes.RoomHistoryVisibility:
-                old_room_state = yield self.store.get_room_state(room_id)
+                old_room_state = yield self.store.get_room_stats_state(room_id)
                 yield self.store.update_room_state(
                     room_id,
                     {"history_visibility": event_content.get("history_visibility")},

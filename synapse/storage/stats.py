@@ -709,9 +709,9 @@ class StatsStore(StateDeltasStore):
 
         return slice_list
 
-    def get_room_state(self, room_id):
+    def get_room_stats_state(self, room_id):
         """
-        Returns the current room_state for a room.
+        Returns the current room_stats_state for a room.
 
         Args:
             room_id (str): The ID of the room to return state for.
