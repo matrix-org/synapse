@@ -773,13 +773,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.store._all_done = False
 
         self.get_success(
-            self.store._simple_insert(
-                "background_updates",
-                {"update_name": "populate_stats_prepare", "progress_json": "{}"},
-            )
-        )
-
-        self.get_success(
             self.store._simple_delete(
                 "room_stats_current", {"1": 1}, "test_delete_stats"
             )
@@ -790,23 +783,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
-
-        r1stats_ante = self._get_current_stats("room", r1)
-        u1stats_ante = self._get_current_stats("user", u1)
-        u2stats_ante = self._get_current_stats("user", u2)
-
         self.helper.invite(r1, u1, u2, tok=u1token)
         self.helper.join(r1, u2, tok=u2token)
         self.helper.invite(r1, u1, u3, tok=u1token)
         self.helper.send(r1, "thou shalt yield", tok=u1token)
 
-        r1stats_post = self._get_current_stats("room", r1)
-        u1stats_post = self._get_current_stats("user", u1)
-        u2stats_post = self._get_current_stats("user", u2)
-
-        # now let the background update continue & finish
+        # now do the background updates
 
         self.store._all_done = False
         self.get_success(
@@ -848,37 +830,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         u2stats_complete = self._get_current_stats("user", u2)
 
         # now we make our assertions
-
-        # first check that none of the stats rows were complete before
-        # the background update occurred.
-        self.assertIsNone(r1stats_ante["completed_delta_stream_id"])
-        self.assertIsNone(r1stats_post["completed_delta_stream_id"])
-        self.assertIsNone(u1stats_ante["completed_delta_stream_id"])
-        self.assertIsNone(u1stats_post["completed_delta_stream_id"])
-        self.assertIsNone(u2stats_ante["completed_delta_stream_id"])
-        self.assertIsNone(u2stats_post["completed_delta_stream_id"])
-
-        # check that _ante rows are all skeletons without any deltas applied
-        self.assertEqual(r1stats_ante["joined_members"], 0)
-        self.assertEqual(r1stats_ante["invited_members"], 0)
-        self.assertEqual(r1stats_ante["total_events"], 0)
-        self.assertEqual(r1stats_ante["current_state_events"], 0)
-
-        self.assertEqual(u1stats_ante["public_rooms"], 0)
-        self.assertEqual(u1stats_ante["private_rooms"], 0)
-        self.assertEqual(u2stats_ante["public_rooms"], 0)
-        self.assertEqual(u2stats_ante["private_rooms"], 0)
-
-        # check that _post rows have the expected deltas applied
-        self.assertEqual(r1stats_post["joined_members"], 1)
-        self.assertEqual(r1stats_post["invited_members"], 1)
-        self.assertEqual(r1stats_post["total_events"], 4)
-        self.assertEqual(r1stats_post["current_state_events"], 2)
-
-        self.assertEqual(u1stats_post["public_rooms"], 0)
-        self.assertEqual(u1stats_post["private_rooms"], 0)
-        self.assertEqual(u2stats_post["public_rooms"], 0)
-        self.assertEqual(u2stats_post["private_rooms"], 1)
 
         # check that _complete rows are complete and correct
         self.assertEqual(r1stats_complete["joined_members"], 2)

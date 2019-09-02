@@ -22,7 +22,6 @@ from twisted.internet.defer import DeferredLock
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.storage import PostgresEngine
-from synapse.storage.engines import Sqlite3Engine
 from synapse.storage.state_deltas import StateDeltasStore
 from synapse.util.caches.descriptors import cached
 
@@ -69,9 +68,6 @@ class StatsStore(StateDeltasStore):
         self.stats_delta_processing_lock = DeferredLock()
 
         self.register_background_update_handler(
-            "populate_stats_prepare", self._populate_stats_prepare
-        )
-        self.register_background_update_handler(
             "populate_stats_process_rooms", self._populate_stats_process_rooms
         )
         self.register_background_update_handler(
@@ -81,6 +77,7 @@ class StatsStore(StateDeltasStore):
         # the potential to reintroduce it in the future – so documentation
         # will still encourage the use of this no-op handler.
         self.register_noop_background_update("populate_stats_cleanup")
+        self.register_noop_background_update("populate_stats_prepare")
 
     def quantise_stats_time(self, ts):
         """
@@ -99,85 +96,6 @@ class StatsStore(StateDeltasStore):
         return (ts // self.stats_bucket_size) * self.stats_bucket_size
 
     @defer.inlineCallbacks
-    def _populate_stats_prepare(self, progress, batch_size):
-        """
-        This is a background update, which prepares the database for
-        statistics regeneration.
-        """
-
-        if not self.stats_enabled:
-            yield self._end_background_update("populate_stats_prepare")
-            return 1
-
-        def _make_skeletons(txn, stats_type):
-            """
-            Get all the rooms and users that we want to process, and create
-            'skeletons' (incomplete _stats_current rows) for them, if they do
-            not already have a row.
-            """
-
-            if isinstance(self.database_engine, Sqlite3Engine):
-                sql = """
-                        INSERT OR IGNORE INTO %(table)s_current
-                        (%(id_col)s, completed_delta_stream_id, %(zero_cols)s)
-                        SELECT %(origin_id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
-                    """
-            else:
-                sql = """
-                        INSERT INTO %(table)s_current
-                        (%(id_col)s, completed_delta_stream_id, %(zero_cols)s)
-                        SELECT %(origin_id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
-                        ON CONFLICT DO NOTHING
-                    """
-
-            table, id_col = TYPE_TO_TABLE[stats_type]
-            origin_table, origin_id_col = TYPE_TO_ORIGIN_TABLE[stats_type]
-            zero_cols = list(
-                chain(ABSOLUTE_STATS_FIELDS[stats_type], PER_SLICE_FIELDS[stats_type])
-            )
-
-            txn.execute(
-                sql
-                % {
-                    "table": table,
-                    "id_col": id_col,
-                    "origin_id_col": origin_id_col,
-                    "origin_table": origin_table,
-                    "zero_cols": ", ".join(zero_cols),
-                    "zeroes": ", ".join(["0"] * len(zero_cols)),
-                }
-            )
-
-        def _delete_dirty_skeletons(txn):
-            """
-            Delete pre-existing rows which are incomplete.
-            """
-            sql = """
-                    DELETE FROM %s_current
-                    WHERE completed_delta_stream_id IS NULL
-            """
-
-            for _k, (table, id_col) in TYPE_TO_TABLE.items():
-                txn.execute(sql % (table,))
-
-        # with the incremental processor wedged, we delete dirty skeleton rows
-        # since we don't want to double-count them.
-        yield self.runInteraction(
-            "populate_stats_delete_dirty_skeletons", _delete_dirty_skeletons
-        )
-
-        yield self.runInteraction(
-            "populate_stats_make_skeletons", _make_skeletons, "room"
-        )
-        yield self.runInteraction(
-            "populate_stats_make_skeletons", _make_skeletons, "user"
-        )
-        self.get_earliest_token_for_stats.invalidate_all()
-
-        yield self._end_background_update("populate_stats_prepare")
-        return 1
-
-    @defer.inlineCallbacks
     def _populate_stats_process_users(self, progress, batch_size):
         """
         This is a background update which regenerates statistics for users.
@@ -186,122 +104,39 @@ class StatsStore(StateDeltasStore):
             yield self._end_background_update("populate_stats_process_users")
             return 1
 
+        last_user_id = progress.get("last_user_id", "")
+
         def _get_next_batch(txn):
-            # Only fetch 250 users, so we don't fetch too many at once, even
-            # if those 250 users have less than batch_size state events.
             sql = """
-                    SELECT user_id FROM user_stats_current
-                    WHERE completed_delta_stream_id IS NULL
-                    LIMIT 250
+                    SELECT DISTINCT name FROM users
+                    WHERE name > ?
+                    ORDER BY name ASC
+                    LIMIT ?
                 """
-            txn.execute(sql)
-            users_to_work_on = txn.fetchall()
-
-            if not users_to_work_on:
-                return None
-
-            # Get how many are left to process, so we can give status on how
-            # far we are in processing
-            sql = """
-                    SELECT COUNT(*) FROM user_stats_current
-                    WHERE completed_delta_stream_id IS NULL
-                """
-            txn.execute(sql)
-            progress["remaining"] = txn.fetchone()[0]
-
-            return users_to_work_on
+            txn.execute(sql, (last_user_id, batch_size))
+            return [r for r, in txn]
 
         users_to_work_on = yield self.runInteraction(
-            "populate_stats_users_get_batch", _get_next_batch
+            "_populate_stats_process_users", _get_next_batch
         )
 
-        # No more users -- complete the transaction.
+        # No more rooms -- complete the transaction.
         if not users_to_work_on:
             yield self._end_background_update("populate_stats_process_users")
             return 1
 
-        logger.info(
-            "Processing the next %d users of %d remaining",
-            len(users_to_work_on),
-            progress["remaining"],
-        )
-
-        processed_membership_count = 0
-
-        promised_positions = yield self.get_stats_positions()
-
-        if not promised_positions:
-            logger.error(
-                "There is a None in promised_positions;"
-                " dependency task must not have been run."
-                " promised_positions: %r",
-                promised_positions,
-            )
-            yield self._end_background_update("populate_stats_process_users")
-            return 1
-
-        for (user_id,) in users_to_work_on:
-            now = self.clock.time_msec()
-
-            def _process_user(txn):
-                # Get the current token
-                current_token = self._get_max_stream_id_in_current_state_deltas_txn(txn)
-
-                sql = """
-                        SELECT
-                            (
-                                join_rules = 'public'
-                                OR history_visibility = 'world_readable'
-                            ) AS is_public,
-                            COUNT(*) AS count
-                        FROM room_memberships
-                        JOIN room_stats_state USING (room_id)
-                        WHERE
-                            user_id = ? AND membership = 'join'
-                        GROUP BY is_public
-                    """
-                txn.execute(sql, (user_id,))
-                room_counts_by_publicness = dict(txn.fetchall())
-
-                self._update_stats_delta_txn(
-                    txn,
-                    now,
-                    "user",
-                    user_id,
-                    {},
-                    complete_with_stream_id=current_token,
-                    absolute_field_overrides={
-                        # these are counted absolutely because it is
-                        # more difficult to count them from the promised time,
-                        # because counting them now can use the quick lookup
-                        # tables.
-                        "public_rooms": room_counts_by_publicness.get(True, 0),
-                        "private_rooms": room_counts_by_publicness.get(False, 0),
-                    },
-                )
-
-                # we use this count for rate-limiting
-                return sum(room_counts_by_publicness.values())
-
-            processed_membership_count += yield self.runInteraction(
-                "update_user_stats", _process_user
-            )
-
-            # Update the remaining counter.
-            progress["remaining"] -= 1
-
-            if processed_membership_count > batch_size:
-                # Don't process any more users, we've hit our batch size.
-                return processed_membership_count
+        for user_id in users_to_work_on:
+            yield self._calculate_and_set_initial_state_for_user(user_id)
+            progress["last_user_id"] = user_id
 
         yield self.runInteraction(
-            "populate_stats",
+            "populate_stats_process_users",
             self._background_update_progress_txn,
             "populate_stats_process_users",
             progress,
         )
 
-        return processed_membership_count
+        return len(users_to_work_on)
 
     @defer.inlineCallbacks
     def _populate_stats_process_rooms(self, progress, batch_size):
@@ -334,7 +169,7 @@ class StatsStore(StateDeltasStore):
             return 1
 
         for room_id in rooms_to_work_on:
-            yield self.calculate_and_set_initial_state_for_room(room_id)
+            yield self._calculate_and_set_initial_state_for_room(room_id)
             progress["last_room_id"] = room_id
 
         yield self.runInteraction(
@@ -910,7 +745,7 @@ class StatsStore(StateDeltasStore):
         return txn.fetchone()
 
     @defer.inlineCallbacks
-    def calculate_and_set_initial_state_for_room(self, room_id):
+    def _calculate_and_set_initial_state_for_room(self, room_id):
         """Calculate and insert an entry into room_stats_current.
 
         Args:
@@ -1040,5 +875,73 @@ class StatsStore(StateDeltasStore):
                 "total_events": total_events,
                 "total_event_bytes": total_event_bytes,
                 "local_users_in_room": len(local_users_in_room),
+            },
+        )
+
+    @defer.inlineCallbacks
+    def _calculate_and_set_initial_state_for_user(self, user_id):
+        def _fetch_current_state_stats_user(txn):
+            pos = self.get_room_max_stream_ordering()
+
+            txn.execute(
+                """
+                SELECT room_id, j.event_id, h.event_id FROM (
+                    SELECT room_id FROM current_state_events
+                    WHERE type = 'm.room.member' AND state_key = ?
+                        AND membership = 'join'
+                ) AS u
+                LEFT JOIN (
+                    SELECT room_id, event_id FROM current_state_events
+                    WHERE type = 'm.room.join_rules' AND state_key = ''
+                ) AS j USING (room_id)
+                LEFT JOIN (
+                    SELECT room_id, event_id FROM current_state_events
+                    WHERE type = 'm.room.history_visibility' AND state_key = ''
+                ) AS h USING (room_id)
+                """,
+                (user_id,),
+            )
+            return txn.fetchall(), pos
+
+        rows, pos = yield self.runInteraction(
+            "calculate_and_set_initial_state_for_user", _fetch_current_state_stats_user
+        )
+
+        event_map = yield self.get_events(
+            [e for _, j, h in rows for e in (j, h)], check_redacted=False
+        )
+
+        private_rooms = 0
+        public_rooms = 0
+
+        for room_id, join_rule_id, visibility_id in rows:
+            public_room = False
+
+            if join_rule_id:
+                j_ev = event_map.get(join_rule_id)
+                if j_ev:
+                    if j_ev.content.get("join_rule") == "public":
+                        public_room = True
+
+            if visibility_id:
+                h_ev = event_map.get(visibility_id)
+                if h_ev:
+                    if h_ev.content.get("history_visibility") == "world_readable":
+                        public_room = True
+
+            if public_room:
+                public_rooms += 1
+            else:
+                private_rooms += 1
+
+        yield self.update_stats_delta(
+            ts=self.clock.time_msec(),
+            stats_type="user",
+            stats_id=user_id,
+            fields={},
+            complete_with_stream_id=pos,
+            absolute_field_overrides={
+                "public_rooms": public_rooms,
+                "private_rooms": private_rooms,
             },
         )
