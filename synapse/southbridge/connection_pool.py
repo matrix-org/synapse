@@ -19,7 +19,7 @@ from typing import List, Mapping, Optional, Tuple
 import attr
 from zope.interface import implementer
 
-from twisted.internet.endpoints import TCP4ClientEndpoint, wrapClientTLS
+from twisted.internet import endpoints
 from twisted.internet.protocol import Factory
 from twisted.python.failure import Failure
 
@@ -181,6 +181,8 @@ class ConnectionPool:
 
     name = attr.ib(default=attr.Factory(readable_id))
 
+    _endpoints = attr.ib(default=endpoints, repr=False)
+
     async def request_connection(self, address: IRemoteAddress) -> IConnection:
         """
         Request a connection from this connection pool.
@@ -198,10 +200,10 @@ class ConnectionPool:
         # TODO: Select this smarter.
         host_to_connect_to = address.addresses[0]
 
-        endpoint = TCP4ClientEndpoint(
-            self.reactor,
-            host_to_connect_to,
-            address.port,
+        endpoint = self._endpoints.TCP4ClientEndpoint(
+            reactor=self.reactor,
+            host=host_to_connect_to,
+            port=address.port,
             timeout=self.timeout,
             bindAddress=self.local_bind_address,
         )
@@ -210,7 +212,7 @@ class ConnectionPool:
             tls_connection_creator = self.tls_factory.creatorForNetloc(
                 address.name.encode("ascii"), address.port
             )
-            endpoint = wrapClientTLS(tls_connection_creator, endpoint)
+            endpoint = self._endpoints.wrapClientTLS(tls_connection_creator, endpoint)
 
         connection_factory = ConnectionFactory(
             Connection,
