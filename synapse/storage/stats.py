@@ -94,49 +94,6 @@ class StatsStore(StateDeltasStore):
         return (ts // self.stats_bucket_size) * self.stats_bucket_size
 
     @defer.inlineCallbacks
-    def _unwedge_incremental_processor(self, forced_promise):
-        """
-        Make a promise about what this stats regeneration will handle,
-        so that we can allow the incremental processor to start doing things
-        right away – 'unwedging' it.
-
-        Args:
-            forced_promise (dict of positions):
-                If supplied, this is the promise that is made.
-                Otherwise, a promise is made that reduces the amount of work
-                that must be performed by the incremental processor.
-        """
-
-        if forced_promise is None:
-            promised_stats_delta_pos = (
-                yield self.get_max_stream_id_in_current_state_deltas()
-            )
-            promised_max = self.get_room_max_stream_ordering()
-            promised_min = self.get_room_min_stream_ordering()
-
-            promised_positions = {
-                "state_delta_stream_id": promised_stats_delta_pos,
-                "total_events_min_stream_ordering": promised_min,
-                "total_events_max_stream_ordering": promised_max,
-            }
-        else:
-            promised_positions = forced_promise
-
-        # this stores it for our reference later
-        yield self.update_stats_positions(
-            promised_positions, for_initial_processor=True
-        )
-
-        # this unwedges the incremental processor
-        yield self.update_stats_positions(
-            promised_positions, for_initial_processor=False
-        )
-
-        # with the delta processor unwedged, now let it catch up in case
-        # anything was missed during the wedge period
-        self.clock.call_later(0, self.hs.get_stats_handler().notify_new_event)
-
-    @defer.inlineCallbacks
     def _populate_stats_prepare(self, progress, batch_size):
         """
         This is a background update, which prepares the database for
@@ -167,15 +124,15 @@ class StatsStore(StateDeltasStore):
 
             if isinstance(self.database_engine, Sqlite3Engine):
                 sql = """
-                        INSERT OR IGNORE INTO %(table)s_current
-                        (%(id_col)s, completed_delta_stream_id, %(zero_cols)s)
-                        SELECT %(origin_id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
+                        INSERT OR IGNORE INTO room_stats_current
+                        (room_id, completed_delta_stream_id, %(zero_cols)s)
+                        SELECT DISTINCT room_id, NULL, %(zeroes)s FROM current_state_events
                     """
             else:
                 sql = """
-                        INSERT INTO %(table)s_current
-                        (%(id_col)s, completed_delta_stream_id, %(zero_cols)s)
-                        SELECT %(origin_id_col)s, NULL, %(zeroes)s FROM %(origin_table)s
+                        INSERT INTO room_stats_current
+                        (room_id, completed_delta_stream_id, %(zero_cols)s)
+                        SELECT DISTINCT room_id, NULL, %(zeroes)s FROM current_state_events
                         ON CONFLICT DO NOTHING
                     """
 
@@ -715,26 +672,20 @@ class StatsStore(StateDeltasStore):
             additive_relatives=deltas_of_absolute_fields,
         )
 
-        if self.has_completed_background_updates():
-            # TODO want to check specifically for stats regenerator, not all
-            #   background updates…
-            # then upsert the `_historical` table.
-            # we don't support absolute_fields for per-slice fields as it makes
-            # no sense.
-            per_slice_additive_relatives = {
-                key: fields.get(key, 0) for key in slice_field_names
-            }
-            self._upsert_copy_from_table_with_additive_relatives_txn(
-                txn=txn,
-                into_table=table + "_historical",
-                keyvalues={id_col: stats_id},
-                extra_dst_insvalues={"bucket_size": self.stats_bucket_size},
-                extra_dst_keyvalues={"end_ts": end_ts},
-                additive_relatives=per_slice_additive_relatives,
-                src_table=table + "_current",
-                copy_columns=abs_field_names,
-                additional_where=" AND completed_delta_stream_id IS NOT NULL",
-            )
+        per_slice_additive_relatives = {
+            key: fields.get(key, 0) for key in slice_field_names
+        }
+        self._upsert_copy_from_table_with_additive_relatives_txn(
+            txn=txn,
+            into_table=table + "_historical",
+            keyvalues={id_col: stats_id},
+            extra_dst_insvalues={"bucket_size": self.stats_bucket_size},
+            extra_dst_keyvalues={"end_ts": end_ts},
+            additive_relatives=per_slice_additive_relatives,
+            src_table=table + "_current",
+            copy_columns=abs_field_names,
+            additional_where=" AND completed_delta_stream_id IS NOT NULL",
+        )
 
     def _upsert_with_additive_relatives_txn(
         self, txn, table, keyvalues, absolutes, additive_relatives
@@ -1055,3 +1006,142 @@ class StatsStore(StateDeltasStore):
         )
         txn.execute(sql, (room_id, low_token, high_token))
         return txn.fetchone()
+
+    @defer.inlineCallbacks
+    def calculate_and_set_initial_state_for_room(self, room_id):
+        """Calculate and insert an entry into room_stats_current.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[tuple[dict, dict, int]]: A tuple of room state, membership
+            counts and stream position.
+        """
+
+        def _fetch_current_state_stats(txn):
+            pos = self._get_max_stream_id_in_current_state_deltas_txn(txn)
+
+            rows = self._simple_select_many_txn(
+                txn,
+                table="current_state_events",
+                column="type",
+                iterable=[
+                    EventTypes.JoinRules,
+                    EventTypes.RoomHistoryVisibility,
+                    EventTypes.Encryption,
+                    EventTypes.Name,
+                    EventTypes.Topic,
+                    EventTypes.RoomAvatar,
+                    EventTypes.CanonicalAlias,
+                ],
+                keyvalues={"room_id": room_id, "state_key": ""},
+                retcols=["event_id"],
+            )
+
+            event_ids = [row["event_id"] for row in rows]
+
+            txn.execute(
+                """
+                    SELECT membership, count(*) FROM current_state_events
+                    WHERE room_id = ? AND type = 'm.room.member'
+                    GROUP BY membership
+                """,
+                (room_id,),
+            )
+            membership_counts = {membership: cnt for membership, cnt in txn}
+
+            txn.execute(
+                """
+                    SELECT COALESCE(count(*), 0) FROM current_state_events
+                    WHERE room_id = ?
+                """,
+                (room_id,),
+            )
+
+            current_state_events_count, = txn.fetchone()
+
+            total_events, total_event_bytes = self._count_events_and_bytes_in_room_txn(
+                txn, room_id, -pos, pos
+            )
+
+            users_in_room = self.get_users_in_room_txn(txn, room_id)
+
+            return (
+                event_ids,
+                membership_counts,
+                current_state_events_count,
+                total_events,
+                total_event_bytes,
+                users_in_room,
+                pos,
+            )
+
+        (
+            event_ids,
+            membership_counts,
+            current_state_events_count,
+            total_events,
+            total_event_bytes,
+            users_in_room,
+            pos,
+        ) = yield self.runInteraction(
+            "get_initial_state_for_room", _fetch_current_state_stats
+        )
+
+        state_event_map = yield self.get_events(event_ids, get_prev_content=False)
+
+        room_state = {
+            "join_rules": None,
+            "history_visibility": None,
+            "encryption": None,
+            "name": None,
+            "topic": None,
+            "avatar": None,
+            "canonical_alias": None,
+        }
+
+        for event in state_event_map.values():
+            if event.type == EventTypes.JoinRules:
+                room_state["join_rules"] = event.content.get("join_rule")
+            elif event.type == EventTypes.RoomHistoryVisibility:
+                room_state["history_visibility"] = event.content.get(
+                    "history_visibility"
+                )
+            elif event.type == EventTypes.Encryption:
+                room_state["encryption"] = event.content.get("algorithm")
+            elif event.type == EventTypes.Name:
+                room_state["name"] = event.content.get("name")
+            elif event.type == EventTypes.Topic:
+                room_state["topic"] = event.content.get("topic")
+            elif event.type == EventTypes.RoomAvatar:
+                room_state["avatar"] = event.content.get("url")
+            elif event.type == EventTypes.CanonicalAlias:
+                room_state["canonical_alias"] = event.content.get("alias")
+
+        yield self.update_room_state(room_id, room_state)
+
+        local_users_in_room = [u for u in users_in_room if self.hs.is_mine_id(u)]
+
+        yield self._update_stats_delta(
+            ts=self.clock.time_msec(),
+            stats_type="room",
+            stats_id=room_id,
+            fields={
+                "total_events": total_events,
+                "total_event_bytes": total_event_bytes,
+            },
+            complete_with_stream_id=pos,
+            absolute_field_overrides={
+                # these are counted absolutely because it is
+                # more difficult to count them from the promised time,
+                # because counting them now can use the quick lookup
+                # tables.
+                "current_state_events": current_state_events_count,
+                "joined_members": membership_counts.get(Membership.JOIN, 0),
+                "invited_members": membership_counts.get(Membership.INVITE, 0),
+                "left_members": membership_counts.get(Membership.LEAVE, 0),
+                "banned_members": membership_counts.get(Membership.BAN, 0),
+                "local_users_in_room": len(local_users_in_room),
+            },
+        )

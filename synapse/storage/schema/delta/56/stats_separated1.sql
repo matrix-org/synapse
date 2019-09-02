@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS room_stats_current (
     left_members INT NOT NULL,
     banned_members INT NOT NULL,
 
+    local_users_in_room INT NOT NULL,
+
     -- If initial stats regen is still to be performed: NULL
     -- If initial stats regen has been performed: the maximum delta stream
     --  position that this row takes into account.
