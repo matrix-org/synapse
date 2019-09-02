@@ -74,7 +74,7 @@ class BackgroundUpdatePerformance(object):
             return float(self.total_item_count) / float(self.total_duration_ms)
 
 
-class BackgroundUpdateStore(SQLBaseStore):
+class BackgroundUpdateStore:
     """ Background updates are updates to the database that run in the
     background. Each update processes a batch of data at once. We attempt to
     limit the impact of each update by monitoring how long each batch takes to
@@ -86,8 +86,10 @@ class BackgroundUpdateStore(SQLBaseStore):
     BACKGROUND_UPDATE_INTERVAL_MS = 1000
     BACKGROUND_UPDATE_DURATION_MS = 100
 
-    def __init__(self, db_conn, hs):
-        super(BackgroundUpdateStore, self).__init__(db_conn, hs)
+    def __init__(self, store, clock):
+        self._store = store
+        self._clock = clock
+
         self._background_update_performance = {}
         self._background_update_queue = []
         self._background_update_handlers = {}
@@ -100,7 +102,7 @@ class BackgroundUpdateStore(SQLBaseStore):
     def _run_background_updates(self):
         logger.info("Starting background schema updates")
         while True:
-            yield self.hs.get_clock().sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0)
+            yield self._clock.sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0)
 
             try:
                 result = yield self.do_next_background_update(
@@ -136,7 +138,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         # otherwise, check if there are updates to be run. This is important,
         # as we may be running on a worker which doesn't perform the bg updates
         # itself, but still wants to wait for them to happen.
-        updates = yield self._simple_select_onecol(
+        updates = yield self._store._simple_select_onecol(
             "background_updates",
             keyvalues=None,
             retcol="1",
@@ -161,7 +163,7 @@ class BackgroundUpdateStore(SQLBaseStore):
             no more work to do.
         """
         if not self._background_update_queue:
-            updates = yield self._simple_select_list(
+            updates = yield self._store._simple_select_list(
                 "background_updates",
                 keyvalues=None,
                 retcols=("update_name", "depends_on"),
@@ -203,7 +205,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         else:
             batch_size = self.DEFAULT_BACKGROUND_BATCH_SIZE
 
-        progress_json = yield self._simple_select_one_onecol(
+        progress_json = yield self._store._simple_select_one_onecol(
             "background_updates",
             keyvalues={"update_name": update_name},
             retcol="progress_json",
@@ -368,7 +370,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         def updater(progress, batch_size):
             if runner is not None:
                 logger.info("Adding index %s to %s", index_name, table)
-                yield self.runWithConnection(runner)
+                yield self._store.runWithConnection(runner)
             yield self._end_background_update(update_name)
             return 1
 
@@ -390,7 +392,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._background_update_queue = []
         progress_json = json.dumps(progress)
 
-        return self._simple_insert(
+        return self._store._simple_insert(
             "background_updates",
             {"update_name": update_name, "progress_json": progress_json},
         )
@@ -406,7 +408,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._background_update_queue = [
             name for name in self._background_update_queue if name != update_name
         ]
-        return self._simple_delete_one(
+        return self._store._simple_delete_one(
             "background_updates", keyvalues={"update_name": update_name}
         )
 
@@ -421,7 +423,7 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         progress_json = json.dumps(progress)
 
-        self._simple_update_one_txn(
+        self._store._simple_update_one_txn(
             txn,
             "background_updates",
             keyvalues={"update_name": update_name},
