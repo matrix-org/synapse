@@ -378,7 +378,7 @@ class SyncHandler(object):
                 event_copy = {k: v for (k, v) in iteritems(event) if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
-        return (now_token, ephemeral_by_room)
+        return now_token, ephemeral_by_room
 
     @defer.inlineCallbacks
     def _load_filtered_recents(
@@ -1332,7 +1332,7 @@ class SyncHandler(object):
                     )
                     if not tags_by_room:
                         logger.debug("no-oping sync")
-                        return ([], [], [], [])
+                        return [], [], [], []
 
         ignored_account_data = yield self.store.get_global_account_data_by_type_for_user(
             "m.ignored_user_list", user_id=user_id
@@ -1642,7 +1642,7 @@ class SyncHandler(object):
                 )
             room_entries.append(entry)
 
-        return (room_entries, invited, newly_joined_rooms, newly_left_rooms)
+        return room_entries, invited, newly_joined_rooms, newly_left_rooms
 
     @defer.inlineCallbacks
     def _get_all_rooms(self, sync_result_builder, ignored_users):
@@ -1716,7 +1716,7 @@ class SyncHandler(object):
                     )
                 )
 
-        return (room_entries, invited, [])
+        return room_entries, invited, []
 
     @defer.inlineCallbacks
     def _generate_room_entry(

@@ -326,8 +326,9 @@ class FederationHandler(BaseHandler):
                     ours = yield self.store.get_state_groups_ids(room_id, seen)
 
                     # state_maps is a list of mappings from (type, state_key) to event_id
-                    # type: list[dict[tuple[str, str], str]]
-                    state_maps = list(ours.values())
+                    state_maps = list(
+                        ours.values()
+                    )  # type: list[dict[tuple[str, str], str]]
 
                     # we don't need this any more, let's delete it.
                     del ours
@@ -1427,7 +1428,7 @@ class FederationHandler(BaseHandler):
         assert event.user_id == user_id
         assert event.state_key == user_id
         assert event.room_id == room_id
-        return (origin, event, format_ver)
+        return origin, event, format_ver
 
     @defer.inlineCallbacks
     @log_function

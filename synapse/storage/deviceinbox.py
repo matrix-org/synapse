@@ -67,7 +67,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 messages.append(json.loads(row[1]))
             if len(messages) < limit:
                 stream_pos = current_stream_id
-            return (messages, stream_pos)
+            return messages, stream_pos
 
         return self.runInteraction(
             "get_new_messages_for_device", get_new_messages_for_device_txn
@@ -176,7 +176,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             if len(messages) < limit:
                 log_kv({"message": "Set stream position to current position"})
                 stream_pos = current_stream_id
-            return (messages, stream_pos)
+            return messages, stream_pos
 
         return self.runInteraction(
             "get_new_device_msgs_for_remote",
