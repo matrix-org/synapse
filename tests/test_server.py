@@ -57,7 +57,7 @@ class JsonResourceTests(unittest.TestCase):
 
         def _callback(request, **kwargs):
             got_kwargs.update(kwargs)
-            return (200, kwargs)
+            return 200, kwargs
 
         res = JsonResource(self.homeserver)
         res.register_paths(

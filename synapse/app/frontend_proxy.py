@@ -70,12 +70,12 @@ class PresenceStatusStubServlet(RestServlet):
         except HttpResponseException as e:
             raise e.to_synapse_error()
 
-        return (200, result)
+        return 200, result
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         yield self.auth.get_user_by_req(request)
-        return (200, {})
+        return 200, {}
 
 
 class KeyUploadServlet(RestServlet):
@@ -126,11 +126,11 @@ class KeyUploadServlet(RestServlet):
                 self.main_uri + request.uri.decode("ascii"), body, headers=headers
             )
 
-            return (200, result)
+            return 200, result
         else:
             # Just interested in counts.
             result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
-            return (200, {"one_time_key_counts": result})
+            return 200, {"one_time_key_counts": result}
 
 
 class FrontendProxySlavedStore(
@@ -232,8 +232,6 @@ def start(config_options):
 
     assert config.worker_main_http_uri is not None
 
-    setup_logging(config, use_worker_options=True)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -245,6 +243,8 @@ def start(config_options):
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
+
+    setup_logging(ss, config, use_worker_options=True)
 
     ss.setup()
     reactor.addSystemEventTrigger(

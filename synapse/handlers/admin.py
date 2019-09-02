@@ -94,6 +94,25 @@ class AdminHandler(BaseHandler):
 
         return ret
 
+    def get_user_server_admin(self, user):
+        """
+        Get the admin bit on a user.
+
+        Args:
+            user_id (UserID): the (necessarily local) user to manipulate
+        """
+        return self.store.is_server_admin(user)
+
+    def set_user_server_admin(self, user, admin):
+        """
+        Set the admin bit on a user.
+
+        Args:
+            user_id (UserID): the (necessarily local) user to manipulate
+            admin (bool): whether or not the user should be an admin of this server
+        """
+        return self.store.set_server_admin(user, admin)
+
     @defer.inlineCallbacks
     def export_user_data(self, user_id, writer):
         """Write all data we have on the user to the given writer.
