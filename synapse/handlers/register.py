@@ -24,7 +24,6 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     ConsentNotGivenError,
-    InvalidCaptchaError,
     LimitExceededError,
     RegistrationError,
     SynapseError,
@@ -39,7 +38,6 @@ from synapse.replication.http.register import (
 )
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
-from synapse.util.threepids import check_3pid_allowed
 
 from ._base import BaseHandler
 
