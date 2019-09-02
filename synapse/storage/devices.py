@@ -356,9 +356,8 @@ class DeviceWorkerStore(SQLBaseStore):
 
         set_tag("in_cache", results)
         set_tag("not_in_cache", user_ids_not_in_cache)
-    
-        return user_ids_not_in_cache, results
 
+        return user_ids_not_in_cache, results
 
     @cachedInlineCallbacks(num_args=2, tree=True)
     def _get_cached_user_device(self, user_id, device_id):
