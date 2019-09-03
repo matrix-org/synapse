@@ -61,21 +61,72 @@ class IdentityHandler(BaseHandler):
                 return False
         return True
 
-    @defer.inlineCallbacks
-    def threepid_from_creds(self, creds):
-        if "id_server" in creds:
-            id_server = creds["id_server"]
-        elif "idServer" in creds:
-            id_server = creds["idServer"]
-        else:
-            raise SynapseError(400, "No id_server in creds")
+    def _extract_items_from_creds_dict(self, creds):
+        """
+        Retrieve entries from a "credentials" dictionary
 
-        if "client_secret" in creds:
-            client_secret = creds["client_secret"]
-        elif "clientSecret" in creds:
-            client_secret = creds["clientSecret"]
+        Args:
+            creds (dict[str, str]): Dictionary of credentials that contain the following keys:
+                * client_secret|clientSecret: A unique secret str provided by the client
+                * id_server|idServer: the domain of the identity server to query
+                * id_access_token: The access token to authenticate to the identity
+                    server with.
+
+        Returns:
+            tuple(str, str, str|None): A tuple containing the client_secret, the id_server,
+                and the id_access_token value if available.
+        """
+        client_secret = creds.get("client_secret") or creds.get("clientSecret")
+        if not client_secret:
+            raise SynapseError(
+                400, "No client_secret in creds", errcode=Codes.MISSING_PARAM
+            )
+
+        id_server = creds.get("id_server") or creds.get("idServer")
+        if not id_server:
+            raise SynapseError(
+                400, "No id_server in creds", errcode=Codes.MISSING_PARAM
+            )
+
+        id_access_token = creds.get("id_access_token")
+        return client_secret, id_server, id_access_token
+
+    @defer.inlineCallbacks
+    def threepid_from_creds(self, creds, use_v2=True):
+        """
+        Retrieve and validate a threepid identitier from a "credentials" dictionary
+
+        Args:
+            creds (dict[str, str]): Dictionary of credentials that contain the following keys:
+                * client_secret|clientSecret: A unique secret str provided by the client
+                * id_server|idServer: the domain of the identity server to query
+                * id_access_token: The access token to authenticate to the identity
+                    server with. Required if use_v2 is true
+            use_v2 (bool): Whether to use v2 Identity Service API endpoints
+
+        Returns:
+            Deferred[dict[str,str|int]|None]: A dictionary consisting of response params to
+                the /getValidated3pid endpoint of the Identity Service API, or None if the
+                threepid was not found
+        """
+        client_secret, id_server, id_access_token = self._extract_items_from_creds_dict(
+            creds
+        )
+
+        query_params = {"sid": creds["sid"], "client_secret": client_secret}
+
+        # Decide which API endpoint URLs and query parameters to use
+        if use_v2:
+            url = "https://%s%s" % (
+                id_server,
+                "/_matrix/identity/v2/3pid/getValidated3pid",
+            )
+            query_params["id_access_token"] = id_access_token
         else:
-            raise SynapseError(400, "No client_secret in creds")
+            url = "https://%s%s" % (
+                id_server,
+                "/_matrix/identity/api/v1/3pid/getValidated3pid",
+            )
 
         if not self._should_trust_id_server(id_server):
             logger.warn(
@@ -85,43 +136,51 @@ class IdentityHandler(BaseHandler):
             return None
 
         try:
-            data = yield self.http_client.get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/3pid/getValidated3pid"),
-                {"sid": creds["sid"], "client_secret": client_secret},
-            )
+            data = yield self.http_client.get_json(url, query_params)
+            return data if "medium" in data else None
         except HttpResponseException as e:
-            logger.info("getValidated3pid failed with Matrix error: %r", e)
-            raise e.to_synapse_error()
+            if e.code != 404 or not use_v2:
+                # Generic failure
+                logger.info("getValidated3pid failed with Matrix error: %r", e)
+                raise e.to_synapse_error()
 
-        if "medium" in data:
-            return data
-        return None
+        # This identity server is too old to understand Identity Service API v2
+        # Attempt v1 endpoint
+        logger.warn("Got 404 when POSTing JSON %s, falling back to v1 URL", url)
+        return (yield self.threepid_from_creds(creds, use_v2=False))
 
     @defer.inlineCallbacks
-    def bind_threepid(self, creds, mxid):
+    def bind_threepid(self, creds, mxid, use_v2=True):
+        """Bind a 3PID to an identity server
+
+        Args:
+            creds (dict[str, str]): Dictionary of credentials that contain the following keys:
+                * client_secret|clientSecret: A unique secret str provided by the client
+                * id_server|idServer: the domain of the identity server to query
+                * id_access_token: The access token to authenticate to the identity
+                    server with. Required if use_v2 is true
+            mxid (str): The MXID to bind the 3PID to
+            use_v2 (bool): Whether to use v2 Identity Service API endpoints
+
+        Returns:
+            Deferred[dict]: The response from the identity server
+        """
         logger.debug("binding threepid %r to %s", creds, mxid)
-        data = None
 
-        if "id_server" in creds:
-            id_server = creds["id_server"]
-        elif "idServer" in creds:
-            id_server = creds["idServer"]
-        else:
-            raise SynapseError(400, "No id_server in creds")
+        client_secret, id_server, id_access_token = self._extract_items_from_creds_dict(
+            creds
+        )
 
-        if "client_secret" in creds:
-            client_secret = creds["client_secret"]
-        elif "clientSecret" in creds:
-            client_secret = creds["clientSecret"]
+        # Decide which API endpoint URLs to use
+        bind_data = {"sid": creds["sid"], "client_secret": client_secret, "mxid": mxid}
+        if use_v2:
+            bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server,)
+            bind_data["id_access_token"] = id_access_token
         else:
-            raise SynapseError(400, "No client_secret in creds")
+            bind_url = "https://%s/_matrix/identity/api/v1/3pid/bind" % (id_server,)
 
         try:
-            data = yield self.http_client.post_json_get_json(
-                "https://%s%s" % (id_server, "/_matrix/identity/api/v1/3pid/bind"),
-                {"sid": creds["sid"], "client_secret": client_secret, "mxid": mxid},
-            )
+            data = yield self.http_client.post_json_get_json(bind_url, bind_data)
             logger.debug("bound threepid %r to %s", creds, mxid)
 
             # Remember where we bound the threepid
@@ -131,9 +190,18 @@ class IdentityHandler(BaseHandler):
                 address=data["address"],
                 id_server=id_server,
             )
+
+            return data
+        except HttpResponseException as e:
+            if e.code != 404 or not use_v2:
+                logger.error("3PID bind failed with Matrix error: %r", e)
+                raise e.to_synapse_error()
         except CodeMessageException as e:
             data = json.loads(e.msg)  # XXX WAT?
-        return data
+            return data
+
+        logger.warn("Got 404 when POSTing JSON %s, falling back to v1 URL", bind_url)
+        return (yield self.bind_threepid(creds, mxid, use_v2=False))
 
     @defer.inlineCallbacks
     def try_unbind_threepid(self, mxid, threepid):
@@ -172,13 +240,16 @@ class IdentityHandler(BaseHandler):
         return changed
 
     @defer.inlineCallbacks
-    def try_unbind_threepid_with_id_server(self, mxid, threepid, id_server):
+    def try_unbind_threepid_with_id_server(
+        self, mxid, threepid, id_server, use_v2=True
+    ):
         """Removes a binding from an identity server
 
         Args:
             mxid (str): Matrix user ID of binding to be removed
             threepid (dict): Dict with medium & address of binding to be removed
             id_server (str): Identity server to unbind from
+            use_v2 (bool): Whether to use the v2 identity service unbind API
 
         Raises:
             SynapseError: If we failed to contact the identity server
@@ -187,7 +258,14 @@ class IdentityHandler(BaseHandler):
             Deferred[bool]: True on success, otherwise False if the identity
             server doesn't support unbinding
         """
-        url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
+        # First attempt the v2 endpoint
+        if use_v2:
+            url = "https://%s/_matrix/identity/v2/3pid/unbind" % (id_server,)
+            url_bytes = "/_matrix/identity/v2/3pid/unbind".encode("ascii")
+        else:
+            url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
+            url_bytes = "/_matrix/identity/api/v1/3pid/unbind".encode("ascii")
+
         content = {
             "mxid": mxid,
             "threepid": {"medium": threepid["medium"], "address": threepid["address"]},
@@ -199,23 +277,35 @@ class IdentityHandler(BaseHandler):
         auth_headers = self.federation_http_client.build_auth_headers(
             destination=None,
             method="POST",
-            url_bytes="/_matrix/identity/api/v1/3pid/unbind".encode("ascii"),
+            url_bytes=url_bytes,
             content=content,
             destination_is=id_server,
         )
         headers = {b"Authorization": auth_headers}
 
+        v1_fallback = False
         try:
             yield self.http_client.post_json_get_json(url, content, headers)
             changed = True
         except HttpResponseException as e:
             changed = False
-            if e.code in (400, 404, 501):
+            if e.code == 404 and use_v2:
+                # v2 is not supported yet, try again with v1
+                v1_fallback = True
+            elif e.code in (400, 404, 501):
                 # The remote server probably doesn't support unbinding (yet)
                 logger.warn("Received %d response while unbinding threepid", e.code)
             else:
                 logger.error("Failed to unbind threepid on identity server: %s", e)
                 raise SynapseError(502, "Failed to contact identity server")
+
+        if v1_fallback:
+            logger.warn("Got 404 when POSTing JSON %s, falling back to v1 URL", url)
+            return (
+                yield self.try_unbind_threepid_with_id_server(
+                    mxid, threepid, id_server, use_v2=False
+                )
+            )
 
         yield self.store.remove_user_bound_threepid(
             user_id=mxid,

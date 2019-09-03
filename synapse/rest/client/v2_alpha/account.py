@@ -542,15 +542,16 @@ class ThreepidRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        threePidCreds = body.get("threePidCreds")
-        threePidCreds = body.get("three_pid_creds", threePidCreds)
-        if threePidCreds is None:
-            raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
+        threepid_creds = body.get("threePidCreds") or body.get("three_pid_creds")
+        if threepid_creds is None:
+            raise SynapseError(
+                400, "Missing param three_pid_creds", Codes.MISSING_PARAM
+            )
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
+        threepid = yield self.identity_handler.threepid_from_creds(threepid_creds)
 
         if not threepid:
             raise SynapseError(400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED)
@@ -566,7 +567,7 @@ class ThreepidRestServlet(RestServlet):
 
         if "bind" in body and body["bind"]:
             logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threePidCreds, user_id)
+            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
 
         return 200, {}
 
