@@ -461,10 +461,10 @@ class AuthHandler(BaseHandler):
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
         if (
             not password_servlet
-            or self.hs.config.threepid_behaviour == ThreepidBehaviour.REMOTE
+            or self.hs.config.threepid_behaviour_email== ThreepidBehaviour.REMOTE
         ):
             threepid = yield identity_handler.threepid_from_creds(threepid_creds)
-        elif self.hs.config.threepid_behaviour == ThreepidBehaviour.LOCAL:
+        elif self.hs.config.threepid_behaviour_email== ThreepidBehaviour.LOCAL:
             row = yield self.store.get_threepid_validation_session(
                 medium,
                 threepid_creds["client_secret"],

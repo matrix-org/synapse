@@ -108,12 +108,12 @@ class EmailConfig(Config):
                 )
 
         self.local_threepid_handling_disabled_due_to_email_config = False
-        if self.threepid_behaviour == ThreepidBehaviour.LOCAL and email_config == {}:
+        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL and email_config == {}:
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
             self.local_threepid_handling_disabled_due_to_email_config = True
 
-            self.threepid_behaviour = ThreepidBehaviour.OFF
+            self.threepid_behaviour_email = ThreepidBehaviour.OFF
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
@@ -123,7 +123,7 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.threepid_behaviour == ThreepidBehaviour.LOCAL
+            or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
         ):
             # make sure we can import the required deps
             import jinja2
@@ -133,7 +133,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.threepid_behaviour == ThreepidBehaviour.LOCAL:
+        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             required = ["smtp_host", "smtp_port", "notif_from"]
 
             missing = []
