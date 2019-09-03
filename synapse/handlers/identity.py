@@ -289,7 +289,7 @@ class IdentityHandler(BaseHandler):
             raise e.to_synapse_error()
 
     @defer.inlineCallbacks
-    def lookup_3pid(self, id_server, medium, address):
+    def lookup_3pid(self, id_server, medium, address, id_access_token=None):
         """Looks up a 3pid in the passed identity server.
 
         Args:
@@ -297,16 +297,23 @@ class IdentityHandler(BaseHandler):
                 of the identity server to use.
             medium (str): The type of the third party identifier (e.g. "email").
             address (str): The third party identifier (e.g. "foo@example.com").
+            id_access_token (str|None): The access token to authenticate to the identity
+                server with
 
         Returns:
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
+        # If an access token is present, add it to the query params of the hash_details request
+        query_params = {}
+        if id_access_token is not None:
+            query_params["id_access_token"] = id_access_token
+
         # Check what hashing details are supported by this identity server
         use_v1 = False
         hash_details = None
         try:
             hash_details = yield self.http_client.get_json(
-                "%s/_matrix/identity/v2/hash_details" % id_server
+                "%s/_matrix/identity/v2/hash_details" % id_server, query_params
             )
         except (HttpResponseException, ValueError) as e:
             # Catch HttpResponseExcept for a non-200 response code
@@ -323,7 +330,11 @@ class IdentityHandler(BaseHandler):
         if use_v1:
             return (yield self._lookup_3pid_v1(id_server, medium, address))
 
-        return (yield self._lookup_3pid_v2(id_server, medium, address, hash_details))
+        return (
+            yield self._lookup_3pid_v2(
+                id_server, id_access_token, medium, address, hash_details
+            )
+        )
 
     @defer.inlineCallbacks
     def _lookup_3pid_v1(self, id_server, medium, address):
@@ -356,12 +367,15 @@ class IdentityHandler(BaseHandler):
         return None
 
     @defer.inlineCallbacks
-    def _lookup_3pid_v2(self, id_server, medium, address, hash_details):
+    def _lookup_3pid_v2(
+        self, id_server, id_access_token, medium, address, hash_details
+    ):
         """Looks up a 3pid in the passed identity server using v2 lookup.
 
         Args:
             id_server (str): The server name (including protocol and port, if required)
                 of the identity server to use.
+            id_access_token (str): The access token to authenticate to the identity server with
             medium (str): The type of the third party identifier (e.g. "email").
             address (str): The third party identifier (e.g. "foo@example.com").
             hash_details (dict[str, str|list]): A dictionary containing hashing information
@@ -406,6 +420,7 @@ class IdentityHandler(BaseHandler):
             lookup_results = yield self.http_client.post_json_get_json(
                 "%s/_matrix/identity/v2/lookup" % id_server,
                 {
+                    "id_access_token": id_access_token,
                     "addresses": [lookup_value],
                     "algorithm": lookup_algorithm,
                     "pepper": lookup_pepper,

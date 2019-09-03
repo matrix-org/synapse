@@ -579,8 +579,8 @@ class RoomCreationHandler(BaseHandler):
 
         room_id = yield self._generate_room_id(creator_id=user_id, is_public=is_public)
 
+        directory_handler = self.hs.get_handlers().directory_handler
         if room_alias:
-            directory_handler = self.hs.get_handlers().directory_handler
             yield directory_handler.create_association(
                 requester=requester,
                 room_id=room_id,
@@ -665,6 +665,7 @@ class RoomCreationHandler(BaseHandler):
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
+            id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
             yield self.hs.get_room_member_handler().do_3pid_invite(
@@ -675,6 +676,7 @@ class RoomCreationHandler(BaseHandler):
                 id_server,
                 requester,
                 txn_id=None,
+                id_access_token=id_access_token,
             )
 
         result = {"room_id": room_id}
