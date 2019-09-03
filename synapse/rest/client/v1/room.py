@@ -703,7 +703,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 txn_id,
             )
             return 200, {}
-            return
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
