@@ -435,8 +435,6 @@ def start(config_options):
 
     assert config.worker_app == "synapse.app.synchrotron"
 
-    setup_logging(config, use_worker_options=True)
-
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -449,6 +447,8 @@ def start(config_options):
         database_engine=database_engine,
         application_service_handler=SynchrotronApplicationService(),
     )
+
+    setup_logging(ss, config, use_worker_options=True)
 
     ss.setup()
     reactor.addSystemEventTrigger(

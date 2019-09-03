@@ -15,9 +15,18 @@
 
 import logging
 
+from canonicaljson import json
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.logging.opentracing import (
+    get_active_span_text_map,
+    log_kv,
+    set_tag,
+    start_active_span,
+    whitelisted_homeserver,
+)
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.stringutils import random_string
 
@@ -78,7 +87,8 @@ class DeviceMessageHandler(object):
 
     @defer.inlineCallbacks
     def send_device_message(self, sender_user_id, message_type, messages):
-
+        set_tag("number_of_messages", len(messages))
+        set_tag("sender", sender_user_id)
         local_messages = {}
         remote_messages = {}
         for user_id, by_device in messages.items():
@@ -100,15 +110,23 @@ class DeviceMessageHandler(object):
 
         message_id = random_string(16)
 
+        context = get_active_span_text_map()
+
         remote_edu_contents = {}
         for destination, messages in remote_messages.items():
-            remote_edu_contents[destination] = {
-                "messages": messages,
-                "sender": sender_user_id,
-                "type": message_type,
-                "message_id": message_id,
-            }
+            with start_active_span("to_device_for_user"):
+                set_tag("destination", destination)
+                remote_edu_contents[destination] = {
+                    "messages": messages,
+                    "sender": sender_user_id,
+                    "type": message_type,
+                    "message_id": message_id,
+                    "org.matrix.opentracing_context": json.dumps(context)
+                    if whitelisted_homeserver(destination)
+                    else None,
+                }
 
+        log_kv({"local_messages": local_messages})
         stream_id = yield self.store.add_messages_to_device_inbox(
             local_messages, remote_edu_contents
         )
@@ -117,6 +135,7 @@ class DeviceMessageHandler(object):
             "to_device_key", stream_id, users=local_messages.keys()
         )
 
+        log_kv({"remote_messages": remote_messages})
         for destination in remote_messages.keys():
             # Enqueue a new federation transaction to send the new
             # device messages to each remote destination.

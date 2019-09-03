@@ -32,7 +32,7 @@ It is up to the remote server to decide what it does with the spans
 it creates. This is called the sampling policy and it can be configured
 through Jaeger's settings.
 
-For OpenTracing concepts see 
+For OpenTracing concepts see
 https://opentracing.io/docs/overview/what-is-tracing/.
 
 For more information about Jaeger's implementation see
@@ -79,7 +79,7 @@ Homeserver whitelisting
 
 The homeserver whitelist is configured using regular expressions. A list of regular
 expressions can be given and their union will be compared when propagating any
-spans contexts to another homeserver. 
+spans contexts to another homeserver.
 
 Though it's mostly safe to send and receive span contexts to and from
 untrusted users since span contexts are usually opaque ids it can lead to
@@ -91,6 +91,29 @@ two problems, namely:
 - Sending servers can attach arbitrary data to spans, known as 'baggage'. For safety this has been disabled in Synapse
   but that doesn't prevent another server sending you baggage which will be logged
   to OpenTracing's logs.
+
+==========
+EDU FORMAT
+==========
+
+EDUs can contain tracing data in their content. This is not specced but
+it could be of interest for other homeservers.
+
+EDU format (if you're using jaeger):
+
+.. code-block:: json
+
+   {
+     "edu_type": "type",
+     "content": {
+       "org.matrix.opentracing_context": {
+         "uber-trace-id": "fe57cf3e65083289"
+       }
+     }
+   }
+
+Though you don't have to use jaeger you must inject the span context into
+`org.matrix.opentracing_context` using the opentracing `Format.TEXT_MAP` inject method.
 
 ==================
 Configuring Jaeger
