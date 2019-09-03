@@ -75,7 +75,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
         self.config = hs.config
 
-        if self.hs.config.threepid_behaviour_email== ThreepidBehaviour.LOCAL:
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
             templates = load_jinja2_templates(
@@ -92,7 +92,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if self.hs.config.threepid_behaviour_email== ThreepidBehaviour.OFF:
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
                     "Email registration has been disabled due to lack of email config"
@@ -124,7 +124,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        if self.config.threepid_behaviour_email== ThreepidBehaviour.REMOTE:
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             if not self.hs.config.account_threepid_delegate_email:
                 logger.warn(
                     "No upstream email account_threepid_delegate configured on the server to "
@@ -246,7 +246,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
             )
-        if self.config.threepid_behaviour_email== ThreepidBehaviour.OFF:
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
                     "User registration via email has been disabled due to lack of email config"
