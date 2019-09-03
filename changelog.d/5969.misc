@@ -1,1 +1,1 @@
-Change account_threepid_delegate to account_threepid_delegates to handle the case of Synapse handling email verification, and an external server handling msisdn verification.
+Change account_threepid_delegate to an account_threepid_delegates dictionary to handle the case of Synapse handling email verification, and an external server handling msisdn verification.
