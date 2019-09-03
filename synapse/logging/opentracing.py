@@ -92,7 +92,7 @@ operation name to ``trace``
 
    from synapse.logging.opentracing import trace
 
-   @trace(operation_name="a_better_operation_name")
+   @trace(opname="a_better_operation_name")
    def interesting_badly_named_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
