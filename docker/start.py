@@ -41,7 +41,7 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
         config_dir (str): where to put generated config files
         config_path (str): where to put the main config file
         environ (dict): environment dictionary
-        ownership (str): "<user>:<group>" string which will be used to set
+        ownership (str|None): "<user>:<group>" string which will be used to set
             ownership of the generated configs. If None, ownership will not change.
     """
     for v in ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS"):
@@ -130,7 +130,7 @@ def run_generate_config(environ, ownership):
 
     Args:
         environ (dict): env var dict
-        ownership (str): "userid:groupid" arg for chmod. If None, ownership will not change.
+        ownership (str|None): "userid:groupid" arg for chmod. If None, ownership will not change.
 
     Never returns.
     """
