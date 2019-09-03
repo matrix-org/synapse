@@ -192,6 +192,17 @@ class RoomWorkerStore(SQLBaseStore):
         if where_clauses:
             where_clause = " AND " + " AND ".join(where_clauses)
 
+        # This query works in two parts:
+        #
+        #   1. The subqueries are for fetching all rooms from the
+        #      public_room_list_stream table that are a) visibile and b) match
+        #      the network_tuple filter. This is slightly convoluted as a room
+        #      may be in multiple room lists, hence the weird visibility
+        #      aggregation to look for *any* list where visibility is true.
+        #
+        #   2. Once we have the rooms, we can then just join on the stats table
+        #      to get the necessary info and do the necessary filtering.
+
         sql = """
             SELECT
                 room_id, name, topic, canonical_alias, joined_members,
