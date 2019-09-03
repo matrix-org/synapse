@@ -59,7 +59,7 @@ class VersionsRestServlet(RestServlet):
                     # also requires `id_server`. If the homeserver is handling 3PID
                     # verification itself, there is no need to ask the user for `id_server` to
                     # be supplied.
-                    "m.require_identity_server": False
+                    "m.require_identity_server": False,
                 },
             },
         )
