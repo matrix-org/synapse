@@ -105,13 +105,9 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
     log("Generating log config file " + log_config_file)
     convert("/conf/log.config", log_config_file, environ)
 
-    subprocess.check_output(["chown", "-R", ownership, "/data"])
 
     # Hopefully we already have a signing key, but generate one if not.
-    subprocess.check_output(
-        [
-            "su-exec",
-            ownership,
+    args = [
             "python",
             "-m",
             "synapse.app.homeserver",
@@ -122,7 +118,12 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
             config_dir,
             "--generate-keys",
         ]
-    )
+
+    if ownership is not None:
+        subprocess.check_output(["chown", "-R", ownership, "/data"])
+        args = ["su-exec", ownership] + args
+
+    subprocess.check_output(args)
 
 
 def run_generate_config(environ, ownership):
@@ -149,9 +150,6 @@ def run_generate_config(environ, ownership):
         log("Creating log config %s" % (log_config_file,))
         convert("/conf/log.config", log_config_file, environ)
 
-    # make sure that synapse has perms to write to the data dir.
-    subprocess.check_output(["chown", ownership, data_dir])
-
     args = [
         "python",
         "-m",
@@ -170,13 +168,27 @@ def run_generate_config(environ, ownership):
         "--open-private-ports",
     ]
     # log("running %s" % (args, ))
-    os.execv("/usr/local/bin/python", args)
+
+    if ownership is not None:
+        args = [ "su-exec", ownership ] + args
+        os.execv("/sbin/su-exec", args)
+
+        # make sure that synapse has perms to write to the data dir.
+        subprocess.check_output(["chown", ownership, data_dir])
+    else:
+        os.execv("/usr/local/bin/python", args)
 
 
 def main(args, environ):
     mode = args[1] if len(args) > 1 else None
-    ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
+    desired_uid = int(environ.get("UID", "991"))
+    desired_gid = int(environ.get("GID", "991"))
+    if (desired_uid == os.getuid()) and (desired_gid == os.getgid()):
+        ownership = None
+    else:
+        ownership = "{}:{}".format(desired_uid, desired_gid)
 
+    log("Desired: %s, %s, Actual %s %s, Setting UID/GID to %s." % (desired_uid, os.getuid(), desired_gid, os.getgid(), ownership))
     # In generate mode, generate a configuration and missing keys, then exit
     if mode == "generate":
         return run_generate_config(environ, ownership)
@@ -228,15 +240,17 @@ def main(args, environ):
     log("Starting synapse with config file " + config_path)
 
     args = [
-        "su-exec",
-        ownership,
         "python",
         "-m",
         "synapse.app.homeserver",
         "--config-path",
         config_path,
     ]
-    os.execv("/sbin/su-exec", args)
+    if ownership is not None:
+        args = [ "su-exec", ownership ] + args
+        os.execv("/sbin/su-exec", args)
+    else:
+        os.execv("/usr/local/bin/python", args)
 
 
 if __name__ == "__main__":
