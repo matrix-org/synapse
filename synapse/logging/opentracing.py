@@ -85,14 +85,14 @@ the function becomes the operation name for the span.
        return something_usual_and_useful
 
 
-Operation names can be explicitly set for functions by using
-``trace_using_operation_name``
+Operation names can be explicitly set for a function by passing the
+operation name to ``trace``
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import trace_using_operation_name
+   from synapse.logging.opentracing import trace
 
-   @trace_using_operation_name("A *much* better operation name")
+   @trace(opname="a_better_operation_name")
    def interesting_badly_named_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
@@ -641,66 +641,26 @@ def extract_text_map(carrier):
 # Tracing decorators
 
 
-def trace(func):
+def trace(func=None, opname=None):
     """
     Decorator to trace a function.
-    Sets the operation name to that of the function's.
+    Sets the operation name to that of the function's or that given
+    as operation_name. See the module's doc string for usage
+    examples.
     """
-    if opentracing is None:
-        return func
 
-    @wraps(func)
-    def _trace_inner(self, *args, **kwargs):
-        if opentracing is None:
-            return func(self, *args, **kwargs)
-
-        scope = start_active_span(func.__name__)
-        scope.__enter__()
-
-        try:
-            result = func(self, *args, **kwargs)
-            if isinstance(result, defer.Deferred):
-
-                def call_back(result):
-                    scope.__exit__(None, None, None)
-                    return result
-
-                def err_back(result):
-                    scope.span.set_tag(tags.ERROR, True)
-                    scope.__exit__(None, None, None)
-                    return result
-
-                result.addCallbacks(call_back, err_back)
-
-            else:
-                scope.__exit__(None, None, None)
-
-            return result
-
-        except Exception as e:
-            scope.__exit__(type(e), None, e.__traceback__)
-            raise
-
-    return _trace_inner
-
-
-def trace_using_operation_name(operation_name):
-    """Decorator to trace a function. Explicitely sets the operation_name."""
-
-    def trace(func):
-        """
-        Decorator to trace a function.
-        Sets the operation name to that of the function's.
-        """
+    def decorator(func):
         if opentracing is None:
             return func
+
+        _opname = opname if opname else func.__name__
 
         @wraps(func)
         def _trace_inner(self, *args, **kwargs):
             if opentracing is None:
                 return func(self, *args, **kwargs)
 
-            scope = start_active_span(operation_name)
+            scope = start_active_span(_opname)
             scope.__enter__()
 
             try:
@@ -717,6 +677,7 @@ def trace_using_operation_name(operation_name):
                         return result
 
                     result.addCallbacks(call_back, err_back)
+
                 else:
                     scope.__exit__(None, None, None)
 
@@ -728,7 +689,10 @@ def trace_using_operation_name(operation_name):
 
         return _trace_inner
 
-    return trace
+    if func:
+        return decorator(func)
+    else:
+        return decorator
 
 
 def tag_args(func):

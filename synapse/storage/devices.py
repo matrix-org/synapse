@@ -23,6 +23,7 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import (
     get_active_span_text_map,
+    set_tag,
     trace,
     whitelisted_homeserver,
 )
@@ -321,6 +322,7 @@ class DeviceWorkerStore(SQLBaseStore):
     def get_device_stream_token(self):
         return self._device_list_id_gen.get_current_token()
 
+    @trace
     @defer.inlineCallbacks
     def get_user_devices_from_cache(self, query_list):
         """Get the devices (and keys if any) for remote users from the cache.
@@ -351,6 +353,9 @@ class DeviceWorkerStore(SQLBaseStore):
                 results.setdefault(user_id, {})[device_id] = device
             else:
                 results[user_id] = yield self._get_cached_devices_for_user(user_id)
+
+        set_tag("in_cache", results)
+        set_tag("not_in_cache", user_ids_not_in_cache)
 
         return user_ids_not_in_cache, results
 
