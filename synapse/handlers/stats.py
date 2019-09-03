@@ -273,6 +273,8 @@ class StatsHandler(StateDeltasHandler):
                 room_state["avatar"] = event_content.get("url")
             elif typ == EventTypes.CanonicalAlias:
                 room_state["canonical_alias"] = event_content.get("alias")
+            elif typ == EventTypes.GuestAccess:
+                room_state["guest_access"] = event_content.get("guest_access")
 
         for room_id, state in room_to_state_updates.items():
             yield self.store.update_room_state(room_id, state)

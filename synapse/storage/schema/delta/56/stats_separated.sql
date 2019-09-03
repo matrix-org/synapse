@@ -133,14 +133,15 @@ CREATE INDEX user_stats_historical_end_ts ON user_stats_historical (end_ts);
 
 CREATE TABLE room_stats_state (
     room_id TEXT NOT NULL,
-    is_federatable BOOLEAN,
+    name TEXT,
+    canonical_alias TEXT,
     join_rules TEXT,
     history_visibility TEXT,
     encryption TEXT,
-    name TEXT,
-    topic TEXT,
     avatar TEXT,
-    canonical_alias TEXT
+    guest_access TEXT,
+    is_federatable BOOLEAN,
+    topic TEXT
 );
 
 CREATE UNIQUE INDEX room_stats_state_room ON room_stats_state(room_id);
