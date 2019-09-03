@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from collections import Counter
 
 from twisted.internet import defer
 
@@ -94,19 +95,33 @@ class StatsHandler(StateDeltasHandler):
 
                 if deltas:
                     logger.debug("Handling %d state deltas", len(deltas))
-                    yield self._handle_deltas(deltas)
+                    room_deltas, user_deltas = yield self._handle_deltas(deltas)
 
                     max_pos = deltas[-1]["stream_id"]
                 else:
+                    room_deltas = {}
+                    user_deltas = {}
                     max_pos = yield self.store.get_room_max_stream_ordering()
 
             # Then count deltas for total_events and total_event_bytes.
             with Measure(self.clock, "stats_total_events_and_bytes"):
-                yield self.store.incremental_update_room_total_events_and_bytes(
+                event_count_changes = yield self.store.get_changes_room_total_events_and_bytes(
                     self.pos, max_pos
                 )
 
-            yield self.store.update_stats_positions(max_pos)
+            for room_id, fields in event_count_changes.items():
+                room_deltas.setdefault(room_id, {}).update(fields)
+
+            logger.debug("room_deltas: %s", room_deltas)
+            logger.debug("user_deltas: %s", user_deltas)
+
+            # Always call this so that we update the stats position.
+            yield self.store.bulk_update_stats_delta(
+                self.clock.time_msec(),
+                updates={"room": room_deltas, "user": user_deltas},
+                stream_id=max_pos,
+            )
+
             event_processing_positions.labels("stats").set(max_pos)
 
             if self.pos == max_pos:
@@ -116,9 +131,17 @@ class StatsHandler(StateDeltasHandler):
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
+        """Called with the state deltas to process
+
+        Returns:
+            Deferred[tuple[dict[str, Counter], dict[str, counter]]]
+            Resovles to two dicts, the room deltas and the user deltas,
+            mapping from room/user ID to changes in the various fields.
         """
-        Called with the state deltas to process
-        """
+
+        room_to_stats_deltas = {}
+        user_to_stats_deltas = {}
+
         for delta in deltas:
             typ = delta["type"]
             state_key = delta["state_key"]
@@ -159,13 +182,12 @@ class StatsHandler(StateDeltasHandler):
             stream_timestamp = int(self.clock.time_msec())
 
             # All the values in this dict are deltas (RELATIVE changes)
-            room_stats_delta = {}
-            is_newly_created = False
+            room_stats_delta = room_to_stats_deltas.setdefault(room_id, Counter())
 
             if prev_event_id is None:
                 # this state event doesn't overwrite another,
                 # so it is a new effective/current state event
-                room_stats_delta["current_state_events"] = 1
+                room_stats_delta["current_state_events"] += 1
 
             if typ == EventTypes.Member:
                 # we could use _get_key_change here but it's a bit inefficient
@@ -193,13 +215,13 @@ class StatsHandler(StateDeltasHandler):
                 elif membership == prev_membership:
                     pass  # noop
                 elif prev_membership == Membership.JOIN:
-                    room_stats_delta["joined_members"] = -1
+                    room_stats_delta["joined_members"] -= 1
                 elif prev_membership == Membership.INVITE:
-                    room_stats_delta["invited_members"] = -1
+                    room_stats_delta["invited_members"] -= 1
                 elif prev_membership == Membership.LEAVE:
-                    room_stats_delta["left_members"] = -1
+                    room_stats_delta["left_members"] -= 1
                 elif prev_membership == Membership.BAN:
-                    room_stats_delta["banned_members"] = -1
+                    room_stats_delta["banned_members"] -= 1
                 else:
                     raise ValueError(
                         "%r is not a valid prev_membership" % (prev_membership,)
@@ -208,13 +230,13 @@ class StatsHandler(StateDeltasHandler):
                 if membership == prev_membership:
                     pass  # noop
                 if membership == Membership.JOIN:
-                    room_stats_delta["joined_members"] = +1
+                    room_stats_delta["joined_members"] += 1
                 elif membership == Membership.INVITE:
-                    room_stats_delta["invited_members"] = +1
+                    room_stats_delta["invited_members"] += 1
                 elif membership == Membership.LEAVE:
-                    room_stats_delta["left_members"] = +1
+                    room_stats_delta["left_members"] += 1
                 elif membership == Membership.BAN:
-                    room_stats_delta["banned_members"] = +1
+                    room_stats_delta["banned_members"] += 1
                 else:
                     raise ValueError("%r is not a valid membership" % (membership,))
 
@@ -232,11 +254,11 @@ class StatsHandler(StateDeltasHandler):
                         field = "public_rooms" if public else "private_rooms"
                         delta = +1 if membership == Membership.JOIN else -1
 
-                        yield self.store.update_stats_delta(
-                            stream_timestamp, "user", user_id, {field: delta}
-                        )
+                        user_to_stats_deltas.setdefault(user_id, Counter())[
+                            field
+                        ] += delta
 
-                        room_stats_delta["local_users_in_room"] = delta
+                        room_stats_delta["local_users_in_room"] += delta
 
             elif typ == EventTypes.Create:
                 # Newly created room. Add it with all blank portions.
@@ -252,8 +274,6 @@ class StatsHandler(StateDeltasHandler):
                         "canonical_alias": None,
                     },
                 )
-
-                is_newly_created = True
 
             elif typ == EventTypes.JoinRules:
                 old_room_state = yield self.store.get_room_stats_state(room_id)
@@ -273,7 +293,7 @@ class StatsHandler(StateDeltasHandler):
                     )
                     if is_public is not None:
                         yield self.update_public_room_stats(
-                            stream_timestamp, room_id, is_public
+                            stream_timestamp, room_id, is_public, stream_id
                         )
 
             elif typ == EventTypes.RoomHistoryVisibility:
@@ -295,7 +315,7 @@ class StatsHandler(StateDeltasHandler):
                     )
                     if is_public is not None:
                         yield self.update_public_room_stats(
-                            stream_timestamp, room_id, is_public
+                            stream_timestamp, room_id, is_public, stream_id
                         )
 
             elif typ == EventTypes.Encryption:
@@ -319,22 +339,10 @@ class StatsHandler(StateDeltasHandler):
                     room_id, {"canonical_alias": event_content.get("alias")}
                 )
 
-            if is_newly_created:
-                yield self.store.update_stats_delta(
-                    stream_timestamp,
-                    "room",
-                    room_id,
-                    room_stats_delta,
-                    complete_with_stream_id=stream_id,
-                )
-
-            elif len(room_stats_delta) > 0:
-                yield self.store.update_stats_delta(
-                    stream_timestamp, "room", room_id, room_stats_delta
-                )
+        return room_to_stats_deltas, user_to_stats_deltas
 
     @defer.inlineCallbacks
-    def update_public_room_stats(self, ts, room_id, is_public):
+    def update_public_room_stats(self, ts, room_id, is_public, stream_id):
         """
         Increment/decrement a user's number of public rooms when a room they are
         in changes to/from public visibility.
@@ -343,6 +351,7 @@ class StatsHandler(StateDeltasHandler):
             ts (int): Timestamp in seconds
             room_id (str)
             is_public (bool)
+            stream_id (int)
         """
         # For now, blindly iterate over all local users in the room so that
         # we can handle the whole problem of copying buckets over as needed
@@ -351,13 +360,14 @@ class StatsHandler(StateDeltasHandler):
         for user_id in user_ids:
             if self.hs.is_mine(UserID.from_string(user_id)):
                 yield self.store.update_stats_delta(
-                    ts,
-                    "user",
-                    user_id,
-                    {
+                    ts=ts,
+                    stats_type="user",
+                    stats_id=user_id,
+                    fields={
                         "public_rooms": +1 if is_public else -1,
                         "private_rooms": -1 if is_public else +1,
                     },
+                    complete_with_stream_id=stream_id,
                 )
 
     @defer.inlineCallbacks

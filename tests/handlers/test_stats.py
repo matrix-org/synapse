@@ -13,12 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
-
-from twisted.internet import defer
-
 from synapse import storage
-from synapse.api.constants import EventTypes, Membership
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 
@@ -181,7 +176,13 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.hs.config.stats_enabled = True
         self.handler.stats_enabled = True
         self.store._all_done = False
-        self.get_success(self.store.update_stats_positions(0))
+        self.get_success(
+            self.store._simple_update_one(
+                table="stats_incremental_position",
+                keyvalues={},
+                updatevalues={"stream_id": 0},
+            )
+        )
 
         self.get_success(
             self.store._simple_insert(
@@ -245,115 +246,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # The newest has 3
         self.assertEqual(r[0]["joined_members"], 3)
-
-    def test_incorrect_state_transition(self):
-        """
-        If the state transition is not one of (JOIN, INVITE, LEAVE, BAN) to
-        (JOIN, INVITE, LEAVE, BAN), an error is raised.
-        """
-        events = {
-            "a1": {"membership": Membership.LEAVE},
-            "a2": {"membership": "not a real thing"},
-        }
-
-        def get_event(event_id, allow_none=True):
-            m = Mock()
-            m.content = events[event_id]
-            d = defer.Deferred()
-            self.reactor.callLater(0.0, d.callback, m)
-            return d
-
-        def get_received_ts(event_id):
-            return defer.succeed(1)
-
-        self.store.get_received_ts = get_received_ts
-        self.store.get_event = get_event
-
-        deltas = [
-            {
-                "type": EventTypes.Member,
-                "state_key": "some_user",
-                "room_id": "room",
-                "event_id": "a1",
-                "prev_event_id": "a2",
-                "stream_id": 60,
-            }
-        ]
-
-        f = self.get_failure(self.handler._handle_deltas(deltas), ValueError)
-        self.assertEqual(
-            f.value.args[0], "'not a real thing' is not a valid prev_membership"
-        )
-
-        # And the other way...
-        deltas = [
-            {
-                "type": EventTypes.Member,
-                "state_key": "some_user",
-                "room_id": "room",
-                "event_id": "a2",
-                "prev_event_id": "a1",
-                "stream_id": 100,
-            }
-        ]
-
-        f = self.get_failure(self.handler._handle_deltas(deltas), ValueError)
-        self.assertEqual(
-            f.value.args[0], "'not a real thing' is not a valid membership"
-        )
-
-    def test_redacted_prev_event(self):
-        """
-        If the prev_event does not exist, then it is assumed to be a LEAVE.
-        """
-        u1 = self.register_user("u1", "pass")
-        u1_token = self.login("u1", "pass")
-
-        room_1 = self.helper.create_room_as(u1, tok=u1_token)
-
-        # Do the initial population of the stats via the background update
-        self._add_background_updates()
-
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
-
-        events = {"a1": None, "a2": {"membership": Membership.JOIN}}
-
-        def get_event(event_id, allow_none=True):
-            if events.get(event_id):
-                m = Mock()
-                m.content = events[event_id]
-            else:
-                m = None
-            d = defer.Deferred()
-            self.reactor.callLater(0.0, d.callback, m)
-            return d
-
-        def get_received_ts(event_id):
-            return defer.succeed(1)
-
-        self.store.get_received_ts = get_received_ts
-        self.store.get_event = get_event
-
-        deltas = [
-            {
-                "type": EventTypes.Member,
-                "state_key": "some_user:test",
-                "room_id": room_1,
-                "event_id": "a2",
-                "prev_event_id": "a1",
-                "stream_id": 100,
-            }
-        ]
-
-        # Handle our fake deltas, which has a user going from LEAVE -> JOIN.
-        self.get_success(self.handler._handle_deltas(deltas))
-
-        # One delta, with two joined members -- the room creator, and our fake
-        # user.
-        r = self.get_success(self.store.get_statistics_for_subject("room", room_1, 0))
-        self.assertEqual(len(r), 1)
-        self.assertEqual(r[0]["joined_members"], 2)
 
     def test_create_user(self):
         """
@@ -742,9 +634,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         self.assertEqual(r1stats["joined_members"], 1)
         self.assertEqual(
-            r1stats["total_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
-        )
-        self.assertEqual(
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
         )
 
@@ -834,10 +723,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # check that _complete rows are complete and correct
         self.assertEqual(r1stats_complete["joined_members"], 2)
         self.assertEqual(r1stats_complete["invited_members"], 1)
-        self.assertEqual(
-            r1stats_complete["total_events"],
-            4 + EXPT_NUM_STATE_EVTS_IN_FRESH_PRIVATE_ROOM,
-        )
+
         self.assertEqual(
             r1stats_complete["current_state_events"],
             2 + EXPT_NUM_STATE_EVTS_IN_FRESH_PRIVATE_ROOM,

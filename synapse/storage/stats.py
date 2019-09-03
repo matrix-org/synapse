@@ -39,8 +39,6 @@ ABSOLUTE_STATS_FIELDS = {
         "left_members",
         "banned_members",
         "local_users_in_room",
-        "total_events",
-        "total_event_bytes",
     ),
     "user": ("public_rooms", "private_rooms"),
 }
@@ -48,7 +46,7 @@ ABSOLUTE_STATS_FIELDS = {
 # these fields are per-timeslice and so should be reset to 0 upon a new slice
 # You can draw these stats on a histogram.
 # Example: number of events sent locally during a time slice
-PER_SLICE_FIELDS = {"room": (), "user": ()}
+PER_SLICE_FIELDS = {"room": ("total_events", "total_event_bytes"), "user": ()}
 
 TYPE_TO_TABLE = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user_id")}
 
@@ -192,20 +190,6 @@ class StatsStore(StateDeltasStore):
             desc="stats_incremental_position",
         )
 
-    def update_stats_positions(self, pos):
-        """
-        Updates the stats processor positions.
-
-        Args:
-            positions: See L{get_stats_positions}
-        """
-        return self._simple_update_one(
-            table="stats_incremental_position",
-            keyvalues={},
-            updatevalues={"stream_id": pos},
-            desc="update_stats_incremental_position",
-        )
-
     def update_room_state(self, room_id, fields):
         """
         Args:
@@ -328,13 +312,50 @@ class StatsStore(StateDeltasStore):
             allow_none=True,
         )
 
+    def bulk_update_stats_delta(self, ts, updates, stream_id):
+        """Bulk update stats tables for a given stream_id and updates the stats
+        incremental position.
+
+        Args:
+            ts (int): Current timestamp in ms
+            updates(dict[str, dict[str, dict[str, Counter]]]): The updates to
+                commit as a mapping stats_type -> stats_id -> field -> delta.
+            stream_id (int): Current position.
+
+        Returns:
+            Deferred
+        """
+
+        def _bulk_update_stats_delta_txn(txn):
+            for stats_type, stats_updates in updates.items():
+                for stats_id, fields in stats_updates.items():
+                    self._update_stats_delta_txn(
+                        txn,
+                        ts=ts,
+                        stats_type=stats_type,
+                        stats_id=stats_id,
+                        fields=fields,
+                        complete_with_stream_id=stream_id,
+                    )
+
+            self._simple_update_one_txn(
+                txn,
+                table="stats_incremental_position",
+                keyvalues={},
+                updatevalues={"stream_id": stream_id},
+            )
+
+        return self.runInteraction(
+            "bulk_update_stats_delta", _bulk_update_stats_delta_txn
+        )
+
     def update_stats_delta(
         self,
         ts,
         stats_type,
         stats_id,
         fields,
-        complete_with_stream_id=None,
+        complete_with_stream_id,
         absolute_field_overrides=None,
     ):
         """
@@ -373,7 +394,7 @@ class StatsStore(StateDeltasStore):
         stats_type,
         stats_id,
         fields,
-        complete_with_stream_id=None,
+        complete_with_stream_id,
         absolute_field_overrides=None,
     ):
         if absolute_field_overrides is None:
@@ -384,6 +405,7 @@ class StatsStore(StateDeltasStore):
         quantised_ts = self.quantise_stats_time(int(ts))
         end_ts = quantised_ts + self.stats_bucket_size
 
+        # Lets be paranoid and check that all the given field names are known
         abs_field_names = ABSOLUTE_STATS_FIELDS[stats_type]
         slice_field_names = PER_SLICE_FIELDS[stats_type]
         for field in chain(fields.keys(), absolute_field_overrides.keys()):
@@ -394,10 +416,6 @@ class StatsStore(StateDeltasStore):
                     " for stats type %s" % (field, stats_type)
                 )
 
-        # only absolute stats fields are tracked in the `_current` stats tables,
-        # so those are the only ones that we process deltas for when
-        # we upsert against the `_current` table.
-
         # This calculates the deltas (`field = field + ?` values)
         # for absolute fields,
         # * defaulting to 0 if not specified
@@ -405,15 +423,12 @@ class StatsStore(StateDeltasStore):
         # * omitting overrides specified in `absolute_field_overrides`
         deltas_of_absolute_fields = {
             key: fields.get(key, 0)
-            for key in abs_field_names
+            for key in chain(abs_field_names, slice_field_names)
             if key not in absolute_field_overrides
         }
 
-        if complete_with_stream_id is not None:
-            absolute_field_overrides = absolute_field_overrides.copy()
-            absolute_field_overrides[
-                "completed_delta_stream_id"
-            ] = complete_with_stream_id
+        # Keep the delta stream ID field up to date
+        absolute_field_overrides["completed_delta_stream_id"] = complete_with_stream_id
 
         # first upsert the `_current` table
         self._upsert_with_additive_relatives_txn(
@@ -424,34 +439,30 @@ class StatsStore(StateDeltasStore):
             additive_relatives=deltas_of_absolute_fields,
         )
 
-        if self.has_completed_background_updates():
-            # TODO want to check specifically for stats regenerator, not all
-            #   background updates…
-            # then upsert the `_historical` table.
-            # we don't support absolute_fields for per-slice fields as it makes
-            # no sense.
-            per_slice_additive_relatives = {
-                key: fields.get(key, 0) for key in slice_field_names
-            }
-            self._upsert_copy_from_table_with_additive_relatives_txn(
-                txn=txn,
-                into_table=table + "_historical",
-                keyvalues={id_col: stats_id},
-                extra_dst_insvalues={"bucket_size": self.stats_bucket_size},
-                extra_dst_keyvalues={"end_ts": end_ts},
-                additive_relatives=per_slice_additive_relatives,
-                src_table=table + "_current",
-                copy_columns=abs_field_names,
-                additional_where=" AND completed_delta_stream_id IS NOT NULL",
-            )
+        per_slice_additive_relatives = {
+            key: fields.get(key, 0) for key in slice_field_names
+        }
+        self._upsert_copy_from_table_with_additive_relatives_txn(
+            txn=txn,
+            into_table=table + "_historical",
+            keyvalues={id_col: stats_id},
+            extra_dst_insvalues={"bucket_size": self.stats_bucket_size},
+            extra_dst_keyvalues={"end_ts": end_ts},
+            additive_relatives=per_slice_additive_relatives,
+            src_table=table + "_current",
+            copy_columns=abs_field_names,
+        )
 
     def _upsert_with_additive_relatives_txn(
         self, txn, table, keyvalues, absolutes, additive_relatives
     ):
         """Used to update values in the stats tables.
 
+        This is basically a slightly convoluted upsert that *adds* to any
+        existing rows.
+
         Args:
-            txn: Transaction
+            txn
             table (str): Table name
             keyvalues (dict[str, any]): Row-identifying key values
             absolutes (dict[str, any]): Absolute (set) fields
@@ -519,9 +530,12 @@ class StatsStore(StateDeltasStore):
         additive_relatives,
         src_table,
         copy_columns,
-        additional_where="",
     ):
-        """
+        """Updates the historic stats table with latest updates.
+
+        This involves copying "absolute" fields from the `_current` table, and
+        adding relative fields to any existing values.
+
         Args:
              txn: Transaction
              into_table (str): The destination table to UPSERT the row into
@@ -534,8 +548,6 @@ class StatsStore(StateDeltasStore):
                 if existing row present. (Must be disjoint from copy_columns.)
              src_table (str): The source table to copy from
              copy_columns (iterable[str]): The list of columns to copy
-             additional_where (str): Additional SQL for where (prefix with AND
-                if using).
         """
         if self.database_engine.can_native_upsert:
             ins_columns = chain(
@@ -567,7 +579,7 @@ class StatsStore(StateDeltasStore):
                 INSERT INTO %(into_table)s (%(ins_columns)s)
                 SELECT %(sel_exprs)s
                 FROM %(src_table)s
-                WHERE %(keyvalues_where)s %(additional_where)s
+                WHERE %(keyvalues_where)s
                 ON CONFLICT (%(keyvalues)s)
                 DO UPDATE SET %(sets)s
             """ % {
@@ -580,7 +592,6 @@ class StatsStore(StateDeltasStore):
                     chain(keyvalues.keys(), extra_dst_keyvalues.keys())
                 ),
                 "sets": ", ".join(chain(sets_cc, sets_ar)),
-                "additional_where": additional_where,
             }
 
             qargs = list(
@@ -620,67 +631,41 @@ class StatsStore(StateDeltasStore):
                     src_row[key] = dest_current_row[key] + val
                 self._simple_update_txn(txn, into_table, all_dest_keyvalues, src_row)
 
-    def incremental_update_room_total_events_and_bytes(self, min_pos, max_pos):
-        """
-        Counts the number of events and total event bytes per-room and then adds
-        these to the respective total_events and total_event_bytes room counts.
+    def get_changes_room_total_events_and_bytes(self, min_pos, max_pos):
+        """Fetches the counts of events in the given range of stream IDs.
 
         Args:
-            in_positions (dict): Positions,
-                as retrieved from L{get_stats_positions}.
+            min_pos (int)
+            max_pos (int)
 
-        Returns (Deferred[tuple[dict, bool]]):
-            First element (dict):
-                The new positions. Note that this is for reference only –
-                the new positions WILL be committed by this function.
-            Second element (bool):
-                true iff there was a change to the positions, false otherwise
+        Returns:
+            Deferred[dict[str, dict[str, int]]]: Mapping of room ID to field
+            changes.
         """
-
-        def incremental_update_total_events_and_bytes_txn(txn):
-            self.update_total_event_and_bytes_count_between_txn(
-                txn, low_pos=min_pos, high_pos=max_pos
-            )
-
-            self.update_total_event_and_bytes_count_between_txn(
-                txn, low_pos=-max_pos, high_pos=-min_pos
-            )
 
         return self.runInteraction(
             "stats_incremental_total_events_and_bytes",
-            incremental_update_total_events_and_bytes_txn,
+            self.get_changes_room_total_events_and_bytes_txn,
+            min_pos,
+            max_pos,
         )
 
-    def update_total_event_and_bytes_count_between_txn(self, txn, low_pos, high_pos):
-        """
-        Updates the total_events and total_event_bytes counts for rooms,
-            in a range of stream_orderings.
-
-        Inclusivity of low_pos and high_pos is dependent upon their signs.
-        This makes it intuitive to use this function for both backfilled
-        and non-backfilled events.
-
-        Examples:
-        (low, high) → (kind)
-        (3, 7) → 3 < … <= 7 (normal-filled; low already processed before)
-        (-4, -2) → -4 <= … < -2 (backfilled; high already processed before)
-        (-7, 7) → -7 <= … <= 7 (both)
+    def get_changes_room_total_events_and_bytes_txn(self, txn, low_pos, high_pos):
+        """Gets the total_events and total_event_bytes counts for rooms, in a
+        range of stream_orderings (including backfilled events).
 
         Args:
-            txn: Database transaction.
-            low_pos: Low stream ordering
-            high_pos: High stream ordering
+            txn
+            low_pos (int): Low stream ordering
+            high_pos (int): High stream ordering
+
+        Returns:
+            dict[str, dict[str, int]]: Mapping of room ID to field changes.
         """
 
         if low_pos >= high_pos:
             # nothing to do here.
-            return
-
-        now = self.clock.time_msec()
-
-        # we choose comparators based on the signs
-        low_comparator = "<=" if low_pos < 0 else "<"
-        high_comparator = "<" if low_pos < 0 else "<="
+            return {}
 
         if isinstance(self.database_engine, PostgresEngine):
             new_bytes_expression = "OCTET_LENGTH(json)"
@@ -690,59 +675,19 @@ class StatsStore(StateDeltasStore):
         sql = """
             SELECT events.room_id, COUNT(*) AS new_events, SUM(%s) AS new_bytes
             FROM events INNER JOIN event_json USING (event_id)
-            WHERE ? %s stream_ordering AND stream_ordering %s ?
+            WHERE (? < stream_ordering AND stream_ordering <= ?)
+                OR (? <= stream_ordering AND stream_ordering <= ?)
             GROUP BY events.room_id
         """ % (
             new_bytes_expression,
-            low_comparator,
-            high_comparator,
         )
 
-        txn.execute(sql, (low_pos, high_pos))
+        txn.execute(sql, (low_pos, high_pos, -high_pos, -low_pos))
 
-        for room_id, new_events, new_bytes in txn.fetchall():
-            self._update_stats_delta_txn(
-                txn,
-                now,
-                "room",
-                room_id,
-                {"total_events": new_events, "total_event_bytes": new_bytes},
-            )
-
-    def _count_events_and_bytes_in_room_txn(self, txn, room_id, low_token, high_token):
-        """
-        Count the number of events and event bytes in a room between two tokens,
-        inclusive.
-        Args:
-            txn (cursor): The database
-            room_id (str): The ID of the room to count events for
-            low_token (int): the minimum stream ordering to count
-            high_token (int): the maximum stream ordering to count
-
-        Returns (tuple[int, int]):
-            First element (int):
-                the number of events
-            Second element (int):
-                the number of bytes in events' event JSON
-        """
-
-        if isinstance(self.database_engine, PostgresEngine):
-            bytes_expression = "OCTET_LENGTH(json)"
-        else:
-            bytes_expression = "LENGTH(CAST(json AS BLOB))"
-
-        sql = """
-            SELECT COUNT(*) AS num_events, SUM(%s) AS num_bytes
-            FROM events
-            JOIN event_json USING (event_id)
-            WHERE events.room_id = ?
-                AND ? <= stream_ordering
-                AND stream_ordering <= ?
-        """ % (
-            bytes_expression,
-        )
-        txn.execute(sql, (room_id, low_token, high_token))
-        return txn.fetchone()
+        return {
+            room_id: {"total_events": new_events, "total_event_bytes": new_bytes}
+            for room_id, new_events, new_bytes in txn.fetchall()
+        }
 
     @defer.inlineCallbacks
     def _calculate_and_set_initial_state_for_room(self, room_id):
@@ -798,9 +743,7 @@ class StatsStore(StateDeltasStore):
 
             current_state_events_count, = txn.fetchone()
 
-            total_events, total_event_bytes = self._count_events_and_bytes_in_room_txn(
-                txn, room_id, -pos, pos
-            )
+            total_events, total_event_bytes = 0, 0
 
             users_in_room = self.get_users_in_room_txn(txn, room_id)
 
