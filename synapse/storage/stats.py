@@ -673,7 +673,7 @@ class StatsStore(StateDeltasStore):
 
         if low_pos >= high_pos:
             # nothing to do here.
-            return {}
+            return {}, {}
 
         if isinstance(self.database_engine, PostgresEngine):
             new_bytes_expression = "OCTET_LENGTH(json)"
