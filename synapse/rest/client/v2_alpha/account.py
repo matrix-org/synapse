@@ -102,17 +102,17 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
         if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
             # Have the configured identity server handle the request
-            if not self.hs.config.account_threepid_delegate:
+            if not self.hs.config.account_threepid_delegate_email:
                 logger.warn(
-                    "No upstream account_threepid_delegate configured on the server to handle "
-                    "this request"
+                    "No upstream email account_threepid_delegate configured on the server to "
+                    "handle this request"
                 )
                 raise SynapseError(
                     400, "Password reset by email is not supported on this homeserver"
                 )
 
             ret = yield self.identity_handler.requestEmailToken(
-                self.hs.config.account_threepid_delegate,
+                self.hs.config.account_threepid_delegate_email,
                 email,
                 client_secret,
                 send_attempt,
@@ -172,30 +172,26 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         if existing_user_id is None:
             raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
 
-        if self.config.threepid_behaviour == ThreepidBehaviour.REMOTE:
-            if not self.hs.config.account_threepid_delegate:
-                logger.warn(
-                    "No upstream account_threepid_delegate configured on the server to handle "
-                    "this request"
-                )
-                raise SynapseError(
-                    400,
-                    "Password reset by phone number is not supported on this homeserver",
-                )
-
-            ret = yield self.identity_handler.requestMsisdnToken(
-                self.config.account_threepid_delegate,
-                country,
-                phone_number,
-                client_secret,
-                send_attempt,
-                next_link,
+        if not self.hs.config.account_threepid_delegate_msisdn:
+            logger.warn(
+                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "handle this request"
             )
-            return (200, ret)
+            raise SynapseError(
+                400,
+                "Password reset by phone number is not supported on this homeserver",
+            )
 
-        raise SynapseError(
-            400, "Password reset by phone number is not supported on this homeserver"
+        ret = yield self.identity_handler.requestMsisdnToken(
+            self.config.account_threepid_delegate_msisdn,
+            country,
+            phone_number,
+            client_secret,
+            send_attempt,
+            next_link,
         )
+
+        return 200, ret
 
 
 class PasswordResetSubmitTokenServlet(RestServlet):
