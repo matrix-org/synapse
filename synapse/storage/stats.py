@@ -40,7 +40,7 @@ ABSOLUTE_STATS_FIELDS = {
         "banned_members",
         "local_users_in_room",
     ),
-    "user": ("public_rooms", "private_rooms"),
+    "user": ("joined_rooms",),
 }
 
 # these fields are per-timeslice and so should be reset to 0 upon a new slice
@@ -823,59 +823,24 @@ class StatsStore(StateDeltasStore):
 
     @defer.inlineCallbacks
     def _calculate_and_set_initial_state_for_user(self, user_id):
-        def _fetch_current_state_stats_user(txn):
-            pos = self.get_room_max_stream_ordering()
+        def _calculate_and_set_initial_state_for_user_txn(txn):
+            pos = self._get_max_stream_id_in_current_state_deltas_txn(txn)
 
             txn.execute(
                 """
-                SELECT room_id, j.event_id, h.event_id FROM (
-                    SELECT room_id FROM current_state_events
+                SELECT COUNT(distinct room_id) FROM current_state_events
                     WHERE type = 'm.room.member' AND state_key = ?
                         AND membership = 'join'
-                ) AS u
-                LEFT JOIN (
-                    SELECT room_id, event_id FROM current_state_events
-                    WHERE type = 'm.room.join_rules' AND state_key = ''
-                ) AS j USING (room_id)
-                LEFT JOIN (
-                    SELECT room_id, event_id FROM current_state_events
-                    WHERE type = 'm.room.history_visibility' AND state_key = ''
-                ) AS h USING (room_id)
                 """,
                 (user_id,),
             )
-            return txn.fetchall(), pos
+            count, = txn.fetchone()
+            return count, pos
 
-        rows, pos = yield self.runInteraction(
-            "calculate_and_set_initial_state_for_user", _fetch_current_state_stats_user
+        joined_rooms, pos = yield self.runInteraction(
+            "calculate_and_set_initial_state_for_user",
+            _calculate_and_set_initial_state_for_user_txn,
         )
-
-        event_map = yield self.get_events(
-            [e for _, j, h in rows for e in (j, h)], check_redacted=False
-        )
-
-        private_rooms = 0
-        public_rooms = 0
-
-        for room_id, join_rule_id, visibility_id in rows:
-            public_room = False
-
-            if join_rule_id:
-                j_ev = event_map.get(join_rule_id)
-                if j_ev:
-                    if j_ev.content.get("join_rule") == "public":
-                        public_room = True
-
-            if visibility_id:
-                h_ev = event_map.get(visibility_id)
-                if h_ev:
-                    if h_ev.content.get("history_visibility") == "world_readable":
-                        public_room = True
-
-            if public_room:
-                public_rooms += 1
-            else:
-                private_rooms += 1
 
         yield self.update_stats_delta(
             ts=self.clock.time_msec(),
@@ -883,8 +848,5 @@ class StatsStore(StateDeltasStore):
             stats_id=user_id,
             fields={},
             complete_with_stream_id=pos,
-            absolute_field_overrides={
-                "public_rooms": public_rooms,
-                "private_rooms": private_rooms,
-            },
+            absolute_field_overrides={"joined_rooms": joined_rooms},
         )

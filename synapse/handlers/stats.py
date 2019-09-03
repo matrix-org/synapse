@@ -248,14 +248,10 @@ class StatsHandler(StateDeltasHandler):
                     )
 
                     if has_changed_joinedness:
-                        # update user_stats as it's one of our users
-                        public = yield self._is_public_room(room_id)
-
-                        field = "public_rooms" if public else "private_rooms"
                         delta = +1 if membership == Membership.JOIN else -1
 
                         user_to_stats_deltas.setdefault(user_id, Counter())[
-                            field
+                            "joined_rooms"
                         ] += delta
 
                         room_stats_delta["local_users_in_room"] += delta
@@ -276,48 +272,14 @@ class StatsHandler(StateDeltasHandler):
                 )
 
             elif typ == EventTypes.JoinRules:
-                old_room_state = yield self.store.get_room_stats_state(room_id)
                 yield self.store.update_room_state(
                     room_id, {"join_rules": event_content.get("join_rule")}
                 )
-
-                # whether the room would be public anyway,
-                # because of history_visibility
-                other_field_gives_publicity = (
-                    old_room_state["history_visibility"] == "world_readable"
-                )
-
-                if not other_field_gives_publicity:
-                    is_public = yield self._get_key_change(
-                        prev_event_id, event_id, "join_rule", JoinRules.PUBLIC
-                    )
-                    if is_public is not None:
-                        yield self.update_public_room_stats(
-                            stream_timestamp, room_id, is_public, stream_id
-                        )
-
             elif typ == EventTypes.RoomHistoryVisibility:
-                old_room_state = yield self.store.get_room_stats_state(room_id)
                 yield self.store.update_room_state(
                     room_id,
                     {"history_visibility": event_content.get("history_visibility")},
                 )
-
-                # whether the room would be public anyway,
-                # because of join_rule
-                other_field_gives_publicity = (
-                    old_room_state["join_rules"] == JoinRules.PUBLIC
-                )
-
-                if not other_field_gives_publicity:
-                    is_public = yield self._get_key_change(
-                        prev_event_id, event_id, "history_visibility", "world_readable"
-                    )
-                    if is_public is not None:
-                        yield self.update_public_room_stats(
-                            stream_timestamp, room_id, is_public, stream_id
-                        )
-
             elif typ == EventTypes.Encryption:
                 yield self.store.update_room_state(
                     room_id, {"encryption": event_content.get("algorithm")}
@@ -340,50 +302,3 @@ class StatsHandler(StateDeltasHandler):
                 )
 
         return room_to_stats_deltas, user_to_stats_deltas
-
-    @defer.inlineCallbacks
-    def update_public_room_stats(self, ts, room_id, is_public, stream_id):
-        """
-        Increment/decrement a user's number of public rooms when a room they are
-        in changes to/from public visibility.
-
-        Args:
-            ts (int): Timestamp in seconds
-            room_id (str)
-            is_public (bool)
-            stream_id (int)
-        """
-        # For now, blindly iterate over all local users in the room so that
-        # we can handle the whole problem of copying buckets over as needed
-        user_ids = yield self.store.get_users_in_room(room_id)
-
-        for user_id in user_ids:
-            if self.hs.is_mine(UserID.from_string(user_id)):
-                yield self.store.update_stats_delta(
-                    ts=ts,
-                    stats_type="user",
-                    stats_id=user_id,
-                    fields={
-                        "public_rooms": +1 if is_public else -1,
-                        "private_rooms": -1 if is_public else +1,
-                    },
-                    complete_with_stream_id=stream_id,
-                )
-
-    @defer.inlineCallbacks
-    def _is_public_room(self, room_id):
-        join_rules = yield self.state.get_current_state(room_id, EventTypes.JoinRules)
-        history_visibility = yield self.state.get_current_state(
-            room_id, EventTypes.RoomHistoryVisibility
-        )
-
-        if (join_rules and join_rules.content.get("join_rule") == JoinRules.PUBLIC) or (
-            (
-                history_visibility
-                and history_visibility.content.get("history_visibility")
-                == "world_readable"
-            )
-        ):
-            return True
-        else:
-            return False

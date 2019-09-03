@@ -262,8 +262,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertIsNotNone(u1stats["completed_delta_stream_id"])
 
         # not in any rooms by default
-        self.assertEqual(u1stats["public_rooms"], 0)
-        self.assertEqual(u1stats["private_rooms"], 0)
+        self.assertEqual(u1stats["joined_rooms"], 0)
 
     def test_create_room(self):
         """
@@ -637,7 +636,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
         )
 
-        self.assertEqual(u1stats["public_rooms"], 1)
+        self.assertEqual(u1stats["joined_rooms"], 1)
 
     def test_incomplete_stats(self):
         """
@@ -729,7 +728,5 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             2 + EXPT_NUM_STATE_EVTS_IN_FRESH_PRIVATE_ROOM,
         )
 
-        self.assertEqual(u1stats_complete["public_rooms"], 0)
-        self.assertEqual(u1stats_complete["private_rooms"], 1)
-        self.assertEqual(u2stats_complete["public_rooms"], 0)
-        self.assertEqual(u2stats_complete["private_rooms"], 1)
+        self.assertEqual(u1stats_complete["joined_rooms"], 1)
+        self.assertEqual(u2stats_complete["joined_rooms"], 1)
