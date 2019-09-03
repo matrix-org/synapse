@@ -702,7 +702,7 @@ class StatsStore(StateDeltasStore):
             FROM events INNER JOIN event_json USING (event_id)
             WHERE (? < stream_ordering AND stream_ordering <= ?)
                 OR (? <= stream_ordering AND stream_ordering <= ?)
-            GROUP BY events.room_id
+            GROUP BY events.sender
         """ % (
             new_bytes_expression,
         )
