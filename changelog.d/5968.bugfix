@@ -1,0 +1,1 @@
+Change unstable flag m.require_identity_server on /versions to always be false.
