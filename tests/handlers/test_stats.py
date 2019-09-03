@@ -89,15 +89,18 @@ class StatsRoomTests(unittest.HomeserverTestCase):
     def _get_current_stats(self, stats_type, stat_id):
         table, id_col = storage.stats.TYPE_TO_TABLE[stats_type]
 
-        cols = (
-            ["completed_delta_stream_id"]
-            + list(storage.stats.ABSOLUTE_STATS_FIELDS[stats_type])
-            + list(storage.stats.PER_SLICE_FIELDS[stats_type])
+        cols = list(storage.stats.ABSOLUTE_STATS_FIELDS[stats_type]) + list(
+            storage.stats.PER_SLICE_FIELDS[stats_type]
         )
+
+        end_ts = self.store.quantise_stats_time(self.reactor.seconds() * 1000)
 
         return self.get_success(
             self.store._simple_select_one(
-                table + "_current", {id_col: stat_id}, cols, allow_none=True
+                table + "_historical",
+                {id_col: stat_id, end_ts: end_ts},
+                cols,
+                allow_none=True,
             )
         )
 
@@ -258,9 +261,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         self.assertIsNotNone(u1stats)
 
-        # row is complete
-        self.assertIsNotNone(u1stats["completed_delta_stream_id"])
-
         # not in any rooms by default
         self.assertEqual(u1stats["joined_rooms"], 0)
 
@@ -280,10 +280,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         self.assertIsNotNone(r1stats)
         self.assertIsNotNone(r2stats)
-
-        # row is complete
-        self.assertIsNotNone(r1stats["completed_delta_stream_id"])
-        self.assertIsNotNone(r2stats["completed_delta_stream_id"])
 
         # contains the default things you'd expect in a fresh room
         self.assertEqual(
@@ -627,9 +623,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats = self._get_current_stats("room", r1)
         u1stats = self._get_current_stats("user", u1)
-
-        self.assertIsNotNone(r1stats["completed_delta_stream_id"])
-        self.assertIsNotNone(u1stats["completed_delta_stream_id"])
 
         self.assertEqual(r1stats["joined_members"], 1)
         self.assertEqual(

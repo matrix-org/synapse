@@ -60,10 +60,6 @@ DROP TABLE IF EXISTS room_stats_current;
 CREATE TABLE room_stats_current (
     room_id TEXT NOT NULL PRIMARY KEY,
 
-    -- These are relative counts from when we started collecting stats
-    total_events INT NOT NULL,
-    total_event_bytes BIGINT NOT NULL,
-
     -- These are absolute counts
     current_state_events INT NOT NULL,
     joined_members INT NOT NULL,
@@ -87,15 +83,17 @@ CREATE TABLE room_stats_historical (
     end_ts BIGINT NOT NULL,
     bucket_size INT NOT NULL,
 
+    -- These stats are absolute counts
     current_state_events INT NOT NULL,
-    total_events INT NOT NULL,
-    total_event_bytes BIGINT NOT NULL,
     joined_members INT NOT NULL,
     invited_members INT NOT NULL,
     left_members INT NOT NULL,
     banned_members INT NOT NULL,
-
     local_users_in_room INT NOT NULL,
+
+    -- These stats are per time slice
+    total_events INT NOT NULL,
+    total_event_bytes BIGINT NOT NULL,
 
     PRIMARY KEY (room_id, end_ts)
 );

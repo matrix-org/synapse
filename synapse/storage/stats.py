@@ -416,6 +416,8 @@ class StatsStore(StateDeltasStore):
                     " for stats type %s" % (field, stats_type)
                 )
 
+        # Per slice fields do not get added to the _current table
+
         # This calculates the deltas (`field = field + ?` values)
         # for absolute fields,
         # * defaulting to 0 if not specified
@@ -423,11 +425,12 @@ class StatsStore(StateDeltasStore):
         # * omitting overrides specified in `absolute_field_overrides`
         deltas_of_absolute_fields = {
             key: fields.get(key, 0)
-            for key in chain(abs_field_names, slice_field_names)
+            for key in abs_field_names
             if key not in absolute_field_overrides
         }
 
         # Keep the delta stream ID field up to date
+        absolute_field_overrides = absolute_field_overrides.copy()
         absolute_field_overrides["completed_delta_stream_id"] = complete_with_stream_id
 
         # first upsert the `_current` table
@@ -743,16 +746,12 @@ class StatsStore(StateDeltasStore):
 
             current_state_events_count, = txn.fetchone()
 
-            total_events, total_event_bytes = 0, 0
-
             users_in_room = self.get_users_in_room_txn(txn, room_id)
 
             return (
                 event_ids,
                 membership_counts,
                 current_state_events_count,
-                total_events,
-                total_event_bytes,
                 users_in_room,
                 pos,
             )
@@ -761,8 +760,6 @@ class StatsStore(StateDeltasStore):
             event_ids,
             membership_counts,
             current_state_events_count,
-            total_events,
-            total_event_bytes,
             users_in_room,
             pos,
         ) = yield self.runInteraction(
@@ -815,8 +812,6 @@ class StatsStore(StateDeltasStore):
                 "invited_members": membership_counts.get(Membership.INVITE, 0),
                 "left_members": membership_counts.get(Membership.LEAVE, 0),
                 "banned_members": membership_counts.get(Membership.BAN, 0),
-                "total_events": total_events,
-                "total_event_bytes": total_event_bytes,
                 "local_users_in_room": len(local_users_in_room),
             },
         )
