@@ -85,24 +85,22 @@ class StatsHandler(StateDeltasHandler):
         # Loop round handling deltas until we're up to date
 
         while True:
-            with Measure(self.clock, "stats_delta"):
-                deltas = yield self.store.get_current_state_deltas(self.pos)
+            deltas = yield self.store.get_current_state_deltas(self.pos)
 
-                if deltas:
-                    logger.debug("Handling %d state deltas", len(deltas))
-                    room_deltas, user_deltas = yield self._handle_deltas(deltas)
+            if deltas:
+                logger.debug("Handling %d state deltas", len(deltas))
+                room_deltas, user_deltas = yield self._handle_deltas(deltas)
 
-                    max_pos = deltas[-1]["stream_id"]
-                else:
-                    room_deltas = {}
-                    user_deltas = {}
-                    max_pos = yield self.store.get_room_max_stream_ordering()
+                max_pos = deltas[-1]["stream_id"]
+            else:
+                room_deltas = {}
+                user_deltas = {}
+                max_pos = yield self.store.get_room_max_stream_ordering()
 
             # Then count deltas for total_events and total_event_bytes.
-            with Measure(self.clock, "stats_total_events_and_bytes"):
-                room_count, user_count = yield self.store.get_changes_room_total_events_and_bytes(
-                    self.pos, max_pos
-                )
+            room_count, user_count = yield self.store.get_changes_room_total_events_and_bytes(
+                self.pos, max_pos
+            )
 
             for room_id, fields in room_count.items():
                 room_deltas.setdefault(room_id, {}).update(fields)
