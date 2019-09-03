@@ -42,7 +42,7 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
         config_path (str): where to put the main config file
         environ (dict): environment dictionary
         ownership (str): "<user>:<group>" string which will be used to set
-            ownership of the generated configs
+            ownership of the generated configs. If None, ownership will not change.
     """
     for v in ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS"):
         if v not in environ:
@@ -105,19 +105,18 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
     log("Generating log config file " + log_config_file)
     convert("/conf/log.config", log_config_file, environ)
 
-
     # Hopefully we already have a signing key, but generate one if not.
     args = [
-            "python",
-            "-m",
-            "synapse.app.homeserver",
-            "--config-path",
-            config_path,
-            # tell synapse to put generated keys in /data rather than /compiled
-            "--keys-directory",
-            config_dir,
-            "--generate-keys",
-        ]
+        "python",
+        "-m",
+        "synapse.app.homeserver",
+        "--config-path",
+        config_path,
+        # tell synapse to put generated keys in /data rather than /compiled
+        "--keys-directory",
+        config_dir,
+        "--generate-keys",
+    ]
 
     if ownership is not None:
         subprocess.check_output(["chown", "-R", ownership, "/data"])
@@ -131,7 +130,7 @@ def run_generate_config(environ, ownership):
 
     Args:
         environ (dict): env var dict
-        ownership (str): "userid:groupid" arg for chmod
+        ownership (str): "userid:groupid" arg for chmod. If None, ownership will not change.
 
     Never returns.
     """
@@ -170,7 +169,7 @@ def run_generate_config(environ, ownership):
     # log("running %s" % (args, ))
 
     if ownership is not None:
-        args = [ "su-exec", ownership ] + args
+        args = ["su-exec", ownership] + args
         os.execv("/sbin/su-exec", args)
 
         # make sure that synapse has perms to write to the data dir.
@@ -188,7 +187,14 @@ def main(args, environ):
     else:
         ownership = "{}:{}".format(desired_uid, desired_gid)
 
-    log("Desired: %s, %s, Actual %s %s, Setting UID/GID to %s." % (desired_uid, os.getuid(), desired_gid, os.getgid(), ownership))
+    log(
+        "Container running as UserID %s:%s, ENV (or defaults) requests %s:%s"
+        % (os.getuid(), os.getgid(), desired_uid, desired_gid)
+    )
+
+    if ownership is None:
+        log("Will not perform chmod/su-exec as UserID already matches request")
+
     # In generate mode, generate a configuration and missing keys, then exit
     if mode == "generate":
         return run_generate_config(environ, ownership)
@@ -239,15 +245,9 @@ def main(args, environ):
 
     log("Starting synapse with config file " + config_path)
 
-    args = [
-        "python",
-        "-m",
-        "synapse.app.homeserver",
-        "--config-path",
-        config_path,
-    ]
+    args = ["python", "-m", "synapse.app.homeserver", "--config-path", config_path]
     if ownership is not None:
-        args = [ "su-exec", ownership ] + args
+        args = ["su-exec", ownership] + args
         os.execv("/sbin/su-exec", args)
     else:
         os.execv("/usr/local/bin/python", args)
