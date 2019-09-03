@@ -1,1 +1,1 @@
-Prevent Docker changing UID/GID if already correct.
+Avoid changing UID/GID if they are already correct.
