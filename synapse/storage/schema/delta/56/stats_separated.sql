@@ -20,6 +20,7 @@
 -- First remove old stats stuff
 DROP TABLE IF EXISTS room_stats;
 DROP TABLE IF EXISTS room_state;
+DROP TABLE IF EXISTS room_stats_state;
 DROP TABLE IF EXISTS user_stats;
 DROP TABLE IF EXISTS room_stats_earliest_tokens;
 DROP TABLE IF EXISTS _temp_populate_stats_position;
@@ -132,14 +133,14 @@ CREATE INDEX user_stats_historical_end_ts ON user_stats_historical (end_ts);
 
 CREATE TABLE room_stats_state (
     room_id TEXT NOT NULL,
+    is_federatable BOOLEAN,
     join_rules TEXT,
     history_visibility TEXT,
     encryption TEXT,
     name TEXT,
     topic TEXT,
     avatar TEXT,
-    canonical_alias TEXT,
-    is_federatable BOOLEAN
+    canonical_alias TEXT
 );
 
 CREATE UNIQUE INDEX room_stats_state_room ON room_stats_state(room_id);
