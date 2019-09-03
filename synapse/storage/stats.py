@@ -46,7 +46,10 @@ ABSOLUTE_STATS_FIELDS = {
 # these fields are per-timeslice and so should be reset to 0 upon a new slice
 # You can draw these stats on a histogram.
 # Example: number of events sent locally during a time slice
-PER_SLICE_FIELDS = {"room": ("total_events", "total_event_bytes"), "user": ()}
+PER_SLICE_FIELDS = {
+    "room": ("total_events", "total_event_bytes"),
+    "user": ("invites_sent", "rooms_created", "total_events", "total_event_bytes"),
+}
 
 TYPE_TO_TABLE = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user_id")}
 
@@ -654,8 +657,8 @@ class StatsStore(StateDeltasStore):
         )
 
     def get_changes_room_total_events_and_bytes_txn(self, txn, low_pos, high_pos):
-        """Gets the total_events and total_event_bytes counts for rooms, in a
-        range of stream_orderings (including backfilled events).
+        """Gets the total_events and total_event_bytes counts for rooms and
+        senders, in a range of stream_orderings (including backfilled events).
 
         Args:
             txn
@@ -663,7 +666,9 @@ class StatsStore(StateDeltasStore):
             high_pos (int): High stream ordering
 
         Returns:
-            dict[str, dict[str, int]]: Mapping of room ID to field changes.
+            tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]: The
+            room and user deltas for total_events/total_event_bytes in the
+            format of `stats_id` -> fields
         """
 
         if low_pos >= high_pos:
@@ -687,10 +692,29 @@ class StatsStore(StateDeltasStore):
 
         txn.execute(sql, (low_pos, high_pos, -high_pos, -low_pos))
 
-        return {
+        room_deltas = {
             room_id: {"total_events": new_events, "total_event_bytes": new_bytes}
             for room_id, new_events, new_bytes in txn.fetchall()
         }
+
+        sql = """
+            SELECT events.sender, COUNT(*) AS new_events, SUM(%s) AS new_bytes
+            FROM events INNER JOIN event_json USING (event_id)
+            WHERE (? < stream_ordering AND stream_ordering <= ?)
+                OR (? <= stream_ordering AND stream_ordering <= ?)
+            GROUP BY events.room_id
+        """ % (
+            new_bytes_expression,
+        )
+
+        txn.execute(sql, (low_pos, high_pos, -high_pos, -low_pos))
+
+        user_deltas = {
+            user_id: {"total_events": new_events, "total_event_bytes": new_bytes}
+            for user_id, new_events, new_bytes in txn.fetchall()
+        }
+
+        return room_deltas, user_deltas
 
     @defer.inlineCallbacks
     def _calculate_and_set_initial_state_for_room(self, room_id):

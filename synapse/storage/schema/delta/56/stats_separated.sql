@@ -83,18 +83,18 @@ CREATE TABLE room_stats_historical (
     -- These stats cover the time from (end_ts - bucket_size)...end_ts (in ms).
     -- Note that end_ts is quantised.
     end_ts BIGINT NOT NULL,
-    bucket_size INT NOT NULL,
+    bucket_size BIGINT NOT NULL,
 
     -- These stats are absolute counts
-    current_state_events INT NOT NULL,
-    joined_members INT NOT NULL,
-    invited_members INT NOT NULL,
-    left_members INT NOT NULL,
-    banned_members INT NOT NULL,
-    local_users_in_room INT NOT NULL,
+    current_state_events BIGINT NOT NULL,
+    joined_members BIGINT NOT NULL,
+    invited_members BIGINT NOT NULL,
+    left_members BIGINT NOT NULL,
+    banned_members BIGINT NOT NULL,
+    local_users_in_room BIGINT NOT NULL,
 
     -- These stats are per time slice
-    total_events INT NOT NULL,
+    total_events BIGINT NOT NULL,
     total_event_bytes BIGINT NOT NULL,
 
     PRIMARY KEY (room_id, end_ts)
@@ -109,7 +109,7 @@ DROP TABLE IF EXISTS user_stats_current;
 CREATE TABLE user_stats_current (
     user_id TEXT NOT NULL PRIMARY KEY,
 
-    joined_rooms INT NOT NULL,
+    joined_rooms BIGINT NOT NULL,
 
     -- The maximum delta stream position that this row takes into account.
     completed_delta_stream_id BIGINT NOT NULL
@@ -120,9 +120,14 @@ DROP TABLE IF EXISTS user_stats_historical;
 CREATE TABLE user_stats_historical (
     user_id TEXT NOT NULL,
     end_ts BIGINT NOT NULL,
-    bucket_size INT NOT NULL,
+    bucket_size BIGINT NOT NULL,
 
-    joined_rooms INT NOT NULL,
+    joined_rooms BIGINT NOT NULL,
+
+    invites_sent BIGINT NOT NULL,
+    rooms_created BIGINT NOT NULL,
+    total_events BIGINT NOT NULL,
+    total_event_bytes BIGINT NOT NULL,
 
     PRIMARY KEY (user_id, end_ts)
 );

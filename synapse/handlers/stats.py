@@ -49,6 +49,9 @@ class StatsHandler(StateDeltasHandler):
         # The current position in the current_state_delta stream
         self.pos = None
 
+        # Guard to ensure we only process deltas one at a time
+        self._is_processing = False
+
         if hs.config.stats_enabled:
             self.notifier.add_replication_callback(self.notify_new_event)
 
@@ -59,30 +62,23 @@ class StatsHandler(StateDeltasHandler):
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
-        if not self.hs.config.stats_enabled:
+        if not self.hs.config.stats_enabled or self._is_processing:
             return
 
-        lock = self.store.stats_delta_processing_lock
+        self._is_processing = True
 
         @defer.inlineCallbacks
         def process():
-            yield lock.acquire()
             try:
                 yield self._unsafe_process()
             finally:
-                yield lock.release()
+                self._is_processing = False
 
-        if not lock.locked:
-            # we only want to run this process one-at-a-time,
-            # and also, if the initial background updater wants us to keep out,
-            # we should respect that.
-            run_as_background_process("stats.notify_new_event", process)
+        run_as_background_process("stats.notify_new_event", process)
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
         # If self.pos is None then means we haven't fetched it from DB
-        # If None is one of the values, then means that the stats regenerator has not (or had not) yet unwedged us
-        #   but note that this might be outdated, so we retrieve the positions again.
         if self.pos is None:
             self.pos = yield self.store.get_stats_positions()
 
@@ -104,12 +100,15 @@ class StatsHandler(StateDeltasHandler):
 
             # Then count deltas for total_events and total_event_bytes.
             with Measure(self.clock, "stats_total_events_and_bytes"):
-                event_count_changes = yield self.store.get_changes_room_total_events_and_bytes(
+                room_count, user_count = yield self.store.get_changes_room_total_events_and_bytes(
                     self.pos, max_pos
                 )
 
-            for room_id, fields in event_count_changes.items():
+            for room_id, fields in room_count.items():
                 room_deltas.setdefault(room_id, {}).update(fields)
+
+            for user_id, fields in user_count.items():
+                user_deltas.setdefault(user_id, {}).update(fields)
 
             logger.debug("room_deltas: %s", room_deltas)
             logger.debug("user_deltas: %s", user_deltas)
@@ -173,10 +172,12 @@ class StatsHandler(StateDeltasHandler):
 
             event_content = {}
 
+            sender = None
             if event_id is not None:
                 event = yield self.store.get_event(event_id, allow_none=True)
                 if event:
                     event_content = event.content or {}
+                    sender = event.sender
 
             # All the values in this dict are deltas (RELATIVE changes)
             room_stats_delta = room_to_stats_deltas.setdefault(room_id, Counter())
@@ -232,6 +233,12 @@ class StatsHandler(StateDeltasHandler):
                     room_stats_delta["joined_members"] += 1
                 elif membership == Membership.INVITE:
                     room_stats_delta["invited_members"] += 1
+
+                    if sender and self.is_mine_id(sender):
+                        user_to_stats_deltas.setdefault(sender, Counter())[
+                            "invites_sent"
+                        ] += 1
+
                 elif membership == Membership.LEAVE:
                     room_stats_delta["left_members"] += 1
                 elif membership == Membership.BAN:
@@ -257,6 +264,10 @@ class StatsHandler(StateDeltasHandler):
 
             elif typ == EventTypes.Create:
                 room_state["is_federatable"] = event_content.get("m.federate", True)
+                if sender and self.is_mine_id(sender):
+                    user_to_stats_deltas.setdefault(sender, Counter())[
+                        "rooms_created"
+                    ] += 1
             elif typ == EventTypes.JoinRules:
                 room_state["join_rules"] = event_content.get("join_rule")
             elif typ == EventTypes.RoomHistoryVisibility:
