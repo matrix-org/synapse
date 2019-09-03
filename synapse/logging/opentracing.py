@@ -653,16 +653,14 @@ def trace(func=None, opname=None):
         if opentracing is None:
             return func
 
-        # Doing this weird assignment thing to get around local variable
-        # referenced before assignment 'bug' raised by checkstyle
-        operation_name = opname if opname else func.__name__
+        _opname = opname if opname else func.__name__
 
         @wraps(func)
         def _trace_inner(self, *args, **kwargs):
             if opentracing is None:
                 return func(self, *args, **kwargs)
 
-            scope = start_active_span(operation_name)
+            scope = start_active_span(_opname)
             scope.__enter__()
 
             try:
