@@ -134,14 +134,17 @@ class RoomListHandler(BaseHandler):
             timeout (int|None): Amount of seconds to wait for a response before
                 timing out. TODO
         """
-        pagination_token = None
         if since_token and since_token != "END":
-            if since_token[0] in ("+", "-"):
-                forwards = since_token[0] == "+"
-                pagination_token = since_token[1:]
-            else:
-                raise SynapseError(400, "Invalid since token.")
+            batch_token = RoomListNextBatch.from_token(since_token)
+
+            public_room_stream_id = batch_token.public_room_stream_id
+            last_room_id = batch_token.last_room_id
+            forwards = batch_token.forwards
         else:
+            batch_token = None
+
+            public_room_stream_id = yield self.store.get_current_public_room_stream_id()
+            last_room_id = None
             forwards = True
 
         # we request one more than wanted to see if there are more pages to come
@@ -151,9 +154,10 @@ class RoomListHandler(BaseHandler):
             network_tuple,
             search_filter,
             probing_limit,
-            pagination_token,
-            forwards,
-            fetch_creation_event_ids=from_federation,
+            last_room_id=last_room_id,
+            forwards=forwards,
+            stream_id=public_room_stream_id,
+            ignore_non_federatable=from_federation,
         )
 
         def build_room_entry(room):
@@ -170,9 +174,6 @@ class RoomListHandler(BaseHandler):
             # Filter out Nones – rather omit the field altogether
             return {k: v for k, v in entry.items() if v is not None}
 
-        if from_federation:
-            room_creation_event_ids = [r["creation_event_id"] for r in results]
-
         results = [build_room_entry(r) for r in results]
 
         response = {}
@@ -180,38 +181,37 @@ class RoomListHandler(BaseHandler):
         if num_results > 0:
             final_room_id = results[-1]["room_id"]
             initial_room_id = results[0]["room_id"]
+
             if limit is not None:
                 more_to_come = num_results == probing_limit
-                results = results[0:limit]
+                results = results[:limit]
             else:
                 more_to_come = False
 
-            if not forwards or (forwards and more_to_come):
-                response["next_batch"] = "+%s" % (final_room_id,)
+            if forwards:
+                if batch_token:
+                    response["prev_batch"] = batch_token.copy_and_replace(
+                        direction_is_forward=False
+                    ).to_token()
 
-            if since_token and (forwards or (not forwards and more_to_come)):
-                if num_results > 0:
-                    response["prev_batch"] = "-%s" % (initial_room_id,)
-                else:
-                    response["prev_batch"] = "-%s" % (pagination_token,)
+                if more_to_come:
+                    response["next_batch"] = RoomListNextBatch(
+                        public_room_stream_id=public_room_stream_id,
+                        last_room_id=final_room_id,
+                        direction_is_forward=True,
+                    ).to_token()
+            else:
+                if batch_token:
+                    response["prev_batch"] = batch_token.copy_and_replace(
+                        direction_is_forward=True
+                    ).to_token()
 
-        if from_federation:
-            # only show rooms with m.federate=True or absent (default is True)
-
-            # we already have rooms' creation state events' IDs
-            # so get rooms' creation state events
-            creation_events_by_id = yield self.store.get_events(room_creation_event_ids)
-
-            # now filter out rooms with m.federate: False in their create event
-            results = [
-                room
-                for (room, room_creation_event_id) in zip(
-                    results, room_creation_event_ids
-                )
-                if creation_events_by_id[room_creation_event_id].content.get(
-                    "m.federate", True
-                )
-            ]
+                if more_to_come:
+                    response["next_batch"] = RoomListNextBatch(
+                        public_room_stream_id=public_room_stream_id,
+                        last_room_id=initial_room_id,
+                        direction_is_forward=False,
+                    ).to_token()
 
         for room in results:
             # populate search result entries with additional fields, namely
@@ -234,50 +234,11 @@ class RoomListHandler(BaseHandler):
 
         response["chunk"] = results
 
-        # TODO for federation, we currently don't remove m.federate=False rooms
-        #   from the total room count estimate.
-        response["total_room_count_estimate"] = yield self.store.count_public_rooms()
+        response["total_room_count_estimate"] = yield self.store.count_public_rooms(
+            public_room_stream_id, network_tuple, ignore_non_federatable=from_federation
+        )
 
         return response
-
-    @defer.inlineCallbacks
-    def _append_room_entry_to_chunk(
-        self,
-        room_id,
-        num_joined_users,
-        chunk,
-        limit,
-        search_filter,
-        from_federation=False,
-    ):
-        """Generate the entry for a room in the public room list and append it
-        to the `chunk` if it matches the search filter
-
-        Args:
-            room_id (str): The ID of the room.
-            num_joined_users (int): The number of joined users in the room.
-            chunk (list)
-            limit (int|None): Maximum amount of rooms to display. Function will
-                return if length of chunk is greater than limit + 1.
-            search_filter (dict|None)
-            from_federation (bool): Whether this request originated from a
-                federating server or a client. Used for room filtering.
-        """
-        if limit and len(chunk) > limit + 1:
-            # We've already got enough, so lets just drop it.
-            return
-
-        result = yield self.generate_room_entry(room_id, num_joined_users)
-        if not result:
-            return
-
-        if from_federation and not result.get("m.federate", True):
-            # This is a room that other servers cannot join. Do not show them
-            # this room.
-            return
-
-        if _matches_room_entry(result, search_filter):
-            chunk.append(result)
 
     @cachedInlineCallbacks(num_args=1, cache_context=True)
     def generate_room_entry(
@@ -492,17 +453,15 @@ class RoomListNextBatch(
     namedtuple(
         "RoomListNextBatch",
         (
-            "stream_ordering",  # stream_ordering of the first public room list
             "public_room_stream_id",  # public room stream id for first public room list
-            "current_limit",  # The number of previous rooms returned
+            "last_room_id",  # The room_id to get rooms after/before
             "direction_is_forward",  # Bool if this is a next_batch, false if prev_batch
         ),
     )
 ):
     KEY_DICT = {
-        "stream_ordering": "s",
         "public_room_stream_id": "p",
-        "current_limit": "n",
+        "last_room_id": "r",
         "direction_is_forward": "d",
     }
 
@@ -510,13 +469,7 @@ class RoomListNextBatch(
 
     @classmethod
     def from_token(cls, token):
-        if PY3:
-            # The argument raw=False is only available on new versions of
-            # msgpack, and only really needed on Python 3. Gate it behind
-            # a PY3 check to avoid causing issues on Debian-packaged versions.
-            decoded = msgpack.loads(decode_base64(token), raw=False)
-        else:
-            decoded = msgpack.loads(decode_base64(token))
+        decoded = msgpack.loads(decode_base64(token), raw=False)
         return RoomListNextBatch(
             **{cls.REVERSE_KEY_DICT[key]: val for key, val in decoded.items()}
         )
