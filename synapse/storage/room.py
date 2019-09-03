@@ -195,7 +195,7 @@ class RoomWorkerStore(SQLBaseStore):
         sql = """
             SELECT
                 room_id, name, topic, canonical_alias, joined_members,
-                avatar, history_visibility, joined_members
+                avatar, history_visibility, joined_members, guest_access
             FROM (
                 SELECT room_id FROM public_room_list_stream
                 INNER JOIN (
@@ -221,7 +221,9 @@ class RoomWorkerStore(SQLBaseStore):
         """ % {
             "appservice_where": appservice_where,
             "where_clause": where_clause,
-            "or_operator": "MAX",
+            "or_operator": "MAX"
+            if isinstance(self.database_engine, Sqlite3Engine)
+            else "bool_or",
             "dir": "DESC" if forwards else "ASC",
         }
 

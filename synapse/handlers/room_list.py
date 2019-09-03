@@ -169,6 +169,7 @@ class RoomListHandler(BaseHandler):
                 "num_joined_members": room["joined_members"],
                 "avatar_url": room["avatar"],
                 "world_readable": room["history_visibility"] == "world_readable",
+                "guest_can_join": room["guest_access"] == "can_join",
             }
 
             # Filter out Nones – rather omit the field altogether
@@ -215,22 +216,12 @@ class RoomListHandler(BaseHandler):
 
         for room in results:
             # populate search result entries with additional fields, namely
-            # 'aliases' and 'guest_can_join'
+            # 'aliases'
             room_id = room["room_id"]
 
             aliases = yield self.store.get_aliases_for_room(room_id)
             if aliases:
                 room["aliases"] = aliases
-
-            state_ids = yield self.store.get_current_state_ids(room_id)
-            guests_can_join = False
-            guest_access_state_id = state_ids.get((EventTypes.GuestAccess, ""))
-            if guest_access_state_id is not None:
-                guest_access = yield self.store.get_event(guest_access_state_id)
-                if guest_access is not None:
-                    if guest_access.content.get("guest_access") == "can_join":
-                        guests_can_join = True
-            room["guest_can_join"] = guests_can_join
 
         response["chunk"] = results
 
