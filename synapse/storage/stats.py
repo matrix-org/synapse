@@ -694,7 +694,7 @@ class StatsStore(StateDeltasStore):
 
         room_deltas = {
             room_id: {"total_events": new_events, "total_event_bytes": new_bytes}
-            for room_id, new_events, new_bytes in txn.fetchall()
+            for room_id, new_events, new_bytes in txn
         }
 
         sql = """
@@ -711,7 +711,8 @@ class StatsStore(StateDeltasStore):
 
         user_deltas = {
             user_id: {"total_events": new_events, "total_event_bytes": new_bytes}
-            for user_id, new_events, new_bytes in txn.fetchall()
+            for user_id, new_events, new_bytes in txn
+            if self.hs.is_mine_id(user_id)
         }
 
         return room_deltas, user_deltas
