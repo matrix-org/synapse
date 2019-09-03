@@ -18,11 +18,10 @@ from collections import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import UserID
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -142,6 +141,8 @@ class StatsHandler(StateDeltasHandler):
         room_to_stats_deltas = {}
         user_to_stats_deltas = {}
 
+        room_to_state_updates = {}
+
         for delta in deltas:
             typ = delta["type"]
             state_key = delta["state_key"]
@@ -150,7 +151,7 @@ class StatsHandler(StateDeltasHandler):
             stream_id = delta["stream_id"]
             prev_event_id = delta["prev_event_id"]
 
-            logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
+            logger.debug("Handling: %r, %r %r, %s", room_id, typ, state_key, event_id)
 
             token = yield self.store.get_earliest_token_for_stats("room", room_id)
 
@@ -177,12 +178,10 @@ class StatsHandler(StateDeltasHandler):
                 if event:
                     event_content = event.content or {}
 
-            # We can't afford for this time to stray into the past, so we count
-            # it as now.
-            stream_timestamp = int(self.clock.time_msec())
-
             # All the values in this dict are deltas (RELATIVE changes)
             room_stats_delta = room_to_stats_deltas.setdefault(room_id, Counter())
+
+            room_state = room_to_state_updates.setdefault(room_id, {})
 
             if prev_event_id is None:
                 # this state event doesn't overwrite another,
@@ -257,48 +256,25 @@ class StatsHandler(StateDeltasHandler):
                         room_stats_delta["local_users_in_room"] += delta
 
             elif typ == EventTypes.Create:
-                # Newly created room. Add it with all blank portions.
-                yield self.store.update_room_state(
-                    room_id,
-                    {
-                        "join_rules": None,
-                        "history_visibility": None,
-                        "encryption": None,
-                        "name": None,
-                        "topic": None,
-                        "avatar": None,
-                        "canonical_alias": None,
-                    },
-                )
-
+                room_state["is_federatable"] = event_content.get("m.federate", True)
             elif typ == EventTypes.JoinRules:
-                yield self.store.update_room_state(
-                    room_id, {"join_rules": event_content.get("join_rule")}
-                )
+                room_state["join_rules"] = event_content.get("join_rule")
             elif typ == EventTypes.RoomHistoryVisibility:
-                yield self.store.update_room_state(
-                    room_id,
-                    {"history_visibility": event_content.get("history_visibility")},
+                room_state["history_visibility"] = event_content.get(
+                    "history_visibility"
                 )
             elif typ == EventTypes.Encryption:
-                yield self.store.update_room_state(
-                    room_id, {"encryption": event_content.get("algorithm")}
-                )
+                room_state["encryption"] = event_content.get("algorithm")
             elif typ == EventTypes.Name:
-                yield self.store.update_room_state(
-                    room_id, {"name": event_content.get("name")}
-                )
+                room_state["name"] = event_content.get("name")
             elif typ == EventTypes.Topic:
-                yield self.store.update_room_state(
-                    room_id, {"topic": event_content.get("topic")}
-                )
+                room_state["topic"] = event_content.get("topic")
             elif typ == EventTypes.RoomAvatar:
-                yield self.store.update_room_state(
-                    room_id, {"avatar": event_content.get("url")}
-                )
+                room_state["avatar"] = event_content.get("url")
             elif typ == EventTypes.CanonicalAlias:
-                yield self.store.update_room_state(
-                    room_id, {"canonical_alias": event_content.get("alias")}
-                )
+                room_state["canonical_alias"] = event_content.get("alias")
+
+        for room_id, state in room_to_state_updates.items():
+            yield self.store.update_room_state(room_id, state)
 
         return room_to_stats_deltas, user_to_stats_deltas

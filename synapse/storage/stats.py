@@ -712,6 +712,7 @@ class StatsStore(StateDeltasStore):
                 table="current_state_events",
                 column="type",
                 iterable=[
+                    EventTypes.Create,
                     EventTypes.JoinRules,
                     EventTypes.RoomHistoryVisibility,
                     EventTypes.Encryption,
@@ -776,6 +777,7 @@ class StatsStore(StateDeltasStore):
             "topic": None,
             "avatar": None,
             "canonical_alias": None,
+            "is_federatable": True,
         }
 
         for event in state_event_map.values():
@@ -795,6 +797,8 @@ class StatsStore(StateDeltasStore):
                 room_state["avatar"] = event.content.get("url")
             elif event.type == EventTypes.CanonicalAlias:
                 room_state["canonical_alias"] = event.content.get("alias")
+            elif event.type == EventTypes.Create:
+                room_state["is_federatable"] = event.content.get("m.federate", True)
 
         yield self.update_room_state(room_id, room_state)
 
