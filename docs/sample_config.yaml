@@ -903,30 +903,19 @@ uploads_path: "DATADIR/uploads"
 #  - matrix.org
 #  - vector.im
 
-# Handle threepid (email/phone etc) registration and password resets through a set of
-# *trusted* identity servers. Note that this allows the configured identity server to
-# reset passwords for accounts!
+# Handle threepid (email/phone etc) registration and password resets
+# through a *trusted* identity server. Note that this allows the configured
+# identity server to reset passwords for accounts.
 #
-# Also be aware that if email is not set to a domain, and SMTP options have not been
-# configured in the email config block, registration and resetting user passwords via
-# email will be globally disabled.
+# If this option is not defined and SMTP options have not been
+# configured, registration by email and resetting user passwords via
+# email will be disabled
 #
-# Additionally, if msisdn is not set to a domain, registration and password resets via
-# msisdn will be disabled regardless. This is due to Synapse currently not supporting
-# any method of sending SMS messages on its own.
+# Otherwise, to enable set this option to the reachable domain name, including protocol
+# definition, for an identity server
+# (e.g "https://matrix.org", "http://localhost:8090")
 #
-# To enable using an identity server for operations regarding a particular third-party
-# identifier type, set the value to the reachable domain name of that identity server,
-# including protocol definition, e.g:
-#  email: "https://matrix.org"  # Let matrix.org handle sending emails for my users
-#  msisdn: "http://localhost:8090"  # Delegate contacting SMS numbers to this process
-#
-# Servers handling the above requests must answer the .../requestToken endpoints
-# defined by the Matrix Identity Service API specification:
-# https://matrix.org/docs/spec/identity_service/latest
-#account_threepid_delegates:
-#  email: ""
-#  msisdn: ""
+#account_threepid_delegate: ""
 
 # Users who register on this homeserver will automatically be joined
 # to these rooms
