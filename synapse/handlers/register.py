@@ -366,6 +366,7 @@ class RegistrationHandler(BaseHandler):
     def check_recaptcha(self, ip, private_key, challenge, response):
         """
         Checks a recaptcha is correct.
+
         Used only by c/s api v1
         """
 
@@ -386,6 +387,7 @@ class RegistrationHandler(BaseHandler):
     def register_email(self, threepidCreds):
         """
         Registers emails with an identity server.
+
         Used only by c/s api v1
         """
 
@@ -452,9 +454,12 @@ class RegistrationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _validate_captcha(self, ip_addr, private_key, challenge, response):
         """Validates the captcha provided.
+
         Used only by c/s api v1
+
         Returns:
             dict: Containing 'valid'(bool) and 'error_url'(str) if invalid.
+
         """
         response = yield self._submit_captcha(ip_addr, private_key, challenge, response)
         # parse Google's response. Lovely format..
