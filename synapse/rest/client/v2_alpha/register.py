@@ -126,9 +126,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            if not self.hs.config.account_threepid_delegate_email:
+            if not self.hs.config.account_threepid_delegate:
                 logger.warn(
-                    "No upstream email account_threepid_delegate configured on the server to "
+                    "No upstream account_threepid_delegate configured on the server to "
                     "handle this request"
                 )
                 raise SynapseError(
@@ -136,7 +136,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 )
 
             ret = yield self.identity_handler.requestEmailToken(
-                self.hs.config.account_threepid_delegate_email,
+                self.hs.config.account_threepid_delegate,
                 email,
                 client_secret,
                 send_attempt,
@@ -201,9 +201,9 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
 
-        if not self.hs.config.account_threepid_delegate_msisdn:
+        if not self.hs.config.account_threepid_delegate:
             logger.warn(
-                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "No upstream account_threepid_delegate configured on the server to "
                 "handle this request"
             )
             raise SynapseError(
@@ -211,7 +211,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(
-            self.hs.config.account_threepid_delegate_msisdn,
+            self.hs.config.account_threepid_delegate,
             country,
             phone_number,
             client_secret,

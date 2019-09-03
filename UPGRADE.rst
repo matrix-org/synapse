@@ -66,23 +66,21 @@ its own, phone-based password resets and registration will be disabled. For Syna
 emails, the ``email`` block of the config must be filled out. If not, then password resets and
 registration via email will be disabled entirely.
 
-This release also deprecates the ``email.trust_identity_server_for_password_resets`` option and
-replaces it with the ``account_threepid_delegates`` dictionary. This option defines whether the
-homeserver should delegate an external server (typically an `identity server
-<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset or
-registration messages via email and SMS.
+This release also deprecates the ``email.trust_identity_server_for_password_resets`` option
+and replaces it with ``account_threepid_delegate``. This option defines whether the homeserver
+should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset
+or registration messages via email or SMS.
 
-Specifically for email, if ``email.trust_identity_server_for_password_resets`` was changed from
-its default to ``true``, and ``account_threepid_delegates.email`` is not set, then the server
-handling password resets and registration via third-party addresses will be set to the first
-entry in the Synapse config's ``trusted_third_party_id_servers`` entry. This is to ensure that
-people who set up an external server for handling these tasks before v1.4.0 will not have their
-setups mysteriously stop working. However, if no trusted identity server domains are
-configured, Synapse will throw an error.
+If ``email.trust_identity_server_for_password_resets`` was changed from its default to
+``true``, and ``account_threepid_delegate`` is not set to an identity server domain, then the
+server handling password resets and registration via third-party addresses will be set to the
+first entry in the Synapse config's ``trusted_third_party_id_servers`` entry. If no domains are
+configured, Synapse will throw an error on startup.
 
-If ``email.trust_identity_server_for_password_resets`` is not set to ``true`` and a type in
-``account_threepid_delegates`` is not set to a domain, then Synapse will attempt to send
-password reset and registration messages itself for that type.
+If ``email.trust_identity_server_for_password_resets`` is not set to ``true`` and
+``account_threepid_delegate`` is not set to a domain, then Synapse will attempt to send
+password reset and registration messages itself.
 
 Email templates
 ---------------
