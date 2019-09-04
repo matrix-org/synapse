@@ -66,9 +66,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             room_keys(iterable[dict]): the keys to add
         """
 
-        yield self._simple_insert_many(
-            table="e2e_room_keys",
-            values=[
+        values = []
+        for (room_id, session_id, room_key) in room_keys:
+            values.append(
                 {
                     "user_id": user_id,
                     "version": version,
@@ -79,17 +79,18 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     "is_verified": room_key["is_verified"],
                     "session_data": json.dumps(room_key["session_data"]),
                 }
-                for (room_id, session_id, room_key) in room_keys
-            ],
-            desc="add_e2e_room_keys",
-        )
-        log_kv(
-            {
-                "message": "Set room key",
-                "room_id": room_id,
-                "session_id": session_id,
-                "room_key": room_key,
-            }
+            )
+            log_kv(
+                {
+                    "message": "Set room key",
+                    "room_id": room_id,
+                    "session_id": session_id,
+                    "room_key": room_key,
+                }
+            )
+
+        yield self._simple_insert_many(
+            table="e2e_room_keys", values=values, desc="add_e2e_room_keys"
         )
 
     @trace
