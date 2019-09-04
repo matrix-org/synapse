@@ -911,22 +911,21 @@ uploads_path: "DATADIR/uploads"
 # configured in the email config block, registration and user password resets via
 # email will be globally disabled.
 #
-# Additionally, if msisdn is not set to a domain, registration and password resets via
-# msisdn will be disabled regardless. This is due to Synapse currently not supporting
-# any method of sending SMS messages on its own.
+# Additionally, if `msisdn` is not set, registration and password resets via msisdn
+# will be disabled regardless. This is due to Synapse currently not supporting any
+# method of sending SMS messages on its own.
 #
 # To enable using an identity server for operations regarding a particular third-party
-# identifier type, set the value to the URL of that identity server, e.g:
-#  email: https://matrix.org  # Let matrix.org handle sending emails for my users
-#  msisdn: http://localhost:8090  # Delegate contacting SMS numbers to this process
+# identifier type, set the value to the URL of that identity server as shown in the 
+# examples below.
 #
-# Servers handling the above requests must answer the .../requestToken endpoints
+# Servers handling the above requests must answer the `/requestToken` endpoints
 # defined by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
 #
 account_threepid_delegates:
-    #email: https://example.com
-    #msisdn: http://localhost:8090
+    #email: https://example.com     # Delegate email sending to matrix.org
+    #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
 # Users who register on this homeserver will automatically be joined
 # to these rooms
