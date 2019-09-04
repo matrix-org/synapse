@@ -142,8 +142,8 @@ class RoomWorkerStore(SQLBaseStore):
             network_tuple (ThirdPartyInstanceID|None):
             search_filter (dict|None):
             limit (int|None): Maxmimum number of rows to return, unlimited otherwise.
-            last_room_id (str|None): if present, a room ID which is to be
-                the (first/last) included in the results.
+            last_room_id (str|None): if present, a room ID which bounds the
+                result set, and is always *excluded* from the result set.
             forwards (bool): true iff going forwards, going backwards otherwise
             stream_id (int): The public room list stream ID
             ignore_non_federatable (bool): If true filters out non-federatable rooms.
@@ -159,9 +159,9 @@ class RoomWorkerStore(SQLBaseStore):
 
         if last_room_id:
             if forwards:
-                where_clauses.append("? < room_id")
+                where_clauses.append("room_id < ?")
             else:
-                where_clauses.append("room_id <= ?")
+                where_clauses.append("? < room_id")
 
             query_args += [last_room_id]
 

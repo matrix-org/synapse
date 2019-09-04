@@ -134,12 +134,17 @@ class RoomListHandler(BaseHandler):
             timeout (int|None): Amount of seconds to wait for a response before
                 timing out. TODO
         """
-        if since_token and since_token != "END":
+
+        # Pagination tokens work by storing the room ID sent in the last batch,
+        # plus the direction (forwards or backwards). Next batch tokens always
+        # go forwards, prev batch tokens always go backwards.
+
+        if since_token:
             batch_token = RoomListNextBatch.from_token(since_token)
 
             public_room_stream_id = batch_token.public_room_stream_id
             last_room_id = batch_token.last_room_id
-            forwards = batch_token.forwards
+            forwards = batch_token.direction_is_forward
         else:
             batch_token = None
 
@@ -179,20 +184,29 @@ class RoomListHandler(BaseHandler):
 
         response = {}
         num_results = len(results)
+        if limit is not None:
+            more_to_come = num_results == probing_limit
+
+            # Depending on direction we trim either the front or back.
+            if forwards:
+                results = results[:limit]
+            else:
+                results = results[-limit:]
+        else:
+            more_to_come = False
+
         if num_results > 0:
             final_room_id = results[-1]["room_id"]
             initial_room_id = results[0]["room_id"]
 
-            if limit is not None:
-                more_to_come = num_results == probing_limit
-                results = results[:limit]
-            else:
-                more_to_come = False
-
             if forwards:
                 if batch_token:
-                    response["prev_batch"] = batch_token.copy_and_replace(
-                        direction_is_forward=False
+                    # If there was a token given then we assume that there
+                    # must be previous results.
+                    response["prev_batch"] = RoomListNextBatch(
+                        public_room_stream_id=public_room_stream_id,
+                        last_room_id=initial_room_id,
+                        direction_is_forward=False,
                     ).to_token()
 
                 if more_to_come:
@@ -203,12 +217,14 @@ class RoomListHandler(BaseHandler):
                     ).to_token()
             else:
                 if batch_token:
-                    response["prev_batch"] = batch_token.copy_and_replace(
-                        direction_is_forward=True
+                    response["next_batch"] = RoomListNextBatch(
+                        public_room_stream_id=public_room_stream_id,
+                        last_room_id=final_room_id,
+                        direction_is_forward=True,
                     ).to_token()
 
                 if more_to_come:
-                    response["next_batch"] = RoomListNextBatch(
+                    response["prev_batch"] = RoomListNextBatch(
                         public_room_stream_id=public_room_stream_id,
                         last_room_id=initial_room_id,
                         direction_is_forward=False,
