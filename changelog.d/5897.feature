@@ -1,1 +1,1 @@
-Switch to the v2 lookup API for 3PID invites.
+Switch to the v2 lookup API for 3PID invites. Implements MSC2134 plus id_access_token authentication for v2 Identity Service APIs from MSC2140.

@@ -315,17 +315,24 @@ class IdentityHandler(BaseHandler):
             hash_details = yield self.http_client.get_json(
                 "%s/_matrix/identity/v2/hash_details" % id_server, query_params
             )
-        except (HttpResponseException, ValueError) as e:
+            if not isinstance(hash_details, dict):
+                logger.warn(
+                    "Got non-dict object when checking hash details of %s: %s",
+                    id_server,
+                    hash_details,
+                )
+                raise SynapseError(
+                    500, "Invalid hash details received from identity server"
+                )
+        except Exception as e:
             # Catch HttpResponseExcept for a non-200 response code
-            # Catch ValueError for non-JSON response body
-
             # Check if this identity server does not know about v2 lookups
-            if e.code == 404:
+            if isinstance(e, HttpResponseException) and e.code == 404:
                 # This is an old identity server that does not yet support v2 lookups
                 use_v1 = True
             else:
                 logger.warn("Error when looking up hashing details: %s" % (e,))
-                return None
+                raise e
 
         if use_v1:
             return (yield self._lookup_3pid_v1(id_server, medium, address))
@@ -362,7 +369,7 @@ class IdentityHandler(BaseHandler):
                 return data["mxid"]
 
         except IOError as e:
-            logger.warn("Error from identity server lookup: %s" % (e,))
+            logger.warn("Error from v1 identity server lookup: %s" % (e,))
 
         return None
 
@@ -385,8 +392,12 @@ class IdentityHandler(BaseHandler):
             Deferred[str|None]: the matrix ID of the 3pid, or None if it is not recognised.
         """
         # Extract information from hash_details
-        supported_lookup_algorithms = hash_details["algorithms"]
-        lookup_pepper = hash_details["lookup_pepper"]
+        supported_lookup_algorithms = hash_details.get("algorithms")
+        lookup_pepper = hash_details.get("lookup_pepper")
+        if not supported_lookup_algorithms or lookup_pepper:
+            raise SynapseError(
+                500, "Invalid hash details received from identity server"
+            )
 
         # Check if any of the supported lookup algorithms are present
         if LookupAlgorithm.SHA256 in supported_lookup_algorithms:
@@ -408,7 +419,7 @@ class IdentityHandler(BaseHandler):
             logger.warn(
                 "None of the provided lookup algorithms of %s are supported: %s",
                 id_server,
-                hash_details["algorithms"],
+                supported_lookup_algorithms,
             )
             raise SynapseError(
                 400,
@@ -426,11 +437,11 @@ class IdentityHandler(BaseHandler):
                     "pepper": lookup_pepper,
                 },
             )
-        except (HttpResponseException, ValueError) as e:
-            # Catch HttpResponseExcept for a non-200 response code
-            # Catch ValueError for non-JSON response body
-            logger.warn("Error when performing a 3pid lookup: %s" % (e,))
-            return None
+        except Exception as e:
+            logger.warn("Error when performing a v2 3pid lookup: %s" % (e,))
+            raise SynapseError(
+                500, "Unknown error occurred during identity server lookup"
+            )
 
         # Check for a mapping from what we looked up to an MXID
         if "mappings" not in lookup_results or not isinstance(
