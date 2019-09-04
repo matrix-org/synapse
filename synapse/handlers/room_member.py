@@ -720,7 +720,7 @@ class RoomMemberHandler(object):
         hash_details = None
         try:
             hash_details = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/v2/hash_details" % (id_server, id_server_scheme),
+                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
                 query_params,
             )
             if not isinstance(hash_details, dict):
