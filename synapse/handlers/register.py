@@ -397,7 +397,6 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _join_user_to_room(self, requester, room_identifier):
-        room_id = None
         room_member_handler = self.hs.get_room_member_handler()
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
@@ -655,7 +654,6 @@ class RegistrationHandler(BaseHandler):
         Args:
             user_id (str): id of user
             threepid (object): m.login.msisdn auth response
-            token (str): access_token for the user
         Returns:
             defer.Deferred:
         """
