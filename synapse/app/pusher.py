@@ -184,8 +184,6 @@ def start(config_options):
 
     assert config.worker_app == "synapse.app.pusher"
 
-    setup_logging(config, use_worker_options=True)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     if config.start_pushers:
@@ -209,6 +207,8 @@ def start(config_options):
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
+
+    setup_logging(ps, config, use_worker_options=True)
 
     ps.setup()
 

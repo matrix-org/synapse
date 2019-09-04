@@ -11,9 +11,13 @@ from twisted.internet import address, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.error import DNSLookupError
-from twisted.internet.interfaces import IReactorPluggableNameResolver, IResolverSimple
+from twisted.internet.interfaces import (
+    IReactorPluggableNameResolver,
+    IReactorTCP,
+    IResolverSimple,
+)
 from twisted.python.failure import Failure
-from twisted.test.proto_helpers import MemoryReactorClock
+from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
 from twisted.web.http import unquote
 from twisted.web.http_headers import Headers
 
@@ -334,7 +338,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
 def get_clock():
     clock = ThreadedMemoryReactorClock()
     hs_clock = Clock(clock)
-    return (clock, hs_clock)
+    return clock, hs_clock
 
 
 @attr.s(cmp=False)
@@ -465,3 +469,22 @@ class FakeTransport(object):
         self.buffer = self.buffer[len(to_write) :]
         if self.buffer and self.autoflush:
             self._reactor.callLater(0.0, self.flush)
+
+
+def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol:
+    """
+    Connect a client to a fake TCP transport.
+
+    Args:
+        reactor
+        factory: The connecting factory to build.
+    """
+    factory = reactor.tcpClients[client_id][2]
+    client = factory.buildProtocol(None)
+    server = AccumulatingProtocol()
+    server.makeConnection(FakeTransport(client, reactor))
+    client.makeConnection(FakeTransport(server, reactor))
+
+    reactor.tcpClients.pop(client_id)
+
+    return client, server

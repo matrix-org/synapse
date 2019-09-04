@@ -36,7 +36,6 @@ from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
 from twisted.web.http_headers import Headers
 
-import synapse.logging.opentracing as opentracing
 import synapse.metrics
 import synapse.util.retryutils
 from synapse.api.errors import (
@@ -50,6 +49,12 @@ from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import BlacklistingAgentWrapper, IPBlacklistingResolver
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.opentracing import (
+    inject_active_span_byte_dict,
+    set_tag,
+    start_active_span,
+    tags,
+)
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
 
@@ -341,20 +346,20 @@ class MatrixFederationHttpClient(object):
             query_bytes = b""
 
         # Retreive current span
-        scope = opentracing.start_active_span(
+        scope = start_active_span(
             "outgoing-federation-request",
             tags={
-                opentracing.tags.SPAN_KIND: opentracing.tags.SPAN_KIND_RPC_CLIENT,
-                opentracing.tags.PEER_ADDRESS: request.destination,
-                opentracing.tags.HTTP_METHOD: request.method,
-                opentracing.tags.HTTP_URL: request.path,
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
+                tags.PEER_ADDRESS: request.destination,
+                tags.HTTP_METHOD: request.method,
+                tags.HTTP_URL: request.path,
             },
             finish_on_close=True,
         )
 
         # Inject the span into the headers
         headers_dict = {}
-        opentracing.inject_active_span_byte_dict(headers_dict, request.destination)
+        inject_active_span_byte_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 
@@ -436,9 +441,7 @@ class MatrixFederationHttpClient(object):
                         response.phrase.decode("ascii", errors="replace"),
                     )
 
-                    opentracing.set_tag(
-                        opentracing.tags.HTTP_STATUS_CODE, response.code
-                    )
+                    set_tag(tags.HTTP_STATUS_CODE, response.code)
 
                     if 200 <= response.code < 300:
                         pass

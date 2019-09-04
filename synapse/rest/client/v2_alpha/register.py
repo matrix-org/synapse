@@ -16,7 +16,6 @@
 
 import hmac
 import logging
-from hashlib import sha1
 
 from six import string_types
 
@@ -95,7 +94,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -138,7 +137,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -178,7 +177,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
             yield self.registration_handler.check_username(username)
 
-            return (200, {"available": True})
+            return 200, {"available": True}
 
 
 class RegisterRestServlet(RestServlet):
@@ -239,14 +238,12 @@ class RegisterRestServlet(RestServlet):
 
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the username/password provided to us.
-        desired_password = None
         if "password" in body:
             if (
                 not isinstance(body["password"], string_types)
                 or len(body["password"]) > 512
             ):
                 raise SynapseError(400, "Invalid password")
-            desired_password = body["password"]
 
         desired_username = None
         if "username" in body:
@@ -261,8 +258,8 @@ class RegisterRestServlet(RestServlet):
         if self.auth.has_access_token(request):
             appservice = yield self.auth.get_appservice_by_req(request)
 
-        # fork off as soon as possible for ASes and shared secret auth which
-        # have completely different registration flows to normal users
+        # fork off as soon as possible for ASes which have completely
+        # different registration flows to normal users
 
         # == Application Service Registration ==
         if appservice:
@@ -282,27 +279,17 @@ class RegisterRestServlet(RestServlet):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
-            return (200, result)  # we throw for non 200 responses
+            return 200, result  # we throw for non 200 responses
             return
 
-        # for either shared secret or regular registration, downcase the
-        # provided username before attempting to register it. This should mean
+        # for regular registration, downcase the provided username before
+        # attempting to register it. This should mean
         # that people who try to register with upper-case in their usernames
         # don't get a nasty surprise. (Note that we treat username
         # case-insenstively in login, so they are free to carry on imagining
         # that their username is CrAzYh4cKeR if that keeps them happy)
         if desired_username is not None:
             desired_username = desired_username.lower()
-
-        # == Shared Secret Registration == (e.g. create new user scripts)
-        if "mac" in body:
-            # FIXME: Should we really be determining if this is shared secret
-            # auth based purely on the 'mac' key?
-            result = yield self._do_shared_secret_registration(
-                desired_username, desired_password, body
-            )
-            return (200, result)  # we throw for non 200 responses
-            return
 
         # == Normal User Registration == (everyone else)
         if not self.hs.config.enable_registration:
@@ -500,7 +487,7 @@ class RegisterRestServlet(RestServlet):
                 bind_msisdn=params.get("bind_msisdn"),
             )
 
-        return (200, return_dict)
+        return 200, return_dict
 
     def on_OPTIONS(self, _):
         return 200, {}
@@ -511,42 +498,6 @@ class RegisterRestServlet(RestServlet):
             username, as_token
         )
         return (yield self._create_registration_details(user_id, body))
-
-    @defer.inlineCallbacks
-    def _do_shared_secret_registration(self, username, password, body):
-        if not self.hs.config.registration_shared_secret:
-            raise SynapseError(400, "Shared secret registration is not enabled")
-        if not username:
-            raise SynapseError(
-                400, "username must be specified", errcode=Codes.BAD_JSON
-            )
-
-        # use the username from the original request rather than the
-        # downcased one in `username` for the mac calculation
-        user = body["username"].encode("utf-8")
-
-        # str() because otherwise hmac complains that 'unicode' does not
-        # have the buffer interface
-        got_mac = str(body["mac"])
-
-        # FIXME this is different to the /v1/register endpoint, which
-        # includes the password and admin flag in the hashed text. Why are
-        # these different?
-        want_mac = hmac.new(
-            key=self.hs.config.registration_shared_secret.encode(),
-            msg=user,
-            digestmod=sha1,
-        ).hexdigest()
-
-        if not compare_digest(want_mac, got_mac):
-            raise SynapseError(403, "HMAC incorrect")
-
-        user_id = yield self.registration_handler.register_user(
-            localpart=username, password=password
-        )
-
-        result = yield self._create_registration_details(user_id, body)
-        return result
 
     @defer.inlineCallbacks
     def _create_registration_details(self, user_id, params):

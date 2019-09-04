@@ -810,7 +810,7 @@ class EventsStore(
         # If they old and new groups are the same then we don't need to do
         # anything.
         if old_state_groups == new_state_groups:
-            return (None, None)
+            return None, None
 
         if len(new_state_groups) == 1 and len(old_state_groups) == 1:
             # If we're going from one state group to another, lets check if
@@ -827,7 +827,7 @@ class EventsStore(
                 # the current state in memory then lets also return that,
                 # but it doesn't matter if we don't.
                 new_state = state_groups_map.get(new_state_group)
-                return (new_state, delta_ids)
+                return new_state, delta_ids
 
         # Now that we have calculated new_state_groups we need to get
         # their state IDs so we can resolve to a single state set.
@@ -839,7 +839,7 @@ class EventsStore(
         if len(new_state_groups) == 1:
             # If there is only one state group, then we know what the current
             # state is.
-            return (state_groups_map[new_state_groups.pop()], None)
+            return state_groups_map[new_state_groups.pop()], None
 
         # Ok, we need to defer to the state handler to resolve our state sets.
 
@@ -868,7 +868,7 @@ class EventsStore(
             state_res_store=StateResolutionStore(self),
         )
 
-        return (res.state, None)
+        return res.state, None
 
     @defer.inlineCallbacks
     def _calculate_state_delta(self, room_id, current_state):
@@ -891,7 +891,7 @@ class EventsStore(
             if ev_id != existing_state.get(key)
         }
 
-        return (to_delete, to_insert)
+        return to_delete, to_insert
 
     @log_function
     def _persist_events_txn(
@@ -1302,15 +1302,11 @@ class EventsStore(
             "event_reference_hashes",
             "event_search",
             "event_to_state_groups",
-            "guest_access",
-            "history_visibility",
             "local_invites",
-            "room_names",
             "state_events",
             "rejections",
             "redactions",
             "room_memberships",
-            "topics",
         ):
             txn.executemany(
                 "DELETE FROM %s WHERE event_id = ?" % (table,),
@@ -1454,10 +1450,10 @@ class EventsStore(
 
         for event, _ in events_and_contexts:
             if event.type == EventTypes.Name:
-                # Insert into the room_names and event_search tables.
+                # Insert into the event_search table.
                 self._store_room_name_txn(txn, event)
             elif event.type == EventTypes.Topic:
-                # Insert into the topics table and event_search table.
+                # Insert into the event_search table.
                 self._store_room_topic_txn(txn, event)
             elif event.type == EventTypes.Message:
                 # Insert into the event_search table.
@@ -1465,12 +1461,6 @@ class EventsStore(
             elif event.type == EventTypes.Redaction:
                 # Insert into the redactions table.
                 self._store_redaction(txn, event)
-            elif event.type == EventTypes.RoomHistoryVisibility:
-                # Insert into the event_search table.
-                self._store_history_visibility_txn(txn, event)
-            elif event.type == EventTypes.GuestAccess:
-                # Insert into the event_search table.
-                self._store_guest_access_txn(txn, event)
 
             self._handle_event_relations(txn, event)
 
@@ -2190,6 +2180,143 @@ class EventsStore(
                 to_dedelta.add(sg)
 
         return to_delete, to_dedelta
+
+    def purge_room(self, room_id):
+        """Deletes all record of a room
+
+        Args:
+            room_id (str):
+        """
+
+        return self.runInteraction("purge_room", self._purge_room_txn, room_id)
+
+    def _purge_room_txn(self, txn, room_id):
+        # first we have to delete the state groups states
+        logger.info("[purge] removing %s from state_groups_state", room_id)
+
+        txn.execute(
+            """
+            DELETE FROM state_groups_state WHERE state_group IN (
+              SELECT state_group FROM events JOIN event_to_state_groups USING(event_id)
+              WHERE events.room_id=?
+            )
+            """,
+            (room_id,),
+        )
+
+        # ... and the state group edges
+        logger.info("[purge] removing %s from state_group_edges", room_id)
+
+        txn.execute(
+            """
+            DELETE FROM state_group_edges WHERE state_group IN (
+              SELECT state_group FROM events JOIN event_to_state_groups USING(event_id)
+              WHERE events.room_id=?
+            )
+            """,
+            (room_id,),
+        )
+
+        # ... and the state groups
+        logger.info("[purge] removing %s from state_groups", room_id)
+
+        txn.execute(
+            """
+            DELETE FROM state_groups WHERE id IN (
+              SELECT state_group FROM events JOIN event_to_state_groups USING(event_id)
+              WHERE events.room_id=?
+            )
+            """,
+            (room_id,),
+        )
+
+        # and then tables which lack an index on room_id but have one on event_id
+        for table in (
+            "event_auth",
+            "event_edges",
+            "event_push_actions_staging",
+            "event_reference_hashes",
+            "event_relations",
+            "event_to_state_groups",
+            "redactions",
+            "rejections",
+            "state_events",
+        ):
+            logger.info("[purge] removing %s from %s", room_id, table)
+
+            txn.execute(
+                """
+                DELETE FROM %s WHERE event_id IN (
+                  SELECT event_id FROM events WHERE room_id=?
+                )
+                """
+                % (table,),
+                (room_id,),
+            )
+
+        # and finally, the tables with an index on room_id (or no useful index)
+        for table in (
+            "current_state_events",
+            "event_backward_extremities",
+            "event_forward_extremities",
+            "event_json",
+            "event_push_actions",
+            "event_search",
+            "events",
+            "group_rooms",
+            "public_room_list_stream",
+            "receipts_graph",
+            "receipts_linearized",
+            "room_aliases",
+            "room_depth",
+            "room_memberships",
+            "room_state",
+            "room_stats",
+            "room_stats_earliest_token",
+            "rooms",
+            "stream_ordering_to_exterm",
+            "topics",
+            "users_in_public_rooms",
+            "users_who_share_private_rooms",
+            # no useful index, but let's clear them anyway
+            "appservice_room_list",
+            "e2e_room_keys",
+            "event_push_summary",
+            "pusher_throttle",
+            "group_summary_rooms",
+            "local_invites",
+            "room_account_data",
+            "room_tags",
+        ):
+            logger.info("[purge] removing %s from %s", room_id, table)
+            txn.execute("DELETE FROM %s WHERE room_id=?" % (table,), (room_id,))
+
+        # Other tables we do NOT need to clear out:
+        #
+        #  - blocked_rooms
+        #    This is important, to make sure that we don't accidentally rejoin a blocked
+        #    room after it was purged
+        #
+        #  - user_directory
+        #    This has a room_id column, but it is unused
+        #
+
+        # Other tables that we might want to consider clearing out include:
+        #
+        #  - event_reports
+        #       Given that these are intended for abuse management my initial
+        #       inclination is to leave them in place.
+        #
+        #  - current_state_delta_stream
+        #  - ex_outlier_stream
+        #  - room_tags_revisions
+        #       The problem with these is that they are largeish and there is no room_id
+        #       index on them. In any case we should be clearing out 'stream' tables
+        #       periodically anyway (#5888)
+
+        # TODO: we could probably usefully do a bunch of cache invalidation here
+
+        logger.info("[purge] done")
 
     @defer.inlineCallbacks
     def is_event_after(self, event_id1, event_id2):

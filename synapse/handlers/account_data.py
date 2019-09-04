@@ -51,8 +51,8 @@ class AccountDataEventSource(object):
                     {"type": account_data_type, "content": content, "room_id": room_id}
                 )
 
-        return (results, current_stream_id)
+        return results, current_stream_id
 
     @defer.inlineCallbacks
     def get_pagination_rows(self, user, config, key):
-        return ([], config.to_id)
+        return [], config.to_id

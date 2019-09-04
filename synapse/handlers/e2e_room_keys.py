@@ -27,6 +27,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.logging.opentracing import log_kv, trace
 from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ class E2eRoomKeysHandler(object):
         # changed.
         self._upload_linearizer = Linearizer("upload_room_keys_lock")
 
+    @trace
     @defer.inlineCallbacks
     def get_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk get the E2E room keys for a given backup, optionally filtered to a given
@@ -85,8 +87,10 @@ class E2eRoomKeysHandler(object):
                 user_id, version, room_id, session_id
             )
 
+            log_kv(results)
             return results
 
+    @trace
     @defer.inlineCallbacks
     def delete_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
@@ -124,6 +128,7 @@ class E2eRoomKeysHandler(object):
             count = yield self.store.count_e2e_room_keys(user_id, version)
             return {"count": count, "hash": version_info["hash"]}
 
+    @trace
     @defer.inlineCallbacks
     def upload_room_keys(self, user_id, version, room_keys):
         """Bulk upload a list of room keys into a given backup version, asserting
@@ -197,9 +202,18 @@ class E2eRoomKeysHandler(object):
             changed = False  # if anything has changed, we need to update the hash
             for room_id, room in iteritems(room_keys["rooms"]):
                 for session_id, room_key in iteritems(room["sessions"]):
+                    log_kv(
+                        {
+                            "message": "Trying to upload room key",
+                            "room_id": room_id,
+                            "session_id": session_id,
+                            "user_id": user_id,
+                        }
+                    )
                     current_room_key = existing_keys.get(room_id, {}).get(session_id)
                     if current_room_key:
                         if self._should_replace_room_key(current_room_key, room_key):
+                            log_kv({"message": "Replacing room key."})
                             # updates are done one at a time in the DB, so send
                             # updates right away rather than batching them up,
                             # like we do with the inserts
@@ -207,7 +221,17 @@ class E2eRoomKeysHandler(object):
                                 user_id, version, room_id, session_id, room_key
                             )
                             changed = True
+                        else:
+                            log_kv({"message": "Not replacing room_key."})
                     else:
+                        log_kv(
+                            {
+                                "message": "Room key not found.",
+                                "room_id": room_id,
+                                "user_id": user_id,
+                            }
+                        )
+                        log_kv({"message": "Replacing room key."})
                         to_insert.append((room_id, session_id, room_key))
                         changed = True
 
@@ -256,6 +280,7 @@ class E2eRoomKeysHandler(object):
                 return False
         return True
 
+    @trace
     @defer.inlineCallbacks
     def create_version(self, user_id, version_info):
         """Create a new backup version.  This automatically becomes the new
@@ -316,6 +341,7 @@ class E2eRoomKeysHandler(object):
             res["count"] = yield self.store.count_e2e_room_keys(user_id, res["version"])
             return res
 
+    @trace
     @defer.inlineCallbacks
     def delete_version(self, user_id, version=None):
         """Deletes a given version of the user's e2e_room_keys backup
@@ -336,6 +362,7 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
 
+    @trace
     @defer.inlineCallbacks
     def update_version(self, user_id, version, version_info):
         """Update the info about a given version of the user's backup
