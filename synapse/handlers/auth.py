@@ -363,8 +363,6 @@ class AuthHandler(BaseHandler):
         login_type = authdict["type"]
         checker = self.checkers.get(login_type)
         if checker is not None:
-            # XXX: Temporary workaround for having Synapse handle password resets
-            # See AuthHandler.check_auth for further details
             res = yield checker(authdict, clientip=clientip)
             return res
 

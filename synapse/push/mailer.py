@@ -629,46 +629,50 @@ def format_ts_filter(value, format):
     return time.strftime(format, time.localtime(value / 1000))
 
 
-# XXX: This method and the next could likely be combined in a smarter way
-@staticmethod
-def load_jinja2_template(template_dir, template_filename, template_vars):
+def load_jinja2_templates(
+    template_dir,
+    template_filenames,
+    apply_format_ts_filter=False,
+    apply_mxc_to_http_filter=False,
+    public_baseurl=None,
+):
     """Loads a jinja2 template with variables to insert
 
     Args:
         template_dir (str): The directory where templates are stored
-        template_filename (str): The name of the template in the template_dir
-        template_vars (Dict): Dictionary of keys in the template
-            alongside their values to insert
+        template_filenames (list[str]): A list of template filenames
+        apply_format_ts_filter (bool): Whether to apply a template filter that formats
+            timestamps
+        apply_mxc_to_http_filter (bool): Whether to apply a template filter that converts
+            mxc urls to http urls
+        public_baseurl (str|None): The public baseurl of the server. Required for
+            apply_mxc_to_http_filter to be enabled
 
     Returns:
-        str containing the contents of the rendered template
+        A list of jinja2 templates corresponding to the given list of filepaths,
+        with order preserved
     """
+    logger.info(
+        "loading email templates %s from '%s'", template_filenames, template_dir
+    )
     loader = jinja2.FileSystemLoader(template_dir)
     env = jinja2.Environment(loader=loader)
 
-    template = env.get_template(template_filename)
-    return template.render(**template_vars)
+    if apply_format_ts_filter:
+        env.filters["format_ts"] = format_ts_filter
+
+    if apply_mxc_to_http_filter and public_baseurl:
+        env.filters["mxc_to_http"] = _create_mxc_to_http_filter(public_baseurl)
+
+    templates = []
+    for template_filename in template_filenames:
+        template = env.get_template(template_filename)
+        templates.append(template)
+
+    return templates
 
 
-def load_jinja2_templates(config, template_html_name, template_text_name):
-    """Load the jinja2 email templates from disk
-
-    Returns:
-        (template_html, template_text)
-    """
-    logger.info("loading email templates from '%s'", config.email_template_dir)
-    loader = jinja2.FileSystemLoader(config.email_template_dir)
-    env = jinja2.Environment(loader=loader)
-    env.filters["format_ts"] = format_ts_filter
-    env.filters["mxc_to_http"] = _create_mxc_to_http_filter(config)
-
-    template_html = env.get_template(template_html_name)
-    template_text = env.get_template(template_text_name)
-
-    return template_html, template_text
-
-
-def _create_mxc_to_http_filter(config):
+def _create_mxc_to_http_filter(public_baseurl):
     def mxc_to_http_filter(value, width, height, resize_method="crop"):
         if value[0:6] != "mxc://":
             return ""
@@ -681,7 +685,7 @@ def _create_mxc_to_http_filter(config):
 
         params = {"width": width, "height": height, "method": resize_method}
         return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
-            config.public_baseurl,
+            public_baseurl,
             serverAndMediaId,
             urllib.parse.urlencode(params),
             fragment or "",

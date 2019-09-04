@@ -30,7 +30,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.push.mailer import load_jinja2_template
+from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import check_3pid_allowed
 
@@ -52,16 +52,21 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
-            templates = load_jinja2_templates(
-                config=hs.config,
-                template_html_name=hs.config.email_password_reset_template_html,
-                template_text_name=hs.config.email_password_reset_template_text,
+            template_html, template_text = load_jinja2_templates(
+                self.config.email_template_dir,
+                [
+                    self.config.email_password_reset_template_html,
+                    self.config.email_password_reset_template_text,
+                ],
+                apply_format_ts_filter=True,
+                apply_mxc_to_http_filter=True,
+                public_baseurl=self.config.public_baseurl,
             )
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=templates[0],
-                template_text=templates[1],
+                template_html=template_html,
+                template_text=template_text,
             )
 
     @defer.inlineCallbacks
@@ -255,13 +260,16 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             html = self.config.email_password_reset_template_success_html
             request.setResponseCode(200)
         except ThreepidValidationError as e:
-            # Show a failure page with a reason
-            html = load_jinja2_template(
-                self.config.email_template_dir,
-                self.config.email_password_reset_template_failure_html,
-                template_vars={"failure_reason": e.msg},
-            )
             request.setResponseCode(e.code)
+
+            # Show a failure page with a reason
+            html_template = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_password_reset_template_failure_html],
+            )
+
+            template_vars = {"failure_reason": e.msg}
+            html = html_template.render(**template_vars)
 
         request.write(html.encode("utf-8"))
         finish_request(request)
