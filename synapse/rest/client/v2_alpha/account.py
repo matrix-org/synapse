@@ -101,9 +101,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             # Have the configured identity server handle the request
-            if not self.hs.config.account_threepid_delegate:
+            if not self.hs.config.account_threepid_delegate_email:
                 logger.warn(
-                    "No upstream account_threepid_delegate configured on the server to "
+                    "No upstream email account_threepid_delegate configured on the server to "
                     "handle this request"
                 )
                 raise SynapseError(
@@ -111,7 +111,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 )
 
             ret = yield self.identity_handler.requestEmailToken(
-                self.hs.config.account_threepid_delegate,
+                self.hs.config.account_threepid_delegate_email,
                 email,
                 client_secret,
                 send_attempt,
@@ -171,9 +171,9 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
         if existing_user_id is None:
             raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
 
-        if not self.hs.config.account_threepid_delegate:
+        if not self.hs.config.account_threepid_delegate_msisdn:
             logger.warn(
-                "No upstream account_threepid_delegate configured on the server to "
+                "No upstream msisdn account_threepid_delegate configured on the server to "
                 "handle this request"
             )
             raise SynapseError(
@@ -182,7 +182,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(
-            self.config.account_threepid_delegate,
+            self.config.account_threepid_delegate_msisdn,
             country,
             phone_number,
             client_secret,
@@ -190,6 +190,8 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
             next_link,
         )
         return (200, ret)
+
+        return 200, ret
 
 
 class PasswordResetSubmitTokenServlet(RestServlet):

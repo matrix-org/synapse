@@ -76,11 +76,12 @@ class EmailConfig(Config):
         )
 
         self.threepid_behaviour_email = (
-            # Have Synapse handle the email sending if account_threepid_delegate is not defined
+            # Have Synapse handle the email sending if account_threepid_delegates.email
+            # is not defined
             # msisdn is currently always remote while Synapse does not support any method of
             # sending SMS messages
             ThreepidBehaviour.REMOTE
-            if self.account_threepid_delegate
+            if self.account_threepid_delegate_email
             else ThreepidBehaviour.LOCAL
         )
         # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
@@ -89,14 +90,16 @@ class EmailConfig(Config):
         # identity server in the process.
         self.using_identity_server_from_trusted_list = False
         if (
-            not self.account_threepid_delegate
+            not self.account_threepid_delegate_email
             and config.get("trust_identity_server_for_password_resets", False) is True
         ):
             # Use the first entry in self.trusted_third_party_id_servers instead
             if self.trusted_third_party_id_servers:
-                # XXX: It's a little confusing that account_threepid_delegate is modified
+                # XXX: It's a little confusing that account_threepid_delegate_email is modified
                 # both in RegistrationConfig and here. We should factor this bit out
-                self.account_threepid_delegate = self.trusted_third_party_id_servers[0]
+                self.account_threepid_delegate_email = self.trusted_third_party_id_servers[
+                    0
+                ]
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
