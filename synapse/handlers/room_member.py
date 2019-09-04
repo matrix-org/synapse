@@ -684,9 +684,7 @@ class RoomMemberHandler(object):
                 403, "Looking up third-party identifiers is denied from this server"
             )
 
-        invitee = yield self.lookup_3pid(
-            id_server, medium, address, id_access_token
-        )
+        invitee = yield self.lookup_3pid(id_server, medium, address, id_access_token)
 
         if invitee:
             yield self.update_membership(
@@ -694,7 +692,14 @@ class RoomMemberHandler(object):
             )
         else:
             yield self._make_and_store_3pid_invite(
-                requester, id_server, medium, address, room_id, inviter, txn_id=txn_id
+                requester,
+                id_server,
+                medium,
+                address,
+                room_id,
+                inviter,
+                txn_id=txn_id,
+                id_access_token=id_access_token,
             )
 
     @defer.inlineCallbacks
@@ -722,8 +727,7 @@ class RoomMemberHandler(object):
         hash_details = None
         try:
             hash_details = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/v2/hash_details"
-                % (id_server, id_server_scheme),
+                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
                 query_params,
             )
             if not isinstance(hash_details, dict):
@@ -888,7 +892,15 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _make_and_store_3pid_invite(
-        self, requester, id_server, medium, address, room_id, user, txn_id
+        self,
+        requester,
+        id_server,
+        medium,
+        address,
+        room_id,
+        user,
+        txn_id,
+        id_access_token=None,
     ):
         room_state = yield self.state_handler.get_current_state(room_id)
 
@@ -937,6 +949,7 @@ class RoomMemberHandler(object):
                 room_name=room_name,
                 inviter_display_name=inviter_display_name,
                 inviter_avatar_url=inviter_avatar_url,
+                id_access_token=id_access_token,
             )
         )
 
@@ -974,6 +987,7 @@ class RoomMemberHandler(object):
         room_name,
         inviter_display_name,
         inviter_avatar_url,
+        id_access_token=None,
     ):
         """
         Asks an identity server for a third party invite.
@@ -993,6 +1007,8 @@ class RoomMemberHandler(object):
             inviter_display_name (str): The current display name of the
                 inviter.
             inviter_avatar_url (str): The URL of the inviter's avatar.
+            id_access_token (str|None): The access token to authenticate to the identity
+                server with
 
         Returns:
             A deferred tuple containing:
@@ -1003,11 +1019,6 @@ class RoomMemberHandler(object):
                 display_name (str): A user-friendly name to represent the invited
                     user.
         """
-        is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
-            id_server_scheme,
-            id_server,
-        )
-
         invite_config = {
             "medium": medium,
             "address": address,
@@ -1020,11 +1031,40 @@ class RoomMemberHandler(object):
             "sender_display_name": inviter_display_name,
             "sender_avatar_url": inviter_avatar_url,
         }
+
+        # Add the identity service access token to the JSON body and use the v2
+        # Identity Service endpoints if id_access_token is present
+        if id_access_token:
+            invite_config["id_access_token"] = id_access_token
+            is_url = "%s%s/_matrix/identity/v2/store-invite" % (
+                id_server_scheme,
+                id_server,
+            )
+            key_validity_url = "%s%s/_matrix/identity/v2/pubkey/isvalid" % (
+                id_server_scheme,
+                id_server,
+            )
+        else:
+            is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
+                id_server_scheme,
+                id_server,
+            )
+            key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
+                id_server_scheme,
+                id_server,
+            )
+
+        fallback_to_v1 = False
         try:
             data = yield self.simple_http_client.post_json_get_json(
                 is_url, invite_config
             )
         except HttpResponseException as e:
+            if id_access_token and e.code == 404:
+                # This identity server does not support v2 endpoints
+                # Fallback to v1 endpoints
+                fallback_to_v1 = True
+
             # Some identity servers may only support application/x-www-form-urlencoded
             # types. This is especially true with old instances of Sydent, see
             # https://github.com/matrix-org/sydent/pull/170
@@ -1037,14 +1077,32 @@ class RoomMemberHandler(object):
                 is_url, invite_config
             )
 
+        if fallback_to_v1:
+            return (
+                yield self._ask_id_server_for_third_party_invite(
+                    requester,
+                    id_server,
+                    medium,
+                    address,
+                    room_id,
+                    inviter_user_id,
+                    room_alias,
+                    room_avatar_url,
+                    room_join_rules,
+                    room_name,
+                    inviter_display_name,
+                    inviter_avatar_url,
+                    id_access_token=None,  # force using v1 endpoints
+                )
+            )
+
         # TODO: Check for success
         token = data["token"]
         public_keys = data.get("public_keys", [])
         if "public_key" in data:
             fallback_public_key = {
                 "public_key": data["public_key"],
-                "key_validity_url": "%s%s/_matrix/identity/api/v1/pubkey/isvalid"
-                % (id_server_scheme, id_server),
+                "key_validity_url": key_validity_url,
             }
         else:
             fallback_public_key = public_keys[0]
