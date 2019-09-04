@@ -29,6 +29,7 @@ import yaml
 from twisted.enterprise import adbapi
 from twisted.internet import defer, reactor
 
+from synapse.config.homeserver import HomeServerConfig
 from synapse.storage import DataStore
 from synapse.storage._base import LoggingTransaction, SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
@@ -100,7 +101,9 @@ end_error_exec_info = None
 
 
 class MockHomeserver(object):
-    def __init__(self, database_engine, db_conn, db_pool):
+    def __init__(self, config, database_engine, db_conn, db_pool):
+        self.config = config
+        self.hostname = config.server_name
         self.database_engine = database_engine
 
         self.db_conn = db_conn
@@ -506,6 +509,7 @@ class Porter(object):
             # Check if all background updates are done, abort if not
             updates_complete = yield self.sqlite_store.has_completed_background_updates()
             if not updates_complete:
+                # TODO: Make this not an exception
                 sys.exit(
                     "Pending background updates exist in the SQLite database."
                     " Please start Synapse again and wait until every update has finished"
@@ -517,7 +521,12 @@ class Porter(object):
 
             self.postgres_store = DataStore(
                 postgres_conn,
-                MockHomeserver(postgres_engine, postgres_conn, postgres_db_pool),
+                MockHomeserver(
+                    self.hs_config,
+                    postgres_engine,
+                    postgres_conn,
+                    postgres_db_pool,
+                ),
             )
 
             yield self.postgres_store.runInteraction(
@@ -984,17 +993,24 @@ if __name__ == "__main__":
         },
     }
 
-    postgres_config = yaml.safe_load(args.postgres_config)
+    hs_config = yaml.safe_load(args.postgres_config)
 
-    if "database" in postgres_config:
-        postgres_config = postgres_config["database"]
+    config = HomeServerConfig()
+    config.parse_config_dict(hs_config, "", "")
 
-    if "name" not in postgres_config:
-        sys.stderr.write("Malformed database config: no 'name'")
-        sys.exit(2)
-    if postgres_config["name"] != "psycopg2":
-        sys.stderr.write("Database must use 'psycopg2' connector.")
-        sys.exit(3)
+    if "database" in hs_config:
+        postgres_config = hs_config["database"]
+
+        if "name" not in postgres_config:
+            sys.stderr.write("Malformed database config: no 'name'")
+            sys.exit(2)
+        if postgres_config["name"] != "psycopg2":
+            sys.stderr.write("Database must use 'psycopg2' connector.")
+            sys.exit(3)
+
+    else:
+        sys.stderr.write("The configuration file must have a 'database' section.")
+        sys.exit(4)
 
     def start(stdscr=None):
         if stdscr:
@@ -1007,6 +1023,7 @@ if __name__ == "__main__":
             postgres_config=postgres_config,
             progress=progress,
             batch_size=args.batch_size,
+            hs_config=config,
         )
 
         reactor.callWhenRunning(porter.run)
