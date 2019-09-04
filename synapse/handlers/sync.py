@@ -578,7 +578,6 @@ class SyncHandler(object):
 
         if not last_events:
             return None
-            return
 
         last_event = last_events[-1]
         state_ids = yield self.store.get_state_ids_for_event(

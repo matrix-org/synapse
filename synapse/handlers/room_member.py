@@ -962,9 +962,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         )
 
         if complexity:
-            if complexity["v1"] > max_complexity:
-                return True
-            return False
+            return complexity["v1"] > max_complexity
         return None
 
     @defer.inlineCallbacks
@@ -980,10 +978,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         max_complexity = self.hs.config.limit_remote_rooms.complexity
         complexity = yield self.store.get_room_complexity(room_id)
 
-        if complexity["v1"] > max_complexity:
-            return True
-
-        return False
+        return complexity["v1"] > max_complexity
 
     @defer.inlineCallbacks
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
