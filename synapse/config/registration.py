@@ -287,7 +287,7 @@ class RegistrationConfig(Config):
         # reset passwords for accounts!
         #
         # Be aware that if `email` is not set, and SMTP options have not been
-        # configured in the email config block, registration and resetting user passwords via
+        # configured in the email config block, registration and user password resets via
         # email will be globally disabled.
         #
         # Additionally, if msisdn is not set to a domain, registration and password resets via
@@ -303,6 +303,7 @@ class RegistrationConfig(Config):
         # Servers handling the above requests must answer the .../requestToken endpoints
         # defined by the Matrix Identity Service API specification:
         # https://matrix.org/docs/spec/identity_service/latest
+        #
         #account_threepid_delegates:
         #  email: ""
         #  msisdn: ""
