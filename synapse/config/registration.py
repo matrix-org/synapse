@@ -99,18 +99,9 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config.get(
             "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
-        account_threepid_delegates = config.get(
-            "account_threepid_delegates", {"email": "", "msisdn": ""}
-        )
+        account_threepid_delegates = config.get("account_threepid_delegates") or {}
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
-        if (
-            self.account_threepid_delegate_email is None
-            or self.account_threepid_delegate_msisdn is None
-        ):
-            raise ConfigError(
-                "account_threepid_delegates must contain fields: email, msisdn"
-            )
 
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
@@ -295,17 +286,17 @@ class RegistrationConfig(Config):
         # any method of sending SMS messages on its own.
         #
         # To enable using an identity server for operations regarding a particular third-party
-        # identifier type, set the value to the reachable domain name of that identity server,
-        # including protocol definition, e.g:
-        #  email: "https://matrix.org"  # Let matrix.org handle sending emails for my users
-        #  msisdn: "http://localhost:8090"  # Delegate contacting SMS numbers to this process
+        # identifier type, set the value to the URL of that identity server, e.g:
+        #  email: https://matrix.org  # Let matrix.org handle sending emails for my users
+        #  msisdn: http://localhost:8090  # Delegate contacting SMS numbers to this process
         #
         # Servers handling the above requests must answer the .../requestToken endpoints
         # defined by the Matrix Identity Service API specification:
         # https://matrix.org/docs/spec/identity_service/latest
-        #account_threepid_delegates:
-        #  email: ""
-        #  msisdn: ""
+        #
+        account_threepid_delegates:
+            #email: https://example.com
+            #msisdn: http://localhost:8090
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
