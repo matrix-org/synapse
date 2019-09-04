@@ -923,7 +923,7 @@ class RoomMemberHandler(object):
         if not public_keys:
             public_keys.append(fallback_public_key)
         display_name = data["display_name"]
-        return (token, public_keys, fallback_public_key, display_name)
+        return token, public_keys, fallback_public_key, display_name
 
     @defer.inlineCallbacks
     def _is_host_in_room(self, current_state_ids):
@@ -982,9 +982,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         )
 
         if complexity:
-            if complexity["v1"] > max_complexity:
-                return True
-            return False
+            return complexity["v1"] > max_complexity
         return None
 
     @defer.inlineCallbacks
@@ -1000,10 +998,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         max_complexity = self.hs.config.limit_remote_rooms.complexity
         complexity = yield self.store.get_room_complexity(room_id)
 
-        if complexity["v1"] > max_complexity:
-            return True
-
-        return False
+        return complexity["v1"] > max_complexity
 
     @defer.inlineCallbacks
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):

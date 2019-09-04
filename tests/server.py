@@ -338,7 +338,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
 def get_clock():
     clock = ThreadedMemoryReactorClock()
     hs_clock = Clock(clock)
-    return (clock, hs_clock)
+    return clock, hs_clock
 
 
 @attr.s(cmp=False)

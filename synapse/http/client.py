@@ -35,7 +35,7 @@ from twisted.internet.interfaces import (
 )
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import Agent, HTTPConnectionPool, PartialDownloadError, readBody
+from twisted.web.client import Agent, HTTPConnectionPool, readBody
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 
@@ -597,38 +597,6 @@ def _readBodyToFile(response, stream, max_size):
     d = defer.Deferred()
     response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
     return d
-
-
-class CaptchaServerHttpClient(SimpleHttpClient):
-    """
-    Separate HTTP client for talking to google's captcha servers
-    Only slightly special because accepts partial download responses
-
-    used only by c/s api v1
-    """
-
-    @defer.inlineCallbacks
-    def post_urlencoded_get_raw(self, url, args={}):
-        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True)
-
-        response = yield self.request(
-            "POST",
-            url,
-            data=query_bytes,
-            headers=Headers(
-                {
-                    b"Content-Type": [b"application/x-www-form-urlencoded"],
-                    b"User-Agent": [self.user_agent],
-                }
-            ),
-        )
-
-        try:
-            body = yield make_deferred_yieldable(readBody(response))
-            return body
-        except PartialDownloadError as e:
-            # twisted dislikes google's response, no content length.
-            return e.response
 
 
 def encode_urlencode_args(args):
