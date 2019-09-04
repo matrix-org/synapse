@@ -301,7 +301,7 @@ class IdentityHandler(BaseHandler):
                 server with
 
         Returns:
-            str: the matrix ID of the 3pid, or None if it is not recognized.
+            str|None: the matrix ID of the 3pid, or None if it is not recognized.
         """
         # If an access token is present, add it to the query params of the hash_details request
         query_params = {}
@@ -313,7 +313,7 @@ class IdentityHandler(BaseHandler):
         hash_details = None
         try:
             hash_details = yield self.http_client.get_json(
-                "%s/_matrix/identity/v2/hash_details" % id_server, query_params
+                "%s/_matrix/identity/v2/hash_details" % (id_server, ), query_params
             )
             if not isinstance(hash_details, dict):
                 logger.warn(
