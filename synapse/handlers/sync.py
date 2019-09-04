@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018, 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -378,7 +378,7 @@ class SyncHandler(object):
                 event_copy = {k: v for (k, v) in iteritems(event) if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
-        return (now_token, ephemeral_by_room)
+        return now_token, ephemeral_by_room
 
     @defer.inlineCallbacks
     def _load_filtered_recents(
@@ -578,7 +578,6 @@ class SyncHandler(object):
 
         if not last_events:
             return None
-            return
 
         last_event = last_events[-1]
         state_ids = yield self.store.get_state_ids_for_event(
@@ -1125,6 +1124,11 @@ class SyncHandler(object):
             # weren't in the previous sync *or* they left and rejoined.
             users_that_have_changed.update(newly_joined_or_invited_users)
 
+            user_signatures_changed = yield self.store.get_users_whose_signatures_changed(
+                user_id, since_token.device_list_key
+            )
+            users_that_have_changed.update(user_signatures_changed)
+
             # Now find users that we no longer track
             for room_id in newly_left_rooms:
                 left_users = yield self.state.get_current_users_in_room(room_id)
@@ -1332,7 +1336,7 @@ class SyncHandler(object):
                     )
                     if not tags_by_room:
                         logger.debug("no-oping sync")
-                        return ([], [], [], [])
+                        return [], [], [], []
 
         ignored_account_data = yield self.store.get_global_account_data_by_type_for_user(
             "m.ignored_user_list", user_id=user_id
@@ -1642,7 +1646,7 @@ class SyncHandler(object):
                 )
             room_entries.append(entry)
 
-        return (room_entries, invited, newly_joined_rooms, newly_left_rooms)
+        return room_entries, invited, newly_joined_rooms, newly_left_rooms
 
     @defer.inlineCallbacks
     def _get_all_rooms(self, sync_result_builder, ignored_users):
@@ -1716,7 +1720,7 @@ class SyncHandler(object):
                     )
                 )
 
-        return (room_entries, invited, [])
+        return room_entries, invited, []
 
     @defer.inlineCallbacks
     def _generate_room_entry(

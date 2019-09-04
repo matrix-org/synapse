@@ -195,6 +195,6 @@ class ChainedIdGenerator(object):
         with self._lock:
             if self._unfinished_ids:
                 stream_id, chained_id = self._unfinished_ids[0]
-                return (stream_id - 1, chained_id)
+                return stream_id - 1, chained_id
 
-            return (self._current_max, self.chained_generator.get_current_token())
+            return self._current_max, self.chained_generator.get_current_token()

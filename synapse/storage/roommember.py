@@ -112,29 +112,31 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=100000, iterable=True)
     def get_users_in_room(self, room_id):
-        def f(txn):
-            # If we can assume current_state_events.membership is up to date
-            # then we can avoid a join, which is a Very Good Thing given how
-            # frequently this function gets called.
-            if self._current_state_events_membership_up_to_date:
-                sql = """
-                    SELECT state_key FROM current_state_events
-                    WHERE type = 'm.room.member' AND room_id = ? AND membership = ?
-                """
-            else:
-                sql = """
-                    SELECT state_key FROM room_memberships as m
-                    INNER JOIN current_state_events as c
-                    ON m.event_id = c.event_id
-                    AND m.room_id = c.room_id
-                    AND m.user_id = c.state_key
-                    WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?
-                """
+        return self.runInteraction(
+            "get_users_in_room", self.get_users_in_room_txn, room_id
+        )
 
-            txn.execute(sql, (room_id, Membership.JOIN))
-            return [to_ascii(r[0]) for r in txn]
+    def get_users_in_room_txn(self, txn, room_id):
+        # If we can assume current_state_events.membership is up to date
+        # then we can avoid a join, which is a Very Good Thing given how
+        # frequently this function gets called.
+        if self._current_state_events_membership_up_to_date:
+            sql = """
+                SELECT state_key FROM current_state_events
+                WHERE type = 'm.room.member' AND room_id = ? AND membership = ?
+            """
+        else:
+            sql = """
+                SELECT state_key FROM room_memberships as m
+                INNER JOIN current_state_events as c
+                ON m.event_id = c.event_id
+                AND m.room_id = c.room_id
+                AND m.user_id = c.state_key
+                WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?
+            """
 
-        return self.runInteraction("get_users_in_room", f)
+        txn.execute(sql, (room_id, Membership.JOIN))
+        return [to_ascii(r[0]) for r in txn]
 
     @cached(max_entries=100000)
     def get_room_summary(self, room_id):
