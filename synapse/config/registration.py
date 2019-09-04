@@ -286,7 +286,7 @@ class RegistrationConfig(Config):
         # method of sending SMS messages on its own.
         #
         # To enable using an identity server for operations regarding a particular third-party
-        # identifier type, set the value to the URL of that identity server as shown in the 
+        # identifier type, set the value to the URL of that identity server as shown in the
         # examples below.
         #
         # Servers handling the these requests must answer the `/requestToken` endpoints defined
