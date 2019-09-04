@@ -146,7 +146,7 @@ class IdentityHandler(BaseHandler):
 
         # This identity server is too old to understand Identity Service API v2
         # Attempt v1 endpoint
-        logger.warn("Got 404 when POSTing JSON %s, falling back to v1 URL", url)
+        logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", url)
         return (yield self.threepid_from_creds(creds, use_v2=False))
 
     @defer.inlineCallbacks
@@ -200,7 +200,7 @@ class IdentityHandler(BaseHandler):
             data = json.loads(e.msg)  # XXX WAT?
             return data
 
-        logger.warn("Got 404 when POSTing JSON %s, falling back to v1 URL", bind_url)
+        logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", bind_url)
         return (yield self.bind_threepid(creds, mxid, use_v2=False))
 
     @defer.inlineCallbacks
@@ -300,7 +300,7 @@ class IdentityHandler(BaseHandler):
                 raise SynapseError(502, "Failed to contact identity server")
 
         if v1_fallback:
-            logger.warn("Got 404 when POSTing JSON %s, falling back to v1 URL", url)
+            logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", url)
             return (
                 yield self.try_unbind_threepid_with_id_server(
                     mxid, threepid, id_server, use_v2=False
