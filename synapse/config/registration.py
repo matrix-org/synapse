@@ -289,8 +289,8 @@ class RegistrationConfig(Config):
         # identifier type, set the value to the URL of that identity server as shown in the 
         # examples below.
         #
-        # Servers handling the above requests must answer the `/requestToken` endpoints
-        # defined by the Matrix Identity Service API specification:
+        # Servers handling the these requests must answer the `/requestToken` endpoints defined
+        # by the Matrix Identity Service API specification:
         # https://matrix.org/docs/spec/identity_service/latest
         #
         account_threepid_delegates:
