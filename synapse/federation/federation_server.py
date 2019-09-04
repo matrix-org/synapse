@@ -100,7 +100,7 @@ class FederationServer(FederationBase):
 
             res = self._transaction_from_pdus(pdus).get_dict()
 
-        return (200, res)
+        return 200, res
 
     @defer.inlineCallbacks
     @log_function
@@ -163,7 +163,7 @@ class FederationServer(FederationBase):
             yield self.transaction_actions.set_response(
                 origin, transaction, 400, response
             )
-            return (400, response)
+            return 400, response
 
         received_pdus_counter.inc(len(transaction.pdus))
 
@@ -265,7 +265,7 @@ class FederationServer(FederationBase):
         logger.debug("Returning: %s", str(response))
 
         yield self.transaction_actions.set_response(origin, transaction, 200, response)
-        return (200, response)
+        return 200, response
 
     @defer.inlineCallbacks
     def received_edu(self, origin, edu_type, content):
@@ -298,7 +298,7 @@ class FederationServer(FederationBase):
                 event_id,
             )
 
-        return (200, resp)
+        return 200, resp
 
     @defer.inlineCallbacks
     def on_state_ids_request(self, origin, room_id, event_id):
@@ -315,7 +315,7 @@ class FederationServer(FederationBase):
         state_ids = yield self.handler.get_state_ids_for_pdu(room_id, event_id)
         auth_chain_ids = yield self.store.get_auth_chain_ids(state_ids)
 
-        return (200, {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids})
+        return 200, {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
     @defer.inlineCallbacks
     def _on_context_state_request_compute(self, room_id, event_id):
@@ -345,15 +345,15 @@ class FederationServer(FederationBase):
         pdu = yield self.handler.get_persisted_pdu(origin, event_id)
 
         if pdu:
-            return (200, self._transaction_from_pdus([pdu]).get_dict())
+            return 200, self._transaction_from_pdus([pdu]).get_dict()
         else:
-            return (404, "")
+            return 404, ""
 
     @defer.inlineCallbacks
     def on_query_request(self, query_type, args):
         received_queries_counter.labels(query_type).inc()
         resp = yield self.registry.on_query(query_type, args)
-        return (200, resp)
+        return 200, resp
 
     @defer.inlineCallbacks
     def on_make_join_request(self, origin, room_id, user_id, supported_versions):
@@ -435,7 +435,7 @@ class FederationServer(FederationBase):
 
         logger.debug("on_send_leave_request: pdu sigs: %s", pdu.signatures)
         yield self.handler.on_send_leave_request(origin, pdu)
-        return (200, {})
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_event_auth(self, origin, room_id, event_id):
@@ -446,7 +446,7 @@ class FederationServer(FederationBase):
             time_now = self._clock.time_msec()
             auth_pdus = yield self.handler.on_event_auth(event_id)
             res = {"auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus]}
-        return (200, res)
+        return 200, res
 
     @defer.inlineCallbacks
     def on_query_auth_request(self, origin, content, room_id, event_id):
@@ -499,7 +499,7 @@ class FederationServer(FederationBase):
                 "missing": ret.get("missing", []),
             }
 
-        return (200, send_content)
+        return 200, send_content
 
     @log_function
     def on_query_client_keys(self, origin, content):

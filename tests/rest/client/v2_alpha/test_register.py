@@ -472,7 +472,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
                 added_at=now,
             )
         )
-        return (user_id, tok)
+        return user_id, tok
 
     def test_manual_email_send_expired_account(self):
         user_id = self.register_user("kermit", "monkey")

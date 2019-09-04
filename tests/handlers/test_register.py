@@ -283,4 +283,4 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
                 user, requester, displayname, by_admin=True
             )
 
-        return (user_id, token)
+        return user_id, token
