@@ -189,7 +189,6 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
             send_attempt,
             next_link,
         )
-        return (200, ret)
 
         return 200, ret
 

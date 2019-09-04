@@ -218,6 +218,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             send_attempt,
             next_link,
         )
+
         return 200, ret
 
 
