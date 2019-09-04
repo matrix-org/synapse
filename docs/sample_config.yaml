@@ -907,8 +907,8 @@ uploads_path: "DATADIR/uploads"
 # *trusted* identity servers. Note that this allows the configured identity server to
 # reset passwords for accounts!
 #
-# Also be aware that if email is not set to a domain, and SMTP options have not been
-# configured in the email config block, registration and resetting user passwords via
+# Be aware that if `email` is not set, and SMTP options have not been
+# configured in the email config block, registration and user password resets via
 # email will be globally disabled.
 #
 # Additionally, if msisdn is not set to a domain, registration and password resets via
@@ -916,17 +916,17 @@ uploads_path: "DATADIR/uploads"
 # any method of sending SMS messages on its own.
 #
 # To enable using an identity server for operations regarding a particular third-party
-# identifier type, set the value to the reachable domain name of that identity server,
-# including protocol definition, e.g:
-#  email: "https://matrix.org"  # Let matrix.org handle sending emails for my users
-#  msisdn: "http://localhost:8090"  # Delegate contacting SMS numbers to this process
+# identifier type, set the value to the URL of that identity server, e.g:
+#  email: https://matrix.org  # Let matrix.org handle sending emails for my users
+#  msisdn: http://localhost:8090  # Delegate contacting SMS numbers to this process
 #
 # Servers handling the above requests must answer the .../requestToken endpoints
 # defined by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
-#account_threepid_delegates:
-#  email: ""
-#  msisdn: ""
+#
+account_threepid_delegates:
+    #email: https://example.com
+    #msisdn: http://localhost:8090
 
 # Users who register on this homeserver will automatically be joined
 # to these rooms

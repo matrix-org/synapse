@@ -277,8 +277,8 @@ class RegistrationConfig(Config):
         # *trusted* identity servers. Note that this allows the configured identity server to
         # reset passwords for accounts!
         #
-        # Also be aware that if email is not set to a domain, and SMTP options have not been
-        # configured in the email config block, registration and resetting user passwords via
+        # Be aware that if `email` is not set, and SMTP options have not been
+        # configured in the email config block, registration and user password resets via
         # email will be globally disabled.
         #
         # Additionally, if msisdn is not set to a domain, registration and password resets via
