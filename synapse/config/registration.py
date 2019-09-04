@@ -99,7 +99,10 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config.get(
             "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
-        self.account_threepid_delegate = config.get("account_threepid_delegate")
+        account_threepid_delegates = config.get("account_threepid_delegates") or {}
+        self.account_threepid_delegate_email = account_threepid_delegates.get("email")
+        self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
+
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
@@ -270,19 +273,29 @@ class RegistrationConfig(Config):
         #  - matrix.org
         #  - vector.im
 
-        # Handle threepid (email/phone etc) registration and password resets
-        # through a *trusted* identity server. Note that this allows the configured
-        # identity server to reset passwords for accounts.
+        # Handle threepid (email/phone etc) registration and password resets through a set of
+        # *trusted* identity servers. Note that this allows the configured identity server to
+        # reset passwords for accounts!
         #
-        # If this option is not defined and SMTP options have not been
-        # configured, registration by email and resetting user passwords via
-        # email will be disabled
+        # Be aware that if `email` is not set, and SMTP options have not been
+        # configured in the email config block, registration and user password resets via
+        # email will be globally disabled.
         #
-        # Otherwise, to enable set this option to the reachable domain name, including protocol
-        # definition, for an identity server
-        # (e.g "https://matrix.org", "http://localhost:8090")
+        # Additionally, if `msisdn` is not set, registration and password resets via msisdn
+        # will be disabled regardless. This is due to Synapse currently not supporting any
+        # method of sending SMS messages on its own.
         #
-        #account_threepid_delegate: ""
+        # To enable using an identity server for operations regarding a particular third-party
+        # identifier type, set the value to the URL of that identity server as shown in the
+        # examples below.
+        #
+        # Servers handling the these requests must answer the `/requestToken` endpoints defined
+        # by the Matrix Identity Service API specification:
+        # https://matrix.org/docs/spec/identity_service/latest
+        #
+        account_threepid_delegates:
+            #email: https://example.com     # Delegate email sending to matrix.org
+            #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
