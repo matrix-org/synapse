@@ -684,9 +684,7 @@ class RoomMemberHandler(object):
                 403, "Looking up third-party identifiers is denied from this server"
             )
 
-        invitee = yield self.lookup_3pid(
-            id_server, medium, address, id_access_token
-        )
+        invitee = yield self.lookup_3pid(id_server, medium, address, id_access_token)
 
         if invitee:
             yield self.update_membership(
@@ -722,8 +720,7 @@ class RoomMemberHandler(object):
         hash_details = None
         try:
             hash_details = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/v2/hash_details"
-                % (id_server, id_server_scheme),
+                "%s%s/_matrix/identity/v2/hash_details" % (id_server, id_server_scheme),
                 query_params,
             )
             if not isinstance(hash_details, dict):
