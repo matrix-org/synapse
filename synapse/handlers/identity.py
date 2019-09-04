@@ -301,7 +301,7 @@ class IdentityHandler(BaseHandler):
                 server with
 
         Returns:
-            str: the matrix ID of the 3pid, or None if it is not recognized.
+            str|None: the matrix ID of the 3pid, or None if it is not recognized.
         """
         # If an access token is present, add it to the query params of the hash_details request
         query_params = {}
@@ -313,7 +313,7 @@ class IdentityHandler(BaseHandler):
         hash_details = None
         try:
             hash_details = yield self.http_client.get_json(
-                "%s/_matrix/identity/v2/hash_details" % id_server, query_params
+                "%s/_matrix/identity/v2/hash_details" % (id_server, ), query_params
             )
         except (HttpResponseException, ValueError) as e:
             # Catch HttpResponseExcept for a non-200 response code
@@ -324,7 +324,7 @@ class IdentityHandler(BaseHandler):
                 # This is an old identity server that does not yet support v2 lookups
                 use_v1 = True
             else:
-                logger.warn("Error when looking up hashing details: %s" % (e,))
+                logger.warning("Error when looking up hashing details: %s", e)
                 return None
 
         if use_v1:
