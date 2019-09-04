@@ -729,7 +729,7 @@ class RoomMemberHandler(object):
         use_v1 = False
         hash_details = None
         try:
-            hash_details = yield self.http_client.get_json(
+            hash_details = yield self.simple_http_client.get_json(
                 "%s/_matrix/identity/v2/hash_details" % (id_server,), query_params
             )
             if not isinstance(hash_details, dict):
@@ -774,7 +774,7 @@ class RoomMemberHandler(object):
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
         try:
-            data = yield self.http_client.get_json(
+            data = yield self.simple_http_client.get_json(
                 "%s/_matrix/identity/api/v1/lookup" % (id_server),
                 {"medium": medium, "address": address},
             )
@@ -811,9 +811,9 @@ class RoomMemberHandler(object):
         # Extract information from hash_details
         supported_lookup_algorithms = hash_details.get("algorithms")
         lookup_pepper = hash_details.get("lookup_pepper")
-        if not supported_lookup_algorithms or lookup_pepper:
+        if not supported_lookup_algorithms or not lookup_pepper:
             raise SynapseError(
-                500, "Invalid hash details received from identity server"
+                500, "Invalid hash details received from identity server: %s, %s"
             )
 
         # Check if any of the supported lookup algorithms are present
@@ -845,7 +845,7 @@ class RoomMemberHandler(object):
             )
 
         try:
-            lookup_results = yield self.http_client.post_json_get_json(
+            lookup_results = yield self.simple_http_client.post_json_get_json(
                 "%s/_matrix/identity/v2/lookup" % id_server,
                 {
                     "id_access_token": id_access_token,
