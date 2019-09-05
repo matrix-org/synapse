@@ -27,6 +27,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import LoggingTransaction
+from synapse.storage.engines import Sqlite3Engine
 from synapse.storage.events_worker import EventsWorkerStore
 from synapse.types import get_domain_from_id
 from synapse.util.async_helpers import Linearizer
@@ -93,15 +94,26 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """
 
         def _transact(txn):
-            query = """
-                SELECT COUNT(DISTINCT substr(out.user_id, pos+1))
-                FROM (
-                    SELECT rm.user_id as user_id, instr(rm.user_id, ':')
-                        AS pos FROM room_memberships as rm
-                    INNER JOIN current_state_events as c ON rm.event_id = c.event_id
-                    WHERE c.type = 'm.room.member'
-                ) as out
-            """
+            if isinstance(self.database_engine, Sqlite3Engine):
+                query = """
+                    SELECT COUNT(DISTINCT substr(out.user_id, pos+1))
+                    FROM (
+                        SELECT rm.user_id as user_id, instr(rm.user_id, ':')
+                            AS pos FROM room_memberships as rm
+                        INNER JOIN current_state_events as c ON rm.event_id = c.event_id
+                        WHERE c.type = 'm.room.member'
+                    ) as out
+                """
+            else:
+                query = """
+                    SELECT COUNT(DISTINCT substring(out.user_id from pos+1))
+                    FROM (
+                        SELECT rm.user_id as user_id, position(rm.user_id, ':')
+                            AS pos FROM room_memberships as rm
+                        INNER JOIN current_state_events as c ON rm.event_id = c.event_id
+                        WHERE c.type = 'm.room.member'
+                    ) as out
+                """
             txn.execute(query)
             return list(txn)[0][0]
 
