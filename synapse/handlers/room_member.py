@@ -724,7 +724,7 @@ class RoomMemberHandler(object):
                 query_params,
             )
             if not isinstance(hash_details, dict):
-                logger.warn(
+                logger.warning(
                     "Got non-dict object when checking hash details of %s: %s",
                     id_server,
                     hash_details,
@@ -739,7 +739,7 @@ class RoomMemberHandler(object):
                 # This is an old identity server that does not yet support v2 lookups
                 use_v1 = True
             else:
-                logger.warn("Error when looking up hashing details: %s" % (e,))
+                logger.warning("Error when looking up hashing details: %s", e)
                 raise e
 
         if use_v1:
@@ -846,7 +846,7 @@ class RoomMemberHandler(object):
                 },
             )
         except Exception as e:
-            logger.warn("Error when performing a v2 3pid lookup: %s" % (e,))
+            logger.warning("Error when performing a v2 3pid lookup: %s", e)
             raise SynapseError(
                 500, "Unknown error occurred during identity server lookup"
             )
