@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import attr
+
 from ._base import Config, ConfigError
 
 MISSING_SENTRY = """Missing sentry-sdk library. This is required to enable sentry

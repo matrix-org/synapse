@@ -18,11 +18,11 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
-from synapse.types import Requester, RoomID, UserID
+from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.rest.client.v1 import login, room
+from synapse.types import Requester, RoomID, UserID
 
 from tests import unittest
 from tests.utils import create_room, setup_test_homeserver
