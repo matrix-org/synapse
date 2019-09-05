@@ -35,7 +35,7 @@ import PortSelection from '../containers/PortSelection';
 import ReverseProxySampleConfig from '../containers/ReverseProxySampleConfig';
 import DelegationSampleConfig from '../containers/DelegationSampleConfig';
 import Database from '../containers/Database';
-import ConfigSelector from './ConfigSelector';
+import ConfigCompleted from './ConfigCompleted';
 import CompleteSetup from '../containers/CompleteSetup';
 import ContentWrapper from '../containers/ContentWrapper';
 import Done from '../containers/Done';
@@ -88,7 +88,7 @@ export default ({ setupUI, configUI, baseConfig }) => {
     if (baseConfig.setupDone) {
 
         console.log(`switching to ui ${configUI}`);
-        return <ConfigSelector></ConfigSelector>
+        return <ConfigCompleted></ConfigCompleted>
 
     }
 
