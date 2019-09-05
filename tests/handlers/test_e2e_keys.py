@@ -265,7 +265,9 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
 
         device_key_1["signatures"][local_user]["ed25519:abc"] = "base64+signature"
         device_key_2["signatures"][local_user]["ed25519:def"] = "base64+signature"
-        devices = yield self.handler.query_devices({"device_keys": {local_user: []}}, 0)
+        devices = yield self.handler.query_devices(
+            {"device_keys": {local_user: []}}, 0, 0
+        )
         del devices["device_keys"][local_user]["abc"]["unsigned"]
         del devices["device_keys"][local_user]["def"]["unsigned"]
         self.assertDictEqual(devices["device_keys"][local_user]["abc"], device_key_1)
