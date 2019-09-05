@@ -23,7 +23,12 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import CodeMessageException, HttpResponseException, SynapseError
+from synapse.api.errors import (
+    CodeMessageException,
+    Codes,
+    HttpResponseException,
+    SynapseError,
+)
 from synapse.util.stringutils import random_string
 
 from ._base import BaseHandler
