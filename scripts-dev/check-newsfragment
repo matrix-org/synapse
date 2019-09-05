@@ -5,9 +5,9 @@
 
 set -e
 
-# make sure that origin/develop is up to date
-git remote set-branches --add origin develop
-git fetch origin develop
+# make sure that origin/dinsic is up to date
+git remote set-branches --add origin dinsic
+git fetch origin dinsic
 
 # if there are changes in the debian directory, check that the debian changelog
 # has been updated
