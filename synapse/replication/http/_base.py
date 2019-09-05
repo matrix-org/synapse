@@ -28,10 +28,9 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.logging.opentracing import inject_active_span_byte_dict, trace_servlet
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
-
-from synapse.logging.opentracing import trace_servlet, inject_active_span_byte_dict
 
 logger = logging.getLogger(__name__)
 
