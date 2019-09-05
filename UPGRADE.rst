@@ -72,29 +72,28 @@ homeserver should delegate an external server (typically an `identity server
 <https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset or
 registration messages via email and SMS.
 
-Specifically for email, if ``email.trust_identity_server_for_password_resets`` was changed from
-its default to ``true``, and ``account_threepid_delegates.email`` is not set, then the server
-handling password resets and registration via third-party addresses will be set to the first
-entry in the Synapse config's ``trusted_third_party_id_servers`` entry. This is to ensure that
-people who set up an external server for handling these tasks before v1.4.0 will not have their
-setups mysteriously stop working. However, if no trusted identity server domains are
-configured, Synapse will throw an error.
+If ``email.trust_identity_server_for_password_resets`` is set to ``true``, and
+``account_threepid_delegates.email`` is not set, then the first entry in
+``trusted_third_party_id_servers`` will be used as the account threepid delegate for email.
+This is to ensure compatibility with existing Synapse installs that set up external server
+handling for these tasks before v1.4.0. If ``email.trust_identity_server_for_password_resets``
+is ``true`` and no trusted identity server domains are configured, Synapse will throw an error.
 
-If ``email.trust_identity_server_for_password_resets`` is not set to ``true`` and a type in
-``account_threepid_delegates`` is not set to a domain, then Synapse will attempt to send
-password reset and registration messages itself for that type.
+If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent and a threepid
+type in ``account_threepid_delegates`` is not set to a domain, then Synapse will attempt to
+send password reset and registration messages for that type.
 
 Email templates
 ---------------
 
 If you have configured a custom template directory with the ``email.template_dir`` option, be
 aware that there are new templates regarding registration. ``registration.html`` and
-``registration.txt`` have been added and contain the text that is sent to a client upon
-registering via email address.
+``registration.txt`` have been added and contain the content that is sent to a client upon
+registering via an email address.
 
-``registration_success.html`` and ``registration_failure.html`` are templates containing HTML
-that will be shown to the user when they click the link in their registration email (if a
-redirect URL is not configured), either showing them a success or failure page.
+``registration_success.html`` and ``registration_failure.html`` are also new HTML templates
+that will be shown to the user when they click the link in their registration emai , either
+showing them a success or failure page (assuming a redirect URL is not configured).
 
 Synapse will expect these files to exist inside the configured template directory. To view the
 default templates, see `synapse/res/templates
