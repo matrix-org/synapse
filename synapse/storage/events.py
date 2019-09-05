@@ -1566,10 +1566,12 @@ class EventsStore(
             Deferred
         """
 
-        if self.stream_ordering_month_ago is None:
+        if not self.hs.config.redaction_retention_period:
             return
 
-        max_pos = self.stream_ordering_month_ago
+        max_pos = yield self.find_first_stream_ordering_after_ts(
+            self._clock.time_msec() - self.hs.config.redaction_retention_period
+        )
 
         # We fetch all redactions that point to an event that we have that has
         # a stream ordering from over a month ago, that we haven't yet censored

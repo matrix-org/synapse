@@ -306,6 +306,11 @@ listeners:
 #
 #allow_per_room_profiles: false
 
+# How long to keep redacted events in unredacted form in the database.
+# By default redactions are kept indefinitely.
+#
+#redaction_retention_period: 30d
+
 
 ## TLS ##
 

@@ -344,7 +344,9 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             {"content": {"body": "t", "msgtype": "message"}}, json.loads(event_json)
         )
 
-        # Advance by 30 days
+        # Advance by 30 days, then advance again to ensure that the looping call
+        # for updating the stream position gets called and then the looping call
+        # for the censoring gets called.
         self.reactor.advance(60 * 60 * 24 * 31)
         self.reactor.advance(60 * 60 * 2)
 
