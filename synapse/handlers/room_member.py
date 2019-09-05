@@ -715,41 +715,37 @@ class RoomMemberHandler(object):
         if id_access_token is not None:
             query_params["id_access_token"] = id_access_token
 
-        # Check what hashing details are supported by this identity server
-        use_v1 = False
-        hash_details = None
-        try:
-            hash_details = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
-                query_params,
-            )
-            if not isinstance(hash_details, dict):
-                logger.warning(
-                    "Got non-dict object when checking hash details of %s: %s",
-                    id_server,
-                    hash_details,
+            # Check what hashing details are supported by this identity server
+            try:
+                hash_details = yield self.simple_http_client.get_json(
+                    "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
+                    query_params,
                 )
-                raise SynapseError(
-                    500, "Invalid hash details received from identity server"
+                if not isinstance(hash_details, dict):
+                    logger.warning(
+                        "Got non-dict object when checking hash details of %s: %s",
+                        id_server,
+                        hash_details,
+                    )
+                    return None
+
+                results = yield self._lookup_3pid_v2(
+                    id_server, id_access_token, medium, address, hash_details
                 )
-        except Exception as e:
-            # Catch HttpResponseExcept for a non-200 response code
-            # Check if this identity server does not know about v2 lookups
-            if isinstance(e, HttpResponseException) and e.code == 404:
-                # This is an old identity server that does not yet support v2 lookups
-                use_v1 = True
-            else:
-                logger.warning("Error when looking up hashing details: %s", e)
-                raise e
+                return results
 
-        if use_v1:
-            return (yield self._lookup_3pid_v1(id_server, medium, address))
+            except Exception as e:
+                # Catch HttpResponseExcept for a non-200 response code
+                # Check if this identity server does not know about v2 lookups
+                if isinstance(e, HttpResponseException) and e.code == 404:
+                    # This is an old identity server that does not yet support v2 lookups
+                    logger.warning("Attempted v2 lookup on v1 identity server %s. Falling "
+                                   "back to v1", id_server)
+                else:
+                    logger.warning("Error when looking up hashing details: %s", e)
+                    return None
 
-        return (
-            yield self._lookup_3pid_v2(
-                id_server, id_access_token, medium, address, hash_details
-            )
-        )
+        return (yield self._lookup_3pid_v1(id_server, medium, address))
 
     @defer.inlineCallbacks
     def _lookup_3pid_v1(self, id_server, medium, address):
@@ -777,7 +773,7 @@ class RoomMemberHandler(object):
                 return data["mxid"]
 
         except IOError as e:
-            logger.warn("Error from v1 identity server lookup: %s" % (e,))
+            logger.warning("Error from v1 identity server lookup: %s" % (e,))
 
         return None
 
@@ -802,7 +798,12 @@ class RoomMemberHandler(object):
         # Extract information from hash_details
         supported_lookup_algorithms = hash_details.get("algorithms")
         lookup_pepper = hash_details.get("lookup_pepper")
-        if not supported_lookup_algorithms or not lookup_pepper:
+        if (
+            not supported_lookup_algorithms
+            or not isinstance(supported_lookup_algorithms, list)
+            or not lookup_pepper
+            or not isinstance(lookup_pepper, str)
+        ):
             raise SynapseError(
                 500, "Invalid hash details received from identity server: %s, %s"
             )
@@ -824,7 +825,7 @@ class RoomMemberHandler(object):
             lookup_value = "%s %s" % (address, medium)
 
         else:
-            logger.warn(
+            logger.warning(
                 "None of the provided lookup algorithms of %s are supported: %s",
                 id_server,
                 supported_lookup_algorithms,
@@ -868,7 +869,8 @@ class RoomMemberHandler(object):
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
             key_data = yield self.simple_http_client.get_json(
-                "%s/_matrix/identity/api/v1/pubkey/%s" % (server_hostname, key_name)
+                "%s%s/_matrix/identity/api/v1/pubkey/%s"
+                % (id_server_scheme, server_hostname, key_name)
             )
             if "public_key" not in key_data:
                 raise AuthError(
@@ -1203,7 +1205,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             # The 'except' clause is very broad, but we need to
             # capture everything from DNS failures upwards
             #
-            logger.warn("Failed to reject invite: %s", e)
+            logger.warning("Failed to reject invite: %s", e)
 
             yield self.store.locally_reject_invite(target.to_string(), room_id)
             return {}
