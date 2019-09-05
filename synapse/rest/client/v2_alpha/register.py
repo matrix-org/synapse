@@ -41,6 +41,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
@@ -78,16 +79,21 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             from synapse.push.mailer import Mailer, load_jinja2_templates
 
-            templates = load_jinja2_templates(
-                config=hs.config,
-                template_html_name=hs.config.email_registration_template_html,
-                template_text_name=hs.config.email_registration_template_text,
+            template_html, template_text = load_jinja2_templates(
+                self.config.email_template_dir,
+                [
+                    self.config.email_registration_template_html,
+                    self.config.email_registration_template_text,
+                ],
+                apply_format_ts_filter=True,
+                apply_mxc_to_http_filter=True,
+                public_baseurl=self.config.public_baseurl,
             )
             self.mailer = Mailer(
                 hs=self.hs,
-                app_name=self.hs.config.email_app_name,
-                template_html=templates[0],
-                template_text=templates[1],
+                app_name=self.config.email_app_name,
+                template_html=template_html,
+                template_text=template_text,
             )
 
     @defer.inlineCallbacks
@@ -284,16 +290,19 @@ class RegistrationSubmitTokenServlet(RestServlet):
             request.setResponseCode(200)
         except ThreepidValidationError as e:
             # Show a failure page with a reason
-            html = self.load_jinja2_template(
-                self.config.email_template_dir,
-                self.config.email_registration_template_failure_html,
-                template_vars={"failure_reason": e.msg},
-            )
             request.setResponseCode(e.code)
+
+            # Show a failure page with a reason
+            html_template = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
+            template_vars = {"failure_reason": e.msg}
+            html = html_template.render(**template_vars)
 
         request.write(html.encode("utf-8"))
         finish_request(request)
-        return None
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -386,7 +395,6 @@ class RegisterRestServlet(RestServlet):
         if kind == b"guest":
             ret = yield self._do_guest_registration(body, address=client_addr)
             return ret
-            return
         elif kind != b"user":
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
@@ -436,7 +444,6 @@ class RegisterRestServlet(RestServlet):
                     desired_username, access_token, body
                 )
             return (200, result)  # we throw for non 200 responses
-            return
 
         # for regular registration, downcase the provided username before
         # attempting to register it. This should mean

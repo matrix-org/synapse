@@ -18,8 +18,6 @@ import logging
 
 from six.moves import http_client
 
-import jinja2
-
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
@@ -32,6 +30,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.push.mailer import Mailer, load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import check_3pid_allowed
 
@@ -51,18 +50,21 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            from synapse.push.mailer import Mailer, load_jinja2_templates
-
-            templates = load_jinja2_templates(
-                config=hs.config,
-                template_html_name=hs.config.email_password_reset_template_html,
-                template_text_name=hs.config.email_password_reset_template_text,
+            template_html, template_text = load_jinja2_templates(
+                self.config.email_template_dir,
+                [
+                    self.config.email_password_reset_template_html,
+                    self.config.email_password_reset_template_text,
+                ],
+                apply_format_ts_filter=True,
+                apply_mxc_to_http_filter=True,
+                public_baseurl=self.config.public_baseurl,
             )
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=templates[0],
-                template_text=templates[1],
+                template_html=template_html,
+                template_text=template_text,
             )
 
     @defer.inlineCallbacks
@@ -215,6 +217,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, medium):
+        # We currently only handle threepid token submissions for email
         if medium != "email":
             raise SynapseError(
                 400, "This medium is currently not supported for password resets"
@@ -255,34 +258,19 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             html = self.config.email_password_reset_template_success_html
             request.setResponseCode(200)
         except ThreepidValidationError as e:
-            # Show a failure page with a reason
-            html = self.load_jinja2_template(
-                self.config.email_template_dir,
-                self.config.email_password_reset_template_failure_html,
-                template_vars={"failure_reason": e.msg},
-            )
             request.setResponseCode(e.code)
+
+            # Show a failure page with a reason
+            html_template = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_password_reset_template_failure_html],
+            )
+
+            template_vars = {"failure_reason": e.msg}
+            html = html_template.render(**template_vars)
 
         request.write(html.encode("utf-8"))
         finish_request(request)
-
-    def load_jinja2_template(self, template_dir, template_filename, template_vars):
-        """Loads a jinja2 template with variables to insert
-
-        Args:
-            template_dir (str): The directory where templates are stored
-            template_filename (str): The name of the template in the template_dir
-            template_vars (Dict): Dictionary of keys in the template
-                alongside their values to insert
-
-        Returns:
-            str containing the contents of the rendered template
-        """
-        loader = jinja2.FileSystemLoader(template_dir)
-        env = jinja2.Environment(loader=loader)
-
-        template = env.get_template(template_filename)
-        return template.render(**template_vars)
 
     @defer.inlineCallbacks
     def on_POST(self, request, medium):
@@ -340,7 +328,6 @@ class PasswordRestServlet(RestServlet):
                 [[LoginType.EMAIL_IDENTITY], [LoginType.MSISDN]],
                 body,
                 self.hs.get_ip_from_request(request),
-                password_servlet=True,
             )
 
             if LoginType.EMAIL_IDENTITY in result:
