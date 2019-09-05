@@ -238,28 +238,31 @@ _homeserver_whitelist = None
 # Util methods
 
 
-def only_if_tracing(func=None, ret=None):
-    """Executes the function only if we're tracing. Otherwise returns `ret`."""
+def only_if_tracing(func):
+    """Executes the function only if we're tracing. Otherwise returns None."""
 
-    def only_if_tracing_inner_1(func):
-        @wraps(func)
-        def only_if_tracing_inner_2(*args, **kwargs):
-            if opentracing:
-                return func(*args, **kwargs)
-            else:
-                return ret
+    @wraps(func)
+    def _only_if_tracing_inner(*args, **kwargs):
+        if opentracing:
+            return func(*args, **kwargs)
+        else:
+            return
 
-        return only_if_tracing_inner_2
-
-    if func:
-        return only_if_tracing_inner_1(func)
-    else:
-        return only_if_tracing_inner_1
+    return _only_if_tracing_inner
 
 
 def ensure_active_span(message, ret=None):
-    """Executes the operation only if there is an active span. Otherwise it logs
-    an error and returns 'ret'."""
+    """Executes the operation only if opentracing is enabled and there is an active span.
+    If there is no active span it logs message at the error level.
+
+    Args:
+        message (str): Message which fills in "There was no active span when trying to %s"
+            in the error log if there is no active span and opentracing is enabled.
+        ret (object): return value if opentracing is None or there is no active span.
+
+    Returns (object): The result of the func or ret if opentracing is disabled or there
+        was no active span.
+    """
 
     def ensure_active_span_inner_1(func):
         @wraps(func)
@@ -343,7 +346,7 @@ def set_homeserver_whitelist(homeserver_whitelist):
         )
 
 
-@only_if_tracing(ret=False)
+@only_if_tracing
 def whitelisted_homeserver(destination):
     """Checks if a destination matches the whitelist
 
@@ -359,7 +362,6 @@ def whitelisted_homeserver(destination):
 # Start spans and scopes
 
 # Could use kwargs but I want these to be explicit
-@only_if_tracing(ret=_noop_context_manager())
 def start_active_span(
     operation_name,
     child_of=None,
@@ -377,6 +379,10 @@ def start_active_span(
     Returns:
         scope (Scope) or noop_context_manager
     """
+
+    if opentracing is None:
+        return _noop_context_manager()
+
     return opentracing.tracer.start_active_span(
         operation_name,
         child_of=child_of,
@@ -388,14 +394,15 @@ def start_active_span(
     )
 
 
-@only_if_tracing(ret=_noop_context_manager())
 def start_active_span_follows_from(operation_name, contexts):
+    if opentracing is None:
+        return _noop_context_manager()
+
     references = [opentracing.follows_from(context) for context in contexts]
     scope = start_active_span(operation_name, references=references)
     return scope
 
 
-@only_if_tracing(ret=_noop_context_manager())
 def start_active_span_from_request(
     request,
     operation_name,
@@ -419,6 +426,9 @@ def start_active_span_from_request(
     # So, we take the first item in the list.
     # Also, twisted uses byte arrays while opentracing expects strings.
 
+    if opentracing is None:
+        return _noop_context_manager()
+
     header_dict = {
         k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
     }
@@ -435,7 +445,6 @@ def start_active_span_from_request(
     )
 
 
-@only_if_tracing(ret=_noop_context_manager())
 def start_active_span_from_edu(
     edu_content,
     operation_name,
@@ -454,6 +463,9 @@ def start_active_span_from_edu(
 
         For the other args see opentracing.tracer
     """
+
+    if opentracing is None:
+        return _noop_context_manager()
 
     carrier = json.loads(edu_content.get("context", "{}")).get("opentracing", {})
     context = opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
@@ -642,9 +654,10 @@ def active_span_context_as_string():
         The active span context encoded as a string.
     """
     carrier = {}
-    opentracing.tracer.inject(
-        opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
-    )
+    if opentracing:
+        opentracing.tracer.inject(
+            opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
+        )
     return json.dumps(carrier)
 
 
