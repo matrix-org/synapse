@@ -571,6 +571,37 @@ class ThreepidRestServlet(RestServlet):
         return 200, {}
 
 
+class ThreepidUnbindRestServlet(RestServlet):
+    PATTERNS = client_patterns("/account/3pid/unbind$")
+
+    def __init__(self, hs):
+        super(ThreepidUnbindRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+        self.auth = hs.get_auth()
+        self.datastore = self.hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        """Unbind the given 3pid from a specific identity server, or identity servers that are
+        known to have this 3pid bound
+        """
+        user_id = yield self.auth.get_user_by_req(request)
+        body = parse_json_object_from_request(request)
+        assert_params_in_dict(body, ["medium", "address"])
+
+        medium = body.get("medium")
+        address = body.get("address")
+        id_server = body.get("id_server")
+
+        # Attempt to unbind the threepid from an identity server. If id_server is None, try to
+        # unbind from all identity servers this threepid has been added to in the past
+        result = yield self.identity_handler.try_unbind_threepid(
+            user_id, {"address": address, "medium": medium, "id_server": id_server}
+        )
+        return {"id_server_unbind_result": "success" if result else "no-support"}
+
+
 class ThreepidDeleteRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/delete$")
 
@@ -629,5 +660,6 @@ def register_servlets(hs, http_server):
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
     MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
+    ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)

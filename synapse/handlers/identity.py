@@ -137,7 +137,8 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def try_unbind_threepid(self, mxid, threepid):
-        """Removes a binding from an identity server
+        """Attempt to remove a 3PID from an identity server, or if one is not provided, all
+        identity servers we're aware the binding is present on
 
         Args:
             mxid (str): Matrix user ID of binding to be removed
