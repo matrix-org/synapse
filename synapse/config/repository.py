@@ -173,6 +173,8 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
+            from netaddr import IPSet
+
             self.url_preview_ip_range_blacklist = IPSet(
                 config["url_preview_ip_range_blacklist"]
             )
