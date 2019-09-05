@@ -264,6 +264,9 @@ def ensure_active_span(message, ret=None):
     def ensure_active_span_inner_1(func):
         @wraps(func)
         def ensure_active_span_inner_2(*args, **kwargs):
+            if not opentracing:
+                return ret
+
             if not opentracing.tracer.active_span:
                 logger.error(
                     "There was no active span when trying to %s."
@@ -482,21 +485,18 @@ def start_active_span_from_edu(
 # Opentracing setters for tags, logs, etc
 
 
-@only_if_tracing
 @ensure_active_span("set a tag")
 def set_tag(key, value):
     """Sets a tag on the active span"""
     opentracing.tracer.active_span.set_tag(key, value)
 
 
-@only_if_tracing
 @ensure_active_span("log")
 def log_kv(key_values, timestamp=None):
     """Log to the active span"""
     opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
 
-@only_if_tracing
 @ensure_active_span("set the traces operation name")
 def set_operation_name(operation_name):
     """Sets the operation name of the active span"""
@@ -506,7 +506,6 @@ def set_operation_name(operation_name):
 # Injection and extraction
 
 
-@only_if_tracing
 @ensure_active_span("inject the span into a header")
 def inject_active_span_twisted_headers(headers, destination, check_destination=True):
     """
@@ -543,7 +542,6 @@ def inject_active_span_twisted_headers(headers, destination, check_destination=T
         headers.addRawHeaders(key, value)
 
 
-@only_if_tracing
 @ensure_active_span("inject the span into a byte dict")
 def inject_active_span_byte_dict(headers, destination, check_destination=True):
     """
@@ -581,7 +579,6 @@ def inject_active_span_byte_dict(headers, destination, check_destination=True):
         headers[key.encode()] = [value.encode()]
 
 
-@only_if_tracing
 @ensure_active_span("inject the span into a text map")
 def inject_active_span_text_map(carrier, destination, check_destination=True):
     """
@@ -614,7 +611,6 @@ def inject_active_span_text_map(carrier, destination, check_destination=True):
     )
 
 
-@only_if_tracing(ret={})
 @ensure_active_span("get the active span context as a dict", ret={})
 def get_active_span_text_map(destination=None):
     """
@@ -639,7 +635,6 @@ def get_active_span_text_map(destination=None):
     return carrier
 
 
-@only_if_tracing(ret={})
 @ensure_active_span("get the span context as a string.", ret={})
 def active_span_context_as_string():
     """
