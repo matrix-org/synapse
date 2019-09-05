@@ -29,15 +29,11 @@ export default ({
         return <ContentWrapper><h1>Verifying ports.</h1></ContentWrapper>
 
     }
-
     const [fedPort, setFedPort] = useState();
     const [clientPort, setClientPort] = useState();
 
     const [clientPortValid, setClientPortValid] = useState(true)
     const [fedPortValid, setFedPortValid] = useState(true)
-
-    const [clientPortPriv, setClientPortPriv] = useState(defaultClientPort < 1024)
-    const [fedPortPriv, setFedPortPriv] = useState(defaultFedPort < 1024)
 
     const [internalFedPortInUse, setInternalFedPortInUse] = useState(fedPortInUse)
     const [internalClientPortInUse, setInternalClientPortInUse] = useState(clientPortInUse)
@@ -46,16 +42,12 @@ export default ({
         !isNaN(port) && 0 < port && port <= 65535,
     )
 
-    const updatePriv = (port, setPriv) => setPriv(
-        port < 1024,
-    )
 
     const onFederationChange = event => {
 
         const val = event.target.value ? event.target.value : defaultFedPort;
         setInternalFedPortInUse(false);
         setFedPort(val);
-        updatePriv(val, setFedPortPriv);
         updateValidity(val, setFedPortValid);
 
     }
@@ -65,7 +57,6 @@ export default ({
         const val = event.target.value ? event.target.value : defaultClientPort;
         setInternalClientPortInUse(false);
         setClientPort(val);
-        updatePriv(val, setClientPortPriv);
         updateValidity(val, setClientPortValid);
 
     }
@@ -82,6 +73,8 @@ export default ({
         !clientPortValid ? "Invalid port" :
             undefined;
 
+    const fedPortPriv = fedPort ? fedPort < 1024 : defaultFedPort < 1024
+    const clientPortPriv = clientPort ? clientPort < 1024 : defaultClientPort < 1024
     return <Card>
         <AccordionToggle as={Card.Header} eventKey={PORT_SELECTION_UI}>
             {servername ? servername + "'s ports" : "Ports"}
@@ -138,8 +131,6 @@ export default ({
                         placeholder={defaultClientPort}
                     />
                 </InlineError>
-                {internalClientPortInUse ? <p>This port is in use.</p> : undefined}
-                {clientPortValid ? undefined : <p>Invalid port</p>}
                 {clientPortPriv ? <p>This is a privileged port.</p> : undefined}
                 <div>
                     <button
