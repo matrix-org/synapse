@@ -106,13 +106,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 """
             else:
                 query = """
-                    SELECT COUNT(DISTINCT substring(out.user_id from pos+1))
-                    FROM (
-                        SELECT rm.user_id as user_id, position(rm.user_id, ':')
-                            AS pos FROM room_memberships as rm
-                        INNER JOIN current_state_events as c ON rm.event_id = c.event_id
-                        WHERE c.type = 'm.room.member'
-                    ) as out
+                    SELECT COUNT(
+                        DISTINCT array_to_string((regexp_split_to_array(state_key, ':'))[2:], ':'))
+                    FROM current_state_events
+                    WHERE type = 'm.room.member' AND membership = 'join';
                 """
             txn.execute(query)
             return list(txn)[0][0]
