@@ -22,9 +22,9 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.logging.opentracing import (
     get_active_span_text_map,
+    log_kv,
     set_tag,
     start_active_span,
-    whitelisted_homeserver,
 )
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.stringutils import random_string
@@ -86,7 +86,8 @@ class DeviceMessageHandler(object):
 
     @defer.inlineCallbacks
     def send_device_message(self, sender_user_id, message_type, messages):
-
+        set_tag("number_of_messages", len(messages))
+        set_tag("sender", sender_user_id)
         local_messages = {}
         remote_messages = {}
         for user_id, by_device in messages.items():
@@ -119,11 +120,10 @@ class DeviceMessageHandler(object):
                     "sender": sender_user_id,
                     "type": message_type,
                     "message_id": message_id,
-                    "org.matrix.opentracing_context": json.dumps(context)
-                    if whitelisted_homeserver(destination)
-                    else None,
+                    "org.matrix.opentracing_context": json.dumps(context),
                 }
 
+        log_kv({"local_messages": local_messages})
         stream_id = yield self.store.add_messages_to_device_inbox(
             local_messages, remote_edu_contents
         )
@@ -132,6 +132,7 @@ class DeviceMessageHandler(object):
             "to_device_key", stream_id, users=local_messages.keys()
         )
 
+        log_kv({"remote_messages": remote_messages})
         for destination in remote_messages.keys():
             # Enqueue a new federation transaction to send the new
             # device messages to each remote destination.

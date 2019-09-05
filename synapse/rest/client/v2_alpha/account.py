@@ -117,7 +117,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
 
-        return (200, ret)
+        return 200, ret
 
     @defer.inlineCallbacks
     def send_password_reset(self, email, client_secret, send_attempt, next_link=None):
@@ -221,7 +221,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class PasswordResetSubmitTokenServlet(RestServlet):
@@ -330,7 +330,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         )
         response_code = 200 if valid else 400
 
-        return (response_code, {"success": valid})
+        return response_code, {"success": valid}
 
 
 class PasswordRestServlet(RestServlet):
@@ -399,7 +399,7 @@ class PasswordRestServlet(RestServlet):
 
         yield self._set_password_handler.set_password(user_id, new_password, requester)
 
-        return (200, {})
+        return 200, {}
 
     def on_OPTIONS(self, _):
         return 200, {}
@@ -434,7 +434,7 @@ class DeactivateAccountRestServlet(RestServlet):
             yield self._deactivate_account_handler.deactivate_account(
                 requester.user.to_string(), erase
             )
-            return (200, {})
+            return 200, {}
 
         yield self.auth_handler.validate_user_via_ui_auth(
             requester, body, self.hs.get_ip_from_request(request)
@@ -447,7 +447,7 @@ class DeactivateAccountRestServlet(RestServlet):
         else:
             id_server_unbind_result = "no-support"
 
-        return (200, {"id_server_unbind_result": id_server_unbind_result})
+        return 200, {"id_server_unbind_result": id_server_unbind_result}
 
 
 class EmailThreepidRequestTokenRestServlet(RestServlet):
@@ -481,7 +481,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class MsisdnThreepidRequestTokenRestServlet(RestServlet):
@@ -516,7 +516,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class ThreepidRestServlet(RestServlet):
@@ -536,21 +536,22 @@ class ThreepidRestServlet(RestServlet):
 
         threepids = yield self.datastore.user_get_threepids(requester.user.to_string())
 
-        return (200, {"threepids": threepids})
+        return 200, {"threepids": threepids}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        threePidCreds = body.get("threePidCreds")
-        threePidCreds = body.get("three_pid_creds", threePidCreds)
-        if threePidCreds is None:
-            raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
+        threepid_creds = body.get("threePidCreds") or body.get("three_pid_creds")
+        if threepid_creds is None:
+            raise SynapseError(
+                400, "Missing param three_pid_creds", Codes.MISSING_PARAM
+            )
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
+        threepid = yield self.identity_handler.threepid_from_creds(threepid_creds)
 
         if not threepid:
             raise SynapseError(400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED)
@@ -566,9 +567,41 @@ class ThreepidRestServlet(RestServlet):
 
         if "bind" in body and body["bind"]:
             logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threePidCreds, user_id)
+            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
 
-        return (200, {})
+        return 200, {}
+
+
+class ThreepidUnbindRestServlet(RestServlet):
+    PATTERNS = client_patterns("/account/3pid/unbind$")
+
+    def __init__(self, hs):
+        super(ThreepidUnbindRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+        self.auth = hs.get_auth()
+        self.datastore = self.hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        """Unbind the given 3pid from a specific identity server, or identity servers that are
+        known to have this 3pid bound
+        """
+        requester = yield self.auth.get_user_by_req(request)
+        body = parse_json_object_from_request(request)
+        assert_params_in_dict(body, ["medium", "address"])
+
+        medium = body.get("medium")
+        address = body.get("address")
+        id_server = body.get("id_server")
+
+        # Attempt to unbind the threepid from an identity server. If id_server is None, try to
+        # unbind from all identity servers this threepid has been added to in the past
+        result = yield self.identity_handler.try_unbind_threepid(
+            requester.user.to_string(),
+            {"address": address, "medium": medium, "id_server": id_server},
+        )
+        return 200, {"id_server_unbind_result": "success" if result else "no-support"}
 
 
 class ThreepidDeleteRestServlet(RestServlet):
@@ -603,7 +636,7 @@ class ThreepidDeleteRestServlet(RestServlet):
         else:
             id_server_unbind_result = "no-support"
 
-        return (200, {"id_server_unbind_result": id_server_unbind_result})
+        return 200, {"id_server_unbind_result": id_server_unbind_result}
 
 
 class WhoamiRestServlet(RestServlet):
@@ -617,7 +650,7 @@ class WhoamiRestServlet(RestServlet):
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        return (200, {"user_id": requester.user.to_string()})
+        return 200, {"user_id": requester.user.to_string()}
 
 
 def register_servlets(hs, http_server):
@@ -629,5 +662,6 @@ def register_servlets(hs, http_server):
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
     MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
+    ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)

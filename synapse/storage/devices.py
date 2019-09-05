@@ -23,6 +23,7 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import (
     get_active_span_text_map,
+    set_tag,
     trace,
     whitelisted_homeserver,
 )
@@ -94,7 +95,7 @@ class DeviceWorkerStore(SQLBaseStore):
             destination, int(from_stream_id)
         )
         if not has_changed:
-            return (now_stream_id, [])
+            return now_stream_id, []
 
         # We retrieve n+1 devices from the list of outbound pokes where n is
         # our outbound device update limit. We then check if the very last
@@ -117,7 +118,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         # Return an empty list if there are no updates
         if not updates:
-            return (now_stream_id, [])
+            return now_stream_id, []
 
         # if we have exceeded the limit, we need to exclude any results with the
         # same stream_id as the last row.
@@ -167,13 +168,13 @@ class DeviceWorkerStore(SQLBaseStore):
         # skip that stream_id and return an empty list, and continue with the next
         # stream_id next time.
         if not query_map:
-            return (stream_id_cutoff, [])
+            return stream_id_cutoff, []
 
         results = yield self._get_device_update_edus_by_remote(
             destination, from_stream_id, query_map
         )
 
-        return (now_stream_id, results)
+        return now_stream_id, results
 
     def _get_devices_by_remote_txn(
         self, txn, destination, from_stream_id, now_stream_id, limit
@@ -321,6 +322,7 @@ class DeviceWorkerStore(SQLBaseStore):
     def get_device_stream_token(self):
         return self._device_list_id_gen.get_current_token()
 
+    @trace
     @defer.inlineCallbacks
     def get_user_devices_from_cache(self, query_list):
         """Get the devices (and keys if any) for remote users from the cache.
@@ -352,7 +354,10 @@ class DeviceWorkerStore(SQLBaseStore):
             else:
                 results[user_id] = yield self._get_cached_devices_for_user(user_id)
 
-        return (user_ids_not_in_cache, results)
+        set_tag("in_cache", results)
+        set_tag("not_in_cache", user_ids_not_in_cache)
+
+        return user_ids_not_in_cache, results
 
     @cachedInlineCallbacks(num_args=2, tree=True)
     def _get_cached_user_device(self, user_id, device_id):
@@ -851,7 +856,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "ts": now,
                     "opentracing_context": json.dumps(context)
                     if whitelisted_homeserver(destination)
-                    else None,
+                    else "{}",
                 }
                 for destination in hosts
                 for device_id in device_ids

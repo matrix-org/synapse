@@ -167,7 +167,6 @@ class EventHandler(BaseHandler):
 
         if not event:
             return None
-            return
 
         users = yield self.store.get_users_in_room(event.room_id)
         is_peeking = user.to_string() not in users

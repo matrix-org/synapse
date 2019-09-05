@@ -94,7 +94,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -137,7 +137,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -177,7 +177,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
             yield self.registration_handler.check_username(username)
 
-            return (200, {"available": True})
+            return 200, {"available": True}
 
 
 class RegisterRestServlet(RestServlet):
@@ -230,7 +230,6 @@ class RegisterRestServlet(RestServlet):
         if kind == b"guest":
             ret = yield self._do_guest_registration(body, address=client_addr)
             return ret
-            return
         elif kind != b"user":
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
@@ -279,8 +278,7 @@ class RegisterRestServlet(RestServlet):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
-            return (200, result)  # we throw for non 200 responses
-            return
+            return 200, result  # we throw for non 200 responses
 
         # for regular registration, downcase the provided username before
         # attempting to register it. This should mean
@@ -483,11 +481,9 @@ class RegisterRestServlet(RestServlet):
                 user_id=registered_user_id,
                 auth_result=auth_result,
                 access_token=return_dict.get("access_token"),
-                bind_email=params.get("bind_email"),
-                bind_msisdn=params.get("bind_msisdn"),
             )
 
-        return (200, return_dict)
+        return 200, return_dict
 
     def on_OPTIONS(self, _):
         return 200, {}

@@ -40,6 +40,7 @@ from synapse.api.errors import (
     UnrecognizedRequestError,
 )
 from synapse.logging.context import preserve_fn
+from synapse.logging.opentracing import trace_servlet
 from synapse.util.caches import intern_dict
 
 logger = logging.getLogger(__name__)
@@ -257,7 +258,9 @@ class JsonResource(HttpServer, resource.Resource):
         self.path_regexs = {}
         self.hs = hs
 
-    def register_paths(self, method, path_patterns, callback, servlet_classname):
+    def register_paths(
+        self, method, path_patterns, callback, servlet_classname, trace=True
+    ):
         """
         Registers a request handler against a regular expression. Later request URLs are
         checked against these regular expressions in order to identify an appropriate
@@ -273,8 +276,16 @@ class JsonResource(HttpServer, resource.Resource):
 
             servlet_classname (str): The name of the handler to be used in prometheus
                 and opentracing logs.
+
+            trace (bool): Whether we should start a span to trace the servlet.
         """
         method = method.encode("utf-8")  # method is bytes on py3
+
+        if trace:
+            # We don't extract the context from the servlet because we can't
+            # trust the sender
+            callback = trace_servlet(servlet_classname)(callback)
+
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(

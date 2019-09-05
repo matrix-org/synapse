@@ -355,7 +355,7 @@ class FederationClient(FederationBase):
 
             auth_chain.sort(key=lambda e: e.depth)
 
-            return (pdus, auth_chain)
+            return pdus, auth_chain
         except HttpResponseException as e:
             if e.code == 400 or e.code == 404:
                 logger.info("Failed to use get_room_state_ids API, falling back")
@@ -404,7 +404,7 @@ class FederationClient(FederationBase):
 
         signed_auth.sort(key=lambda e: e.depth)
 
-        return (signed_pdus, signed_auth)
+        return signed_pdus, signed_auth
 
     @defer.inlineCallbacks
     def get_events_from_store_or_dest(self, destination, room_id, event_ids):
@@ -429,7 +429,7 @@ class FederationClient(FederationBase):
             missing_events.discard(k)
 
         if not missing_events:
-            return (signed_events, failed_to_fetch)
+            return signed_events, failed_to_fetch
 
         logger.debug(
             "Fetching unknown state/auth events %s for room %s",
@@ -465,7 +465,7 @@ class FederationClient(FederationBase):
             # We removed all events we successfully fetched from `batch`
             failed_to_fetch.update(batch)
 
-        return (signed_events, failed_to_fetch)
+        return signed_events, failed_to_fetch
 
     @defer.inlineCallbacks
     @log_function
