@@ -149,7 +149,8 @@ def check_requirements(for_feature=None):
         except DistributionNotFound:
             deps_needed.append(dependency)
             errors.append(
-                "Needed %s for %s but it was not installed" % (dependency, for_feature)
+                "Needed %s for the '%s' feature but it was not installed"
+                % (dependency, for_feature)
             )
 
     if not for_feature:
