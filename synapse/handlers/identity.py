@@ -113,6 +113,10 @@ class IdentityHandler(BaseHandler):
             creds
         )
 
+        # If an id_access_token is not supplied, force usage of v1
+        if id_access_token is None:
+            use_v2 = False
+
         query_params = {"sid": creds["sid"], "client_secret": client_secret}
 
         # Decide which API endpoint URLs and query parameters to use
@@ -170,6 +174,10 @@ class IdentityHandler(BaseHandler):
         client_secret, id_server, id_access_token = self._extract_items_from_creds_dict(
             creds
         )
+
+        # If an id_access_token is not supplied, force usage of v1
+        if id_access_token is None:
+            use_v2 = False
 
         # Decide which API endpoint URLs to use
         bind_data = {"sid": creds["sid"], "client_secret": client_secret, "mxid": mxid}
@@ -241,7 +249,7 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def try_unbind_threepid_with_id_server(
-        self, mxid, threepid, id_server, use_v2=True
+        self, mxid, threepid, id_server
     ):
         """Removes a binding from an identity server
 
@@ -249,7 +257,6 @@ class IdentityHandler(BaseHandler):
             mxid (str): Matrix user ID of binding to be removed
             threepid (dict): Dict with medium & address of binding to be removed
             id_server (str): Identity server to unbind from
-            use_v2 (bool): Whether to use the v2 identity service unbind API
 
         Raises:
             SynapseError: If we failed to contact the identity server
@@ -258,13 +265,8 @@ class IdentityHandler(BaseHandler):
             Deferred[bool]: True on success, otherwise False if the identity
             server doesn't support unbinding
         """
-        # First attempt the v2 endpoint
-        if use_v2:
-            url = "https://%s/_matrix/identity/v2/3pid/unbind" % (id_server,)
-            url_bytes = "/_matrix/identity/v2/3pid/unbind".encode("ascii")
-        else:
-            url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
-            url_bytes = "/_matrix/identity/api/v1/3pid/unbind".encode("ascii")
+        url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
+        url_bytes = "/_matrix/identity/api/v1/3pid/unbind".encode("ascii")
 
         content = {
             "mxid": mxid,
@@ -289,23 +291,12 @@ class IdentityHandler(BaseHandler):
             changed = True
         except HttpResponseException as e:
             changed = False
-            if e.code == 404 and use_v2:
-                # v2 is not supported yet, try again with v1
-                v1_fallback = True
-            elif e.code in (400, 404, 501):
+            if e.code in (400, 404, 501):
                 # The remote server probably doesn't support unbinding (yet)
                 logger.warn("Received %d response while unbinding threepid", e.code)
             else:
                 logger.error("Failed to unbind threepid on identity server: %s", e)
                 raise SynapseError(502, "Failed to contact identity server")
-
-        if v1_fallback:
-            logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", url)
-            return (
-                yield self.try_unbind_threepid_with_id_server(
-                    mxid, threepid, id_server, use_v2=False
-                )
-            )
 
         yield self.store.remove_user_bound_threepid(
             user_id=mxid,
