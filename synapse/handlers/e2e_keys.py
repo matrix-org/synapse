@@ -629,9 +629,9 @@ class E2eKeysHandler(object):
 
         # split between checking signatures for own user and signatures for
         # other users, since we verify them with different keys
-        if user_id in signatures:
-            self_signatures = signatures[user_id]
-            del signatures[user_id]
+        self_signatures = signatures.get(user_id, {})
+        other_signatures = {k: v for k, v in signatures.items() if k != user_id}
+        if self_signatures:
             self_device_ids = list(self_signatures.keys())
             try:
                 # get our self-signing key to verify the signatures
@@ -766,9 +766,9 @@ class E2eKeysHandler(object):
                 }
 
         signed_users = []  # what user have been signed, for notifying
-        if len(signatures):
-            # if signatures isn't empty, then we have signatures for other
-            # users.  These signatures will be signed by the user signing key
+        if other_signatures:
+            # now check non-self signatures.  These signatures will be signed
+            # by the user-signing key
 
             try:
                 # get our user-signing key to verify the signatures
@@ -776,7 +776,7 @@ class E2eKeysHandler(object):
                     user_id, "user_signing"
                 )
 
-                for user, devicemap in signatures.items():
+                for user, devicemap in other_signatures.items():
                     device_id = None
                     try:
                         # get the user's master key, to make sure it matches
