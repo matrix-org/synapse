@@ -15,6 +15,18 @@
 
 from ._base import Config, ConfigError
 
+MISSING_OPENTRACING = """Missing opentracing library.
+
+    Install by running:
+        pip install opentracing
+    """
+
+MISSING_JAEGER = """Missing jaeger-client library. This is the backend required for opentracing.
+
+    Install by running:
+        pip install jaeger-client
+    """
+
 
 class TracerConfig(Config):
     def read_config(self, config, **kwargs):
@@ -29,7 +41,22 @@ class TracerConfig(Config):
             {"sampler": {"type": "const", "param": 1}, "logging": False},
         )
 
-        if not self.opentracer_enabled:
+        if self.opentracer_enabled:
+            try:
+                import opentracing
+
+                opentracing  # To stop unused lint.
+            except ImportError:
+                raise ConfigError(MISSING_OPENTRACING)
+
+            try:
+                import jaeger_client
+
+                jaeger_client  # To stop unused lint.
+            except ImportError:
+                raise ConfigError(MISSING_JAEGER)
+
+        else:
             return
 
         # The tracer is enabled so sanitize the config
