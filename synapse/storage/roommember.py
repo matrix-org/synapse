@@ -24,6 +24,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
+from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import LoggingTransaction
 from synapse.storage.events_worker import EventsWorkerStore
@@ -73,6 +74,36 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
         self._check_safe_current_state_events_membership_updated_txn(txn)
         txn.close()
+
+        if self.hs.config.metrics_flags.known_servers:
+            self._known_servers_count = 1
+            self.hs.get_clock().looping_call(self._count_known_servers, 60 * 1000)
+            self.hs.get_clock().call_later(1000, self._count_known_servers)
+            LaterGauge(
+                "synapse_servers_known_about", "", [], lambda: self._known_servers_count
+            )
+
+    @defer.inlineCallbacks
+    def _count_known_servers(self):
+        """
+        Count the servers that this server knows about.
+        """
+
+        def _transact(txn):
+            query = """
+                SELECT COUNT(DISTINCT substr(user_id, pos+1))
+                FROM
+                (SELECT user_id, instr(user_id, ':') AS pos FROM room_memberships)
+            """
+            txn.execute(query)
+            return list(txn)[0][0]
+
+        count = yield self.runInteraction("get_known_servers", _transact)
+
+        # We always know about ourselves, even if we have nothing in
+        # room_memberships (for example, the server is new).
+        self._known_servers_count = max([count, 1])
+        return self._known_servers_count
 
     def _check_safe_current_state_events_membership_updated_txn(self, txn):
         """Checks if it is safe to assume the new current_state_events

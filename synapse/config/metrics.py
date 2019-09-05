@@ -13,11 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import attr
 from ._base import Config, ConfigError
 
 MISSING_SENTRY = """Missing sentry-sdk library. This is required to enable sentry
     integration.
     """
+
+
+@attr.s
+class MetricsFlags(object):
+    known_servers = attr.ib(default=False, validator=attr.validators.instance_of(bool))
+
+    @classmethod
+    def all_off(cls):
+        """
+        Instantiate the flags with all options set to off.
+        """
+        return cls(**{x.name: False for x in attr.fields(cls)})
 
 
 class MetricsConfig(Config):
@@ -26,6 +39,11 @@ class MetricsConfig(Config):
         self.report_stats = config.get("report_stats", None)
         self.metrics_port = config.get("metrics_port")
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
+
+        if self.enable_metrics:
+            self.metrics_flags = MetricsFlags(**config.get("metrics_flags", {}))
+        else:
+            self.metrics_flags = MetricsFlags.all_off()
 
         self.sentry_enabled = "sentry" in config
         if self.sentry_enabled:
