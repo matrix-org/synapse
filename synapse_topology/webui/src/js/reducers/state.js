@@ -17,7 +17,7 @@ const setupDone = "setupDone";
 const baseConfigChecked = "baseConfigChecked";
 const servername = "servername";
 const reportStats = "reportStats";
-const gettingSecretKey = "gettingSecretKey";
+const secretKeyLoaded = "secretKeyLoaded";
 const secretKey = "secretKey";
 const delegationType = "delegationType";
 const delegationServerName = "delegationServerName";
@@ -55,7 +55,7 @@ const state = {
         [configDir]: "sadfasdf",
         [servername]: "server_name",
         [reportStats]: false,
-        [gettingSecretKey]: false,
+        [secretKeyLoaded]: false,
         [secretKey]: "asdfsadf",
         [delegationType]: "local|well_known|DNS_SRV",
         [delegationServerName]: "name",
@@ -88,13 +88,13 @@ export const uiStateMapping = {
     ],
     [SERVER_NAME_UI]: [
         servername,
+        secretKeyLoaded,
+        secretKey,
     ],
     [STATS_REPORT_UI]: [
         reportStats,
     ],
     [KEY_EXPORT_UI]: [
-        gettingSecretKey,
-        secretKey,
     ],
     [DELEGATION_OPTIONS_UI]: [
         delegationType,
