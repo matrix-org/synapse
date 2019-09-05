@@ -64,7 +64,9 @@ class TransactionManager(object):
         keep_destination = whitelisted_homeserver(destination)
 
         for edu in pending_edus:
-            span_contexts.append(extract_text_map(json.loads(edu.get_context())))
+            context = edu.get_context()
+            if context:
+                span_contexts.append(extract_text_map(json.loads(context)))
             if keep_destination:
                 edu.strip_context()
 
