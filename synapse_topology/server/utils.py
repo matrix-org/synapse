@@ -27,9 +27,8 @@ def port_checker(port):
 
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         try:
-            sock.bind((socket.gethostname(), port))
+            sock.bind(("0.0.0.0", port))
             sock.listen()
-            sock.close()
             return True
         except:
             return False

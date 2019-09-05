@@ -35,8 +35,6 @@ export default ({
     const [clientPortValid, setClientPortValid] = useState(true)
     const [fedPortValid, setFedPortValid] = useState(true)
 
-    const [internalFedPortInUse, setInternalFedPortInUse] = useState(fedPortInUse)
-    const [internalClientPortInUse, setInternalClientPortInUse] = useState(clientPortInUse)
 
     const updateValidity = (port, setValid) => setValid(
         !isNaN(port) && 0 < port && port <= 65535,
@@ -46,7 +44,6 @@ export default ({
     const onFederationChange = event => {
 
         const val = event.target.value ? event.target.value : defaultFedPort;
-        setInternalFedPortInUse(false);
         setFedPort(val);
         updateValidity(val, setFedPortValid);
 
@@ -55,7 +52,6 @@ export default ({
     const onClientChange = event => {
 
         const val = event.target.value ? event.target.value : defaultClientPort;
-        setInternalClientPortInUse(false);
         setClientPort(val);
         updateValidity(val, setClientPortValid);
 
@@ -63,12 +59,12 @@ export default ({
 
     const toggle = useAccordionToggle(nextUI(PORT_SELECTION_UI));
 
-    const fedPortError = internalFedPortInUse ?
+    const fedPortError = fedPortInUse ?
         "This port is in use" :
         !fedPortValid ? "Invalid port" :
             undefined;
 
-    const clientPortError = internalClientPortInUse ?
+    const clientPortError = clientPortInUse ?
         "This port is in use" :
         !clientPortValid ? "Invalid port" :
             undefined;
@@ -124,7 +120,6 @@ export default ({
                 <InlineError error={clientPortError}>
                     <input
                         type="text"
-                        className={internalClientPortInUse | !clientPortValid ? "invalid" : undefined}
                         onChange={onClientChange}
                         disabled={canChangePorts ? undefined : true}
                         autoFocus
