@@ -98,7 +98,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 FROM (
                     SELECT rm.user_id as user_id, instr(rm.user_id, ':')
                         AS pos FROM room_memberships as rm
-                    INNER JOIN current_state_events as c WHERE c.type = 'm.room.member'
+                    INNER JOIN current_state_events as c ON rm.event_id = c.event_id
+                    WHERE c.type = 'm.room.member'
                 )
             """
             txn.execute(query)
