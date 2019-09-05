@@ -248,9 +248,7 @@ class IdentityHandler(BaseHandler):
         return changed
 
     @defer.inlineCallbacks
-    def try_unbind_threepid_with_id_server(
-        self, mxid, threepid, id_server
-    ):
+    def try_unbind_threepid_with_id_server(self, mxid, threepid, id_server):
         """Removes a binding from an identity server
 
         Args:
@@ -285,7 +283,6 @@ class IdentityHandler(BaseHandler):
         )
         headers = {b"Authorization": auth_headers}
 
-        v1_fallback = False
         try:
             yield self.http_client.post_json_get_json(url, content, headers)
             changed = True
