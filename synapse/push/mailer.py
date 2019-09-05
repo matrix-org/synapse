@@ -636,7 +636,7 @@ def load_jinja2_templates(
     apply_mxc_to_http_filter=False,
     public_baseurl=None,
 ):
-    """Loads a jinja2 template with variables to insert
+    """Loads and returns one or more jinja2 templates and applies optional filters
 
     Args:
         template_dir (str): The directory where templates are stored
@@ -649,7 +649,7 @@ def load_jinja2_templates(
             apply_mxc_to_http_filter to be enabled
 
     Returns:
-        A list of jinja2 templates corresponding to the given list of filepaths,
+        A list of jinja2 templates corresponding to the given list of filenames,
         with order preserved
     """
     logger.info(
