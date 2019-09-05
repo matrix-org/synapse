@@ -80,7 +80,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             self.hs.get_clock().looping_call(self._count_known_servers, 60 * 1000)
             self.hs.get_clock().call_later(1000, self._count_known_servers)
             LaterGauge(
-                "synapse_servers_known_about", "", [], lambda: self._known_servers_count
+                "synapse_federation_known_servers", "", [], lambda: self._known_servers_count
             )
 
     @defer.inlineCallbacks
