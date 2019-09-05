@@ -23,7 +23,8 @@ export default ({
     const defaultDatabase = DATABASE_TYPES.POSTGRES;
     const [database, setDatabase] = useState(defaultDatabase)
 
-    const [databaseHost, setHost] = useState();
+    const hostDefault = "localhost"
+    const [databaseHost, setHost] = useState(hostDefault);
     const [postgresDatabase, setPostgresDatabase] = useState();
     const [databaseUsername, setUser] = useState();
     const [databasePassword, setPassword] = useState();
@@ -40,13 +41,14 @@ export default ({
                 <p>Postgres is recommended.</p>
 
                 <Tabs defaultActiveKey={defaultDatabase} onSelect={k => setDatabase(k)}>
-                    <Tab eventKey={DATABASE_TYPES.POSTGRES} title={DATABASE_TYPES.POSTGRES}>
+                    <Tab eventKey={DATABASE_TYPES.POSTGRES} title={"Postgres"}>
+                        This will connect to the given Postgres database via {DATABASE_TYPES.POSTGRES}
                         <p>
                             Host
                         </p>
                         <input
                             type="text"
-                            onChange={e => setHost(e.target.value)}
+                            onChange={e => setHost(e.target.value ? e.target.value : hostDefault)}
                             autoFocus
                             placeholder="localhost"
                         />
@@ -79,6 +81,7 @@ export default ({
                         />
                         <button
                             className='inputButton'
+                            disabled={databaseHost ? undefined : true}
                             onClick={() => {
                                 toggle();
                                 onClick({
@@ -89,7 +92,7 @@ export default ({
                                     databasePassword,
                                 })
                             }}
-                        >Use {DATABASE_TYPES.POSTGRES}</button>
+                        >Use Postgres</button>
                     </Tab>
                     <Tab eventKey={DATABASE_TYPES.SQLITE3} title={DATABASE_TYPES.SQLITE3}>
                         <button
