@@ -213,11 +213,11 @@ class ReplicationEndpoint(object):
         args = "/".join("(?P<%s>[^/]+)" % (arg,) for arg in url_args)
         pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
 
+        handler = trace_servlet(self.__class__.__name__, extract_context=True)(handler)
+        # We don't let register paths trace this servlet using the default tracing
+        # options because we wish to extract the context explicitly.
         http_server.register_paths(
-            method,
-            [pattern],
-            trace_servlet(self.__class__.__name__, extract_context=True)(handler),
-            self.__class__.__name__,
+            method, [pattern], handler, self.__class__.__name__, trace=False
         )
 
     def _cached_handler(self, request, txn_id, **kwargs):
