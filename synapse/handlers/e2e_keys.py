@@ -851,7 +851,7 @@ class E2eKeysHandler(object):
                 user_id, signed_users
             )
 
-        defer.returnValue({"failures": failures})
+        return {"failures": failures}
 
     @defer.inlineCallbacks
     def _get_e2e_cross_signing_verify_key(self, user_id, key_type, from_user_id=None):
