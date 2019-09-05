@@ -926,6 +926,16 @@ uploads_path: "DATADIR/uploads"
 #sentry:
 #    dsn: "..."
 
+# Flags to enable metrics which are not suitable to be enabled by
+# default, either for performance reasons or limited use.
+#
+# known_servers: Publish synapse_federation_known_servers, a gauge of
+#   the number of servers this homeserver knows about, including itself.
+#   May cause performance problems on large homeservers.
+#
+#metrics_flags:
+#    known_servers: true
+
 # Whether or not to report anonymized homeserver usage statistics.
 # report_stats: true|false
 
