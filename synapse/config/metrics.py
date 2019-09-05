@@ -78,15 +78,15 @@ class MetricsConfig(Config):
         #sentry:
         #    dsn: "..."
 
-        # Flags to enable metrics which are not suitable to be enabled by
-        # default, either for performance reasons or limited use.
+        # Flags to enable Prometheus metrics which are not suitable to be
+        # enabled by default, either for performance reasons or limited use.
         #
-        # known_servers: Publish synapse_federation_known_servers, a gauge of
-        #   the number of servers this homeserver knows about, including itself.
-        #   May cause performance problems on large homeservers.
-        #
-        #metrics_flags:
-        #    known_servers: true
+        metrics_flags:
+            # Publish synapse_federation_known_servers, a g auge of the number of
+            # servers this homeserver knows about, including itself. May cause
+            # performance problems on large homeservers.
+            #
+            #known_servers: true
 
         # Whether or not to report anonymized homeserver usage statistics.
         """
