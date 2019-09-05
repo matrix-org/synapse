@@ -22,7 +22,12 @@ from six.moves import urllib
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
+from synapse.logging.opentracing import (
+    trace,
+    inject_active_span_byte_dict,
+    trace_servlet,
+)
+
 from synapse.api.errors import (
     CodeMessageException,
     HttpResponseException,
@@ -129,6 +134,7 @@ class ReplicationEndpoint(object):
 
         client = hs.get_simple_http_client()
 
+        @trace
         @defer.inlineCallbacks
         def send_request(**kwargs):
             data = yield cls._serialize_payload(**kwargs)
@@ -167,9 +173,7 @@ class ReplicationEndpoint(object):
                 # the master, and so whether we should clean up or not.
                 while True:
                     headers = {}
-                    opentracing.inject_active_span_byte_dict(
-                        headers, None, check_destination=False
-                    )
+                    inject_active_span_byte_dict(headers, None, check_destination=False)
                     try:
                         result = yield request_func(uri, data, headers=headers)
                         break
@@ -213,9 +217,7 @@ class ReplicationEndpoint(object):
         http_server.register_paths(
             method,
             [pattern],
-            opentracing.trace_servlet(self.__class__.__name__, extract_context=True)(
-                handler
-            ),
+            trace_servlet(self.__class__.__name__, extract_context=True)(handler),
             self.__class__.__name__,
         )
 
