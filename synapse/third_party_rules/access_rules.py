@@ -483,7 +483,6 @@ class RoomAccessRules(object):
         """
         return rule != ACCESS_RULE_DIRECT
 
-
     def _on_room_name_change(self, event, rule):
         """Check whether a change of room name is allowed.
         The current rule is to forbid such a change in direct chats but allow it
@@ -496,7 +495,6 @@ class RoomAccessRules(object):
             bool, True if the event can be allowed, False otherwise.
         """
         return rule != ACCESS_RULE_DIRECT
-
 
     def _on_room_topic_change(self, event, rule):
         """Check whether a change of room topic is allowed.
