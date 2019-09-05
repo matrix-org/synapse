@@ -40,8 +40,6 @@ export default ({
 
     const toggle = useAccordionToggle(nextUI(TLS_UI));
 
-    console.log(certKeyPathInvalid)
-    console.log(certPathInvalid)
     return <Card>
         <AccordionToggle as={Card.Header} eventKey={TLS_UI}>
             TLS
