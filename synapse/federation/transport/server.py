@@ -342,7 +342,7 @@ class BaseFederationServlet(object):
                 continue
 
             server.register_paths(
-                method, (pattern,), self._wrap(code), self.__class__.__name__
+                method, (pattern,), self._wrap(code), self.__class__.__name__, trace=False
             )
 
 

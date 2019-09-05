@@ -22,7 +22,6 @@ from six.moves import urllib
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
 from synapse.api.errors import (
     CodeMessageException,
     HttpResponseException,
@@ -31,6 +30,8 @@ from synapse.api.errors import (
 )
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
+
+from synapse.logging.opentracing import trace_servlet, inject_active_span_byte_dict
 
 logger = logging.getLogger(__name__)
 
@@ -167,9 +168,7 @@ class ReplicationEndpoint(object):
                 # the master, and so whether we should clean up or not.
                 while True:
                     headers = {}
-                    opentracing.inject_active_span_byte_dict(
-                        headers, None, check_destination=False
-                    )
+                    inject_active_span_byte_dict(headers, None, check_destination=False)
                     try:
                         result = yield request_func(uri, data, headers=headers)
                         break
@@ -210,13 +209,11 @@ class ReplicationEndpoint(object):
         args = "/".join("(?P<%s>[^/]+)" % (arg,) for arg in url_args)
         pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
 
+        handler = trace_servlet(self.__class__.__name__, extract_context=True)(handler)
+        # We don't let register paths trace this servlet using the default tracing
+        # options because we wish to extract the context explicitly.
         http_server.register_paths(
-            method,
-            [pattern],
-            opentracing.trace_servlet(self.__class__.__name__, extract_context=True)(
-                handler
-            ),
-            self.__class__.__name__,
+            method, [pattern], handler, self.__class__.__name__, trace=False
         )
 
     def _cached_handler(self, request, txn_id, **kwargs):
