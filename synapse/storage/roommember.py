@@ -94,9 +94,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         def _transact(txn):
             query = """
-                SELECT COUNT(DISTINCT substr(user_id, pos+1))
-                FROM
-                (SELECT user_id, instr(user_id, ':') AS pos FROM room_memberships)
+                SELECT COUNT(DISTINCT substr(rm.user_id, pos+1))
+                FROM (
+                    SELECT rm.user_id, instr(rm.user_id, ':') AS pos FROM room_memberships as rm
+                    INNER JOIN current_state_events as c WHERE c.type = 'm.room.member'
+                )
             """
             txn.execute(query)
             return list(txn)[0][0]
