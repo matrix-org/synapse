@@ -13,19 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.python_dependencies import DependencyException, check_requirements
+
 from ._base import Config, ConfigError
-
-MISSING_OPENTRACING = """Missing opentracing library.
-
-    Install by running:
-        pip install opentracing
-    """
-
-MISSING_JAEGER = """Missing jaeger-client library. This is the backend required for opentracing.
-
-    Install by running:
-        pip install jaeger-client
-    """
 
 
 class TracerConfig(Config):
@@ -43,19 +33,9 @@ class TracerConfig(Config):
 
         if self.opentracer_enabled:
             try:
-                import opentracing
-
-                opentracing  # To stop unused lint.
-            except ImportError:
-                raise ConfigError(MISSING_OPENTRACING)
-
-            try:
-                import jaeger_client
-
-                jaeger_client  # To stop unused lint.
-            except ImportError:
-                raise ConfigError(MISSING_JAEGER)
-
+                check_requirements("opentracing")
+            except DependencyException as e:
+                raise ConfigError(e.message)
         else:
             return
 
