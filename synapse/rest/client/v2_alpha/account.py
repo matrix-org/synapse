@@ -586,7 +586,7 @@ class ThreepidUnbindRestServlet(RestServlet):
         """Unbind the given 3pid from a specific identity server, or identity servers that are
         known to have this 3pid bound
         """
-        user_id = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["medium", "address"])
 
@@ -597,9 +597,10 @@ class ThreepidUnbindRestServlet(RestServlet):
         # Attempt to unbind the threepid from an identity server. If id_server is None, try to
         # unbind from all identity servers this threepid has been added to in the past
         result = yield self.identity_handler.try_unbind_threepid(
-            user_id, {"address": address, "medium": medium, "id_server": id_server}
+            requester.user.to_string(),
+            {"address": address, "medium": medium, "id_server": id_server},
         )
-        return {"id_server_unbind_result": "success" if result else "no-support"}
+        return 200, {"id_server_unbind_result": "success" if result else "no-support"}
 
 
 class ThreepidDeleteRestServlet(RestServlet):
