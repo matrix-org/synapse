@@ -22,17 +22,16 @@ from six.moves import urllib
 
 from twisted.internet import defer
 
-from synapse.logging.opentracing import (
-    trace,
-    inject_active_span_byte_dict,
-    trace_servlet,
-)
-
 from synapse.api.errors import (
     CodeMessageException,
     HttpResponseException,
     RequestSendFailed,
     SynapseError,
+)
+from synapse.logging.opentracing import (
+    inject_active_span_byte_dict,
+    trace,
+    trace_servlet,
 )
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
