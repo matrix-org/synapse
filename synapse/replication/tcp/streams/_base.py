@@ -158,7 +158,7 @@ class Stream(object):
         updates, current_token = yield self.get_updates_since(self.last_token)
         self.last_token = current_token
 
-        return (updates, current_token)
+        return updates, current_token
 
     @defer.inlineCallbacks
     def get_updates_since(self, from_token):
@@ -172,14 +172,14 @@ class Stream(object):
                 sent over the replication steam.
         """
         if from_token in ("NOW", "now"):
-            return ([], self.upto_token)
+            return [], self.upto_token
 
         current_token = self.upto_token
 
         from_token = int(from_token)
 
         if from_token == current_token:
-            return ([], current_token)
+            return [], current_token
 
         if self._LIMITED:
             rows = yield self.update_function(
@@ -198,7 +198,7 @@ class Stream(object):
         if self._LIMITED and len(updates) >= MAX_EVENTS_BEHIND:
             raise Exception("stream %s has fallen behind" % (self.NAME))
 
-        return (updates, current_token)
+        return updates, current_token
 
     def current_token(self):
         """Gets the current token of the underlying streams. Should be provided

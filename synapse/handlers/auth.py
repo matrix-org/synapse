@@ -269,7 +269,7 @@ class AuthHandler(BaseHandler):
                     creds,
                     list(clientdict),
                 )
-                return (creds, clientdict, session["id"])
+                return creds, clientdict, session["id"]
 
         ret = self._auth_dict_for_flows(flows, session)
         ret["completed"] = list(creds)
@@ -704,7 +704,7 @@ class AuthHandler(BaseHandler):
                 known_login_type = True
                 is_valid = yield provider.check_password(qualified_user_id, password)
                 if is_valid:
-                    return (qualified_user_id, None)
+                    return qualified_user_id, None
 
             if not hasattr(provider, "get_supported_login_types") or not hasattr(
                 provider, "check_auth"
@@ -748,7 +748,7 @@ class AuthHandler(BaseHandler):
             )
 
             if canonical_user_id:
-                return (canonical_user_id, None)
+                return canonical_user_id, None
 
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
@@ -798,7 +798,7 @@ class AuthHandler(BaseHandler):
                         result = (result, None)
                     return result
 
-        return (None, None)
+        return None, None
 
     @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):

@@ -270,6 +270,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_emailrequest(self, args):
+        # TODO: Update to use v2 Identity Service API endpoint
         url = (
             self._identityServerUrl()
             + "/_matrix/identity/api/v1/validate/email/requestToken"
@@ -304,6 +305,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_emailvalidate(self, args):
+        # TODO: Update to use v2 Identity Service API endpoint
         url = (
             self._identityServerUrl()
             + "/_matrix/identity/api/v1/validate/email/submitToken"
@@ -332,6 +334,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_3pidbind(self, args):
+        # TODO: Update to use v2 Identity Service API endpoint
         url = self._identityServerUrl() + "/_matrix/identity/api/v1/3pid/bind"
 
         json_res = yield self.http_client.do_request(
@@ -400,6 +403,7 @@ class SynapseCmd(cmd.Cmd):
     @defer.inlineCallbacks
     def _do_invite(self, roomid, userstring):
         if not userstring.startswith("@") and self._is_on("complete_usernames"):
+            # TODO: Update to use v2 Identity Service API endpoint
             url = self._identityServerUrl() + "/_matrix/identity/api/v1/lookup"
 
             json_res = yield self.http_client.do_request(
@@ -409,6 +413,7 @@ class SynapseCmd(cmd.Cmd):
             mxid = None
 
             if "mxid" in json_res and "signatures" in json_res:
+                # TODO: Update to use v2 Identity Service API endpoint
                 url = (
                     self._identityServerUrl()
                     + "/_matrix/identity/api/v1/pubkey/ed25519"

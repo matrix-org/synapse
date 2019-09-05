@@ -810,7 +810,7 @@ class EventsStore(
         # If they old and new groups are the same then we don't need to do
         # anything.
         if old_state_groups == new_state_groups:
-            return (None, None)
+            return None, None
 
         if len(new_state_groups) == 1 and len(old_state_groups) == 1:
             # If we're going from one state group to another, lets check if
@@ -827,7 +827,7 @@ class EventsStore(
                 # the current state in memory then lets also return that,
                 # but it doesn't matter if we don't.
                 new_state = state_groups_map.get(new_state_group)
-                return (new_state, delta_ids)
+                return new_state, delta_ids
 
         # Now that we have calculated new_state_groups we need to get
         # their state IDs so we can resolve to a single state set.
@@ -839,7 +839,7 @@ class EventsStore(
         if len(new_state_groups) == 1:
             # If there is only one state group, then we know what the current
             # state is.
-            return (state_groups_map[new_state_groups.pop()], None)
+            return state_groups_map[new_state_groups.pop()], None
 
         # Ok, we need to defer to the state handler to resolve our state sets.
 
@@ -868,7 +868,7 @@ class EventsStore(
             state_res_store=StateResolutionStore(self),
         )
 
-        return (res.state, None)
+        return res.state, None
 
     @defer.inlineCallbacks
     def _calculate_state_delta(self, room_id, current_state):
@@ -891,7 +891,7 @@ class EventsStore(
             if ev_id != existing_state.get(key)
         }
 
-        return (to_delete, to_insert)
+        return to_delete, to_insert
 
     @log_function
     def _persist_events_txn(
@@ -2270,8 +2270,9 @@ class EventsStore(
             "room_aliases",
             "room_depth",
             "room_memberships",
-            "room_state",
-            "room_stats",
+            "room_stats_state",
+            "room_stats_current",
+            "room_stats_historical",
             "room_stats_earliest_token",
             "rooms",
             "stream_ordering_to_exterm",
