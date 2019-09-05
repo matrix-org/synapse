@@ -133,7 +133,7 @@ class ReplicationEndpoint(object):
 
         client = hs.get_simple_http_client()
 
-        @trace
+        @trace(opname="outgoing_replication_request")
         @defer.inlineCallbacks
         def send_request(**kwargs):
             data = yield cls._serialize_payload(**kwargs)
