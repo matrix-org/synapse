@@ -718,7 +718,8 @@ class RoomMemberHandler(object):
             # Check what hashing details are supported by this identity server
             try:
                 hash_details = yield self.simple_http_client.get_json(
-                    "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
+                    "%s%s/_matrix/identity/v2/hash_details"
+                    % (id_server_scheme, id_server),
                     query_params,
                 )
                 if not isinstance(hash_details, dict):
@@ -739,8 +740,11 @@ class RoomMemberHandler(object):
                 # Check if this identity server does not know about v2 lookups
                 if isinstance(e, HttpResponseException) and e.code == 404:
                     # This is an old identity server that does not yet support v2 lookups
-                    logger.warning("Attempted v2 lookup on v1 identity server %s. Falling "
-                                   "back to v1", id_server)
+                    logger.warning(
+                        "Attempted v2 lookup on v1 identity server %s. Falling "
+                        "back to v1",
+                        id_server,
+                    )
                 else:
                     logger.warning("Error when looking up hashing details: %s", e)
                     return None
