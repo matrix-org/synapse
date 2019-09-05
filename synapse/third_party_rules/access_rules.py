@@ -237,6 +237,15 @@ class RoomAccessRules(object):
         if event.type == EventTypes.JoinRules:
             return self._on_join_rule_change(event, rule)
 
+        if event.type == EventTypes.RoomAvatar:
+            return self._on_room_avatar_change(event, rule)
+
+        if event.type == EventTypes.Name:
+            return self._on_room_name_change(event, rule)
+
+        if event.type == EventTypes.Topic:
+            return self._on_room_topic_change(event, rule)
+
         return True
 
     def _on_rules_change(self, event, state_events):
@@ -460,6 +469,47 @@ class RoomAccessRules(object):
             return rule == ACCESS_RULE_RESTRICTED
 
         return True
+
+    def _on_room_avatar_change(self, event, rule):
+        """Check whether a change of room avatar is allowed.
+        The current rule is to forbid such a change in direct chats but allow it
+        everywhere else.
+
+        Args:
+            event (synapse.events.EventBase): The event to check.
+            rule (str): The name of the rule to apply.
+        Returns:
+            bool, True if the event can be allowed, False otherwise.
+        """
+        return rule != ACCESS_RULE_DIRECT
+
+
+    def _on_room_name_change(self, event, rule):
+        """Check whether a change of room name is allowed.
+        The current rule is to forbid such a change in direct chats but allow it
+        everywhere else.
+
+        Args:
+            event (synapse.events.EventBase): The event to check.
+            rule (str): The name of the rule to apply.
+        Returns:
+            bool, True if the event can be allowed, False otherwise.
+        """
+        return rule != ACCESS_RULE_DIRECT
+
+
+    def _on_room_topic_change(self, event, rule):
+        """Check whether a change of room topic is allowed.
+        The current rule is to forbid such a change in direct chats but allow it
+        everywhere else.
+
+        Args:
+            event (synapse.events.EventBase): The event to check.
+            rule (str): The name of the rule to apply.
+        Returns:
+            bool, True if the event can be allowed, False otherwise.
+        """
+        return rule != ACCESS_RULE_DIRECT
 
     @staticmethod
     def _get_rule_from_state(state_events):
