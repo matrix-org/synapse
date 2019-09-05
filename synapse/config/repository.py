@@ -16,6 +16,7 @@
 import os
 from collections import namedtuple
 
+from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
@@ -33,17 +34,6 @@ THUMBNAIL_SIZE_YAML = """\
         #    height: %(height)i
         #    method: %(method)s
 """
-
-MISSING_NETADDR = "Missing netaddr library. This is required for URL preview API."
-
-MISSING_LXML = """Missing lxml library. This is required for URL preview API.
-
-    Install by running:
-        pip install lxml
-
-    Requires libxslt1-dev system package.
-    """
-
 
 ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
@@ -171,16 +161,10 @@ class ContentRepositoryConfig(Config):
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
             try:
-                import lxml
+                check_requirements("url-preview-api")
 
-                lxml  # To stop unused lint.
-            except ImportError:
-                raise ConfigError(MISSING_LXML)
-
-            try:
-                from netaddr import IPSet
-            except ImportError:
-                raise ConfigError(MISSING_NETADDR)
+            except DependencyException as e:
+                raise ConfigError(e.message)
 
             if "url_preview_ip_range_blacklist" not in config:
                 raise ConfigError(

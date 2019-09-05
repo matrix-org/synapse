@@ -13,11 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
+from synapse.python_dependencies import DependencyException, check_requirements
 
-MISSING_SENTRY = """Missing sentry-sdk library. This is required to enable sentry
-    integration.
-    """
+from ._base import Config, ConfigError
 
 
 class MetricsConfig(Config):
@@ -30,9 +28,9 @@ class MetricsConfig(Config):
         self.sentry_enabled = "sentry" in config
         if self.sentry_enabled:
             try:
-                import sentry_sdk  # noqa F401
-            except ImportError:
-                raise ConfigError(MISSING_SENTRY)
+                check_requirements("sentry")
+            except DependencyException as e:
+                raise ConfigError(e.message)
 
             self.sentry_dsn = config["sentry"].get("dsn")
             if not self.sentry_dsn:

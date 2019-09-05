@@ -95,6 +95,7 @@ CONDITIONAL_REQUIREMENTS = {
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],
+    "url-preview-api": ["netaddr", "lxml"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()
@@ -147,7 +148,9 @@ def check_requirements(for_feature=None):
             )
         except DistributionNotFound:
             deps_needed.append(dependency)
-            errors.append("Needed %s but it was not installed" % (dependency,))
+            errors.append(
+                "Needed %s for %s but it was not installed" % (dependency, for_feature)
+            )
 
     if not for_feature:
         # Check the optional dependencies are up to date. We allow them to not be
