@@ -1,1 +1,1 @@
-Link send loop opentracing to edu contexts regardles of destination.
+Fix sending of EDUs when opentracing is enabled with an empty whitelist.
