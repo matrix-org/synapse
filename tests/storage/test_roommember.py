@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unittest.mock import Mock
+
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.rest.admin import register_servlets_for_client_rest_resource
@@ -30,6 +32,12 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         register_servlets_for_client_rest_resource,
         room.register_servlets,
     ]
+
+    def make_homeserver(self, reactor, clock):
+        hs = self.setup_test_homeserver(
+            resource_for_federation=Mock(), http_client=None
+        )
+        return hs
 
     def prepare(self, reactor, clock, hs):
 

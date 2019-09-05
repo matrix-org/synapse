@@ -106,8 +106,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 """
             else:
                 query = """
-                    SELECT COUNT(
-                        DISTINCT array_to_string((regexp_split_to_array(state_key, ':'))[2:], ':'))
+                    SELECT COUNT(DISTINCT array_to_string((regexp_split_to_array(state_key, ':'))[2:], ':'))
                     FROM current_state_events
                     WHERE type = 'm.room.member' AND membership = 'join';
                 """
