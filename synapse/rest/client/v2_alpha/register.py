@@ -481,8 +481,6 @@ class RegisterRestServlet(RestServlet):
                 user_id=registered_user_id,
                 auth_result=auth_result,
                 access_token=return_dict.get("access_token"),
-                bind_email=params.get("bind_email"),
-                bind_msisdn=params.get("bind_msisdn"),
             )
 
         return 200, return_dict

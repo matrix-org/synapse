@@ -542,15 +542,16 @@ class ThreepidRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        threePidCreds = body.get("threePidCreds")
-        threePidCreds = body.get("three_pid_creds", threePidCreds)
-        if threePidCreds is None:
-            raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
+        threepid_creds = body.get("threePidCreds") or body.get("three_pid_creds")
+        if threepid_creds is None:
+            raise SynapseError(
+                400, "Missing param three_pid_creds", Codes.MISSING_PARAM
+            )
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
+        threepid = yield self.identity_handler.threepid_from_creds(threepid_creds)
 
         if not threepid:
             raise SynapseError(400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED)
@@ -566,9 +567,41 @@ class ThreepidRestServlet(RestServlet):
 
         if "bind" in body and body["bind"]:
             logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threePidCreds, user_id)
+            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
 
         return 200, {}
+
+
+class ThreepidUnbindRestServlet(RestServlet):
+    PATTERNS = client_patterns("/account/3pid/unbind$")
+
+    def __init__(self, hs):
+        super(ThreepidUnbindRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+        self.auth = hs.get_auth()
+        self.datastore = self.hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        """Unbind the given 3pid from a specific identity server, or identity servers that are
+        known to have this 3pid bound
+        """
+        requester = yield self.auth.get_user_by_req(request)
+        body = parse_json_object_from_request(request)
+        assert_params_in_dict(body, ["medium", "address"])
+
+        medium = body.get("medium")
+        address = body.get("address")
+        id_server = body.get("id_server")
+
+        # Attempt to unbind the threepid from an identity server. If id_server is None, try to
+        # unbind from all identity servers this threepid has been added to in the past
+        result = yield self.identity_handler.try_unbind_threepid(
+            requester.user.to_string(),
+            {"address": address, "medium": medium, "id_server": id_server},
+        )
+        return 200, {"id_server_unbind_result": "success" if result else "no-support"}
 
 
 class ThreepidDeleteRestServlet(RestServlet):
@@ -629,5 +662,6 @@ def register_servlets(hs, http_server):
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
     MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
+    ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
