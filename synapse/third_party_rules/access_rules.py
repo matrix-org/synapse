@@ -569,13 +569,13 @@ class RoomAccessRules(object):
         # room's state, in which case we need to remove the entry from the list in order
         # to avoid conflicts.
         if event.is_state():
-            def filter_out_event(state_key):
-                return event.state_key != state_key
+            existing_members = existing_members
+            threepid_invite_tokens = filter(
+                lambda sk: event.state_key != sk,
+                threepid_invite_tokens,
+            )
 
-            existing_members = filter(filter_out_event, existing_members)
-            threepid_invite_tokens = filter(filter_out_event, threepid_invite_tokens)
-
-        return list(existing_members), list(threepid_invite_tokens)
+        return existing_members, len(threepid_invite_tokens)
 
     @staticmethod
     def _is_invite_from_threepid(invite, threepid_invite_token):
