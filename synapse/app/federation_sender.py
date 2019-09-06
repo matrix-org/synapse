@@ -262,6 +262,8 @@ class FederationSenderHandler(object):
             # we only want to send on receipts for our own users
             if not self._is_mine_id(receipt.user_id):
                 continue
+            if receipt.data.get("hidden", False):
+                return  # do not send over federation
             receipt_info = ReadReceipt(
                 receipt.room_id,
                 receipt.receipt_type,

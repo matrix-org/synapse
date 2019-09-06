@@ -115,7 +115,7 @@ class ReceiptsHandler(BaseHandler):
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
-            data={"ts": int(self.clock.time_msec())},
+            data={"ts": int(self.clock.time_msec()), "hidden": hidden},
         )
 
         is_new = yield self._handle_new_receipts([receipt])
