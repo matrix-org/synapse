@@ -21,6 +21,7 @@ from hashlib import sha256
 
 import six
 
+import idna
 from unpaddedbase64 import encode_base64
 
 from OpenSSL import SSL, crypto
@@ -110,8 +111,8 @@ class TlsConfig(Config):
         # Support globs (*) in whitelist values
         self.federation_certificate_verification_whitelist = []
         for entry in fed_whitelist_entries:
-            # Convert globs to regex
-            entry_regex = glob_to_regex(entry)
+            # Convert globs to regex, and make sure we IDNA the entries
+            entry_regex = glob_to_regex(idna.encode(entry).decode("ascii"))
             self.federation_certificate_verification_whitelist.append(entry_regex)
 
         # List of custom certificate authorities for federation traffic validation

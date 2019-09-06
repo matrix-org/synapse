@@ -114,14 +114,19 @@ class ClientTLSOptionsFactory(object):
         self._no_verify_ssl_context = self._no_verify_ssl.getContext()
         self._no_verify_ssl_context.set_info_callback(self._context_info_cb)
 
-    def get_options(self, host):
+    def get_options(self, host: bytes):
+
+        # IPolicyForHTTPS.get_options takes bytes, but we want to compare
+        # against the str whitelist (which is IDNA-encoded and ASCII decoded).
+        ascii_host = host.decode("ascii")
+
         # Check if certificate verification has been enabled
         should_verify = self._config.federation_verify_certificates
 
         # Check if we've disabled certificate verification for this host
         if should_verify:
             for regex in self._config.federation_certificate_verification_whitelist:
-                if regex.match(host):
+                if regex.match(ascii_host):
                     should_verify = False
                     break
 
@@ -162,7 +167,7 @@ class SSLClientConnectionCreator(object):
     Replaces twisted.internet.ssl.ClientTLSOptions
     """
 
-    def __init__(self, hostname, ctx, verify_certs):
+    def __init__(self, hostname: bytes, ctx, verify_certs: bool):
         self._ctx = ctx
         self._verifier = ConnectionVerifier(hostname, verify_certs)
 
@@ -190,21 +195,16 @@ class ConnectionVerifier(object):
 
     # This code is based on twisted.internet.ssl.ClientTLSOptions.
 
-    def __init__(self, hostname, verify_certs):
+    def __init__(self, hostname: bytes, verify_certs):
         self._verify_certs = verify_certs
 
-        if isIPAddress(hostname) or isIPv6Address(hostname):
-            self._hostnameBytes = hostname.encode("ascii")
+        _decoded = idna.decode(hostname)
+        if isIPAddress(_decoded) or isIPv6Address(_decoded):
             self._is_ip_address = True
         else:
-            # twisted's ClientTLSOptions falls back to the stdlib impl here if
-            # idna is not installed, but points out that lacks support for
-            # IDNA2008 (http://bugs.python.org/issue17305).
-            #
-            # We can rely on having idna.
-            self._hostnameBytes = idna.encode(hostname)
             self._is_ip_address = False
 
+        self._hostnameBytes = hostname
         self._hostnameASCII = self._hostnameBytes.decode("ascii")
 
     def verify_context_info_cb(self, ssl_connection, where):
