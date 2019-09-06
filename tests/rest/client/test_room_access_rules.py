@@ -586,6 +586,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             body=topic_content,
             tok=self.tok,
             expect_code=403,
+        )
 
     def test_revoke_3pid_invite_direct(self):
         """Tests that revoking a 3PID invite doesn't cause the room access rules module to
