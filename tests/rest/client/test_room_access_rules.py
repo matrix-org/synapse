@@ -743,4 +743,3 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, expect_code, channel.result)
 
         return channel.json_body
-
