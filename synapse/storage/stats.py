@@ -823,7 +823,9 @@ class StatsStore(StateDeltasStore):
             elif event.type == EventTypes.CanonicalAlias:
                 room_state["canonical_alias"] = event.content.get("alias")
             elif event.type == EventTypes.Create:
-                room_state["is_federatable"] = event.content.get("m.federate", True)
+                room_state["is_federatable"] = (
+                    event.content.get("m.federate", True) is True
+                )
 
         yield self.update_room_state(room_id, room_state)
 
