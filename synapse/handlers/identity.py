@@ -153,7 +153,9 @@ class IdentityHandler(BaseHandler):
 
         sid = creds.get("sid")
         if not sid:
-            raise SynapseError(400, "No sid in three_pid_creds", errcode=Codes.MISSING_PARAM)
+            raise SynapseError(
+                400, "No sid in three_pid_creds", errcode=Codes.MISSING_PARAM
+            )
 
         # If an id_access_token is not supplied, force usage of v1
         if id_access_token is None:
