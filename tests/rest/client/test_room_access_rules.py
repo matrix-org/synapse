@@ -521,6 +521,16 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             tok=self.tok,
         )
 
+        invite_token = "someothertoken"
+
+        self.send_state_with_state_key(
+            room_id=self.direct_rooms[1],
+            event_type=EventTypes.ThirdPartyInvite,
+            state_key=invite_token,
+            body=invite_body,
+            tok=self.tok,
+        )
+
     def create_room(
         self, direct=False, rule=None, preset=RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
         initial_state=None, expected_code=200,

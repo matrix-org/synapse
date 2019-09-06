@@ -511,9 +511,9 @@ class RoomAccessRules(object):
         existing_members = []
         threepid_invite_tokens = []
         for key, state_event in state_events.items():
-            if key[0] == EventTypes.Member:
+            if key[0] == EventTypes.Member and state_event.content:
                 existing_members.append(state_event.state_key)
-            if key[0] == EventTypes.ThirdPartyInvite:
+            if key[0] == EventTypes.ThirdPartyInvite and state_event.content:
                 threepid_invite_tokens.append(state_event.state_key)
 
         # If the event is a state event, there already is an event with the same state key
