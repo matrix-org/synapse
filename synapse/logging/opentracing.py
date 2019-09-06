@@ -702,15 +702,15 @@ def trace(func=None, opname=None):
         _opname = opname if opname else func.__name__
 
         @wraps(func)
-        def _trace_inner(self, *args, **kwargs):
+        def _trace_inner(*args, **kwargs):
             if opentracing is None:
-                return func(self, *args, **kwargs)
+                return func(*args, **kwargs)
 
             scope = start_active_span(_opname)
             scope.__enter__()
 
             try:
-                result = func(self, *args, **kwargs)
+                result = func(*args, **kwargs)
                 if isinstance(result, defer.Deferred):
 
                     def call_back(result):
@@ -750,13 +750,13 @@ def tag_args(func):
         return func
 
     @wraps(func)
-    def _tag_args_inner(self, *args, **kwargs):
+    def _tag_args_inner(*args, **kwargs):
         argspec = inspect.getargspec(func)
         for i, arg in enumerate(argspec.args[1:]):
             set_tag("ARG_" + arg, args[i])
         set_tag("args", args[len(argspec.args) :])
         set_tag("kwargs", kwargs)
-        return func(self, *args, **kwargs)
+        return func(*args, **kwargs)
 
     return _tag_args_inner
 
