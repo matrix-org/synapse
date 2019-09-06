@@ -304,11 +304,6 @@ def main():
             except subprocess.CalledProcessError:
                 error = True
 
-        # If we're only trying to start synapse and it blew up we can safely
-        # return a non-zero exit code.
-        if not workers:
-            exit(1)
-
         for worker in workers:
             env = os.environ.copy()
 
@@ -327,9 +322,12 @@ def main():
             os.environ.clear()
             os.environ.update(env)
 
-        # If we only tried to start one worker and it blew up we can safely return
+        # we tried to start exactly one thing and it blew up so it's alright to have
         # a non-zero exit code.
-        if error and len(workers) == 1 and not start_stop_synapse:
+        if error and (
+            (start_stop_synapse and not workers)
+            or (len(workers) == 1 and not start_stop_synapse)
+        ):
             exit(1)
 
 
