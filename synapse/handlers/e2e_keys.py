@@ -686,17 +686,13 @@ class E2eKeysHandler(object):
             devices = devices[user_id]
         except SynapseError as e:
             failures[user_id] = {
-                device: _exception_to_failure(e)
-                for device in signatures.keys()
+                device: _exception_to_failure(e) for device in signatures.keys()
             }
             return signature_list, failures
 
         for device_id, device in signatures.items():
             try:
-                if (
-                    "signatures" not in device
-                    or user_id not in device["signatures"]
-                ):
+                if "signatures" not in device or user_id not in device["signatures"]:
                     # no signature was sent
                     raise SynapseError(
                         400, "Invalid signature", Codes.INVALID_SIGNATURE
@@ -725,9 +721,7 @@ class E2eKeysHandler(object):
                             # signed by an unknown device, or the
                             # device does not have the key
                             raise SynapseError(
-                                400,
-                                "Invalid signature",
-                                Codes.INVALID_SIGNATURE,
+                                400, "Invalid signature", Codes.INVALID_SIGNATURE
                             )
 
                         # get the key and check the signature
@@ -760,9 +754,9 @@ class E2eKeysHandler(object):
                     stored_device = devices[device_id]["keys"]
                 except KeyError:
                     raise SynapseError(404, "Unknown device", Codes.NOT_FOUND)
-                if self_signing_key_id in stored_device.get(
-                    "signatures", {}
-                ).get(user_id, {}):
+                if self_signing_key_id in stored_device.get("signatures", {}).get(
+                    user_id, {}
+                ):
                     # we already have a signature on this device, so we
                     # can skip it, since it should be exactly the same
                     continue
@@ -776,9 +770,7 @@ class E2eKeysHandler(object):
                     (self_signing_key_id, user_id, device_id, signature)
                 )
             except SynapseError as e:
-                failures.setdefault(user_id, {})[
-                    device_id
-                ] = _exception_to_failure(e)
+                failures.setdefault(user_id, {})[device_id] = _exception_to_failure(e)
 
         return signature_list, failures
 
@@ -799,9 +791,7 @@ class E2eKeysHandler(object):
         except SynapseError as e:
             failure = _exception_to_failure(e)
             for user, devicemap in signatures.items():
-                failures[user] = {
-                    device_id: failure for device_id in devicemap.keys()
-                }
+                failures[user] = {device_id: failure for device_id in devicemap.keys()}
             return signature_list, failures
 
         for user, devicemap in signatures.items():
@@ -833,9 +823,7 @@ class E2eKeysHandler(object):
                     failure = _exception_to_failure(
                         SynapseError(404, "Unknown device", Codes.NOT_FOUND)
                     )
-                    failures[user] = {
-                        device: failure for device in other_devices
-                    }
+                    failures[user] = {device: failure for device in other_devices}
 
                 if user_signing_key_id in stored_key.get("signatures", {}).get(
                     user_id, {}
@@ -848,9 +836,7 @@ class E2eKeysHandler(object):
                 )
 
                 signature = key["signatures"][user_id][user_signing_key_id]
-                signature_list.append(
-                    (user_signing_key_id, user, device_id, signature)
-                )
+                signature_list.append((user_signing_key_id, user, device_id, signature))
             except SynapseError as e:
                 failure = _exception_to_failure(e)
                 if device_id is None:
