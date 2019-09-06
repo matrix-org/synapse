@@ -395,7 +395,11 @@ class InitialSyncHandler(BaseHandler):
             )
             if not receipts:
                 receipts = []
-            return receipts
+
+            return [
+                r for r in receipts
+                if not r.data.get("hidden", False) or r.user_id == user_id
+            ]
 
         presence, receipts, (messages, token) = yield make_deferred_yieldable(
             defer.gatherResults(

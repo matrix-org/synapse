@@ -334,6 +334,7 @@ class SyncHandler(object):
         """
 
         sync_config = sync_result_builder.sync_config
+        user_id = sync_result_builder.sync_config.user.to_string()
 
         with Measure(self.clock, "ephemeral_by_room"):
             typing_key = since_token.typing_key if since_token else "0"
@@ -376,7 +377,33 @@ class SyncHandler(object):
                 room_id = event["room_id"]
                 # exclude room id, as above
                 event_copy = {k: v for (k, v) in iteritems(event) if k != "room_id"}
-                ephemeral_by_room.setdefault(room_id, []).append(event_copy)
+
+                # filter out receipts the user shouldn't see
+                content = event_copy.get('content', {})
+                event_ids = content.keys()
+                reconstructed = event_copy.copy()
+                reconstructed['content'] = {}  # clear old content
+                for event_id in event_ids:
+                    m_read = content[event_id].get("m.read", None)
+                    if m_read is None:
+                        # clone it now - it's not something we can process
+                        reconstructed["content"][event_id] = content[event_id]
+                        continue
+                    user_ids = m_read.keys()
+                    for rr_user_id in user_ids:
+                        data = m_read[rr_user_id]
+                        hidden = data.get("hidden", False)
+                        if rr_user_id == user_id or not hidden:
+                            # append the key to the reconstructed receipt
+                            new_content = reconstructed["content"]
+                            if new_content.get(event_id, None) is None:
+                                new_content[event_id] = {"m.read": {}}
+                            ev_content = new_content[event_id]["m.read"]
+                            if ev_content.get(rr_user_id, None) is None:
+                                ev_content[rr_user_id] = {}
+                            ev_content[rr_user_id] = data
+                if len(reconstructed["content"].keys()) > 0:
+                    ephemeral_by_room.setdefault(room_id, []).append(reconstructed)
 
         return now_token, ephemeral_by_room
 
