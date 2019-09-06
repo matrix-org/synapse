@@ -294,7 +294,7 @@ def main():
             write("All processes exited; now restarting...")
 
     if action == "start" or action == "restart":
-        error = False
+        errors = 0
         if start_stop_synapse:
             # Check if synapse is already running
             if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
@@ -302,7 +302,7 @@ def main():
             try:
                 start(configfile, bool(options.daemonize))
             except subprocess.CalledProcessError:
-                error = True
+                errors += 1
 
         for worker in workers:
             env = os.environ.copy()
@@ -316,20 +316,19 @@ def main():
             try:
                 start_worker(worker.app, configfile, worker.configfile)
             except subprocess.CalledProcessError:
-                error = True
+                errors += 1
 
             # Reset env back to the original
             os.environ.clear()
             os.environ.update(env)
 
-        # we tried to start exactly one thing and it blew up so it's alright to have
-        # a non-zero exit code.
-        if error and (
-            (start_stop_synapse and not workers)
-            or (len(workers) == 1 and not start_stop_synapse)
-        ):
+        process_count = len(workers) + int(start_stop_synapse)
+
+        # If every process failed to start we exit with exit code 1. If a subset
+        # fails we exit with 4
+        if errors == process_count:
             exit(1)
-        elif error:
+        elif errors:
             exit(4)
 
 
