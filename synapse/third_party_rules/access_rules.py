@@ -265,7 +265,7 @@ class RoomAccessRules(object):
         # Make sure we don't apply "direct" if the room has more than two members.
         if new_rule == ACCESS_RULE_DIRECT:
             existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
-                state_events,
+                state_events, event
             )
 
             if len(existing_members) > 2 or len(threepid_tokens) > 1:
@@ -356,7 +356,7 @@ class RoomAccessRules(object):
         """
         # Get the room memberships and 3PID invite tokens from the room's state.
         existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
-            state_events,
+            state_events, event
         )
 
         # There should never be more than one 3PID invite in the room state: if the second
@@ -494,13 +494,14 @@ class RoomAccessRules(object):
         return join_rule_event.content.get("join_rule")
 
     @staticmethod
-    def _get_members_and_tokens_from_state(state_events):
+    def _get_members_and_tokens_from_state(state_events, event):
         """Retrieves from a list of state events the list of users that have a
         m.room.member event in the room, and the tokens of 3PID invites in the room.
 
         Args:
             state_events (dict[tuple[event type, state key], EventBase]): The set of state
                 events.
+            event (EventBase): The event being checked.
         Returns:
             existing_members (list[str]): List of targets of the m.room.member events in
                 the state.
@@ -509,13 +510,24 @@ class RoomAccessRules(object):
         """
         existing_members = []
         threepid_invite_tokens = []
-        for key, event in state_events.items():
+        for key, state_event in state_events.items():
             if key[0] == EventTypes.Member:
-                existing_members.append(event.state_key)
+                existing_members.append(state_event.state_key)
             if key[0] == EventTypes.ThirdPartyInvite:
-                threepid_invite_tokens.append(event.state_key)
+                threepid_invite_tokens.append(state_event.state_key)
 
-        return existing_members, threepid_invite_tokens
+        # If the event is a state event, there already is an event with the same state key
+        # in the room's state, then the event is updating an existing event from the
+        # room's state, in which case we need to remove the entry from the list in order
+        # to avoid conflicts.
+        if event.is_state():
+            def filter_out_event(state_key):
+                return event.state_key != state_key
+
+            existing_members = filter(filter_out_event, existing_members)
+            threepid_invite_tokens = filter(filter_out_event, threepid_invite_tokens)
+
+        return list(existing_members), list(threepid_invite_tokens)
 
     @staticmethod
     def _is_invite_from_threepid(invite, threepid_invite_token):
