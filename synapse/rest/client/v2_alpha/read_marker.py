@@ -49,6 +49,7 @@ class ReadMarkerRestServlet(RestServlet):
                 "m.read",
                 user_id=requester.user.to_string(),
                 event_id=read_event_id,
+                hidden=body.get("m.hidden", False),
             )
 
         read_marker_event_id = body.get("m.fully_read", None)

@@ -106,7 +106,7 @@ class ReceiptsHandler(BaseHandler):
         return True
 
     @defer.inlineCallbacks
-    def received_client_receipt(self, room_id, receipt_type, user_id, event_id):
+    def received_client_receipt(self, room_id, receipt_type, user_id, event_id, hidden):
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
         """
@@ -122,7 +122,8 @@ class ReceiptsHandler(BaseHandler):
         if not is_new:
             return
 
-        yield self.federation.send_read_receipt(receipt)
+        if not hidden:
+            yield self.federation.send_read_receipt(receipt)
 
     @defer.inlineCallbacks
     def get_receipts_for_room(self, room_id, to_key):
