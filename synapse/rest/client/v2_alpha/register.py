@@ -293,7 +293,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
             request.setResponseCode(e.code)
 
             # Show a failure page with a reason
-            [html_template] = load_jinja2_templates(
+            html_template, = load_jinja2_templates(
                 self.config.email_template_dir,
                 [self.config.email_registration_template_failure_html],
             )
