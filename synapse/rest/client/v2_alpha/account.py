@@ -412,12 +412,14 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
     def __init__(self, hs):
         super(EmailThreepidRequestTokenRestServlet, self).__init__()
         self.hs = hs
+        self.auth = hs.get_auth()
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
         self.store = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(
             body, ["id_server", "client_secret", "email", "send_attempt"]
@@ -439,7 +441,8 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             "email", body["email"]
         )
 
-        if existing_user_id is not None:
+        # Allow this MSISDN to be rebound if the requester owns it
+        if existing_user_id != requester.user.to_string():
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(
@@ -452,13 +455,15 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/msisdn/requestToken$")
 
     def __init__(self, hs):
-        self.hs = hs
         super(MsisdnThreepidRequestTokenRestServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
         self.store = self.hs.get_datastore()
         self.identity_handler = hs.get_handlers().identity_handler
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        requester = self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(
             body,
@@ -482,7 +487,8 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
         existing_user_id = yield self.store.get_user_id_by_threepid("msisdn", msisdn)
 
-        if existing_user_id is not None:
+        # Allow this MSISDN to be rebound if the requester owns it
+        if existing_user_id != requester.user.to_string():
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestMsisdnToken(
