@@ -329,6 +329,8 @@ def main():
             or (len(workers) == 1 and not start_stop_synapse)
         ):
             exit(1)
+        elif error:
+            exit(4)
 
 
 if __name__ == "__main__":
