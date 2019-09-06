@@ -111,8 +111,15 @@ class TlsConfig(Config):
         # Support globs (*) in whitelist values
         self.federation_certificate_verification_whitelist = []
         for entry in fed_whitelist_entries:
-            # Convert globs to regex, and make sure we IDNA the entries
-            entry_regex = glob_to_regex(idna.encode(entry).decode("ascii"))
+
+            # Don't try and IDNA encode globs
+            if entry[0:2] == "*.":
+                entry = b"*." + idna.encode(entry[2:])
+            else:
+                entry = idna.encode(entry)
+
+            # Convert globs to regex
+            entry_regex = glob_to_regex(entry.decode("ascii"))
             self.federation_certificate_verification_whitelist.append(entry_regex)
 
         # List of custom certificate authorities for federation traffic validation
