@@ -1,1 +1,1 @@
-Fix broken replication requests when opentracing is enabled.
+Fix invalid references to None while opentracing if the log context slips.
