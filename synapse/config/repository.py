@@ -161,7 +161,7 @@ class ContentRepositoryConfig(Config):
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
             try:
-                check_requirements("url-preview-api")
+                check_requirements("url_preview")
 
             except DependencyException as e:
                 raise ConfigError(e.message)
