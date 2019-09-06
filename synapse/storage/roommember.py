@@ -78,8 +78,18 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         if self.hs.config.metrics_flags.known_servers:
             self._known_servers_count = 1
-            self.hs.get_clock().looping_call(self._count_known_servers, 60 * 1000)
-            self.hs.get_clock().call_later(1000, self._count_known_servers)
+            self.hs.get_clock().looping_call(
+                run_as_background_process,
+                60 * 1000,
+                "_count_known_servers",
+                self._count_known_servers,
+            )
+            self.hs.get_clock().call_later(
+                1000,
+                run_as_background_process,
+                "_count_known_servers",
+                self._count_known_servers,
+            )
             LaterGauge(
                 "synapse_federation_known_servers",
                 "",
