@@ -614,6 +614,82 @@ class RegistrationWorkerStore(SQLBaseStore):
         # Convert the integer into a boolean.
         return res == 1
 
+    def validate_threepid_session(self, session_id, client_secret, token, current_ts):
+        """Attempt to validate a threepid session using a token
+
+        Args:
+            session_id (str): The id of a validation session
+            client_secret (str): A unique string provided by the client to
+                help identify this validation attempt
+            token (str): A validation token
+            current_ts (int): The current unix time in milliseconds. Used for
+                checking token expiry status
+
+        Returns:
+            deferred str|None: A str representing a link to redirect the user
+            to if there is one.
+        """
+
+        # Insert everything into a transaction in order to run atomically
+        def validate_threepid_session_txn(txn):
+            row = self._simple_select_one_txn(
+                txn,
+                table="threepid_validation_session",
+                keyvalues={"session_id": session_id},
+                retcols=["client_secret", "validated_at"],
+                allow_none=True,
+            )
+
+            if not row:
+                raise ThreepidValidationError(400, "Unknown session_id")
+            retrieved_client_secret = row["client_secret"]
+            validated_at = row["validated_at"]
+
+            if retrieved_client_secret != client_secret:
+                raise ThreepidValidationError(
+                    400, "This client_secret does not match the provided session_id"
+                )
+
+            row = self._simple_select_one_txn(
+                txn,
+                table="threepid_validation_token",
+                keyvalues={"session_id": session_id, "token": token},
+                retcols=["expires", "next_link"],
+                allow_none=True,
+            )
+
+            if not row:
+                raise ThreepidValidationError(
+                    400, "Validation token not found or has expired"
+                )
+            expires = row["expires"]
+            next_link = row["next_link"]
+
+            # If the session is already validated, no need to revalidate
+            if validated_at:
+                return next_link
+
+            if expires <= current_ts:
+                raise ThreepidValidationError(
+                    400, "This token has expired. Please request a new one"
+                )
+
+            # Looks good. Validate the session
+            self._simple_update_txn(
+                txn,
+                table="threepid_validation_session",
+                keyvalues={"session_id": session_id},
+                updatevalues={"validated_at": self.clock.time_msec()},
+            )
+
+            return next_link
+
+        # Return next_link if it exists
+        return self.runInteraction(
+            "validate_threepid_session_txn", validate_threepid_session_txn
+        )
+
+
 
 class RegistrationStore(
     RegistrationWorkerStore, background_updates.BackgroundUpdateStore
@@ -1134,81 +1210,6 @@ class RegistrationStore(
 
         return self.runInteraction(
             "get_threepid_validation_session", get_threepid_validation_session_txn
-        )
-
-    def validate_threepid_session(self, session_id, client_secret, token, current_ts):
-        """Attempt to validate a threepid session using a token
-
-        Args:
-            session_id (str): The id of a validation session
-            client_secret (str): A unique string provided by the client to
-                help identify this validation attempt
-            token (str): A validation token
-            current_ts (int): The current unix time in milliseconds. Used for
-                checking token expiry status
-
-        Returns:
-            deferred str|None: A str representing a link to redirect the user
-            to if there is one.
-        """
-
-        # Insert everything into a transaction in order to run atomically
-        def validate_threepid_session_txn(txn):
-            row = self._simple_select_one_txn(
-                txn,
-                table="threepid_validation_session",
-                keyvalues={"session_id": session_id},
-                retcols=["client_secret", "validated_at"],
-                allow_none=True,
-            )
-
-            if not row:
-                raise ThreepidValidationError(400, "Unknown session_id")
-            retrieved_client_secret = row["client_secret"]
-            validated_at = row["validated_at"]
-
-            if retrieved_client_secret != client_secret:
-                raise ThreepidValidationError(
-                    400, "This client_secret does not match the provided session_id"
-                )
-
-            row = self._simple_select_one_txn(
-                txn,
-                table="threepid_validation_token",
-                keyvalues={"session_id": session_id, "token": token},
-                retcols=["expires", "next_link"],
-                allow_none=True,
-            )
-
-            if not row:
-                raise ThreepidValidationError(
-                    400, "Validation token not found or has expired"
-                )
-            expires = row["expires"]
-            next_link = row["next_link"]
-
-            # If the session is already validated, no need to revalidate
-            if validated_at:
-                return next_link
-
-            if expires <= current_ts:
-                raise ThreepidValidationError(
-                    400, "This token has expired. Please request a new one"
-                )
-
-            # Looks good. Validate the session
-            self._simple_update_txn(
-                txn,
-                table="threepid_validation_session",
-                keyvalues={"session_id": session_id},
-                updatevalues={"validated_at": self.clock.time_msec()},
-            )
-
-            return next_link
-
-        # Return next_link if it exists
-        return self.runInteraction(
-            "validate_threepid_session_txn", validate_threepid_session_txn
         )
 
     def upsert_threepid_validation_session(
