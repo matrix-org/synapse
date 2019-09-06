@@ -101,6 +101,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     def _count_known_servers(self):
         """
         Count the servers that this server knows about.
+
+        The statistic is stored on the class for the
+        `synapse_federation_known_servers` LaterGauge to collect.
         """
 
         def _transact(txn):
