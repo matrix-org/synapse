@@ -1,0 +1,1 @@
+Allow users to rebind 3pids they own (MSC2229).
