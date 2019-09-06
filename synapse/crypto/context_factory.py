@@ -15,7 +15,6 @@
 
 import logging
 
-import idna
 from service_identity import VerificationError
 from service_identity.pyopenssl import verify_hostname, verify_ip_address
 from zope.interface import implementer
@@ -198,7 +197,7 @@ class ConnectionVerifier(object):
     def __init__(self, hostname: bytes, verify_certs):
         self._verify_certs = verify_certs
 
-        _decoded = hostname.decode('ascii')
+        _decoded = hostname.decode("ascii")
         if isIPAddress(_decoded) or isIPv6Address(_decoded):
             self._is_ip_address = True
         else:
