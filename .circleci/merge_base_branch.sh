@@ -17,7 +17,7 @@ then
     GITBASE="dinsic"
 else
     # Get the reference, using the GitHub API
-    GITBASE=`wget -O- https://api.github.com/repos/matrix-org/synapse/pulls/${CIRCLE_PR_NUMBER} | jq -r '.base.ref'`
+    GITBASE=`wget -O- https://api.github.com/repos/matrix-org/synapse-dinsic/pulls/${CIRCLE_PR_NUMBER} | jq -r '.base.ref'`
 fi
 
 # Show what we are before
