@@ -483,6 +483,110 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             expected_code=403,
         )
 
+    def test_change_room_avatar(self):
+        """Tests that changing the room avatar is always allowed unless the room is a
+        direct chat, in which case it's forbidden.
+        """
+
+        avatar_content = {
+            "info": {
+                "h": 398,
+                "mimetype": "image/jpeg",
+                "size": 31037,
+                "w": 394
+            },
+            "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
+        }
+
+        self.helper.send_state(
+            room_id=self.restricted_room,
+            event_type=EventTypes.RoomAvatar,
+            body=avatar_content,
+            tok=self.tok,
+            expect_code=200,
+        )
+
+        self.helper.send_state(
+            room_id=self.unrestricted_room,
+            event_type=EventTypes.RoomAvatar,
+            body=avatar_content,
+            tok=self.tok,
+            expect_code=200,
+        )
+
+        self.helper.send_state(
+            room_id=self.direct_rooms[0],
+            event_type=EventTypes.RoomAvatar,
+            body=avatar_content,
+            tok=self.tok,
+            expect_code=403,
+        )
+
+    def test_change_room_name(self):
+        """Tests that changing the room name is always allowed unless the room is a direct
+        chat, in which case it's forbidden.
+        """
+
+        name_content = {
+            "name": "My super room",
+        }
+
+        self.helper.send_state(
+            room_id=self.restricted_room,
+            event_type=EventTypes.Name,
+            body=name_content,
+            tok=self.tok,
+            expect_code=200,
+        )
+
+        self.helper.send_state(
+            room_id=self.unrestricted_room,
+            event_type=EventTypes.Name,
+            body=name_content,
+            tok=self.tok,
+            expect_code=200,
+        )
+
+        self.helper.send_state(
+            room_id=self.direct_rooms[0],
+            event_type=EventTypes.Name,
+            body=name_content,
+            tok=self.tok,
+            expect_code=403,
+        )
+
+    def test_change_room_topic(self):
+        """Tests that changing the room topic is always allowed unless the room is a
+        direct chat, in which case it's forbidden.
+        """
+
+        topic_content = {
+            "topic": "Welcome to this room",
+        }
+
+        self.helper.send_state(
+            room_id=self.restricted_room,
+            event_type=EventTypes.Topic,
+            body=topic_content,
+            tok=self.tok,
+            expect_code=200,
+        )
+
+        self.helper.send_state(
+            room_id=self.unrestricted_room,
+            event_type=EventTypes.Topic,
+            body=topic_content,
+            tok=self.tok,
+            expect_code=200,
+        )
+
+        self.helper.send_state(
+            room_id=self.direct_rooms[0],
+            event_type=EventTypes.Topic,
+            body=topic_content,
+            tok=self.tok,
+            expect_code=403,
+
     def test_revoke_3pid_invite_direct(self):
         """Tests that revoking a 3PID invite doesn't cause the room access rules module to
         confuse the revokation as a new 3PID invite.
@@ -492,14 +596,14 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         invite_body = {
             "display_name": "ker...@exa...",
             "public_keys": [
-              {
-                "key_validity_url": "https://validity_url",
-                "public_key": "ta8IQ0u1sp44HVpxYi7dFOdS/bfwDjcy4xLFlfY5KOA"
-              },
-              {
-                "key_validity_url": "https://validity_url",
-                "public_key": "4_9nzEeDwR5N9s51jPodBiLnqH43A2_g2InVT137t9I"
-              }
+                {
+                    "key_validity_url": "https://validity_url",
+                    "public_key": "ta8IQ0u1sp44HVpxYi7dFOdS/bfwDjcy4xLFlfY5KOA"
+                },
+                {
+                    "key_validity_url": "https://validity_url",
+                    "public_key": "4_9nzEeDwR5N9s51jPodBiLnqH43A2_g2InVT137t9I"
+                }
             ],
             "key_validity_url": "https://validity_url",
             "public_key": "ta8IQ0u1sp44HVpxYi7dFOdS/bfwDjcy4xLFlfY5KOA"
