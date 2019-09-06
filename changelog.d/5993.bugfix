@@ -1,1 +1,0 @@
-Fix a bug where registration via threepid was broken due to the store method being in the wrong place.
