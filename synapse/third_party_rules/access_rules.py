@@ -575,7 +575,7 @@ class RoomAccessRules(object):
                 threepid_invite_tokens,
             )
 
-        return existing_members, len(threepid_invite_tokens)
+        return existing_members, list(threepid_invite_tokens)
 
     @staticmethod
     def _is_invite_from_threepid(invite, threepid_invite_token):
