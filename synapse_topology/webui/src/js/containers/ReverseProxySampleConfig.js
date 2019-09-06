@@ -2,7 +2,6 @@ import { connect } from 'react-redux';
 
 import ReverseProxySampleConfig from '../components/ReverseProxySampleConfig';
 
-import { advanceUI } from '../actions';
 import { REVERSE_PROXY_TYPES } from '../actions/constants';
 
 import apacheConfig from '../templates/apache';
@@ -24,6 +23,8 @@ const sampleConfig = reverseProxyType => {
             return nginxConfig;
         case REVERSE_PROXY_TYPES.OTHER:
             return otherConfig;
+        default:
+            return () => { }
 
     }
 
