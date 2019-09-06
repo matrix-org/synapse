@@ -379,10 +379,10 @@ class SyncHandler(object):
                 event_copy = {k: v for (k, v) in iteritems(event) if k != "room_id"}
 
                 # filter out receipts the user shouldn't see
-                content = event_copy.get('content', {})
+                content = event_copy.get("content", {})
                 event_ids = content.keys()
                 reconstructed = event_copy.copy()
-                reconstructed['content'] = {}  # clear old content
+                reconstructed["content"] = {}  # clear old content
                 for event_id in event_ids:
                     m_read = content[event_id].get("m.read", None)
                     if m_read is None:

@@ -397,7 +397,8 @@ class InitialSyncHandler(BaseHandler):
                 receipts = []
 
             return [
-                r for r in receipts
+                r
+                for r in receipts
                 if not r.data.get("hidden", False) or r.user_id == user_id
             ]
 
