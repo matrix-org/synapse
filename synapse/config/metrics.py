@@ -43,7 +43,8 @@ class MetricsConfig(Config):
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
 
         if self.enable_metrics:
-            self.metrics_flags = MetricsFlags(**config.get("metrics_flags", {}))
+            _metrics_config = config.get("metrics_flags") or {}
+            self.metrics_flags = MetricsFlags(**_metrics_config)
         else:
             self.metrics_flags = MetricsFlags.all_off()
 
