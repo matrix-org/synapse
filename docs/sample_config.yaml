@@ -891,9 +891,41 @@ uploads_path: "DATADIR/uploads"
 # Also defines the ID server which will be called when an account is
 # deactivated (one will be picked arbitrarily).
 #
+# Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
+# server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
+# background migration script, informing itself that the identity server all of its
+# 3PIDs have been bound to is likely one of the below.
+#
+# As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
+# it is now solely used for the purposes of the background migration script, and can be
+# removed once it has run.
 #trusted_third_party_id_servers:
 #  - matrix.org
 #  - vector.im
+
+# Handle threepid (email/phone etc) registration and password resets through a set of
+# *trusted* identity servers. Note that this allows the configured identity server to
+# reset passwords for accounts!
+#
+# Be aware that if `email` is not set, and SMTP options have not been
+# configured in the email config block, registration and user password resets via
+# email will be globally disabled.
+#
+# Additionally, if `msisdn` is not set, registration and password resets via msisdn
+# will be disabled regardless. This is due to Synapse currently not supporting any
+# method of sending SMS messages on its own.
+#
+# To enable using an identity server for operations regarding a particular third-party
+# identifier type, set the value to the URL of that identity server as shown in the
+# examples below.
+#
+# Servers handling the these requests must answer the `/requestToken` endpoints defined
+# by the Matrix Identity Service API specification:
+# https://matrix.org/docs/spec/identity_service/latest
+#
+account_threepid_delegates:
+    #email: https://example.com     # Delegate email sending to matrix.org
+    #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
 # Users who register on this homeserver will automatically be joined
 # to these rooms
@@ -925,6 +957,16 @@ uploads_path: "DATADIR/uploads"
 #
 #sentry:
 #    dsn: "..."
+
+# Flags to enable Prometheus metrics which are not suitable to be
+# enabled by default, either for performance reasons or limited use.
+#
+metrics_flags:
+    # Publish synapse_federation_known_servers, a g auge of the number of
+    # servers this homeserver knows about, including itself. May cause
+    # performance problems on large homeservers.
+    #
+    #known_servers: true
 
 # Whether or not to report anonymized homeserver usage statistics.
 # report_stats: true|false
@@ -1164,19 +1206,6 @@ password_config:
 #   #
 #   riot_base_url: "http://localhost/riot"
 #
-#   # Enable sending password reset emails via the configured, trusted
-#   # identity servers
-#   #
-#   # IMPORTANT! This will give a malicious or overtaken identity server
-#   # the ability to reset passwords for your users! Make absolutely sure
-#   # that you want to do this! It is strongly recommended that password
-#   # reset emails be sent by the homeserver instead
-#   #
-#   # If this option is set to false and SMTP options have not been
-#   # configured, resetting user passwords via email will be disabled
-#   #
-#   #trust_identity_server_for_password_resets: false
-#
 #   # Configure the time that a validation email or text message code
 #   # will expire after sending
 #   #
@@ -1208,11 +1237,22 @@ password_config:
 #   #password_reset_template_html: password_reset.html
 #   #password_reset_template_text: password_reset.txt
 #
+#   # Templates for registration emails sent by the homeserver
+#   #
+#   #registration_template_html: registration.html
+#   #registration_template_text: registration.txt
+#
 #   # Templates for password reset success and failure pages that a user
 #   # will see after attempting to reset their password
 #   #
 #   #password_reset_template_success_html: password_reset_success.html
 #   #password_reset_template_failure_html: password_reset_failure.html
+#
+#   # Templates for registration success and failure pages that a user
+#   # will see after attempting to register using an email or phone
+#   #
+#   #registration_template_success_html: registration_success.html
+#   #registration_template_failure_html: registration_failure.html
 
 
 #password_providers:
