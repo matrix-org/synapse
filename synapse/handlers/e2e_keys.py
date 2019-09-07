@@ -659,6 +659,18 @@ class E2eKeysHandler(object):
 
     @defer.inlineCallbacks
     def _process_self_signatures(self, user_id, signatures):
+        """Process uploaded signatures of the user's own keys.
+
+        Args:
+            user_id (string): the user uploading the keys
+            signatures (dict[string, dict]): map of devices to signed keys
+
+        Returns:
+            (list[(string, string, string, string)], dict[string, dict[string, dict]]):
+            a list of signatures to upload, in the form (signing_key_id, target_user_id,
+            target_device_id, signature), and a map of users to devices to failure
+            reasons
+        """
         signature_list = []
         failures = {}
         if not signatures:
@@ -776,8 +788,18 @@ class E2eKeysHandler(object):
 
     @defer.inlineCallbacks
     def _process_other_signatures(self, user_id, signatures):
-        # now check non-self signatures.  These signatures will be signed
-        # by the user-signing key
+        """Process uploaded signatures of other users' keys.
+
+        Args:
+            user_id (string): the user uploading the keys
+            signatures (dict[string, dict]): map of users to devices to signed keys
+
+        Returns:
+            (list[(string, string, string, string)], dict[string, dict[string, dict]]):
+            a list of signatures to upload, in the form (signing_key_id, target_user_id,
+            target_device_id, signature), and a map of users to devices to failure
+            reasons
+        """
         signature_list = []
         failures = {}
         if not signatures:
