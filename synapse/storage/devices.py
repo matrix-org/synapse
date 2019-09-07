@@ -933,7 +933,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "ts": now,
                     "opentracing_context": json.dumps(context)
                     if whitelisted_homeserver(destination)
-                    else None,
+                    else "{}",
                 }
                 for destination in hosts
                 for device_id in device_ids
