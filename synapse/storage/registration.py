@@ -358,7 +358,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             retcol="user_type",
             allow_none=True,
         )
-        return True if res is None or res == "" else False
+        return res is None
 
     def is_support_user_txn(self, txn, user_id):
         res = self._simple_select_one_onecol_txn(
