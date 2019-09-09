@@ -13,10 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, List, Tuple
-from unittest import mock
-
-from twisted.internet.defer import Deferred, ensureDeferred
+from twisted.internet.defer import ensureDeferred
 
 from synapse.southbridge.connection_pool import Connection, ConnectionPool
 from synapse.southbridge.objects import Protocols, RemoteAddress

@@ -27,9 +27,8 @@ from mock import Mock
 from canonicaljson import json
 
 from twisted.internet.defer import Deferred, succeed
-from twisted.internet.interfaces import IProtocol, ITransport
+from twisted.internet.interfaces import IProtocol
 from twisted.python.threadpool import ThreadPool
-from twisted.test.proto_helpers import StringTransportWithDisconnection
 from twisted.trial import unittest
 
 from synapse.api.constants import EventTypes
