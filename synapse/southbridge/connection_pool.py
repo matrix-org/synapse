@@ -114,6 +114,7 @@ class Connection:
     def makeConnection(self, transport):
         self._connected = True
         self.transport = transport
+        self.connectionMade()
 
     def connectionMade(self) -> None:
         """

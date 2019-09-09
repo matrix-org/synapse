@@ -29,7 +29,7 @@ from canonicaljson import json
 from twisted.internet.defer import Deferred, succeed
 from twisted.internet.interfaces import IProtocol, ITransport
 from twisted.python.threadpool import ThreadPool
-from twisted.test.proto_helpers import StringTransport
+from twisted.test.proto_helpers import StringTransportWithDisconnection
 from twisted.trial import unittest
 
 from synapse.api.constants import EventTypes
@@ -40,7 +40,13 @@ from synapse.logging.context import LoggingContext
 from synapse.server import HomeServer
 from synapse.types import Requester, UserID, create_requester
 
-from tests.server import get_clock, make_request, render, setup_test_homeserver
+from tests.server import (
+    connect_client,
+    get_clock,
+    make_request,
+    render,
+    setup_test_homeserver,
+)
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
@@ -198,7 +204,6 @@ class HomeserverTestCase(TestCase):
         self.reactor, self.clock = get_clock()
         self._hs_args = {"clock": self.clock, "reactor": self.reactor}
         self.hs = self.make_homeserver(self.reactor, self.clock)
-        self.endpoints = self._make_endpoints()
 
         if self.hs is None:
             raise Exception("No homeserver returned from make_homeserver.")
@@ -565,37 +570,11 @@ class HomeserverTestCase(TestCase):
         self.render(request)
         self.assertEqual(channel.code, 403, channel.result)
 
-    def _make_endpoints(self):
+    def connect_tcp(self, id: int) -> Tuple[IProtocol, IProtocol]:
         """
-        Make a fake `twisted.internet.endpoints`.
+        Connect connection #id from the pending connections.
         """
-        connections = []
-        self.connections = connections
-
-        def connector(reactor, host, port, timeout, bindAddress):
-
-            connect = Deferred()
-
-            def _conn(factory):
-                connections.append((connect, (host, port), factory))
-                return connect
-
-            endpoint = Mock(spec=["connect"], connect=_conn)
-            return endpoint
-
-        return Mock(spec=["TCP4ClientEndpoint"], TCP4ClientEndpoint=connector)
-
-    def connect_tcp(self, id: int) -> Tuple[IProtocol, ITransport]:
-        """
-        Connect connection #id from the pending connections, and remove it.
-        """
-        protocol = self.connections[id][2].buildProtocol(None)
-        transport = StringTransport()
-        protocol.makeConnection(transport)
-        self.connections[id][0].callback(protocol)
-        self.connections.pop(id)
-
-        return protocol, transport
+        return connect_client(self.reactor, id)
 
 
 def override_config(extra_config):

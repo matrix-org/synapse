@@ -1,6 +1,7 @@
 import json
 import logging
 from io import BytesIO
+from typing import Tuple
 
 from six import text_type
 
@@ -246,6 +247,8 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super(ThreadedMemoryReactorClock, self).__init__()
 
+        self.establishedTCPClients = []
+
     def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
         p.startListening()
@@ -263,6 +266,10 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
     def getThreadPool(self):
         return self.threadpool
+
+    def getTCPClientCounts(self):
+        self.pump([0] * 100)
+        return len(self.tcpClients), len(self.establishedTCPClients)
 
 
 class ThreadPool:
@@ -391,6 +398,7 @@ class FakeTransport(object):
             self.disconnecting = True
             if self._protocol:
                 self._protocol.connectionLost(reason)
+            self._reactor.establishedTCPClients.remove(self._protocol)
             self.disconnected = True
 
     def abortConnection(self):
@@ -471,7 +479,9 @@ class FakeTransport(object):
             self._reactor.callLater(0.0, self.flush)
 
 
-def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol:
+def connect_client(
+    reactor: IReactorTCP, client_id: int
+) -> Tuple[AccumulatingProtocol, AccumulatingProtocol]:
     """
     Connect a client to a fake TCP transport.
 
@@ -482,9 +492,10 @@ def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol
     factory = reactor.tcpClients[client_id][2]
     client = factory.buildProtocol(None)
     server = AccumulatingProtocol()
-    server.makeConnection(FakeTransport(client, reactor))
-    client.makeConnection(FakeTransport(server, reactor))
+    server.makeConnection(FakeTransport(client, reactor, server))
+    client.makeConnection(FakeTransport(server, reactor, client))
 
     reactor.tcpClients.pop(client_id)
+    reactor.establishedTCPClients.append(client)
 
     return client, server
