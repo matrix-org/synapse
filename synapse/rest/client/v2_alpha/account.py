@@ -22,11 +22,11 @@ from twisted.internet import defer
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
+    AuthError,
     Codes,
+    InvalidClientCredentialsError,
     SynapseError,
     ThreepidValidationError,
-    AuthError,
-    InvalidClientCredentialsError,
 )
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import finish_request
@@ -445,7 +445,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         requester = None
         try:
             requester = yield self.auth.get_user_by_req(request)
-        except (AuthError, InvalidClientCredentialsError) as e:
+        except (AuthError, InvalidClientCredentialsError):
             # No authentication provided, ignore
             pass
 
@@ -456,9 +456,8 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         # If the request is authenticated, allow this MSISDN to be rebound if the requester
         # owns it.
         # Otherwise, deny the request if the 3PID exists
-        if (
-            (requester and existing_user_id != requester.user.to_string()) or
-            (requester is None and existing_user_id)
+        if (requester and existing_user_id != requester.user.to_string()) or (
+            requester is None and existing_user_id
         ):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
@@ -504,7 +503,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         requester = None
         try:
             requester = yield self.auth.get_user_by_req(request)
-        except (AuthError, InvalidClientCredentialsError) as e:
+        except (AuthError, InvalidClientCredentialsError):
             # No authentication provided, ignore
             pass
 
@@ -513,9 +512,8 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         # If the request is authenticated, allow this MSISDN to be rebound if the requester
         # owns it.
         # Otherwise, deny the request if the 3PID exists
-        if (
-            (requester and existing_user_id != requester.user.to_string()) or
-            (requester is None and existing_user_id)
+        if (requester and existing_user_id != requester.user.to_string()) or (
+            requester is None and existing_user_id
         ):
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
@@ -573,7 +571,9 @@ class ThreepidRestServlet(RestServlet):
         # Check that the user is not trying to add an email that's already bound to another
         # user
         if existing_user_id != requester.user.to_string():
-            raise SynapseError(400, "This 3PID is already in use", Codes.THREEPID_IN_USE)
+            raise SynapseError(
+                400, "This 3PID is already in use", Codes.THREEPID_IN_USE
+            )
 
         yield self.auth_handler.add_threepid(
             user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
