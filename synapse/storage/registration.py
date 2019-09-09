@@ -332,9 +332,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             Deferred[bool]: True if user 'user_type' is null or empty string
         """
-        res = yield self.runInteraction(
-            "is_real_user", self.is_real_user_txn, user_id
-        )
+        res = yield self.runInteraction("is_real_user", self.is_real_user_txn, user_id)
         return res
 
     @cachedInlineCallbacks()
@@ -451,7 +449,9 @@ class RegistrationWorkerStore(SQLBaseStore):
         """Counts all users without a special user_type registered on the homeserver."""
 
         def _count_users(txn):
-            txn.execute("SELECT COUNT(*) AS users FROM users where user_type is null or user_type = ''")
+            txn.execute(
+                "SELECT COUNT(*) AS users FROM users where user_type is null or user_type = ''"
+            )
             rows = self.cursor_to_dict(txn)
             if rows:
                 return rows[0]["users"]
