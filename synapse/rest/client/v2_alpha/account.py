@@ -456,10 +456,12 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         # If the request is authenticated, allow this MSISDN to be rebound if the requester
         # owns it.
         # Otherwise, deny the request if the 3PID exists
-        if (requester and existing_user_id != requester.user.to_string()) or (
-            requester is None and existing_user_id
-        ):
-            raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
+        if existing_user_id:
+            if (
+                requester is None or
+                (requester and existing_user_id != requester.user.to_string)
+            ):
+                raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(
             id_server, email, client_secret, send_attempt, next_link
@@ -512,10 +514,12 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         # If the request is authenticated, allow this MSISDN to be rebound if the requester
         # owns it.
         # Otherwise, deny the request if the 3PID exists
-        if (requester and existing_user_id != requester.user.to_string()) or (
-            requester is None and existing_user_id
-        ):
-            raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
+        if existing_user_id:
+            if (
+                requester is None or
+                (requester and existing_user_id != requester.user.to_string)
+            ):
+                raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestMsisdnToken(
             id_server, country, phone_number, client_secret, send_attempt, next_link
@@ -570,9 +574,10 @@ class ThreepidRestServlet(RestServlet):
 
         # Check that the user is not trying to add an email that's already bound to another
         # user
-        if existing_user_id != requester.user.to_string():
+        if existing_user_id and existing_user_id != requester.user.to_string():
             raise SynapseError(
-                400, "This 3PID is already in use", Codes.THREEPID_IN_USE
+                400, "This 3PID is already in use by %s" % (existing_user_id,),
+                Codes.THREEPID_IN_USE,
             )
 
         yield self.auth_handler.add_threepid(
