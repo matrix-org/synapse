@@ -1586,12 +1586,15 @@ class EventsStore(
         # We use the range [-max_pos, max_pos] to handle backfilled events,
         # which are given negative stream ordering.
         sql = """
-            SELECT er.event_id, redacts FROM redactions
-            INNER JOIN events AS er USING (event_id)
-            INNER JOIN events AS eb ON (er.room_id = eb.room_id AND redacts = eb.event_id)
+            SELECT redact_event.event_id, redacts FROM redactions
+            INNER JOIN events AS redact_event USING (event_id)
+            INNER JOIN events AS original_event ON (
+                redact_event.room_id = original_event.room_id
+                AND redacts = original_event.event_id
+            )
             WHERE NOT have_censored
-            AND ? <= er.stream_ordering AND er.stream_ordering <= ?
-            ORDER BY er.stream_ordering ASC
+            AND ? <= redact_event.stream_ordering AND redact_event.stream_ordering <= ?
+            ORDER BY redact_event.stream_ordering ASC
             LIMIT ?
         """
 
