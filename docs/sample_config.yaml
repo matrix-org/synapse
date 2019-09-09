@@ -1141,6 +1141,13 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #  # The default is 5 minutes.
 #  #
 #  # saml_session_lifetime: 5m
+#  #
+#  # # The ID of the attestation that will be used for the localpart of the user's Matrix ID
+#  # # Deafault: 'uid'
+#  # username_attestation: "uid"
+#  #
+#  # # The ID of the attestation that will be used for the user's display name. Default: 'displayName'
+#  # displayname_attestation: "displayName"
 
 
 
