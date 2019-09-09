@@ -710,28 +710,11 @@ class RoomMemberHandler(object):
         Returns:
             str|None: the matrix ID of the 3pid, or None if it is not recognized.
         """
-        # If an access token is present, add it to the query params of the hash_details request
         query_params = {}
         if id_access_token is not None:
-            query_params["id_access_token"] = id_access_token
-
-            # Check what hashing details are supported by this identity server
             try:
-                hash_details = yield self.simple_http_client.get_json(
-                    "%s%s/_matrix/identity/v2/hash_details"
-                    % (id_server_scheme, id_server),
-                    query_params,
-                )
-                if not isinstance(hash_details, dict):
-                    logger.warning(
-                        "Got non-dict object when checking hash details of %s: %s",
-                        id_server,
-                        hash_details,
-                    )
-                    return None
-
                 results = yield self._lookup_3pid_v2(
-                    id_server, id_access_token, medium, address, hash_details
+                    id_server, id_access_token, medium, address
                 )
                 return results
 
@@ -783,7 +766,7 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _lookup_3pid_v2(
-        self, id_server, id_access_token, medium, address, hash_details
+        self, id_server, id_access_token, medium, address
     ):
         """Looks up a 3pid in the passed identity server using v2 lookup.
 
@@ -793,12 +776,39 @@ class RoomMemberHandler(object):
             id_access_token (str): The access token to authenticate to the identity server with
             medium (str): The type of the third party identifier (e.g. "email").
             address (str): The third party identifier (e.g. "foo@example.com").
-            hash_details (dict[str, str|list]): A dictionary containing hashing information
-                provided by an identity server.
 
         Returns:
             Deferred[str|None]: the matrix ID of the 3pid, or None if it is not recognised.
         """
+        try:
+            # Check what hashing details are supported by this identity server
+            hash_details = yield self.simple_http_client.get_json(
+                "%s%s/_matrix/identity/v2/hash_details"
+                % (id_server_scheme, id_server),
+                {"id_access_token": id_access_token},
+            )
+        except HttpResponseException as e:
+            if e.code == 404:
+                raise
+
+            logger.warning("Error when performing a v2 hash_details request: %s", e)
+            raise SynapseError(
+                500, "Unknown error occurred during identity server lookup"
+            )
+
+        if not isinstance(hash_details, dict):
+            logger.warning(
+                "Got non-dict object when checking hash details of %s%s: %s",
+                id_server_scheme, id_server,
+                hash_details,
+            )
+            raise SynapseError(
+                400, "Non-dict object from %s%s during v2 hash_details request: %s" % (
+                    id_server_scheme, id_server,
+                    hash_details,
+                )
+            )
+
         # Extract information from hash_details
         supported_lookup_algorithms = hash_details.get("algorithms")
         lookup_pepper = hash_details.get("lookup_pepper")
@@ -809,7 +819,10 @@ class RoomMemberHandler(object):
             or not isinstance(lookup_pepper, str)
         ):
             raise SynapseError(
-                500, "Invalid hash details received from identity server: %s, %s"
+                400, "Invalid hash details received from identity server: %s%s, %s" % (
+                    id_server_scheme, id_server,
+                    hash_details
+                )
             )
 
         # Check if any of the supported lookup algorithms are present
@@ -835,7 +848,7 @@ class RoomMemberHandler(object):
                 supported_lookup_algorithms,
             )
             raise SynapseError(
-                400,
+                500,
                 "Provided identity server does not support any v2 lookup "
                 "algorithms that this homeserver supports.",
             )
@@ -860,7 +873,7 @@ class RoomMemberHandler(object):
         if "mappings" not in lookup_results or not isinstance(
             lookup_results["mappings"], dict
         ):
-            logger.debug("No results from 3pid lookup")
+            logger.warning("No results from 3pid lookup")
             return None
 
         # Return the MXID if it's available, or None otherwise
