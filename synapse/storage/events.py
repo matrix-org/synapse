@@ -269,7 +269,7 @@ class EventsStore(
             )
 
         if self.hs.config.redaction_retention_period is not None:
-            hs.get_clock().looping_call(_censor_redactions, 10 * 60 * 1000)
+            hs.get_clock().looping_call(_censor_redactions, 5 * 60 * 1000)
 
     @defer.inlineCallbacks
     def _read_forward_extremities(self):
@@ -1574,9 +1574,17 @@ class EventsStore(
             self._clock.time_msec() - self.hs.config.redaction_retention_period
         )
 
-        # We fetch all redactions that point to an event that we have that has
-        # a stream ordering from over a month ago, that we haven't yet censored
-        # in the DB.
+        # We fetch all redactions that:
+        #   1. point to an event we have that has,
+        #   2. has a stream ordering from before the cut off, and
+        #   3. we haven't yet censored.
+        #
+        # This is limited to 100 events to ensure that we don't try and do too
+        # much at once. We'll get called again so this should eventually catch
+        # up.
+        #
+        # We use the range [-max_pos, max_pos] to handle backfilled events,
+        # which are given negative stream ordering.
         sql = """
             SELECT er.event_id, redacts FROM redactions
             INNER JOIN events AS er USING (event_id)
