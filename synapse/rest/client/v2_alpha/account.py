@@ -21,7 +21,13 @@ from six.moves import http_client
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
+from synapse.api.errors import (
+    Codes,
+    SynapseError,
+    ThreepidValidationError,
+    AuthError,
+    InvalidClientCredentialsError,
+)
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
@@ -419,7 +425,6 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(
             body, ["id_server", "client_secret", "email", "send_attempt"]
@@ -437,12 +442,24 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
+        requester = None
+        try:
+            requester = yield self.auth.get_user_by_req(request)
+        except (AuthError, InvalidClientCredentialsError) as e:
+            # No authentication provided, ignore
+            pass
+
         existing_user_id = yield self.store.get_user_id_by_threepid(
             "email", body["email"]
         )
 
-        # Allow this MSISDN to be rebound if the requester owns it
-        if existing_user_id != requester.user.to_string():
+        # If the request is authenticated, allow this MSISDN to be rebound if the requester
+        # owns it.
+        # Otherwise, deny the request if the 3PID exists
+        if (
+            (requester and existing_user_id != requester.user.to_string()) or
+            (requester is None and existing_user_id)
+        ):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(
@@ -463,7 +480,6 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        requester = self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(
             body,
@@ -485,10 +501,22 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
+        requester = None
+        try:
+            requester = yield self.auth.get_user_by_req(request)
+        except (AuthError, InvalidClientCredentialsError) as e:
+            # No authentication provided, ignore
+            pass
+
         existing_user_id = yield self.store.get_user_id_by_threepid("msisdn", msisdn)
 
-        # Allow this MSISDN to be rebound if the requester owns it
-        if existing_user_id != requester.user.to_string():
+        # If the request is authenticated, allow this MSISDN to be rebound if the requester
+        # owns it.
+        # Otherwise, deny the request if the 3PID exists
+        if (
+            (requester and existing_user_id != requester.user.to_string()) or
+            (requester is None and existing_user_id)
+        ):
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestMsisdnToken(
@@ -528,7 +556,6 @@ class ThreepidRestServlet(RestServlet):
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
-
         threepid = yield self.identity_handler.threepid_from_creds(threepid_creds)
 
         if not threepid:
@@ -538,6 +565,15 @@ class ThreepidRestServlet(RestServlet):
             if reqd not in threepid:
                 logger.warn("Couldn't add 3pid: invalid response from ID server")
                 raise SynapseError(500, "Invalid response from ID Server")
+
+        existing_user_id = yield self.datastore.get_user_id_by_threepid(
+            threepid["medium"], threepid["address"]
+        )
+
+        # Check that the user is not trying to add an email that's already bound to another
+        # user
+        if existing_user_id != requester.user.to_string():
+            raise SynapseError(400, "This 3PID is already in use", Codes.THREEPID_IN_USE)
 
         yield self.auth_handler.add_threepid(
             user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
