@@ -274,7 +274,7 @@ class RoomAccessRules(object):
         # Make sure we don't apply "direct" if the room has more than two members.
         if new_rule == ACCESS_RULE_DIRECT:
             existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
-                state_events, event
+                state_events
             )
 
             if len(existing_members) > 2 or len(threepid_tokens) > 1:
@@ -365,7 +365,7 @@ class RoomAccessRules(object):
         """
         # Get the room memberships and 3PID invite tokens from the room's state.
         existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
-            state_events, event
+            state_events
         )
 
         # There should never be more than one 3PID invite in the room state: if the second
@@ -374,8 +374,12 @@ class RoomAccessRules(object):
         # join the first time), Synapse will successfully look it up before attempting to
         # store an invite on the IS.
         if len(threepid_tokens) == 1 and event.type == EventTypes.ThirdPartyInvite:
-            # If we already have a 3PID invite in flight, don't accept another one.
-            return False
+            # If we already have a 3PID invite in flight, don't accept another one, unless
+            # the new one has the same invite token as its state key. This is because 3PID
+            # invite revocations must be allowed, and a revocation is basically a new 3PID
+            # invite event with an empty content and the same token as the invite it
+            # revokes.
+            return event.state_key in threepid_tokens
 
         if len(existing_members) == 2:
             # If the user was within the two initial user of the room, Synapse would have
@@ -542,14 +546,13 @@ class RoomAccessRules(object):
         return join_rule_event.content.get("join_rule")
 
     @staticmethod
-    def _get_members_and_tokens_from_state(state_events, event):
+    def _get_members_and_tokens_from_state(state_events):
         """Retrieves from a list of state events the list of users that have a
         m.room.member event in the room, and the tokens of 3PID invites in the room.
 
         Args:
             state_events (dict[tuple[event type, state key], EventBase]): The set of state
                 events.
-            event (EventBase): The event being checked.
         Returns:
             existing_members (list[str]): List of targets of the m.room.member events in
                 the state.
@@ -562,20 +565,10 @@ class RoomAccessRules(object):
             if key[0] == EventTypes.Member and state_event.content:
                 existing_members.append(state_event.state_key)
             if key[0] == EventTypes.ThirdPartyInvite and state_event.content:
+                # Don't include revoked invites.
                 threepid_invite_tokens.append(state_event.state_key)
 
-        # If the event is a state event, there already is an event with the same state key
-        # in the room's state, then the event is updating an existing event from the
-        # room's state, in which case we need to remove the entry from the list in order
-        # to avoid conflicts.
-        if event.is_state():
-            existing_members = existing_members
-            threepid_invite_tokens = filter(
-                lambda sk: event.state_key != sk,
-                threepid_invite_tokens,
-            )
-
-        return existing_members, list(threepid_invite_tokens)
+        return existing_members, threepid_invite_tokens
 
     @staticmethod
     def _is_invite_from_threepid(invite, threepid_invite_token):
