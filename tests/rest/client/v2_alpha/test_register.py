@@ -20,7 +20,6 @@ import json
 import os
 
 from mock import Mock
-from six import ensure_binary
 
 import pkg_resources
 
@@ -438,7 +437,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # Check that the HTML we're getting is the one we expect on a successful renewal.
         expected_html = self.hs.config.account_validity.account_renewed_html_content
         self.assertEqual(
-            channel.result["body"], ensure_binary(expected_html), channel.result
+            channel.result["body"], expected_html.encode("utf8"), channel.result
         )
 
         # Move 3 days forward. If the renewal failed, every authed request with
@@ -468,7 +467,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # invalid/unknown token.
         expected_html = self.hs.config.account_validity.invalid_token_html_content
         self.assertEqual(
-            channel.result["body"], ensure_binary(expected_html), channel.result
+            channel.result["body"], expected_html.encode("utf8"), channel.result
         )
 
     def test_manual_email_send(self):
