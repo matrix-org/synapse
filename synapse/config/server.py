@@ -165,7 +165,7 @@ class ServerConfig(Config):
         # How long to keep redacted events in the database in unredacted form
         # before redacting them.
         redaction_retention_period = config.get("redaction_retention_period")
-        if redaction_retention_period:
+        if redaction_retention_period is not None:
             self.redaction_retention_period = self.parse_duration(
                 redaction_retention_period
             )

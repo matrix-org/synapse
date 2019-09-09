@@ -1566,7 +1566,7 @@ class EventsStore(
             Deferred
         """
 
-        if not self.hs.config.redaction_retention_period:
+        if self.hs.config.redaction_retention_period is None:
             return
 
         max_pos = yield self.find_first_stream_ordering_after_ts(
