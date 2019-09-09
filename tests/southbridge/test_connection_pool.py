@@ -17,7 +17,6 @@ from typing import Callable, List, Tuple
 from unittest import mock
 
 from twisted.internet.defer import Deferred, ensureDeferred
-from twisted.test.proto_helpers import StringTransport
 
 from synapse.southbridge.connection_pool import Connection, ConnectionPool
 from synapse.southbridge.objects import Protocols, RemoteAddress
@@ -25,52 +24,54 @@ from synapse.southbridge.objects import Protocols, RemoteAddress
 from tests.unittest import HomeserverTestCase
 
 
-def make_connector() -> Tuple[Callable, List[Tuple[Deferred, Tuple[str, int]]]]:
-
-    connections = []
-
-    def connector(reactor, host, port, timeout, bindAddress):
-
-        connect = Deferred()
-
-        def _conn(factory):
-            connections.append((connect, (host, port), factory))
-            return connect
-
-        endpoint = mock.Mock(spec=["connect"], connect=_conn)
-        return endpoint
-
-    return connector, connections
-
-
 class FakeConnector(object):
     pass
 
 
 class ConnectionPoolTests(HomeserverTestCase):
-    def test_basic(self):
 
-        connector, connections = make_connector()
-        endpoints = mock.Mock(spec=["TCP4ClientEndpoint"], TCP4ClientEndpoint=connector)
-
-        pool = ConnectionPool(
+    def make_pool(self):
+        return ConnectionPool(
             reactor=self.reactor,
             tls_factory=self.hs.get_federation_tls_options(),
-            endpoints=endpoints,
+            endpoints=self.endpoints,
         )
 
+
+    def test_basic(self):
+        """
+        When a connection is requested of the pool, it returns it when the
+        connection is made.
+        """
+        pool = self.make_pool()
         host = RemoteAddress(
             name="example.com", addresses=["0.1.2.3"], port=80, protocol=Protocols.HTTP
         )
 
         connection = ensureDeferred(pool.request_connection(host))
         self.pump()
-        self.assertEqual(len(connections), 1)
+        self.assertEqual(len(self.connections), 1)
 
-        protocol = connections[0][2].buildProtocol(None)
-        transport = StringTransport()
-        protocol.makeConnection(transport)
-        connections[0][0].callback(protocol)
+        protocol, transport = self.connect_tcp(0)
+        resolved = self.successResultOf(connection)
+
+        self.assertIsInstance(resolved, Connection)
+
+    def test_basic(self):
+        """
+        When a connection is requested of the pool, it returns it when the
+        connection is made.
+        """
+        pool = self.make_pool()
+        host = RemoteAddress(
+            name="example.com", addresses=["0.1.2.3"], port=80, protocol=Protocols.HTTP
+        )
+
+        connection = ensureDeferred(pool.request_connection(host))
+        self.pump()
+        self.assertEqual(len(self.connections), 1)
+
+        protocol, transport = self.connect_tcp(0)
         resolved = self.successResultOf(connection)
 
         self.assertIsInstance(resolved, Connection)

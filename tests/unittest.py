@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,18 +14,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import gc
 import hashlib
 import hmac
 import logging
 import time
+from typing import Tuple
 
 from mock import Mock
 
 from canonicaljson import json
 
 from twisted.internet.defer import Deferred, succeed
+from twisted.internet.interfaces import IProtocol, ITransport
 from twisted.python.threadpool import ThreadPool
+from twisted.test.proto_helpers import StringTransport
 from twisted.trial import unittest
 
 from synapse.api.constants import EventTypes
@@ -193,6 +198,7 @@ class HomeserverTestCase(TestCase):
         self.reactor, self.clock = get_clock()
         self._hs_args = {"clock": self.clock, "reactor": self.reactor}
         self.hs = self.make_homeserver(self.reactor, self.clock)
+        self.endpoints = self._make_endpoints()
 
         if self.hs is None:
             raise Exception("No homeserver returned from make_homeserver.")
@@ -558,6 +564,38 @@ class HomeserverTestCase(TestCase):
         )
         self.render(request)
         self.assertEqual(channel.code, 403, channel.result)
+
+    def _make_endpoints(self):
+        """
+        Make a fake `twisted.internet.endpoints`.
+        """
+        connections = []
+        self.connections = connections
+
+        def connector(reactor, host, port, timeout, bindAddress):
+
+            connect = Deferred()
+
+            def _conn(factory):
+                connections.append((connect, (host, port), factory))
+                return connect
+
+            endpoint = Mock(spec=["connect"], connect=_conn)
+            return endpoint
+
+        return Mock(spec=["TCP4ClientEndpoint"], TCP4ClientEndpoint=connector)
+
+    def connect_tcp(self, id: int) -> Tuple[IProtocol, ITransport]:
+        """
+        Connect connection #id from the pending connections, and remove it.
+        """
+        protocol = self.connections[id][2].buildProtocol(None)
+        transport = StringTransport()
+        protocol.makeConnection(transport)
+        self.connections[id][0].callback(protocol)
+        self.connections.pop(id)
+
+        return protocol, transport
 
 
 def override_config(extra_config):
