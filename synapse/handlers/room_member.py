@@ -710,7 +710,6 @@ class RoomMemberHandler(object):
         Returns:
             str|None: the matrix ID of the 3pid, or None if it is not recognized.
         """
-        query_params = {}
         if id_access_token is not None:
             try:
                 results = yield self._lookup_3pid_v2(
@@ -765,9 +764,7 @@ class RoomMemberHandler(object):
         return None
 
     @defer.inlineCallbacks
-    def _lookup_3pid_v2(
-        self, id_server, id_access_token, medium, address
-    ):
+    def _lookup_3pid_v2(self, id_server, id_access_token, medium, address):
         """Looks up a 3pid in the passed identity server using v2 lookup.
 
         Args:
@@ -783,8 +780,7 @@ class RoomMemberHandler(object):
         try:
             # Check what hashing details are supported by this identity server
             hash_details = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/v2/hash_details"
-                % (id_server_scheme, id_server),
+                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
                 {"id_access_token": id_access_token},
             )
         except HttpResponseException as e:
@@ -799,14 +795,14 @@ class RoomMemberHandler(object):
         if not isinstance(hash_details, dict):
             logger.warning(
                 "Got non-dict object when checking hash details of %s%s: %s",
-                id_server_scheme, id_server,
+                id_server_scheme,
+                id_server,
                 hash_details,
             )
             raise SynapseError(
-                400, "Non-dict object from %s%s during v2 hash_details request: %s" % (
-                    id_server_scheme, id_server,
-                    hash_details,
-                )
+                400,
+                "Non-dict object from %s%s during v2 hash_details request: %s"
+                % (id_server_scheme, id_server, hash_details),
             )
 
         # Extract information from hash_details
@@ -819,10 +815,9 @@ class RoomMemberHandler(object):
             or not isinstance(lookup_pepper, str)
         ):
             raise SynapseError(
-                400, "Invalid hash details received from identity server: %s%s, %s" % (
-                    id_server_scheme, id_server,
-                    hash_details
-                )
+                400,
+                "Invalid hash details received from identity server: %s%s, %s"
+                % (id_server_scheme, id_server, hash_details),
             )
 
         # Check if any of the supported lookup algorithms are present
