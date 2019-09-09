@@ -164,7 +164,7 @@ class ServerConfig(Config):
 
         # How long to keep redacted events in the database in unredacted form
         # before redacting them.
-        redaction_retention_period = config.get("redaction_retention_period")
+        redaction_retention_period = config.get("redaction_retention_period", "7d")
         if redaction_retention_period is not None:
             self.redaction_retention_period = self.parse_duration(
                 redaction_retention_period
@@ -729,10 +729,12 @@ class ServerConfig(Config):
         #
         #allow_per_room_profiles: false
 
-        # How long to keep redacted events in unredacted form in the database.
-        # By default redactions are kept indefinitely.
+        # How long to keep redacted events in unredacted form in the database. After
+        # this period redacted events get replaced with their redacted form in the DB.
         #
-        #redaction_retention_period: 30d
+        # Defaults to `7d`. Set to `null` to disable.
+        #
+        redaction_retention_period: 7d
         """
             % locals()
         )
