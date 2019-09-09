@@ -15,6 +15,7 @@
 
 import argparse
 import errno
+from io import open
 import os
 from textwrap import dedent
 
@@ -131,7 +132,7 @@ class Config(object):
     @classmethod
     def read_file(cls, file_path, config_name):
         cls.check_file(file_path, config_name)
-        with open(file_path) as file_stream:
+        with open(file_path, encoding="utf-8") as file_stream:
             return file_stream.read()
 
     @staticmethod
