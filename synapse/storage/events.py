@@ -1559,7 +1559,8 @@ class EventsStore(
 
     @defer.inlineCallbacks
     def _censor_redactions(self):
-        """Censors all redactions older than a month that haven't been censored.
+        """Censors all redactions older than the configured period that haven't
+        been censored yet.
 
         By censor we mean update the event_json table with the redacted event.
 
@@ -1575,7 +1576,7 @@ class EventsStore(
         )
 
         # We fetch all redactions that:
-        #   1. point to an event we have that has,
+        #   1. point to an event we have,
         #   2. has a stream ordering from before the cut off, and
         #   3. we haven't yet censored.
         #
