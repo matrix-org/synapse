@@ -268,7 +268,8 @@ class EventsStore(
                 "_censor_redactions", self._censor_redactions
             )
 
-        hs.get_clock().looping_call(_censor_redactions, 10 * 60 * 1000)
+        if self.hs.config.redaction_retention_period is not None:
+            hs.get_clock().looping_call(_censor_redactions, 10 * 60 * 1000)
 
     @defer.inlineCallbacks
     def _read_forward_extremities(self):
