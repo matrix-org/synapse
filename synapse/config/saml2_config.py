@@ -48,6 +48,9 @@ class SAML2Config(Config):
             saml2_config.get("saml_session_lifetime", "5m")
         )
 
+        self.saml2_username_attestation = saml2_config.get("username_attestation", "uid")
+        self.saml2_displayname_attestation = saml2_config.get("displayname_attestation", "displayName")
+
     def _default_saml_config_dict(self):
         import saml2
 
@@ -135,6 +138,13 @@ class SAML2Config(Config):
         #  # The default is 5 minutes.
         #  #
         #  # saml_session_lifetime: 5m
+        #  #
+        #  # # The ID of the attestation that will be used for the localpart of the user's Matrix ID
+        #  # # Deafault: 'uid'
+        #  # username_attestation: "uid"
+        #  #
+        #  # # The ID of the attestation that will be used for the user's display name. Default: 'displayName'
+        #  # displayname_attestation: "displayName"
         """ % {
             "config_dir_path": config_dir_path
         }

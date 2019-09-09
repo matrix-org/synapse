@@ -35,6 +35,8 @@ class SamlHandler:
 
         self._clock = hs.get_clock()
         self._saml2_session_lifetime = hs.config.saml2_session_lifetime
+        self.saml2_username_attestation = hs.config.saml2_username_attestation
+        self.saml2_displayname_attestation = hs.config.saml2_displayname_attestation
 
     def handle_redirect_request(self, client_redirect_url):
         """Handle an incoming request to /login/sso/redirect
@@ -91,14 +93,14 @@ class SamlHandler:
             logger.warning("SAML2 response was not signed")
             raise SynapseError(400, "SAML2 response was not signed")
 
-        if "uid" not in saml2_auth.ava:
-            logger.warning("SAML2 response lacks a 'uid' attestation")
-            raise SynapseError(400, "uid not in SAML2 response")
+        if self.saml2_username_attestation not in saml2_auth.ava:
+            logger.warning("SAML2 response lacks a '%s' attestation", self.saml2_username_attestation)
+            raise SynapseError(400, "username attestation not in SAML2 response")
 
         self._outstanding_requests_dict.pop(saml2_auth.in_response_to, None)
 
-        username = saml2_auth.ava["uid"][0]
-        displayName = saml2_auth.ava.get("displayName", [None])[0]
+        username = saml2_auth.ava[self.saml2_username_attestation][0]
+        displayName = saml2_auth.ava.get(self.saml2_displayname_attestation, [None])[0]
 
         return self._sso_auth_handler.on_successful_auth(
             username, request, relay_state, user_display_name=displayName
