@@ -15,8 +15,8 @@
 
 import argparse
 import errno
-from io import open
 import os
+from io import open
 from textwrap import dedent
 
 from six import integer_types
