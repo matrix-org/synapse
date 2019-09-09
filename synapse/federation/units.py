@@ -41,6 +41,9 @@ class Edu(JsonEncodedObject):
     def get_context(self):
         return getattr(self, "content", {}).get("org.matrix.opentracing_context", "{}")
 
+    def strip_context(self):
+        getattr(self, "content", {})["org.matrix.opentracing_context"] = "{}"
+
 
 class Transaction(JsonEncodedObject):
     """ A transaction is a list of Pdus and Edus to be sent to a remote home

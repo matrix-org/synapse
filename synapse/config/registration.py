@@ -99,6 +99,10 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config.get(
             "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
+        account_threepid_delegates = config.get("account_threepid_delegates") or {}
+        self.account_threepid_delegate_email = account_threepid_delegates.get("email")
+        self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
+
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
@@ -257,9 +261,41 @@ class RegistrationConfig(Config):
         # Also defines the ID server which will be called when an account is
         # deactivated (one will be picked arbitrarily).
         #
+        # Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
+        # server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
+        # background migration script, informing itself that the identity server all of its
+        # 3PIDs have been bound to is likely one of the below.
+        #
+        # As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
+        # it is now solely used for the purposes of the background migration script, and can be
+        # removed once it has run.
         #trusted_third_party_id_servers:
         #  - matrix.org
         #  - vector.im
+
+        # Handle threepid (email/phone etc) registration and password resets through a set of
+        # *trusted* identity servers. Note that this allows the configured identity server to
+        # reset passwords for accounts!
+        #
+        # Be aware that if `email` is not set, and SMTP options have not been
+        # configured in the email config block, registration and user password resets via
+        # email will be globally disabled.
+        #
+        # Additionally, if `msisdn` is not set, registration and password resets via msisdn
+        # will be disabled regardless. This is due to Synapse currently not supporting any
+        # method of sending SMS messages on its own.
+        #
+        # To enable using an identity server for operations regarding a particular third-party
+        # identifier type, set the value to the URL of that identity server as shown in the
+        # examples below.
+        #
+        # Servers handling the these requests must answer the `/requestToken` endpoints defined
+        # by the Matrix Identity Service API specification:
+        # https://matrix.org/docs/spec/identity_service/latest
+        #
+        account_threepid_delegates:
+            #email: https://example.com     # Delegate email sending to matrix.org
+            #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms

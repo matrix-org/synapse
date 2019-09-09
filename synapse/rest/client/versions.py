@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 class VersionsRestServlet(RestServlet):
     PATTERNS = [re.compile("^/_matrix/client/versions$")]
 
+    def __init__(self, hs):
+        super(VersionsRestServlet, self).__init__()
+        self.config = hs.config
+
     def on_GET(self, request):
         return (
             200,
@@ -49,5 +53,5 @@ class VersionsRestServlet(RestServlet):
         )
 
 
-def register_servlets(http_server):
-    VersionsRestServlet().register(http_server)
+def register_servlets(hs, http_server):
+    VersionsRestServlet(hs).register(http_server)
