@@ -48,8 +48,12 @@ class SAML2Config(Config):
             saml2_config.get("saml_session_lifetime", "5m")
         )
 
-        self.saml2_username_attestation = saml2_config.get("username_attestation", "uid")
-        self.saml2_displayname_attestation = saml2_config.get("displayname_attestation", "displayName")
+        self.saml2_username_attestation = saml2_config.get(
+            "username_attestation", "uid"
+        )
+        self.saml2_displayname_attestation = saml2_config.get(
+            "displayname_attestation", "displayName"
+        )
 
     def _default_saml_config_dict(self):
         import saml2

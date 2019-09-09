@@ -94,7 +94,10 @@ class SamlHandler:
             raise SynapseError(400, "SAML2 response was not signed")
 
         if self.saml2_username_attestation not in saml2_auth.ava:
-            logger.warning("SAML2 response lacks a '%s' attestation", self.saml2_username_attestation)
+            logger.warning(
+                "SAML2 response lacks a '%s' attestation",
+                self.saml2_username_attestation,
+            )
             raise SynapseError(400, "username attestation not in SAML2 response")
 
         self._outstanding_requests_dict.pop(saml2_auth.in_response_to, None)
