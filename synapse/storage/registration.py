@@ -449,9 +449,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         """Counts all users without a special user_type registered on the homeserver."""
 
         def _count_users(txn):
-            txn.execute(
-                "SELECT COUNT(*) AS users FROM users where user_type is null"
-            )
+            txn.execute("SELECT COUNT(*) AS users FROM users where user_type is null")
             rows = self.cursor_to_dict(txn)
             if rows:
                 return rows[0]["users"]
