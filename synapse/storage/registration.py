@@ -450,7 +450,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         def _count_users(txn):
             txn.execute(
-                "SELECT COUNT(*) AS users FROM users where user_type is null or user_type = ''"
+                "SELECT COUNT(*) AS users FROM users where user_type is null"
             )
             rows = self.cursor_to_dict(txn)
             if rows:
