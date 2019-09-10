@@ -1035,7 +1035,7 @@ class RoomMemberHandler(object):
         # Add the identity service access token to the JSON body and use the v2
         # Identity Service endpoints if id_access_token is present
         if id_access_token:
-            invite_config["id_access_token"] = id_access_token
+            invite_config["access_token"] = id_access_token
             is_url = "%s%s/_matrix/identity/v2/store-invite" % (
                 id_server_scheme,
                 id_server,
