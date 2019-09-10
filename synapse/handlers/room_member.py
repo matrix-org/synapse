@@ -781,7 +781,7 @@ class RoomMemberHandler(object):
             # Check what hashing details are supported by this identity server
             hash_details = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
-                {"id_access_token": id_access_token},
+                {"access_token": id_access_token},
             )
         except HttpResponseException as e:
             if e.code == 404:
@@ -852,7 +852,7 @@ class RoomMemberHandler(object):
             lookup_results = yield self.simple_http_client.post_json_get_json(
                 "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
                 {
-                    "id_access_token": id_access_token,
+                    "access_token": id_access_token,
                     "addresses": [lookup_value],
                     "algorithm": lookup_algorithm,
                     "pepper": lookup_pepper,
