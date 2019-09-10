@@ -173,6 +173,7 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
+            # netaddr is a dependency for url_preview
             from netaddr import IPSet
 
             self.url_preview_ip_range_blacklist = IPSet(
