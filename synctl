@@ -71,7 +71,19 @@ def abort(message, colour=RED, stream=sys.stderr):
     sys.exit(1)
 
 
-def start(configfile, daemonize=True):
+def start(configfile: str, daemonize=True) -> bool:
+    """Attempts to start synapse.
+    Args:
+        configfile: path to a yaml synapse config file
+        daemonize: whether to daemonize synapse or keep it attached to the current
+            session
+
+    Returns:
+        boolean stating whether synapse started successfully if daemonize is True
+
+        doesn't return unless interupted if daemonize is false.
+    """
+
     write("Starting ...")
     args = SYNAPSE
 
@@ -83,27 +95,39 @@ def start(configfile, daemonize=True):
     try:
         subprocess.check_call(args)
         write("started synapse.app.homeserver(%r)" % (configfile,), colour=GREEN)
+        return True
     except subprocess.CalledProcessError as e:
         write(
             "error starting (exit code: %d); see above for logs" % e.returncode,
             colour=RED,
         )
-        raise
+        return False
 
 
-def start_worker(app, configfile, worker_configfile):
+def start_worker(app: str, configfile: str, worker_configfile: str) -> bool:
+    """Attempts to start a synapse worker.
+    Args:
+        app: name of the worker's appservice
+        configfile: path to a yaml synapse config file
+        worker_configfile: path to worker specific yaml synapse file
+
+    Returns:
+        boolean stating whether synapse started successfully if daemonize is True
+    """
+
     args = [sys.executable, "-B", "-m", app, "-c", configfile, "-c", worker_configfile]
 
     try:
         subprocess.check_call(args)
         write("started %s(%r)" % (app, worker_configfile), colour=GREEN)
+        return True
     except subprocess.CalledProcessError as e:
         write(
             "error starting %s(%r) (exit code: %d); see above for logs"
             % (app, worker_configfile, e.returncode),
             colour=RED,
         )
-        raise
+        return False
 
 
 def stop(pidfile, app):
@@ -299,10 +323,7 @@ def main():
             # Check if synapse is already running
             if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
                 abort("synapse.app.homeserver already running")
-            try:
-                start(configfile, bool(options.daemonize))
-            except subprocess.CalledProcessError:
-                errors += 1
+                errors += int(start(configfile, bool(options.daemonize)))
 
         for worker in workers:
             env = os.environ.copy()
@@ -313,10 +334,7 @@ def main():
             for cache_name, factor in iteritems(worker.cache_factors):
                 os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
 
-            try:
-                start_worker(worker.app, configfile, worker.configfile)
-            except subprocess.CalledProcessError:
-                errors += 1
+                errors += int(start_worker(worker.app, configfile, worker.configfile))
 
             # Reset env back to the original
             os.environ.clear()
