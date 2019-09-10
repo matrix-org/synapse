@@ -29,6 +29,7 @@ from synapse.api.errors import (
     HttpResponseException,
     SynapseError,
 )
+from synapse.util.stringutils import random_string
 
 from ._base import BaseHandler
 
@@ -41,25 +42,7 @@ class IdentityHandler(BaseHandler):
 
         self.http_client = hs.get_simple_http_client()
         self.federation_http_client = hs.get_http_client()
-
-        self.trusted_id_servers = set(hs.config.trusted_third_party_id_servers)
-        self.trust_any_id_server_just_for_testing_do_not_use = (
-            hs.config.use_insecure_ssl_client_just_for_testing_do_not_use
-        )
-
-    def _should_trust_id_server(self, id_server):
-        if id_server not in self.trusted_id_servers:
-            if self.trust_any_id_server_just_for_testing_do_not_use:
-                logger.warn(
-                    "Trusting untrustworthy ID server %r even though it isn't"
-                    " in the trusted id list for testing because"
-                    " 'use_insecure_ssl_client_just_for_testing_do_not_use'"
-                    " is set in the config",
-                    id_server,
-                )
-            else:
-                return False
-        return True
+        self.hs = hs
 
     def _extract_items_from_creds_dict(self, creds):
         """
@@ -132,13 +115,6 @@ class IdentityHandler(BaseHandler):
                 "/_matrix/identity/api/v1/3pid/getValidated3pid",
             )
 
-        if not self._should_trust_id_server(id_server):
-            logger.warn(
-                "%s is not a trusted ID server: rejecting 3pid " + "credentials",
-                id_server,
-            )
-            return None
-
         try:
             data = yield self.http_client.get_json(url, query_params)
             return data if "medium" in data else None
@@ -175,12 +151,18 @@ class IdentityHandler(BaseHandler):
             creds
         )
 
+        sid = creds.get("sid")
+        if not sid:
+            raise SynapseError(
+                400, "No sid in three_pid_creds", errcode=Codes.MISSING_PARAM
+            )
+
         # If an id_access_token is not supplied, force usage of v1
         if id_access_token is None:
             use_v2 = False
 
         # Decide which API endpoint URLs to use
-        bind_data = {"sid": creds["sid"], "client_secret": client_secret, "mxid": mxid}
+        bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
         if use_v2:
             bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server,)
             bind_data["id_access_token"] = id_access_token
@@ -306,27 +288,121 @@ class IdentityHandler(BaseHandler):
         return changed
 
     @defer.inlineCallbacks
+    def send_threepid_validation(
+        self,
+        email_address,
+        client_secret,
+        send_attempt,
+        send_email_func,
+        next_link=None,
+    ):
+        """Send a threepid validation email for password reset or
+        registration purposes
+
+        Args:
+            email_address (str): The user's email address
+            client_secret (str): The provided client secret
+            send_attempt (int): Which send attempt this is
+            send_email_func (func): A function that takes an email address, token,
+                                    client_secret and session_id, sends an email
+                                    and returns a Deferred.
+            next_link (str|None): The URL to redirect the user to after validation
+
+        Returns:
+            The new session_id upon success
+
+        Raises:
+            SynapseError is an error occurred when sending the email
+        """
+        # Check that this email/client_secret/send_attempt combo is new or
+        # greater than what we've seen previously
+        session = yield self.store.get_threepid_validation_session(
+            "email", client_secret, address=email_address, validated=False
+        )
+
+        # Check to see if a session already exists and that it is not yet
+        # marked as validated
+        if session and session.get("validated_at") is None:
+            session_id = session["session_id"]
+            last_send_attempt = session["last_send_attempt"]
+
+            # Check that the send_attempt is higher than previous attempts
+            if send_attempt <= last_send_attempt:
+                # If not, just return a success without sending an email
+                return session_id
+        else:
+            # An non-validated session does not exist yet.
+            # Generate a session id
+            session_id = random_string(16)
+
+        # Generate a new validation token
+        token = random_string(32)
+
+        # Send the mail with the link containing the token, client_secret
+        # and session_id
+        try:
+            yield send_email_func(email_address, token, client_secret, session_id)
+        except Exception:
+            logger.exception(
+                "Error sending threepid validation email to %s", email_address
+            )
+            raise SynapseError(500, "An error was encountered when sending the email")
+
+        token_expires = (
+            self.hs.clock.time_msec() + self.hs.config.email_validation_token_lifetime
+        )
+
+        yield self.store.start_or_continue_validation_session(
+            "email",
+            email_address,
+            session_id,
+            client_secret,
+            send_attempt,
+            next_link,
+            token,
+            token_expires,
+        )
+
+        return session_id
+
+    @defer.inlineCallbacks
     def requestEmailToken(
         self, id_server, email, client_secret, send_attempt, next_link=None
     ):
-        if not self._should_trust_id_server(id_server):
-            raise SynapseError(
-                400, "Untrusted ID server '%s'" % id_server, Codes.SERVER_NOT_TRUSTED
-            )
+        """
+        Request an external server send an email on our behalf for the purposes of threepid
+        validation.
 
+        Args:
+            id_server (str): The identity server to proxy to
+            email (str): The email to send the message to
+            client_secret (str): The unique client_secret sends by the user
+            send_attempt (int): Which attempt this is
+            next_link: A link to redirect the user to once they submit the token
+
+        Returns:
+            The json response body from the server
+        """
         params = {
             "email": email,
             "client_secret": client_secret,
             "send_attempt": send_attempt,
         }
-
         if next_link:
-            params.update({"next_link": next_link})
+            params["next_link"] = next_link
+
+        if self.hs.config.using_identity_server_from_trusted_list:
+            # Warn that a deprecated config option is in use
+            logger.warn(
+                'The config option "trust_identity_server_for_password_resets" '
+                'has been replaced by "account_threepid_delegate". '
+                "Please consult the sample config at docs/sample_config.yaml for "
+                "details and update your config file."
+            )
 
         try:
             data = yield self.http_client.post_json_get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/validate/email/requestToken"),
+                id_server + "/_matrix/identity/api/v1/validate/email/requestToken",
                 params,
             )
             return data
@@ -336,25 +412,49 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
-        self, id_server, country, phone_number, client_secret, send_attempt, **kwargs
+        self,
+        id_server,
+        country,
+        phone_number,
+        client_secret,
+        send_attempt,
+        next_link=None,
     ):
-        if not self._should_trust_id_server(id_server):
-            raise SynapseError(
-                400, "Untrusted ID server '%s'" % id_server, Codes.SERVER_NOT_TRUSTED
-            )
+        """
+        Request an external server send an SMS message on our behalf for the purposes of
+        threepid validation.
+        Args:
+            id_server (str): The identity server to proxy to
+            country (str): The country code of the phone number
+            phone_number (str): The number to send the message to
+            client_secret (str): The unique client_secret sends by the user
+            send_attempt (int): Which attempt this is
+            next_link: A link to redirect the user to once they submit the token
 
+        Returns:
+            The json response body from the server
+        """
         params = {
             "country": country,
             "phone_number": phone_number,
             "client_secret": client_secret,
             "send_attempt": send_attempt,
         }
-        params.update(kwargs)
+        if next_link:
+            params["next_link"] = next_link
+
+        if self.hs.config.using_identity_server_from_trusted_list:
+            # Warn that a deprecated config option is in use
+            logger.warn(
+                'The config option "trust_identity_server_for_password_resets" '
+                'has been replaced by "account_threepid_delegate". '
+                "Please consult the sample config at docs/sample_config.yaml for "
+                "details and update your config file."
+            )
 
         try:
             data = yield self.http_client.post_json_get_json(
-                "https://%s%s"
-                % (id_server, "/_matrix/identity/api/v1/validate/msisdn/requestToken"),
+                id_server + "/_matrix/identity/api/v1/validate/msisdn/requestToken",
                 params,
             )
             return data

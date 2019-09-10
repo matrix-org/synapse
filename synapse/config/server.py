@@ -162,6 +162,16 @@ class ServerConfig(Config):
 
         self.mau_trial_days = config.get("mau_trial_days", 0)
 
+        # How long to keep redacted events in the database in unredacted form
+        # before redacting them.
+        redaction_retention_period = config.get("redaction_retention_period", "7d")
+        if redaction_retention_period is not None:
+            self.redaction_retention_period = self.parse_duration(
+                redaction_retention_period
+            )
+        else:
+            self.redaction_retention_period = None
+
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
         self.hs_disabled_message = config.get("hs_disabled_message", "")
@@ -718,6 +728,13 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #allow_per_room_profiles: false
+
+        # How long to keep redacted events in unredacted form in the database. After
+        # this period redacted events get replaced with their redacted form in the DB.
+        #
+        # Defaults to `7d`. Set to `null` to disable.
+        #
+        redaction_retention_period: 7d
         """
             % locals()
         )
