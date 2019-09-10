@@ -150,6 +150,8 @@ def check_requirements(for_feature=None):
             errors.append(
                 "Needed %s for the '%s' feature but it was not installed"
                 % (dependency, for_feature)
+                if for_feature
+                else "Needed %s but it was not installed" % (dependency,)
             )
 
     if not for_feature:
