@@ -274,7 +274,7 @@ class RoomAccessRules(object):
         # Make sure we don't apply "direct" if the room has more than two members.
         if new_rule == ACCESS_RULE_DIRECT:
             existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
-                state_events,
+                state_events
             )
 
             if len(existing_members) > 2 or len(threepid_tokens) > 1:
@@ -365,7 +365,7 @@ class RoomAccessRules(object):
         """
         # Get the room memberships and 3PID invite tokens from the room's state.
         existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
-            state_events,
+            state_events
         )
 
         # There should never be more than one 3PID invite in the room state: if the second
@@ -374,8 +374,12 @@ class RoomAccessRules(object):
         # join the first time), Synapse will successfully look it up before attempting to
         # store an invite on the IS.
         if len(threepid_tokens) == 1 and event.type == EventTypes.ThirdPartyInvite:
-            # If we already have a 3PID invite in flight, don't accept another one.
-            return False
+            # If we already have a 3PID invite in flight, don't accept another one, unless
+            # the new one has the same invite token as its state key. This is because 3PID
+            # invite revocations must be allowed, and a revocation is basically a new 3PID
+            # invite event with an empty content and the same token as the invite it
+            # revokes.
+            return event.state_key in threepid_tokens
 
         if len(existing_members) == 2:
             # If the user was within the two initial user of the room, Synapse would have
@@ -557,11 +561,12 @@ class RoomAccessRules(object):
         """
         existing_members = []
         threepid_invite_tokens = []
-        for key, event in state_events.items():
-            if key[0] == EventTypes.Member:
-                existing_members.append(event.state_key)
-            if key[0] == EventTypes.ThirdPartyInvite:
-                threepid_invite_tokens.append(event.state_key)
+        for key, state_event in state_events.items():
+            if key[0] == EventTypes.Member and state_event.content:
+                existing_members.append(state_event.state_key)
+            if key[0] == EventTypes.ThirdPartyInvite and state_event.content:
+                # Don't include revoked invites.
+                threepid_invite_tokens.append(state_event.state_key)
 
         return existing_members, threepid_invite_tokens
 

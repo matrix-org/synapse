@@ -588,6 +588,54 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             expect_code=403,
         )
 
+    def test_revoke_3pid_invite_direct(self):
+        """Tests that revoking a 3PID invite doesn't cause the room access rules module to
+        confuse the revokation as a new 3PID invite.
+        """
+        invite_token = "sometoken"
+
+        invite_body = {
+            "display_name": "ker...@exa...",
+            "public_keys": [
+                {
+                    "key_validity_url": "https://validity_url",
+                    "public_key": "ta8IQ0u1sp44HVpxYi7dFOdS/bfwDjcy4xLFlfY5KOA"
+                },
+                {
+                    "key_validity_url": "https://validity_url",
+                    "public_key": "4_9nzEeDwR5N9s51jPodBiLnqH43A2_g2InVT137t9I"
+                }
+            ],
+            "key_validity_url": "https://validity_url",
+            "public_key": "ta8IQ0u1sp44HVpxYi7dFOdS/bfwDjcy4xLFlfY5KOA"
+        }
+
+        self.send_state_with_state_key(
+            room_id=self.direct_rooms[1],
+            event_type=EventTypes.ThirdPartyInvite,
+            state_key=invite_token,
+            body=invite_body,
+            tok=self.tok,
+        )
+
+        self.send_state_with_state_key(
+            room_id=self.direct_rooms[1],
+            event_type=EventTypes.ThirdPartyInvite,
+            state_key=invite_token,
+            body={},
+            tok=self.tok,
+        )
+
+        invite_token = "someothertoken"
+
+        self.send_state_with_state_key(
+            room_id=self.direct_rooms[1],
+            event_type=EventTypes.ThirdPartyInvite,
+            state_key=invite_token,
+            body=invite_body,
+            tok=self.tok,
+        )
+
     def create_room(
         self, direct=False, rule=None, preset=RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
         initial_state=None, expected_code=200,
@@ -679,3 +727,19 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
+
+    def send_state_with_state_key(
+        self, room_id, event_type, state_key, body, tok, expect_code=200
+    ):
+        path = "/_matrix/client/r0/rooms/%s/state/%s/%s" % (
+            room_id, event_type, state_key
+        )
+
+        request, channel = self.make_request(
+            "PUT", path, json.dumps(body), access_token=tok
+        )
+        self.render(request)
+
+        self.assertEqual(channel.code, expect_code, channel.result)
+
+        return channel.json_body
