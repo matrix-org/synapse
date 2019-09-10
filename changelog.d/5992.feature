@@ -1,1 +1,1 @@
-Give appropriate exit codes when syctl fails.
+Give appropriate exit codes when synctl fails.
