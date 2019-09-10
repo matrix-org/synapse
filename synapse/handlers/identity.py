@@ -84,8 +84,8 @@ class IdentityHandler(BaseHandler):
             id_server (str|None): The identity server to validate 3PIDs against. If None,
                 we will attempt to extract id_server creds
 
-            creds (dict[str, str]): Dictionary containing the following key:
-                * id_server: An optional domain name of an identity server
+            creds (dict[str, str]): Dictionary containing the following keys:
+                * id_server|idServer: An optional domain name of an identity server
                 * client_secret|clientSecret: A unique secret str provided by the client
                 * sid: The ID of the validation session
 
@@ -106,7 +106,7 @@ class IdentityHandler(BaseHandler):
             )
         if not id_server:
             # Attempt to get the id_server from the creds dict
-            id_server = creds.get("id_server")
+            id_server = creds.get("id_server") or creds.get("idServer")
             if not id_server:
                 raise SynapseError(
                     400, "Missing param id_server in creds", errcode=Codes.MISSING_PARAM
