@@ -31,13 +31,13 @@ class TracerConfig(Config):
             {"sampler": {"type": "const", "param": 1}, "logging": False},
         )
 
-        if self.opentracer_enabled:
-            try:
-                check_requirements("opentracing")
-            except DependencyException as e:
-                raise ConfigError(e.message)
-        else:
+        if not self.opentracer_enabled:
             return
+
+        try:
+            check_requirements("opentracing")
+        except DependencyException as e:
+            raise ConfigError(e.message)
 
         # The tracer is enabled so sanitize the config
 
