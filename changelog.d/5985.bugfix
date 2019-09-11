@@ -1,1 +1,0 @@
-Fix synapse workers turinging into a zombie processes if opentracing is enabled in the config but not installed.
