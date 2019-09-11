@@ -22,6 +22,7 @@ from prometheus_client import Counter
 from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
+from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
 
@@ -194,7 +195,17 @@ class HttpPusher(object):
         )
 
         for push_action in unprocessed:
-            processed = yield self._process_one(push_action)
+            with opentracing.start_active_span(
+                "http-push",
+                tags={
+                    "authenticated_entity": self.user_id,
+                    "event_id": push_action["event_id"],
+                    "app_id": self.app_id,
+                    "app_display_name": self.app_display_name,
+                },
+            ):
+                processed = yield self._process_one(push_action)
+
             if processed:
                 http_push_processed_counter.inc()
                 self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
