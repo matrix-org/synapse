@@ -29,7 +29,7 @@ from twisted.internet import defer
 from synapse import types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, HttpResponseException, SynapseError
-from synapse.handlers.identity import LookupAlgorithm
+from synapse.handlers.identity import LookupAlgorithm, create_id_access_token_header
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -839,15 +839,18 @@ class RoomMemberHandler(object):
                 "algorithms that this homeserver supports.",
             )
 
+        # Authenticate with identity server given the access token from the client
+        headers = {"Authorization": create_id_access_token_header(id_access_token)}
+
         try:
             lookup_results = yield self.simple_http_client.post_json_get_json(
                 "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
                 {
-                    "access_token": id_access_token,
                     "addresses": [lookup_value],
                     "algorithm": lookup_algorithm,
                     "pepper": lookup_pepper,
                 },
+                headers=headers,
             )
         except Exception as e:
             logger.warning("Error when performing a v2 3pid lookup: %s", e)
