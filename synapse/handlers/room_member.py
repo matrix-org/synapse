@@ -1034,8 +1034,9 @@ class RoomMemberHandler(object):
 
         # Add the identity service access token to the JSON body and use the v2
         # Identity Service endpoints if id_access_token is present
+        headers = {}
         if id_access_token:
-            invite_config["access_token"] = id_access_token
+            headers["Authorization"] = create_id_access_token_header(id_access_token)
             is_url = "%s%s/_matrix/identity/v2/store-invite" % (
                 id_server_scheme,
                 id_server,
@@ -1057,7 +1058,7 @@ class RoomMemberHandler(object):
         fallback_to_v1 = False
         try:
             data = yield self.simple_http_client.post_json_get_json(
-                is_url, invite_config
+                is_url, invite_config, headers
             )
         except HttpResponseException as e:
             if id_access_token and e.code == 404:
