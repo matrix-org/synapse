@@ -729,7 +729,13 @@ class EventCreationHandler(object):
         assert not self.config.worker_app
 
         if ratelimit:
-            yield self.base_handler.ratelimit(requester)
+            is_admin_redaction = (
+                event.type == EventTypes.Redaction
+                and event.sender != requester.user.to_string()
+            )
+            yield self.base_handler.ratelimit(
+                requester, is_admin_redaction=is_admin_redaction
+            )
 
         yield self.base_handler.maybe_kick_guest_users(event, context)
 

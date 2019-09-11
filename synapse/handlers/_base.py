@@ -45,6 +45,7 @@ class BaseHandler(object):
         self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
         self.ratelimiter = hs.get_ratelimiter()
+        self.admin_redaction_ratelimiter = hs.get_admin_redaction_ratelimiter()
         self.clock = hs.get_clock()
         self.hs = hs
 
@@ -53,7 +54,7 @@ class BaseHandler(object):
         self.event_builder_factory = hs.get_event_builder_factory()
 
     @defer.inlineCallbacks
-    def ratelimit(self, requester, update=True):
+    def ratelimit(self, requester, update=True, is_admin_redaction=False):
         """Ratelimits requests.
 
         Args:
@@ -62,6 +63,9 @@ class BaseHandler(object):
                 Set to False when doing multiple checks for one request (e.g.
                 to check up front if we would reject the request), and set to
                 True for the last call for a given request.
+            is_admin_redaction (bool): Whether this is a room admin/moderator
+                redacting an event. If so then we may apply different
+                ratelimits depending on config.
 
         Raises:
             LimitExceededError if the request should be ratelimited
@@ -90,16 +94,33 @@ class BaseHandler(object):
             messages_per_second = override.messages_per_second
             burst_count = override.burst_count
         else:
-            messages_per_second = self.hs.config.rc_message.per_second
-            burst_count = self.hs.config.rc_message.burst_count
+            # We default to different values if this is an admin redaction and
+            # the config is set
+            if is_admin_redaction and self.hs.config.rc_admin_redaction:
+                messages_per_second = self.hs.config.rc_admin_redaction.per_second
+                burst_count = self.hs.config.rc_admin_redaction.burst_count
+            else:
+                messages_per_second = self.hs.config.rc_message.per_second
+                burst_count = self.hs.config.rc_message.burst_count
 
-        allowed, time_allowed = self.ratelimiter.can_do_action(
-            user_id,
-            time_now,
-            rate_hz=messages_per_second,
-            burst_count=burst_count,
-            update=update,
-        )
+        if is_admin_redaction and self.hs.config.rc_admin_redaction:
+            # If we have separate config for admin redactions we use a separate
+            # ratelimiter.
+            allowed, time_allowed = self.admin_redaction_ratelimiter.can_do_action(
+                user_id,
+                time_now,
+                rate_hz=messages_per_second,
+                burst_count=burst_count,
+                update=update,
+            )
+        else:
+            allowed, time_allowed = self.ratelimiter.can_do_action(
+                user_id,
+                time_now,
+                rate_hz=messages_per_second,
+                burst_count=burst_count,
+                update=update,
+            )
         if not allowed:
             raise LimitExceededError(
                 retry_after_ms=int(1000 * (time_allowed - time_now))
