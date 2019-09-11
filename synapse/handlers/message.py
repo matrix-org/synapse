@@ -731,7 +731,7 @@ class EventCreationHandler(object):
         if ratelimit:
             # We check if this is a room admin redacting an event so that we
             # can apply different ratelimiting. We do this by simply checking
-            # its not a self-redaction (to avoid having to look up whether the
+            # it's not a self-redaction (to avoid having to look up whether the
             # user is actually admin or not).
             is_admin_redaction = False
             if event.type == EventTypes.Redaction:

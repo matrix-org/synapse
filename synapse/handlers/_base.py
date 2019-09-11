@@ -105,7 +105,7 @@ class BaseHandler(object):
 
         if is_admin_redaction and self.hs.config.rc_admin_redaction:
             # If we have separate config for admin redactions we use a separate
-            # ratelimiter.
+            # ratelimiter
             allowed, time_allowed = self.admin_redaction_ratelimiter.can_do_action(
                 user_id,
                 time_now,

@@ -110,7 +110,7 @@ class RatelimitConfig(Config):
         #     attempts for this account.
         #   - one for ratelimiting redactions by room admins. If this is not explicitly
         #     set then it uses the same ratelimiting as per rc_message. This is useful
-        #     to allow room admins to quickly deal with abuse quickly.
+        #     to allow room admins to deal with abuse quickly.
         #
         # The defaults are as shown below.
         #
