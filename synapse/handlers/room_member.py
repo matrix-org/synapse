@@ -777,20 +777,11 @@ class RoomMemberHandler(object):
         Returns:
             Deferred[str|None]: the matrix ID of the 3pid, or None if it is not recognised.
         """
-        try:
-            # Check what hashing details are supported by this identity server
-            hash_details = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
-                {"access_token": id_access_token},
-            )
-        except HttpResponseException as e:
-            if e.code == 404:
-                raise
-
-            logger.warning("Error when performing a v2 hash_details request: %s", e)
-            raise SynapseError(
-                500, "Unknown error occurred during identity server lookup"
-            )
+        # Check what hashing details are supported by this identity server
+        hash_details = yield self.simple_http_client.get_json(
+            "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
+            {"access_token": id_access_token},
+        )
 
         if not isinstance(hash_details, dict):
             logger.warning(
@@ -816,7 +807,7 @@ class RoomMemberHandler(object):
         ):
             raise SynapseError(
                 400,
-                "Invalid hash details received from identity server: %s%s, %s"
+                "Invalid hash details received from identity server %s%s: %s"
                 % (id_server_scheme, id_server, hash_details),
             )
 
@@ -843,7 +834,7 @@ class RoomMemberHandler(object):
                 supported_lookup_algorithms,
             )
             raise SynapseError(
-                500,
+                400,
                 "Provided identity server does not support any v2 lookup "
                 "algorithms that this homeserver supports.",
             )
