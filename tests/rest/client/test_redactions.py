@@ -30,6 +30,14 @@ class RedactionsTestCase(HomeserverTestCase):
         sync.register_servlets,
     ]
 
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+
+        config["rc_message"] = {"per_second": 0.2, "burst_count": 10}
+        config["rc_admin_redaction"] = {"per_second": 1, "burst_count": 100}
+
+        return self.setup_test_homeserver(config=config)
+
     def prepare(self, reactor, clock, hs):
         # register a couple of users
         self.mod_user_id = self.register_user("user1", "pass")
@@ -177,3 +185,20 @@ class RedactionsTestCase(HomeserverTestCase):
         self._redact_event(
             self.other_access_token, self.room_id, create_event_id, expect_code=403
         )
+
+    def test_redact_event_as_moderator_ratelimit(self):
+        """Tests that the correct ratelimiting is applied to redactions
+        """
+
+        message_ids = []
+        # as a regular user, send messages to redact
+        for _ in range(20):
+            b = self.helper.send(room_id=self.room_id, tok=self.other_access_token)
+            message_ids.append(b["event_id"])
+            self.reactor.advance(10)  # To get around ratelimits
+
+        # as the moderator, send a bunch of redactions redaction
+        for msg_id in message_ids:
+            # These should all succeed, even though this would be denied by
+            # standard message ratelimiter
+            self._redact_event(self.mod_access_token, self.room_id, msg_id)
