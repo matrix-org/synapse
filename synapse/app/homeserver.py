@@ -561,7 +561,9 @@ def run(hs):
 
         stats["database_engine"] = hs.get_datastore().database_engine_name
         stats["database_server_version"] = hs.get_datastore().get_server_version()
-        logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
+        logger.info(
+            "Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats)
+        )
         try:
             yield hs.get_simple_http_client().put_json(
                 hs.config.report_stats_endpoint, stats

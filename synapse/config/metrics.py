@@ -39,7 +39,9 @@ class MetricsConfig(Config):
     def read_config(self, config, **kwargs):
         self.enable_metrics = config.get("enable_metrics", False)
         self.report_stats = config.get("report_stats", None)
-        self.report_stats_endpoint = config.get("report_stats_endpoint", "https://matrix.org/report-usage-stats/push")
+        self.report_stats_endpoint = config.get(
+            "report_stats_endpoint", "https://matrix.org/report-usage-stats/push"
+        )
         self.metrics_port = config.get("metrics_port")
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
 
@@ -98,8 +100,10 @@ class MetricsConfig(Config):
         else:
             res += "report_stats: %s\n" % ("true" if report_stats else "false")
 
-        res += """\
+        res += """
         # The endpoint to report the anonymized homeserver usage statistics to.
+        # Defaults to https://matrix.org/report-usage-stats/push
+        #
         #report_stats_endpoint: https://example.com/report-usage-stats/push
         """
         return res
