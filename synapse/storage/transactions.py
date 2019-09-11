@@ -250,26 +250,6 @@ class TransactionStore(SQLBaseStore):
                 },
             )
 
-    def get_destinations_needing_retry(self):
-        """Get all destinations which are due a retry for sending a transaction.
-
-        Returns:
-            list: A list of dicts
-        """
-
-        return self.runInteraction(
-            "get_destinations_needing_retry", self._get_destinations_needing_retry
-        )
-
-    def _get_destinations_needing_retry(self, txn):
-        query = (
-            "SELECT * FROM destinations"
-            " WHERE retry_last_ts > 0 and retry_next_ts < ?"
-        )
-
-        txn.execute(query, (self._clock.time_msec(),))
-        return self.cursor_to_dict(txn)
-
     def _start_cleanup_transactions(self):
         return run_as_background_process(
             "cleanup_transactions", self._cleanup_transactions
