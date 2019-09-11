@@ -80,6 +80,12 @@ class RatelimitConfig(Config):
             "federation_rr_transactions_per_room_per_second", 50
         )
 
+        rc_admin_redaction = config.get("rc_admin_redaction")
+        if rc_admin_redaction:
+            self.rc_admin_redaction = RateLimitConfig(rc_admin_redaction)
+        else:
+            self.rc_admin_redaction = None
+
     def generate_config_section(self, **kwargs):
         return """\
         ## Ratelimiting ##
@@ -102,6 +108,9 @@ class RatelimitConfig(Config):
         #   - one for login that ratelimits login requests based on the account the
         #     client is attempting to log into, based on the amount of failed login
         #     attempts for this account.
+        #   - one for ratelimiting redactions by room admins. If this is not explicitly
+        #     set then it uses the same ratelimiting as per rc_message. This is useful
+        #     to allow room admins to quickly deal with abuse quickly.
         #
         # The defaults are as shown below.
         #
@@ -123,6 +132,10 @@ class RatelimitConfig(Config):
         #  failed_attempts:
         #    per_second: 0.17
         #    burst_count: 3
+        #
+        #rc_admin_redaction:
+        #  per_second: 1
+        #  burst_count: 50
 
 
         # Ratelimiting settings for incoming federation
