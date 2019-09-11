@@ -978,8 +978,8 @@ metrics_flags:
 # Whether or not to report anonymized homeserver usage statistics.
 # report_stats: true|false
 
-# The endpoint where to report the anonymized homeserver usage statistics to. Defaults to matrix.org
-# report_stats_endpoint: "https://matrix.org/report-usage-stats/push"
+# The endpoint to report the anonymized homeserver usage statistics to.
+#report_stats_endpoint: https://matrix.org/report-usage-stats/push
 
 ## API Configuration ##
 
