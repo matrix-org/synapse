@@ -197,8 +197,8 @@ class RedactionsTestCase(HomeserverTestCase):
             message_ids.append(b["event_id"])
             self.reactor.advance(10)  # To get around ratelimits
 
-        # as the moderator, send a bunch of redactions redaction
+        # as the moderator, send a bunch of redactions
         for msg_id in message_ids:
             # These should all succeed, even though this would be denied by
-            # standard message ratelimiter
+            # the standard message ratelimiter
             self._redact_event(self.mod_access_token, self.room_id, msg_id)
