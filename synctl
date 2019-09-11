@@ -71,7 +71,7 @@ def abort(message, colour=RED, stream=sys.stderr):
     sys.exit(1)
 
 
-def start(configfile: str, daemonize=True) -> bool:
+def start(configfile: str, daemonize: bool = True) -> bool:
     """Attempts to start synapse.
     Args:
         configfile: path to a yaml synapse config file
@@ -79,9 +79,10 @@ def start(configfile: str, daemonize=True) -> bool:
             session
 
     Returns:
-        boolean stating whether synapse started successfully if daemonize is True
+        True if the process started successfully
+        False if there was an error starting the process
 
-        doesn't return unless interupted if daemonize is false.
+        If deamonize is False it will only return once synapse exits.
     """
 
     write("Starting ...")
@@ -318,12 +319,13 @@ def main():
             write("All processes exited; now restarting...")
 
     if action == "start" or action == "restart":
-        errors = 0
+        error = False
         if start_stop_synapse:
             # Check if synapse is already running
             if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
                 abort("synapse.app.homeserver already running")
-                errors += int(start(configfile, bool(options.daemonize)))
+
+            error |= start(configfile, bool(options.daemonize))
 
         for worker in workers:
             env = os.environ.copy()
@@ -334,20 +336,14 @@ def main():
             for cache_name, factor in iteritems(worker.cache_factors):
                 os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
 
-                errors += int(start_worker(worker.app, configfile, worker.configfile))
+            error |= start_worker(worker.app, configfile, worker.configfile)
 
             # Reset env back to the original
             os.environ.clear()
             os.environ.update(env)
 
-        process_count = len(workers) + int(start_stop_synapse)
-
-        # If every process failed to start we exit with exit code 1. If a subset
-        # fails we exit with 4
-        if errors == process_count:
+        if error:
             exit(1)
-        elif errors:
-            exit(4)
 
 
 if __name__ == "__main__":
