@@ -1,1 +1,0 @@
-Fix v2 identity server calls using `id_access_token` instead of `access_token`, and use HTTP Authorization headers to send them instead of query parameters or JSON bodies.
