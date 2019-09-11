@@ -575,7 +575,7 @@ class FederationThirdPartyInviteExchangeServlet(BaseFederationServlet):
 
     async def on_PUT(self, origin, content, query, room_id):
         content = await self.handler.on_exchange_third_party_invite_request(
-            origin, room_id, content
+            room_id, content
         )
         return 200, content
 

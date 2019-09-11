@@ -148,7 +148,13 @@ def check_requirements(for_feature=None):
             )
         except DistributionNotFound:
             deps_needed.append(dependency)
-            errors.append("Needed %s but it was not installed" % (dependency,))
+            if for_feature:
+                errors.append(
+                    "Needed %s for the '%s' feature but it was not installed"
+                    % (dependency, for_feature)
+                )
+            else:
+                errors.append("Needed %s but it was not installed" % (dependency,))
 
     if not for_feature:
         # Check the optional dependencies are up to date. We allow them to not be

@@ -75,59 +75,52 @@ class IdentityHandler(BaseHandler):
         return client_secret, id_server, id_access_token
 
     @defer.inlineCallbacks
-    def threepid_from_creds(self, creds, use_v2=True):
+    def threepid_from_creds(self, id_server, creds):
         """
-        Retrieve and validate a threepid identitier from a "credentials" dictionary
+        Retrieve and validate a threepid identifier from a "credentials" dictionary against a
+        given identity server
 
         Args:
-            creds (dict[str, str]): Dictionary of credentials that contain the following keys:
+            id_server (str|None): The identity server to validate 3PIDs against. If None,
+                we will attempt to extract id_server creds
+
+            creds (dict[str, str]): Dictionary containing the following keys:
+                * id_server|idServer: An optional domain name of an identity server
                 * client_secret|clientSecret: A unique secret str provided by the client
-                * id_server|idServer: the domain of the identity server to query
-                * id_access_token: The access token to authenticate to the identity
-                    server with. Required if use_v2 is true
-            use_v2 (bool): Whether to use v2 Identity Service API endpoints
+                * sid: The ID of the validation session
 
         Returns:
             Deferred[dict[str,str|int]|None]: A dictionary consisting of response params to
                 the /getValidated3pid endpoint of the Identity Service API, or None if the
                 threepid was not found
         """
-        client_secret, id_server, id_access_token = self._extract_items_from_creds_dict(
-            creds
+        client_secret = creds.get("client_secret") or creds.get("clientSecret")
+        if not client_secret:
+            raise SynapseError(
+                400, "Missing param client_secret in creds", errcode=Codes.MISSING_PARAM
+            )
+        session_id = creds.get("sid")
+        if not session_id:
+            raise SynapseError(
+                400, "Missing param session_id in creds", errcode=Codes.MISSING_PARAM
+            )
+        if not id_server:
+            # Attempt to get the id_server from the creds dict
+            id_server = creds.get("id_server") or creds.get("idServer")
+            if not id_server:
+                raise SynapseError(
+                    400, "Missing param id_server in creds", errcode=Codes.MISSING_PARAM
+                )
+
+        query_params = {"sid": session_id, "client_secret": client_secret}
+
+        url = "https://%s%s" % (
+            id_server,
+            "/_matrix/identity/api/v1/3pid/getValidated3pid",
         )
 
-        # If an id_access_token is not supplied, force usage of v1
-        if id_access_token is None:
-            use_v2 = False
-
-        query_params = {"sid": creds["sid"], "client_secret": client_secret}
-
-        # Decide which API endpoint URLs and query parameters to use
-        if use_v2:
-            url = "https://%s%s" % (
-                id_server,
-                "/_matrix/identity/v2/3pid/getValidated3pid",
-            )
-            query_params["id_access_token"] = id_access_token
-        else:
-            url = "https://%s%s" % (
-                id_server,
-                "/_matrix/identity/api/v1/3pid/getValidated3pid",
-            )
-
-        try:
-            data = yield self.http_client.get_json(url, query_params)
-            return data if "medium" in data else None
-        except HttpResponseException as e:
-            if e.code != 404 or not use_v2:
-                # Generic failure
-                logger.info("getValidated3pid failed with Matrix error: %r", e)
-                raise e.to_synapse_error()
-
-        # This identity server is too old to understand Identity Service API v2
-        # Attempt v1 endpoint
-        logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", url)
-        return (yield self.threepid_from_creds(creds, use_v2=False))
+        data = yield self.http_client.get_json(url, query_params)
+        return data if "medium" in data else None
 
     @defer.inlineCallbacks
     def bind_threepid(self, creds, mxid, use_v2=True):
@@ -162,15 +155,18 @@ class IdentityHandler(BaseHandler):
             use_v2 = False
 
         # Decide which API endpoint URLs to use
+        headers = {}
         bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
         if use_v2:
             bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server,)
-            bind_data["id_access_token"] = id_access_token
+            headers["Authorization"] = create_id_access_token_header(id_access_token)
         else:
             bind_url = "https://%s/_matrix/identity/api/v1/3pid/bind" % (id_server,)
 
         try:
-            data = yield self.http_client.post_json_get_json(bind_url, bind_data)
+            data = yield self.http_client.post_json_get_json(
+                bind_url, bind_data, headers=headers
+            )
             logger.debug("bound threepid %r to %s", creds, mxid)
 
             # Remember where we bound the threepid
@@ -461,3 +457,36 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
+
+
+def create_id_access_token_header(id_access_token):
+    """Create an Authorization header for passing to SimpleHttpClient as the header value
+    of an HTTP request.
+
+    Args:
+        id_access_token (str): An identity server access token.
+
+    Returns:
+        list[str]: The ascii-encoded bearer token encased in a list.
+    """
+    # Prefix with Bearer
+    bearer_token = "Bearer %s" % id_access_token
+
+    # Encode headers to standard ascii
+    bearer_token.encode("ascii")
+
+    # Return as a list as that's how SimpleHttpClient takes header values
+    return [bearer_token]
+
+
+class LookupAlgorithm:
+    """
+    Supported hashing algorithms when performing a 3PID lookup.
+
+    SHA256 - Hashing an (address, medium, pepper) combo with sha256, then url-safe base64
+        encoding
+    NONE - Not performing any hashing. Simply sending an (address, medium) combo in plaintext
+    """
+
+    SHA256 = "sha256"
+    NONE = "none"

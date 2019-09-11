@@ -22,6 +22,15 @@ from synapse.api.errors import CodeMessageException
 
 logger = logging.getLogger(__name__)
 
+# the intial backoff, after the first transaction fails
+MIN_RETRY_INTERVAL = 10 * 60 * 1000
+
+# how much we multiply the backoff by after each subsequent fail
+RETRY_MULTIPLIER = 5
+
+# a cap on the backoff
+MAX_RETRY_INTERVAL = 24 * 60 * 60 * 1000
+
 
 class NotRetryingDestination(Exception):
     def __init__(self, retry_last_ts, retry_interval, destination):
@@ -112,9 +121,6 @@ class RetryDestinationLimiter(object):
         clock,
         store,
         retry_interval,
-        min_retry_interval=10 * 60 * 1000,
-        max_retry_interval=24 * 60 * 60 * 1000,
-        multiplier_retry_interval=5,
         backoff_on_404=False,
         backoff_on_failure=True,
     ):
@@ -130,12 +136,6 @@ class RetryDestinationLimiter(object):
             retry_interval (int): The next retry interval taken from the
                 database in milliseconds, or zero if the last request was
                 successful.
-            min_retry_interval (int): The minimum retry interval to use after
-                a failed request, in milliseconds.
-            max_retry_interval (int): The maximum retry interval to use after
-                a failed request, in milliseconds.
-            multiplier_retry_interval (int): The multiplier to use to increase
-                the retry interval after a failed request.
             backoff_on_404 (bool): Back off if we get a 404
 
             backoff_on_failure (bool): set to False if we should not increase the
@@ -146,9 +146,6 @@ class RetryDestinationLimiter(object):
         self.destination = destination
 
         self.retry_interval = retry_interval
-        self.min_retry_interval = min_retry_interval
-        self.max_retry_interval = max_retry_interval
-        self.multiplier_retry_interval = multiplier_retry_interval
         self.backoff_on_404 = backoff_on_404
         self.backoff_on_failure = backoff_on_failure
 
@@ -196,13 +193,13 @@ class RetryDestinationLimiter(object):
         else:
             # We couldn't connect.
             if self.retry_interval:
-                self.retry_interval *= self.multiplier_retry_interval
+                self.retry_interval *= RETRY_MULTIPLIER
                 self.retry_interval *= int(random.uniform(0.8, 1.4))
 
-                if self.retry_interval >= self.max_retry_interval:
-                    self.retry_interval = self.max_retry_interval
+                if self.retry_interval >= MAX_RETRY_INTERVAL:
+                    self.retry_interval = MAX_RETRY_INTERVAL
             else:
-                self.retry_interval = self.min_retry_interval
+                self.retry_interval = MIN_RETRY_INTERVAL
 
             logger.info(
                 "Connection to %s was unsuccessful (%s(%s)); backoff now %i",

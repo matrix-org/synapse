@@ -444,7 +444,16 @@ class AuthHandler(BaseHandler):
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            threepid = yield identity_handler.threepid_from_creds(threepid_creds)
+            if medium == "email":
+                threepid = yield identity_handler.threepid_from_creds(
+                    self.hs.config.account_threepid_delegate_email, threepid_creds
+                )
+            elif medium == "msisdn":
+                threepid = yield identity_handler.threepid_from_creds(
+                    self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+                )
+            else:
+                raise SynapseError(400, "Unrecognized threepid medium: %s" % (medium,))
         elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             row = yield self.store.get_threepid_validation_session(
                 medium,

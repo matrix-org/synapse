@@ -222,6 +222,7 @@ class HomeServer(object):
         self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
+        self.admin_redaction_ratelimiter = Ratelimiter()
         self.registration_ratelimiter = Ratelimiter()
 
         self.datastore = None
@@ -279,6 +280,9 @@ class HomeServer(object):
 
     def get_registration_ratelimiter(self):
         return self.registration_ratelimiter
+
+    def get_admin_redaction_ratelimiter(self):
+        return self.admin_redaction_ratelimiter
 
     def build_federation_client(self):
         return FederationClient(self)
