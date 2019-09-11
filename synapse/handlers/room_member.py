@@ -100,7 +100,7 @@ class RoomMemberHandler(object):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _remote_reject_invite(self, remote_room_hosts, room_id, target):
+    def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
         """Attempt to reject an invite for a room this server is not in. If we
         fail to do so we locally mark the invite as rejected.
 
@@ -491,8 +491,6 @@ class RoomMemberHandler(object):
                 else:
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
-                    # Note: This is calling _remote_reject_invite on RoomMemberMasterHandler,
-                    # hence the `requester` arg
                     res = yield self._remote_reject_invite(
                         requester, remote_room_hosts, room_id, target
                     )
