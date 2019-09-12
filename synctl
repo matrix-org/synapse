@@ -325,7 +325,8 @@ def main():
             if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
                 abort("synapse.app.homeserver already running")
 
-            error |= start(configfile, bool(options.daemonize))
+            if not start(configfile, bool(options.daemonize)):
+                error = True
 
         for worker in workers:
             env = os.environ.copy()
@@ -336,7 +337,8 @@ def main():
             for cache_name, factor in iteritems(worker.cache_factors):
                 os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
 
-            error |= start_worker(worker.app, configfile, worker.configfile)
+            if not start_worker(worker.app, configfile, worker.configfile):
+                error = True
 
             # Reset env back to the original
             os.environ.clear()
