@@ -65,29 +65,26 @@ class RoomWorkerStore(SQLBaseStore):
             desc="get_public_room_ids",
         )
 
-    def count_public_rooms(self, stream_id, network_tuple, ignore_non_federatable):
+    def count_public_rooms(self, network_tuple, ignore_non_federatable):
         """Counts the number of public rooms as tracked in the room_stats_current
         and room_stats_state table.
 
         Args:
-            stream_id (int): The public room list stream ID
             network_tuple (ThirdPartyInstanceID|None)
             ignore_non_federatable (bool): If true filters out non-federatable rooms
         """
 
         def _count_public_rooms_txn(txn):
-            query_args = [stream_id]
+            query_args = []
 
             appservice_where = ""
             if network_tuple:
                 if network_tuple.appservice_id:
-                    appservice_where = " AND appservice_id = ? AND network_id = ?"
+                    appservice_where = "appservice_id = ? AND network_id = ?"
                     query_args.append(network_tuple.appservice_id)
                     query_args.append(network_tuple.network_id)
                 else:
-                    appservice_where = (
-                        " AND appservice_id IS NULL AND network_id IS NULL"
-                    )
+                    appservice_where = "appservice_id IS NULL AND network_id IS NULL"
 
             sql = """
                 SELECT
@@ -99,7 +96,7 @@ class RoomWorkerStore(SQLBaseStore):
                             room_id, MAX(stream_id) AS stream_id, appservice_id,
                             network_id
                         FROM public_room_list_stream
-                        WHERE stream_id <= ? %(appservice_where)s
+                        WHERE %(appservice_where)s
                         GROUP BY room_id, appservice_id, network_id
                     ) grouped USING (room_id, stream_id)
                     GROUP BY room_id
@@ -132,7 +129,6 @@ class RoomWorkerStore(SQLBaseStore):
         limit,
         last_room_id,
         forwards,
-        stream_id,
         ignore_non_federatable=False,
     ):
         """Gets the largest public rooms (where largest is in terms of joined
@@ -145,7 +141,6 @@ class RoomWorkerStore(SQLBaseStore):
             last_room_id (str|None): if present, a room ID which bounds the
                 result set, and is always *excluded* from the result set.
             forwards (bool): true iff going forwards, going backwards otherwise
-            stream_id (int): The public room list stream ID
             ignore_non_federatable (bool): If true filters out non-federatable rooms.
 
         Returns:
@@ -155,7 +150,7 @@ class RoomWorkerStore(SQLBaseStore):
         """
 
         where_clauses = []
-        query_args = [stream_id]
+        query_args = []
 
         if last_room_id:
             if forwards:
@@ -182,11 +177,11 @@ class RoomWorkerStore(SQLBaseStore):
         appservice_where = ""
         if network_tuple:
             if network_tuple.appservice_id:
-                appservice_where = " AND appservice_id = ? AND network_id = ?"
+                appservice_where = "appservice_id = ? AND network_id = ?"
                 query_args.append(network_tuple.appservice_id)
                 query_args.append(network_tuple.network_id)
             else:
-                appservice_where = " AND appservice_id IS NULL AND network_id IS NULL"
+                appservice_where = "appservice_id IS NULL AND network_id IS NULL"
 
         where_clause = ""
         if where_clauses:
@@ -214,7 +209,7 @@ class RoomWorkerStore(SQLBaseStore):
                         room_id, MAX(stream_id) AS stream_id, appservice_id,
                         network_id
                     FROM public_room_list_stream
-                    WHERE stream_id <= ? %(appservice_where)s
+                    WHERE %(appservice_where)s
                     GROUP BY room_id, appservice_id, network_id
                 ) grouped USING (room_id, stream_id)
                 GROUP BY room_id

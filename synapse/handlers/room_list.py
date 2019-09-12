@@ -142,13 +142,11 @@ class RoomListHandler(BaseHandler):
         if since_token:
             batch_token = RoomListNextBatch.from_token(since_token)
 
-            public_room_stream_id = batch_token.public_room_stream_id
             last_room_id = batch_token.last_room_id
             forwards = batch_token.direction_is_forward
         else:
             batch_token = None
 
-            public_room_stream_id = yield self.store.get_current_public_room_stream_id()
             last_room_id = None
             forwards = True
 
@@ -161,7 +159,6 @@ class RoomListHandler(BaseHandler):
             probing_limit,
             last_room_id=last_room_id,
             forwards=forwards,
-            stream_id=public_room_stream_id,
             ignore_non_federatable=from_federation,
         )
 
@@ -204,30 +201,22 @@ class RoomListHandler(BaseHandler):
                     # If there was a token given then we assume that there
                     # must be previous results.
                     response["prev_batch"] = RoomListNextBatch(
-                        public_room_stream_id=public_room_stream_id,
-                        last_room_id=initial_room_id,
-                        direction_is_forward=False,
+                        last_room_id=initial_room_id, direction_is_forward=False
                     ).to_token()
 
                 if more_to_come:
                     response["next_batch"] = RoomListNextBatch(
-                        public_room_stream_id=public_room_stream_id,
-                        last_room_id=final_room_id,
-                        direction_is_forward=True,
+                        last_room_id=final_room_id, direction_is_forward=True
                     ).to_token()
             else:
                 if batch_token:
                     response["next_batch"] = RoomListNextBatch(
-                        public_room_stream_id=public_room_stream_id,
-                        last_room_id=final_room_id,
-                        direction_is_forward=True,
+                        last_room_id=final_room_id, direction_is_forward=True
                     ).to_token()
 
                 if more_to_come:
                     response["prev_batch"] = RoomListNextBatch(
-                        public_room_stream_id=public_room_stream_id,
-                        last_room_id=initial_room_id,
-                        direction_is_forward=False,
+                        last_room_id=initial_room_id, direction_is_forward=False
                     ).to_token()
 
         for room in results:
@@ -242,7 +231,7 @@ class RoomListHandler(BaseHandler):
         response["chunk"] = results
 
         response["total_room_count_estimate"] = yield self.store.count_public_rooms(
-            public_room_stream_id, network_tuple, ignore_non_federatable=from_federation
+            network_tuple, ignore_non_federatable=from_federation
         )
 
         return response
@@ -460,17 +449,12 @@ class RoomListNextBatch(
     namedtuple(
         "RoomListNextBatch",
         (
-            "public_room_stream_id",  # public room stream id for first public room list
             "last_room_id",  # The room_id to get rooms after/before
             "direction_is_forward",  # Bool if this is a next_batch, false if prev_batch
         ),
     )
 ):
-    KEY_DICT = {
-        "public_room_stream_id": "p",
-        "last_room_id": "r",
-        "direction_is_forward": "d",
-    }
+    KEY_DICT = {"last_room_id": "r", "direction_is_forward": "d"}
 
     REVERSE_KEY_DICT = {v: k for k, v in KEY_DICT.items()}
 
