@@ -91,7 +91,7 @@ class StatsHandler(StateDeltasHandler):
             deltas = yield self.store.get_current_state_deltas(self.pos)
 
             if deltas:
-                logger.info("Handling %d state deltas", len(deltas))
+                logger.debug("Handling %d state deltas", len(deltas))
                 room_deltas, user_deltas = yield self._handle_deltas(deltas)
 
                 max_pos = deltas[-1]["stream_id"]
@@ -121,7 +121,7 @@ class StatsHandler(StateDeltasHandler):
                 stream_id=max_pos,
             )
 
-            logger.info("Handled room stats to %s -> %s", self.pos, max_pos)
+            logger.debug("Handled room stats to %s -> %s", self.pos, max_pos)
 
             event_processing_positions.labels("stats").set(max_pos)
 
