@@ -28,8 +28,8 @@ MIN_RETRY_INTERVAL = 10 * 60 * 1000
 # how much we multiply the backoff by after each subsequent fail
 RETRY_MULTIPLIER = 5
 
-# a cap on the backoff
-MAX_RETRY_INTERVAL = 24 * 60 * 60 * 1000
+# a cap on the backoff. (Essentially none)
+MAX_RETRY_INTERVAL = 2 ** 63
 
 
 class NotRetryingDestination(Exception):
@@ -193,8 +193,9 @@ class RetryDestinationLimiter(object):
         else:
             # We couldn't connect.
             if self.retry_interval:
-                self.retry_interval *= RETRY_MULTIPLIER
-                self.retry_interval *= int(random.uniform(0.8, 1.4))
+                self.retry_interval = int(
+                    self.retry_interval * RETRY_MULTIPLIER * random.uniform(0.8, 1.4)
+                )
 
                 if self.retry_interval >= MAX_RETRY_INTERVAL:
                     self.retry_interval = MAX_RETRY_INTERVAL
