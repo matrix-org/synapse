@@ -80,11 +80,13 @@ class RoomWorkerStore(SQLBaseStore):
             appservice_where = ""
             if network_tuple:
                 if network_tuple.appservice_id:
-                    appservice_where = "appservice_id = ? AND network_id = ?"
+                    appservice_where = "WHERE appservice_id = ? AND network_id = ?"
                     query_args.append(network_tuple.appservice_id)
                     query_args.append(network_tuple.network_id)
                 else:
-                    appservice_where = "appservice_id IS NULL AND network_id IS NULL"
+                    appservice_where = (
+                        "WHERE appservice_id IS NULL AND network_id IS NULL"
+                    )
 
             sql = """
                 SELECT
@@ -96,7 +98,7 @@ class RoomWorkerStore(SQLBaseStore):
                             room_id, MAX(stream_id) AS stream_id, appservice_id,
                             network_id
                         FROM public_room_list_stream
-                        WHERE %(appservice_where)s
+                        %(appservice_where)s
                         GROUP BY room_id, appservice_id, network_id
                     ) grouped USING (room_id, stream_id)
                     GROUP BY room_id
@@ -177,11 +179,11 @@ class RoomWorkerStore(SQLBaseStore):
         appservice_where = ""
         if network_tuple:
             if network_tuple.appservice_id:
-                appservice_where = "appservice_id = ? AND network_id = ?"
+                appservice_where = "WHERE appservice_id = ? AND network_id = ?"
                 query_args.append(network_tuple.appservice_id)
                 query_args.append(network_tuple.network_id)
             else:
-                appservice_where = "appservice_id IS NULL AND network_id IS NULL"
+                appservice_where = "WHERE appservice_id IS NULL AND network_id IS NULL"
 
         where_clause = ""
         if where_clauses:
@@ -209,7 +211,7 @@ class RoomWorkerStore(SQLBaseStore):
                         room_id, MAX(stream_id) AS stream_id, appservice_id,
                         network_id
                     FROM public_room_list_stream
-                    WHERE %(appservice_where)s
+                    %(appservice_where)s
                     GROUP BY room_id, appservice_id, network_id
                 ) grouped USING (room_id, stream_id)
                 GROUP BY room_id
