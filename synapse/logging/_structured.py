@@ -33,7 +33,6 @@ from twisted.logger import (
     LogLevelFilterPredicate,
     LogPublisher,
     eventAsText,
-    globalLogBeginner,
     jsonFileLogObserver,
 )
 
@@ -265,7 +264,7 @@ def setup_structured_logging(
     hs,
     config,
     log_config: dict,
-    logBeginner: LogBeginner = globalLogBeginner,
+    logBeginner: LogBeginner,
     redirect_stdlib_logging: bool = True,
 ) -> LogPublisher:
     """

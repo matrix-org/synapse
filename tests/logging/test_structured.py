@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import os.path
 import shutil
@@ -33,7 +34,20 @@ class FakeBeginner(object):
         self.observers = observers
 
 
-class StructuredLoggingTestCase(HomeserverTestCase):
+class StructuredLoggingTestBase(object):
+    """
+    Test base that registers a cleanup handler to reset the stdlib log handler
+    to 'unset'.
+    """
+
+    def prepare(self, reactor, clock, hs):
+        def _cleanup():
+            logging.getLogger("synapse").setLevel(0)
+
+        self.addCleanup(_cleanup)
+
+
+class StructuredLoggingTestCase(StructuredLoggingTestBase, HomeserverTestCase):
     """
     Tests for Synapse's structured logging support.
     """
@@ -139,7 +153,9 @@ class StructuredLoggingTestCase(HomeserverTestCase):
         self.assertEqual(logs[0]["request"], "somereq")
 
 
-class StructuredLoggingConfigurationFileTestCase(HomeserverTestCase):
+class StructuredLoggingConfigurationFileTestCase(
+    StructuredLoggingTestBase, HomeserverTestCase
+):
     def make_homeserver(self, reactor, clock):
 
         tempdir = self.mktemp()
@@ -179,10 +195,11 @@ class StructuredLoggingConfigurationFileTestCase(HomeserverTestCase):
         """
         When a structured logging config is given, Synapse will use it.
         """
-        setup_logging(self.hs, self.hs.config)
+        beginner = FakeBeginner()
+        publisher = setup_logging(self.hs, self.hs.config, logBeginner=beginner)
 
         # Make a logger and send an event
-        logger = Logger(namespace="tests.logging.test_structured")
+        logger = Logger(namespace="tests.logging.test_structured", observer=publisher)
 
         with LoggingContext("testcontext", request="somereq"):
             logger.info("Hello there, {name}!", name="steve")
