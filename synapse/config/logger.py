@@ -21,7 +21,12 @@ from string import Template
 
 import yaml
 
-from twisted.logger import LogBeginner, ILogObserver, STDLibLogObserver, globalLogBeginner
+from twisted.logger import (
+    ILogObserver,
+    LogBeginner,
+    STDLibLogObserver,
+    globalLogBeginner,
+)
 
 import synapse
 from synapse.app import _base as appbase

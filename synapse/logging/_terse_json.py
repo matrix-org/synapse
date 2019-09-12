@@ -25,6 +25,7 @@ from typing import IO
 
 import attr
 from simplejson import dumps
+from zope.interface import implementer
 
 from twisted.application.internet import ClientService
 from twisted.internet.endpoints import (
@@ -33,7 +34,7 @@ from twisted.internet.endpoints import (
     TCP6ClientEndpoint,
 )
 from twisted.internet.protocol import Factory, Protocol
-from twisted.logger import FileLogObserver, Logger
+from twisted.logger import FileLogObserver, ILogObserver, Logger
 from twisted.python.failure import Failure
 
 
@@ -146,6 +147,7 @@ def TerseJSONToConsoleLogObserver(outFile: IO[str], metadata: dict) -> FileLogOb
 
 
 @attr.s
+@implementer(ILogObserver)
 class TerseJSONToTCPLogObserver(object):
     """
     An IObserver that writes JSON logs to a TCP target.

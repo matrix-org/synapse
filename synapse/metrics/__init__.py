@@ -16,11 +16,11 @@
 import functools
 import gc
 import logging
-from typing import Dict, Union
 import os
 import platform
 import threading
 import time
+from typing import Dict, Union
 
 import six
 
