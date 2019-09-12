@@ -113,7 +113,8 @@ def start_worker(app: str, configfile: str, worker_configfile: str) -> bool:
         worker_configfile: path to worker specific yaml synapse file
 
     Returns:
-        boolean stating whether synapse started successfully if daemonize is True
+        True if the process started successfully
+        False if there was an error starting the process
     """
 
     args = [sys.executable, "-B", "-m", app, "-c", configfile, "-c", worker_configfile]
