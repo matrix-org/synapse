@@ -21,7 +21,7 @@ from string import Template
 
 import yaml
 
-from twisted.logger import LogBeginner, Logger, STDLibLogObserver, globalLogBeginner
+from twisted.logger import LogBeginner, ILogObserver, STDLibLogObserver, globalLogBeginner
 
 import synapse
 from synapse.app import _base as appbase
@@ -183,7 +183,7 @@ def _reload_stdlib_logging(*args, log_config=None):
 
 def setup_logging(
     hs, config, use_worker_options=False, logBeginner: LogBeginner = globalLogBeginner
-) -> Logger:
+) -> ILogObserver:
     """
     Set up the logging subsystem.
 
@@ -195,6 +195,10 @@ def setup_logging(
             instead of 'log_config'.
 
         logBeginner: The Twisted logBeginner to use.
+
+    Returns:
+        The "root" Twisted Logger observer, suitable for sending logs to from a
+        Logger instance.
     """
     log_config = config.worker_log_config if use_worker_options else config.log_config
 

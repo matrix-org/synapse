@@ -42,7 +42,7 @@ class StructuredLoggingTestBase(object):
 
     def prepare(self, reactor, clock, hs):
         def _cleanup():
-            logging.getLogger("synapse").setLevel(0)
+            logging.getLogger("synapse").setLevel(logging.NOTSET)
 
         self.addCleanup(_cleanup)
 
