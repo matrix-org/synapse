@@ -193,8 +193,9 @@ class RetryDestinationLimiter(object):
         else:
             # We couldn't connect.
             if self.retry_interval:
-                self.retry_interval *= RETRY_MULTIPLIER
-                self.retry_interval *= int(random.uniform(0.8, 1.4))
+                self.retry_interval = int(
+                    self.retry_interval * RETRY_MULTIPLIER * random.uniform(0.8, 1.4)
+                )
 
                 if self.retry_interval >= MAX_RETRY_INTERVAL:
                     self.retry_interval = MAX_RETRY_INTERVAL
