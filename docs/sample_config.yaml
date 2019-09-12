@@ -938,7 +938,7 @@ uploads_path: "DATADIR/uploads"
 # https://matrix.org/docs/spec/identity_service/latest
 #
 account_threepid_delegates:
-    #email: https://example.com     # Delegate email sending to matrix.org
+    #email: https://example.com     # Delegate email sending to example.org
     #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
 # Users who register on this homeserver will automatically be joined
