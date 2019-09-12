@@ -14,6 +14,7 @@ To make Synapse (and therefore Riot) use it:
    ```yaml
    saml2_config:
      sp_config:
+       allow_unknown_attributes: true  # Works around a bug with AVA Hashes: https://github.com/IdentityPython/pysaml2/issues/388
        metadata:
          local: ["samling.xml"]   
    ```
