@@ -1065,18 +1065,18 @@ class RoomMemberHandler(object):
                 # This identity server does not support v2 endpoints
                 # Fallback to v1 endpoints
                 fallback_to_v1 = True
-
-            # Some identity servers may only support application/x-www-form-urlencoded
-            # types. This is especially true with old instances of Sydent, see
-            # https://github.com/matrix-org/sydent/pull/170
-            logger.info(
-                "Failed to POST %s with JSON, falling back to urlencoded form: %s",
-                is_url,
-                e,
-            )
-            data = yield self.simple_http_client.post_urlencoded_get_json(
-                is_url, invite_config
-            )
+            else:
+                # Some identity servers may only support application/x-www-form-urlencoded
+                # types. This is especially true with old instances of Sydent, see
+                # https://github.com/matrix-org/sydent/pull/170
+                logger.info(
+                    "Failed to POST %s with JSON, falling back to urlencoded form: %s",
+                    is_url,
+                    e,
+                )
+                data = yield self.simple_http_client.post_urlencoded_get_json(
+                    is_url, invite_config
+                )
 
         if fallback_to_v1:
             return (
