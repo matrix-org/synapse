@@ -186,6 +186,7 @@ class Config(object):
         tls_certificate_path=None,
         tls_private_key_path=None,
         acme_domain=None,
+        account_threepid_delegates=None,
     ):
         """Build a default configuration file
 
@@ -257,6 +258,7 @@ class Config(object):
                 tls_certificate_path=tls_certificate_path,
                 tls_private_key_path=tls_private_key_path,
                 acme_domain=acme_domain,
+                account_threepid_delegates=account_threepid_delegates,
             )
         )
 

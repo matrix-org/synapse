@@ -15,8 +15,10 @@
 
 import os
 from distutils.util import strtobool
+from textwrap import indent
 
 import pkg_resources
+import yaml
 
 from synapse.config._base import Config, ConfigError
 from synapse.types import RoomAlias
@@ -124,7 +126,9 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
-    def generate_config_section(self, generate_secrets=False, **kwargs):
+    def generate_config_section(
+        self, generate_secrets=False, account_threepid_delegates=None, **kwargs
+    ):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
                 random_string_with_symbols(50),
@@ -133,6 +137,18 @@ class RegistrationConfig(Config):
             registration_shared_secret = (
                 "# registration_shared_secret: <PRIVATE STRING>"
             )
+
+        if account_threepid_delegates:
+            account_threepid_delegates = indent(
+                yaml.dump(account_threepid_delegates), " " * 4
+            ).lstrip()
+
+        else:
+            account_threepid_delegates = indent(
+                "#email: https://example.com     # Delegate email sending to example.org"
+                "\n#msisdn: http://localhost:8090  # Delegate SMS sending to this local process",
+                " " * 12,
+            ).lstrip()
 
         return (
             """\
@@ -294,8 +310,7 @@ class RegistrationConfig(Config):
         # https://matrix.org/docs/spec/identity_service/latest
         #
         account_threepid_delegates:
-            #email: https://example.com     # Delegate email sending to example.org
-            #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
+            %(account_threepid_delegates)s
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
