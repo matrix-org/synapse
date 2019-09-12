@@ -58,19 +58,62 @@ Config options
 **Note: Registration by email address or phone number will not work in this release unless
 some config options are changed from their defaults.**
 
-This is due to Synapse v1.4.0 now defaulting to sending registration and password reset tokens
-itself. This is for security reasons as well as putting less reliance on identity servers.
-However, currently Synapse only supports sending emails, and does not have support for
-phone-based password reset or account registration. If Synapse is configured to handle these on
-its own, phone-based password resets and registration will be disabled. For Synapse to send
-emails, the ``email`` block of the config must be filled out. If not, then password resets and
-registration via email will be disabled entirely.
+Previous versions of Synapse delegate the sending of registration emails and
+SMS to an Identity Server by default. In most cases this server is vector.im or
+matrix.org.
 
-This release also deprecates the ``email.trust_identity_server_for_password_resets`` option and
-replaces it with the ``account_threepid_delegates`` dictionary. This option defines whether the
+In Synapse 1.4, for security and privacy reasons, the homeserver will no longer
+delegate email or SMS to an identity server by default and instead the admin
+will need to explicitly decide how they would like email and SMS to be sent.
+
+In the medium term the vector.im and matrix.org Identity servers will disable
+sending email and SMS entirely, however in order to ease the transition they
+will retain the capability to send email and SMS for a limited period. Email
+will be disabled on XXX (giving 2 months notice), disabling SMS will follow
+some time after that once SMS sending support resides in Synapse.
+
+Once email and SMS support has been disabled in the vector.im and matrix.org
+identity servers, all Synapse versions that depend on those instances will be
+unable to send email and SMS them through them.
+
+Email
+-----
+
+Following upgrade, to continue using email as a registration method admins can either:-
+ * Configure Synapse to use an alternate email server (details follow).
+ * Run their own identity server and delegate to it (which then will require details of an alternate email server).
+
+To configure an SMTP server for Synapse, modify the configuration section
+headed ```email```, and be sure to have at least the ```smtp_host, smtp_port```
+and ```notif_from``` fields filled out.
+
+You may also need to set ```smtp_user```, ```smtp_pass```, and
+```require_transport_security```.
+
+See the sample configuration file for more details on these settings.
+
+Some admins will wish to continue using email as a registration method, but
+will not immediately have an appropriate SMTP server to hand.
+
+To this end, we will continue to support email delegation via the vector.im and
+matrix.org identity servers for two months, the cut off date is XXXX after
+which time email delegation will be disabled.
+
+The ``account_threepid_delegates`` dictionary defines whether the
 homeserver should delegate an external server (typically an `identity server
 <https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset or
 registration messages via email and SMS.
+
+So to delegate email sending set ``account_threepid_delegates.email`` to a base URL of
+an identity server in your homeserver.yaml. Note that ``account_threepid_delegates.email``
+replaces the deprecated ``email.trust_identity_server_for_password_resets``
+
+``
+account_threepid_delegates:
+    email: https://example.com     # Delegate email sending to example.com
+``
+
+
 
 If ``email.trust_identity_server_for_password_resets`` is set to ``true``, and
 ``account_threepid_delegates.email`` is not set, then the first entry in
@@ -98,6 +141,36 @@ showing them a success or failure page (assuming a redirect URL is not configure
 Synapse will expect these files to exist inside the configured template directory. To view the
 default templates, see `synapse/res/templates
 <https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
+
+SMS
+---
+
+Following upgrade, the only way to maintain the ability to register via a phone
+number will be to continue to delegate SMS delivery via the matrix.org and
+vector.im identity servers.
+
+The ``account_threepid_delegates`` dictionary defines whether the
+homeserver should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset or
+registration messages via email and SMS.
+
+So to delegate SMS sending set ``account_threepid_delegates.sms`` to a base URL of
+an identity server in your homeserver.yaml.
+
+``
+account_threepid_delegates:
+    sms: https://example.com     # Delegate sms sending to example.com
+``
+
+
+Currently Synapse does not support a means to send SMS itself, and the
+matrix.org and vector.im identity servers will continue to support SMS until
+such time as it is possible for admins to configure their servers to send SMS
+directly. More details will follow in a future release.
+
+
+For more details on why these changes are necessary see (link to blog).
+
 
 Upgrading to v1.2.0
 ===================
