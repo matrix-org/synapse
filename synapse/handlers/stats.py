@@ -260,7 +260,7 @@ class StatsHandler(StateDeltasHandler):
                         room_stats_delta["local_users_in_room"] += delta
 
             elif typ == EventTypes.Create:
-                room_state["is_federatable"] = event_content.get("m.federate", True)
+                room_state["is_federatable"] = event_content.get("m.federate", True) is True
                 if sender and self.is_mine_id(sender):
                     user_to_stats_deltas.setdefault(sender, Counter())[
                         "rooms_created"
