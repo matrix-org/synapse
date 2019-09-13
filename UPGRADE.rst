@@ -159,7 +159,7 @@ an identity server in your homeserver.yaml.
 .. code:: yaml
 
    account_threepid_delegates:
-       sms: https://example.com     # Delegate email sending to example.com
+       msisdn: https://example.com     # Delegate sms sending to example.com
 
 Currently Synapse does not support a means to send SMS itself, and the
 matrix.org and vector.im identity servers will continue to support SMS until
