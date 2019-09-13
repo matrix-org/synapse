@@ -70,7 +70,7 @@ In the medium term the vector.im and matrix.org identity servers will disable
 sending email and SMS entirely, however in order to ease the transition they
 will retain the capability to send email and SMS for a limited period. Email
 will be disabled on XXX (giving 2 months notice), disabling SMS will follow
-some time after that once SMS sending support resides in Synapse.
+some time after that once SMS sending support lands in Synapse.
 
 Once email and SMS support has been disabled in the vector.im and matrix.org
 identity servers, all Synapse versions that depend on those instances will be
