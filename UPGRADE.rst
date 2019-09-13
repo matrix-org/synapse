@@ -74,7 +74,7 @@ some time after that once SMS sending support lands in Synapse.
 
 Once email and SMS support has been disabled in the vector.im and matrix.org
 identity servers, all Synapse versions that depend on those instances will be
-unable to send email and SMS them through them.
+unable to send email and SMS through them.
 
 Email
 -----
