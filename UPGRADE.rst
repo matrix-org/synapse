@@ -66,7 +66,7 @@ In Synapse 1.4, for security and privacy reasons, the homeserver will no longer
 delegate email or SMS to an identity server by default and instead the admin
 will need to explicitly decide how they would like email and SMS to be sent.
 
-In the medium term the vector.im and matrix.org Identity servers will disable
+In the medium term the vector.im and matrix.org identity servers will disable
 sending email and SMS entirely, however in order to ease the transition they
 will retain the capability to send email and SMS for a limited period. Email
 will be disabled on XXX (giving 2 months notice), disabling SMS will follow
