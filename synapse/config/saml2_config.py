@@ -12,7 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import re
+
 from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.types import (
+    map_username_to_mxid_localpart,
+    mxid_localpart_allowed_characters,
+)
 
 from ._base import Config, ConfigError
 
@@ -36,6 +42,14 @@ class SAML2Config(Config):
 
         self.saml2_enabled = True
 
+        self.saml2_mxid_source_attribute = saml2_config.get(
+            "mxid_source_attribute", "uid"
+        )
+
+        self.saml2_grandfathered_mxid_source_attribute = saml2_config.get(
+            "grandfathered_mxid_source_attribute", "uid"
+        )
+
         import saml2.config
 
         self.saml2_sp_config = saml2.config.SPConfig()
@@ -51,12 +65,25 @@ class SAML2Config(Config):
             saml2_config.get("saml_session_lifetime", "5m")
         )
 
+        mapping = saml2_config.get("mxid_mapping", "hexencode")
+        try:
+            self.saml2_mxid_mapper = MXID_MAPPER_MAP[mapping]
+        except KeyError:
+            raise ConfigError("%s is not a known mxid_mapping" % (mapping,))
+
     def _default_saml_config_dict(self):
         import saml2
 
         public_baseurl = self.public_baseurl
         if public_baseurl is None:
             raise ConfigError("saml2_config requires a public_baseurl to be set")
+
+        required_attributes = {"uid", self.saml2_mxid_source_attribute}
+
+        optional_attributes = {"displayName"}
+        if self.saml2_grandfathered_mxid_source_attribute:
+            optional_attributes.add(self.saml2_grandfathered_mxid_source_attribute)
+        optional_attributes -= required_attributes
 
         metadata_url = public_baseurl + "_matrix/saml2/metadata.xml"
         response_url = public_baseurl + "_matrix/saml2/authn_response"
@@ -69,8 +96,9 @@ class SAML2Config(Config):
                             (response_url, saml2.BINDING_HTTP_POST)
                         ]
                     },
-                    "required_attributes": ["uid"],
-                    "optional_attributes": ["mail", "surname", "givenname"],
+                    "required_attributes": list(required_attributes),
+                    "optional_attributes": list(optional_attributes),
+                    # "name_id_format": saml2.saml.NAMEID_FORMAT_PERSISTENT,
                 }
             },
         }
@@ -146,6 +174,52 @@ class SAML2Config(Config):
           # The default is 5 minutes.
           #
           #saml_session_lifetime: 5m
+
+          # The SAML attribute (after mapping via the attribute maps) to use to derive
+          # the Matrix ID from. 'uid' by default.
+          #
+          #mxid_source_attribute: displayName
+
+          # The mapping system to use for mapping the saml attribute onto a matrix ID.
+          # Options include:
+          #  * 'hexencode' (which maps unpermitted characters to '=xx')
+          #  * 'dotreplace' (which replaces unpermitted characters with '.').
+          # The default is 'hexencode'.
+          #
+          #mxid_mapping: dotreplace
+
+          # In previous versions of synapse, the mapping from SAML attribute to MXID was
+          # always calculated dynamically rather than stored in a table. For backwards-
+          # compatibility, we will look for user_ids matching such a pattern before
+          # creating a new account.
+          #
+          # This setting controls the SAML attribute which will be used for this
+          # backwards-compatibility lookup. Typically it should be 'uid', but if the
+          # attribute maps are changed, it may be necessary to change it.
+          #
+          # The default is 'uid'.
+          #
+          #grandfathered_mxid_source_attribute: upn
         """ % {
             "config_dir_path": config_dir_path
         }
+
+
+DOT_REPLACE_PATTERN = re.compile(
+    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),))
+)
+
+
+def dot_replace_for_mxid(username: str) -> str:
+    username = username.lower()
+    username = DOT_REPLACE_PATTERN.sub(".", username)
+
+    # regular mxids aren't allowed to start with an underscore either
+    username = re.sub("^_", "", username)
+    return username
+
+
+MXID_MAPPER_MAP = {
+    "hexencode": map_username_to_mxid_localpart,
+    "dotreplace": dot_replace_for_mxid,
+}
