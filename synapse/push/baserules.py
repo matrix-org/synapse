@@ -335,11 +335,6 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "_id": "_message",
             }
         ],
-        # default to not notifying for group chats
-        # see https://github.com/vector-im/riot-web/issues/3268
-        # we can't do this on existing servers because we need to
-        # add per-user overrides to preserve their existing behaviour
-        "enabled": False,
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },
     # XXX: this is going to fire for events which aren't m.room.messages
