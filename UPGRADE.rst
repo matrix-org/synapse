@@ -80,17 +80,18 @@ Email
 -----
 
 Following upgrade, to continue using email as a registration method admins can either:-
- * Configure Synapse to use an alternate email server (details follow).
- * Run their own identity server and delegate to it (which then will require details of an alternate email server).
+
+* Configure Synapse to use an alternate email server (details follow).
+* Run their own identity server and delegate to it (which then will require details of an alternate email server).
 
 To configure an SMTP server for Synapse, modify the configuration section
-headed ```email```, and be sure to have at least the ```smtp_host, smtp_port```
-and ```notif_from``` fields filled out.
+headed ``email``, and be sure to have at least the ``smtp_host, smtp_port``
+and ``notif_from`` fields filled out.
 
-You may also need to set ```smtp_user```, ```smtp_pass```, and
-```require_transport_security```.
+You may also need to set ``smtp_user``, ``smtp_pass``, and
+``require_transport_security``.
 
-See the sample configuration file for more details on these settings.
+See the `sample configuration file <https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_ for more details on these settings.
 
 Some admins will wish to continue using email as a registration method, but
 will not immediately have an appropriate SMTP server to hand.
@@ -108,12 +109,10 @@ So to delegate email sending set ``account_threepid_delegates.email`` to a base 
 an identity server in your homeserver.yaml. Note that ``account_threepid_delegates.email``
 replaces the deprecated ``email.trust_identity_server_for_password_resets``
 
-``
-account_threepid_delegates:
-    email: https://example.com     # Delegate email sending to example.com
-``
+.. code:: yaml
 
-
+   account_threepid_delegates:
+       email: https://example.com     # Delegate email sending to example.com
 
 If ``email.trust_identity_server_for_password_resets`` is set to ``true``, and
 ``account_threepid_delegates.email`` is not set, then the first entry in
@@ -157,11 +156,10 @@ registration messages via email and SMS.
 So to delegate SMS sending set ``account_threepid_delegates.sms`` to a base URL of
 an identity server in your homeserver.yaml.
 
-``
-account_threepid_delegates:
-    sms: https://example.com     # Delegate sms sending to example.com
-``
+.. code:: yaml
 
+   account_threepid_delegates:
+       sms: https://example.com     # Delegate email sending to example.com
 
 Currently Synapse does not support a means to send SMS itself, and the
 matrix.org and vector.im identity servers will continue to support SMS until
