@@ -116,7 +116,8 @@ class ClientTLSOptionsFactory(object):
     def get_options(self, host: bytes):
 
         # IPolicyForHTTPS.get_options takes bytes, but we want to compare
-        # against the str whitelist (which is IDNA-encoded and ASCII decoded).
+        # against the str whitelist. The hostnames in the whitelist are already
+        # IDNA-encoded like the hosts will be here.
         ascii_host = host.decode("ascii")
 
         # Check if certificate verification has been enabled
