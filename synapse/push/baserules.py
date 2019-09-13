@@ -340,10 +340,7 @@ BASE_APPEND_UNDERRIDE_RULES = [
         # we can't do this on existing servers because we need to
         # add per-user overrides to preserve their existing behaviour
         "enabled": False,
-        "actions": [
-            "notify",
-            {"set_tweak": "highlight", "value": False}
-        ],
+        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },
     # XXX: this is going to fire for events which aren't m.room.messages
     # but are encrypted (e.g. m.call.*)...
