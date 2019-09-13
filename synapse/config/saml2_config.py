@@ -26,6 +26,9 @@ class SAML2Config(Config):
         if not saml2_config or not saml2_config.get("enabled", True):
             return
 
+        if not saml2_config.get("sp_config") and not saml2_config.get("config_path"):
+            return
+
         try:
             check_requirements("saml2")
         except DependencyException as e:
@@ -76,12 +79,13 @@ class SAML2Config(Config):
         return """\
         # Enable SAML2 for registration and login. Uses pysaml2.
         #
-        # `sp_config` is the configuration for the pysaml2 Service Provider.
-        # See pysaml2 docs for format of config.
+        # At least one of `sp_config` or `config_path` must be set in this section to
+        # enable SAML login.
         #
-        # Default values will be used for the 'entityid' and 'service' settings,
-        # so it is not normally necessary to specify them unless you need to
-        # override them.
+        # (You will probably also want to set the following options to `false` to
+        # disable the regular login/registration flows:
+        #   * enable_registration
+        #   * password_config.enabled
         #
         # Once SAML support is enabled, a metadata file will be exposed at
         # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -89,52 +93,59 @@ class SAML2Config(Config):
         # the IdP to use an ACS location of
         # https://<server>:<port>/_matrix/saml2/authn_response.
         #
-        #saml2_config:
-        #  sp_config:
-        #    # point this to the IdP's metadata. You can use either a local file or
-        #    # (preferably) a URL.
-        #    metadata:
-        #      #local: ["saml2/idp.xml"]
-        #      remote:
-        #        - url: https://our_idp/metadata.xml
-        #
-        #    # By default, the user has to go to our login page first. If you'd like to
-        #    # allow IdP-initiated login, set 'allow_unsolicited: True' in a
-        #    # 'service.sp' section:
-        #    #
-        #    #service:
-        #    #  sp:
-        #    #    allow_unsolicited: True
-        #
-        #    # The examples below are just used to generate our metadata xml, and you
-        #    # may well not need it, depending on your setup. Alternatively you
-        #    # may need a whole lot more detail - see the pysaml2 docs!
-        #
-        #    description: ["My awesome SP", "en"]
-        #    name: ["Test SP", "en"]
-        #
-        #    organization:
-        #      name: Example com
-        #      display_name:
-        #        - ["Example co", "en"]
-        #      url: "http://example.com"
-        #
-        #    contact_person:
-        #      - given_name: Bob
-        #        sur_name: "the Sysadmin"
-        #        email_address": ["admin@example.com"]
-        #        contact_type": technical
-        #
-        #  # Instead of putting the config inline as above, you can specify a
-        #  # separate pysaml2 configuration file:
-        #  #
-        #  config_path: "%(config_dir_path)s/sp_conf.py"
-        #
-        #  # the lifetime of a SAML session. This defines how long a user has to
-        #  # complete the authentication process, if allow_unsolicited is unset.
-        #  # The default is 5 minutes.
-        #  #
-        #  # saml_session_lifetime: 5m
+        saml2_config:
+          # `sp_config` is the configuration for the pysaml2 Service Provider.
+          # See pysaml2 docs for format of config.
+          #
+          # Default values will be used for the 'entityid' and 'service' settings,
+          # so it is not normally necessary to specify them unless you need to
+          # override them.
+          #
+          #sp_config:
+          #  # point this to the IdP's metadata. You can use either a local file or
+          #  # (preferably) a URL.
+          #  metadata:
+          #    #local: ["saml2/idp.xml"]
+          #    remote:
+          #      - url: https://our_idp/metadata.xml
+          #
+          #    # By default, the user has to go to our login page first. If you'd like
+          #    # to allow IdP-initiated login, set 'allow_unsolicited: True' in a
+          #    # 'service.sp' section:
+          #    #
+          #    #service:
+          #    #  sp:
+          #    #    allow_unsolicited: true
+          #
+          #    # The examples below are just used to generate our metadata xml, and you
+          #    # may well not need them, depending on your setup. Alternatively you
+          #    # may need a whole lot more detail - see the pysaml2 docs!
+          #
+          #    description: ["My awesome SP", "en"]
+          #    name: ["Test SP", "en"]
+          #
+          #    organization:
+          #      name: Example com
+          #      display_name:
+          #        - ["Example co", "en"]
+          #      url: "http://example.com"
+          #
+          #    contact_person:
+          #      - given_name: Bob
+          #        sur_name: "the Sysadmin"
+          #        email_address": ["admin@example.com"]
+          #        contact_type": technical
+
+          # Instead of putting the config inline as above, you can specify a
+          # separate pysaml2 configuration file:
+          #
+          #config_path: "%(config_dir_path)s/sp_conf.py"
+
+          # the lifetime of a SAML session. This defines how long a user has to
+          # complete the authentication process, if allow_unsolicited is unset.
+          # The default is 5 minutes.
+          #
+          #saml_session_lifetime: 5m
         """ % {
             "config_dir_path": config_dir_path
         }
