@@ -59,7 +59,7 @@ Config options
 some config options are changed from their defaults.**
 
 Previous versions of Synapse delegate the sending of registration emails and
-SMS to an Identity Server by default. In most cases this server is vector.im or
+SMS to an identity server by default. In most cases this server is vector.im or
 matrix.org.
 
 In Synapse 1.4, for security and privacy reasons, the homeserver will no longer
