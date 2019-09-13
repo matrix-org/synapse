@@ -255,7 +255,7 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
 
     def test_whitelist_idna_result(self):
         """
-        The federation certificate whitelist will not allow IDNA domain names.
+        The federation certificate whitelist will match on IDNA encoded names.
         """
         config = {
             "federation_certificate_verification_whitelist": [
