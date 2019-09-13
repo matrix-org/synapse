@@ -237,14 +237,30 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
 
         self.assertTrue(conf.acme_enabled)
 
-    def test_whitelist_idna(self):
+    def test_whitelist_idna_failure(self):
         """
-        The federation certificate whitelist functions on international domain names.
+        The federation certificate whitelist will not allow IDNA domain names.
         """
         config = {
             "federation_certificate_verification_whitelist": [
                 "example.com",
                 "*.ドメイン.テスト",
+            ]
+        }
+        t = TestConfig()
+        e = self.assertRaises(
+            ConfigError, t.read_config, config, config_dir_path="", data_dir_path=""
+        )
+        self.assertIn("IDNA domain names", str(e))
+
+    def test_whitelist_idna_result(self):
+        """
+        The federation certificate whitelist will not allow IDNA domain names.
+        """
+        config = {
+            "federation_certificate_verification_whitelist": [
+                "example.com",
+                "*.xn--eckwd4c7c.xn--zckzah",
             ]
         }
         t = TestConfig()
