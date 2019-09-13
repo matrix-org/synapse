@@ -107,7 +107,7 @@ registration messages via email and SMS.
 
 So to delegate email sending set ``account_threepid_delegates.email`` to a base URL of
 an identity server in your homeserver.yaml. Note that ``account_threepid_delegates.email``
-replaces the deprecated ``email.trust_identity_server_for_password_resets``
+replaces the deprecated ``email.trust_identity_server_for_password_resets``.
 
 .. code:: yaml
 
