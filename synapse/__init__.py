@@ -35,4 +35,4 @@ try:
 except ImportError:
     pass
 
-__version__ = "1.3.2-alpha.2+modular"
+__version__ = "1.3.2-alpha.3+modular"
