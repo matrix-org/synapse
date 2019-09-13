@@ -82,7 +82,7 @@ Email
 Following upgrade, to continue using email as a registration method admins can either:-
 
 * Configure Synapse to use an alternate email server (details follow).
-* Run their own identity server and delegate to it (which then will require details of an alternate email server).
+* Run or choose an identity server (with email support) and delegate to it.
 
 To configure an SMTP server for Synapse, modify the configuration section
 headed ``email``, and be sure to have at least the ``smtp_host, smtp_port``
