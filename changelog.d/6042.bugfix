@@ -1,0 +1,1 @@
+Prevent dummy event insertion failing due to lack of tos consent.

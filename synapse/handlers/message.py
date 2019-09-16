@@ -909,27 +909,23 @@ class EventCreationHandler(object):
             for member in members:
                 if self.hs.is_mine_id(member):
                     user_id = member
-                    break
+                    requester = create_requester(user_id)
 
-            if not user_id:
-                # We don't have a joined user.
-                # TODO: We should do something here to stop the room from
-                # appearing next time.
-                continue
+                    event, context = yield self.create_event(
+                        requester,
+                        {
+                            "type": "org.matrix.dummy_event",
+                            "content": {},
+                            "room_id": room_id,
+                            "sender": user_id,
+                        },
+                        prev_events_and_hashes=prev_events_and_hashes,
+                    )
 
-            requester = create_requester(user_id)
-
-            event, context = yield self.create_event(
-                requester,
-                {
-                    "type": "org.matrix.dummy_event",
-                    "content": {},
-                    "room_id": room_id,
-                    "sender": user_id,
-                },
-                prev_events_and_hashes=prev_events_and_hashes,
-            )
-
-            event.internal_metadata.proactively_send = False
-
-            yield self.send_nonmember_event(requester, event, context, ratelimit=False)
+                    event.internal_metadata.proactively_send = False
+                    try:
+                        yield self.send_nonmember_event(requester, event, context, ratelimit=False)
+                        break
+                    except ConsentNotGivenError:
+                        # Failed to send dummy event due to lack of consent, try another user
+                        pass
