@@ -416,13 +416,26 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
         self.store = self.hs.get_datastore()
 
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            template_html, template_text = load_jinja2_templates(
+                self.config.email_template_dir,
+                [
+                    self.config.email_add_threepid_template_html,
+                    self.config.email_add_threepid_template_text,
+                ],
+                public_baseurl=self.config.public_baseurl,
+            )
+            self.mailer = Mailer(
+                hs=self.hs,
+                app_name=self.config.email_app_name,
+                template_html=template_html,
+                template_text=template_text,
+            )
+
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-        assert_params_in_dict(
-            body, ["id_server", "client_secret", "email", "send_attempt"]
-        )
-        id_server = "https://" + body["id_server"]  # Assume https
+        assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
         client_secret = body["client_secret"]
         email = body["email"]
         send_attempt = body["send_attempt"]
@@ -442,9 +455,37 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestEmailToken(
-            id_server, email, client_secret, send_attempt, next_link
-        )
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            # Have the configured identity server handle the request
+            if not self.hs.config.account_threepid_delegate_email:
+                logger.warn(
+                    "No upstream email account_threepid_delegate configured on the server to "
+                    "handle this request"
+                )
+                raise SynapseError(
+                    400, "Password reset by email is not supported on this homeserver"
+                )
+
+            ret = yield self.identity_handler.requestEmailToken(
+                self.hs.config.account_threepid_delegate_email,
+                email,
+                client_secret,
+                send_attempt,
+                next_link,
+            )
+        else:
+            # Send password reset emails from Synapse
+            sid = yield self.identity_handler.send_threepid_validation(
+                email,
+                client_secret,
+                send_attempt,
+                self.mailer.send_add_threepid_mail,
+                next_link,
+            )
+
+            # Wrap the session id in a JSON object
+            ret = {"sid": sid}
+
         return 200, ret
 
 
@@ -461,10 +502,8 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(
-            body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
-        id_server = "https://" + body["id_server"]  # Assume https
         client_secret = body["client_secret"]
         country = body["country"]
         phone_number = body["phone_number"]
@@ -485,10 +524,116 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
+        if not self.hs.config.account_threepid_delegate_msisdn:
+            logger.warn(
+                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "handle this request"
+            )
+            raise SynapseError(
+                400,
+                "Password reset by phone number is not supported on this homeserver",
+            )
+
         ret = yield self.identity_handler.requestMsisdnToken(
-            id_server, country, phone_number, client_secret, send_attempt, next_link
+            self.hs.config.email_account_threepid_delegate_msisdn,
+            country,
+            phone_number,
+            client_secret,
+            send_attempt,
+            next_link,
         )
+
         return 200, ret
+
+
+class AddThreepidSubmitTokenServlet(RestServlet):
+    """Handles 3PID validation token submission for adding a 3PID to a user's account"""
+
+    PATTERNS = client_patterns(
+        "/add_threepid/(?P<medium>[^/]*)/submit_token/*$", releases=(), unstable=True
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(AddThreepidSubmitTokenServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.config = hs.config
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, medium):
+        # We currently only handle threepid token submissions for email
+        if medium != "email":
+            raise SynapseError(400, "This medium is currently not supported")
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "Adding emails have been disabled due to lack of an email config"
+                )
+            raise SynapseError(
+                400, "Adding an email to your account is disabled on this server"
+            )
+
+        sid = parse_string(request, "sid", required=True)
+        client_secret = parse_string(request, "client_secret", required=True)
+        token = parse_string(request, "token", required=True)
+
+        # Attempt to validate a 3PID session
+        try:
+            # Mark the session as valid
+            next_link = yield self.store.validate_threepid_session(
+                sid, client_secret, token, self.clock.time_msec()
+            )
+
+            # Perform a 302 redirect if next_link is set
+            if next_link:
+                if next_link.startswith("file:///"):
+                    logger.warn(
+                        "Not redirecting to next_link as it is a local file: address"
+                    )
+                else:
+                    request.setResponseCode(302)
+                    request.setHeader("Location", next_link)
+                    finish_request(request)
+                    return None
+
+            # Otherwise show the success template
+            html = self.config.email_add_threepid_template_success_html_content
+            request.setResponseCode(200)
+        except ThreepidValidationError as e:
+            request.setResponseCode(e.code)
+
+            # Show a failure page with a reason
+            html_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_add_threepid_template_failure_html],
+            )
+
+            template_vars = {"failure_reason": e.msg}
+            html = html_template.render(**template_vars)
+
+        request.write(html.encode("utf-8"))
+        finish_request(request)
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, medium):
+        if medium != "email":
+            raise SynapseError(400, "This medium is currently not supported")
+
+        body = parse_json_object_from_request(request)
+        assert_params_in_dict(body, ["sid", "client_secret", "token"])
+
+        valid, _ = yield self.store.validate_threepid_session(
+            body["sid"], body["client_secret"], body["token"], self.clock.time_msec()
+        )
+        response_code = 200 if valid else 400
+
+        return response_code, {"success": valid}
 
 
 class ThreepidRestServlet(RestServlet):
@@ -523,24 +668,32 @@ class ThreepidRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        # Specify None as the identity server to retrieve it from the request body instead
-        threepid = yield self.identity_handler.threepid_from_creds(None, threepid_creds)
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            # Specify None as the identity server to retrieve it from the request body instead
+            threepid = yield self.identity_handler.threepid_from_creds(
+                None, threepid_creds
+            )
 
-        if not threepid:
-            raise SynapseError(400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED)
+            if not threepid:
+                raise SynapseError(
+                    400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED
+                )
 
-        for reqd in ["medium", "address", "validated_at"]:
-            if reqd not in threepid:
-                logger.warn("Couldn't add 3pid: invalid response from ID server")
-                raise SynapseError(500, "Invalid response from ID Server")
+            for reqd in ["medium", "address", "validated_at"]:
+                if reqd not in threepid:
+                    logger.warn("Couldn't add 3pid: invalid response from ID server")
+                    raise SynapseError(500, "Invalid response from ID Server")
 
-        yield self.auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
-        )
+            yield self.auth_handler.add_threepid(
+                user_id,
+                threepid["medium"],
+                threepid["address"],
+                threepid["validated_at"],
+            )
 
-        if "bind" in body and body["bind"]:
-            logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
+            if "bind" in body and body["bind"]:
+                logger.debug("Binding threepid %s to %s", threepid, user_id)
+                yield self.identity_handler.bind_threepid(threepid_creds, user_id)
 
         return 200, {}
 
@@ -634,6 +787,7 @@ def register_servlets(hs, http_server):
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
     MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
+    AddThreepidSubmitTokenServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
     ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
