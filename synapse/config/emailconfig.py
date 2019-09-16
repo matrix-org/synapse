@@ -373,8 +373,8 @@ class EmailConfig(Config):
         #   # Templates for success and failure pages that a user will see after attempting
         #   # to add an email or phone to their account
         #   #
-        #   #add_threepid_success_html: add_threepid_success.html
-        #   #add_threepid_failure_html: add_threepid_failure.html
+        #   #add_threepid_success_html: add_threepid.html
+        #   #add_threepid_failure_html: add_threepid.html
         """
 
 
