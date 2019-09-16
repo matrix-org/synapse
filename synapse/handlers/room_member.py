@@ -1034,68 +1034,46 @@ class RoomMemberHandler(object):
 
         # Add the identity service access token to the JSON body and use the v2
         # Identity Service endpoints if id_access_token is present
-        headers = {}
+        data = None
+        base_url = "%s%s/_matrix/identity" % (id_server_scheme, id_server)
+
         if id_access_token:
-            headers["Authorization"] = create_id_access_token_header(id_access_token)
-            is_url = "%s%s/_matrix/identity/v2/store-invite" % (
-                id_server_scheme,
-                id_server,
-            )
             key_validity_url = "%s%s/_matrix/identity/v2/pubkey/isvalid" % (
                 id_server_scheme,
                 id_server,
             )
-        else:
-            is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
-                id_server_scheme,
-                id_server,
-            )
+
+            # Attempt a v2 lookup
+            url = base_url + "/v2/store-invite"
+            try:
+                data = yield self.simple_http_client.post_json_get_json(
+                    url,
+                    invite_config,
+                    {"Authorization": create_id_access_token_header(id_access_token)},
+                )
+            except HttpResponseException as e:
+                if e.code != 404:
+                    logger.info("Failed to POST %s with JSON: %s", url, e)
+                    raise e
+
+        if data is None:
             key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
                 id_server_scheme,
                 id_server,
             )
+            url = base_url + "/api/v1/store-invite"
 
-        fallback_to_v1 = False
-        try:
-            data = yield self.simple_http_client.post_json_get_json(
-                is_url, invite_config, headers
-            )
-        except HttpResponseException as e:
-            if id_access_token and e.code == 404:
-                # This identity server does not support v2 endpoints
-                # Fallback to v1 endpoints
-                fallback_to_v1 = True
-            else:
+            try:
+                data = yield self.simple_http_client.post_json_get_json(
+                    url, invite_config
+                )
+            except HttpResponseException:
                 # Some identity servers may only support application/x-www-form-urlencoded
                 # types. This is especially true with old instances of Sydent, see
                 # https://github.com/matrix-org/sydent/pull/170
-                logger.info(
-                    "Failed to POST %s with JSON, falling back to urlencoded form: %s",
-                    is_url,
-                    e,
-                )
                 data = yield self.simple_http_client.post_urlencoded_get_json(
-                    is_url, invite_config
+                    url, invite_config
                 )
-
-        if fallback_to_v1:
-            return (
-                yield self._ask_id_server_for_third_party_invite(
-                    requester,
-                    id_server,
-                    medium,
-                    address,
-                    room_id,
-                    inviter_user_id,
-                    room_alias,
-                    room_avatar_url,
-                    room_join_rules,
-                    room_name,
-                    inviter_display_name,
-                    inviter_avatar_url,
-                    id_access_token=None,  # force using v1 endpoints
-                )
-            )
 
         # TODO: Check for success
         token = data["token"]
