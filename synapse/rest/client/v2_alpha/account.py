@@ -771,6 +771,105 @@ class ThreepidBindRestServlet(RestServlet):
         return 200, {}
 
 
+class ThreepidAddRestServlet(RestServlet):
+    PATTERNS = client_patterns("/account/3pid/add$", unstable=True)
+
+    def __init__(self, hs):
+        super(ThreepidAddRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+        self.store = self.hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        assert_params_in_dict(body, ["client_secret", "sid"])
+        client_secret = body["client_secret"]
+        sid = body["sid"]
+
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        self.store.validate_threepid_session(sid, )
+
+        threepid = yield self.identity_handler.threepid_from_creds(None, threepid_creds)
+
+        if not threepid:
+            raise SynapseError(400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED)
+
+        for reqd in ["medium", "address", "validated_at"]:
+            if reqd not in threepid:
+                logger.warn("Couldn't add 3pid: invalid response from ID server")
+                raise SynapseError(500, "Invalid response from ID Server")
+
+        yield self.auth_handler.add_threepid(
+            user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
+        )
+
+        if "bind" in body and body["bind"]:
+            logger.debug("Binding threepid %s to %s", threepid, user_id)
+            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
+
+        return 200, {}
+
+
+class ThreepidBindRestServlet(RestServlet):
+    PATTERNS = client_patterns("/account/3pid/bind$", unstable=True)
+
+    def __init__(self, hs):
+        super(ThreepidBindRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+        self.datastore = self.hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+
+        threepids = yield self.datastore.user_get_threepids(requester.user.to_string())
+
+        return 200, {"threepids": threepids}
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        threepid_creds = body.get("threePidCreds") or body.get("three_pid_creds")
+        if threepid_creds is None:
+            raise SynapseError(
+                400, "Missing param three_pid_creds", Codes.MISSING_PARAM
+            )
+
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        # Specify None as the identity server to retrieve it from the request body instead
+        threepid = yield self.identity_handler.threepid_from_creds(None, threepid_creds)
+
+        if not threepid:
+            raise SynapseError(400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED)
+
+        for reqd in ["medium", "address", "validated_at"]:
+            if reqd not in threepid:
+                logger.warn("Couldn't add 3pid: invalid response from ID server")
+                raise SynapseError(500, "Invalid response from ID Server")
+
+        yield self.auth_handler.add_threepid(
+            user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
+        )
+
+        if "bind" in body and body["bind"]:
+            logger.debug("Binding threepid %s to %s", threepid, user_id)
+            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
+
+        return 200, {}
+
+
 class ThreepidUnbindRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/unbind$", releases=(), unstable=True)
 
