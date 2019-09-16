@@ -1,0 +1,1 @@
+Allow homeservers to send emails when clients request adding a new email address to their account.
