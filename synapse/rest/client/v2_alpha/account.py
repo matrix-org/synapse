@@ -725,25 +725,19 @@ class ThreepidAddRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        self.store.validate_threepid_session(sid, )
-
-        threepid = yield self.identity_handler.threepid_from_creds(None, threepid_creds)
-
-        if not threepid:
-            raise SynapseError(400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED)
-
-        for reqd in ["medium", "address", "validated_at"]:
-            if reqd not in threepid:
-                logger.warn("Couldn't add 3pid: invalid response from ID server")
-                raise SynapseError(500, "Invalid response from ID Server")
-
-        yield self.auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
+        # Get a validated session matching these details
+        validation_session = self.store.get_threepid_validation_session(
+            None, client_secret, sid=sid
         )
 
-        if "bind" in body and body["bind"]:
-            logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
+        if not validation_session:
+            raise SynapseError(
+                400, "Not validated 3pid session found", Codes.THREEPID_AUTH_FAILED
+            )
+
+        address, _, medium, _, _, validated_at = validation_session
+
+        yield self.auth_handler.add_threepid(user_id, medium, address, validated_at)
 
         return 200, {}
 
