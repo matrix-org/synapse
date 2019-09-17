@@ -665,35 +665,31 @@ class ThreepidRestServlet(RestServlet):
                 400, "Missing param three_pid_creds", Codes.MISSING_PARAM
             )
 
+        # We ignore the bind parameter as this endpoint no longer is able to bind threepids
+        # to an identity server
+
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            # Specify None as the identity server to retrieve it from the request body instead
-            threepid = yield self.identity_handler.threepid_from_creds(
-                None, threepid_creds
+        threepid_creds = body["three_pid_creds"]
+        assert_params_in_dict(threepid_creds, ["client_secret", "sid"])
+
+        client_secret = body["client_secret"]
+        sid = body["sid"]
+
+        # Get a validated session matching these details
+        validation_session = self.datastore.get_threepid_validation_session(
+            None, client_secret, sid=sid
+        )
+
+        if not validation_session:
+            raise SynapseError(
+                400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
             )
 
-            if not threepid:
-                raise SynapseError(
-                    400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED
-                )
+        address, _, medium, _, _, validated_at = validation_session
 
-            for reqd in ["medium", "address", "validated_at"]:
-                if reqd not in threepid:
-                    logger.warn("Couldn't add 3pid: invalid response from ID server")
-                    raise SynapseError(500, "Invalid response from ID Server")
-
-            yield self.auth_handler.add_threepid(
-                user_id,
-                threepid["medium"],
-                threepid["address"],
-                threepid["validated_at"],
-            )
-
-            if "bind" in body and body["bind"]:
-                logger.debug("Binding threepid %s to %s", threepid, user_id)
-                yield self.identity_handler.bind_threepid(threepid_creds, user_id)
+        yield self.auth_handler.add_threepid(user_id, medium, address, validated_at)
 
         return 200, {}
 
