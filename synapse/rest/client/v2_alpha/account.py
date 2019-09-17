@@ -282,12 +282,20 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["sid", "client_secret", "token"])
 
-        valid, _ = yield self.store.validate_threepid_session(
-            body["sid"], body["client_secret"], body["token"], self.clock.time_msec()
-        )
-        response_code = 200 if valid else 400
-
-        return response_code, {"success": valid}
+        try:
+            yield self.store.validate_threepid_session(
+                body["sid"],
+                body["client_secret"],
+                body["token"],
+                self.clock.time_msec(),
+            )
+            return 200, {"success": True}
+        except ThreepidValidationError:
+            # Validation failure
+            return 400, {"success": False}
+        except Exception as e:
+            logger.error("Error validating threepid session: %s", e)
+            raise e
 
 
 class PasswordRestServlet(RestServlet):
@@ -463,7 +471,8 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                     "handle this request"
                 )
                 raise SynapseError(
-                    400, "Password reset by email is not supported on this homeserver"
+                    400,
+                    "Adding emails to user accounts is not supported by this homeserver",
                 )
 
             ret = yield self.identity_handler.requestEmailToken(
@@ -474,7 +483,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 next_link,
             )
         else:
-            # Send password reset emails from Synapse
+            # Send threepid validation emails from Synapse
             sid = yield self.identity_handler.send_threepid_validation(
                 email,
                 client_secret,
@@ -531,7 +540,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             )
             raise SynapseError(
                 400,
-                "Password reset by phone number is not supported on this homeserver",
+                "Adding phone numbers to user account is not supported by this homeserver",
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(
@@ -569,7 +578,7 @@ class AddThreepidSubmitTokenServlet(RestServlet):
     def on_GET(self, request, medium):
         # We currently only handle threepid token submissions for email
         if medium != "email":
-            raise SynapseError(400, "This medium is currently not supported")
+            raise SynapseError(400, "This medium is not supported")
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
@@ -623,17 +632,25 @@ class AddThreepidSubmitTokenServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, medium):
         if medium != "email":
-            raise SynapseError(400, "This medium is currently not supported")
+            raise SynapseError(400, "This medium is not supported")
 
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["sid", "client_secret", "token"])
 
-        valid, _ = yield self.store.validate_threepid_session(
-            body["sid"], body["client_secret"], body["token"], self.clock.time_msec()
-        )
-        response_code = 200 if valid else 400
-
-        return response_code, {"success": valid}
+        try:
+            yield self.store.validate_threepid_session(
+                body["sid"],
+                body["client_secret"],
+                body["token"],
+                self.clock.time_msec(),
+            )
+            return 200, {"success": True}
+        except ThreepidValidationError:
+            # Validation failure
+            return 400, {"success": False}
+        except Exception as e:
+            logger.error("Error validating threepid session: %s", e)
+            raise e
 
 
 class ThreepidRestServlet(RestServlet):

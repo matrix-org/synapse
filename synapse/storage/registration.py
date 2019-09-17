@@ -1209,6 +1209,10 @@ class RegistrationStore(
             current_ts (int): The current unix time in milliseconds. Used for
                 checking token expiry status
 
+        Raises:
+            ThreepidValidationError: if a matching validation token was not found or has
+                expired
+
         Returns:
             deferred str|None: A str representing a link to redirect the user
             to if there is one.
