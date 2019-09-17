@@ -750,48 +750,23 @@ class ThreepidBindRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
-        self.auth_handler = hs.get_auth_handler()
-        self.datastore = self.hs.get_datastore()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
-
-        threepids = yield self.datastore.user_get_threepids(requester.user.to_string())
-
-        return 200, {"threepids": threepids}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        threepid_creds = body.get("threePidCreds") or body.get("three_pid_creds")
-        if threepid_creds is None:
-            raise SynapseError(
-                400, "Missing param three_pid_creds", Codes.MISSING_PARAM
-            )
+        assert_params_in_dict(body, ["id_server", "sid", "client_secret"])
+        id_server = body["id_server"]
+        sid = body["sid"]
+        client_secret = body["client_secret"]
+        id_access_token = body.get("id_access_token")  # optional
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        # Specify None as the identity server to retrieve it from the request body instead
-        threepid = yield self.identity_handler.threepid_from_creds(None, threepid_creds)
-
-        if not threepid:
-            raise SynapseError(400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED)
-
-        for reqd in ["medium", "address", "validated_at"]:
-            if reqd not in threepid:
-                logger.warn("Couldn't add 3pid: invalid response from ID server")
-                raise SynapseError(500, "Invalid response from ID Server")
-
-        yield self.auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
+        yield self.identity_handler.bind_threepid(
+            client_secret, sid, user_id, id_server, id_access_token
         )
-
-        if "bind" in body and body["bind"]:
-            logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
 
         return 200, {}
 

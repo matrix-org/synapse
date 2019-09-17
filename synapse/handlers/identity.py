@@ -44,36 +44,6 @@ class IdentityHandler(BaseHandler):
         self.federation_http_client = hs.get_http_client()
         self.hs = hs
 
-    def _extract_items_from_creds_dict(self, creds):
-        """
-        Retrieve entries from a "credentials" dictionary
-
-        Args:
-            creds (dict[str, str]): Dictionary of credentials that contain the following keys:
-                * client_secret|clientSecret: A unique secret str provided by the client
-                * id_server|idServer: the domain of the identity server to query
-                * id_access_token: The access token to authenticate to the identity
-                    server with.
-
-        Returns:
-            tuple(str, str, str|None): A tuple containing the client_secret, the id_server,
-                and the id_access_token value if available.
-        """
-        client_secret = creds.get("client_secret") or creds.get("clientSecret")
-        if not client_secret:
-            raise SynapseError(
-                400, "No client_secret in creds", errcode=Codes.MISSING_PARAM
-            )
-
-        id_server = creds.get("id_server") or creds.get("idServer")
-        if not id_server:
-            raise SynapseError(
-                400, "No id_server in creds", errcode=Codes.MISSING_PARAM
-            )
-
-        id_access_token = creds.get("id_access_token")
-        return client_secret, id_server, id_access_token
-
     @defer.inlineCallbacks
     def threepid_from_creds(self, id_server, creds):
         """
@@ -112,32 +82,29 @@ class IdentityHandler(BaseHandler):
         return data if "medium" in data else None
 
     @defer.inlineCallbacks
-    def bind_threepid(self, creds, mxid, use_v2=True):
+    def bind_threepid(
+        self, client_secret, sid, mxid, id_server, id_access_token=None, use_v2=True
+    ):
         """Bind a 3PID to an identity server
 
         Args:
-            creds (dict[str, str]): Dictionary of credentials that contain the following keys:
-                * client_secret|clientSecret: A unique secret str provided by the client
-                * id_server|idServer: the domain of the identity server to query
-                * id_access_token: The access token to authenticate to the identity
-                    server with. Required if use_v2 is true
+            client_secret: A unique secret str provided by the client
+
+            sid: The ID of the validation session
+
             mxid (str): The MXID to bind the 3PID to
-            use_v2 (bool): Whether to use v2 Identity Service API endpoints
+
+            id_server: The domain of the identity server to query
+
+            id_access_token: The access token to authenticate to the identity
+                server with, if necessary. Required if use_v2 is true
+
+            use_v2 (bool): Whether to use v2 Identity Service API endpoints. Defaults to True
 
         Returns:
             Deferred[dict]: The response from the identity server
         """
-        logger.debug("binding threepid %r to %s", creds, mxid)
-
-        client_secret, id_server, id_access_token = self._extract_items_from_creds_dict(
-            creds
-        )
-
-        sid = creds.get("sid")
-        if not sid:
-            raise SynapseError(
-                400, "No sid in three_pid_creds", errcode=Codes.MISSING_PARAM
-            )
+        logger.debug("Proxying threepid bind request for %s to %s", mxid, id_server)
 
         # If an id_access_token is not supplied, force usage of v1
         if id_access_token is None:
@@ -156,7 +123,6 @@ class IdentityHandler(BaseHandler):
             data = yield self.http_client.post_json_get_json(
                 bind_url, bind_data, headers=headers
             )
-            logger.debug("bound threepid %r to %s", creds, mxid)
 
             # Remember where we bound the threepid
             yield self.store.add_user_bound_threepid(
@@ -176,7 +142,10 @@ class IdentityHandler(BaseHandler):
             return data
 
         logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", bind_url)
-        return (yield self.bind_threepid(creds, mxid, use_v2=False))
+        res = yield self.bind_threepid(
+            client_secret, sid, mxid, id_server, id_access_token, use_v2=False
+        )
+        return res
 
     @defer.inlineCallbacks
     def try_unbind_threepid(self, mxid, threepid):
