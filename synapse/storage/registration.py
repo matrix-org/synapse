@@ -586,6 +586,14 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="add_user_bound_threepid",
         )
 
+    def user_get_bound_threepids(self, user_id):
+        return self._simple_select_list(
+            "user_threepid_id_server",
+            {"user_id": user_id},
+            ["medium", "address"],
+            "user_get_bound_threepids",
+        )
+
     def remove_user_bound_threepid(self, user_id, medium, address, id_server):
         """The server proxied an unbind request to the given identity server on
         behalf of the given user, so we remove the mapping of threepid to

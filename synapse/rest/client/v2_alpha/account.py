@@ -862,6 +862,8 @@ def register_servlets(hs, http_server):
     MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
     AddThreepidSubmitTokenServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
+    ThreepidAddRestServlet(hs).register(http_server)
+    ThreepidBindRestServlet(hs).register(http_server)
     ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
