@@ -103,7 +103,7 @@ Upgrading to v1.2.0
 ===================
 
 Some counter metrics have been renamed, with the old names deprecated. See
-`the metrics documentation <docs/metrics-howto.rst#renaming-of-metrics--deprecation-of-old-names-in-12>`_
+`the metrics documentation <docs/metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12>`_
 for details.
 
 Upgrading to v1.1.0
