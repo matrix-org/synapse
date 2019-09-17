@@ -1068,20 +1068,29 @@ class RoomMemberHandler(object):
                     url, invite_config
                 )
             except HttpResponseException as e:
-                logger.warning("Error trying to call /store-invite on %s%s: %s",
-                               id_server_scheme, id_server, e)
+                logger.warning(
+                    "Error trying to call /store-invite on %s%s: %s",
+                    id_server_scheme,
+                    id_server,
+                    e,
+                )
 
             if data is None:
+                # Some identity servers may only support application/x-www-form-urlencoded
+                # types. This is especially true with old instances of Sydent, see
+                # https://github.com/matrix-org/sydent/pull/170
                 try:
-                    # Some identity servers may only support application/x-www-form-urlencoded
-                    # types. This is especially true with old instances of Sydent, see
-                    # https://github.com/matrix-org/sydent/pull/170
                     data = yield self.simple_http_client.post_urlencoded_get_json(
                         url, invite_config
                     )
                 except HttpResponseException as e:
-                    logger.warning("Error calling /store-invite on %s%s with fallback "
-                                   "encoding: %s", id_server_scheme, id_server, e)
+                    logger.warning(
+                        "Error calling /store-invite on %s%s with fallback "
+                        "encoding: %s",
+                        id_server_scheme,
+                        id_server,
+                        e,
+                    )
                     raise e
 
         # TODO: Check for success
