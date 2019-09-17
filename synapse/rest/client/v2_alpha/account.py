@@ -514,7 +514,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             )
             raise SynapseError(
                 400,
-                "Password reset by phone number is not supported on this homeserver",
+                "Adding phone numbers to user account is not supported by this homeserver",
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(
