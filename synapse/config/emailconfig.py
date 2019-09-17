@@ -352,6 +352,12 @@ class EmailConfig(Config):
         #   #registration_template_html: registration.html
         #   #registration_template_text: registration.txt
         #
+        #   # Templates for validation emails sent by the homeserver when adding an email to
+        #   # your user account
+        #   #
+        #   #add_threepid_template_html: add_threepid.html
+        #   #add_threepid_template_text: add_threepid.txt
+        #
         #   # Templates for password reset success and failure pages that a user
         #   # will see after attempting to reset their password
         #   #
