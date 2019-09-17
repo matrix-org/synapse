@@ -48,7 +48,11 @@ class VersionsRestServlet(RestServlet):
                     "r0.5.0",
                 ],
                 # as per MSC1497:
-                "unstable_features": {"m.lazy_load_members": True},
+                "unstable_features": {
+                    "m.lazy_load_members": True,
+                    # as per MSC2290
+                    "m.separate_add_and_bind": True,
+                },
             },
         )
 
