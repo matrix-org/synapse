@@ -668,9 +668,15 @@ class RegistrationWorkerStore(SQLBaseStore):
                 perform no filtering
 
         Returns:
-            deferred {str, int}|None: A dict containing the
-                latest session_id and send_attempt count for this 3PID.
-                Otherwise None if there hasn't been a previous attempt
+            deferred {str, str|int|None}|None: A dict containing the following:
+                * address - address of the 3pid
+                * medium - medium of the 3pid
+                * client_secret - a secret provided by the client for this validation session
+                * session_id - ID of the validation session
+                * send_attempt - a number serving to dedupe send attempts for this session
+                * validated_at - timestamp of when this session was validated if so
+
+                Otherwise None if a validation session is not found
         """
         keyvalues = {"medium": medium, "client_secret": client_secret}
         if address:

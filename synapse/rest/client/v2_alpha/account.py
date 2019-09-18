@@ -674,6 +674,8 @@ class ThreepidRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
         threepid_creds = body.get("threePidCreds") or body.get("three_pid_creds")
@@ -681,22 +683,14 @@ class ThreepidRestServlet(RestServlet):
             raise SynapseError(
                 400, "Missing param three_pid_creds", Codes.MISSING_PARAM
             )
-
-        # We ignore the bind parameter as this endpoint no longer is able to bind threepids
-        # to an identity server
-
-        requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
-
-        threepid_creds = body["three_pid_creds"]
         assert_params_in_dict(threepid_creds, ["client_secret", "sid"])
 
-        client_secret = body["client_secret"]
-        sid = body["sid"]
+        client_secret = threepid_creds["client_secret"]
+        sid = threepid_creds["sid"]
 
         # Get a validated session matching these details
-        validation_session = self.datastore.get_threepid_validation_session(
-            None, client_secret, sid=sid
+        validation_session = yield self.datastore.get_threepid_validation_session(
+            None, client_secret, sid=sid, validated=True
         )
 
         if not validation_session:
@@ -704,7 +698,9 @@ class ThreepidRestServlet(RestServlet):
                 400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
             )
 
-        address, _, medium, _, _, validated_at = validation_session
+        address = validation_session["address"]
+        medium = validation_session["medium"]
+        validated_at = validation_session["validated_at"]
 
         yield self.auth_handler.add_threepid(user_id, medium, address, validated_at)
 
