@@ -84,6 +84,13 @@ class StatsHandler(StateDeltasHandler):
         # Loop round handling deltas until we're up to date
 
         while True:
+            # Be sure to read the max stream_ordering *before* checking if there are any outstanding
+            # deltas, since there is otherwise a chance that we could miss updates which arrive
+            # after we check the deltas.
+            room_max_stream_ordering = yield self.store.get_room_max_stream_ordering()
+            if self.pos == room_max_stream_ordering:
+                break
+
             deltas = yield self.store.get_current_state_deltas(self.pos)
 
             if deltas:
@@ -94,7 +101,7 @@ class StatsHandler(StateDeltasHandler):
             else:
                 room_deltas = {}
                 user_deltas = {}
-                max_pos = yield self.store.get_room_max_stream_ordering()
+                max_pos = room_max_stream_ordering
 
             # Then count deltas for total_events and total_event_bytes.
             room_count, user_count = yield self.store.get_changes_room_total_events_and_bytes(
@@ -117,10 +124,9 @@ class StatsHandler(StateDeltasHandler):
                 stream_id=max_pos,
             )
 
-            event_processing_positions.labels("stats").set(max_pos)
+            logger.debug("Handled room stats to %s -> %s", self.pos, max_pos)
 
-            if self.pos == max_pos:
-                break
+            event_processing_positions.labels("stats").set(max_pos)
 
             self.pos = max_pos
 
@@ -260,7 +266,9 @@ class StatsHandler(StateDeltasHandler):
                         room_stats_delta["local_users_in_room"] += delta
 
             elif typ == EventTypes.Create:
-                room_state["is_federatable"] = event_content.get("m.federate", True)
+                room_state["is_federatable"] = (
+                    event_content.get("m.federate", True) is True
+                )
                 if sender and self.is_mine_id(sender):
                     user_to_stats_deltas.setdefault(sender, Counter())[
                         "rooms_created"

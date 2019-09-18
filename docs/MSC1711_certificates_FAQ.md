@@ -147,7 +147,7 @@ your domain, you can simply route all traffic through the reverse proxy by
 updating the SRV record appropriately (or removing it, if the proxy listens on
 8448).
 
-See [reverse_proxy.rst](reverse_proxy.rst) for information on setting up a
+See [reverse_proxy.md](reverse_proxy.md) for information on setting up a
 reverse proxy.
 
 #### Option 3: add a .well-known file to delegate your matrix traffic
@@ -319,7 +319,7 @@ We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.
 
-See [reverse_proxy.rst](reverse_proxy.rst) for information on setting up a
+See [reverse_proxy.md](reverse_proxy.md) for information on setting up a
 reverse proxy.
 
 ### Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?

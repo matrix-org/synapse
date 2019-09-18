@@ -144,20 +144,29 @@ class IdentityHandler(BaseHandler):
             creds
         )
 
+        sid = creds.get("sid")
+        if not sid:
+            raise SynapseError(
+                400, "No sid in three_pid_creds", errcode=Codes.MISSING_PARAM
+            )
+
         # If an id_access_token is not supplied, force usage of v1
         if id_access_token is None:
             use_v2 = False
 
         # Decide which API endpoint URLs to use
-        bind_data = {"sid": creds["sid"], "client_secret": client_secret, "mxid": mxid}
+        headers = {}
+        bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
         if use_v2:
             bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server,)
-            bind_data["id_access_token"] = id_access_token
+            headers["Authorization"] = create_id_access_token_header(id_access_token)
         else:
             bind_url = "https://%s/_matrix/identity/api/v1/3pid/bind" % (id_server,)
 
         try:
-            data = yield self.http_client.post_json_get_json(bind_url, bind_data)
+            data = yield self.http_client.post_json_get_json(
+                bind_url, bind_data, headers=headers
+            )
             logger.debug("bound threepid %r to %s", creds, mxid)
 
             # Remember where we bound the threepid
@@ -448,3 +457,36 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
+
+
+def create_id_access_token_header(id_access_token):
+    """Create an Authorization header for passing to SimpleHttpClient as the header value
+    of an HTTP request.
+
+    Args:
+        id_access_token (str): An identity server access token.
+
+    Returns:
+        list[str]: The ascii-encoded bearer token encased in a list.
+    """
+    # Prefix with Bearer
+    bearer_token = "Bearer %s" % id_access_token
+
+    # Encode headers to standard ascii
+    bearer_token.encode("ascii")
+
+    # Return as a list as that's how SimpleHttpClient takes header values
+    return [bearer_token]
+
+
+class LookupAlgorithm:
+    """
+    Supported hashing algorithms when performing a 3PID lookup.
+
+    SHA256 - Hashing an (address, medium, pepper) combo with sha256, then url-safe base64
+        encoding
+    NONE - Not performing any hashing. Simply sending an (address, medium) combo in plaintext
+    """
+
+    SHA256 = "sha256"
+    NONE = "none"

@@ -136,8 +136,8 @@ federation_ip_range_blacklist:
 #
 #   type: the type of listener. Normally 'http', but other valid options are:
 #       'manhole' (see docs/manhole.md),
-#       'metrics' (see docs/metrics-howto.rst),
-#       'replication' (see docs/workers.rst).
+#       'metrics' (see docs/metrics-howto.md),
+#       'replication' (see docs/workers.md).
 #
 #   tls: set to true to enable TLS for this listener. Will use the TLS
 #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -172,12 +172,12 @@ federation_ip_range_blacklist:
 #
 #   media: the media API (/_matrix/media).
 #
-#   metrics: the metrics interface. See docs/metrics-howto.rst.
+#   metrics: the metrics interface. See docs/metrics-howto.md.
 #
 #   openid: OpenID authentication.
 #
 #   replication: the HTTP replication API (/_synapse/replication). See
-#       docs/workers.rst.
+#       docs/workers.md.
 #
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
@@ -201,7 +201,7 @@ listeners:
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
-  # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+  # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
   #
   - port: 8008
     tls: false
@@ -305,6 +305,13 @@ listeners:
 # Defaults to 'true'.
 #
 #allow_per_room_profiles: false
+
+# How long to keep redacted events in unredacted form in the database. After
+# this period redacted events get replaced with their redacted form in the DB.
+#
+# Defaults to `7d`. Set to `null` to disable.
+#
+redaction_retention_period: 7d
 
 
 ## TLS ##
@@ -511,6 +518,9 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for login that ratelimits login requests based on the account the
 #     client is attempting to log into, based on the amount of failed login
 #     attempts for this account.
+#   - one for ratelimiting redactions by room admins. If this is not explicitly
+#     set then it uses the same ratelimiting as per rc_message. This is useful
+#     to allow room admins to deal with abuse quickly.
 #
 # The defaults are as shown below.
 #
@@ -532,6 +542,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  failed_attempts:
 #    per_second: 0.17
 #    burst_count: 3
+#
+#rc_admin_redaction:
+#  per_second: 1
+#  burst_count: 50
 
 
 # Ratelimiting settings for incoming federation
@@ -958,8 +972,23 @@ account_threepid_delegates:
 #sentry:
 #    dsn: "..."
 
+# Flags to enable Prometheus metrics which are not suitable to be
+# enabled by default, either for performance reasons or limited use.
+#
+metrics_flags:
+    # Publish synapse_federation_known_servers, a g auge of the number of
+    # servers this homeserver knows about, including itself. May cause
+    # performance problems on large homeservers.
+    #
+    #known_servers: true
+
 # Whether or not to report anonymized homeserver usage statistics.
 # report_stats: true|false
+
+# The endpoint to report the anonymized homeserver usage statistics to.
+# Defaults to https://matrix.org/report-usage-stats/push
+#
+#report_stats_endpoint: https://example.com/report-usage-stats/push
 
 
 ## API Configuration ##
