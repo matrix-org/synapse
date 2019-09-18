@@ -293,9 +293,6 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         except ThreepidValidationError:
             # Validation failure
             return 400, {"success": False}
-        except Exception as e:
-            logger.error("Error validating threepid session: %s", e)
-            raise e
 
 
 class PasswordRestServlet(RestServlet):
