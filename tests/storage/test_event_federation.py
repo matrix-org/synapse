@@ -100,7 +100,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
 
         # Does filter work?
         r = yield self.store.get_rooms_with_many_extremities(5, 5, ["#room1"])
-        self.assertEqual(r, ["#room2", "#room3"])
+        self.assertTrue("#room2" in r)
+        self.assertTrue("#room3" in r)
+        self.assertEqual(len(r), 2)
 
         r = yield self.store.get_rooms_with_many_extremities(5, 5, ["#room1", "#room2"])
         self.assertEqual(r, ["#room3"])
