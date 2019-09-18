@@ -640,57 +640,10 @@ class ThreepidRestServlet(RestServlet):
         client_secret = threepid_creds["client_secret"]
         sid = threepid_creds["sid"]
 
-        # We don't actually know which medium this 3PID is. Thus we first assume it's email,
-        # and if validation fails we try msisdn
-        validation_session = None
-
-        # Try to validate as email
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            # Ask our delegated email identity server
-            try:
-                validation_session = yield self.identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_email, threepid_creds
-                )
-            except HttpResponseException:
-                logger.debug(
-                    "%s reported non-validated threepid: %s",
-                    self.hs.config.account_threepid_delegate_email,
-                    threepid_creds,
-                )
-        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            # Get a validated session matching these details
-            validation_session = yield self.datastore.get_threepid_validation_session(
-                "email", client_secret, sid=sid, validated=True
-            )
-
-        # Old versions of Sydent return a 200 http code even on a failed validation check.
-        # Thus, in addition to the HttpResponseException check above (which checks for
-        # non-200 errors), we need to make sure validation_session isn't actually an error,
-        # identified by containing an "error" key
-        # See https://github.com/matrix-org/sydent/issues/215 for details
-        if validation_session and "error" not in validation_session:
-            yield self._add_threepid_to_account(user_id, validation_session)
-            return 200, {}
-
-        # Try to validate as msisdn
-        if self.hs.config.account_threepid_delegate_msisdn:
-            # Ask our delegated msisdn identity server
-            try:
-                validation_session = yield self.identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_msisdn, threepid_creds
-                )
-            except HttpResponseException:
-                logger.debug(
-                    "%s reported non-validated threepid: %s",
-                    self.hs.config.account_threepid_delegate_email,
-                    threepid_creds,
-                )
-
-            # Check that validation_session isn't actually an error due to old Sydent instances
-            # See explanatory comment above
-            if validation_session and "error" not in validation_session:
-                yield self._add_threepid_to_account(user_id, validation_session)
-                return 200, {}
+        # Get a validated session matching these details
+        validation_session = yield self.datastore.get_threepid_validation_session(
+            None, client_secret, sid=sid, validated=True
+        )
 
         raise SynapseError(
             400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
