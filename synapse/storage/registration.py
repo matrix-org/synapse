@@ -678,7 +678,11 @@ class RegistrationWorkerStore(SQLBaseStore):
 
                 Otherwise None if a validation session is not found
         """
-        keyvalues = {"medium": medium, "client_secret": client_secret}
+        keyvalues = {}
+        if client_secret:
+            keyvalues["client_secret"] = client_secret
+        if medium:
+            keyvalues["medium"] = medium
         if address:
             keyvalues["address"] = address
         if sid:
