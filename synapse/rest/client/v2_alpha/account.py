@@ -442,6 +442,15 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "Adding emails have been disabled due to lack of an email config"
+                )
+            raise SynapseError(
+                400, "Adding an email to your account is disabled on this server"
+            )
+
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
         client_secret = body["client_secret"]
