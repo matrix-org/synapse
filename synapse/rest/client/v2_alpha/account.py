@@ -607,29 +607,6 @@ class AddThreepidSubmitTokenServlet(RestServlet):
         request.write(html.encode("utf-8"))
         finish_request(request)
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, medium):
-        if medium != "email":
-            raise SynapseError(400, "This medium is not supported")
-
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["sid", "client_secret", "token"])
-
-        try:
-            yield self.store.validate_threepid_session(
-                body["sid"],
-                body["client_secret"],
-                body["token"],
-                self.clock.time_msec(),
-            )
-            return 200, {"success": True}
-        except ThreepidValidationError:
-            # Validation failure
-            return 400, {"success": False}
-        except Exception as e:
-            logger.error("Error validating threepid session: %s", e)
-            raise e
-
 
 class ThreepidRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid$")
