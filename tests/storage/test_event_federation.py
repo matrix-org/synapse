@@ -75,3 +75,36 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
             el = r[i]
             depth = el[2]
             self.assertLessEqual(5, depth)
+
+    @defer.inlineCallbacks
+    def test_get_rooms_with_many_extremities(self):
+
+        def insert_event(txn, i, room_id):
+            event_id = "$event_%i:local" % i
+
+            txn.execute(
+                (
+                    "INSERT INTO event_forward_extremities (room_id, event_id) "
+                    "VALUES (?, ?)"
+                ),
+                (room_id, event_id),
+            )
+        for i in range(0, 20):
+            yield self.store.runInteraction("insert", insert_event, i, '#room1')
+            yield self.store.runInteraction("insert", insert_event, i, '#room2')
+            yield self.store.runInteraction("insert", insert_event, i, '#room3')
+
+        # Test simple case
+        r = yield self.store.get_rooms_with_many_extremities(5, 5, [])
+        self.assertEqual(len(r), 3)
+
+        # Does filter work?
+        r = yield self.store.get_rooms_with_many_extremities(5, 5, ['#room1'])
+        self.assertEqual(r, ['#room2', '#room3'])
+
+        r = yield self.store.get_rooms_with_many_extremities(5, 5, ['#room1', '#room2'])
+        self.assertEqual(r, ['#room3'])
+
+        # Does filter and limit work?
+        r = yield self.store.get_rooms_with_many_extremities(5, 1, ['#room1'])
+        self.assertEqual(r, ['#room2'] or ['#room3'])

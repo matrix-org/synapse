@@ -190,7 +190,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             room_id,
         )
 
-    def get_rooms_with_many_extremities(self, min_count, limit):
+    def get_rooms_with_many_extremities(self, min_count, limit, room_id_filter):
         """Get the top rooms with at least N extremities.
 
         Args:
@@ -203,15 +203,33 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """
 
         def _get_rooms_with_many_extremities_txn(txn):
-            sql = """
+            base_sql_pre = """
                 SELECT room_id FROM event_forward_extremities
                 GROUP BY room_id
                 HAVING count(*) > ?
+            """
+            base_sql_post = """
                 ORDER BY count(*) DESC
                 LIMIT ?
             """
+            query_args = [limit]
+            # Need if/else since 'AND room_id NOT IN ({})' fails on Postgres
+            # when len(room_id_filter) == 0. Works fine on sqlite.
+            if len(room_id_filter) > 0:
+                # questionmarks is a hack to overcome sqlite not supporting
+                # tuples in 'WHERE IN %s'
+                questionmarks = "?" * len(room_id_filter)
 
-            txn.execute(sql, (min_count, limit))
+                query_args.extend(room_id_filter)
+
+                sql = base_sql_pre + """ AND room_id NOT IN ({})""".format(
+                    ",".join(questionmarks)
+                ) + " " + base_sql_post
+            else:
+                sql = base_sql_pre + base_sql_post
+
+            query_args.append(limit)
+            txn.execute(sql, query_args)
             return [room_id for room_id, in txn]
 
         return self.runInteraction(
