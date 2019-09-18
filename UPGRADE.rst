@@ -55,8 +55,8 @@ Upgrading to v1.4.0
 Config options
 --------------
 
-**Note: Registration by email address or phone number will not work in this release unless
-some config options are changed from their defaults.**
+**Note: Registration by email address or phone number will not work in this
+release unless some config options are changed from their defaults.**
 
 Previous versions of Synapse delegate the sending of registration emails and
 SMS to an identity server by default. In most cases this server is vector.im or
@@ -74,12 +74,14 @@ some time after that once SMS sending support lands in Synapse.
 
 Once email and SMS support has been disabled in the vector.im and matrix.org
 identity servers, all Synapse versions that depend on those instances will be
-unable to send email and SMS through them.
+unable to send email and SMS through them. There are no imminent plans to
+remove email and SMS support from Sydent altogether.
 
 Email
 -----
 
-Following upgrade, to continue using email as a registration method admins can either:-
+Following upgrade, to continue using email as a registration method admins can
+either:-
 
 * Configure Synapse to use an alternate email server (details follow).
 * Run or choose an identity server (with email support) and delegate to it.
@@ -91,7 +93,9 @@ and ``notif_from`` fields filled out.
 You may also need to set ``smtp_user``, ``smtp_pass``, and
 ``require_transport_security``.
 
-See the `sample configuration file <https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_ for more details on these settings.
+See the `sample configuration file
+<https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_
+for more details on these settings.
 
 Some admins will wish to continue using email as a registration method, but
 will not immediately have an appropriate SMTP server to hand.
@@ -100,14 +104,15 @@ To this end, we will continue to support email delegation via the vector.im and
 matrix.org identity servers for two months, the cut off date is XXXX after
 which time email delegation will be disabled.
 
-The ``account_threepid_delegates`` dictionary defines whether the
-homeserver should delegate an external server (typically an `identity server
-<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset or
-registration messages via email and SMS.
+The ``account_threepid_delegates`` dictionary defines whether the homeserver
+should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending
+password reset or registration messages via email and SMS.
 
-So to delegate email sending set ``account_threepid_delegates.email`` to a base URL of
-an identity server in your homeserver.yaml. Note that ``account_threepid_delegates.email``
-replaces the deprecated ``email.trust_identity_server_for_password_resets``.
+So to delegate email sending set ``account_threepid_delegates.email`` to a base
+URL of an identity server in your homeserver.yaml. Note that
+``account_threepid_delegates.email`` replaces the deprecated
+``email.trust_identity_server_for_password_resets``.
 
 .. code:: yaml
 
@@ -116,29 +121,43 @@ replaces the deprecated ``email.trust_identity_server_for_password_resets``.
 
 If ``email.trust_identity_server_for_password_resets`` is set to ``true``, and
 ``account_threepid_delegates.email`` is not set, then the first entry in
-``trusted_third_party_id_servers`` will be used as the account threepid delegate for email.
-This is to ensure compatibility with existing Synapse installs that set up external server
-handling for these tasks before v1.4.0. If ``email.trust_identity_server_for_password_resets``
-is ``true`` and no trusted identity server domains are configured, Synapse will throw an error.
+``trusted_third_party_id_servers`` will be used as the account threepid
+delegate for email. This is to ensure compatibility with existing Synapse
+installs that set up external server handling for these tasks before v1.4.0. If
+``email.trust_identity_server_for_password_resets`` is ``true`` and no trusted
+identity server domains are configured, Synapse will throw an error.
 
-If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent and a threepid
-type in ``account_threepid_delegates`` is not set to a domain, then Synapse will attempt to
-send password reset and registration messages for that type.
+If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent
+and a threepid type in ``account_threepid_delegates`` is not set to a domain,
+then Synapse will attempt to send password reset and registration messages for
+that type.
 
 Email templates
 ---------------
 
-If you have configured a custom template directory with the ``email.template_dir`` option, be
-aware that there are new templates regarding registration. ``registration.html`` and
-``registration.txt`` have been added and contain the content that is sent to a client upon
-registering via an email address.
+If you have configured a custom template directory with the
+``email.template_dir`` option, be aware that there are new templates regarding
+registration and threepid management.
 
-``registration_success.html`` and ``registration_failure.html`` are also new HTML templates
-that will be shown to the user when they click the link in their registration emai , either
-showing them a success or failure page (assuming a redirect URL is not configured).
+``registration.html`` and ``registration.txt`` contain the content that is sent
+to a client upon registering via an email address.
 
-Synapse will expect these files to exist inside the configured template directory. To view the
-default templates, see `synapse/res/templates
+``registration_success.html`` and ``registration_failure.html`` are templates
+that will be shown to the user when they click the link in their registration
+email , either showing them a success or failure page (assuming a redirect URL
+is not configured).
+
+``add_threepid.html`` and  ``add_threepid.txt`` are templates sent to a client
+to add the threepid.
+
+``add_threepid_failure.html`` and ``add_threepid_success.html`` are templates
+that will be shown to the user when they click the link in their threeid add
+email , either showing them a success or failure page (assuming a redirect URL
+is not configured).
+
+
+Synapse will expect these files to exist inside the configured template
+directory. To view the default templates, see `synapse/res/templates
 <https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
 
 SMS
@@ -148,10 +167,10 @@ Following upgrade, the only way to maintain the ability to register via a phone
 number will be to continue to delegate SMS delivery via the matrix.org and
 vector.im identity servers.
 
-The ``account_threepid_delegates`` dictionary defines whether the
-homeserver should delegate an external server (typically an `identity server
-<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset or
-registration messages via email and SMS.
+The ``account_threepid_delegates`` dictionary defines whether the homeserver
+should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending
+password reset or registration messages via email and SMS.
 
 So to delegate SMS sending set ``account_threepid_delegates.sms`` to a base URL of
 an identity server in your homeserver.yaml.
