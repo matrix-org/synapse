@@ -553,7 +553,7 @@ class AddThreepidSubmitTokenServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(AddThreepidSubmitTokenServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.config = hs.config
