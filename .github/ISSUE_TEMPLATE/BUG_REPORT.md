@@ -7,7 +7,7 @@ about: Create a report to help us improve
 <!--
 
 **IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**:
-You will likely get better support more quickly if you ask in ** #matrix:matrix.org ** ;)
+You will likely get better support more quickly if you ask in ** #synapse:matrix.org ** ;)
 
 
 This is a bug report template. By following the instructions below and
