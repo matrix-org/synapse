@@ -554,7 +554,6 @@ class AddThreepidSubmitTokenServlet(RestServlet):
             hs (synapse.server.HomeServer): server
         """
         super().__init__()
-        self.hs = hs
         self.auth = hs.get_auth()
         self.config = hs.config
         self.clock = hs.get_clock()
