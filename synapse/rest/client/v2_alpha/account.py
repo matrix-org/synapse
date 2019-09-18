@@ -193,7 +193,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
 
     PATTERNS = client_patterns(
-        "/password_reset/(?P<medium>[^/]*)/submit_token/*$", releases=(), unstable=True
+        "/password_reset/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
     )
 
     def __init__(self, hs):
@@ -545,7 +545,7 @@ class AddThreepidSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission for adding a 3PID to a user's account"""
 
     PATTERNS = client_patterns(
-        "/add_threepid/(?P<medium>[^/]*)/submit_token/*$", releases=(), unstable=True
+        "/add_threepid/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
     )
 
     def __init__(self, hs):
