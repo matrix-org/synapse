@@ -63,16 +63,16 @@ SMS to an identity server by default. In most cases this server is vector.im or
 matrix.org.
 
 In Synapse 1.4, for security and privacy reasons, the homeserver will no longer
-delegate email or SMS to an identity server by default and instead the admin
+delegate this task to an identity server by default. Instead, the server administrator
 will need to explicitly decide how they would like email and SMS to be sent.
 
 In the medium term the vector.im and matrix.org identity servers will disable
 sending email and SMS entirely, however in order to ease the transition they
 will retain the capability to send email and SMS for a limited period. Email
-will be disabled on XXX (giving 2 months notice), disabling SMS will follow
+will be disabled on XXX (giving 2 months notice). Disabling SMS will follow
 some time after that once SMS sending support lands in Synapse.
 
-Once email and SMS support has been disabled in the vector.im and matrix.org
+Once email and SMS support have been disabled in the vector.im and matrix.org
 identity servers, all Synapse versions that depend on those instances will be
 unable to send email and SMS through them. There are no imminent plans to
 remove email and SMS support from Sydent altogether.
@@ -83,7 +83,7 @@ Email
 Following upgrade, to continue using email as a registration method admins can
 either:-
 
-* Configure Synapse to use an alternate email server (details follow).
+* Configure Synapse to use an email server (details follow).
 * Run or choose an identity server (with email support) and delegate to it.
 
 To configure an SMTP server for Synapse, modify the configuration section
@@ -94,14 +94,14 @@ You may also need to set ``smtp_user``, ``smtp_pass``, and
 ``require_transport_security``.
 
 See the `sample configuration file
-<https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_
+<docs/sample_config.yaml>`_
 for more details on these settings.
 
 Some admins will wish to continue using email as a registration method, but
 will not immediately have an appropriate SMTP server to hand.
 
 To this end, we will continue to support email delegation via the vector.im and
-matrix.org identity servers for two months, the cut off date is XXXX after
+matrix.org identity servers for two months. The cut off date is XXXX, after
 which time email delegation will be disabled.
 
 The ``account_threepid_delegates`` dictionary defines whether the homeserver
@@ -109,10 +109,12 @@ should delegate an external server (typically an `identity server
 <https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending
 password reset or registration messages via email and SMS.
 
-So to delegate email sending set ``account_threepid_delegates.email`` to a base
-URL of an identity server in your homeserver.yaml. Note that
+So to delegate email sending, in ``homeserver.yaml``, set ``account_threepid_delegates.email`` to a base
+URL of an identity server. Note that
 ``account_threepid_delegates.email`` replaces the deprecated
 ``email.trust_identity_server_for_password_resets``.
+
+For example:
 
 .. code:: yaml
 
@@ -125,36 +127,34 @@ If ``email.trust_identity_server_for_password_resets`` is set to ``true``, and
 delegate for email. This is to ensure compatibility with existing Synapse
 installs that set up external server handling for these tasks before v1.4.0. If
 ``email.trust_identity_server_for_password_resets`` is ``true`` and no trusted
-identity server domains are configured, Synapse will throw an error.
+identity server domains are configured, Synapse will report an error and refuse to start.
 
 If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent
-and a threepid type in ``account_threepid_delegates`` is not set to a domain,
+and a threepid type in ``account_threepid_delegates`` is not set,
 then Synapse will attempt to send password reset and registration messages for
 that type.
 
-Email templates
+Custom templates
 ---------------
 
 If you have configured a custom template directory with the
 ``email.template_dir`` option, be aware that there are new templates regarding
 registration and threepid management.
 
-``registration.html`` and ``registration.txt`` contain the content that is sent
+``registration.html`` and ``registration.txt`` contain the content of the email that is sent
 to a client upon registering via an email address.
 
 ``registration_success.html`` and ``registration_failure.html`` are templates
 that will be shown to the user when they click the link in their registration
-email , either showing them a success or failure page (assuming a redirect URL
+email, either showing them a success page (in the case that no onward redirect was specified by the client), or a failure page.
 is not configured).
 
-``add_threepid.html`` and  ``add_threepid.txt`` are templates sent to a client
-to add the threepid.
+``add_threepid.html`` and  ``add_threepid.txt``contain the content of the email that is sent to a user
+when they make a request to add an email address to their account.
 
 ``add_threepid_failure.html`` and ``add_threepid_success.html`` are templates
-that will be shown to the user when they click the link in their threeid add
-email , either showing them a success or failure page (assuming a redirect URL
-is not configured).
-
+that will be shown to the user when they click the link in that confirmation
+email, either showing them a success page (in the case that no onward redirect was specified by the client), or a failure page.
 
 Synapse will expect these files to exist inside the configured template
 directory. To view the default templates, see `synapse/res/templates
@@ -163,7 +163,7 @@ directory. To view the default templates, see `synapse/res/templates
 SMS
 ---
 
-Following upgrade, the only way to maintain the ability to register via a phone
+Following upgrade, the only way to maintain the ability to register with a phone
 number will be to continue to delegate SMS delivery via the matrix.org and
 vector.im identity servers.
 
@@ -184,7 +184,6 @@ Currently Synapse does not support a means to send SMS itself, and the
 matrix.org and vector.im identity servers will continue to support SMS until
 such time as it is possible for admins to configure their servers to send SMS
 directly. More details will follow in a future release.
-
 
 For more details on why these changes are necessary see (link to blog).
 
