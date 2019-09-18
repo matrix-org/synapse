@@ -282,12 +282,17 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["sid", "client_secret", "token"])
 
-        valid, _ = yield self.store.validate_threepid_session(
-            body["sid"], body["client_secret"], body["token"], self.clock.time_msec()
-        )
-        response_code = 200 if valid else 400
-
-        return response_code, {"success": valid}
+        try:
+            yield self.store.validate_threepid_session(
+                body["sid"],
+                body["client_secret"],
+                body["token"],
+                self.clock.time_msec(),
+            )
+            return 200, {"success": True}
+        except ThreepidValidationError:
+            # Validation failure
+            return 400, {"success": False}
 
 
 class PasswordRestServlet(RestServlet):
