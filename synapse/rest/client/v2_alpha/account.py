@@ -485,10 +485,8 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(
-            body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
-        id_server = "https://" + body["id_server"]  # Assume https
         client_secret = body["client_secret"]
         country = body["country"]
         phone_number = body["phone_number"]
@@ -509,8 +507,23 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
+        if not self.hs.config.account_threepid_delegate_msisdn:
+            logger.warn(
+                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "handle this request"
+            )
+            raise SynapseError(
+                400,
+                "Adding phone numbers to user account is not supported by this homeserver",
+            )
+
         ret = yield self.identity_handler.requestMsisdnToken(
-            id_server, country, phone_number, client_secret, send_attempt, next_link
+            self.hs.config.email_account_threepid_delegate_msisdn,
+            country,
+            phone_number,
+            client_secret,
+            send_attempt,
+            next_link,
         )
 
         return 200, ret
