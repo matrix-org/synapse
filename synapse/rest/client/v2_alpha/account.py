@@ -103,16 +103,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            # Have the configured identity server handle the request
-            if not self.hs.config.account_threepid_delegate_email:
-                logger.warn(
-                    "No upstream email account_threepid_delegate configured on the server to "
-                    "handle this request"
-                )
-                raise SynapseError(
-                    400, "Password reset by email is not supported on this homeserver"
-                )
+            assert self.hs.config.account_threepid_delegate_email
 
+            # Have the configured identity server handle the request
             ret = yield self.identity_handler.requestEmailToken(
                 self.hs.config.account_threepid_delegate_email,
                 email,
@@ -465,17 +458,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            # Have the configured identity server handle the request
-            if not self.hs.config.account_threepid_delegate_email:
-                logger.warn(
-                    "No upstream email account_threepid_delegate configured on the server to "
-                    "handle this request"
-                )
-                raise SynapseError(
-                    400,
-                    "Adding emails to user accounts is not supported by this homeserver",
-                )
+            assert self.hs.config.account_threepid_delegate_email
 
+            # Have the configured identity server handle the request
             ret = yield self.identity_handler.requestEmailToken(
                 self.hs.config.account_threepid_delegate_email,
                 email,

@@ -131,15 +131,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            if not self.hs.config.account_threepid_delegate_email:
-                logger.warn(
-                    "No upstream email account_threepid_delegate configured on the server to "
-                    "handle this request"
-                )
-                raise SynapseError(
-                    400, "Registration by email is not supported on this homeserver"
-                )
+            assert self.hs.config.account_threepid_delegate_email
 
+            # Have the configured identity server handle the request
             ret = yield self.identity_handler.requestEmailToken(
                 self.hs.config.account_threepid_delegate_email,
                 email,
