@@ -222,9 +222,12 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
                 query_args.extend(room_id_filter)
 
-                sql = base_sql_pre + """ AND room_id NOT IN ({})""".format(
-                    ",".join(questionmarks)
-                ) + " " + base_sql_post
+                sql = (
+                    base_sql_pre
+                    + """ AND room_id NOT IN ({})""".format(",".join(questionmarks))
+                    + " "
+                    + base_sql_post
+                )
             else:
                 sql = base_sql_pre + base_sql_post
 

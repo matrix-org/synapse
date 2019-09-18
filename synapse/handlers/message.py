@@ -898,7 +898,7 @@ class EventCreationHandler(object):
         room_ids = yield self.store.get_rooms_with_many_extremities(
             min_count=10,
             limit=5,
-            room_id_filter=self._rooms_to_exclude_from_dummy_event_insertion.keys()
+            room_id_filter=self._rooms_to_exclude_from_dummy_event_insertion.keys(),
         )
         for room_id in room_ids:
             # For each room we need to find a joined member we can use to send
@@ -931,7 +931,9 @@ class EventCreationHandler(object):
 
                         event.internal_metadata.proactively_send = False
 
-                        yield self.send_nonmember_event(requester, event, context, ratelimit=False)
+                        yield self.send_nonmember_event(
+                            requester, event, context, ratelimit=False
+                        )
                         break
                     except ConsentNotGivenError:
                         # Failed to send dummy event due to lack of consent, try another user

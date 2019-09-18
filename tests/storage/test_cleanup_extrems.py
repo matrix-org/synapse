@@ -287,7 +287,9 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         # Create new user, and add consent
         user2 = self.register_user("user2", "password")
         token2 = self.login("user2", "password")
-        self.get_success(self.store.user_set_consent_version(user2, self.CONSENT_VERSION))
+        self.get_success(
+            self.store.user_set_consent_version(user2, self.CONSENT_VERSION)
+        )
         self.helper.join(self.room_id, user2, tok=token2)
 
         # Background updates should now cause a dummy event to be added to the graph
@@ -302,25 +304,40 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         """Simple test to ensure that _expire_rooms_to_exclude_from_dummy_event_insertion()
         expires old entries correctly.
         """
-        self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion['1'] = 100000
-        self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion['2'] = 200000
-        self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion['3'] = 300000
+        self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion[
+            "1"
+        ] = 100000
+        self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion[
+            "2"
+        ] = 200000
+        self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion[
+            "3"
+        ] = 300000
         self.event_creator_handler._ROOM_EXCLUSION_EXPIRY = 250
         self.event_creator_handler._expire_rooms_to_exclude_from_dummy_event_insertion()
         # All entries within time frame
         self.assertEqual(
-            len(self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion), 3
+            len(
+                self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion
+            ),
+            3,
         )
         # Oldest room to expire
         self.pump(1)
         self.event_creator_handler._expire_rooms_to_exclude_from_dummy_event_insertion()
         self.assertEqual(
-            len(self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion), 2
+            len(
+                self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion
+            ),
+            2,
         )
         # All rooms to expire
         self.pump(2)
         self.assertEqual(
-            len(self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion), 0
+            len(
+                self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion
+            ),
+            0,
         )
 
     def _create_extremity_rich_graph(self):
