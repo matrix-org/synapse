@@ -668,7 +668,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 perform no filtering
 
         Returns:
-            deferred {str, str|int|None}|None: A dict containing the following:
+            Deferred[dict|None]: A dict containing the following:
                 * address - address of the 3pid
                 * medium - medium of the 3pid
                 * client_secret - a secret provided by the client for this validation session
