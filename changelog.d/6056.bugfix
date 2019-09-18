@@ -1,0 +1,1 @@
+Fix broken call to `validate_threepid_session` during POST requests for password reset.
