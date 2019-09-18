@@ -43,8 +43,7 @@ try:
     # exception.
     resource.getrusage(RUSAGE_THREAD)
 
-    def is_thread_resource_usage_supported():
-        return True
+    is_thread_resource_usage_supported = True
 
     def get_thread_resource_usage():
         return resource.getrusage(RUSAGE_THREAD)
@@ -53,8 +52,7 @@ try:
 except Exception:
     # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
     # won't track resource usage.
-    def is_thread_resource_usage_supported():
-        return False
+    is_thread_resource_usage_supported = False
 
     def get_thread_resource_usage():
         return None
@@ -367,8 +365,10 @@ class LoggingContext(object):
         # When we stop, let's record the cpu used since we started
         if not self.usage_start:
             # Log a warning on platforms that support thread usage tracking
-            if is_thread_resource_usage_supported():
-                logger.warning("Called stop on logcontext %s without calling start", self)
+            if is_thread_resource_usage_supported:
+                logger.warning(
+                    "Called stop on logcontext %s without calling start", self
+                )
             return
 
         utime_delta, stime_delta = self._get_cputime()
