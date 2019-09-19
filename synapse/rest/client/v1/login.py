@@ -122,10 +122,10 @@ class LoginRestServlet(RestServlet):
             ({"type": t} for t in self.auth_handler.get_supported_login_types())
         )
 
-        return (200, {"flows": flows})
+        return 200, {"flows": flows}
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -153,7 +153,7 @@ class LoginRestServlet(RestServlet):
         well_known_data = self._well_known_builder.get_well_known()
         if well_known_data:
             result["well_known"] = well_known_data
-        return (200, result)
+        return 200, result
 
     @defer.inlineCallbacks
     def _do_other_login(self, login_submission):

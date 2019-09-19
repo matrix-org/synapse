@@ -41,8 +41,10 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
-from synapse.rest.admin.media import register_servlets_for_media_repo
+from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
+from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
+from synapse.rest.admin.users import UserAdminServlet
 from synapse.types import UserID, create_requester
 from synapse.util.versionstring import get_version_string
 
@@ -50,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 class UsersRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -67,7 +69,7 @@ class UsersRestServlet(RestServlet):
 
         ret = yield self.handlers.admin_handler.get_users()
 
-        return (200, ret)
+        return 200, ret
 
 
 class VersionServlet(RestServlet):
@@ -118,7 +120,7 @@ class UserRegisterServlet(RestServlet):
 
         nonce = self.hs.get_secrets().token_hex(64)
         self.nonces[nonce] = int(self.reactor.seconds())
-        return (200, {"nonce": nonce})
+        return 200, {"nonce": nonce}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -210,7 +212,7 @@ class UserRegisterServlet(RestServlet):
         )
 
         result = yield register._create_registration_details(user_id, body)
-        return (200, result)
+        return 200, result
 
 
 class WhoisRestServlet(RestServlet):
@@ -235,7 +237,7 @@ class WhoisRestServlet(RestServlet):
 
         ret = yield self.handlers.admin_handler.get_whois(target_user)
 
-        return (200, ret)
+        return 200, ret
 
 
 class PurgeHistoryRestServlet(RestServlet):
@@ -320,7 +322,7 @@ class PurgeHistoryRestServlet(RestServlet):
             room_id, token, delete_local_events=delete_local_events
         )
 
-        return (200, {"purge_id": purge_id})
+        return 200, {"purge_id": purge_id}
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
@@ -345,7 +347,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        return (200, purge_status.asdict())
+        return 200, purge_status.asdict()
 
 
 class DeactivateAccountRestServlet(RestServlet):
@@ -377,7 +379,7 @@ class DeactivateAccountRestServlet(RestServlet):
         else:
             id_server_unbind_result = "no-support"
 
-        return (200, {"id_server_unbind_result": id_server_unbind_result})
+        return 200, {"id_server_unbind_result": id_server_unbind_result}
 
 
 class ShutdownRoomRestServlet(RestServlet):
@@ -547,7 +549,7 @@ class ResetPasswordRestServlet(RestServlet):
         yield self._set_password_handler.set_password(
             target_user_id, new_password, requester
         )
-        return (200, {})
+        return 200, {}
 
 
 class GetUsersPaginatedRestServlet(RestServlet):
@@ -589,7 +591,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
-        return (200, ret)
+        return 200, ret
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
@@ -617,7 +619,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
-        return (200, ret)
+        return 200, ret
 
 
 class SearchUsersRestServlet(RestServlet):
@@ -660,7 +662,7 @@ class SearchUsersRestServlet(RestServlet):
         logger.info("term: %s ", term)
 
         ret = yield self.handlers.admin_handler.search_users(term)
-        return (200, ret)
+        return 200, ret
 
 
 class DeleteGroupAdminRestServlet(RestServlet):
@@ -683,7 +685,7 @@ class DeleteGroupAdminRestServlet(RestServlet):
             raise SynapseError(400, "Can only delete local groups")
 
         yield self.group_server.delete_group(group_id, requester.user.to_string())
-        return (200, {})
+        return 200, {}
 
 
 class AccountValidityRenewServlet(RestServlet):
@@ -714,7 +716,7 @@ class AccountValidityRenewServlet(RestServlet):
         )
 
         res = {"expiration_ts": expiration_ts}
-        return (200, res)
+        return 200, res
 
 
 ########################################################################################
@@ -738,8 +740,10 @@ def register_servlets(hs, http_server):
     Register all the admin servlets.
     """
     register_servlets_for_client_rest_resource(hs, http_server)
+    PurgeRoomServlet(hs).register(http_server)
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
+    UserAdminServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):
@@ -757,9 +761,12 @@ def register_servlets_for_client_rest_resource(hs, http_server):
     DeleteGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
 
-    # Load the media repo ones if we're using them.
+    # Load the media repo ones if we're using them. Otherwise load the servlets which
+    # don't need a media repo (typically readonly admin APIs).
     if hs.config.can_load_media_repo:
         register_servlets_for_media_repo(hs, http_server)
+    else:
+        ListMediaInRoom(hs).register(http_server)
 
     # don't add more things here: new servlets should only be exposed on
     # /_synapse/admin so should not go here. Instead register them in AdminRestResource.

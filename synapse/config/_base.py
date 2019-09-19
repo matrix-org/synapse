@@ -181,6 +181,11 @@ class Config(object):
         generate_secrets=False,
         report_stats=None,
         open_private_ports=False,
+        listeners=None,
+        database_conf=None,
+        tls_certificate_path=None,
+        tls_private_key_path=None,
+        acme_domain=None,
     ):
         """Build a default configuration file
 
@@ -207,6 +212,33 @@ class Config(object):
             open_private_ports (bool): True to leave private ports (such as the non-TLS
                 HTTP listener) open to the internet.
 
+            listeners (list(dict)|None): A list of descriptions of the listeners
+                synapse should start with each of which specifies a port (str), a list of
+                resources (list(str)), tls (bool) and type (str). For example:
+                [{
+                    "port": 8448,
+                    "resources": [{"names": ["federation"]}],
+                    "tls": True,
+                    "type": "http",
+                },
+                {
+                    "port": 443,
+                    "resources": [{"names": ["client"]}],
+                    "tls": False,
+                    "type": "http",
+                }],
+
+
+            database (str|None): The database type to configure, either `psycog2`
+                or `sqlite3`.
+
+            tls_certificate_path (str|None): The path to the tls certificate.
+
+            tls_private_key_path (str|None): The path to the tls private key.
+
+            acme_domain (str|None): The domain acme will try to validate. If
+                specified acme will be enabled.
+
         Returns:
             str: the yaml config file
         """
@@ -220,6 +252,11 @@ class Config(object):
                 generate_secrets=generate_secrets,
                 report_stats=report_stats,
                 open_private_ports=open_private_ports,
+                listeners=listeners,
+                database_conf=database_conf,
+                tls_certificate_path=tls_certificate_path,
+                tls_private_key_path=tls_private_key_path,
+                acme_domain=acme_domain,
             )
         )
 

@@ -37,6 +37,7 @@ def client_patterns(path_regex, releases=(0,), unstable=True, v1=False):
         SRE_Pattern
     """
     patterns = []
+
     if unstable:
         unstable_prefix = CLIENT_API_PREFIX + "/unstable"
         patterns.append(re.compile("^" + unstable_prefix + path_regex))
@@ -46,6 +47,7 @@ def client_patterns(path_regex, releases=(0,), unstable=True, v1=False):
     for release in releases:
         new_prefix = CLIENT_API_PREFIX + "/r%d" % (release,)
         patterns.append(re.compile("^" + new_prefix + path_regex))
+
     return patterns
 
 

@@ -1,0 +1,1 @@
+Fix the structured logging tests stomping on the global log configuration for subsequent tests.

@@ -20,7 +20,6 @@ import logging
 from canonicaljson import json
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.logging.opentracing import trace_servlet
 
 logger = logging.getLogger(__name__)
 
@@ -298,10 +297,7 @@ class RestServlet(object):
                     servlet_classname = self.__class__.__name__
                     method_handler = getattr(self, "on_%s" % (method,))
                     http_server.register_paths(
-                        method,
-                        patterns,
-                        trace_servlet(servlet_classname, method_handler),
-                        servlet_classname,
+                        method, patterns, method_handler, servlet_classname
                     )
 
         else:

@@ -115,7 +115,7 @@ Registering a new user from a client
 
 By default, registration of new users via Matrix clients is disabled. To enable
 it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
-recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.rst>`_.)
+recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.md>`_.)
 
 Once ``enable_registration`` is set to ``true``, it is possible to register a
 user via `riot.im <https://riot.im/app/#/register>`_ or other Matrix clients.
@@ -186,7 +186,7 @@ Almost all installations should opt to use PostreSQL. Advantages include:
   synapse itself.
 
 For information on how to install and use PostgreSQL, please see
-`docs/postgres.rst <docs/postgres.rst>`_.
+`docs/postgres.md <docs/postgres.md>`_.
 
 .. _reverse-proxy:
 
@@ -201,7 +201,7 @@ It is recommended to put a reverse proxy such as
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 
-For information on configuring one, see `<docs/reverse_proxy.rst>`_.
+For information on configuring one, see `<docs/reverse_proxy.md>`_.
 
 Identity Servers
 ================
