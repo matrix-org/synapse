@@ -99,6 +99,31 @@ Synapse will expect these files to exist inside the configured template director
 default templates, see `synapse/res/templates
 <https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
 
+Rolling back to v1.3.1
+----------------------
+
+If you encounter problems with v1.4.0, it should be possible to roll back to
+v1.3.1, subject to the following:
+
+* The 'room statistics' engine was heavily reworked in this release (see
+  `#5971 <https://github.com/matrix-org/synapse/pull/5971>`_), including
+  significant changes to the database schema, which are not easily
+  reverted. This will cause the room statistics engine to stop updating when
+  you downgrade.
+
+  The room statistics are essentially unused in v1.3.1 (in future versions of
+  Synapse, they will be used to populate the room directory), so there should
+  be no loss of functionality. However, the statistics engine will write errors
+  to the logs, which can be avoided by setting the following in `homeserver.yaml`:
+
+  .. code:: yaml
+
+    stats:
+      enabled: false
+
+  Don't forget to re-enable it when you upgrade again, in preparation for its
+  use in the room directory!
+
 Upgrading to v1.2.0
 ===================
 
