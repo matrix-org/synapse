@@ -651,7 +651,7 @@ class ThreepidRestServlet(RestServlet):
         elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             # Get a validated session matching these details
             validation_session = yield self.datastore.get_threepid_validation_session(
-                None, client_secret, sid=sid, validated=True
+                "email", client_secret, sid=sid, validated=True
             )
 
         if self._add_threepid_to_account(user_id, validation_session):
