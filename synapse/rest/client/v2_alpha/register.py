@@ -16,7 +16,6 @@
 
 import hmac
 import logging
-from hashlib import sha1
 
 from six import string_types
 
@@ -29,16 +28,20 @@ from synapse.api.errors import (
     Codes,
     LimitExceededError,
     SynapseError,
+    ThreepidValidationError,
     UnrecognizedRequestError,
 )
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
+from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
@@ -71,31 +74,93 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         super(EmailRegisterRequestTokenRestServlet, self).__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
+        self.config = hs.config
+
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            from synapse.push.mailer import Mailer, load_jinja2_templates
+
+            template_html, template_text = load_jinja2_templates(
+                self.config.email_template_dir,
+                [
+                    self.config.email_registration_template_html,
+                    self.config.email_registration_template_text,
+                ],
+                apply_format_ts_filter=True,
+                apply_mxc_to_http_filter=True,
+                public_baseurl=self.config.public_baseurl,
+            )
+            self.mailer = Mailer(
+                hs=self.hs,
+                app_name=self.config.email_app_name,
+                template_html=template_html,
+                template_text=template_text,
+            )
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "Email registration has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration has been disabled on this server"
+            )
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(
-            body, ["id_server", "client_secret", "email", "send_attempt"]
-        )
+        assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
 
-        if not check_3pid_allowed(self.hs, "email", body["email"]):
+        # Extract params from body
+        client_secret = body["client_secret"]
+        email = body["email"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
+
+        if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "email", body["email"]
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestEmailToken(**body)
-        return (200, ret)
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            if not self.hs.config.account_threepid_delegate_email:
+                logger.warn(
+                    "No upstream email account_threepid_delegate configured on the server to "
+                    "handle this request"
+                )
+                raise SynapseError(
+                    400, "Registration by email is not supported on this homeserver"
+                )
+
+            ret = yield self.identity_handler.requestEmailToken(
+                self.hs.config.account_threepid_delegate_email,
+                email,
+                client_secret,
+                send_attempt,
+                next_link,
+            )
+        else:
+            # Send registration emails from Synapse
+            sid = yield self.identity_handler.send_threepid_validation(
+                email,
+                client_secret,
+                send_attempt,
+                self.mailer.send_registration_mail,
+                next_link,
+            )
+
+            # Wrap the session id in a JSON object
+            ret = {"sid": sid}
+
+        return 200, ret
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -115,11 +180,15 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(
-            body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
+        client_secret = body["client_secret"]
+        country = body["country"]
+        phone_number = body["phone_number"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
-        msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
+        msisdn = phone_number_to_msisdn(country, phone_number)
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
@@ -128,17 +197,112 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "msisdn", msisdn
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
 
-        ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        if not self.hs.config.account_threepid_delegate_msisdn:
+            logger.warn(
+                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "handle this request"
+            )
+            raise SynapseError(
+                400, "Registration by phone number is not supported on this homeserver"
+            )
+
+        ret = yield self.identity_handler.requestMsisdnToken(
+            self.hs.config.account_threepid_delegate_msisdn,
+            country,
+            phone_number,
+            client_secret,
+            send_attempt,
+            next_link,
+        )
+
+        return 200, ret
+
+
+class RegistrationSubmitTokenServlet(RestServlet):
+    """Handles registration 3PID validation token submission"""
+
+    PATTERNS = client_patterns(
+        "/registration/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(RegistrationSubmitTokenServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.config = hs.config
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, medium):
+        if medium != "email":
+            raise SynapseError(
+                400, "This medium is currently not supported for registration"
+            )
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "User registration via email has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration is disabled on this server"
+            )
+
+        sid = parse_string(request, "sid", required=True)
+        client_secret = parse_string(request, "client_secret", required=True)
+        token = parse_string(request, "token", required=True)
+
+        # Attempt to validate a 3PID session
+        try:
+            # Mark the session as valid
+            next_link = yield self.store.validate_threepid_session(
+                sid, client_secret, token, self.clock.time_msec()
+            )
+
+            # Perform a 302 redirect if next_link is set
+            if next_link:
+                if next_link.startswith("file:///"):
+                    logger.warn(
+                        "Not redirecting to next_link as it is a local file: address"
+                    )
+                else:
+                    request.setResponseCode(302)
+                    request.setHeader("Location", next_link)
+                    finish_request(request)
+                    return None
+
+            # Otherwise show the success template
+            html = self.config.email_registration_template_success_html_content
+
+            request.setResponseCode(200)
+        except ThreepidValidationError as e:
+            # Show a failure page with a reason
+            request.setResponseCode(e.code)
+
+            # Show a failure page with a reason
+            html_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
+            template_vars = {"failure_reason": e.msg}
+            html = html_template.render(**template_vars)
+
+        request.write(html.encode("utf-8"))
+        finish_request(request)
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -178,7 +342,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
             yield self.registration_handler.check_username(username)
 
-            return (200, {"available": True})
+            return 200, {"available": True}
 
 
 class RegisterRestServlet(RestServlet):
@@ -231,7 +395,6 @@ class RegisterRestServlet(RestServlet):
         if kind == b"guest":
             ret = yield self._do_guest_registration(body, address=client_addr)
             return ret
-            return
         elif kind != b"user":
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
@@ -239,14 +402,12 @@ class RegisterRestServlet(RestServlet):
 
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the username/password provided to us.
-        desired_password = None
         if "password" in body:
             if (
                 not isinstance(body["password"], string_types)
                 or len(body["password"]) > 512
             ):
                 raise SynapseError(400, "Invalid password")
-            desired_password = body["password"]
 
         desired_username = None
         if "username" in body:
@@ -261,8 +422,8 @@ class RegisterRestServlet(RestServlet):
         if self.auth.has_access_token(request):
             appservice = yield self.auth.get_appservice_by_req(request)
 
-        # fork off as soon as possible for ASes and shared secret auth which
-        # have completely different registration flows to normal users
+        # fork off as soon as possible for ASes which have completely
+        # different registration flows to normal users
 
         # == Application Service Registration ==
         if appservice:
@@ -282,27 +443,16 @@ class RegisterRestServlet(RestServlet):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
-            return (200, result)  # we throw for non 200 responses
-            return
+            return 200, result  # we throw for non 200 responses
 
-        # for either shared secret or regular registration, downcase the
-        # provided username before attempting to register it. This should mean
+        # for regular registration, downcase the provided username before
+        # attempting to register it. This should mean
         # that people who try to register with upper-case in their usernames
         # don't get a nasty surprise. (Note that we treat username
         # case-insenstively in login, so they are free to carry on imagining
         # that their username is CrAzYh4cKeR if that keeps them happy)
         if desired_username is not None:
             desired_username = desired_username.lower()
-
-        # == Shared Secret Registration == (e.g. create new user scripts)
-        if "mac" in body:
-            # FIXME: Should we really be determining if this is shared secret
-            # auth based purely on the 'mac' key?
-            result = yield self._do_shared_secret_registration(
-                desired_username, desired_password, body
-            )
-            return (200, result)  # we throw for non 200 responses
-            return
 
         # == Normal User Registration == (everyone else)
         if not self.hs.config.enable_registration:
@@ -453,11 +603,11 @@ class RegisterRestServlet(RestServlet):
                         medium = auth_result[login_type]["medium"]
                         address = auth_result[login_type]["address"]
 
-                        existingUid = yield self.store.get_user_id_by_threepid(
+                        existing_user_id = yield self.store.get_user_id_by_threepid(
                             medium, address
                         )
 
-                        if existingUid is not None:
+                        if existing_user_id is not None:
                             raise SynapseError(
                                 400,
                                 "%s is already in use" % medium,
@@ -496,11 +646,9 @@ class RegisterRestServlet(RestServlet):
                 user_id=registered_user_id,
                 auth_result=auth_result,
                 access_token=return_dict.get("access_token"),
-                bind_email=params.get("bind_email"),
-                bind_msisdn=params.get("bind_msisdn"),
             )
 
-        return (200, return_dict)
+        return 200, return_dict
 
     def on_OPTIONS(self, _):
         return 200, {}
@@ -511,42 +659,6 @@ class RegisterRestServlet(RestServlet):
             username, as_token
         )
         return (yield self._create_registration_details(user_id, body))
-
-    @defer.inlineCallbacks
-    def _do_shared_secret_registration(self, username, password, body):
-        if not self.hs.config.registration_shared_secret:
-            raise SynapseError(400, "Shared secret registration is not enabled")
-        if not username:
-            raise SynapseError(
-                400, "username must be specified", errcode=Codes.BAD_JSON
-            )
-
-        # use the username from the original request rather than the
-        # downcased one in `username` for the mac calculation
-        user = body["username"].encode("utf-8")
-
-        # str() because otherwise hmac complains that 'unicode' does not
-        # have the buffer interface
-        got_mac = str(body["mac"])
-
-        # FIXME this is different to the /v1/register endpoint, which
-        # includes the password and admin flag in the hashed text. Why are
-        # these different?
-        want_mac = hmac.new(
-            key=self.hs.config.registration_shared_secret.encode(),
-            msg=user,
-            digestmod=sha1,
-        ).hexdigest()
-
-        if not compare_digest(want_mac, got_mac):
-            raise SynapseError(403, "HMAC incorrect")
-
-        user_id = yield self.registration_handler.register_user(
-            localpart=username, password=password
-        )
-
-        result = yield self._create_registration_details(user_id, body)
-        return result
 
     @defer.inlineCallbacks
     def _create_registration_details(self, user_id, params):
@@ -603,4 +715,5 @@ def register_servlets(hs, http_server):
     EmailRegisterRequestTokenRestServlet(hs).register(http_server)
     MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
     UsernameAvailabilityRestServlet(hs).register(http_server)
+    RegistrationSubmitTokenServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)

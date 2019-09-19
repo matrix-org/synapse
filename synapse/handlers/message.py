@@ -24,7 +24,7 @@ from twisted.internet import defer
 from twisted.internet.defer import succeed
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RelationTypes
+from synapse.api.constants import EventTypes, Membership, RelationTypes, UserTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -469,6 +469,9 @@ class EventCreationHandler(object):
 
         u = yield self.store.get_user_by_id(user_id)
         assert u is not None
+        if u["user_type"] in (UserTypes.SUPPORT, UserTypes.BOT):
+            # support and bot users are not required to consent
+            return
         if u["appservice_id"] is not None:
             # users registered by an appservice are exempt
             return
@@ -726,7 +729,27 @@ class EventCreationHandler(object):
         assert not self.config.worker_app
 
         if ratelimit:
-            yield self.base_handler.ratelimit(requester)
+            # We check if this is a room admin redacting an event so that we
+            # can apply different ratelimiting. We do this by simply checking
+            # it's not a self-redaction (to avoid having to look up whether the
+            # user is actually admin or not).
+            is_admin_redaction = False
+            if event.type == EventTypes.Redaction:
+                original_event = yield self.store.get_event(
+                    event.redacts,
+                    check_redacted=False,
+                    get_prev_content=False,
+                    allow_rejected=False,
+                    allow_none=True,
+                )
+
+                is_admin_redaction = (
+                    original_event and event.sender != original_event.sender
+                )
+
+            yield self.base_handler.ratelimit(
+                requester, is_admin_redaction=is_admin_redaction
+            )
 
         yield self.base_handler.maybe_kick_guest_users(event, context)
 

@@ -6,6 +6,7 @@ services:
     image: postgres:9.5
     environment:
       POSTGRES_PASSWORD: postgres
+    command: -c fsync=off
 
   testenv:
     image: python:3.5
@@ -16,6 +17,6 @@ services:
       SYNAPSE_POSTGRES_HOST: postgres
       SYNAPSE_POSTGRES_USER: postgres
       SYNAPSE_POSTGRES_PASSWORD: postgres
-    working_dir: /app
+    working_dir: /src
     volumes:
-      - ..:/app
+      - ..:/src

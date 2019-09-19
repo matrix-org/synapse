@@ -136,8 +136,8 @@ federation_ip_range_blacklist:
 #
 #   type: the type of listener. Normally 'http', but other valid options are:
 #       'manhole' (see docs/manhole.md),
-#       'metrics' (see docs/metrics-howto.rst),
-#       'replication' (see docs/workers.rst).
+#       'metrics' (see docs/metrics-howto.md),
+#       'replication' (see docs/workers.md).
 #
 #   tls: set to true to enable TLS for this listener. Will use the TLS
 #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -172,12 +172,12 @@ federation_ip_range_blacklist:
 #
 #   media: the media API (/_matrix/media).
 #
-#   metrics: the metrics interface. See docs/metrics-howto.rst.
+#   metrics: the metrics interface. See docs/metrics-howto.md.
 #
 #   openid: OpenID authentication.
 #
 #   replication: the HTTP replication API (/_synapse/replication). See
-#       docs/workers.rst.
+#       docs/workers.md.
 #
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
@@ -201,13 +201,13 @@ listeners:
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
-  # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+  # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
   #
   - port: 8008
     tls: false
-    bind_addresses: ['::1', '127.0.0.1']
     type: http
     x_forwarded: true
+    bind_addresses: ['::1', '127.0.0.1']
 
     resources:
       - names: [client, federation]
@@ -306,6 +306,13 @@ listeners:
 #
 #allow_per_room_profiles: false
 
+# How long to keep redacted events in unredacted form in the database. After
+# this period redacted events get replaced with their redacted form in the DB.
+#
+# Defaults to `7d`. Set to `null` to disable.
+#
+redaction_retention_period: 7d
+
 
 ## TLS ##
 
@@ -392,10 +399,10 @@ listeners:
 #    permission to listen on port 80.
 #
 acme:
-    # ACME support is disabled by default. Uncomment the following line
-    # (and tls_certificate_path and tls_private_key_path above) to enable it.
+    # ACME support is disabled by default. Set this to `true` and uncomment
+    # tls_certificate_path and tls_private_key_path above to enable it.
     #
-    #enabled: true
+    enabled: False
 
     # Endpoint to use to request certificates. If you only want to test,
     # use Let's Encrypt's staging url:
@@ -406,17 +413,17 @@ acme:
     # Port number to listen on for the HTTP-01 challenge. Change this if
     # you are forwarding connections through Apache/Nginx/etc.
     #
-    #port: 80
+    port: 80
 
     # Local addresses to listen on for incoming connections.
     # Again, you may want to change this if you are forwarding connections
     # through Apache/Nginx/etc.
     #
-    #bind_addresses: ['::', '0.0.0.0']
+    bind_addresses: ['::', '0.0.0.0']
 
     # How many days remaining on a certificate before it is renewed.
     #
-    #reprovision_threshold: 30
+    reprovision_threshold: 30
 
     # The domain that the certificate should be for. Normally this
     # should be the same as your Matrix domain (i.e., 'server_name'), but,
@@ -430,7 +437,7 @@ acme:
     #
     # If not set, defaults to your 'server_name'.
     #
-    #domain: matrix.example.com
+    domain: matrix.example.com
 
     # file to use for the account key. This will be generated if it doesn't
     # exist.
@@ -485,7 +492,8 @@ database:
 
 ## Logging ##
 
-# A yaml python logging config file
+# A yaml python logging config file as described by
+# https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
 #
 log_config: "CONFDIR/SERVERNAME.log.config"
 
@@ -510,6 +518,9 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for login that ratelimits login requests based on the account the
 #     client is attempting to log into, based on the amount of failed login
 #     attempts for this account.
+#   - one for ratelimiting redactions by room admins. If this is not explicitly
+#     set then it uses the same ratelimiting as per rc_message. This is useful
+#     to allow room admins to deal with abuse quickly.
 #
 # The defaults are as shown below.
 #
@@ -531,6 +542,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  failed_attempts:
 #    per_second: 0.17
 #    burst_count: 3
+#
+#rc_admin_redaction:
+#  per_second: 1
+#  burst_count: 50
 
 
 # Ratelimiting settings for incoming federation
@@ -890,9 +905,41 @@ uploads_path: "DATADIR/uploads"
 # Also defines the ID server which will be called when an account is
 # deactivated (one will be picked arbitrarily).
 #
+# Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
+# server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
+# background migration script, informing itself that the identity server all of its
+# 3PIDs have been bound to is likely one of the below.
+#
+# As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
+# it is now solely used for the purposes of the background migration script, and can be
+# removed once it has run.
 #trusted_third_party_id_servers:
 #  - matrix.org
 #  - vector.im
+
+# Handle threepid (email/phone etc) registration and password resets through a set of
+# *trusted* identity servers. Note that this allows the configured identity server to
+# reset passwords for accounts!
+#
+# Be aware that if `email` is not set, and SMTP options have not been
+# configured in the email config block, registration and user password resets via
+# email will be globally disabled.
+#
+# Additionally, if `msisdn` is not set, registration and password resets via msisdn
+# will be disabled regardless. This is due to Synapse currently not supporting any
+# method of sending SMS messages on its own.
+#
+# To enable using an identity server for operations regarding a particular third-party
+# identifier type, set the value to the URL of that identity server as shown in the
+# examples below.
+#
+# Servers handling the these requests must answer the `/requestToken` endpoints defined
+# by the Matrix Identity Service API specification:
+# https://matrix.org/docs/spec/identity_service/latest
+#
+account_threepid_delegates:
+    #email: https://example.com     # Delegate email sending to matrix.org
+    #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
 # Users who register on this homeserver will automatically be joined
 # to these rooms
@@ -925,8 +972,23 @@ uploads_path: "DATADIR/uploads"
 #sentry:
 #    dsn: "..."
 
+# Flags to enable Prometheus metrics which are not suitable to be
+# enabled by default, either for performance reasons or limited use.
+#
+metrics_flags:
+    # Publish synapse_federation_known_servers, a g auge of the number of
+    # servers this homeserver knows about, including itself. May cause
+    # performance problems on large homeservers.
+    #
+    #known_servers: true
+
 # Whether or not to report anonymized homeserver usage statistics.
 # report_stats: true|false
+
+# The endpoint to report the anonymized homeserver usage statistics to.
+# Defaults to https://matrix.org/report-usage-stats/push
+#
+#report_stats_endpoint: https://example.com/report-usage-stats/push
 
 
 ## API Configuration ##
@@ -1027,6 +1089,14 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #
 #trusted_key_servers:
 #  - server_name: "matrix.org"
+#
+
+# The signing keys to use when acting as a trusted key server. If not specified
+# defaults to the server signing key.
+#
+# Can contain multiple keys, one per line.
+#
+#key_server_signing_keys_path: "key_server_signing_keys.key"
 
 
 # Enable SAML2 for registration and login. Uses pysaml2.
@@ -1191,19 +1261,6 @@ password_config:
 #   #
 #   riot_base_url: "http://localhost/riot"
 #
-#   # Enable sending password reset emails via the configured, trusted
-#   # identity servers
-#   #
-#   # IMPORTANT! This will give a malicious or overtaken identity server
-#   # the ability to reset passwords for your users! Make absolutely sure
-#   # that you want to do this! It is strongly recommended that password
-#   # reset emails be sent by the homeserver instead
-#   #
-#   # If this option is set to false and SMTP options have not been
-#   # configured, resetting user passwords via email will be disabled
-#   #
-#   #trust_identity_server_for_password_resets: false
-#
 #   # Configure the time that a validation email or text message code
 #   # will expire after sending
 #   #
@@ -1235,11 +1292,22 @@ password_config:
 #   #password_reset_template_html: password_reset.html
 #   #password_reset_template_text: password_reset.txt
 #
+#   # Templates for registration emails sent by the homeserver
+#   #
+#   #registration_template_html: registration.html
+#   #registration_template_text: registration.txt
+#
 #   # Templates for password reset success and failure pages that a user
 #   # will see after attempting to reset their password
 #   #
 #   #password_reset_template_success_html: password_reset_success.html
 #   #password_reset_template_failure_html: password_reset_failure.html
+#
+#   # Templates for registration success and failure pages that a user
+#   # will see after attempting to register using an email or phone
+#   #
+#   #registration_template_success_html: registration_success.html
+#   #registration_template_failure_html: registration_failure.html
 
 
 #password_providers:

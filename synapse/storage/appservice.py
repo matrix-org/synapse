@@ -165,7 +165,6 @@ class ApplicationServiceTransactionWorkerStore(
         )
         if result:
             return result.get("state")
-            return
         return None
 
     def set_appservice_state(self, service, state):
@@ -358,7 +357,7 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = yield self.get_events_as_list(event_ids)
 
-        return (upper_bound, events)
+        return upper_bound, events
 
 
 class ApplicationServiceTransactionStore(ApplicationServiceTransactionWorkerStore):

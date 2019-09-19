@@ -101,7 +101,7 @@ class ModuleApi(object):
         )
         user_id = yield self.register_user(localpart, displayname, emails)
         _, access_token = yield self.register_device(user_id)
-        return (user_id, access_token)
+        return user_id, access_token
 
     def register_user(self, localpart, displayname=None, emails=[]):
         """Registers a new user with given localpart and optional displayname, emails.
