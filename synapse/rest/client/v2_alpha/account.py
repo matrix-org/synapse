@@ -528,10 +528,10 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
 
 class AddThreepidSubmitTokenServlet(RestServlet):
-    """Handles 3PID validation token submission for adding a 3PID to a user's account"""
+    """Handles 3PID validation token submission for adding an email to a user's account"""
 
     PATTERNS = client_patterns(
-        "/add_threepid/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
+        "/add_threepid/email/submit_token$", releases=(), unstable=True
     )
 
     def __init__(self, hs):
@@ -551,9 +551,6 @@ class AddThreepidSubmitTokenServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, medium):
-        # We currently only handle threepid token submissions for email
-        if medium != "email":
-            raise SynapseError(400, "This medium is not supported")
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
