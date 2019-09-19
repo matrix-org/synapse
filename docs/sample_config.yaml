@@ -1108,6 +1108,8 @@ saml2_config:
   # Options include:
   #  * 'hexencode' (which maps unpermitted characters to '=xx')
   #  * 'dotreplace' (which replaces unpermitted characters with '.').
+  #  * 'dotreplace_email_localpart' (truncates at the first '@' and replaces
+  #         unpermitted characters with '.')
   # The default is 'hexencode'.
   #
   #mxid_mapping: dotreplace
