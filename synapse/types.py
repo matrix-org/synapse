@@ -16,8 +16,9 @@ import re
 import string
 from collections import namedtuple
 
-import attr
 from six.moves import filter
+
+import attr
 
 from synapse.api.errors import SynapseError
 
