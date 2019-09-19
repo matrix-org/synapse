@@ -239,10 +239,12 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.config = hs.config
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
-        self.failure_email_template, = load_jinja2_templates(
-            self.config.email_template_dir,
-            [self.config.email_registration_template_failure_html],
-        )
+
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.failure_email_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.failure_email_template, = load_jinja2_templates(
