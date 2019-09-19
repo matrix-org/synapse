@@ -364,7 +364,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             the chunk of events returned.
         """
         if from_key == to_key:
-            return ([], from_key)
+            return [], from_key
 
         from_id = RoomStreamToken.parse_stream_token(from_key).stream
         to_id = RoomStreamToken.parse_stream_token(to_key).stream
@@ -374,7 +374,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         if not has_changed:
-            return ([], from_key)
+            return [], from_key
 
         def f(txn):
             sql = (
@@ -407,7 +407,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             # get.
             key = from_key
 
-        return (ret, key)
+        return ret, key
 
     @defer.inlineCallbacks
     def get_membership_changes_for_user(self, user_id, from_key, to_key):
@@ -496,7 +496,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         # Allow a zero limit here, and no-op.
         if limit == 0:
-            return ([], end_token)
+            return [], end_token
 
         end_token = RoomStreamToken.parse(end_token)
 
@@ -511,7 +511,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         # We want to return the results in ascending order.
         rows.reverse()
 
-        return (rows, token)
+        return rows, token
 
     def get_room_event_after_stream_ordering(self, room_id, stream_ordering):
         """Gets details of the first event in a room at or after a stream ordering
@@ -783,7 +783,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         events = yield self.get_events_as_list(event_ids)
 
-        return (upper_bound, events)
+        return upper_bound, events
 
     def get_federation_out_pos(self, typ):
         return self._simple_select_one_onecol(
