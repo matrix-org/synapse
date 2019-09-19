@@ -1,4 +1,4 @@
-/* Copyright 2019 The Matrix.org Foundation C.I.C.
+/* Copyright 2019 The Matrix.org Foundation C.I.C
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,13 @@
  * limitations under the License.
  */
 
--- these tables are never used.
-DROP TABLE IF EXISTS room_names;
-DROP TABLE IF EXISTS topics;
-DROP TABLE IF EXISTS history_visibility;
-DROP TABLE IF EXISTS guest_access;
+/*
+ * Record the timestamp when a given server started failing
+ */
+ALTER TABLE destinations ADD failure_ts BIGINT;
+
+/* as a rough approximation, we assume that the server started failing at
+ * retry_interval before the last retry
+ */
+UPDATE destinations SET failure_ts = retry_last_ts - retry_interval
+    WHERE retry_last_ts > 0;

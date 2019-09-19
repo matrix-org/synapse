@@ -160,6 +160,7 @@ Synapse will expect these files to exist inside the configured template
 directory. To view the default templates, see `synapse/res/templates
 <https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
 
+<<<<<<< HEAD
 SMS
 ---
 
@@ -185,12 +186,38 @@ Currently Synapse does not support a means to send SMS itself, and the
 matrix.org and vector.im identity servers will continue to support SMS until
 such time as it is possible for admins to configure their servers to send SMS
 directly. More details will follow in a future release.
+=======
+Rolling back to v1.3.1
+----------------------
+
+If you encounter problems with v1.4.0, it should be possible to roll back to
+v1.3.1, subject to the following:
+
+* The 'room statistics' engine was heavily reworked in this release (see
+  `#5971 <https://github.com/matrix-org/synapse/pull/5971>`_), including
+  significant changes to the database schema, which are not easily
+  reverted. This will cause the room statistics engine to stop updating when
+  you downgrade.
+
+  The room statistics are essentially unused in v1.3.1 (in future versions of
+  Synapse, they will be used to populate the room directory), so there should
+  be no loss of functionality. However, the statistics engine will write errors
+  to the logs, which can be avoided by setting the following in `homeserver.yaml`:
+
+  .. code:: yaml
+
+    stats:
+      enabled: false
+
+  Don't forget to re-enable it when you upgrade again, in preparation for its
+  use in the room directory!
+>>>>>>> 35ce3bda7aaa6281f02123225ca63d913fa12df1
 
 Upgrading to v1.2.0
 ===================
 
 Some counter metrics have been renamed, with the old names deprecated. See
-`the metrics documentation <docs/metrics-howto.rst#renaming-of-metrics--deprecation-of-old-names-in-12>`_
+`the metrics documentation <docs/metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12>`_
 for details.
 
 Upgrading to v1.1.0
