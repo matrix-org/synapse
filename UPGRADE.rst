@@ -53,19 +53,19 @@ Upgrading to v1.4.0
 ===================
 
 **Note: Sending emails and/or SMS will not work in this release without config
-changes. Notably this will affect the ability to register via email or phone number.
+changes. Notably this will affect the ability to register via email or phone number.**
 
 Previous versions of Synapse delegate the sending of emails and
 SMS to an identity server by default. In most cases this server is vector.im or
 matrix.org. Email and SMS are often used as part of registration and account recovery.
 
 
-In Synapse 1.4,0, for security and privacy reasons, the homeserver will no longer
+In Synapse 1.4.0, for security and privacy reasons, the homeserver will no longer
 delegate email or SMS to an identity server by default and instead the server administrator
 will need to explicitly decide how they would like email and SMS to be sent.
 
 In the medium term the vector.im and matrix.org identity servers will disable
-sending email and SMS entirely, however in order to ease the transition they
+sending email and SMS for homeservers entirely, however in order to ease the transition they
 will retain the capability to send email and SMS for a limited period. Email
 will be disabled on XXX (giving 2 months notice). Disabling SMS will follow
 some time after that once SMS sending support lands in Synapse.
@@ -84,7 +84,10 @@ Following upgrade, to continue sending email (and therefore register via an emai
 either:-
 
 * Configure Synapse to use an email server (details follow).
-* Run or choose an identity server (with email support) and delegate to it.
+* Run or choose an identity server which allows email delegation and delegate to it.
+
+Configure SMTP in Synapse
+-------------------------
 
 To configure an SMTP server for Synapse, modify the configuration section
 headed ``email``, and be sure to have at least the ``smtp_host, smtp_port``
@@ -96,6 +99,9 @@ You may also need to set ``smtp_user``, ``smtp_pass``, and
 See the `sample configuration file
 <docs/sample_config.yaml>`_
 for more details on these settings.
+
+Delegate Email to an identity server
+------------------------------------
 
 Some admins will wish to continue using email as a registration method, but
 will not immediately have an appropriate SMTP server to hand.
@@ -123,8 +129,8 @@ For example:
 
 If ``email.trust_identity_server_for_password_resets`` is set to ``true``, and
 ``account_threepid_delegates.email`` is not set, then the first entry in
-``trusted_third_party_id_servers`` will be used as the account threepid
-delegate for email. This is to ensure compatibility with existing Synapse
+``trusted_third_party_id_servers`` will be used as the ``account_threepid_delegate``
+ for email. This is to ensure compatibility with existing Synapse
 installs that set up external server handling for these tasks before v1.4.0. If
 ``email.trust_identity_server_for_password_resets`` is ``true`` and no trusted
 identity server domains are configured, Synapse will report an error and refuse to start.
@@ -149,7 +155,7 @@ that will be shown to the user when they click the link in their registration
 email, either showing them a success page (in the case that no onward redirect was specified by the client), or a failure page.
 is not configured).
 
-``add_threepid.html`` and  ``add_threepid.txt``contain the content of the email that is sent to a user
+``add_threepid.html`` and  ``add_threepid.txt`` contain the content of the email that is sent to a user
 when they make a request to add an email address to their account.
 
 ``add_threepid_failure.html`` and ``add_threepid_success.html`` are templates
@@ -160,7 +166,7 @@ Synapse will expect these files to exist inside the configured template
 directory. To view the default templates, see `synapse/res/templates
 <https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
 
-<<<<<<< HEAD
+
 SMS
 ---
 
@@ -186,7 +192,7 @@ Currently Synapse does not support a means to send SMS itself, and the
 matrix.org and vector.im identity servers will continue to support SMS until
 such time as it is possible for admins to configure their servers to send SMS
 directly. More details will follow in a future release.
-=======
+
 Rolling back to v1.3.1
 ----------------------
 
@@ -211,7 +217,7 @@ v1.3.1, subject to the following:
 
   Don't forget to re-enable it when you upgrade again, in preparation for its
   use in the room directory!
->>>>>>> 35ce3bda7aaa6281f02123225ca63d913fa12df1
+
 
 Upgrading to v1.2.0
 ===================
