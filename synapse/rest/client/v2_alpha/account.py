@@ -529,7 +529,7 @@ class ThreepidRestServlet(RestServlet):
 
 
 class ThreepidUnbindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/unbind$")
+    PATTERNS = client_patterns("/account/3pid/unbind$", releases=(), unstable=True)
 
     def __init__(self, hs):
         super(ThreepidUnbindRestServlet, self).__init__()
