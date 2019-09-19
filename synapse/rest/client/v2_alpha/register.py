@@ -239,6 +239,10 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.config = hs.config
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
+        self.failure_email_template, = load_jinja2_templates(
+            self.config.email_template_dir,
+            [self.config.email_registration_template_failure_html],
+        )
 
     @defer.inlineCallbacks
     def on_GET(self, request, medium):
@@ -283,17 +287,11 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
             request.setResponseCode(200)
         except ThreepidValidationError as e:
-            # Show a failure page with a reason
             request.setResponseCode(e.code)
 
             # Show a failure page with a reason
-            html_template, = load_jinja2_templates(
-                self.config.email_template_dir,
-                [self.config.email_registration_template_failure_html],
-            )
-
             template_vars = {"failure_reason": e.msg}
-            html = html_template.render(**template_vars)
+            html = self.failure_email_template.render(**template_vars)
 
         request.write(html.encode("utf-8"))
         finish_request(request)
