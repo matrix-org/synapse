@@ -9,30 +9,30 @@ instructions that may be required are listed later in this document.
   <INSTALL.md#prebuilt-packages>`_, you will need to follow the normal process
   for upgrading those packages.
 
-* If synapse was installed from source, then:
+* If Synapse was installed from source, then:
 
-  1. Activate the virtualenv before upgrading. For example, if synapse is
+  1. Activate the virtualenv before upgrading. For example, if Synapse is
      installed in a virtualenv in ``~/synapse/env`` then run:
 
      .. code:: bash
 
        source ~/synapse/env/bin/activate
 
-  2. If synapse was installed using pip then upgrade to the latest version by
+  2. If Synapse was installed using pip then upgrade to the latest version by
      running:
 
      .. code:: bash
 
        pip install --upgrade matrix-synapse
 
-     If synapse was installed using git then upgrade to the latest version by
+     If Synapse was installed using git then upgrade to the latest version by
      running:
 
      .. code:: bash
        git pull
        pip install --upgrade .
 
-   3. Restart synapse:
+   3. Restart Synapse:
 
       .. code:: bash
 
