@@ -111,19 +111,18 @@ v1.3.1, subject to the following:
   reverted. This will cause the room statistics engine to stop updating when
   you downgrade.
 
-  The room statistics are essentially unused in v1.3.1 (they are used to
-  populate the room directory in v1.4.0), so there should be no loss of
-  functionality. However, the statistics engine will write errors to the logs,
-  which can be avoided by setting the following in `homeserver.yaml`:
+  The room statistics are essentially unused in v1.3.1 (in future versions of
+  Synapse, they will be used to populate the room directory), so there should
+  be no loss of functionality. However, the statistics engine will write errors
+  to the logs, which can be avoided by setting the following in `homeserver.yaml`:
 
   .. code:: yaml
 
     stats:
       enabled: false
 
-  Don't forget to re-enable it when you upgrade again, or your room directory
-  will stop working!
-
+  Don't forget to re-enable it when you upgrade again, in preparation for its
+  use in the room directory!
 
 Upgrading to v1.2.0
 ===================
