@@ -12,9 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from six import string_types
 
 from synapse.api.errors import SynapseError
-from synapse.types import GroupID, RoomAlias, UserID, map_username_to_mxid_localpart
+from synapse.types import (
+    GroupID,
+    RoomAlias,
+    UserID,
+    map_username_to_mxid_localpart,
+    strip_invalid_mxid_characters,
+)
 
 from tests import unittest
 from tests.utils import TestHomeServer
@@ -106,3 +113,16 @@ class MapUsernameTestCase(unittest.TestCase):
         self.assertEqual(
             map_username_to_mxid_localpart(u'têst'.encode('utf-8')), "t=c3=aast"
         )
+
+
+class StripInvalidMxidCharactersTestCase(unittest.TestCase):
+    def test_return_type(self):
+        unstripped = strip_invalid_mxid_characters("test")
+        stripped = strip_invalid_mxid_characters("test@")
+
+        self.assertTrue(isinstance(unstripped, string_types), type(unstripped))
+        self.assertTrue(isinstance(stripped, string_types), type(stripped))
+
+    def test_strip(self):
+        stripped = strip_invalid_mxid_characters("test@")
+        self.assertEqual(stripped, "test", stripped)
