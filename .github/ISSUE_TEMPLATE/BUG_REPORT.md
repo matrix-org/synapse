@@ -49,12 +49,13 @@ those (please be careful to remove any personal or private data). Please surroun
 If not matrix.org:
 
 <!--
-What version of Synapse is running?
+ What version of Synapse is running?
+
 You can find the Synapse version with this command:
 
 $ curl http://localhost:8008/_synapse/admin/v1/server_version
 
-(You may need to replace `localhost:8008` if synapse is not configured to
+(You may need to replace `localhost:8008` if Synapse is not configured to
 listen on that port.)
 -->
 - **Version**:
