@@ -261,7 +261,7 @@ class EventCreationHandler(object):
         # without local users who can send events into the room.
         self._rooms_to_exclude_from_dummy_event_insertion = {}
         # Rooms can be excluded from dummy event insertion, but should be rechecked
-        # from time to time.
+        # from time to time. Measured in ms.
         self._ROOM_EXCLUSION_EXPIRY = 7 * 24 * 60 * 60 * 1000
 
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
@@ -941,7 +941,8 @@ class EventCreationHandler(object):
 
             if user_id is None:
                 # Did not find a valid user in the room, so remove from future attempts
-                # The store is reset on start up, which creates a crude retry mechanism
+                # Exclusion is time limited, so the room will be rechecked in the future
+                # dependent on self._ROOM_EXCLUSION_EXPIRY
                 now = self.clock.time_msec()
                 self._rooms_to_exclude_from_dummy_event_insertion[room_id] = now
 
