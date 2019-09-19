@@ -78,9 +78,12 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_rooms_with_many_extremities(self):
+        room1 = "#room1"
+        room2 = "#room2"
+        room3 = "#room3"
+
         def insert_event(txn, i, room_id):
             event_id = "$event_%i:local" % i
-
             txn.execute(
                 (
                     "INSERT INTO event_forward_extremities (room_id, event_id) "
@@ -90,21 +93,21 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
             )
 
         for i in range(0, 20):
-            yield self.store.runInteraction("insert", insert_event, i, "#room1")
-            yield self.store.runInteraction("insert", insert_event, i, "#room2")
-            yield self.store.runInteraction("insert", insert_event, i, "#room3")
+            yield self.store.runInteraction("insert", insert_event, i, room1)
+            yield self.store.runInteraction("insert", insert_event, i, room2)
+            yield self.store.runInteraction("insert", insert_event, i, room3)
 
         # Test simple case
         r = yield self.store.get_rooms_with_many_extremities(5, 5, [])
         self.assertEqual(len(r), 3)
 
         # Does filter work?
-        r = yield self.store.get_rooms_with_many_extremities(5, 5, ["#room1"])
-        self.assertEqual(r, ["#room2", "#room3"])
+        r = yield self.store.get_rooms_with_many_extremities(5, 5, [room1])
+        self.assertEqual(r, [room2, room3])
 
-        r = yield self.store.get_rooms_with_many_extremities(5, 5, ["#room1", "#room2"])
-        self.assertEqual(r, ["#room3"])
+        r = yield self.store.get_rooms_with_many_extremities(5, 5, [room1, room2])
+        self.assertEqual(r, [room3])
 
         # Does filter and limit work?
-        r = yield self.store.get_rooms_with_many_extremities(5, 1, ["#room1"])
-        self.assertEqual(r, ["#room2"] or ["#room3"])
+        r = yield self.store.get_rooms_with_many_extremities(5, 1, [room1])
+        self.assertEqual(r, [room2] or [room3])
