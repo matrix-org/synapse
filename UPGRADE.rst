@@ -142,10 +142,10 @@ If you have configured a custom template directory with the
 registration and threepid management.
 
 ``registration.html`` and ``registration.txt`` contain the content of the email that is sent
-to a client upon registering via an email address.
+to a user when registering with an email address.
 
 ``registration_success.html`` and ``registration_failure.html`` are templates
-that will be shown to the user when they click the link in their registration
+that will be shown to the user when they click the link in that confirmation
 email, either showing them a success page (in the case that no onward redirect was specified by the client), or a failure page.
 is not configured).
 
