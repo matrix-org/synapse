@@ -17,6 +17,7 @@ import string
 from collections import namedtuple
 
 import attr
+from six.moves import filter
 
 from synapse.api.errors import SynapseError
 
@@ -240,7 +241,8 @@ def strip_invalid_mxid_characters(localpart):
     Returns:
         localpart (basestring): the localpart having been stripped
     """
-    return filter(lambda c: c in mxid_localpart_allowed_characters, localpart)
+    filtered = filter(lambda c: c in mxid_localpart_allowed_characters, localpart)
+    return "".join(list(filtered))
 
 
 UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
