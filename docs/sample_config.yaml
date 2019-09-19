@@ -938,7 +938,7 @@ uploads_path: "DATADIR/uploads"
 # https://matrix.org/docs/spec/identity_service/latest
 #
 account_threepid_delegates:
-    #email: https://example.com     # Delegate email sending to matrix.org
+    #email: https://example.com     # Delegate email sending to example.org
     #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
 # Users who register on this homeserver will automatically be joined
@@ -1520,7 +1520,7 @@ opentracing:
     #enabled: true
 
     # The list of homeservers we wish to send and receive span contexts and span baggage.
-    # See docs/opentracing.md
+    # See docs/opentracing.rst
     # This is a list of regexes which are matched against the server_name of the
     # homeserver.
     #
