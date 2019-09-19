@@ -191,10 +191,11 @@ class Mailer(object):
 
             sid (str): The generated session ID
         """
+        params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
             self.hs.config.public_baseurl
-            + "_matrix/client/unstable/add_threepid/email/submit_token"
-            "?token=%s&client_secret=%s&sid=%s" % (token, client_secret, sid)
+            + "_matrix/client/unstable/add_threepid/email/submit_token?%s"
+            % urllib.parse.urlencode(params),
         )
 
         template_vars = {"link": link}
