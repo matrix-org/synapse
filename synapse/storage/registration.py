@@ -24,7 +24,7 @@ from six.moves import range
 from twisted.internet import defer
 
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, StoreError, ThreepidValidationError
+from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
@@ -661,8 +661,8 @@ class RegistrationWorkerStore(SQLBaseStore):
             medium (str|None): The medium of the 3PID
             address (str|None): The address of the 3PID
             sid (str|None): The ID of the validation session
-            client_secret (str|None): A unique string provided by the client to
-                help identify this validation attempt
+            client_secret (str): A unique string provided by the client to help identify this
+                validation attempt
             validated (bool|None): Whether sessions should be filtered by
                 whether they have been validated already or not. None to
                 perform no filtering
@@ -678,9 +678,12 @@ class RegistrationWorkerStore(SQLBaseStore):
 
                 Otherwise None if a validation session is not found
         """
-        keyvalues = {}
-        if client_secret:
-            keyvalues["client_secret"] = client_secret
+        if not client_secret:
+            raise SynapseError(
+                400, "Missing parameter: client_secret", errcode=Codes.MISSING_PARAM
+            )
+
+        keyvalues = {"client_secret": client_secret}
         if medium:
             keyvalues["medium"] = medium
         if address:
