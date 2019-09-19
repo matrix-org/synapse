@@ -351,8 +351,7 @@ sudo pip install py-bcrypt
 
 ### Void Linux
 
-Synapse can be found in the void repositories as 'synapse'.  
-synchronize your repository databases and update your system to the most recent packages, including their dependencies. Then install synapse.
+Synapse can be found in the void repositories as 'synapse':
 
     xbps-install -Su
     xbps-install -S synapse
