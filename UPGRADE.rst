@@ -29,14 +29,15 @@ instructions that may be required are listed later in this document.
      running:
 
      .. code:: bash
+     
        git pull
        pip install --upgrade .
 
-   3. Restart Synapse:
+  3. Restart Synapse:
 
-      .. code:: bash
+     .. code:: bash
 
-         ./synctl restart
+       ./synctl restart
 
 To check whether your update was successful, you can check the running server
 version with:
