@@ -64,7 +64,8 @@ for example:
   .. code:: bash
 
      source env/bin/activate
-     pip install matrix-synapse==<version>
+     # replace `1.3.0` accordingly:
+     pip install matrix-synapse==1.3.0
 
 * Debian:
 
