@@ -56,6 +56,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 "consent_server_notice_sent",
                 "appservice_id",
                 "creation_ts",
+                "user_type",
             ],
             allow_none=True,
             desc="get_user_by_id",
@@ -272,6 +273,14 @@ class RegistrationWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def is_server_admin(self, user):
+        """Determines if a user is an admin of this homeserver.
+
+        Args:
+            user (UserID): user ID of the user to test
+
+        Returns (bool):
+            true iff the user is a server admin, false otherwise.
+        """
         res = yield self._simple_select_one_onecol(
             table="users",
             keyvalues={"name": user.to_string()},
@@ -281,6 +290,21 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
 
         return res if res else False
+
+    def set_server_admin(self, user, admin):
+        """Sets whether a user is an admin of this homeserver.
+
+        Args:
+            user (UserID): user ID of the user to test
+            admin (bool): true iff the user is to be a server admin,
+                false otherwise.
+        """
+        return self._simple_update_one(
+            table="users",
+            keyvalues={"name": user.to_string()},
+            updatevalues={"admin": 1 if admin else 0},
+            desc="set_server_admin",
+        )
 
     def _query_for_auth(self, txn, token):
         sql = (
@@ -299,6 +323,19 @@ class RegistrationWorkerStore(SQLBaseStore):
         return None
 
     @cachedInlineCallbacks()
+    def is_real_user(self, user_id):
+        """Determines if the user is a real user, ie does not have a 'user_type'.
+
+        Args:
+            user_id (str): user id to test
+
+        Returns:
+            Deferred[bool]: True if user 'user_type' is null or empty string
+        """
+        res = yield self.runInteraction("is_real_user", self.is_real_user_txn, user_id)
+        return res
+
+    @cachedInlineCallbacks()
     def is_support_user(self, user_id):
         """Determines if the user is of type UserTypes.SUPPORT
 
@@ -312,6 +349,16 @@ class RegistrationWorkerStore(SQLBaseStore):
             "is_support_user", self.is_support_user_txn, user_id
         )
         return res
+
+    def is_real_user_txn(self, txn, user_id):
+        res = self._simple_select_one_onecol_txn(
+            txn=txn,
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="user_type",
+            allow_none=True,
+        )
+        return res is None
 
     def is_support_user_txn(self, txn, user_id):
         res = self._simple_select_one_onecol_txn(
@@ -395,6 +442,20 @@ class RegistrationWorkerStore(SQLBaseStore):
             return count
 
         ret = yield self.runInteraction("count_users", _count_users)
+        return ret
+
+    @defer.inlineCallbacks
+    def count_real_users(self):
+        """Counts all users without a special user_type registered on the homeserver."""
+
+        def _count_users(txn):
+            txn.execute("SELECT COUNT(*) AS users FROM users where user_type is null")
+            rows = self.cursor_to_dict(txn)
+            if rows:
+                return rows[0]["users"]
+            return 0
+
+        ret = yield self.runInteraction("count_real_users", _count_users)
         return ret
 
     @defer.inlineCallbacks
@@ -589,6 +650,85 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         # Convert the integer into a boolean.
         return res == 1
+
+    def get_threepid_validation_session(
+        self, medium, client_secret, address=None, sid=None, validated=True
+    ):
+        """Gets a session_id and last_send_attempt (if available) for a
+        client_secret/medium/(address|session_id) combo
+
+        Args:
+            medium (str|None): The medium of the 3PID
+            address (str|None): The address of the 3PID
+            sid (str|None): The ID of the validation session
+            client_secret (str|None): A unique string provided by the client to
+                help identify this validation attempt
+            validated (bool|None): Whether sessions should be filtered by
+                whether they have been validated already or not. None to
+                perform no filtering
+
+        Returns:
+            deferred {str, int}|None: A dict containing the
+                latest session_id and send_attempt count for this 3PID.
+                Otherwise None if there hasn't been a previous attempt
+        """
+        keyvalues = {"medium": medium, "client_secret": client_secret}
+        if address:
+            keyvalues["address"] = address
+        if sid:
+            keyvalues["session_id"] = sid
+
+        assert address or sid
+
+        def get_threepid_validation_session_txn(txn):
+            sql = """
+                SELECT address, session_id, medium, client_secret,
+                last_send_attempt, validated_at
+                FROM threepid_validation_session WHERE %s
+                """ % (
+                " AND ".join("%s = ?" % k for k in iterkeys(keyvalues)),
+            )
+
+            if validated is not None:
+                sql += " AND validated_at IS " + ("NOT NULL" if validated else "NULL")
+
+            sql += " LIMIT 1"
+
+            txn.execute(sql, list(keyvalues.values()))
+            rows = self.cursor_to_dict(txn)
+            if not rows:
+                return None
+
+            return rows[0]
+
+        return self.runInteraction(
+            "get_threepid_validation_session", get_threepid_validation_session_txn
+        )
+
+    def delete_threepid_session(self, session_id):
+        """Removes a threepid validation session from the database. This can
+        be done after validation has been performed and whatever action was
+        waiting on it has been carried out
+
+        Args:
+            session_id (str): The ID of the session to delete
+        """
+
+        def delete_threepid_session_txn(txn):
+            self._simple_delete_txn(
+                txn,
+                table="threepid_validation_token",
+                keyvalues={"session_id": session_id},
+            )
+            self._simple_delete_txn(
+                txn,
+                table="threepid_validation_session",
+                keyvalues={"session_id": session_id},
+            )
+
+        return self.runInteraction(
+            "delete_threepid_session", delete_threepid_session_txn
+        )
 
 
 class RegistrationStore(
@@ -845,6 +985,17 @@ class RegistrationStore(
                 (user_id_obj.localpart, create_profile_with_displayname),
             )
 
+        if self.hs.config.stats_enabled:
+            # we create a new completed user statistics row
+
+            # we don't strictly need current_token since this user really can't
+            # have any state deltas before now (as it is a new user), but still,
+            # we include it for completeness.
+            current_token = self._get_max_stream_id_in_current_state_deltas_txn(txn)
+            self._update_stats_delta_txn(
+                txn, now, "user", user_id, {}, complete_with_stream_id=current_token
+            )
+
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
@@ -1047,60 +1198,6 @@ class RegistrationStore(
 
         return 1
 
-    def get_threepid_validation_session(
-        self, medium, client_secret, address=None, sid=None, validated=True
-    ):
-        """Gets a session_id and last_send_attempt (if available) for a
-        client_secret/medium/(address|session_id) combo
-
-        Args:
-            medium (str|None): The medium of the 3PID
-            address (str|None): The address of the 3PID
-            sid (str|None): The ID of the validation session
-            client_secret (str|None): A unique string provided by the client to
-                help identify this validation attempt
-            validated (bool|None): Whether sessions should be filtered by
-                whether they have been validated already or not. None to
-                perform no filtering
-
-        Returns:
-            deferred {str, int}|None: A dict containing the
-                latest session_id and send_attempt count for this 3PID.
-                Otherwise None if there hasn't been a previous attempt
-        """
-        keyvalues = {"medium": medium, "client_secret": client_secret}
-        if address:
-            keyvalues["address"] = address
-        if sid:
-            keyvalues["session_id"] = sid
-
-        assert address or sid
-
-        def get_threepid_validation_session_txn(txn):
-            sql = """
-                SELECT address, session_id, medium, client_secret,
-                last_send_attempt, validated_at
-                FROM threepid_validation_session WHERE %s
-                """ % (
-                " AND ".join("%s = ?" % k for k in iterkeys(keyvalues)),
-            )
-
-            if validated is not None:
-                sql += " AND validated_at IS " + ("NOT NULL" if validated else "NULL")
-
-            sql += " LIMIT 1"
-
-            txn.execute(sql, list(keyvalues.values()))
-            rows = self.cursor_to_dict(txn)
-            if not rows:
-                return None
-
-            return rows[0]
-
-        return self.runInteraction(
-            "get_threepid_validation_session", get_threepid_validation_session_txn
-        )
-
     def validate_threepid_session(self, session_id, client_secret, token, current_ts):
         """Attempt to validate a threepid session using a token
 
@@ -1116,6 +1213,7 @@ class RegistrationStore(
             deferred str|None: A str representing a link to redirect the user
             to if there is one.
         """
+
         # Insert everything into a transaction in order to run atomically
         def validate_threepid_session_txn(txn):
             row = self._simple_select_one_txn(
@@ -1285,31 +1383,6 @@ class RegistrationStore(
             "cull_expired_threepid_validation_tokens",
             cull_expired_threepid_validation_tokens_txn,
             self.clock.time_msec(),
-        )
-
-    def delete_threepid_session(self, session_id):
-        """Removes a threepid validation session from the database. This can
-        be done after validation has been performed and whatever action was
-        waiting on it has been carried out
-
-        Args:
-            session_id (str): The ID of the session to delete
-        """
-
-        def delete_threepid_session_txn(txn):
-            self._simple_delete_txn(
-                txn,
-                table="threepid_validation_token",
-                keyvalues={"session_id": session_id},
-            )
-            self._simple_delete_txn(
-                txn,
-                table="threepid_validation_session",
-                keyvalues={"session_id": session_id},
-            )
-
-        return self.runInteraction(
-            "delete_threepid_session", delete_threepid_session_txn
         )
 
     def set_user_deactivated_status_txn(self, txn, user_id, deactivated):

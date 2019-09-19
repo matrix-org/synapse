@@ -62,7 +62,7 @@ class PushersRestServlet(RestServlet):
                 if k not in allowed_keys:
                     del p[k]
 
-        return (200, {"pushers": pushers})
+        return 200, {"pushers": pushers}
 
     def on_OPTIONS(self, _):
         return 200, {}
@@ -94,7 +94,7 @@ class PushersSetRestServlet(RestServlet):
             yield self.pusher_pool.remove_pusher(
                 content["app_id"], content["pushkey"], user_id=user.to_string()
             )
-            return (200, {})
+            return 200, {}
 
         assert_params_in_dict(
             content,
@@ -143,7 +143,7 @@ class PushersSetRestServlet(RestServlet):
 
         self.notifier.on_new_replication_data()
 
-        return (200, {})
+        return 200, {}
 
     def on_OPTIONS(self, _):
         return 200, {}
