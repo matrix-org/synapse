@@ -52,17 +52,14 @@ returned by the Client-Server API:
 Upgrading to v1.4.0
 ===================
 
-Config options
---------------
+**Note: Sending emails and/or SMS will not work in this release without config
+changes. Notably this will affect the ability to register via email or phone number.
 
-**Note: Registration by email address or phone number will not work in this
-release unless some config options are changed from their defaults.**
-
-Previous versions of Synapse delegate the sending of registration emails and
+Previous versions of Synapse delegate the sending of emails and
 SMS to an identity server by default. In most cases this server is vector.im or
-matrix.org.
+matrix.org. Email and SMS are often used as part of registration and account recovery.
 
-In Synapse 1.4, for security and privacy reasons, the homeserver will no longer
+In Synapse 1.4,0, for security and privacy reasons, the homeserver will no longer
 delegate email or SMS to an identity server by default and instead the admin
 will need to explicitly decide how they would like email and SMS to be sent.
 
@@ -77,10 +74,12 @@ identity servers, all Synapse versions that depend on those instances will be
 unable to send email and SMS through them. There are no imminent plans to
 remove email and SMS support from Sydent altogether.
 
+For more details on why these changes are necessary see (link to blog).
+
 Email
 -----
 
-Following upgrade, to continue using email as a registration method admins can
+Following upgrade, to continue sending email (and therefore register via an email address) admins can
 either:-
 
 * Configure Synapse to use an alternate email server (details follow).
@@ -163,16 +162,16 @@ directory. To view the default templates, see `synapse/res/templates
 SMS
 ---
 
-Following upgrade, the only way to maintain the ability to register via a phone
-number will be to continue to delegate SMS delivery via the matrix.org and
-vector.im identity servers.
+Following upgrade, the only way to maintain the ability to send SMS (and therefore register via a phone
+number) will be to continue to delegate SMS delivery via the matrix.org and
+vector.im identity servers (or another identity server that supports SMS sending).
 
 The ``account_threepid_delegates`` dictionary defines whether the homeserver
 should delegate an external server (typically an `identity server
 <https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending
 password reset or registration messages via email and SMS.
 
-So to delegate SMS sending set ``account_threepid_delegates.sms`` to a base URL of
+So to delegate SMS sending set ``account_threepid_delegates.msisdn`` to a base URL of
 an identity server in your homeserver.yaml.
 
 .. code:: yaml
@@ -184,10 +183,6 @@ Currently Synapse does not support a means to send SMS itself, and the
 matrix.org and vector.im identity servers will continue to support SMS until
 such time as it is possible for admins to configure their servers to send SMS
 directly. More details will follow in a future release.
-
-
-For more details on why these changes are necessary see (link to blog).
-
 
 Upgrading to v1.2.0
 ===================
