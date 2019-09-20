@@ -521,10 +521,6 @@ class ThreepidRestServlet(RestServlet):
             user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
         )
 
-        if "bind" in body and body["bind"]:
-            logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
-
         return 200, {}
 
 
