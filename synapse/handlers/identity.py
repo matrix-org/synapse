@@ -44,7 +44,6 @@ class IdentityHandler(BaseHandler):
         self.http_client = hs.get_simple_http_client()
         self.federation_http_client = hs.get_http_client()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
 
     @defer.inlineCallbacks
     def threepid_from_creds(self, id_server, creds):
@@ -441,7 +440,7 @@ class IdentityHandler(BaseHandler):
         # Try to validate as email
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             # Ask our delegated email identity server
-            validation_session = yield self.identity_handler.threepid_from_creds(
+            validation_session = yield self.threepid_from_creds(
                 self.hs.config.account_threepid_delegate_email, threepid_creds
             )
         elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
@@ -456,7 +455,7 @@ class IdentityHandler(BaseHandler):
         # Try to validate as msisdn
         if self.hs.config.account_threepid_delegate_msisdn:
             # Ask our delegated msisdn identity server
-            validation_session = yield self.identity_handler.threepid_from_creds(
+            validation_session = yield self.threepid_from_creds(
                 self.hs.config.account_threepid_delegate_msisdn, threepid_creds
             )
 
