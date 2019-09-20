@@ -23,6 +23,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -43,6 +44,7 @@ class IdentityHandler(BaseHandler):
         self.http_client = hs.get_simple_http_client()
         self.federation_http_client = hs.get_http_client()
         self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
 
     @defer.inlineCallbacks
     def threepid_from_creds(self, id_server, creds):
@@ -415,6 +417,53 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
+
+    @defer.inlineCallbacks
+    def validate_threepid_session(self, client_secret, sid):
+        """Validates a threepid session with only the client secret and session ID
+        Tries validating against any configured account_threepid_delegates as well as locally.
+
+        Args:
+            client_secret (str): A secret provided by the client
+
+            sid (str): The ID of the session
+
+        Returns:
+            Dict[str, str|int] if validation was successful, otherwise None
+        """
+        # We don't actually know which medium this 3PID is. Thus we first assume it's email,
+        # and if validation fails we try msisdn
+        validation_session = None
+
+        # XXX: We should need to keep wrapping and unwrapping this value
+        threepid_creds = {
+            "client_secret": client_secret,
+            "sid": sid,
+        }
+
+        # Try to validate as email
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            # Ask our delegated email identity server
+            validation_session = yield self.identity_handler.threepid_from_creds(
+                self.hs.config.account_threepid_delegate_email, threepid_creds
+            )
+        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            # Get a validated session matching these details
+            validation_session = yield self.store.get_threepid_validation_session(
+                "email", client_secret, sid=sid, validated=True
+            )
+
+        if validation_session:
+            return validation_session
+
+        # Try to validate as msisdn
+        if self.hs.config.account_threepid_delegate_msisdn:
+            # Ask our delegated msisdn identity server
+            validation_session = yield self.identity_handler.threepid_from_creds(
+                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+            )
+
+        return validation_session
 
 
 def create_id_access_token_header(id_access_token):
