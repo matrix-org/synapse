@@ -734,27 +734,66 @@ class ThreepidAddRestServlet(RestServlet):
         assert_params_in_dict(body, ["client_secret", "sid"])
         client_secret = body["client_secret"]
         sid = body["sid"]
+        threepid_creds = {"client_secret": client_secret, "sid": sid}
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        # Get a validated session matching these details
-        validation_session = yield self.store.get_threepid_validation_session(
-            "email", client_secret, sid=sid
-        )
+        # We don't actually know which medium this 3PID is. Thus we first assume it's email,
+        # and if validation fails we try msisdn
+        validation_session = None
 
-        if not validation_session:
-            raise SynapseError(
-                400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
+        # Try to validate as email
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            # Ask our delegated email identity server
+            validation_session = yield self.identity_handler.threepid_from_creds(
+                self.hs.config.account_threepid_delegate_email, threepid_creds
+            )
+        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            # Get a validated session matching these details
+            validation_session = yield self.store.get_threepid_validation_session(
+                "email", client_secret, sid=sid, validated=True
             )
 
-        address = validation_session["address"]
-        medium = validation_session["medium"]
-        validated_at = validation_session["validated_at"]
+        if validation_session:
+            yield self._add_threepid_to_account(user_id, validation_session)
+            return 200, {}
 
-        yield self.auth_handler.add_threepid(user_id, medium, address, validated_at)
+        # Try to validate as msisdn
+        if self.hs.config.account_threepid_delegate_msisdn:
+            # Ask our delegated msisdn identity server
+            validation_session = yield self.identity_handler.threepid_from_creds(
+                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+            )
 
-        return 200, {}
+            if validation_session:
+                yield self._add_threepid_to_account(user_id, validation_session)
+                return 200, {}
+
+        raise SynapseError(
+            400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
+        )
+
+    @defer.inlineCallbacks
+    def _add_threepid_to_account(self, user_id, validation_session):
+        """Add a threepid wrapped in a validation_session dict to an account
+
+        Args:
+            user_id (str): The mxid of the user to add this 3PID to
+
+            validation_session (dict|None): A dict containing the following:
+                * medium       - medium of the threepid
+                * address      - address of the threepid
+                * validated_at - timestamp of when the validation occurred
+
+                If validation_session is None, this method will return False
+        """
+        yield self.auth_handler.add_threepid(
+            user_id,
+            validation_session["medium"],
+            validation_session["address"],
+            validation_session["validated_at"],
+        )
 
 
 class ThreepidBindRestServlet(RestServlet):
