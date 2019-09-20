@@ -745,7 +745,7 @@ class ThreepidAddRestServlet(RestServlet):
 
         if not validation_session:
             raise SynapseError(
-                400, "Not validated 3pid session found", Codes.THREEPID_AUTH_FAILED
+                400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
             )
 
         address = validation_session["address"]
