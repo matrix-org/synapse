@@ -626,7 +626,7 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
 
         try:
             # Proxy submit_token request to msisdn threepid delegate
-            response = self.identity_handler.proxy_msisdn_submit_token(
+            response = yield self.identity_handler.proxy_msisdn_submit_token(
                 self.config.account_threepid_delegate_msisdn,
                 body["client_secret"],
                 body["sid"],
