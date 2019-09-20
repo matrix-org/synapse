@@ -541,7 +541,6 @@ class AddThreepidSubmitTokenServlet(RestServlet):
             hs (synapse.server.HomeServer): server
         """
         super().__init__()
-        self.auth = hs.get_auth()
         self.config = hs.config
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
@@ -552,7 +551,7 @@ class AddThreepidSubmitTokenServlet(RestServlet):
             )
 
     @defer.inlineCallbacks
-    def on_GET(self, request, medium):
+    def on_GET(self, request):
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warn(
