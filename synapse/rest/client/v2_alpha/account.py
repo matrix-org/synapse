@@ -644,7 +644,7 @@ class ThreepidRestServlet(RestServlet):
             )
 
         if validation_session:
-            self._add_threepid_to_account(user_id, validation_session)
+            yield self._add_threepid_to_account(user_id, validation_session)
             return 200, {}
 
         # Try to validate as msisdn
@@ -655,13 +655,14 @@ class ThreepidRestServlet(RestServlet):
             )
 
             if validation_session:
-                self._add_threepid_to_account(user_id, validation_session)
+                yield self._add_threepid_to_account(user_id, validation_session)
                 return 200, {}
 
         raise SynapseError(
             400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
         )
 
+    @defer.inlineCallbacks
     def _add_threepid_to_account(self, user_id, validation_session):
         """Add a threepid wrapped in a validation_session dict to an account
 
