@@ -196,6 +196,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         Args:
             min_count (int): The minimum number of extremities
             limit (int): The maximum number of rooms to return.
+            room_id_filter (list[str]): List of room_ids to exclude from the look up
 
         Returns:
             Deferred[list]: At most `limit` room IDs that have at least
@@ -203,35 +204,26 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """
 
         def _get_rooms_with_many_extremities_txn(txn):
-            base_sql_pre = """
+
+            where_clause = "1=1"
+            if room_id_filter:
+                where_clause = "room_id NOT IN (%s)" % (
+                    ",".join("?" for _ in room_id_filter),
+                )
+
+            sql = """
                 SELECT room_id FROM event_forward_extremities
+                WHERE %s
                 GROUP BY room_id
                 HAVING count(*) > ?
-            """
-            base_sql_post = """
                 ORDER BY count(*) DESC
                 LIMIT ?
-            """
-            query_args = [limit]
-            # Need if/else since 'AND room_id NOT IN ({})' fails on Postgres
-            # when len(room_id_filter) == 0. Works fine on sqlite.
-            if len(room_id_filter) > 0:
-                # questionmarks is a hack to overcome sqlite not supporting
-                # tuples in 'WHERE IN %s'
-                questionmarks = "?" * len(room_id_filter)
+            """ % (
+                where_clause,
+            )
 
-                query_args.extend(room_id_filter)
-
-                sql = (
-                    base_sql_pre
-                    + """ AND room_id NOT IN ({})""".format(",".join(questionmarks))
-                    + " "
-                    + base_sql_post
-                )
-            else:
-                sql = base_sql_pre + base_sql_post
-
-            query_args.append(limit)
+            query_args = room_id_filter
+            query_args.extend([min_count, limit])
             txn.execute(sql, query_args)
             return [room_id for room_id, in txn]
 
