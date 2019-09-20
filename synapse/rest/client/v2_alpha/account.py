@@ -739,7 +739,7 @@ class ThreepidAddRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         # Get a validated session matching these details
-        validation_session = self.store.get_threepid_validation_session(
+        validation_session = yield self.store.get_threepid_validation_session(
             None, client_secret, sid=sid
         )
 
