@@ -639,13 +639,22 @@ class ThreepidRestServlet(RestServlet):
                     self.hs.config.account_threepid_delegate_email, threepid_creds
                 )
             except HttpResponseException:
-                pass
+                logger.debug(
+                    "%s reported non-validated threepid: %s",
+                    self.hs.config.account_threepid_delegate_email,
+                    threepid_creds,
+                )
         elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             # Get a validated session matching these details
             validation_session = yield self.datastore.get_threepid_validation_session(
                 "email", client_secret, sid=sid, validated=True
             )
 
+        # Old versions of Sydent return a 200 http code even on a failed validation check.
+        # Thus, in addition to the HttpResponseException check above (which checks for
+        # non-200 errors), we need to make sure validation_session isn't actually an error,
+        # identified by containing an "error" key
+        # See https://github.com/matrix-org/sydent/issues/215 for details
         if validation_session and "error" not in validation_session:
             yield self._add_threepid_to_account(user_id, validation_session)
             return 200, {}
@@ -658,8 +667,14 @@ class ThreepidRestServlet(RestServlet):
                     self.hs.config.account_threepid_delegate_msisdn, threepid_creds
                 )
             except HttpResponseException:
-                pass
+                logger.debug(
+                    "%s reported non-validated threepid: %s",
+                    self.hs.config.account_threepid_delegate_email,
+                    threepid_creds,
+                )
 
+            # Check that validation_session isn't actually an error due to old Sydent instances
+            # See explanatory comment above
             if validation_session and "error" not in validation_session:
                 yield self._add_threepid_to_account(user_id, validation_session)
                 return 200, {}
@@ -679,8 +694,6 @@ class ThreepidRestServlet(RestServlet):
                 * medium       - medium of the threepid
                 * address      - address of the threepid
                 * validated_at - timestamp of when the validation occurred
-
-                If validation_session is None, this method will return False
         """
         yield self.auth_handler.add_threepid(
             user_id,
