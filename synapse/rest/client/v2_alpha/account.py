@@ -740,7 +740,7 @@ class ThreepidAddRestServlet(RestServlet):
 
         # Get a validated session matching these details
         validation_session = yield self.store.get_threepid_validation_session(
-            None, client_secret, sid=sid
+            "email", client_secret, sid=sid
         )
 
         if not validation_session:
