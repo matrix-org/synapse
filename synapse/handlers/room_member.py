@@ -839,7 +839,7 @@ class RoomMemberHandler(object):
             )
 
         # Authenticate with identity server given the access token from the client
-        headers = {"Authorization": create_id_access_token_header(id_access_token)}
+        headers = {b"Authorization": create_id_access_token_header(id_access_token)}
 
         try:
             lookup_results = yield self.simple_http_client.post_json_get_json(
