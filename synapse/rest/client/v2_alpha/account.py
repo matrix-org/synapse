@@ -21,7 +21,12 @@ from six.moves import http_client
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
+from synapse.api.errors import (
+    Codes,
+    HttpResponseException,
+    SynapseError,
+    ThreepidValidationError,
+)
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
@@ -629,9 +634,12 @@ class ThreepidRestServlet(RestServlet):
         # Try to validate as email
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             # Ask our delegated email identity server
-            validation_session = yield self.identity_handler.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_email, threepid_creds
-            )
+            try:
+                validation_session = yield self.identity_handler.threepid_from_creds(
+                    self.hs.config.account_threepid_delegate_email, threepid_creds
+                )
+            except HttpResponseException:
+                pass
         elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             # Get a validated session matching these details
             validation_session = yield self.datastore.get_threepid_validation_session(
@@ -645,9 +653,12 @@ class ThreepidRestServlet(RestServlet):
         # Try to validate as msisdn
         if self.hs.config.account_threepid_delegate_msisdn:
             # Ask our delegated msisdn identity server
-            validation_session = yield self.identity_handler.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
-            )
+            try:
+                validation_session = yield self.identity_handler.threepid_from_creds(
+                    self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+                )
+            except HttpResponseException:
+                pass
 
             if validation_session:
                 yield self._add_threepid_to_account(user_id, validation_session)
