@@ -655,7 +655,8 @@ class ThreepidRestServlet(RestServlet):
                 "email", client_secret, sid=sid, validated=True
             )
 
-        if self._add_threepid_to_account(user_id, validation_session):
+        if validation_session:
+            self._add_threepid_to_account(user_id, validation_session)
             return 200, {}
 
         # Try to validate as msisdn
@@ -665,7 +666,8 @@ class ThreepidRestServlet(RestServlet):
                 self.hs.config.account_threepid_delegate_msisdn, threepid_creds
             )
 
-            if self._add_threepid_to_account(user_id, validation_session):
+            if validation_session:
+                self._add_threepid_to_account(user_id, validation_session)
                 return 200, {}
 
         raise SynapseError(
@@ -673,7 +675,7 @@ class ThreepidRestServlet(RestServlet):
         )
 
     def _add_threepid_to_account(self, user_id, validation_session):
-        """Attempt to add a threepid wrapped in a validation_session dict to an account
+        """Add a threepid wrapped in a validation_session dict to an account
 
         Args:
             user_id (str): The mxid of the user to add this 3PID to
@@ -684,21 +686,13 @@ class ThreepidRestServlet(RestServlet):
                 * validated_at - timestamp of when the validation occurred
 
                 If validation_session is None, this method will return False
-
-        Returns:
-            A boolean stating whether adding the threepid was successful
         """
-        if not validation_session:
-            return False
-
         yield self.auth_handler.add_threepid(
             user_id,
             validation_session["medium"],
             validation_session["address"],
             validation_session["validated_at"],
         )
-
-        return True
 
 
 class ThreepidUnbindRestServlet(RestServlet):
