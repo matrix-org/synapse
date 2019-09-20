@@ -265,23 +265,6 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         request.write(html.encode("utf-8"))
         finish_request(request)
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, medium):
-        if medium != "email":
-            raise SynapseError(
-                400, "This medium is currently not supported for password resets"
-            )
-
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["sid", "client_secret", "token"])
-
-        valid, _ = yield self.store.validate_threepid_session(
-            body["sid"], body["client_secret"], body["token"], self.clock.time_msec()
-        )
-        response_code = 200 if valid else 400
-
-        return response_code, {"success": valid}
-
 
 class PasswordRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/password$")
@@ -697,7 +680,7 @@ class ThreepidRestServlet(RestServlet):
 
 
 class ThreepidUnbindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/unbind$")
+    PATTERNS = client_patterns("/account/3pid/unbind$", releases=(), unstable=True)
 
     def __init__(self, hs):
         super(ThreepidUnbindRestServlet, self).__init__()
