@@ -897,7 +897,7 @@ class EventCreationHandler(object):
         room_ids = yield self.store.get_rooms_with_many_extremities(
             min_count=10,
             limit=5,
-            room_id_filter=self._rooms_to_exclude_from_dummy_event_insertion.keys(),
+            room_id_filter=list(self._rooms_to_exclude_from_dummy_event_insertion),
         )
         for room_id in room_ids:
             # For each room we need to find a joined member we can use to send
