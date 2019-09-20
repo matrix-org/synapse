@@ -521,15 +521,11 @@ class ThreepidRestServlet(RestServlet):
             user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
         )
 
-        if "bind" in body and body["bind"]:
-            logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
-
         return 200, {}
 
 
 class ThreepidUnbindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/unbind$")
+    PATTERNS = client_patterns("/account/3pid/unbind$", releases=(), unstable=True)
 
     def __init__(self, hs):
         super(ThreepidUnbindRestServlet, self).__init__()
