@@ -25,6 +25,7 @@ from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
+from twisted.internet.error import TimeoutError
 
 from synapse import types
 from synapse.api.constants import EventTypes, Membership
@@ -756,7 +757,8 @@ class RoomMemberHandler(object):
                     raise AuthError(401, "No signatures on 3pid binding")
                 yield self._verify_any_signature(data, id_server)
                 return data["mxid"]
-
+        except TimeoutError:
+            raise SynapseError(504, "Timed out contacting identity server")
         except IOError as e:
             logger.warning("Error from v1 identity server lookup: %s" % (e,))
 
@@ -777,10 +779,13 @@ class RoomMemberHandler(object):
             Deferred[str|None]: the matrix ID of the 3pid, or None if it is not recognised.
         """
         # Check what hashing details are supported by this identity server
-        hash_details = yield self.simple_http_client.get_json(
-            "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
-            {"access_token": id_access_token},
-        )
+        try:
+            hash_details = yield self.simple_http_client.get_json(
+                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
+                {"access_token": id_access_token},
+            )
+        except TimeoutError:
+            raise SynapseError(504, "Timed out contacting identity server")
 
         if not isinstance(hash_details, dict):
             logger.warning(
@@ -851,6 +856,8 @@ class RoomMemberHandler(object):
                 },
                 headers=headers,
             )
+        except TimeoutError:
+            raise SynapseError(504, "Timed out contacting identity server")
         except Exception as e:
             logger.warning("Error when performing a v2 3pid lookup: %s", e)
             raise SynapseError(
@@ -873,10 +880,13 @@ class RoomMemberHandler(object):
         if server_hostname not in data["signatures"]:
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
-            key_data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/pubkey/%s"
-                % (id_server_scheme, server_hostname, key_name)
-            )
+            try:
+                key_data = yield self.simple_http_client.get_json(
+                    "%s%s/_matrix/identity/api/v1/pubkey/%s"
+                    % (id_server_scheme, server_hostname, key_name)
+                )
+            except TimeoutError:
+                raise SynapseError(504, "Timed out contacting identity server")
             if "public_key" not in key_data:
                 raise AuthError(
                     401, "No public key named %s from %s" % (key_name, server_hostname)
@@ -1051,6 +1061,8 @@ class RoomMemberHandler(object):
                     invite_config,
                     {"Authorization": create_id_access_token_header(id_access_token)},
                 )
+            except TimeoutError:
+                raise SynapseError(504, "Timed out contacting identity server")
             except HttpResponseException as e:
                 if e.code != 404:
                     logger.info("Failed to POST %s with JSON: %s", url, e)
@@ -1067,6 +1079,8 @@ class RoomMemberHandler(object):
                 data = yield self.simple_http_client.post_json_get_json(
                     url, invite_config
                 )
+            except TimeoutError:
+                raise SynapseError(504, "Timed out contacting identity server")
             except HttpResponseException as e:
                 logger.warning(
                     "Error trying to call /store-invite on %s%s: %s",
