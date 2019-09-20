@@ -23,13 +23,13 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
     HttpResponseException,
     SynapseError,
 )
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.util.stringutils import random_string
 
 from ._base import BaseHandler
@@ -436,10 +436,7 @@ class IdentityHandler(BaseHandler):
         validation_session = None
 
         # XXX: We should need to keep wrapping and unwrapping this value
-        threepid_creds = {
-            "client_secret": client_secret,
-            "sid": sid,
-        }
+        threepid_creds = {"client_secret": client_secret, "sid": sid}
 
         # Try to validate as email
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:

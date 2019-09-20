@@ -21,12 +21,7 @@ from six.moves import http_client
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import (
-    Codes,
-    HttpResponseException,
-    SynapseError,
-    ThreepidValidationError,
-)
+from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
