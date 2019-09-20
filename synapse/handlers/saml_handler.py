@@ -111,6 +111,8 @@ class SamlHandler:
             logger.warning("SAML2 response was not signed")
             raise SynapseError(400, "SAML2 response was not signed")
 
+        logger.info("Got SAML2 reponse with attributes: %s", saml2_auth.ava)
+
         try:
             remote_user_id = saml2_auth.ava["uid"][0]
         except KeyError:
