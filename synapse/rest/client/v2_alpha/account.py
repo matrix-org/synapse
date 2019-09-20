@@ -690,7 +690,7 @@ class ThreepidRestServlet(RestServlet):
         Args:
             user_id (str): The mxid of the user to add this 3PID to
 
-            validation_session (dict|None): A dict containing the following:
+            validation_session (dict): A dict containing the following:
                 * medium       - medium of the threepid
                 * address      - address of the threepid
                 * validated_at - timestamp of when the validation occurred
