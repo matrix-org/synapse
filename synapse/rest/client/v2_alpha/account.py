@@ -513,6 +513,14 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             id_server, country, phone_number, client_secret, send_attempt, next_link
         )
 
+        assert self.hs.config.public_baseurl
+
+        # Add submit_url response parameter as per MSC2078
+        ret["submit_url"] = (
+            self.hs.config.public_baseurl
+            + "_matrix/client/unstable/add_threepid/msisdn/submit_token"
+        )
+
         return 200, ret
 
 
