@@ -635,7 +635,7 @@ class ThreepidRestServlet(RestServlet):
         client_secret = threepid_creds["client_secret"]
         sid = threepid_creds["sid"]
 
-        validation_session = self.identity_handler.validate_threepid_session(
+        validation_session = yield self.identity_handler.validate_threepid_session(
             client_secret, sid
         )
         if validation_session:
@@ -672,7 +672,7 @@ class ThreepidAddRestServlet(RestServlet):
         client_secret = body["client_secret"]
         sid = body["sid"]
 
-        validation_session = self.identity_handler.validate_threepid_session(
+        validation_session = yield self.identity_handler.validate_threepid_session(
             client_secret, sid
         )
         if validation_session:
