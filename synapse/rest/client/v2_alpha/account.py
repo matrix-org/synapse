@@ -646,7 +646,7 @@ class ThreepidRestServlet(RestServlet):
                 "email", client_secret, sid=sid, validated=True
             )
 
-        if validation_session:
+        if validation_session and "error" not in validation_session:
             yield self._add_threepid_to_account(user_id, validation_session)
             return 200, {}
 
@@ -660,7 +660,7 @@ class ThreepidRestServlet(RestServlet):
             except HttpResponseException:
                 pass
 
-            if validation_session:
+            if validation_session and "error" not in validation_session:
                 yield self._add_threepid_to_account(user_id, validation_session)
                 return 200, {}
 
