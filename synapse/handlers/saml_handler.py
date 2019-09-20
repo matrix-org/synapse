@@ -134,6 +134,12 @@ class SamlHandler:
 
         displayName = saml2_auth.ava.get("displayName", [None])[0]
 
+        # mozilla-specific hack: truncate at @
+        if displayName:
+            pos = displayName.find("@")
+            if pos >= 0:
+                displayName = displayName[:pos]
+
         with (await self._mapping_lock.queue(self._auth_provider_id)):
             # first of all, check if we already have a mapping for this user
             logger.info(
