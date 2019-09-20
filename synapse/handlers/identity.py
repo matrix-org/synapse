@@ -22,6 +22,7 @@ import logging
 from canonicaljson import json
 
 from twisted.internet import defer
+from twisted.internet.error import TimeoutError
 
 from synapse.api.errors import (
     CodeMessageException,
@@ -119,7 +120,10 @@ class IdentityHandler(BaseHandler):
             "/_matrix/identity/api/v1/3pid/getValidated3pid",
         )
 
-        data = yield self.http_client.get_json(url, query_params)
+        try:
+            data = yield self.http_client.get_json(url, query_params)
+        except TimeoutError:
+            raise SynapseError(504, "Timed out contacting identity server")
         return data if "medium" in data else None
 
     @defer.inlineCallbacks
@@ -182,6 +186,8 @@ class IdentityHandler(BaseHandler):
             if e.code != 404 or not use_v2:
                 logger.error("3PID bind failed with Matrix error: %r", e)
                 raise e.to_synapse_error()
+        except TimeoutError:
+            raise SynapseError(504, "Timed out contacting identity server")
         except CodeMessageException as e:
             data = json.loads(e.msg)  # XXX WAT?
             return data
@@ -273,6 +279,8 @@ class IdentityHandler(BaseHandler):
             else:
                 logger.error("Failed to unbind threepid on identity server: %s", e)
                 raise SynapseError(502, "Failed to contact identity server")
+        except TimeoutError:
+            raise SynapseError(504, "Timed out contacting identity server")
 
         yield self.store.remove_user_bound_threepid(
             user_id=mxid,
@@ -405,6 +413,8 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
+        except TimeoutError:
+            raise SynapseError(504, "Timed out contacting identity server")
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
@@ -457,6 +467,8 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
+        except TimeoutError:
+            raise SynapseError(504, "Timed out contacting identity server")
 
 
 def create_id_access_token_header(id_access_token):
