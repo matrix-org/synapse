@@ -114,10 +114,11 @@ class IdentityHandler(BaseHandler):
 
         query_params = {"sid": session_id, "client_secret": client_secret}
 
-        url = "https://%s%s" % (
-            id_server,
-            "/_matrix/identity/api/v1/3pid/getValidated3pid",
-        )
+        if not id_server.startswith("http"):
+            # Prefix identity server URL with https
+            id_server = "https://" + id_server
+
+        url = "%s%s" % (id_server, "/_matrix/identity/api/v1/3pid/getValidated3pid")
 
         data = yield self.http_client.get_json(url, query_params)
         return data if "medium" in data else None
