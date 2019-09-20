@@ -474,7 +474,6 @@ class EventCreationHandler(object):
             return
 
         u = yield self.store.get_user_by_id(user_id)
-
         assert u is not None
         if u["user_type"] in (UserTypes.SUPPORT, UserTypes.BOT):
             # support and bot users are not required to consent
@@ -911,38 +910,44 @@ class EventCreationHandler(object):
             members = yield self.state.get_current_users_in_room(
                 room_id, latest_event_ids=latest_event_ids
             )
-            user_id = None
+            dummy_event_sent = False
+            for user_id in members:
+                if not self.hs.is_mine_id(user_id):
+                    continue
+                requester = create_requester(user_id)
+                try:
+                    event, context = yield self.create_event(
+                        requester,
+                        {
+                            "type": "org.matrix.dummy_event",
+                            "content": {},
+                            "room_id": room_id,
+                            "sender": user_id,
+                        },
+                        prev_events_and_hashes=prev_events_and_hashes,
+                    )
 
-            for member in members:
-                if self.hs.is_mine_id(member):
-                    user_id = member
-                    requester = create_requester(user_id)
-                    try:
-                        event, context = yield self.create_event(
-                            requester,
-                            {
-                                "type": "org.matrix.dummy_event",
-                                "content": {},
-                                "room_id": room_id,
-                                "sender": user_id,
-                            },
-                            prev_events_and_hashes=prev_events_and_hashes,
-                        )
+                    event.internal_metadata.proactively_send = False
 
-                        event.internal_metadata.proactively_send = False
+                    yield self.send_nonmember_event(
+                        requester, event, context, ratelimit=False
+                    )
+                    dummy_event_sent = True
+                    break
+                except ConsentNotGivenError:
+                    logger.debug(
+                        "Failed to send dummy event into room %s for user %s due to lack of consent, try another user"
+                        % (room_id, user_id)
+                    )
 
-                        yield self.send_nonmember_event(
-                            requester, event, context, ratelimit=False
-                        )
-                        break
-                    except ConsentNotGivenError:
-                        # Failed to send dummy event due to lack of consent, try another user
-                        user_id = None
-
-            if user_id is None:
+            if not dummy_event_sent:
                 # Did not find a valid user in the room, so remove from future attempts
                 # Exclusion is time limited, so the room will be rechecked in the future
                 # dependent on self._ROOM_EXCLUSION_EXPIRY
+                logger.debug(
+                    "Cannot send dummy events into room %s exclude it from future attempts until cache expires"
+                    % (room_id)
+                )
                 now = self.clock.time_msec()
                 self._rooms_to_exclude_from_dummy_event_insertion[room_id] = now
 
@@ -953,5 +958,8 @@ class EventCreationHandler(object):
             if time < expire_before:
                 to_expire.add(room_id)
         for room_id in to_expire:
-            logger.debug("Expiring room id %s", room_id)
+            logger.debug(
+                "Expiring room id %s from dummy event insertion exclusion cache",
+                room_id,
+            )
             del self._rooms_to_exclude_from_dummy_event_insertion[room_id]
