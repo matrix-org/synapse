@@ -435,7 +435,7 @@ class IdentityHandler(BaseHandler):
         # and if validation fails we try msisdn
         validation_session = None
 
-        # XXX: We should need to keep wrapping and unwrapping this value
+        # XXX: We shouldn't need to keep wrapping and unwrapping this value
         threepid_creds = {"client_secret": client_secret, "sid": sid}
 
         # Try to validate as email
