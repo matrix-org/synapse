@@ -2,52 +2,78 @@ Upgrading Synapse
 =================
 
 Before upgrading check if any special steps are required to upgrade from the
-what you currently have installed to current version of synapse. The extra
+what you currently have installed to current version of Synapse. The extra
 instructions that may be required are listed later in this document.
 
-1. If synapse was installed in a virtualenv then activate that virtualenv before
-   upgrading. If synapse is installed in a virtualenv in ``~/synapse/env`` then
-   run:
+* If Synapse was installed using `prebuilt packages
+  <INSTALL.md#prebuilt-packages>`_, you will need to follow the normal process
+  for upgrading those packages.
 
-   .. code:: bash
+* If Synapse was installed from source, then:
+
+  1. Activate the virtualenv before upgrading. For example, if Synapse is
+     installed in a virtualenv in ``~/synapse/env`` then run:
+
+     .. code:: bash
 
        source ~/synapse/env/bin/activate
 
-2. If synapse was installed using pip then upgrade to the latest version by
-   running:
+  2. If Synapse was installed using pip then upgrade to the latest version by
+     running:
 
-   .. code:: bash
+     .. code:: bash
 
-       pip install --upgrade matrix-synapse[all]
+       pip install --upgrade matrix-synapse
 
-       # restart synapse
-       synctl restart
+     If Synapse was installed using git then upgrade to the latest version by
+     running:
 
-
-   If synapse was installed using git then upgrade to the latest version by
-   running:
-
-   .. code:: bash
-
-       # Pull the latest version of the master branch.
+     .. code:: bash
+     
        git pull
+       pip install --upgrade .
 
-       # Update synapse and its python dependencies.
-       pip install --upgrade .[all]
+  3. Restart Synapse:
 
-       # restart synapse
+     .. code:: bash
+
        ./synctl restart
 
-
-To check whether your update was successful, you can check the Server header
-returned by the Client-Server API:
+To check whether your update was successful, you can check the running server
+version with:
 
 .. code:: bash
 
-    # replace <host.name> with the hostname of your synapse homeserver.
-    # You may need to specify a port (eg, :8448) if your server is not
-    # configured on port 443.
-    curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
+    # you may need to replace 'localhost:8008' if synapse is not configured
+    # to listen on port 8008.
+
+    curl http://localhost:8008/_synapse/admin/v1/server_version
+
+Rolling back to older versions
+------------------------------
+
+Rolling back to previous releases can be difficult, due to database schema
+changes between releases. Where we have been able to test the rollback process,
+this will be noted below.
+
+In general, you will need to undo any changes made during the upgrade process,
+for example:
+
+* pip:
+
+  .. code:: bash
+
+     source env/bin/activate
+     # replace `1.3.0` accordingly:
+     pip install matrix-synapse==1.3.0
+
+* Debian:
+
+  .. code:: bash
+
+     # replace `1.3.0` and `stretch` accordingly:
+     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
 Upgrading to v1.4.0
 ===================
@@ -98,6 +124,31 @@ showing them a success or failure page (assuming a redirect URL is not configure
 Synapse will expect these files to exist inside the configured template directory. To view the
 default templates, see `synapse/res/templates
 <https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
+
+Rolling back to v1.3.1
+----------------------
+
+If you encounter problems with v1.4.0, it should be possible to roll back to
+v1.3.1, subject to the following:
+
+* The 'room statistics' engine was heavily reworked in this release (see
+  `#5971 <https://github.com/matrix-org/synapse/pull/5971>`_), including
+  significant changes to the database schema, which are not easily
+  reverted. This will cause the room statistics engine to stop updating when
+  you downgrade.
+
+  The room statistics are essentially unused in v1.3.1 (in future versions of
+  Synapse, they will be used to populate the room directory), so there should
+  be no loss of functionality. However, the statistics engine will write errors
+  to the logs, which can be avoided by setting the following in `homeserver.yaml`:
+
+  .. code:: yaml
+
+    stats:
+      enabled: false
+
+  Don't forget to re-enable it when you upgrade again, in preparation for its
+  use in the room directory!
 
 Upgrading to v1.2.0
 ===================
