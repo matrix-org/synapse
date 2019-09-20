@@ -587,6 +587,18 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
 
     def user_get_bound_threepids(self, user_id):
+        """Get the threepids that a user has bound to an identity server through the homeserver
+        The homeserver remembers where binds to an identity server occurred. Using this
+        method can retrieve those threepids.
+
+        Args:
+            user_id (str): The ID of the user to retrieve threepids for
+
+        Returns:
+            list[dict(str, str)]: List of dictionaries containing the following:
+                medium (str): The medium of the threepid (e.g "email")
+                address (str): The address of the threepid (e.g "bob@example.com")
+        """
         return self._simple_select_list(
             table="user_threepid_id_server",
             keyvalues={"user_id": user_id},
