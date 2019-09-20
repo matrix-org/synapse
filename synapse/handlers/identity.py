@@ -447,6 +447,34 @@ class IdentityHandler(BaseHandler):
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
 
+    @defer.inlineCallbacks
+    def proxy_msisdn_submit_token(self, id_server, client_secret, sid, token):
+        """Proxy a POST submitToken request to an identity server for verification purposes
+
+        Args:
+            id_server (str): The identity server URL to contact
+
+            client_secret (str): Secret provided by the client
+
+            sid (str): The ID of the session
+
+            token (str): The verification token
+
+        Raises:
+            SynapseError: If we failed to contact the identity server
+
+        Returns:
+            The response dict from the identity server
+        """
+        body = {"client_secret": client_secret, "sid": sid, "token": token}
+
+        return (
+            yield self.http_client.post_json_get_json(
+                id_server + "/_matrix/identity/api/v1/validate/msisdn/requestToken",
+                body,
+            )
+        )
+
 
 def create_id_access_token_header(id_access_token):
     """Create an Authorization header for passing to SimpleHttpClient as the header value

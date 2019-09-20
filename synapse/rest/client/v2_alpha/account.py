@@ -516,7 +516,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         return 200, ret
 
 
-class AddThreepidSubmitTokenServlet(RestServlet):
+class AddThreepidEmailSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission for adding an email to a user's account"""
 
     PATTERNS = client_patterns(
@@ -590,6 +590,52 @@ class AddThreepidSubmitTokenServlet(RestServlet):
 
         request.write(html.encode("utf-8"))
         finish_request(request)
+
+
+class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
+    """Handles 3PID validation token submission for adding a phone number to a user's
+    account
+    """
+
+    PATTERNS = client_patterns(
+        "/add_threepid/msisdn/submit_token$", releases=(), unstable=True
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super().__init__()
+        self.config = hs.config
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+        self.identity_handler = hs.get_handlers().identity_handler
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        if not self.config.account_threepid_delegate_msisdn:
+            raise SynapseError(
+                400,
+                "This homeserver is not validating phone numbers. Use an identity server "
+                "instead.",
+            )
+
+        body = parse_json_object_from_request(request)
+        assert_params_in_dict(body, ["client_secret", "sid", "token"])
+
+        try:
+            # Proxy submit_token request to msisdn threepid delegate
+            response = self.identity_handler.proxy_msisdn_submit_token(
+                self.config.account_threepid_delegate_msisdn,
+                body["client_secret"],
+                body["sid"],
+                body["token"],
+            )
+            return 200, response
+        except HttpResponseException as e:
+            logger.warn("Error contacting msisdn account_threepid_delegate: %s", e)
+            raise SynapseError(400, "Error contacting the identity server")
 
 
 class ThreepidRestServlet(RestServlet):
@@ -792,7 +838,8 @@ def register_servlets(hs, http_server):
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
     MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
-    AddThreepidSubmitTokenServlet(hs).register(http_server)
+    AddThreepidEmailSubmitTokenServlet(hs).register(http_server)
+    AddThreepidMsisdnSubmitTokenServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
     ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
