@@ -28,16 +28,20 @@ from synapse.api.errors import (
     Codes,
     LimitExceededError,
     SynapseError,
+    ThreepidValidationError,
     UnrecognizedRequestError,
 )
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
+from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
@@ -70,30 +74,92 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         super(EmailRegisterRequestTokenRestServlet, self).__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
+        self.config = hs.config
+
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            from synapse.push.mailer import Mailer, load_jinja2_templates
+
+            template_html, template_text = load_jinja2_templates(
+                self.config.email_template_dir,
+                [
+                    self.config.email_registration_template_html,
+                    self.config.email_registration_template_text,
+                ],
+                apply_format_ts_filter=True,
+                apply_mxc_to_http_filter=True,
+                public_baseurl=self.config.public_baseurl,
+            )
+            self.mailer = Mailer(
+                hs=self.hs,
+                app_name=self.config.email_app_name,
+                template_html=template_html,
+                template_text=template_text,
+            )
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "Email registration has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration has been disabled on this server"
+            )
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(
-            body, ["id_server", "client_secret", "email", "send_attempt"]
-        )
+        assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
 
-        if not check_3pid_allowed(self.hs, "email", body["email"]):
+        # Extract params from body
+        client_secret = body["client_secret"]
+        email = body["email"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
+
+        if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "email", body["email"]
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestEmailToken(**body)
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            if not self.hs.config.account_threepid_delegate_email:
+                logger.warn(
+                    "No upstream email account_threepid_delegate configured on the server to "
+                    "handle this request"
+                )
+                raise SynapseError(
+                    400, "Registration by email is not supported on this homeserver"
+                )
+
+            ret = yield self.identity_handler.requestEmailToken(
+                self.hs.config.account_threepid_delegate_email,
+                email,
+                client_secret,
+                send_attempt,
+                next_link,
+            )
+        else:
+            # Send registration emails from Synapse
+            sid = yield self.identity_handler.send_threepid_validation(
+                email,
+                client_secret,
+                send_attempt,
+                self.mailer.send_registration_mail,
+                next_link,
+            )
+
+            # Wrap the session id in a JSON object
+            ret = {"sid": sid}
+
         return 200, ret
 
 
@@ -114,11 +180,15 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(
-            body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
+        client_secret = body["client_secret"]
+        country = body["country"]
+        phone_number = body["phone_number"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
-        msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
+        msisdn = phone_number_to_msisdn(country, phone_number)
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
@@ -127,17 +197,112 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "msisdn", msisdn
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
 
-        ret = yield self.identity_handler.requestMsisdnToken(**body)
+        if not self.hs.config.account_threepid_delegate_msisdn:
+            logger.warn(
+                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "handle this request"
+            )
+            raise SynapseError(
+                400, "Registration by phone number is not supported on this homeserver"
+            )
+
+        ret = yield self.identity_handler.requestMsisdnToken(
+            self.hs.config.account_threepid_delegate_msisdn,
+            country,
+            phone_number,
+            client_secret,
+            send_attempt,
+            next_link,
+        )
+
         return 200, ret
+
+
+class RegistrationSubmitTokenServlet(RestServlet):
+    """Handles registration 3PID validation token submission"""
+
+    PATTERNS = client_patterns(
+        "/registration/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(RegistrationSubmitTokenServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.config = hs.config
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, medium):
+        if medium != "email":
+            raise SynapseError(
+                400, "This medium is currently not supported for registration"
+            )
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "User registration via email has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration is disabled on this server"
+            )
+
+        sid = parse_string(request, "sid", required=True)
+        client_secret = parse_string(request, "client_secret", required=True)
+        token = parse_string(request, "token", required=True)
+
+        # Attempt to validate a 3PID session
+        try:
+            # Mark the session as valid
+            next_link = yield self.store.validate_threepid_session(
+                sid, client_secret, token, self.clock.time_msec()
+            )
+
+            # Perform a 302 redirect if next_link is set
+            if next_link:
+                if next_link.startswith("file:///"):
+                    logger.warn(
+                        "Not redirecting to next_link as it is a local file: address"
+                    )
+                else:
+                    request.setResponseCode(302)
+                    request.setHeader("Location", next_link)
+                    finish_request(request)
+                    return None
+
+            # Otherwise show the success template
+            html = self.config.email_registration_template_success_html_content
+
+            request.setResponseCode(200)
+        except ThreepidValidationError as e:
+            # Show a failure page with a reason
+            request.setResponseCode(e.code)
+
+            # Show a failure page with a reason
+            html_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
+            template_vars = {"failure_reason": e.msg}
+            html = html_template.render(**template_vars)
+
+        request.write(html.encode("utf-8"))
+        finish_request(request)
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -438,11 +603,11 @@ class RegisterRestServlet(RestServlet):
                         medium = auth_result[login_type]["medium"]
                         address = auth_result[login_type]["address"]
 
-                        existingUid = yield self.store.get_user_id_by_threepid(
+                        existing_user_id = yield self.store.get_user_id_by_threepid(
                             medium, address
                         )
 
-                        if existingUid is not None:
+                        if existing_user_id is not None:
                             raise SynapseError(
                                 400,
                                 "%s is already in use" % medium,
@@ -481,8 +646,6 @@ class RegisterRestServlet(RestServlet):
                 user_id=registered_user_id,
                 auth_result=auth_result,
                 access_token=return_dict.get("access_token"),
-                bind_email=params.get("bind_email"),
-                bind_msisdn=params.get("bind_msisdn"),
             )
 
         return 200, return_dict
@@ -552,4 +715,5 @@ def register_servlets(hs, http_server):
     EmailRegisterRequestTokenRestServlet(hs).register(http_server)
     MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
     UsernameAvailabilityRestServlet(hs).register(http_server)
+    RegistrationSubmitTokenServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)

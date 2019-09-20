@@ -29,3 +29,12 @@ Enabling an unknown default rule fails with 404
 
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1663
 New federated private chats get full presence information (SYN-115)
+
+# Blacklisted temporarily due to https://github.com/matrix-org/matrix-doc/pull/2290
+# These sytests need to be updated with new endpoints, which will come in a later PR
+# That PR will also remove this blacklist
+Can bind 3PID via home server
+Can bind and unbind 3PID via homeserver
+3PIDs are unbound after account deactivation
+Can bind and unbind 3PID via /unbind by specifying the identity server
+Can bind and unbind 3PID via /unbind without specifying the identity server
