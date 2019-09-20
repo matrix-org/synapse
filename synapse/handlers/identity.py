@@ -88,15 +88,15 @@ class IdentityHandler(BaseHandler):
         """Bind a 3PID to an identity server
 
         Args:
-            client_secret: A unique secret str provided by the client
+            client_secret (str): A unique secret provided by the client
 
-            sid: The ID of the validation session
+            sid (str): The ID of the validation session
 
             mxid (str): The MXID to bind the 3PID to
 
-            id_server: The domain of the identity server to query
+            id_server (str): The domain of the identity server to query
 
-            id_access_token: The access token to authenticate to the identity
+            id_access_token (str): The access token to authenticate to the identity
                 server with, if necessary. Required if use_v2 is true
 
             use_v2 (bool): Whether to use v2 Identity Service API endpoints. Defaults to True

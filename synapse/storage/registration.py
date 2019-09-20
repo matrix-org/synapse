@@ -588,10 +588,10 @@ class RegistrationWorkerStore(SQLBaseStore):
 
     def user_get_bound_threepids(self, user_id):
         return self._simple_select_list(
-            "user_threepid_id_server",
-            {"user_id": user_id},
-            ["medium", "address"],
-            "user_get_bound_threepids",
+            table="user_threepid_id_server",
+            keyvalues={"user_id": user_id},
+            retcols=["medium", "address"],
+            desc="user_get_bound_threepids",
         )
 
     def remove_user_bound_threepid(self, user_id, medium, address, id_server):

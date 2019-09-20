@@ -1,1 +1,1 @@
-Implement [MSC2290](https://github.com/matrix-org/matrix-doc/pull/2290).
+Implement new Client Server API endpoints `/account/3pid/add` and `/account/3pid/bind` as per [MSC2290](https://github.com/matrix-org/matrix-doc/pull/2290).
