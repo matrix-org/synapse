@@ -470,7 +470,7 @@ class IdentityHandler(BaseHandler):
 
         return (
             yield self.http_client.post_json_get_json(
-                id_server + "/_matrix/identity/api/v1/validate/msisdn/requestToken",
+                id_server + "/_matrix/identity/api/v1/validate/msisdn/submitToken",
                 body,
             )
         )
