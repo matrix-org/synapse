@@ -243,7 +243,7 @@ def strip_invalid_mxid_characters(localpart):
         localpart (basestring): the localpart having been stripped
     """
     filtered = filter(lambda c: c in mxid_localpart_allowed_characters, localpart)
-    return "".join(list(filtered))
+    return "".join(filtered)
 
 
 UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
