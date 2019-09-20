@@ -195,7 +195,7 @@ class Mailer(object):
         link = (
             self.hs.config.public_baseurl
             + "_matrix/client/unstable/add_threepid/email/submit_token?%s"
-            % urllib.parse.urlencode(params),
+            % urllib.parse.urlencode(params)
         )
 
         template_vars = {"link": link}
