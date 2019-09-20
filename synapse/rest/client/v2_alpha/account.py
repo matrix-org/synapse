@@ -518,7 +518,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             )
 
         ret = yield self.identity_handler.requestMsisdnToken(
-            self.hs.config.email_account_threepid_delegate_msisdn,
+            self.hs.config.account_threepid_delegate_msisdn,
             country,
             phone_number,
             client_secret,
@@ -757,74 +757,6 @@ class ThreepidAddRestServlet(RestServlet):
 
 class ThreepidBindRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/bind$", releases=(), unstable=True)
-
-    def __init__(self, hs):
-        super(ThreepidBindRestServlet, self).__init__()
-        self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
-        self.auth = hs.get_auth()
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        body = parse_json_object_from_request(request)
-
-        assert_params_in_dict(body, ["id_server", "sid", "client_secret"])
-        id_server = body["id_server"]
-        sid = body["sid"]
-        client_secret = body["client_secret"]
-        id_access_token = body.get("id_access_token")  # optional
-
-        requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
-
-        yield self.identity_handler.bind_threepid(
-            client_secret, sid, user_id, id_server, id_access_token
-        )
-
-        return 200, {}
-
-
-class ThreepidAddRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/add$", unstable=True)
-
-    def __init__(self, hs):
-        super(ThreepidAddRestServlet, self).__init__()
-        self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
-        self.auth = hs.get_auth()
-        self.auth_handler = hs.get_auth_handler()
-        self.store = self.hs.get_datastore()
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        body = parse_json_object_from_request(request)
-
-        assert_params_in_dict(body, ["client_secret", "sid"])
-        client_secret = body["client_secret"]
-        sid = body["sid"]
-
-        requester = yield self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
-
-        # Get a validated session matching these details
-        validation_session = self.store.get_threepid_validation_session(
-            None, client_secret, sid=sid
-        )
-
-        if not validation_session:
-            raise SynapseError(
-                400, "Not validated 3pid session found", Codes.THREEPID_AUTH_FAILED
-            )
-
-        address, _, medium, _, _, validated_at = validation_session
-
-        yield self.auth_handler.add_threepid(user_id, medium, address, validated_at)
-
-        return 200, {}
-
-
-class ThreepidBindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/bind$", unstable=True)
 
     def __init__(self, hs):
         super(ThreepidBindRestServlet, self).__init__()
