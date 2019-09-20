@@ -748,7 +748,9 @@ class ThreepidAddRestServlet(RestServlet):
                 400, "Not validated 3pid session found", Codes.THREEPID_AUTH_FAILED
             )
 
-        address, _, medium, _, _, validated_at = validation_session
+        address = validation_session["address"]
+        medium = validation_session["medium"]
+        validated_at = validation_session["validated_at"]
 
         yield self.auth_handler.add_threepid(user_id, medium, address, validated_at)
 

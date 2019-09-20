@@ -663,7 +663,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         self, medium, client_secret, address=None, sid=None, validated=True
     ):
         """Gets a session_id and last_send_attempt (if available) for a
-        client_secret/medium/(address|session_id) combo
+        combination of validation metadata
 
         Args:
             medium (str|None): The medium of the 3PID
