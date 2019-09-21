@@ -328,6 +328,11 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
+        if not self.hs.config.enable_registration:
+            raise SynapseError(
+                403, "Registration has been disabled", errcode=Codes.FORBIDDEN
+            )
+
         ip = self.hs.get_ip_from_request(request)
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             yield wait_deferred
