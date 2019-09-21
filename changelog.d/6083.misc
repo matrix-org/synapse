@@ -1,0 +1,1 @@
+Remove IdentityHandler's bind_threepid method as it is unused.

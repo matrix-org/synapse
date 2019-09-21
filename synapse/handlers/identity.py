@@ -19,12 +19,9 @@
 
 import logging
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.api.errors import (
-    CodeMessageException,
     Codes,
     HttpResponseException,
     SynapseError,
@@ -110,73 +107,6 @@ class IdentityHandler(BaseHandler):
 
         data = yield self.http_client.get_json(url, query_params)
         return data if "medium" in data else None
-
-    @defer.inlineCallbacks
-    def bind_threepid(self, creds, mxid, use_v2=True):
-        """Bind a 3PID to an identity server
-
-        Args:
-            creds (dict[str, str]): Dictionary of credentials that contain the following keys:
-                * client_secret|clientSecret: A unique secret str provided by the client
-                * id_server|idServer: the domain of the identity server to query
-                * id_access_token: The access token to authenticate to the identity
-                    server with. Required if use_v2 is true
-            mxid (str): The MXID to bind the 3PID to
-            use_v2 (bool): Whether to use v2 Identity Service API endpoints
-
-        Returns:
-            Deferred[dict]: The response from the identity server
-        """
-        logger.debug("binding threepid %r to %s", creds, mxid)
-
-        client_secret, id_server, id_access_token = self._extract_items_from_creds_dict(
-            creds
-        )
-
-        sid = creds.get("sid")
-        if not sid:
-            raise SynapseError(
-                400, "No sid in three_pid_creds", errcode=Codes.MISSING_PARAM
-            )
-
-        # If an id_access_token is not supplied, force usage of v1
-        if id_access_token is None:
-            use_v2 = False
-
-        # Decide which API endpoint URLs to use
-        headers = {}
-        bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
-        if use_v2:
-            bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server,)
-            headers["Authorization"] = create_id_access_token_header(id_access_token)
-        else:
-            bind_url = "https://%s/_matrix/identity/api/v1/3pid/bind" % (id_server,)
-
-        try:
-            data = yield self.http_client.post_json_get_json(
-                bind_url, bind_data, headers=headers
-            )
-            logger.debug("bound threepid %r to %s", creds, mxid)
-
-            # Remember where we bound the threepid
-            yield self.store.add_user_bound_threepid(
-                user_id=mxid,
-                medium=data["medium"],
-                address=data["address"],
-                id_server=id_server,
-            )
-
-            return data
-        except HttpResponseException as e:
-            if e.code != 404 or not use_v2:
-                logger.error("3PID bind failed with Matrix error: %r", e)
-                raise e.to_synapse_error()
-        except CodeMessageException as e:
-            data = json.loads(e.msg)  # XXX WAT?
-            return data
-
-        logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", bind_url)
-        return (yield self.bind_threepid(creds, mxid, use_v2=False))
 
     @defer.inlineCallbacks
     def try_unbind_threepid(self, mxid, threepid):
