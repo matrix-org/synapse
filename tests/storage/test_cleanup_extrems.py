@@ -18,6 +18,7 @@ import os.path
 from mock import Mock
 
 import synapse.rest.admin
+from synapse.api.constants import EventTypes
 from synapse.rest.client.v1 import login, room
 from synapse.storage import prepare_database
 from synapse.types import Requester, UserID
@@ -249,6 +250,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
 
         # Create a test user and room
         self.user = UserID.from_string(self.register_user("user1", "password"))
+        self.token1 = self.login("user1", "password")
         self.requester = Requester(self.user, None, False, None, None)
         info = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
@@ -260,6 +262,38 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
 
         # Pump the reactor repeatedly so that the background updates have a
         # chance to run.
+        self.pump(10 * 60)
+
+        latest_event_ids = self.get_success(
+            self.store.get_latest_event_ids_in_room(self.room_id)
+        )
+        self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
+
+    def test_send_dummy_events_when_insufficient_power(self):
+        self._create_extremity_rich_graph()
+        # Criple power levels
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.PowerLevels,
+            body={"users": {str(self.user): -1}},
+            tok=self.token1,
+        )
+        # Pump the reactor repeatedly so that the background updates have a
+        # chance to run.
+        self.pump(10 * 60)
+
+        latest_event_ids = self.get_success(
+            self.store.get_latest_event_ids_in_room(self.room_id)
+        )
+        # Check that the room has not been pruned
+        self.assertEquals(len(latest_event_ids) > 10)
+        # Flush cache
+        self.event_creator_handler._ROOM_EXCLUSION_EXPIRY = 0
+
+        # New user with regular levels
+        user2 = self.register_user("user2", "password")
+        token2 = self.login("user2", "password")
+        self.helper.join(self.room_id, user2, tok=token2)
         self.pump(10 * 60)
 
         latest_event_ids = self.get_success(

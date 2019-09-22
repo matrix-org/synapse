@@ -939,6 +939,11 @@ class EventCreationHandler(object):
                         "Failed to send dummy event into room %s for user %s due to lack of consent, try another user"
                         % (room_id, user_id)
                     )
+                except AuthError:
+                    logger.debug(
+                        "Failed to send dummy event into room %s for user %s due to lack of power, try another user"
+                        % (room_id, user_id)
+                    )
 
             if not dummy_event_sent:
                 # Did not find a valid user in the room, so remove from future attempts
