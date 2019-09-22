@@ -286,7 +286,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
             self.store.get_latest_event_ids_in_room(self.room_id)
         )
         # Check that the room has not been pruned
-        self.assertEquals(len(latest_event_ids) > 10)
+        self.assertTrue(len(latest_event_ids) > 10)
         # Flush cache
         self.event_creator_handler._ROOM_EXCLUSION_EXPIRY = 0
 
