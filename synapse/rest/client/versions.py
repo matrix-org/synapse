@@ -50,9 +50,21 @@ class VersionsRestServlet(RestServlet):
                 # as per MSC1497:
                 "unstable_features": {
                     "m.lazy_load_members": True,
+
                     # as per https://github.com/matrix-org/synapse/issues/5927
                     # to be removed in r0.6.0
                     "m.id_access_token": True,
+
+                    # Advertise to clients that they need not include an `id_server`
+                    # parameter during registration or password reset, as Synapse now decides
+                    # itself which identity server to use (or none at all).
+                    #
+                    # This is also used by a client when they wish to bind a 3PID to their
+                    # account, but not bind it to an identity server, the endpoint for which
+                    # also requires `id_server`. If the homeserver is handling 3PID
+                    # verification itself, there is no need to ask the user for `id_server` to
+                    # be supplied.
+                    "m.require_identity_server": False,
                 },
             },
         )
