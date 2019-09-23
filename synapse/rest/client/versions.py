@@ -63,6 +63,8 @@ class VersionsRestServlet(RestServlet):
                     # verification itself, there is no need to ask the user for `id_server` to
                     # be supplied.
                     "m.require_identity_server": False,
+                    # as per MSC2290
+                    "m.separate_add_and_bind": True,
                 },
             },
         )
