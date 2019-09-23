@@ -30,8 +30,7 @@ from twisted.enterprise import adbapi
 from twisted.internet import defer, reactor
 
 from synapse.config.homeserver import HomeServerConfig
-from synapse.storage._base import LoggingTransaction, SQLBaseStore
-from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.storage._base import LoggingTransaction
 from synapse.storage.client_ips import ClientIpStore
 from synapse.storage.deviceinbox import DeviceInboxStore
 from synapse.storage.devices import DeviceStore
@@ -132,7 +131,7 @@ class MockHomeserver(object):
         return self.db_conn
 
 
-class BackgroundUpdatesRunnerStore(
+class Store(
     ClientIpStore,
     DeviceInboxStore,
     DeviceStore,
@@ -145,101 +144,8 @@ class BackgroundUpdatesRunnerStore(
     UserDirectoryStore,
 ):
     def __init__(self, db_conn, hs):
-        super(BackgroundUpdatesRunnerStore, self).__init__(db_conn, hs)
+        super(Store, self).__init__(db_conn, hs)
         self.db_pool = hs.get_db_pool()
-
-    def runInteraction(self, desc, func, *args, **kwargs):
-        def r(conn):
-            try:
-                i = 0
-                N = 5
-                while True:
-                    try:
-                        txn = conn.cursor()
-                        return func(
-                            LoggingTransaction(txn, desc, self.database_engine, [], []),
-                            *args,
-                            **kwargs
-                        )
-                    except self.database_engine.module.DatabaseError as e:
-                        if self.database_engine.is_deadlock(e):
-                            logger.warn("[TXN DEADLOCK] {%s} %d/%d", desc, i, N)
-                            if i < N:
-                                i += 1
-                                conn.rollback()
-                                continue
-                        raise
-            except Exception as e:
-                logger.debug("[TXN FAIL] {%s} %s", desc, e)
-                raise
-
-        return self.db_pool.runWithConnection(r)
-
-    def execute(self, f, *args, **kwargs):
-        return self.runInteraction(f.__name__, f, *args, **kwargs)
-
-    def execute_sql(self, sql, *args):
-        def r(txn):
-            txn.execute(sql, args)
-            return txn.fetchall()
-
-        return self.runInteraction("execute_sql", r)
-
-    def insert_many_txn(self, txn, table, headers, rows):
-        sql = "INSERT INTO %s (%s) VALUES (%s)" % (
-            table,
-            ", ".join(k for k in headers),
-            ", ".join("%s" for _ in headers),
-        )
-
-        try:
-            txn.executemany(sql, rows)
-        except Exception:
-            logger.exception("Failed to insert: %s", table)
-            raise
-
-
-class Store(object):
-    """This object is used to pull out some of the convenience API from the
-    Storage layer.
-
-    *All* database interactions should go through this object.
-    """
-
-    def __init__(self, db_pool, engine):
-        self.db_pool = db_pool
-        self.database_engine = engine
-        self._background_update_performance = {}
-        self._background_update_queue = []
-        self._background_update_handlers = {}
-        self._all_done = False
-
-    _simple_insert_txn = SQLBaseStore.__dict__["_simple_insert_txn"]
-    _simple_insert = SQLBaseStore.__dict__["_simple_insert"]
-
-    _simple_select_onecol_txn = SQLBaseStore.__dict__["_simple_select_onecol_txn"]
-    _simple_select_onecol = SQLBaseStore.__dict__["_simple_select_onecol"]
-    _simple_select_one = SQLBaseStore.__dict__["_simple_select_one"]
-    _simple_select_one_txn = SQLBaseStore.__dict__["_simple_select_one_txn"]
-    _simple_select_one_onecol = SQLBaseStore.__dict__["_simple_select_one_onecol"]
-    _simple_select_one_onecol_txn = SQLBaseStore.__dict__[
-        "_simple_select_one_onecol_txn"
-    ]
-
-    _simple_update_one = SQLBaseStore.__dict__["_simple_update_one"]
-    _simple_update_one_txn = SQLBaseStore.__dict__["_simple_update_one_txn"]
-    _simple_update_txn = SQLBaseStore.__dict__["_simple_update_txn"]
-    _simple_select_list = SQLBaseStore.__dict__["_simple_select_list"]
-    _simple_select_list_txn = SQLBaseStore.__dict__["_simple_select_list_txn"]
-    cursor_to_dict = SQLBaseStore.__dict__["cursor_to_dict"]
-
-    has_completed_background_updates = BackgroundUpdateStore.__dict__[
-        "has_completed_background_updates"
-    ]
-    do_next_background_update = BackgroundUpdateStore.__dict__[
-        "do_next_background_update"
-    ]
-    _do_background_update = BackgroundUpdateStore.__dict__["_do_background_update"]
 
     def runInteraction(self, desc, func, *args, **kwargs):
         def r(conn):
@@ -579,11 +485,20 @@ class Porter(object):
             sqlite_engine = create_engine(sqlite_config)
             postgres_engine = create_engine(postgres_config)
 
-            self.sqlite_store = Store(sqlite_db_pool, sqlite_engine)
-
             # Step 1. Set up databases.
             self.progress.set_state("Preparing SQLite3")
-            self.setup_db(sqlite_config, sqlite_engine)
+            sqlite_conn = self.setup_db(sqlite_config, sqlite_engine)
+
+            self.sqlite_store = Store(
+                sqlite_conn,
+                MockHomeserver(
+                    self.hs_config,
+                    sqlite_engine,
+                    sqlite_conn,
+                    sqlite_db_pool,
+                ),
+            )
+            sqlite_conn.commit()
 
             # Check if all background updates are done, abort if not
             updates_complete = yield self.sqlite_store.has_completed_background_updates()
@@ -598,7 +513,7 @@ class Porter(object):
             self.progress.set_state("Preparing PostgreSQL")
             postgres_conn = self.setup_db(postgres_config, postgres_engine)
 
-            self.postgres_store = BackgroundUpdatesRunnerStore(
+            self.postgres_store = Store(
                 postgres_conn,
                 MockHomeserver(
                     self.hs_config,
@@ -616,6 +531,8 @@ class Porter(object):
 
             # Manually apply all background updates on the db
             postgres_ready = yield self.postgres_store.has_completed_background_updates()
+            if not postgres_ready:
+                self.progress.set_state("Running background updates on PostgreSQL")
             while not postgres_ready:
                 yield self.postgres_store.do_next_background_update(100)
                 postgres_ready = yield self.postgres_store.has_completed_background_updates()
