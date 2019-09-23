@@ -246,6 +246,12 @@ class RegistrationSubmitTokenServlet(RestServlet):
                 [self.config.email_registration_template_failure_html],
             )
 
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.failure_email_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
     @defer.inlineCallbacks
     def on_GET(self, request, medium):
         if medium != "email":

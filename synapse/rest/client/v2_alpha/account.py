@@ -21,12 +21,7 @@ from six.moves import http_client
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import (
-    Codes,
-    HttpResponseException,
-    SynapseError,
-    ThreepidValidationError,
-)
+from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
@@ -485,10 +480,8 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(
-            body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
-        id_server = "https://" + body["id_server"]  # Assume https
         client_secret = body["client_secret"]
         country = body["country"]
         phone_number = body["phone_number"]
@@ -509,8 +502,23 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         if existing_user_id is not None:
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
+        if not self.hs.config.account_threepid_delegate_msisdn:
+            logger.warn(
+                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "handle this request"
+            )
+            raise SynapseError(
+                400,
+                "Adding phone numbers to user account is not supported by this homeserver",
+            )
+
         ret = yield self.identity_handler.requestMsisdnToken(
-            id_server, country, phone_number, client_secret, send_attempt, next_link
+            self.hs.config.account_threepid_delegate_msisdn,
+            country,
+            phone_number,
+            client_secret,
+            send_attempt,
+            next_link,
         )
 
         return 200, ret
@@ -627,80 +635,87 @@ class ThreepidRestServlet(RestServlet):
         client_secret = threepid_creds["client_secret"]
         sid = threepid_creds["sid"]
 
-        # We don't actually know which medium this 3PID is. Thus we first assume it's email,
-        # and if validation fails we try msisdn
-        validation_session = None
-
-        # Try to validate as email
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            # Ask our delegated email identity server
-            try:
-                validation_session = yield self.identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_email, threepid_creds
-                )
-            except HttpResponseException:
-                logger.debug(
-                    "%s reported non-validated threepid: %s",
-                    self.hs.config.account_threepid_delegate_email,
-                    threepid_creds,
-                )
-        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            # Get a validated session matching these details
-            validation_session = yield self.datastore.get_threepid_validation_session(
-                "email", client_secret, sid=sid, validated=True
+        validation_session = yield self.identity_handler.validate_threepid_session(
+            client_secret, sid
+        )
+        if validation_session:
+            yield self.auth_handler.add_threepid(
+                user_id,
+                validation_session["medium"],
+                validation_session["address"],
+                validation_session["validated_at"],
             )
-
-        # Old versions of Sydent return a 200 http code even on a failed validation check.
-        # Thus, in addition to the HttpResponseException check above (which checks for
-        # non-200 errors), we need to make sure validation_session isn't actually an error,
-        # identified by containing an "error" key
-        # See https://github.com/matrix-org/sydent/issues/215 for details
-        if validation_session and "error" not in validation_session:
-            yield self._add_threepid_to_account(user_id, validation_session)
             return 200, {}
-
-        # Try to validate as msisdn
-        if self.hs.config.account_threepid_delegate_msisdn:
-            # Ask our delegated msisdn identity server
-            try:
-                validation_session = yield self.identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_msisdn, threepid_creds
-                )
-            except HttpResponseException:
-                logger.debug(
-                    "%s reported non-validated threepid: %s",
-                    self.hs.config.account_threepid_delegate_email,
-                    threepid_creds,
-                )
-
-            # Check that validation_session isn't actually an error due to old Sydent instances
-            # See explanatory comment above
-            if validation_session and "error" not in validation_session:
-                yield self._add_threepid_to_account(user_id, validation_session)
-                return 200, {}
 
         raise SynapseError(
             400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
         )
 
+
+class ThreepidAddRestServlet(RestServlet):
+    PATTERNS = client_patterns("/account/3pid/add$", releases=(), unstable=True)
+
+    def __init__(self, hs):
+        super(ThreepidAddRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+
     @defer.inlineCallbacks
-    def _add_threepid_to_account(self, user_id, validation_session):
-        """Add a threepid wrapped in a validation_session dict to an account
+    def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+        body = parse_json_object_from_request(request)
 
-        Args:
-            user_id (str): The mxid of the user to add this 3PID to
+        assert_params_in_dict(body, ["client_secret", "sid"])
+        client_secret = body["client_secret"]
+        sid = body["sid"]
 
-            validation_session (dict): A dict containing the following:
-                * medium       - medium of the threepid
-                * address      - address of the threepid
-                * validated_at - timestamp of when the validation occurred
-        """
-        yield self.auth_handler.add_threepid(
-            user_id,
-            validation_session["medium"],
-            validation_session["address"],
-            validation_session["validated_at"],
+        validation_session = yield self.identity_handler.validate_threepid_session(
+            client_secret, sid
         )
+        if validation_session:
+            yield self.auth_handler.add_threepid(
+                user_id,
+                validation_session["medium"],
+                validation_session["address"],
+                validation_session["validated_at"],
+            )
+            return 200, {}
+
+        raise SynapseError(
+            400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
+        )
+
+
+class ThreepidBindRestServlet(RestServlet):
+    PATTERNS = client_patterns("/account/3pid/bind$", releases=(), unstable=True)
+
+    def __init__(self, hs):
+        super(ThreepidBindRestServlet, self).__init__()
+        self.hs = hs
+        self.identity_handler = hs.get_handlers().identity_handler
+        self.auth = hs.get_auth()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        body = parse_json_object_from_request(request)
+
+        assert_params_in_dict(body, ["id_server", "sid", "client_secret"])
+        id_server = body["id_server"]
+        sid = body["sid"]
+        client_secret = body["client_secret"]
+        id_access_token = body.get("id_access_token")  # optional
+
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        yield self.identity_handler.bind_threepid(
+            client_secret, sid, user_id, id_server, id_access_token
+        )
+
+        return 200, {}
 
 
 class ThreepidUnbindRestServlet(RestServlet):
@@ -794,6 +809,8 @@ def register_servlets(hs, http_server):
     MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
     AddThreepidSubmitTokenServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
+    ThreepidAddRestServlet(hs).register(http_server)
+    ThreepidBindRestServlet(hs).register(http_server)
     ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)

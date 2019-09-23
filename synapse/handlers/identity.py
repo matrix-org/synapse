@@ -30,6 +30,7 @@ from synapse.api.errors import (
     HttpResponseException,
     SynapseError,
 )
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.util.stringutils import random_string
 
 from ._base import BaseHandler
@@ -44,36 +45,6 @@ class IdentityHandler(BaseHandler):
         self.http_client = hs.get_simple_http_client()
         self.federation_http_client = hs.get_http_client()
         self.hs = hs
-
-    def _extract_items_from_creds_dict(self, creds):
-        """
-        Retrieve entries from a "credentials" dictionary
-
-        Args:
-            creds (dict[str, str]): Dictionary of credentials that contain the following keys:
-                * client_secret|clientSecret: A unique secret str provided by the client
-                * id_server|idServer: the domain of the identity server to query
-                * id_access_token: The access token to authenticate to the identity
-                    server with.
-
-        Returns:
-            tuple(str, str, str|None): A tuple containing the client_secret, the id_server,
-                and the id_access_token value if available.
-        """
-        client_secret = creds.get("client_secret") or creds.get("clientSecret")
-        if not client_secret:
-            raise SynapseError(
-                400, "No client_secret in creds", errcode=Codes.MISSING_PARAM
-            )
-
-        id_server = creds.get("id_server") or creds.get("idServer")
-        if not id_server:
-            raise SynapseError(
-                400, "No id_server in creds", errcode=Codes.MISSING_PARAM
-            )
-
-        id_access_token = creds.get("id_access_token")
-        return client_secret, id_server, id_access_token
 
     @defer.inlineCallbacks
     def threepid_from_creds(self, id_server, creds):
@@ -113,35 +84,50 @@ class IdentityHandler(BaseHandler):
             data = yield self.http_client.get_json(url, query_params)
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
-        return data if "medium" in data else None
+        except HttpResponseException as e:
+            logger.info(
+                "%s returned %i for threepid validation for: %s",
+                id_server,
+                e.code,
+                creds,
+            )
+            return None
+
+        # Old versions of Sydent return a 200 http code even on a failed validation
+        # check. Thus, in addition to the HttpResponseException check above (which
+        # checks for non-200 errors), we need to make sure validation_session isn't
+        # actually an error, identified by the absence of a "medium" key
+        # See https://github.com/matrix-org/sydent/issues/215 for details
+        if "medium" in data:
+            return data
+
+        logger.info("%s reported non-validated threepid: %s", id_server, creds)
+        return None
 
     @defer.inlineCallbacks
-    def bind_threepid(self, creds, mxid, use_v2=True):
+    def bind_threepid(
+        self, client_secret, sid, mxid, id_server, id_access_token=None, use_v2=True
+    ):
         """Bind a 3PID to an identity server
 
         Args:
-            creds (dict[str, str]): Dictionary of credentials that contain the following keys:
-                * client_secret|clientSecret: A unique secret str provided by the client
-                * id_server|idServer: the domain of the identity server to query
-                * id_access_token: The access token to authenticate to the identity
-                    server with. Required if use_v2 is true
+            client_secret (str): A unique secret provided by the client
+
+            sid (str): The ID of the validation session
+
             mxid (str): The MXID to bind the 3PID to
-            use_v2 (bool): Whether to use v2 Identity Service API endpoints
+
+            id_server (str): The domain of the identity server to query
+
+            id_access_token (str): The access token to authenticate to the identity
+                server with, if necessary. Required if use_v2 is true
+
+            use_v2 (bool): Whether to use v2 Identity Service API endpoints. Defaults to True
 
         Returns:
             Deferred[dict]: The response from the identity server
         """
-        logger.debug("binding threepid %r to %s", creds, mxid)
-
-        client_secret, id_server, id_access_token = self._extract_items_from_creds_dict(
-            creds
-        )
-
-        sid = creds.get("sid")
-        if not sid:
-            raise SynapseError(
-                400, "No sid in three_pid_creds", errcode=Codes.MISSING_PARAM
-            )
+        logger.debug("Proxying threepid bind request for %s to %s", mxid, id_server)
 
         # If an id_access_token is not supplied, force usage of v1
         if id_access_token is None:
@@ -160,7 +146,6 @@ class IdentityHandler(BaseHandler):
             data = yield self.http_client.post_json_get_json(
                 bind_url, bind_data, headers=headers
             )
-            logger.debug("bound threepid %r to %s", creds, mxid)
 
             # Remember where we bound the threepid
             yield self.store.add_user_bound_threepid(
@@ -182,7 +167,10 @@ class IdentityHandler(BaseHandler):
             return data
 
         logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", bind_url)
-        return (yield self.bind_threepid(creds, mxid, use_v2=False))
+        res = yield self.bind_threepid(
+            client_secret, sid, mxid, id_server, id_access_token, use_v2=False
+        )
+        return res
 
     @defer.inlineCallbacks
     def try_unbind_threepid(self, mxid, threepid):
@@ -458,6 +446,50 @@ class IdentityHandler(BaseHandler):
             raise e.to_synapse_error()
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
+
+    @defer.inlineCallbacks
+    def validate_threepid_session(self, client_secret, sid):
+        """Validates a threepid session with only the client secret and session ID
+        Tries validating against any configured account_threepid_delegates as well as locally.
+
+        Args:
+            client_secret (str): A secret provided by the client
+
+            sid (str): The ID of the session
+
+        Returns:
+            Dict[str, str|int] if validation was successful, otherwise None
+        """
+        # XXX: We shouldn't need to keep wrapping and unwrapping this value
+        threepid_creds = {"client_secret": client_secret, "sid": sid}
+
+        # We don't actually know which medium this 3PID is. Thus we first assume it's email,
+        # and if validation fails we try msisdn
+        validation_session = None
+
+        # Try to validate as email
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            # Ask our delegated email identity server
+            validation_session = yield self.threepid_from_creds(
+                self.hs.config.account_threepid_delegate_email, threepid_creds
+            )
+        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            # Get a validated session matching these details
+            validation_session = yield self.store.get_threepid_validation_session(
+                "email", client_secret, sid=sid, validated=True
+            )
+
+        if validation_session:
+            return validation_session
+
+        # Try to validate as msisdn
+        if self.hs.config.account_threepid_delegate_msisdn:
+            # Ask our delegated msisdn identity server
+            validation_session = yield self.threepid_from_creds(
+                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+            )
+
+        return validation_session
 
 
 def create_id_access_token_header(id_access_token):
