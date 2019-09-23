@@ -91,7 +91,7 @@ class IdentityHandler(BaseHandler):
             return None
 
         # Old versions of Sydent return a 200 http code even on a failed validation
-        # check. # Thus, in addition to the HttpResponseException check above (which
+        # check. Thus, in addition to the HttpResponseException check above (which
         # checks for non-200 errors), we need to make sure validation_session isn't
         # actually an error, identified by the absence of a "medium" key
         # See https://github.com/matrix-org/sydent/issues/215 for details
