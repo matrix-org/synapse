@@ -392,19 +392,14 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             keys giving the column names
         """
 
-        res = yield self.runInteraction(
-            "get_last_client_ip_by_device",
-            self._get_last_client_ip_by_device_txn,
-            user_id,
-            device_id,
-            retcols=(
-                "user_id",
-                "access_token",
-                "ip",
-                "user_agent",
-                "device_id",
-                "last_seen",
-            ),
+        keyvalues = {"user_id": user_id}
+        if device_id:
+            keyvalues["device_id"] = device_id
+
+        res = yield self._simple_select_list(
+            table="devices",
+            keyvalues=keyvalues,
+            retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
         )
 
         ret = {(d["user_id"], d["device_id"]): d for d in res}
@@ -422,42 +417,6 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                         "last_seen": last_seen,
                     }
         return ret
-
-    @classmethod
-    def _get_last_client_ip_by_device_txn(cls, txn, user_id, device_id, retcols):
-        where_clauses = []
-        bindings = []
-        if device_id is None:
-            where_clauses.append("user_id = ?")
-            bindings.extend((user_id,))
-        else:
-            where_clauses.append("(user_id = ? AND device_id = ?)")
-            bindings.extend((user_id, device_id))
-
-        if not where_clauses:
-            return []
-
-        inner_select = (
-            "SELECT MAX(last_seen) mls, user_id, device_id FROM user_ips "
-            "WHERE %(where)s "
-            "GROUP BY user_id, device_id"
-        ) % {"where": " OR ".join(where_clauses)}
-
-        sql = (
-            "SELECT %(retcols)s FROM user_ips "
-            "JOIN (%(inner_select)s) ips ON"
-            "    user_ips.last_seen = ips.mls AND"
-            "    user_ips.user_id = ips.user_id AND"
-            "    (user_ips.device_id = ips.device_id OR"
-            "         (user_ips.device_id IS NULL AND ips.device_id IS NULL)"
-            "    )"
-        ) % {
-            "retcols": ",".join("user_ips." + c for c in retcols),
-            "inner_select": inner_select,
-        }
-
-        txn.execute(sql, bindings)
-        return cls.cursor_to_dict(txn)
 
     @defer.inlineCallbacks
     def get_user_ip_and_agents(self, user):

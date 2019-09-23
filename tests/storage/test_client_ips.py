@@ -55,7 +55,6 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": "device_id",
-                "access_token": "access_token",
                 "ip": "ip",
                 "user_agent": "user_agent",
                 "last_seen": 12345678000,
