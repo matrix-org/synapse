@@ -354,6 +354,21 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                     },
                     lock=False,
                 )
+
+                # Technically an access token might not be associated with
+                # a device so we need to check.
+                if device_id:
+                    self._simple_upsert_txn(
+                        txn,
+                        table="devices",
+                        keyvalues={"user_id": user_id, "device_id": device_id},
+                        values={
+                            "user_agent": user_agent,
+                            "last_seen": last_seen,
+                            "ip": ip,
+                        },
+                        lock=False,
+                    )
             except Exception as e:
                 # Failed to upsert, log and continue
                 logger.error("Failed to insert client IP %r: %r", entry, e)
