@@ -758,7 +758,7 @@ class RoomMemberHandler(object):
                 yield self._verify_any_signature(data, id_server)
                 return data["mxid"]
         except TimeoutError:
-            raise SynapseError(504, "Timed out contacting identity server")
+            raise SynapseError(500, "Timed out contacting identity server")
         except IOError as e:
             logger.warning("Error from v1 identity server lookup: %s" % (e,))
 
@@ -785,7 +785,7 @@ class RoomMemberHandler(object):
                 {"access_token": id_access_token},
             )
         except TimeoutError:
-            raise SynapseError(504, "Timed out contacting identity server")
+            raise SynapseError(500, "Timed out contacting identity server")
 
         if not isinstance(hash_details, dict):
             logger.warning(
@@ -857,7 +857,7 @@ class RoomMemberHandler(object):
                 headers=headers,
             )
         except TimeoutError:
-            raise SynapseError(504, "Timed out contacting identity server")
+            raise SynapseError(500, "Timed out contacting identity server")
         except Exception as e:
             logger.warning("Error when performing a v2 3pid lookup: %s", e)
             raise SynapseError(
@@ -886,7 +886,7 @@ class RoomMemberHandler(object):
                     % (id_server_scheme, server_hostname, key_name)
                 )
             except TimeoutError:
-                raise SynapseError(504, "Timed out contacting identity server")
+                raise SynapseError(500, "Timed out contacting identity server")
             if "public_key" not in key_data:
                 raise AuthError(
                     401, "No public key named %s from %s" % (key_name, server_hostname)
@@ -1062,7 +1062,7 @@ class RoomMemberHandler(object):
                     {"Authorization": create_id_access_token_header(id_access_token)},
                 )
             except TimeoutError:
-                raise SynapseError(504, "Timed out contacting identity server")
+                raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 if e.code != 404:
                     logger.info("Failed to POST %s with JSON: %s", url, e)
@@ -1080,7 +1080,7 @@ class RoomMemberHandler(object):
                     url, invite_config
                 )
             except TimeoutError:
-                raise SynapseError(504, "Timed out contacting identity server")
+                raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 logger.warning(
                     "Error trying to call /store-invite on %s%s: %s",

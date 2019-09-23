@@ -123,7 +123,7 @@ class IdentityHandler(BaseHandler):
         try:
             data = yield self.http_client.get_json(url, query_params)
         except TimeoutError:
-            raise SynapseError(504, "Timed out contacting identity server")
+            raise SynapseError(500, "Timed out contacting identity server")
         return data if "medium" in data else None
 
     @defer.inlineCallbacks
@@ -187,7 +187,7 @@ class IdentityHandler(BaseHandler):
                 logger.error("3PID bind failed with Matrix error: %r", e)
                 raise e.to_synapse_error()
         except TimeoutError:
-            raise SynapseError(504, "Timed out contacting identity server")
+            raise SynapseError(500, "Timed out contacting identity server")
         except CodeMessageException as e:
             data = json.loads(e.msg)  # XXX WAT?
             return data
@@ -278,9 +278,9 @@ class IdentityHandler(BaseHandler):
                 logger.warn("Received %d response while unbinding threepid", e.code)
             else:
                 logger.error("Failed to unbind threepid on identity server: %s", e)
-                raise SynapseError(502, "Failed to contact identity server")
+                raise SynapseError(500, "Failed to contact identity server")
         except TimeoutError:
-            raise SynapseError(504, "Timed out contacting identity server")
+            raise SynapseError(500, "Timed out contacting identity server")
 
         yield self.store.remove_user_bound_threepid(
             user_id=mxid,
@@ -414,7 +414,7 @@ class IdentityHandler(BaseHandler):
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
         except TimeoutError:
-            raise SynapseError(504, "Timed out contacting identity server")
+            raise SynapseError(500, "Timed out contacting identity server")
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
@@ -468,7 +468,7 @@ class IdentityHandler(BaseHandler):
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
         except TimeoutError:
-            raise SynapseError(504, "Timed out contacting identity server")
+            raise SynapseError(500, "Timed out contacting identity server")
 
 
 def create_id_access_token_header(id_access_token):
