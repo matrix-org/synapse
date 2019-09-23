@@ -246,6 +246,12 @@ class RegistrationSubmitTokenServlet(RestServlet):
                 [self.config.email_registration_template_failure_html],
             )
 
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.failure_email_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
     @defer.inlineCallbacks
     def on_GET(self, request, medium):
         if medium != "email":
@@ -328,6 +334,11 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
+        if not self.hs.config.enable_registration:
+            raise SynapseError(
+                403, "Registration has been disabled", errcode=Codes.FORBIDDEN
+            )
+
         ip = self.hs.get_ip_from_request(request)
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             yield wait_deferred
