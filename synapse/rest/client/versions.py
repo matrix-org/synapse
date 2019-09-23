@@ -51,7 +51,7 @@ class VersionsRestServlet(RestServlet):
                 "unstable_features": {
                     "m.lazy_load_members": True,
 
-                    # as per https://github.com/matrix-org/synapse/issues/5927
+                    # as per MSC2190, as amended by MSC2264
                     # to be removed in r0.6.0
                     "m.id_access_token": True,
 
