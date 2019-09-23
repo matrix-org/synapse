@@ -131,15 +131,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            if not self.hs.config.account_threepid_delegate_email:
-                logger.warn(
-                    "No upstream email account_threepid_delegate configured on the server to "
-                    "handle this request"
-                )
-                raise SynapseError(
-                    400, "Registration by email is not supported on this homeserver"
-                )
+            assert self.hs.config.account_threepid_delegate_email
 
+            # Have the configured identity server handle the request
             ret = yield self.identity_handler.requestEmailToken(
                 self.hs.config.account_threepid_delegate_email,
                 email,
@@ -246,6 +240,18 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.failure_email_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.failure_email_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
     @defer.inlineCallbacks
     def on_GET(self, request, medium):
         if medium != "email":
@@ -289,17 +295,11 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
             request.setResponseCode(200)
         except ThreepidValidationError as e:
-            # Show a failure page with a reason
             request.setResponseCode(e.code)
 
             # Show a failure page with a reason
-            html_template, = load_jinja2_templates(
-                self.config.email_template_dir,
-                [self.config.email_registration_template_failure_html],
-            )
-
             template_vars = {"failure_reason": e.msg}
-            html = html_template.render(**template_vars)
+            html = self.failure_email_template.render(**template_vars)
 
         request.write(html.encode("utf-8"))
         finish_request(request)
@@ -334,6 +334,11 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
+        if not self.hs.config.enable_registration:
+            raise SynapseError(
+                403, "Registration has been disabled", errcode=Codes.FORBIDDEN
+            )
+
         ip = self.hs.get_ip_from_request(request)
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             yield wait_deferred
