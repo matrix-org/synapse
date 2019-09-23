@@ -525,40 +525,6 @@ class IdentityHandler(BaseHandler):
             logger.warning("Error contacting msisdn account_threepid_delegate: %s", e)
             raise SynapseError(400, "Error contacting the identity server")
 
-    @defer.inlineCallbacks
-    def proxy_msisdn_submit_token(self, id_server, client_secret, sid, token):
-        """Proxy a POST submitToken request to an identity server for verification purposes
-
-        Args:
-            id_server (str): The identity server URL to contact
-
-            client_secret (str): Secret provided by the client
-
-            sid (str): The ID of the session
-
-            token (str): The verification token
-
-        Raises:
-            SynapseError: If we failed to contact the identity server
-
-        Returns:
-            Deferred[dict]: The response dict from the identity server
-        """
-        body = {"client_secret": client_secret, "sid": sid, "token": token}
-
-        try:
-            return (
-                yield self.http_client.post_json_get_json(
-                    id_server + "/_matrix/identity/api/v1/validate/msisdn/submitToken",
-                    body,
-                )
-            )
-        except TimeoutError:
-            raise SynapseError(500, "Timed out contacting identity server")
-        except HttpResponseException as e:
-            logger.warning("Error contacting msisdn account_threepid_delegate: %s", e)
-            raise SynapseError(400, "Error contacting the identity server")
-
 
 def create_id_access_token_header(id_access_token):
     """Create an Authorization header for passing to SimpleHttpClient as the header value
