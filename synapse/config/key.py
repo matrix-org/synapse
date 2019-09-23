@@ -120,7 +120,10 @@ class KeyConfig(Config):
         else:
             key_servers = config.get("trusted_key_servers", [])
             for server in key_servers:
-                if server['server_name'] == 'matrix.org' and not suppress_key_server_warning:
+                if (
+                    server["server_name"] == "matrix.org"
+                    and not suppress_key_server_warning
+                ):
                     logger.warn(
                         """
                         This server is configured to use 'matrix.org' as its
