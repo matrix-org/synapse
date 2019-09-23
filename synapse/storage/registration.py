@@ -862,7 +862,7 @@ class RegistrationStore(
             if batch_size > len(rows):
                 return (True, rows_processed_nb)
             else:
-                return (True, rows_processed_nb)
+                return (False, rows_processed_nb)
 
         end, nb_processed = yield self.runInteraction(
             "users_set_deactivated_flag", _background_update_set_deactivated_flag_txn
