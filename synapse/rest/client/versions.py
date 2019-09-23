@@ -50,6 +50,9 @@ class VersionsRestServlet(RestServlet):
                 # as per MSC1497:
                 "unstable_features": {
                     "m.lazy_load_members": True,
+                    # as per MSC2190, as amended by MSC2264
+                    # to be removed in r0.6.0
+                    "m.id_access_token": True,
                     # Advertise to clients that they need not include an `id_server`
                     # parameter during registration or password reset, as Synapse now decides
                     # itself which identity server to use (or none at all).
