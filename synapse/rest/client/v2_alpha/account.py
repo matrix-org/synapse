@@ -632,18 +632,14 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["client_secret", "sid", "token"])
 
-        try:
-            # Proxy submit_token request to msisdn threepid delegate
-            response = yield self.identity_handler.proxy_msisdn_submit_token(
-                self.config.account_threepid_delegate_msisdn,
-                body["client_secret"],
-                body["sid"],
-                body["token"],
-            )
-            return 200, response
-        except HttpResponseException as e:
-            logger.warn("Error contacting msisdn account_threepid_delegate: %s", e)
-            raise SynapseError(400, "Error contacting the identity server")
+        # Proxy submit_token request to msisdn threepid delegate
+        response = yield self.identity_handler.proxy_msisdn_submit_token(
+            self.config.account_threepid_delegate_msisdn,
+            body["client_secret"],
+            body["sid"],
+            body["token"],
+        )
+        return 200, response
 
 
 class ThreepidRestServlet(RestServlet):
