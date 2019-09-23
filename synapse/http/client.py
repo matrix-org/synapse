@@ -371,7 +371,7 @@ class SimpleHttpClient(object):
         Args:
             uri (str):
             post_json (object):
-            headers (dict[bytes, List[str]]|None): If not None, a map from
+            headers (dict[str, List[str]]|None): If not None, a map from
                header name to a list of values for that header
 
         Returns:
