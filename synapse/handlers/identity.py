@@ -452,12 +452,22 @@ class IdentityHandler(BaseHandler):
                 id_server + "/_matrix/identity/api/v1/validate/msisdn/requestToken",
                 params,
             )
-            return data
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
+
+        assert self.hs.config.public_baseurl
+
+        # we need to tell the client to send the token back to us, since it doesn't
+        # otherwise know where to send it, so add submit_url response parameter
+        # (see also MSC2078)
+        data["submit_url"] = (
+            self.hs.config.public_baseurl
+            + "_matrix/client/unstable/add_threepid/msisdn/submit_token"
+        )
+        return data
 
     @defer.inlineCallbacks
     def validate_threepid_session(self, client_secret, sid):
