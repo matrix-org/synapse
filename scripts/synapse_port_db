@@ -30,11 +30,20 @@ from twisted.enterprise import adbapi
 from twisted.internet import defer, reactor
 
 from synapse.config.homeserver import HomeServerConfig
-from synapse.storage import DataStore
 from synapse.storage._base import LoggingTransaction, SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.storage.client_ips import ClientIpStore
+from synapse.storage.deviceinbox import DeviceInboxStore
+from synapse.storage.devices import DeviceStore
 from synapse.storage.engines import create_engine
+from synapse.storage.events_bg_updates import EventsBackgroundUpdatesStore
+from synapse.storage.media_repository import MediaRepositoryStore
 from synapse.storage.prepare_database import prepare_database
+from synapse.storage.registration import RegistrationStore
+from synapse.storage.roommember import RoomMemberStore
+from synapse.storage.search import SearchStore
+from synapse.storage.state import StateStore
+from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util import Clock
 
 logger = logging.getLogger("synapse_port_db")
@@ -123,20 +132,6 @@ class MockHomeserver(object):
         return self.db_conn
 
 
-# EXPERIMENTAL: Background updates runner store to replace mocked store
-
-from synapse.storage.client_ips import ClientIpStore
-from synapse.storage.deviceinbox import DeviceInboxStore
-from synapse.storage.devices import DeviceStore
-from synapse.storage.events_bg_updates import EventsBackgroundUpdatesStore
-from synapse.storage.media_repository import MediaRepositoryStore
-from synapse.storage.registration import RegistrationStore
-from synapse.storage.roommember import RoomMemberStore
-from synapse.storage.search import SearchStore
-from synapse.storage.state import StateStore
-from synapse.storage.user_directory import UserDirectoryStore
-
-
 class BackgroundUpdatesRunnerStore(
     ClientIpStore,
     DeviceInboxStore,
@@ -202,8 +197,6 @@ class BackgroundUpdatesRunnerStore(
         except Exception:
             logger.exception("Failed to insert: %s", table)
             raise
-
-# END EXPERIMENTAL
 
 
 class Store(object):
