@@ -464,15 +464,22 @@ class IdentityHandler(BaseHandler):
             SynapseError: If we failed to contact the identity server
 
         Returns:
-            The response dict from the identity server
+            Deferred[dict]: The response dict from the identity server
         """
         body = {"client_secret": client_secret, "sid": sid, "token": token}
 
-        return (
-            yield self.http_client.post_json_get_json(
-                id_server + "/_matrix/identity/api/v1/validate/msisdn/submitToken", body
+        try:
+            return (
+                yield self.http_client.post_json_get_json(
+                    id_server + "/_matrix/identity/api/v1/validate/msisdn/submitToken",
+                    body,
+                )
             )
-        )
+        except TimeoutError:
+            raise SynapseError(500, "Timed out contacting identity server")
+        except HttpResponseException as e:
+            logger.warning("Error contacting msisdn account_threepid_delegate: %s", e)
+            raise SynapseError(400, "Error contacting the identity server")
 
 
 def create_id_access_token_header(id_access_token):
