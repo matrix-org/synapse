@@ -95,6 +95,24 @@ class KeyConfig(Config):
 
         # if neither trusted_key_servers nor perspectives are given, use the default.
         if "perspectives" not in config and "trusted_key_servers" not in config:
+            logger.warn(
+                """
+                Synapse requires that a notary homeserver is configured to
+                verify keys of other servers in the federation. This homeserver
+                does not have a notary server configured in homeserver.yaml and
+                will fall back to the default of 'matrix.org'.
+
+                Notary servers should be long lived, stable and trusted which
+                makes matrix.org a good choice for many admins, but some may
+                wish to choose another. To suppress this warning, the admin
+                should set 'trusted_key_servers' in homeserver.yaml to their
+                desired notary server.
+
+                In a future release the software defined default will be
+                removed entirely and the notary server will be defined
+                exclusively by the value of 'trust_key_servers'.
+                """
+            )
             key_servers = [{"server_name": "matrix.org"}]
         else:
             key_servers = config.get("trusted_key_servers", [])
