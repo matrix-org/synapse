@@ -595,7 +595,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             user_id (str): The ID of the user to retrieve threepids for
 
         Returns:
-            list[dict(str, str)]: List of dictionaries containing the following:
+            Deferred[list[dict]]: List of dictionaries containing the following:
                 medium (str): The medium of the threepid (e.g "email")
                 address (str): The address of the threepid (e.g "bob@example.com")
         """

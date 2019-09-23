@@ -81,14 +81,25 @@ class IdentityHandler(BaseHandler):
 
         try:
             data = yield self.http_client.get_json(url, query_params)
-            return data if "medium" in data else None
-        except HttpResponseException:
-            logger.debug(
-                "%s reported non-validated threepid: %s",
-                self.hs.config.account_threepid_delegate_email,
+        except HttpResponseException as e:
+            logger.info(
+                "%s returned %i for threepid validation for: %s",
+                id_server,
+                e.code,
                 creds,
             )
             return None
+
+        # Old versions of Sydent return a 200 http code even on a failed validation
+        # check. # Thus, in addition to the HttpResponseException check above (which
+        # checks for non-200 errors), we need to make sure validation_session isn't
+        # actually an error, identified by the absence of a "medium" key
+        # See https://github.com/matrix-org/sydent/issues/215 for details
+        if "medium" in data:
+            return data
+
+        logger.info("%s reported non-validated threepid: %s", id_server, creds)
+        return None
 
     @defer.inlineCallbacks
     def bind_threepid(
@@ -438,10 +449,6 @@ class IdentityHandler(BaseHandler):
         Returns:
             Dict[str, str|int] if validation was successful, otherwise None
         """
-        # We don't actually know which medium this 3PID is. Thus we first assume it's email,
-        # and if validation fails we try msisdn
-        validation_session = None
-
         # XXX: We shouldn't need to keep wrapping and unwrapping this value
         threepid_creds = {"client_secret": client_secret, "sid": sid}
 
@@ -461,12 +468,7 @@ class IdentityHandler(BaseHandler):
                 "email", client_secret, sid=sid, validated=True
             )
 
-        # Old versions of Sydent return a 200 http code even on a failed validation check.
-        # Thus, in addition to the HttpResponseException check above (which checks for
-        # non-200 errors), we need to make sure validation_session isn't actually an error,
-        # identified by containing an "error" key
-        # See https://github.com/matrix-org/sydent/issues/215 for details
-        if validation_session and "error" not in validation_session:
+        if validation_session:
             return validation_session
 
         # Try to validate as msisdn
@@ -476,12 +478,7 @@ class IdentityHandler(BaseHandler):
                 self.hs.config.account_threepid_delegate_msisdn, threepid_creds
             )
 
-            # Check that validation_session isn't actually an error due to old Sydent instances
-            # See explanatory comment above
-            if validation_session and "error" not in validation_session:
-                return validation_session
-
-        return None
+        return validation_session
 
 
 def create_id_access_token_header(id_access_token):
