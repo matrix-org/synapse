@@ -860,18 +860,18 @@ class RegistrationStore(
             )
 
             if batch_size > len(rows):
-                return True
+                return (True, rows_processed_nb)
             else:
-                return False
+                return (True, rows_processed_nb)
 
-        end = yield self.runInteraction(
+        end, nb_processed = yield self.runInteraction(
             "users_set_deactivated_flag", _background_update_set_deactivated_flag_txn
         )
 
         if end:
             yield self._end_background_update("users_set_deactivated_flag")
 
-        return batch_size
+        return nb_processed
 
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id, valid_until_ms):
