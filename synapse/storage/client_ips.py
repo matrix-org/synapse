@@ -85,6 +85,11 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             "user_ips_drop_nonunique_index", self._remove_user_ip_nonunique
         )
 
+        # Update the last seen info in devices.
+        self.register_background_update_handler(
+            "devices_last_seen", self._devices_last_seen_update
+        )
+
         # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
         self._batch_row_update = {}
 
@@ -485,3 +490,50 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             }
             for (access_token, ip), (user_agent, last_seen) in iteritems(results)
         )
+
+    @defer.inlineCallbacks
+    def _devices_last_seen_update(self, progress, batch_size):
+        """Background update to insert last seen info into devices table
+        """
+
+        last_user_id = progress.get("last_user_id", "")
+        last_device_id = progress.get("last_device_id", "")
+
+        def _devices_last_seen_update_txn(txn):
+            sql = """
+                SELECT u.last_seen, u.ip, u.user_agent, user_id, device_id FROM devices
+                INNER JOIN user_ips AS u USING (user_id, device_id)
+                WHERE user_id > ? OR (user_id = ? AND device_id > ?)
+                ORDER BY user_id ASC, device_id ASC
+                LIMIT ?
+            """
+            txn.execute(sql, (last_user_id, last_user_id, last_device_id, batch_size))
+
+            rows = txn.fetchall()
+            if not rows:
+                return 0
+
+            sql = """
+                UPDATE devices
+                SET last_seen = ?, ip = ?, user_agent = ?
+                WHERE user_id = ? AND device_id = ?
+            """
+            txn.execute_batch(sql, rows)
+
+            _, _, _, user_id, device_id = rows[-1]
+            self._background_update_progress_txn(
+                txn,
+                "devices_last_seen",
+                {"last_user_id": user_id, "last_device_id": device_id},
+            )
+
+            return len(rows)
+
+        updated = yield self.runInteraction(
+            "_devices_last_seen_update", _devices_last_seen_update_txn
+        )
+
+        if not updated:
+            yield self._end_background_update("devices_last_seen")
+
+        return updated

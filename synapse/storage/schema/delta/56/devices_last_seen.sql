@@ -19,3 +19,6 @@
 ALTER TABLE devices ADD COLUMN last_seen BIGINT;
 ALTER TABLE devices ADD COLUMN ip TEXT;
 ALTER TABLE devices ADD COLUMN user_agent TEXT;
+
+INSERT INTO background_updates (update_name, progress_json) VALUES
+  ('devices_last_seen', '{}');
