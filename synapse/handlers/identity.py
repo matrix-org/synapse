@@ -82,7 +82,7 @@ class IdentityHandler(BaseHandler):
 
         try:
             data = yield self.http_client.get_json(url, query_params)
-          except TimeoutError:
+        except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except HttpResponseException as e:
             logger.info(
