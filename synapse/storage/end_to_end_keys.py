@@ -490,24 +490,19 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
 
         Args:
             user_id (str): the user who made the signatures
-            signatures (iterable[(str, str, str, str)]): signatures to add - each
-                a tuple of (key_id, target_user_id, target_device_id, signature),
-                where key_id is the ID of the key (including the signature
-                algorithm) that made the signature, target_user_id and
-                target_device_id indicate the device being signed, and signature
-                is the signature of the device
+            signatures (iterable[SignatureListItem]): signatures to add
         """
         return self._simple_insert_many(
             "e2e_cross_signing_signatures",
             [
                 {
                     "user_id": user_id,
-                    "key_id": key_id,
-                    "target_user_id": target_user_id,
-                    "target_device_id": target_device_id,
-                    "signature": signature,
+                    "key_id": item.signing_key_id,
+                    "target_user_id": item.target_user_id,
+                    "target_device_id": item.target_device_id,
+                    "signature": item.signature,
                 }
-                for (key_id, target_user_id, target_device_id, signature) in signatures
+                for item in signatures
             ],
             "add_e2e_signing_key",
         )
