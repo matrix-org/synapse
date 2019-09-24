@@ -34,19 +34,12 @@ from tests import unittest
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [register.register_servlets]
+    url = b"/_matrix/client/r0/register"
 
-    def make_homeserver(self, reactor, clock):
-
-        self.url = b"/_matrix/client/r0/register"
-
-        self.hs = self.setup_test_homeserver()
-        self.hs.config.enable_registration = True
-        self.hs.config.registrations_require_3pid = []
-        self.hs.config.auto_join_rooms = []
-        self.hs.config.enable_registration_captcha = False
-        self.hs.config.allow_guest_access = True
-
-        return self.hs
+    def default_config(self, name="test"):
+        config = super().default_config(name)
+        config["allow_guest_access"] = True
+        return config
 
     def test_POST_appservice_registration_valid(self):
         user_id = "@as_user_kermit:test"
@@ -198,6 +191,68 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_advertised_flows(self):
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        flows = channel.json_body["flows"]
+
+        # with the stock config, we expect all four combinations of 3pid
+        self.assertCountEqual(
+            [
+                ["m.login.dummy"],
+                ["m.login.email.identity"],
+                ["m.login.msisdn"],
+                ["m.login.msisdn", "m.login.email.identity"],
+            ],
+            (f["stages"] for f in flows),
+        )
+
+    @unittest.override_config(
+        {
+            "enable_registration_captcha": True,
+            "user_consent": {
+                "version": "1",
+                "template_dir": "/",
+                "require_at_registration": True,
+            },
+        }
+    )
+    def test_advertised_flows_captcha_and_terms(self):
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        flows = channel.json_body["flows"]
+
+        self.assertCountEqual(
+            [
+                ["m.login.recaptcha", "m.login.dummy", "m.login.terms"],
+                ["m.login.recaptcha", "m.login.terms", "m.login.email.identity"],
+                ["m.login.recaptcha", "m.login.terms", "m.login.msisdn"],
+                [
+                    "m.login.recaptcha",
+                    "m.login.terms",
+                    "m.login.msisdn",
+                    "m.login.email.identity",
+                ],
+            ],
+            (f["stages"] for f in flows),
+        )
+
+    @unittest.override_config(
+        {"registrations_require_3pid": ["email"], "disable_msisdn_registration": True}
+    )
+    def test_advertised_flows_no_msisdn_email_required(self):
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        flows = channel.json_body["flows"]
+
+        # with the stock config, we expect all four combinations of 3pid
+        self.assertCountEqual(
+            [["m.login.email.identity"]], (f["stages"] for f in flows)
+        )
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
