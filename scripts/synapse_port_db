@@ -537,7 +537,9 @@ class Porter(object):
                 self.progress.set_state("Running background updates on PostgreSQL")
             while not postgres_ready:
                 yield self.postgres_store.do_next_background_update(100)
-                postgres_ready = yield self.postgres_store.has_completed_background_updates()
+                postgres_ready = yield (
+                    self.postgres_store.has_completed_background_updates()
+                )
 
             self.progress.set_state("Creating port tables")
 
