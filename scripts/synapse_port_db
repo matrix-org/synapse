@@ -1011,14 +1011,14 @@ if __name__ == "__main__":
         postgres_config = hs_config["database"]
 
         if "name" not in postgres_config:
-            sys.stderr.write("Malformed database config: no 'name'")
+            sys.stderr.write("Malformed database config: no 'name'\n")
             sys.exit(2)
         if postgres_config["name"] != "psycopg2":
-            sys.stderr.write("Database must use 'psycopg2' connector.")
+            sys.stderr.write("Database must use 'psycopg2' connector.\n")
             sys.exit(3)
 
     else:
-        sys.stderr.write("The configuration file must have a 'database' section.")
+        sys.stderr.write("The configuration file must have a 'database' section.\n")
         sys.exit(4)
 
     def start(stdscr=None):
