@@ -42,6 +42,7 @@ from synapse.storage.registration import RegistrationStore
 from synapse.storage.roommember import RoomMemberStore
 from synapse.storage.search import SearchStore
 from synapse.storage.state import StateStore
+from synapse.storage.stats import StatsStore
 from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util import Clock
 
@@ -141,6 +142,7 @@ class Store(
     RoomMemberStore,
     SearchStore,
     StateStore,
+    StatsStore,
     UserDirectoryStore,
 ):
     def __init__(self, db_conn, hs):
