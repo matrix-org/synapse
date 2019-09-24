@@ -52,9 +52,9 @@ returned by the Client-Server API:
 Upgrading to v1.4.0
 ===================
 
-**Note: Sending emails and/or SMS will not work in this release without config
-changes. Notably this will affect the ability to register via email or phone
-number.**
+**Note: As of this release, users will be unable to add phone numbers or email
+addresses to their accounts, without changes to the Synapse configuration. This
+includes adding an email address during registration.**
 
 Previous versions of Synapse delegate the sending of emails and SMS to an
 identity server by default. In most cases this server is vector.im or
