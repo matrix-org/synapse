@@ -20,7 +20,6 @@ import logging
 from six import iteritems
 
 import attr
-
 from canonicaljson import encode_canonical_json, json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
