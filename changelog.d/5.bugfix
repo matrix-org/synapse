@@ -1,1 +1,1 @@
-Fix room retention policy management for in worker mode.
+Fix room retention policy management in worker mode.
