@@ -73,7 +73,9 @@ class DeactivateAccountHandler(BaseHandler):
         # unbinding
         identity_server_supports_unbinding = True
 
-        threepids = yield self.store.user_get_threepids(user_id)
+        # Retrieve the 3PIDs this user has bound to an identity server
+        threepids = yield self.store.user_get_bound_threepids(user_id)
+
         for threepid in threepids:
             try:
                 result = yield self._identity_handler.try_unbind_threepid(

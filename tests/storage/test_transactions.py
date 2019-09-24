@@ -29,17 +29,19 @@ class TransactionStoreTestCase(HomeserverTestCase):
         r = self.get_success(d)
         self.assertIsNone(r)
 
-        d = self.store.set_destination_retry_timings("example.com", 50, 100)
+        d = self.store.set_destination_retry_timings("example.com", 1000, 50, 100)
         self.get_success(d)
 
         d = self.store.get_destination_retry_timings("example.com")
         r = self.get_success(d)
 
-        self.assert_dict({"retry_last_ts": 50, "retry_interval": 100}, r)
+        self.assert_dict(
+            {"retry_last_ts": 50, "retry_interval": 100, "failure_ts": 1000}, r
+        )
 
     def test_initial_set_transactions(self):
         """Tests that we can successfully set the destination retries (there
         was a bug around invalidating the cache that broke this)
         """
-        d = self.store.set_destination_retry_timings("example.com", 50, 100)
+        d = self.store.set_destination_retry_timings("example.com", 1000, 50, 100)
         self.get_success(d)

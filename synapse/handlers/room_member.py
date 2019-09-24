@@ -25,13 +25,17 @@ from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
+from twisted.internet.error import TimeoutError
 
 from synapse import types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, HttpResponseException, SynapseError
+from synapse.handlers.identity import LookupAlgorithm, create_id_access_token_header
+from synapse.http.client import SimpleHttpClient
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
+from synapse.util.hash import sha256_and_url_safe_base64
 
 from ._base import BaseHandler
 
@@ -59,7 +63,11 @@ class RoomMemberHandler(object):
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
-        self.simple_http_client = hs.get_simple_http_client()
+        # We create a blacklisting instance of SimpleHttpClient for contacting identity
+        # servers specified by clients
+        self.simple_http_client = SimpleHttpClient(
+            hs, ip_blacklist=hs.config.federation_ip_range_blacklist
+        )
 
         self.federation_handler = hs.get_handlers().federation_handler
         self.directory_handler = hs.get_handlers().directory_handler
@@ -100,7 +108,7 @@ class RoomMemberHandler(object):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _remote_reject_invite(self, remote_room_hosts, room_id, target):
+    def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
         """Attempt to reject an invite for a room this server is not in. If we
         fail to do so we locally mark the invite as rejected.
 
@@ -510,9 +518,7 @@ class RoomMemberHandler(object):
         return res
 
     @defer.inlineCallbacks
-    def send_membership_event(
-        self, requester, event, context, remote_room_hosts=None, ratelimit=True
-    ):
+    def send_membership_event(self, requester, event, context, ratelimit=True):
         """
         Change the membership status of a user in a room.
 
@@ -522,16 +528,10 @@ class RoomMemberHandler(object):
                 act as the sender, will be skipped.
             event (SynapseEvent): The membership event.
             context: The context of the event.
-            is_guest (bool): Whether the sender is a guest.
-            room_hosts ([str]): Homeservers which are likely to already be in
-                the room, and could be danced with in order to join this
-                homeserver for the first time.
             ratelimit (bool): Whether to rate limit this request.
         Raises:
             SynapseError if there was a problem changing the membership.
         """
-        remote_room_hosts = remote_room_hosts or []
-
         target_user = UserID.from_string(event.state_key)
         room_id = event.room_id
 
@@ -634,7 +634,7 @@ class RoomMemberHandler(object):
             servers.remove(room_alias.domain)
         servers.insert(0, room_alias.domain)
 
-        return (RoomID.from_string(room_id), servers)
+        return RoomID.from_string(room_id), servers
 
     @defer.inlineCallbacks
     def _get_inviter(self, user_id, room_id):
@@ -646,7 +646,15 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def do_3pid_invite(
-        self, room_id, inviter, medium, address, id_server, requester, txn_id
+        self,
+        room_id,
+        inviter,
+        medium,
+        address,
+        id_server,
+        requester,
+        txn_id,
+        id_access_token=None,
     ):
         if self.config.block_non_admin_invites:
             is_requester_admin = yield self.auth.is_server_admin(requester.user)
@@ -669,7 +677,12 @@ class RoomMemberHandler(object):
                 Codes.FORBIDDEN,
             )
 
-        invitee = yield self._lookup_3pid(id_server, medium, address)
+        if not self._enable_lookup:
+            raise SynapseError(
+                403, "Looking up third-party identifiers is denied from this server"
+            )
+
+        invitee = yield self._lookup_3pid(id_server, medium, address, id_access_token)
 
         if invitee:
             yield self.update_membership(
@@ -677,12 +690,57 @@ class RoomMemberHandler(object):
             )
         else:
             yield self._make_and_store_3pid_invite(
-                requester, id_server, medium, address, room_id, inviter, txn_id=txn_id
+                requester,
+                id_server,
+                medium,
+                address,
+                room_id,
+                inviter,
+                txn_id=txn_id,
+                id_access_token=id_access_token,
             )
 
     @defer.inlineCallbacks
-    def _lookup_3pid(self, id_server, medium, address):
+    def _lookup_3pid(self, id_server, medium, address, id_access_token=None):
         """Looks up a 3pid in the passed identity server.
+
+        Args:
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            medium (str): The type of the third party identifier (e.g. "email").
+            address (str): The third party identifier (e.g. "foo@example.com").
+            id_access_token (str|None): The access token to authenticate to the identity
+                server with
+
+        Returns:
+            str|None: the matrix ID of the 3pid, or None if it is not recognized.
+        """
+        if id_access_token is not None:
+            try:
+                results = yield self._lookup_3pid_v2(
+                    id_server, id_access_token, medium, address
+                )
+                return results
+
+            except Exception as e:
+                # Catch HttpResponseExcept for a non-200 response code
+                # Check if this identity server does not know about v2 lookups
+                if isinstance(e, HttpResponseException) and e.code == 404:
+                    # This is an old identity server that does not yet support v2 lookups
+                    logger.warning(
+                        "Attempted v2 lookup on v1 identity server %s. Falling "
+                        "back to v1",
+                        id_server,
+                    )
+                else:
+                    logger.warning("Error when looking up hashing details: %s", e)
+                    return None
+
+        return (yield self._lookup_3pid_v1(id_server, medium, address))
+
+    @defer.inlineCallbacks
+    def _lookup_3pid_v1(self, id_server, medium, address):
+        """Looks up a 3pid in the passed identity server using v1 lookup.
 
         Args:
             id_server (str): The server name (including port, if required)
@@ -693,10 +751,6 @@ class RoomMemberHandler(object):
         Returns:
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
-        if not self._enable_lookup:
-            raise SynapseError(
-                403, "Looking up third-party identifiers is denied from this server"
-            )
         try:
             data = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
@@ -708,20 +762,136 @@ class RoomMemberHandler(object):
                     raise AuthError(401, "No signatures on 3pid binding")
                 yield self._verify_any_signature(data, id_server)
                 return data["mxid"]
-
+        except TimeoutError:
+            raise SynapseError(500, "Timed out contacting identity server")
         except IOError as e:
-            logger.warn("Error from identity server lookup: %s" % (e,))
+            logger.warning("Error from v1 identity server lookup: %s" % (e,))
+
+        return None
+
+    @defer.inlineCallbacks
+    def _lookup_3pid_v2(self, id_server, id_access_token, medium, address):
+        """Looks up a 3pid in the passed identity server using v2 lookup.
+
+        Args:
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            id_access_token (str): The access token to authenticate to the identity server with
+            medium (str): The type of the third party identifier (e.g. "email").
+            address (str): The third party identifier (e.g. "foo@example.com").
+
+        Returns:
+            Deferred[str|None]: the matrix ID of the 3pid, or None if it is not recognised.
+        """
+        # Check what hashing details are supported by this identity server
+        try:
+            hash_details = yield self.simple_http_client.get_json(
+                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
+                {"access_token": id_access_token},
+            )
+        except TimeoutError:
+            raise SynapseError(500, "Timed out contacting identity server")
+
+        if not isinstance(hash_details, dict):
+            logger.warning(
+                "Got non-dict object when checking hash details of %s%s: %s",
+                id_server_scheme,
+                id_server,
+                hash_details,
+            )
+            raise SynapseError(
+                400,
+                "Non-dict object from %s%s during v2 hash_details request: %s"
+                % (id_server_scheme, id_server, hash_details),
+            )
+
+        # Extract information from hash_details
+        supported_lookup_algorithms = hash_details.get("algorithms")
+        lookup_pepper = hash_details.get("lookup_pepper")
+        if (
+            not supported_lookup_algorithms
+            or not isinstance(supported_lookup_algorithms, list)
+            or not lookup_pepper
+            or not isinstance(lookup_pepper, str)
+        ):
+            raise SynapseError(
+                400,
+                "Invalid hash details received from identity server %s%s: %s"
+                % (id_server_scheme, id_server, hash_details),
+            )
+
+        # Check if any of the supported lookup algorithms are present
+        if LookupAlgorithm.SHA256 in supported_lookup_algorithms:
+            # Perform a hashed lookup
+            lookup_algorithm = LookupAlgorithm.SHA256
+
+            # Hash address, medium and the pepper with sha256
+            to_hash = "%s %s %s" % (address, medium, lookup_pepper)
+            lookup_value = sha256_and_url_safe_base64(to_hash)
+
+        elif LookupAlgorithm.NONE in supported_lookup_algorithms:
+            # Perform a non-hashed lookup
+            lookup_algorithm = LookupAlgorithm.NONE
+
+            # Combine together plaintext address and medium
+            lookup_value = "%s %s" % (address, medium)
+
+        else:
+            logger.warning(
+                "None of the provided lookup algorithms of %s are supported: %s",
+                id_server,
+                supported_lookup_algorithms,
+            )
+            raise SynapseError(
+                400,
+                "Provided identity server does not support any v2 lookup "
+                "algorithms that this homeserver supports.",
+            )
+
+        # Authenticate with identity server given the access token from the client
+        headers = {"Authorization": create_id_access_token_header(id_access_token)}
+
+        try:
+            lookup_results = yield self.simple_http_client.post_json_get_json(
+                "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
+                {
+                    "addresses": [lookup_value],
+                    "algorithm": lookup_algorithm,
+                    "pepper": lookup_pepper,
+                },
+                headers=headers,
+            )
+        except TimeoutError:
+            raise SynapseError(500, "Timed out contacting identity server")
+        except Exception as e:
+            logger.warning("Error when performing a v2 3pid lookup: %s", e)
+            raise SynapseError(
+                500, "Unknown error occurred during identity server lookup"
+            )
+
+        # Check for a mapping from what we looked up to an MXID
+        if "mappings" not in lookup_results or not isinstance(
+            lookup_results["mappings"], dict
+        ):
+            logger.warning("No results from 3pid lookup")
             return None
+
+        # Return the MXID if it's available, or None otherwise
+        mxid = lookup_results["mappings"].get(lookup_value)
+        return mxid
 
     @defer.inlineCallbacks
     def _verify_any_signature(self, data, server_hostname):
         if server_hostname not in data["signatures"]:
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
-            key_data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/pubkey/%s"
-                % (id_server_scheme, server_hostname, key_name)
-            )
+            try:
+                key_data = yield self.simple_http_client.get_json(
+                    "%s%s/_matrix/identity/api/v1/pubkey/%s"
+                    % (id_server_scheme, server_hostname, key_name)
+                )
+            except TimeoutError:
+                raise SynapseError(500, "Timed out contacting identity server")
             if "public_key" not in key_data:
                 raise AuthError(
                     401, "No public key named %s from %s" % (key_name, server_hostname)
@@ -737,7 +907,15 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _make_and_store_3pid_invite(
-        self, requester, id_server, medium, address, room_id, user, txn_id
+        self,
+        requester,
+        id_server,
+        medium,
+        address,
+        room_id,
+        user,
+        txn_id,
+        id_access_token=None,
     ):
         room_state = yield self.state_handler.get_current_state(room_id)
 
@@ -786,6 +964,7 @@ class RoomMemberHandler(object):
                 room_name=room_name,
                 inviter_display_name=inviter_display_name,
                 inviter_avatar_url=inviter_avatar_url,
+                id_access_token=id_access_token,
             )
         )
 
@@ -823,6 +1002,7 @@ class RoomMemberHandler(object):
         room_name,
         inviter_display_name,
         inviter_avatar_url,
+        id_access_token=None,
     ):
         """
         Asks an identity server for a third party invite.
@@ -842,6 +1022,8 @@ class RoomMemberHandler(object):
             inviter_display_name (str): The current display name of the
                 inviter.
             inviter_avatar_url (str): The URL of the inviter's avatar.
+            id_access_token (str|None): The access token to authenticate to the identity
+                server with
 
         Returns:
             A deferred tuple containing:
@@ -852,12 +1034,6 @@ class RoomMemberHandler(object):
                 display_name (str): A user-friendly name to represent the invited
                     user.
         """
-
-        is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
-            id_server_scheme,
-            id_server,
-        )
-
         invite_config = {
             "medium": medium,
             "address": address,
@@ -871,22 +1047,70 @@ class RoomMemberHandler(object):
             "sender_avatar_url": inviter_avatar_url,
         }
 
-        try:
-            data = yield self.simple_http_client.post_json_get_json(
-                is_url, invite_config
+        # Add the identity service access token to the JSON body and use the v2
+        # Identity Service endpoints if id_access_token is present
+        data = None
+        base_url = "%s%s/_matrix/identity" % (id_server_scheme, id_server)
+
+        if id_access_token:
+            key_validity_url = "%s%s/_matrix/identity/v2/pubkey/isvalid" % (
+                id_server_scheme,
+                id_server,
             )
-        except HttpResponseException as e:
-            # Some identity servers may only support application/x-www-form-urlencoded
-            # types. This is especially true with old instances of Sydent, see
-            # https://github.com/matrix-org/sydent/pull/170
-            logger.info(
-                "Failed to POST %s with JSON, falling back to urlencoded form: %s",
-                is_url,
-                e,
+
+            # Attempt a v2 lookup
+            url = base_url + "/v2/store-invite"
+            try:
+                data = yield self.simple_http_client.post_json_get_json(
+                    url,
+                    invite_config,
+                    {"Authorization": create_id_access_token_header(id_access_token)},
+                )
+            except TimeoutError:
+                raise SynapseError(500, "Timed out contacting identity server")
+            except HttpResponseException as e:
+                if e.code != 404:
+                    logger.info("Failed to POST %s with JSON: %s", url, e)
+                    raise e
+
+        if data is None:
+            key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
+                id_server_scheme,
+                id_server,
             )
-            data = yield self.simple_http_client.post_urlencoded_get_json(
-                is_url, invite_config
-            )
+            url = base_url + "/api/v1/store-invite"
+
+            try:
+                data = yield self.simple_http_client.post_json_get_json(
+                    url, invite_config
+                )
+            except TimeoutError:
+                raise SynapseError(500, "Timed out contacting identity server")
+            except HttpResponseException as e:
+                logger.warning(
+                    "Error trying to call /store-invite on %s%s: %s",
+                    id_server_scheme,
+                    id_server,
+                    e,
+                )
+
+            if data is None:
+                # Some identity servers may only support application/x-www-form-urlencoded
+                # types. This is especially true with old instances of Sydent, see
+                # https://github.com/matrix-org/sydent/pull/170
+                try:
+                    data = yield self.simple_http_client.post_urlencoded_get_json(
+                        url, invite_config
+                    )
+                except HttpResponseException as e:
+                    logger.warning(
+                        "Error calling /store-invite on %s%s with fallback "
+                        "encoding: %s",
+                        id_server_scheme,
+                        id_server,
+                        e,
+                    )
+                    raise e
 
         # TODO: Check for success
         token = data["token"]
@@ -894,8 +1118,7 @@ class RoomMemberHandler(object):
         if "public_key" in data:
             fallback_public_key = {
                 "public_key": data["public_key"],
-                "key_validity_url": "%s%s/_matrix/identity/api/v1/pubkey/isvalid"
-                % (id_server_scheme, id_server),
+                "key_validity_url": key_validity_url,
             }
         else:
             fallback_public_key = public_keys[0]
@@ -962,9 +1185,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         )
 
         if complexity:
-            if complexity["v1"] > max_complexity:
-                return True
-            return False
+            return complexity["v1"] > max_complexity
         return None
 
     @defer.inlineCallbacks
@@ -980,10 +1201,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         max_complexity = self.hs.config.limit_remote_rooms.complexity
         complexity = yield self.store.get_room_complexity(room_id)
 
-        if complexity["v1"] > max_complexity:
-            return True
-
-        return False
+        return complexity["v1"] > max_complexity
 
     @defer.inlineCallbacks
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -1062,7 +1280,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             # The 'except' clause is very broad, but we need to
             # capture everything from DNS failures upwards
             #
-            logger.warn("Failed to reject invite: %s", e)
+            logger.warning("Failed to reject invite: %s", e)
 
             yield self.store.locally_reject_invite(target.to_string(), room_id)
             return {}

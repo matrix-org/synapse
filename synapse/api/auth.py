@@ -25,7 +25,7 @@ from twisted.internet import defer
 import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import EventTypes, JoinRules, Membership, UserTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -704,13 +704,12 @@ class Auth(object):
                 and visibility.content["history_visibility"] == "world_readable"
             ):
                 return Membership.JOIN, None
-                return
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )
 
     @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None, threepid=None):
+    def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
@@ -723,6 +722,9 @@ class Auth(object):
                 with a MAU blocked server, normally they would be rejected but their
                 threepid is on the reserved list. user_id and
                 threepid should never be set at the same time.
+
+            user_type(str|None): If present, is used to decide whether to check against
+                certain blocking reasons like MAU.
         """
 
         # Never fail an auth check for the server notices users or support user
@@ -760,6 +762,10 @@ class Auth(object):
                     self.hs.config.mau_limits_reserved_threepids, threepid
                 ):
                     return
+            elif user_type == UserTypes.SUPPORT:
+                # If the user does not exist yet and is of type "support",
+                # allow registration. Support users are excluded from MAU checks.
+                return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:

@@ -701,9 +701,9 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 content["id_server"],
                 requester,
                 txn_id,
+                content.get("id_access_token"),
             )
             return 200, {}
-            return
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
