@@ -982,6 +982,14 @@ if __name__ == "__main__":
 
     logging.basicConfig(**logging_config)
 
+    # TODO: The store initialisation (or the call to has_completed_background_updates) is
+    #   causing some logging contexts to be lost. Currently figuring out what exactly does
+    #   that is not trivial, because we don't have an efficient way to know what lost its
+    #   context, only to know when we realise a context has been lost. This doesn't seem
+    #   to impact synapse_port_db, though, so for now we can just ignore warnings about
+    #   it, but that is something we should fix in the future.
+    logging.getLogger("synapse.logging.context").setLevel(logging.ERROR)
+
     sqlite_config = {
         "name": "sqlite3",
         "args": {
