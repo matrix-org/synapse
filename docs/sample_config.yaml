@@ -110,6 +110,9 @@ pid_file: DATADIR/homeserver.pid
 # blacklist IP address CIDR ranges. If this option is not specified, or
 # specified with an empty list, no ip range blacklist will be enforced.
 #
+# As of Synapse v1.4.0 this option also affects any outbound requests to identity
+# servers provided by user input.
+#
 # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
 # listed here, since they correspond to unroutable addresses.)
 #
@@ -937,8 +940,10 @@ uploads_path: "DATADIR/uploads"
 # by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
 #
+# If a delegate is specified, the config option public_baseurl must also be filled out.
+#
 account_threepid_delegates:
-    #email: https://example.com     # Delegate email sending to matrix.org
+    #email: https://example.com     # Delegate email sending to example.org
     #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
 # Users who register on this homeserver will automatically be joined
@@ -1295,6 +1300,12 @@ password_config:
 #   #registration_template_html: registration.html
 #   #registration_template_text: registration.txt
 #
+#   # Templates for validation emails sent by the homeserver when adding an email to
+#   # your user account
+#   #
+#   #add_threepid_template_html: add_threepid.html
+#   #add_threepid_template_text: add_threepid.txt
+#
 #   # Templates for password reset success and failure pages that a user
 #   # will see after attempting to reset their password
 #   #
@@ -1306,6 +1317,12 @@ password_config:
 #   #
 #   #registration_template_success_html: registration_success.html
 #   #registration_template_failure_html: registration_failure.html
+#
+#   # Templates for success and failure pages that a user will see after attempting
+#   # to add an email or phone to their account
+#   #
+#   #add_threepid_success_html: add_threepid_success.html
+#   #add_threepid_failure_html: add_threepid_failure.html
 
 
 #password_providers:
