@@ -238,6 +238,14 @@ class RoomWorkerStore(SQLBaseStore):
         Returns:
             dict[int, int]: "min_lifetime" and "max_lifetime" for this room.
         """
+        # If the room retention feature is disabled, return a policy with no minimum nor
+        # maximum, in order not to filter out events we should filter out when sending to
+        # the client.
+        if not self.config.retention_enabled:
+            defer.returnValue({
+                "min_lifetime": None,
+                "max_lifetime": None,
+            })
 
         def get_retention_policy_for_room_txn(txn):
             txn.execute(
