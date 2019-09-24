@@ -844,7 +844,7 @@ class RegistrationStore(
             rows = self.cursor_to_dict(txn)
 
             if not rows:
-                return True
+                return True, 0
 
             rows_processed_nb = 0
 
@@ -860,9 +860,9 @@ class RegistrationStore(
             )
 
             if batch_size > len(rows):
-                return (True, rows_processed_nb)
+                return True, len(rows)
             else:
-                return (False, rows_processed_nb)
+                return False, len(rows)
 
         end, nb_processed = yield self.runInteraction(
             "users_set_deactivated_flag", _background_update_set_deactivated_flag_txn
