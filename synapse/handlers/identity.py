@@ -332,10 +332,10 @@ class IdentityHandler(BaseHandler):
         if next_link:
             # Manipulate the next_link to add the sid, because the caller won't get
             # it until we send a response, by which time we've sent the mail.
-            if '?' in next_link:
-                next_link += '&'
+            if "?" in next_link:
+                next_link += "&"
             else:
-                next_link += '?'
+                next_link += "?"
             next_link += "sid=" + urllib.parse.quote(session_id)
 
         # Generate a new validation token
