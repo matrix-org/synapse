@@ -699,7 +699,10 @@ class E2eKeysHandler(object):
                 user_id, "self_signing"
             )
 
-            # get our master key, since it may be signed
+            # get our master key, since we may have received a signature of it.
+            # We need to fetch it here so that we know what its key ID is, so
+            # that we can check if a signature that was sent is a signature of
+            # the master key or of a device
             master_key, _, master_verify_key = yield self._get_e2e_cross_signing_verify_key(
                 user_id, "master"
             )
@@ -719,8 +722,10 @@ class E2eKeysHandler(object):
             return signature_list, failures
 
         for device_id, device in signatures.items():
+            # make sure submitted data is in the right form
             if not isinstance(device, dict):
                 raise SynapseError(400, "Invalid parameter", Codes.INVALID_PARAM)
+
             try:
                 if "signatures" not in device or user_id not in device["signatures"]:
                     # no signature was sent
@@ -729,6 +734,8 @@ class E2eKeysHandler(object):
                     )
 
                 if device_id == master_verify_key.version:
+                    # The signature is of the master key. This needs to be
+                    # handled differently from signatures of normal devices.
                     master_key_signature_list = self._check_master_key_signature(
                         user_id, device_id, device, master_key, devices
                     )
@@ -743,7 +750,6 @@ class E2eKeysHandler(object):
                         400, "Invalid signature", Codes.INVALID_SIGNATURE
                     )
 
-                stored_device = None
                 try:
                     stored_device = devices[device_id]["keys"]
                 except KeyError:
@@ -848,11 +854,13 @@ class E2eKeysHandler(object):
             return signature_list, failures
 
         for target_user, devicemap in signatures.items():
+            # make sure submitted data is in the right form
             if not isinstance(devicemap, dict):
                 raise SynapseError(400, "Invalid parameter", Codes.INVALID_PARAM)
             for device in devicemap.values():
                 if not isinstance(device, dict):
                     raise SynapseError(400, "Invalid parameter", Codes.INVALID_PARAM)
+
             device_id = None
             try:
                 # get the target user's master key, to make sure it matches
