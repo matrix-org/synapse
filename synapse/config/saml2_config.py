@@ -20,20 +20,32 @@ from synapse.util.module_loader import load_python_module
 from ._base import Config, ConfigError
 
 
-def _dict_merge(merge_dict, into_dct):
+def _dict_merge(merge_dict, into_dict):
+    """Do a deep merge of two dicts
+
+    Recursively merges `merge_dict` into `into_dict`:
+      * For keys where both `merge_dict` and `into_dict` have a dict value, the values
+        are recursively merged
+      * For all other keys, the values in `into_dict` (if any) are overwritten with
+        the value from `merge_dict`.
+
+    Args:
+        merge_dict (dict): dict to merge
+        into_dict (dict): target dict
+    """
     for k, v in merge_dict.items():
-        if k not in into_dct:
-            into_dct[k] = v
+        if k not in into_dict:
+            into_dict[k] = v
             continue
 
-        current_val = into_dct[k]
+        current_val = into_dict[k]
 
         if isinstance(v, dict) and isinstance(current_val, dict):
             _dict_merge(v, current_val)
             continue
 
         # otherwise we just overwrite
-        into_dct[k] = v
+        into_dict[k] = v
 
 
 class SAML2Config(Config):
@@ -53,12 +65,14 @@ class SAML2Config(Config):
         self.saml2_enabled = True
 
         saml2_config_dict = self._default_saml_config_dict()
-        _dict_merge(saml2_config.get("sp_config", {}), saml2_config_dict)
+        _dict_merge(
+            merge_dict=saml2_config.get("sp_config", {}), into_dict=saml2_config_dict
+        )
 
         config_path = saml2_config.get("config_path", None)
         if config_path is not None:
             mod = load_python_module(config_path)
-            _dict_merge(mod.CONFIG, saml2_config_dict)
+            _dict_merge(merge_dict=mod.CONFIG, into_dict=saml2_config_dict)
 
         import saml2.config
 
