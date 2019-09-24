@@ -15,6 +15,8 @@
 
 import logging
 import threading
+from asyncio import iscoroutine
+from functools import wraps
 
 import six
 
@@ -197,7 +199,15 @@ def run_as_background_process(desc, func, *args, **kwargs):
                 _background_processes.setdefault(desc, set()).add(proc)
 
             try:
-                yield func(*args, **kwargs)
+                # We ensureDeferred here to handle coroutines
+                result = func(*args, **kwargs)
+
+                # We need this check because ensureDeferred doesn't like when
+                # func doesn't return a Deferred or coroutine.
+                if iscoroutine(result):
+                    result = defer.ensureDeferred(result)
+
+                return (yield result)
             except Exception:
                 logger.exception("Background process '%s' threw an exception", desc)
             finally:
@@ -208,3 +218,20 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
     with PreserveLoggingContext():
         return run()
+
+
+def wrap_as_background_process(desc):
+    """Decorator that wraps a function that gets called as a background
+    process.
+
+    Equivalent of calling the function with `run_as_background_process`
+    """
+
+    def wrap_as_background_process_inner(func):
+        @wraps(func)
+        def wrap_as_background_process_inner_2(*args, **kwargs):
+            return run_as_background_process(desc, func, *args, **kwargs)
+
+        return wrap_as_background_process_inner_2
+
+    return wrap_as_background_process_inner
