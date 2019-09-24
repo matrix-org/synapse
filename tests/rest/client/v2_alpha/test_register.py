@@ -227,7 +227,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertCountEqual(
             [
-                ["m.login.recaptcha", "m.login.dummy", "m.login.terms"],
+                ["m.login.recaptcha", "m.login.terms", "m.login.dummy"],
                 ["m.login.recaptcha", "m.login.terms", "m.login.email.identity"],
                 ["m.login.recaptcha", "m.login.terms", "m.login.msisdn"],
                 [
