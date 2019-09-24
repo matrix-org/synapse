@@ -70,8 +70,9 @@ and SMS to be sent.
 In the medium term the vector.im and matrix.org identity servers will disable
 sending email and SMS for homeservers entirely, however in order to ease the
 transition they will retain the capability to send email and SMS for a limited
-period. Email will be disabled on XXX (giving 2 months notice). Disabling SMS
-will follow some time after that once SMS sending support lands in Synapse.
+period. Email will be disabled on Monday 2nd December 2019 (giving roughly 2
+months notice). Disabling SMS will follow some time after that once SMS sending
+support lands in Synapse.
 
 Once email and SMS support have been disabled in the vector.im and matrix.org
 identity servers, all Synapse versions that depend on those instances will be
@@ -110,8 +111,8 @@ Some admins will wish to continue using email as a registration method, but
 will not immediately have an appropriate SMTP server to hand.
 
 To this end, we will continue to support email delegation via the vector.im and
-matrix.org identity servers for two months. The cut off date is XXXX, after
-which time email delegation will be disabled.
+matrix.org identity servers for two months. The cut off date is Monday 2nd
+December 2019, after which time email delegation will be disabled.
 
 The ``account_threepid_delegates`` dictionary defines whether the homeserver
 should delegate an external server (typically an `identity server
