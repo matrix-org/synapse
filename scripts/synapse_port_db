@@ -500,17 +500,18 @@ class Porter(object):
                     sqlite_db_pool,
                 ),
             )
+            # Commit any uncommitted transactions.
             sqlite_conn.commit()
 
-            # Check if all background updates are done, abort if not
+            # Check if all background updates are done, abort if not.
             updates_complete = yield self.sqlite_store.has_completed_background_updates()
             if not updates_complete:
-                # TODO: Make this not an exception
-                sys.exit(
-                    "Pending background updates exist in the SQLite database."
+                sys.stderr.write(
+                    "Pending background updates exist in the SQLite3 database."
                     " Please start Synapse again and wait until every update has finished"
-                    " before running this script."
+                    " before running this script.\n"
                 )
+                defer.returnValue(None)
 
             self.progress.set_state("Preparing PostgreSQL")
             postgres_conn = self.setup_db(postgres_config, postgres_engine)
@@ -524,6 +525,7 @@ class Porter(object):
                     postgres_db_pool,
                 ),
             )
+            # Commit any uncommitted transactions.
             postgres_conn.commit()
 
             yield self.postgres_store.runInteraction(
@@ -531,10 +533,14 @@ class Porter(object):
                 postgres_engine.check_database,
             )
 
-            # Manually apply all background updates on the db
+            # Manually apply all background updates on the PostgreSQL database.
             postgres_ready = yield self.postgres_store.has_completed_background_updates()
+
             if not postgres_ready:
+                # Only say that we're running background updates when there are background
+                # updates to run.
                 self.progress.set_state("Running background updates on PostgreSQL")
+
             while not postgres_ready:
                 yield self.postgres_store.do_next_background_update(100)
                 postgres_ready = yield (
