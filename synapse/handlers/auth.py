@@ -435,7 +435,7 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _check_threepid(self, medium, authdict, **kwargs):
-        print('_check_threepid')
+        print("_check_threepid")
         if "threepid_creds" not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
@@ -483,9 +483,7 @@ class AuthHandler(BaseHandler):
                     # Valid threepid returned, delete from the db
                     yield self.store.delete_threepid_session(threepid_creds["sid"])
             else:
-                raise SynapseError(
-                    400, "Email is not enabled on this homeserver"
-                )
+                raise SynapseError(400, "Email is not enabled on this homeserver")
         else:
             raise SynapseError(400, "Unrecognized threepid medium: %s" % (medium,))
         if not threepid:
