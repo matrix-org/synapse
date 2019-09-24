@@ -313,6 +313,12 @@ listeners:
 #
 redaction_retention_period: 7d
 
+# How long to track users' last seen time and IPs in the database.
+#
+# Defaults to `28d`. Set to `null` to disable.
+#
+#user_ips_max_age: 14d
+
 
 ## TLS ##
 
