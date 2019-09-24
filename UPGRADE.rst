@@ -56,22 +56,32 @@ Upgrading to v1.4.0
 changes. Notably this will affect the ability to register via email or phone
 number.**
 
-Previous versions of Synapse delegate the sending of emails and SMS to an
-identity server by default. In most cases this server is vector.im or
-matrix.org. Email and SMS are often used as part of registration and account
-recovery.
+It is possible for a user to associate an email address or phone number
+with their account, for a number of reasons:
+ * for use when logging in, as an alternative to the user id.
+ * in the case of email, as an alternative contact to help with account recovery.
+ * in the case of email, to receive notifications of missed messages.
 
+Before an an email address or phone number can be added to a user's account, 
+or before such an address is used to carry out a password-reset, Synapse must 
+confirm the operation with the owner of the email address or phone number.
+It does this by sending an email or text giving the user a link or token to confirm 
+receipt. This process is known as '3pid verification'.
+
+Previous versions of Synapse delegated this task to an
+identity server by default. In most cases this server is vector.im or
+matrix.org.
 
 In Synapse 1.4.0, for security and privacy reasons, the homeserver will no
-longer delegate email or SMS to an identity server by default and instead the
-server administrator will need to explicitly decide how they would like email
-and SMS to be sent.
+longer delegate 3pid validation to an identity server by default and instead the
+server administrator will need to explicitly decide how they would like the validation
+messages to be sent.
 
 In the medium term the vector.im and matrix.org identity servers will disable
 sending email and SMS for homeservers entirely, however in order to ease the
 transition they will retain the capability to send email and SMS for a limited
 period. Email will be disabled on Monday 2nd December 2019 (giving roughly 2
-months notice). Disabling SMS will follow some time after that once SMS sending
+months' notice). Disabling SMS will follow some time after that once SMS sending
 support lands in Synapse.
 
 Once email and SMS support have been disabled in the vector.im and matrix.org
