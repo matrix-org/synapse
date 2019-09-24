@@ -1174,6 +1174,32 @@ saml2_config:
   #
   #saml_session_lifetime: 5m
 
+  # The SAML attribute (after mapping via the attribute maps) to use to derive
+  # the Matrix ID from. 'uid' by default.
+  #
+  #mxid_source_attribute: displayName
+
+  # The mapping system to use for mapping the saml attribute onto a matrix ID.
+  # Options include:
+  #  * 'hexencode' (which maps unpermitted characters to '=xx')
+  #  * 'dotreplace' (which replaces unpermitted characters with '.').
+  # The default is 'hexencode'.
+  #
+  #mxid_mapping: dotreplace
+
+  # In previous versions of synapse, the mapping from SAML attribute to MXID was
+  # always calculated dynamically rather than stored in a table. For backwards-
+  # compatibility, we will look for user_ids matching such a pattern before
+  # creating a new account.
+  #
+  # This setting controls the SAML attribute which will be used for this
+  # backwards-compatibility lookup. Typically it should be 'uid', but if the
+  # attribute maps are changed, it may be necessary to change it.
+  #
+  # The default is 'uid'.
+  #
+  #grandfathered_mxid_source_attribute: upn
+
 
 
 # Enable CAS for registration and login.
