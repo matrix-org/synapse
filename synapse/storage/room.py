@@ -223,6 +223,61 @@ class RoomWorkerStore(SQLBaseStore):
         else:
             defer.returnValue(None)
 
+    @cachedInlineCallbacks()
+    def get_retention_policy_for_room(self, room_id):
+        """Get the retention policy for a given room.
+
+        If no retention policy has been found for this room, returns a policy defined
+        by the configured default policy (which has None as both the 'min_lifetime' and
+        the 'max_lifetime' if no default policy has been defined in the server's
+        configuration).
+
+        Args:
+            room_id (str): The ID of the room to get the retention policy of.
+
+        Returns:
+            dict[int, int]: "min_lifetime" and "max_lifetime" for this room.
+        """
+
+        def get_retention_policy_for_room_txn(txn):
+            txn.execute(
+                """
+                SELECT min_lifetime, max_lifetime FROM room_retention
+                INNER JOIN current_state_events USING (event_id, room_id)
+                WHERE room_id = ?;
+                """,
+                (room_id,)
+            )
+
+            return self.cursor_to_dict(txn)
+
+        ret = yield self.runInteraction(
+            "get_retention_policy_for_room",
+            get_retention_policy_for_room_txn,
+        )
+
+        # If we don't know this room ID, ret will be None, in this case return the default
+        # policy.
+        if not ret:
+            defer.returnValue({
+                "min_lifetime": self.config.retention_default_min_lifetime,
+                "max_lifetime": self.config.retention_default_max_lifetime,
+            })
+
+        row = ret[0]
+
+        # If one of the room's policy's attributes isn't defined, use the matching
+        # attribute from the default policy.
+        # The default values will be None if no default policy has been defined, or if one
+        # of the attributes is missing from the default policy.
+        if row["min_lifetime"] is None:
+            row["min_lifetime"] = self.config.retention_default_min_lifetime
+
+        if row["max_lifetime"] is None:
+            row["max_lifetime"] = self.config.retention_default_max_lifetime
+
+        defer.returnValue(row)
+
 
 class RoomStore(RoomWorkerStore, SearchStore):
     def __init__(self, db_conn, hs):
@@ -835,58 +890,3 @@ class RoomStore(RoomWorkerStore, SearchStore):
         )
 
         defer.returnValue(rooms)
-
-    @cachedInlineCallbacks()
-    def get_retention_policy_for_room(self, room_id):
-        """Get the retention policy for a given room.
-
-        If no retention policy has been found for this room, returns a policy defined
-        by the configured default policy (which has None as both the 'min_lifetime' and
-        the 'max_lifetime' if no default policy has been defined in the server's
-        configuration).
-
-        Args:
-            room_id (str): The ID of the room to get the retention policy of.
-
-        Returns:
-            dict[int, int]: "min_lifetime" and "max_lifetime" for this room.
-        """
-
-        def get_retention_policy_for_room_txn(txn):
-            txn.execute(
-                """
-                SELECT min_lifetime, max_lifetime FROM room_retention
-                INNER JOIN current_state_events USING (event_id, room_id)
-                WHERE room_id = ?;
-                """,
-                (room_id,)
-            )
-
-            return self.cursor_to_dict(txn)
-
-        ret = yield self.runInteraction(
-            "get_retention_policy_for_room",
-            get_retention_policy_for_room_txn,
-        )
-
-        # If we don't know this room ID, ret will be None, in this case return the default
-        # policy.
-        if not ret:
-            defer.returnValue({
-                "min_lifetime": self.config.retention_default_min_lifetime,
-                "max_lifetime": self.config.retention_default_max_lifetime,
-            })
-
-        row = ret[0]
-
-        # If one of the room's policy's attributes isn't defined, use the matching
-        # attribute from the default policy.
-        # The default values will be None if no default policy has been defined, or if one
-        # of the attributes is missing from the default policy.
-        if row["min_lifetime"] is None:
-            row["min_lifetime"] = self.config.retention_default_min_lifetime
-
-        if row["max_lifetime"] is None:
-            row["max_lifetime"] = self.config.retention_default_max_lifetime
-
-        defer.returnValue(row)
