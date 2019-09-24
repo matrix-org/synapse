@@ -928,7 +928,7 @@ class E2eKeysHandler(object):
             user_id, key_type, from_user_id
         )
         if key is None:
-            logger.error("no %s key found for %s", key_type, user_id)
+            logger.debug("no %s key found for %s", key_type, user_id)
             raise NotFoundError("No %s key found for %s" % (key_type, user_id))
         key_id, verify_key = get_verify_key_from_cross_signing_key(key)
         return key, key_id, verify_key
@@ -986,7 +986,7 @@ def _check_device_signature(user_id, verify_key, signed_device, stored_device):
         k: v for k, v in stored_device.items() if k not in ["signatures", "unsigned"]
     }
     if stripped_signed_device != stripped_stored_device:
-        logger.error(
+        logger.debug(
             "upload signatures: key does not match %s vs %s",
             signed_device,
             stored_device,
@@ -996,7 +996,7 @@ def _check_device_signature(user_id, verify_key, signed_device, stored_device):
     try:
         verify_signed_json(signed_device, user_id, verify_key)
     except SignatureVerifyException:
-        logger.error("invalid signature on key")
+        logger.debug("invalid signature on key")
         raise SynapseError(400, "Invalid signature", Codes.INVALID_SIGNATURE)
 
 
