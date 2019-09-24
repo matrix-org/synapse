@@ -435,6 +435,7 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _check_threepid(self, medium, authdict, **kwargs):
+        print('_check_threepid')
         if "threepid_creds" not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
@@ -443,43 +444,50 @@ class AuthHandler(BaseHandler):
         identity_handler = self.hs.get_handlers().identity_handler
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            if medium == "email":
-                threepid = yield identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_email, threepid_creds
-                )
-            elif medium == "msisdn":
+
+        # msisdns are currently always ThreepidBehaviour.REMOTE
+        if medium == "msisdn":
+            if self.hs.config.account_threepid_delegate_msisdn:
                 threepid = yield identity_handler.threepid_from_creds(
                     self.hs.config.account_threepid_delegate_msisdn, threepid_creds
                 )
             else:
-                raise SynapseError(400, "Unrecognized threepid medium: %s" % (medium,))
-        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            row = yield self.store.get_threepid_validation_session(
-                medium,
-                threepid_creds["client_secret"],
-                sid=threepid_creds["sid"],
-                validated=True,
-            )
+                raise SynapseError(
+                    400, "SMS delegation is not enabled on this homeserver"
+                )
+        elif medium == "email":
+            if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+                if medium == "email":
+                    threepid = yield identity_handler.threepid_from_creds(
+                        self.hs.config.account_threepid_delegate_email, threepid_creds
+                    )
+            elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+                row = yield self.store.get_threepid_validation_session(
+                    medium,
+                    threepid_creds["client_secret"],
+                    sid=threepid_creds["sid"],
+                    validated=True,
+                )
 
-            threepid = (
-                {
-                    "medium": row["medium"],
-                    "address": row["address"],
-                    "validated_at": row["validated_at"],
-                }
-                if row
-                else None
-            )
+                threepid = (
+                    {
+                        "medium": row["medium"],
+                        "address": row["address"],
+                        "validated_at": row["validated_at"],
+                    }
+                    if row
+                    else None
+                )
 
-            if row:
-                # Valid threepid returned, delete from the db
-                yield self.store.delete_threepid_session(threepid_creds["sid"])
+                if row:
+                    # Valid threepid returned, delete from the db
+                    yield self.store.delete_threepid_session(threepid_creds["sid"])
+            else:
+                raise SynapseError(
+                    400, "Email is not enabled on this homeserver"
+                )
         else:
-            raise SynapseError(
-                400, "Password resets are not enabled on this homeserver"
-            )
-
+            raise SynapseError(400, "Unrecognized threepid medium: %s" % (medium,))
         if not threepid:
             raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
 
