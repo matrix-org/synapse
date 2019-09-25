@@ -435,7 +435,6 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _check_threepid(self, medium, authdict, **kwargs):
-        print("_check_threepid")
         if "threepid_creds" not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
