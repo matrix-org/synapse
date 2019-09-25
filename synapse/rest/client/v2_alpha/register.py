@@ -16,6 +16,7 @@
 
 import hmac
 import logging
+from typing import List, Union
 
 from six import string_types
 
@@ -31,9 +32,14 @@ from synapse.api.errors import (
     ThreepidValidationError,
     UnrecognizedRequestError,
 )
+from synapse.config import ConfigError
+from synapse.config.captcha import CaptchaConfig
+from synapse.config.consent_config import ConsentConfig
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
+from synapse.config.registration import RegistrationConfig
 from synapse.config.server import is_threepid_reserved
+from synapse.handlers.auth import AuthHandler
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -246,6 +252,12 @@ class RegistrationSubmitTokenServlet(RestServlet):
                 [self.config.email_registration_template_failure_html],
             )
 
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.failure_email_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
     @defer.inlineCallbacks
     def on_GET(self, request, medium):
         if medium != "email":
@@ -364,6 +376,10 @@ class RegisterRestServlet(RestServlet):
         self.macaroon_gen = hs.get_macaroon_generator()
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.clock = hs.get_clock()
+
+        self._registration_flows = _calculate_registration_flows(
+            hs.config, self.auth_handler
+        )
 
     @interactive_auth_handler
     @defer.inlineCallbacks
@@ -485,69 +501,8 @@ class RegisterRestServlet(RestServlet):
                 assigned_user_id=registered_user_id,
             )
 
-        # FIXME: need a better error than "no auth flow found" for scenarios
-        # where we required 3PID for registration but the user didn't give one
-        require_email = "email" in self.hs.config.registrations_require_3pid
-        require_msisdn = "msisdn" in self.hs.config.registrations_require_3pid
-
-        show_msisdn = True
-        if self.hs.config.disable_msisdn_registration:
-            show_msisdn = False
-            require_msisdn = False
-
-        flows = []
-        if self.hs.config.enable_registration_captcha:
-            # only support 3PIDless registration if no 3PIDs are required
-            if not require_email and not require_msisdn:
-                # Also add a dummy flow here, otherwise if a client completes
-                # recaptcha first we'll assume they were going for this flow
-                # and complete the request, when they could have been trying to
-                # complete one of the flows with email/msisdn auth.
-                flows.extend([[LoginType.RECAPTCHA, LoginType.DUMMY]])
-            # only support the email-only flow if we don't require MSISDN 3PIDs
-            if not require_msisdn:
-                flows.extend([[LoginType.RECAPTCHA, LoginType.EMAIL_IDENTITY]])
-
-            if show_msisdn:
-                # only support the MSISDN-only flow if we don't require email 3PIDs
-                if not require_email:
-                    flows.extend([[LoginType.RECAPTCHA, LoginType.MSISDN]])
-                # always let users provide both MSISDN & email
-                flows.extend(
-                    [[LoginType.RECAPTCHA, LoginType.MSISDN, LoginType.EMAIL_IDENTITY]]
-                )
-        else:
-            # only support 3PIDless registration if no 3PIDs are required
-            if not require_email and not require_msisdn:
-                flows.extend([[LoginType.DUMMY]])
-            # only support the email-only flow if we don't require MSISDN 3PIDs
-            if not require_msisdn:
-                flows.extend([[LoginType.EMAIL_IDENTITY]])
-
-            if show_msisdn:
-                # only support the MSISDN-only flow if we don't require email 3PIDs
-                if not require_email or require_msisdn:
-                    flows.extend([[LoginType.MSISDN]])
-                # always let users provide both MSISDN & email
-                flows.extend([[LoginType.MSISDN, LoginType.EMAIL_IDENTITY]])
-
-        # Append m.login.terms to all flows if we're requiring consent
-        if self.hs.config.user_consent_at_registration:
-            new_flows = []
-            for flow in flows:
-                inserted = False
-                # m.login.terms should go near the end but before msisdn or email auth
-                for i, stage in enumerate(flow):
-                    if stage == LoginType.EMAIL_IDENTITY or stage == LoginType.MSISDN:
-                        flow.insert(i, LoginType.TERMS)
-                        inserted = True
-                        break
-                if not inserted:
-                    flow.append(LoginType.TERMS)
-            flows.extend(new_flows)
-
         auth_result, params, session_id = yield self.auth_handler.check_auth(
-            flows, body, self.hs.get_ip_from_request(request)
+            self._registration_flows, body, self.hs.get_ip_from_request(request)
         )
 
         # Check that we're not trying to register a denied 3pid.
@@ -708,6 +663,83 @@ class RegisterRestServlet(RestServlet):
                 "home_server": self.hs.hostname,
             },
         )
+
+
+def _calculate_registration_flows(
+    # technically `config` has to provide *all* of these interfaces, not just one
+    config: Union[RegistrationConfig, ConsentConfig, CaptchaConfig],
+    auth_handler: AuthHandler,
+) -> List[List[str]]:
+    """Get a suitable flows list for registration
+
+    Args:
+        config: server configuration
+        auth_handler: authorization handler
+
+    Returns: a list of supported flows
+    """
+    # FIXME: need a better error than "no auth flow found" for scenarios
+    # where we required 3PID for registration but the user didn't give one
+    require_email = "email" in config.registrations_require_3pid
+    require_msisdn = "msisdn" in config.registrations_require_3pid
+
+    show_msisdn = True
+    show_email = True
+
+    if config.disable_msisdn_registration:
+        show_msisdn = False
+        require_msisdn = False
+
+    enabled_auth_types = auth_handler.get_enabled_auth_types()
+    if LoginType.EMAIL_IDENTITY not in enabled_auth_types:
+        show_email = False
+        if require_email:
+            raise ConfigError(
+                "Configuration requires email address at registration, but email "
+                "validation is not configured"
+            )
+
+    if LoginType.MSISDN not in enabled_auth_types:
+        show_msisdn = False
+        if require_msisdn:
+            raise ConfigError(
+                "Configuration requires msisdn at registration, but msisdn "
+                "validation is not configured"
+            )
+
+    flows = []
+
+    # only support 3PIDless registration if no 3PIDs are required
+    if not require_email and not require_msisdn:
+        # Add a dummy step here, otherwise if a client completes
+        # recaptcha first we'll assume they were going for this flow
+        # and complete the request, when they could have been trying to
+        # complete one of the flows with email/msisdn auth.
+        flows.append([LoginType.DUMMY])
+
+    # only support the email-only flow if we don't require MSISDN 3PIDs
+    if show_email and not require_msisdn:
+        flows.append([LoginType.EMAIL_IDENTITY])
+
+    # only support the MSISDN-only flow if we don't require email 3PIDs
+    if show_msisdn and not require_email:
+        flows.append([LoginType.MSISDN])
+
+    if show_email and show_msisdn:
+        # always let users provide both MSISDN & email
+        flows.append([LoginType.MSISDN, LoginType.EMAIL_IDENTITY])
+
+    # Prepend m.login.terms to all flows if we're requiring consent
+    if config.user_consent_at_registration:
+        for flow in flows:
+            flow.insert(0, LoginType.TERMS)
+
+    # Prepend recaptcha to all flows if we're requiring captcha
+    if config.enable_registration_captcha:
+        for flow in flows:
+            flow.insert(0, LoginType.RECAPTCHA)
+
+    return flows
 
 
 def register_servlets(hs, http_server):

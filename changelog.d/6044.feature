@@ -1,0 +1,1 @@
+Add an unstable feature flag for separate add/bind 3pid APIs.
