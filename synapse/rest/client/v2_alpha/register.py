@@ -32,7 +32,6 @@ from synapse.api.errors import (
     ThreepidValidationError,
     UnrecognizedRequestError,
 )
-from synapse.config import ConfigError
 from synapse.config.captcha import CaptchaConfig
 from synapse.config.consent_config import ConsentConfig
 from synapse.config.emailconfig import ThreepidBehaviour
