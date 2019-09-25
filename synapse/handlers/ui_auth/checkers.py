@@ -145,10 +145,9 @@ class _BaseThreepidAuthChecker:
                 )
         elif medium == "email":
             if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-                if medium == "email":
-                    threepid = yield identity_handler.threepid_from_creds(
-                        self.hs.config.account_threepid_delegate_email, threepid_creds
-                    )
+                threepid = yield identity_handler.threepid_from_creds(
+                    self.hs.config.account_threepid_delegate_email, threepid_creds
+                )
             elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 row = yield self.store.get_threepid_validation_session(
                     medium,
