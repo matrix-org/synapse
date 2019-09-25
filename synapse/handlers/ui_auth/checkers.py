@@ -32,7 +32,6 @@ class UserInteractiveAuthChecker:
     def __init__(self, hs):
         pass
 
-    @defer.inlineCallbacks
     def check_auth(self, authdict, clientip):
         """Given the authentication dict from the client, attempt to check this step
 
@@ -123,7 +122,7 @@ class _BaseThreepidAuthChecker:
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def _check_threepid(self, medium, authdict, **kwargs):
+    def _check_threepid(self, medium, authdict):
         if "threepid_creds" not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
