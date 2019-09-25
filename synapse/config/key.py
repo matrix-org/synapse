@@ -105,13 +105,13 @@ class KeyConfig(Config):
                 homeserver.yaml and will fall back to the default of
                 'matrix.org'.
 
-                Trusted key servers should be long lived and stable which
+                Trusted key servers should be long-lived and stable which
                 makes matrix.org a good choice for many admins, but some admins may
                 wish to choose another. To suppress this warning, the admin
                 should set 'trusted_key_servers' in homeserver.yaml to their
-                desired key server and 'suppress_key_server_warning' to 'True'.
+                desired key server and 'suppress_key_server_warning' to 'true'.
 
-                In a future release the software defined default will be
+                In a future release the software-defined default will be
                 removed entirely and the trusted key server will be defined
                 exclusively by the value of 'trusted_key_servers'.
                 """
@@ -128,13 +128,13 @@ class KeyConfig(Config):
                         """
                         This server is configured to use 'matrix.org' as its
                         trusted key server via the 'trusted_key_servers' config
-                        option. 'Matrix.org' is a good choice for a key server
-                        since it is long lived, stable and trusted. However, some
+                        option. 'matrix.org' is a good choice for a key server
+                        since it is long-lived, stable and trusted. However, some
                         admins may wish to use another server for this purpose.
 
                         To suppress this warning and continue using
                         'matrix.org', admins should set
-                        'suppress_key_server_warning' to 'True' in
+                        'suppress_key_server_warning' to 'true' in
                         homeserver.yaml.
                         """
                     )
