@@ -21,10 +21,8 @@ import unicodedata
 import attr
 import bcrypt
 import pymacaroons
-from canonicaljson import json
 
 from twisted.internet import defer
-from twisted.web.client import PartialDownloadError
 
 import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
@@ -38,7 +36,8 @@ from synapse.api.errors import (
     UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.handlers.ui_auth import INTERACTIVE_AUTH_CHECKERS
+from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.logging.context import defer_to_thread
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
@@ -58,13 +57,12 @@ class AuthHandler(BaseHandler):
             hs (synapse.server.HomeServer):
         """
         super(AuthHandler, self).__init__(hs)
-        self.checkers = {
-            LoginType.RECAPTCHA: self._check_recaptcha,
-            LoginType.EMAIL_IDENTITY: self._check_email_identity,
-            LoginType.MSISDN: self._check_msisdn,
-            LoginType.DUMMY: self._check_dummy_auth,
-            LoginType.TERMS: self._check_terms_auth,
-        }
+
+        self.checkers = {}  # type: dict[str, UserInteractiveAuthChecker]
+        for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
+            inst = auth_checker_class(hs)
+            self.checkers[inst.AUTH_TYPE] = inst
+
         self.bcrypt_rounds = hs.config.bcrypt_rounds
 
         # This is not a cache per se, but a store of all current sessions that
@@ -292,7 +290,7 @@ class AuthHandler(BaseHandler):
             sess["creds"] = {}
         creds = sess["creds"]
 
-        result = yield self.checkers[stagetype](authdict, clientip)
+        result = yield self.checkers[stagetype].check_auth(authdict, clientip)
         if result:
             creds[stagetype] = result
             self._save_session(sess)
@@ -363,7 +361,7 @@ class AuthHandler(BaseHandler):
         login_type = authdict["type"]
         checker = self.checkers.get(login_type)
         if checker is not None:
-            res = yield checker(authdict, clientip=clientip)
+            res = yield checker.check_auth(authdict, clientip=clientip)
             return res
 
         # build a v1-login-style dict out of the authdict and fall back to the
@@ -375,125 +373,6 @@ class AuthHandler(BaseHandler):
 
         (canonical_id, callback) = yield self.validate_login(user_id, authdict)
         return canonical_id
-
-    @defer.inlineCallbacks
-    def _check_recaptcha(self, authdict, clientip, **kwargs):
-        try:
-            user_response = authdict["response"]
-        except KeyError:
-            # Client tried to provide captcha but didn't give the parameter:
-            # bad request.
-            raise LoginError(
-                400, "Captcha response is required", errcode=Codes.CAPTCHA_NEEDED
-            )
-
-        logger.info(
-            "Submitting recaptcha response %s with remoteip %s", user_response, clientip
-        )
-
-        # TODO: get this from the homeserver rather than creating a new one for
-        # each request
-        try:
-            client = self.hs.get_simple_http_client()
-            resp_body = yield client.post_urlencoded_get_json(
-                self.hs.config.recaptcha_siteverify_api,
-                args={
-                    "secret": self.hs.config.recaptcha_private_key,
-                    "response": user_response,
-                    "remoteip": clientip,
-                },
-            )
-        except PartialDownloadError as pde:
-            # Twisted is silly
-            data = pde.response
-            resp_body = json.loads(data)
-
-        if "success" in resp_body:
-            # Note that we do NOT check the hostname here: we explicitly
-            # intend the CAPTCHA to be presented by whatever client the
-            # user is using, we just care that they have completed a CAPTCHA.
-            logger.info(
-                "%s reCAPTCHA from hostname %s",
-                "Successful" if resp_body["success"] else "Failed",
-                resp_body.get("hostname"),
-            )
-            if resp_body["success"]:
-                return True
-        raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
-
-    def _check_email_identity(self, authdict, **kwargs):
-        return self._check_threepid("email", authdict, **kwargs)
-
-    def _check_msisdn(self, authdict, **kwargs):
-        return self._check_threepid("msisdn", authdict)
-
-    def _check_dummy_auth(self, authdict, **kwargs):
-        return defer.succeed(True)
-
-    def _check_terms_auth(self, authdict, **kwargs):
-        return defer.succeed(True)
-
-    @defer.inlineCallbacks
-    def _check_threepid(self, medium, authdict, **kwargs):
-        if "threepid_creds" not in authdict:
-            raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
-
-        threepid_creds = authdict["threepid_creds"]
-
-        identity_handler = self.hs.get_handlers().identity_handler
-
-        logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            if medium == "email":
-                threepid = yield identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_email, threepid_creds
-                )
-            elif medium == "msisdn":
-                threepid = yield identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_msisdn, threepid_creds
-                )
-            else:
-                raise SynapseError(400, "Unrecognized threepid medium: %s" % (medium,))
-        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            row = yield self.store.get_threepid_validation_session(
-                medium,
-                threepid_creds["client_secret"],
-                sid=threepid_creds["sid"],
-                validated=True,
-            )
-
-            threepid = (
-                {
-                    "medium": row["medium"],
-                    "address": row["address"],
-                    "validated_at": row["validated_at"],
-                }
-                if row
-                else None
-            )
-
-            if row:
-                # Valid threepid returned, delete from the db
-                yield self.store.delete_threepid_session(threepid_creds["sid"])
-        else:
-            raise SynapseError(
-                400, "Password resets are not enabled on this homeserver"
-            )
-
-        if not threepid:
-            raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
-
-        if threepid["medium"] != medium:
-            raise LoginError(
-                401,
-                "Expecting threepid of type '%s', got '%s'"
-                % (medium, threepid["medium"]),
-                errcode=Codes.UNAUTHORIZED,
-            )
-
-        threepid["threepid_creds"] = authdict["threepid_creds"]
-
-        return threepid
 
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}
