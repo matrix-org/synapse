@@ -105,8 +105,8 @@ class Keyring(object):
         if key_fetchers is None:
             key_fetchers = (
                 StoreKeyFetcher(hs),
-                PerspectivesKeyFetcher(hs),
                 ServerKeyFetcher(hs),
+                PerspectivesKeyFetcher(hs),
             )
         self._key_fetchers = key_fetchers
 
