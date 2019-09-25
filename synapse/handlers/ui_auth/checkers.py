@@ -148,42 +148,47 @@ class _BaseThreepidAuthChecker:
         identity_handler = self.hs.get_handlers().identity_handler
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            if medium == "email":
+
+        # msisdns are currently always ThreepidBehaviour.REMOTE
+        if medium == "msisdn":
+            if not self.hs.config.account_threepid_delegate_msisdn:
+                raise SynapseError(
+                    400, "Phone number verification is not enabled on this homeserver"
+                )
+            threepid = yield identity_handler.threepid_from_creds(
+                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+            )
+        elif medium == "email":
+            if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+                assert self.hs.config.account_threepid_delegate_email
                 threepid = yield identity_handler.threepid_from_creds(
                     self.hs.config.account_threepid_delegate_email, threepid_creds
                 )
-            elif medium == "msisdn":
-                threepid = yield identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+            elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+                threepid = None
+                row = yield self.store.get_threepid_validation_session(
+                    medium,
+                    threepid_creds["client_secret"],
+                    sid=threepid_creds["sid"],
+                    validated=True,
                 )
+
+                if row:
+                    threepid = {
+                        "medium": row["medium"],
+                        "address": row["address"],
+                        "validated_at": row["validated_at"],
+                    }
+
+                    # Valid threepid returned, delete from the db
+                    yield self.store.delete_threepid_session(threepid_creds["sid"])
             else:
-                raise SynapseError(400, "Unrecognized threepid medium: %s" % (medium,))
-        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            row = yield self.store.get_threepid_validation_session(
-                medium,
-                threepid_creds["client_secret"],
-                sid=threepid_creds["sid"],
-                validated=True,
-            )
-
-            threepid = (
-                {
-                    "medium": row["medium"],
-                    "address": row["address"],
-                    "validated_at": row["validated_at"],
-                }
-                if row
-                else None
-            )
-
-            if row:
-                # Valid threepid returned, delete from the db
-                yield self.store.delete_threepid_session(threepid_creds["sid"])
+                raise SynapseError(
+                    400, "Email address verification is not enabled on this homeserver"
+                )
         else:
-            raise SynapseError(
-                400, "Password resets are not enabled on this homeserver"
-            )
+            # this can't happen!
+            raise AssertionError("Unrecognized threepid medium: %s" % (medium,))
 
         if not threepid:
             raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
