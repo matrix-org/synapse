@@ -906,7 +906,7 @@ class EventCreationHandler(object):
         room_ids = yield self.store.get_rooms_with_many_extremities(
             min_count=10,
             limit=5,
-            room_id_filter=list(self._rooms_to_exclude_from_dummy_event_insertion),
+            room_id_filter=self._rooms_to_exclude_from_dummy_event_insertion.keys(),
         )
 
         for room_id in room_ids:
