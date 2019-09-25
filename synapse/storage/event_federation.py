@@ -196,7 +196,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         Args:
             min_count (int): The minimum number of extremities
             limit (int): The maximum number of rooms to return.
-            room_id_filter (list[str]): List of room_ids to exclude from the look up
+            room_id_filter (iterable[str]): room_ids to exclude from the results
 
         Returns:
             Deferred[list]: At most `limit` room IDs that have at least
@@ -204,7 +204,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """
 
         def _get_rooms_with_many_extremities_txn(txn):
-
             where_clause = "1=1"
             if room_id_filter:
                 where_clause = "room_id NOT IN (%s)" % (
@@ -222,8 +221,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 where_clause,
             )
 
-            query_args = room_id_filter
-            query_args.extend([min_count, limit])
+            query_args = room_id_filter + [min_count, limit]
             txn.execute(sql, query_args)
             return [room_id for room_id, in txn]
 

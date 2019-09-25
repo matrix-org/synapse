@@ -222,6 +222,13 @@ class MessageHandler(object):
         }
 
 
+# The duration (in ms) after which rooms should be removed
+# `_rooms_to_exclude_from_dummy_event_insertion` (with the effect that we will try
+# to generate a dummy event for them once more)
+#
+_DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY = 7 * 24 * 60 * 60 * 1000
+
+
 class EventCreationHandler(object):
     def __init__(self, hs):
         self.hs = hs
@@ -257,12 +264,13 @@ class EventCreationHandler(object):
         self._block_events_without_consent_error = (
             self.config.block_events_without_consent_error
         )
-        # Some rooms should be excluded from dummy insertion, for instance rooms
-        # without local users who can send events into the room.
-        self._rooms_to_exclude_from_dummy_event_insertion = {}
-        # Rooms can be excluded from dummy event insertion, but should be rechecked
-        # from time to time. Measured in ms.
-        self._ROOM_EXCLUSION_EXPIRY = 7 * 24 * 60 * 60 * 1000
+
+        # Rooms which should be excluded from dummy insertion. (For instance,
+        # those without local users who can send events into the room).
+        #
+        # map from room id to time-of-last-attempt.
+        #
+        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: dict[str, int]
 
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
         # config options, but *only* if we have a configuration for which we are
@@ -483,6 +491,7 @@ class EventCreationHandler(object):
             return
         if u["consent_version"] == self.config.user_consent_version:
             return
+
         consent_uri = self._consent_uri_builder.build_user_consent_uri(
             requester.user.localpart
         )
@@ -899,6 +908,7 @@ class EventCreationHandler(object):
             limit=5,
             room_id_filter=list(self._rooms_to_exclude_from_dummy_event_insertion),
         )
+
         for room_id in room_ids:
             # For each room we need to find a joined member we can use to send
             # the dummy event with.
@@ -935,29 +945,29 @@ class EventCreationHandler(object):
                     dummy_event_sent = True
                     break
                 except ConsentNotGivenError:
-                    logger.debug(
-                        "Failed to send dummy event into room %s for user %s due to lack of consent, try another user"
-                        % (room_id, user_id)
+                    logger.info(
+                        "Failed to send dummy event into room %s for user %s due to "
+                        "lack of consent. Will try another user" % (room_id, user_id)
                     )
                 except AuthError:
-                    logger.debug(
-                        "Failed to send dummy event into room %s for user %s due to lack of power, try another user"
-                        % (room_id, user_id)
+                    logger.info(
+                        "Failed to send dummy event into room %s for user %s due to "
+                        "lack of power. Will try another user" % (room_id, user_id)
                     )
 
             if not dummy_event_sent:
                 # Did not find a valid user in the room, so remove from future attempts
                 # Exclusion is time limited, so the room will be rechecked in the future
-                # dependent on self._ROOM_EXCLUSION_EXPIRY
-                logger.debug(
-                    "Cannot send dummy events into room %s exclude it from future attempts until cache expires"
-                    % (room_id)
+                # dependent on _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
+                logger.info(
+                    "Failed to send dummy event into room %s. Will exclude it from "
+                    "future attempts until cache expires" % (room_id,)
                 )
                 now = self.clock.time_msec()
                 self._rooms_to_exclude_from_dummy_event_insertion[room_id] = now
 
     def _expire_rooms_to_exclude_from_dummy_event_insertion(self):
-        expire_before = self.clock.time_msec() - self._ROOM_EXCLUSION_EXPIRY
+        expire_before = self.clock.time_msec() - _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
         to_expire = set()
         for room_id, time in self._rooms_to_exclude_from_dummy_event_insertion.items():
             if time < expire_before:
