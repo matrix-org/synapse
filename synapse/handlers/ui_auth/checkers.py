@@ -32,7 +32,6 @@ class UserInteractiveAuthChecker:
     def __init__(self, hs):
         pass
 
-    @defer.inlineCallbacks
     def check_auth(self, authdict, clientip):
         """Given the authentication dict from the client, attempt to check this step
 
