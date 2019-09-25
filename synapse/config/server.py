@@ -355,10 +355,8 @@ class ServerConfig(Config):
 
         _check_resource_config(self.listeners)
 
-        # An experimental option to try and periodically clean up extremities
-        # by sending dummy events.
         self.cleanup_extremities_with_dummy_events = config.get(
-            "cleanup_extremities_with_dummy_events", False
+            "cleanup_extremities_with_dummy_events", True
         )
 
     def has_tls_listener(self):
