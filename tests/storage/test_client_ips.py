@@ -55,7 +55,6 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": "device_id",
-                "access_token": "access_token",
                 "ip": "ip",
                 "user_agent": "user_agent",
                 "last_seen": 12345678000,
@@ -200,6 +199,85 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertTrue(active)
+
+    def test_devices_last_seen_bg_update(self):
+        # First make sure we have completed all updates.
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)
+
+        # Insert a user IP
+        user_id = "@user:id"
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip", "user_agent", "device_id"
+            )
+        )
+
+        # Force persisting to disk
+        self.reactor.advance(200)
+
+        # But clear the associated entry in devices table
+        self.get_success(
+            self.store._simple_update(
+                table="devices",
+                keyvalues={"user_id": user_id, "device_id": "device_id"},
+                updatevalues={"last_seen": None, "ip": None, "user_agent": None},
+                desc="test_devices_last_seen_bg_update",
+            )
+        )
+
+        # We should now get nulls when querying
+        result = self.get_success(
+            self.store.get_last_client_ip_by_device(user_id, "device_id")
+        )
+
+        r = result[(user_id, "device_id")]
+        self.assertDictContainsSubset(
+            {
+                "user_id": user_id,
+                "device_id": "device_id",
+                "ip": None,
+                "user_agent": None,
+                "last_seen": None,
+            },
+            r,
+        )
+
+        # Register the background update to run again.
+        self.get_success(
+            self.store._simple_insert(
+                table="background_updates",
+                values={
+                    "update_name": "devices_last_seen",
+                    "progress_json": "{}",
+                    "depends_on": None,
+                },
+            )
+        )
+
+        # ... and tell the DataStore that it hasn't finished all updates yet
+        self.store._all_done = False
+
+        # Now let's actually drive the updates to completion
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)
+
+        # We should now get the correct result again
+        result = self.get_success(
+            self.store.get_last_client_ip_by_device(user_id, "device_id")
+        )
+
+        r = result[(user_id, "device_id")]
+        self.assertDictContainsSubset(
+            {
+                "user_id": user_id,
+                "device_id": "device_id",
+                "ip": "ip",
+                "user_agent": "user_agent",
+                "last_seen": 0,
+            },
+            r,
+        )
 
 
 class ClientIpAuthTestCase(unittest.HomeserverTestCase):
