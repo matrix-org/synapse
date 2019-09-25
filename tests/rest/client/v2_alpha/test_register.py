@@ -198,16 +198,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"401", channel.result)
         flows = channel.json_body["flows"]
 
-        # with the stock config, we expect all four combinations of 3pid
-        self.assertCountEqual(
-            [
-                ["m.login.dummy"],
-                ["m.login.email.identity"],
-                ["m.login.msisdn"],
-                ["m.login.msisdn", "m.login.email.identity"],
-            ],
-            (f["stages"] for f in flows),
-        )
+        # with the stock config, we only expect the dummy flow
+        self.assertCountEqual([["m.login.dummy"]], (f["stages"] for f in flows))
 
     @unittest.override_config(
         {
@@ -217,9 +209,13 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
                 "template_dir": "/",
                 "require_at_registration": True,
             },
+            "account_threepid_delegates": {
+                "email": "https://id_server",
+                "msisdn": "https://id_server",
+            },
         }
     )
-    def test_advertised_flows_captcha_and_terms(self):
+    def test_advertised_flows_captcha_and_terms_and_3pids(self):
         request, channel = self.make_request(b"POST", self.url, b"{}")
         self.render(request)
         self.assertEquals(channel.result["code"], b"401", channel.result)
@@ -241,7 +237,16 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         )
 
     @unittest.override_config(
-        {"registrations_require_3pid": ["email"], "disable_msisdn_registration": True}
+        {
+            "public_baseurl": "https://test_server",
+            "registrations_require_3pid": ["email"],
+            "disable_msisdn_registration": True,
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
     )
     def test_advertised_flows_no_msisdn_email_required(self):
         request, channel = self.make_request(b"POST", self.url, b"{}")
