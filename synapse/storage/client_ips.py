@@ -393,7 +393,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         """
 
         keyvalues = {"user_id": user_id}
-        if device_id:
+        if device_id is not None:
             keyvalues["device_id"] = device_id
 
         res = yield self._simple_select_list(
