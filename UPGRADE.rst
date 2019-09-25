@@ -62,11 +62,13 @@ with their account, for a number of reasons:
  * in the case of email, as an alternative contact to help with account recovery.
  * in the case of email, to receive notifications of missed messages.
 
-Before an an email address or phone number can be added to a user's account, 
+Before an email address or phone number can be added to a user's account, 
 or before such an address is used to carry out a password-reset, Synapse must 
 confirm the operation with the owner of the email address or phone number.
 It does this by sending an email or text giving the user a link or token to confirm 
-receipt. This process is known as '3pid verification'.
+receipt. This process is known as '3pid verification'. 3pid, or "threepid",
+stands for third party identifier. Email addresses and phone numbers
+are considered 3pids.
 
 Previous versions of Synapse delegated this task to an
 identity server by default. In most cases this server is vector.im or
@@ -77,17 +79,18 @@ longer delegate 3pid validation to an identity server by default and instead the
 server administrator will need to explicitly decide how they would like the validation
 messages to be sent.
 
-In the medium term the vector.im and matrix.org identity servers will disable
-sending email and SMS for homeservers entirely, however in order to ease the
-transition they will retain the capability to send email and SMS for a limited
+In the medium term, the vector.im and matrix.org identity servers will disable
+sending email and SMS for homeservers entirely. However, in order to ease the
+transition, they will retain the capability to send email and SMS for a limited
 period. Email will be disabled on Monday 2nd December 2019 (giving roughly 2
-months' notice). Disabling SMS will follow some time after that once SMS sending
+months notice). Disabling SMS will follow some time after that once SMS sending
 support lands in Synapse.
 
 Once email and SMS support have been disabled in the vector.im and matrix.org
 identity servers, all Synapse versions that depend on those instances will be
 unable to send email and SMS through them. There are no imminent plans to
-remove email and SMS support from Sydent altogether.
+remove email and SMS support from Sydent, the software that the vector.im and matrix.org identity
+servers run.
 
 For more details on why these changes are necessary see (link to blog).
 
@@ -101,7 +104,7 @@ email address) admins can either:-
 identity server which allows email delegation and delegate to it.
 
 Configure SMTP in Synapse
--------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To configure an SMTP server for Synapse, modify the configuration section
 headed ``email``, and be sure to have at least the ``smtp_host, smtp_port``
@@ -118,9 +121,9 @@ Delegate Email to an identity server
 ------------------------------------
 
 Some admins will wish to continue using email as a registration method, but
-will not immediately have an appropriate SMTP server to hand.
+will not immediately have an appropriate SMTP server at hand.
 
-To this end, we will continue to support email delegation via the vector.im and
+To this end, we will continue to support email verification delegation via the vector.im and
 matrix.org identity servers for two months. The cut off date is Monday 2nd
 December 2019, after which time email delegation will be disabled.
 
@@ -129,8 +132,10 @@ should delegate an external server (typically an `identity server
 <https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending
 password reset or registration messages via email and SMS.
 
-So to delegate email sending, in ``homeserver.yaml``, set
-``account_threepid_delegates.email`` to a base URL of an identity server. Note
+So to delegate email verification, in ``homeserver.yaml``, set
+``account_threepid_delegates.email`` to the base URL of an identity server. 
+
+Note
 that ``account_threepid_delegates.email`` replaces the deprecated
 ``email.trust_identity_server_for_password_resets``.
 
@@ -151,8 +156,9 @@ before v1.4.0. If ``email.trust_identity_server_for_password_resets`` is
 report an error and refuse to start.
 
 If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent
-and a threepid type in ``account_threepid_delegates`` is not set,
-then Synapse will attempt to send password reset and registration messages for
+and no ``email`` delegate is configured in ``account_threepid_delegates``,
+then Synapse will send email verification messages itself, using the configured
+SMTP server (see above).
 that type.
 
 Custom templates
@@ -168,7 +174,7 @@ that is sent to a user when registering with an email address.
 ``registration_success.html`` and ``registration_failure.html`` are templates
 that will be shown to the user when they click the link in that confirmation
 email, either showing them a success page (in the case that no onward redirect
-was specified by the client), or a failure page. is not configured).
+was specified by the client), or a failure page.
 
 ``add_threepid.html`` and  ``add_threepid.txt`` contain the content of the
 email that is sent to a user when they make a request to add an email address
@@ -191,7 +197,6 @@ Following upgrade, the only way to maintain the ability to send SMS (and
 therefore register via a phone number) will be to continue to delegate SMS
 delivery via the matrix.org and vector.im identity servers (or another identity
 server that supports SMS sending).
-
 
 The ``account_threepid_delegates`` dictionary defines whether the homeserver
 should delegate an external server (typically an `identity server
