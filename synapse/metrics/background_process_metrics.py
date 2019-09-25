@@ -175,7 +175,7 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
     Args:
         desc (str): a description for this background process type
-        func: a function, which may return a Deferred
+        func: a function, which may return a Deferred or a coroutine
         args: positional args for func
         kwargs: keyword args for func
 
@@ -199,11 +199,13 @@ def run_as_background_process(desc, func, *args, **kwargs):
                 _background_processes.setdefault(desc, set()).add(proc)
 
             try:
-                # We ensureDeferred here to handle coroutines
                 result = func(*args, **kwargs)
 
-                # We need this check because ensureDeferred doesn't like when
-                # func doesn't return a Deferred or coroutine.
+                # We probably don't have an ensureDeferred in our call stack to handle
+                # coroutine results, so we need to ensureDeferred here.
+                #
+                # But we need this check because ensureDeferred doesn't like being
+                # called on immediate values (as opposed to Deferreds or coroutines).
                 if iscoroutine(result):
                     result = defer.ensureDeferred(result)
 
