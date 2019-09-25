@@ -19,4 +19,4 @@ TODO: move more stuff out of AuthHandler in here.
 
 """
 
-from synapse.handlers.ui_auth.checkers import INTERACTIVE_AUTH_CHECKERS
+from synapse.handlers.ui_auth.checkers import INTERACTIVE_AUTH_CHECKERS  # noqa: F401
