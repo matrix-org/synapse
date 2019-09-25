@@ -1,0 +1,1 @@
+Threepid validity checks on msisdns should not be dependent on 'threepid_behaviour_email'.
