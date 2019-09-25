@@ -362,10 +362,8 @@ class ServerConfig(Config):
 
         _check_resource_config(self.listeners)
 
-        # An experimental option to try and periodically clean up extremities
-        # by sending dummy events.
         self.cleanup_extremities_with_dummy_events = config.get(
-            "cleanup_extremities_with_dummy_events", False
+            "cleanup_extremities_with_dummy_events", True
         )
 
     def has_tls_listener(self):
@@ -551,6 +549,9 @@ class ServerConfig(Config):
         # Prevent federation requests from being sent to the following
         # blacklist IP address CIDR ranges. If this option is not specified, or
         # specified with an empty list, no ip range blacklist will be enforced.
+        #
+        # As of Synapse v1.4.0 this option also affects any outbound requests to identity
+        # servers provided by user input.
         #
         # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
         # listed here, since they correspond to unroutable addresses.)
