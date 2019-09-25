@@ -109,7 +109,7 @@ class KeyConfig(Config):
                 makes matrix.org a good choice for many admins, but some admins may
                 wish to choose another. To suppress this warning, the admin
                 should set 'trusted_key_servers' in homeserver.yaml to their
-                desired key server.
+                desired key server and 'suppress_key_server_warning' to 'True'.
 
                 In a future release the software defined default will be
                 removed entirely and the trusted key server will be defined
