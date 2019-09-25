@@ -506,7 +506,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         """Removes entries in user IPs older than the configured period.
         """
 
-        if not self.user_ips_max_age:
+        if self.user_ips_max_age is None:
             # Nothing to do
             return
 

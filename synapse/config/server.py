@@ -745,7 +745,7 @@ class ServerConfig(Config):
 
         # How long to track users' last seen time and IPs in the database.
         #
-        # Defaults to `28d`. Set to `null` to disable.
+        # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
         #
         #user_ips_max_age: 14d
         """

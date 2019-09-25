@@ -148,11 +148,8 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         return False
 
-    async def has_completed_background_update(self, update_name):
+    async def has_completed_background_update(self, update_name) -> bool:
         """Check if the given background update has finished running.
-
-        Returns:
-            Deferred[bool]
         """
 
         if self._all_done:
