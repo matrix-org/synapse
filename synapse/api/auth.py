@@ -179,7 +179,6 @@ class Auth(object):
     def get_public_keys(self, invite_event):
         return event_auth.get_public_keys(invite_event)
 
-    @opentracing.trace
     @defer.inlineCallbacks
     def get_user_by_req(
         self, request, allow_guest=False, rights="access", allow_expired=False
