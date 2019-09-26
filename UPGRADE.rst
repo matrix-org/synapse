@@ -58,6 +58,7 @@ includes adding an email address during registration.**
 
 It is possible for a user to associate an email address or phone number
 with their account, for a number of reasons:
+
 * for use when logging in, as an alternative to the user id.
 * in the case of email, as an alternative contact to help with account recovery.
 * in the case of email, to receive notifications of missed messages.
