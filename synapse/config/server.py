@@ -48,6 +48,13 @@ ROOM_COMPLEXITY_TOO_GREAT = (
     "to join this room."
 )
 
+METRICS_PORT_WARNING = """\
+The metrics_port configuration option is deprecated in Synapse 0.31 in favour of
+a listener. Please see
+https://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md
+on how to configure the new listener.
+--------------------------------------------------------------------------------"""
+
 
 class ServerConfig(Config):
     def read_config(self, config, **kwargs):
@@ -334,14 +341,7 @@ class ServerConfig(Config):
 
         metrics_port = config.get("metrics_port")
         if metrics_port:
-            logger.warn(
-                (
-                    "The metrics_port configuration option is deprecated in Synapse 0.31 "
-                    "in favour of a listener. Please see "
-                    "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md"
-                    " on how to configure the new listener."
-                )
-            )
+            logger.warning(METRICS_PORT_WARNING)
 
             self.listeners.append(
                 {

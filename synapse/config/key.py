@@ -65,7 +65,8 @@ to 'true'.
 
 In a future release the software-defined default will be removed entirely and
 the trusted key server will be defined exclusively by the value of
-'trusted_key_servers'."""
+'trusted_key_servers'.
+--------------------------------------------------------------------------------"""
 
 TRUSTED_KEY_SERVER_CONFIGURED_AS_M_ORG_WARN = """\
 This server is configured to use 'matrix.org' as its trusted key server via the
@@ -74,7 +75,8 @@ server since it is long-lived, stable and trusted. However, some admins may
 wish to use another server for this purpose.
 
 To suppress this warning and continue using 'matrix.org', admins should set
-'suppress_key_server_warning' to 'true' in homeserver.yaml."""
+'suppress_key_server_warning' to 'true' in homeserver.yaml.
+--------------------------------------------------------------------------------"""
 
 logger = logging.getLogger(__name__)
 
@@ -132,15 +134,13 @@ class KeyConfig(Config):
                     % (type(key_servers).__name__,)
                 )
 
-            for server in key_servers:
-                if (
-                    server["server_name"] == "matrix.org"
-                    and not suppress_key_server_warning
-                ):
-                    logger.warn(TRUSTED_KEY_SERVER_CONFIGURED_AS_M_ORG_WARN)
-
             # merge the 'perspectives' config into the 'trusted_key_servers' config.
             key_servers.extend(_perspectives_to_key_servers(config))
+
+            if not suppress_key_server_warning and "matrix.org" in (
+                s["server_name"] for s in key_servers
+            ):
+                logger.warning(TRUSTED_KEY_SERVER_CONFIGURED_AS_M_ORG_WARN)
 
         # list of TrustedKeyServer objects
         self.key_servers = list(
@@ -225,8 +225,8 @@ class KeyConfig(Config):
         # is still supported for backwards-compatibility, but it is deprecated.
         #
         # 'trusted_key_servers' defaults to matrix.org, but using it will generate a
-        # warning on start up to suppress this warning set 'suppress_key_server_warning'
-        # to true.
+        # warning on start-up. To suppress this warning, set
+        # 'suppress_key_server_warning' to true.
         #
         # Options for each entry in the list include:
         #
@@ -254,9 +254,12 @@ class KeyConfig(Config):
         #
         trusted_key_servers:
           - server_name: "matrix.org"
+
+        # Uncomment the following to disable the warning that is emitted when the
+        # trusted_key_servers include 'matrix.org'. See above.
         #
         #suppress_key_server_warning: true
-        #
+
         # The signing keys to use when acting as a trusted key server. If not specified
         # defaults to the server signing key.
         #
