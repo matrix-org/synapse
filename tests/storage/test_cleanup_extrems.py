@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os.path
+from unittest.mock import patch
 
 from mock import Mock
 
@@ -269,6 +270,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         )
         self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
 
+    @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=0)
     def test_send_dummy_events_when_insufficient_power(self):
         self._create_extremity_rich_graph()
         # Criple power levels
@@ -287,8 +289,6 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         )
         # Check that the room has not been pruned
         self.assertTrue(len(latest_event_ids) > 10)
-        # Flush cache
-        self.event_creator_handler._ROOM_EXCLUSION_EXPIRY = 0
 
         # New user with regular levels
         user2 = self.register_user("user2", "password")
@@ -301,6 +301,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         )
         self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
 
+    @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=0)
     def test_send_dummy_event_without_consent(self):
         self._create_extremity_rich_graph()
         self._enable_consent_checking()
@@ -313,10 +314,6 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
             self.store.get_latest_event_ids_in_room(self.room_id)
         )
         self.assertTrue(len(latest_event_ids) == self.EXTREMITIES_COUNT)
-
-        # Room will have been black listed, so force flush of cache
-        self.event_creator_handler._ROOM_EXCLUSION_EXPIRY = 0
-        self.pump(10 * 60)
 
         # Create new user, and add consent
         user2 = self.register_user("user2", "password")
@@ -334,6 +331,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         )
         self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
 
+    @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=250)
     def test_expiry_logic(self):
         """Simple test to ensure that _expire_rooms_to_exclude_from_dummy_event_insertion()
         expires old entries correctly.
@@ -347,7 +345,6 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.event_creator_handler._rooms_to_exclude_from_dummy_event_insertion[
             "3"
         ] = 300000
-        self.event_creator_handler._ROOM_EXCLUSION_EXPIRY = 250
         self.event_creator_handler._expire_rooms_to_exclude_from_dummy_event_insertion()
         # All entries within time frame
         self.assertEqual(

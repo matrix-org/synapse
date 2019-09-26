@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import itertools
 import logging
 import random
 
@@ -221,7 +222,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 where_clause,
             )
 
-            query_args = room_id_filter + [min_count, limit]
+            query_args = list(itertools.chain(room_id_filter, [min_count, limit]))
             txn.execute(sql, query_args)
             return [room_id for room_id, in txn]
 
