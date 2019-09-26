@@ -79,14 +79,9 @@ class RoomWorkerStore(SQLBaseStore):
 
             appservice_where = ""
             if network_tuple:
-                if network_tuple.appservice_id:
-                    appservice_where = "WHERE appservice_id = ? AND network_id = ?"
-                    query_args.append(network_tuple.appservice_id)
-                    query_args.append(network_tuple.network_id)
-                else:
-                    appservice_where = (
-                        "WHERE appservice_id IS NULL AND network_id IS NULL"
-                    )
+                appservice_where = "WHERE appservice_id = ? AND network_id = ?"
+                query_args.append(network_tuple.appservice_id or "")
+                query_args.append(network_tuple.network_id or "")
 
             sql = """
                 SELECT
@@ -177,45 +172,29 @@ class RoomWorkerStore(SQLBaseStore):
             query_args += [search_term, search_term, search_term]
 
         appservice_where = ""
-        if network_tuple:
-            if network_tuple.appservice_id:
-                appservice_where = "WHERE appservice_id = ? AND network_id = ?"
-                query_args.append(network_tuple.appservice_id)
-                query_args.append(network_tuple.network_id)
-            else:
-                appservice_where = "WHERE appservice_id IS NULL AND network_id IS NULL"
+        if network_tuple and network_tuple.appservice_id:
+            appservice_where = """
+                UNION SELECT room_id from appservice_room_list
+                WHERE appservice_id = ? AND network_id = ?
+            """
+            query_args.append(network_tuple.appservice_id)
+            query_args.append(network_tuple.network_id)
+        elif not network_tuple:
+            appservice_where = """
+                UNION SELECT room_id from appservice_room_list
+            """
 
         where_clause = ""
         if where_clauses:
             where_clause = " AND " + " AND ".join(where_clauses)
-
-        # This query works in two parts:
-        #
-        #   1. The subqueries are for fetching all rooms from the
-        #      public_room_list_stream table that are a) visibile and b) match
-        #      the network_tuple filter. This is slightly convoluted as a room
-        #      may be in multiple room lists, hence the weird visibility
-        #      aggregation to look for *any* list where visibility is true.
-        #
-        #   2. Once we have the rooms, we can then just join on the stats table
-        #      to get the necessary info and do the necessary filtering.
 
         sql = """
             SELECT
                 room_id, name, topic, canonical_alias, joined_members,
                 avatar, history_visibility, joined_members, guest_access
             FROM (
-                SELECT room_id FROM public_room_list_stream
-                INNER JOIN (
-                    SELECT
-                        room_id, MAX(stream_id) AS stream_id, appservice_id,
-                        network_id
-                    FROM public_room_list_stream
-                    %(appservice_where)s
-                    GROUP BY room_id, appservice_id, network_id
-                ) grouped USING (room_id, stream_id)
-                GROUP BY room_id
-                HAVING %(or_operator)s(visibility)
+                SELECT room_id FROM rooms WHERE is_public
+                %(appservice_where)s
             ) published
             INNER JOIN room_stats_state USING (room_id)
             INNER JOIN room_stats_current USING (room_id)
