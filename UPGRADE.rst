@@ -52,6 +52,26 @@ returned by the Client-Server API:
 Upgrading to v1.4.0
 ===================
 
+New custom templates
+--------------------
+
+If you have configured a custom template directory with the
+``email.template_dir`` option, be aware that there are new templates regarding
+registration and threepid management (see below) that must be included.
+
+* ``registration.html`` and ``registration.txt``
+* ``registration_success.html`` and ``registration_failure.html``
+* ``add_threepid.html`` and  ``add_threepid.txt``
+* ``add_threepid_failure.html`` and ``add_threepid_success.html``
+
+Synapse will expect these files to exist inside the configured template
+directory, and **will fail to start** if they are absent.
+To view the default templates, see `synapse/res/templates
+<https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
+
+3pid verification changes
+-------------------------
+
 **Note: As of this release, users will be unable to add phone numbers or email
 addresses to their accounts, without changes to the Synapse configuration. This
 includes adding an email address during registration.**
@@ -96,25 +116,6 @@ matrix.org instances).
 
 For more details on why these changes are necessary see the `matrix.org blog
 <https://matrix.org/blog/posts>`_.
-
-Custom Email templates
-----------------------
-
-If you have configured a custom template directory with the
-``email.template_dir`` option, be aware that there are new templates regarding
-registration and threepid management that must be included.
-
-* ``registration.html`` and ``registration.txt``
-* ``registration_success.html`` and ``registration_failure.html``
-* ``add_threepid.html`` and  ``add_threepid.txt``
-* ``add_threepid_failure.html`` and ``add_threepid_success.html``
-
-Synapse will expect these files to exist inside the configured template
-directory. To view the default templates, see `synapse/res/templates
-<https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
-
-3pid verification
------------------
 
 Email
 ~~~~~
