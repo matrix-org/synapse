@@ -115,9 +115,6 @@ are no imminent plans to remove delegated 3pid verification from Sydent
 generally. (Sydent is the identity server project that backs the ``vector.im`` and
 ``matrix.org`` instances).
 
-For more details on why these changes are necessary, see the `matrix.org blog
-<https://matrix.org/blog/posts>`_.
-
 Email
 ~~~~~
 Following upgrade, to continue verifying email (e.g. as part of the
