@@ -2,7 +2,7 @@ Synapse 1.4.0rc1 (2019-09-26)
 =============================
 
 Note that this release includes significant changes around 3pid
-verification. Administrators are reminded to review the [upgrade notes](UPGRADE.rst##upgrading-to-v140).
+verification. Administrators are reminded to review the [upgrade notes](UPGRADE.rst#upgrading-to-v140).
 
 Features
 --------
