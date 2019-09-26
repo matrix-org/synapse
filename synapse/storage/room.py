@@ -171,16 +171,21 @@ class RoomWorkerStore(SQLBaseStore):
             )
             query_args += [search_term, search_term, search_term]
 
-        appservice_where = ""
-        if network_tuple and network_tuple.appservice_id:
-            appservice_where = """
-                UNION SELECT room_id from appservice_room_list
-                WHERE appservice_id = ? AND network_id = ?
-            """
-            query_args.append(network_tuple.appservice_id)
-            query_args.append(network_tuple.network_id)
-        elif not network_tuple:
-            appservice_where = """
+        if network_tuple:
+            if network_tuple.appservice_id:
+                published_sql = """
+                    SELECT room_id from appservice_room_list
+                    WHERE appservice_id = ? AND network_id = ?
+                """
+                query_args.append(network_tuple.appservice_id)
+                query_args.append(network_tuple.network_id)
+            else:
+                published_sql = """
+                    SELECT room_id FROM rooms WHERE is_public
+                """
+        else:
+            published_sql = """
+                SELECT room_id FROM rooms WHERE is_public
                 UNION SELECT room_id from appservice_room_list
             """
 
@@ -193,8 +198,7 @@ class RoomWorkerStore(SQLBaseStore):
                 room_id, name, topic, canonical_alias, joined_members,
                 avatar, history_visibility, joined_members, guest_access
             FROM (
-                SELECT room_id FROM rooms WHERE is_public
-                %(appservice_where)s
+                %(published_sql)s
             ) published
             INNER JOIN room_stats_state USING (room_id)
             INNER JOIN room_stats_current USING (room_id)
@@ -206,7 +210,7 @@ class RoomWorkerStore(SQLBaseStore):
                 %(where_clause)s
             ORDER BY joined_members %(dir)s, room_id %(dir)s
         """ % {
-            "appservice_where": appservice_where,
+            "published_sql": published_sql,
             "where_clause": where_clause,
             "or_operator": "MAX"
             if isinstance(self.database_engine, Sqlite3Engine)
