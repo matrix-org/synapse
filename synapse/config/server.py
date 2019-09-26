@@ -172,6 +172,13 @@ class ServerConfig(Config):
         else:
             self.redaction_retention_period = None
 
+        # How long to keep entries in the `users_ips` table.
+        user_ips_max_age = config.get("user_ips_max_age", "28d")
+        if user_ips_max_age is not None:
+            self.user_ips_max_age = self.parse_duration(user_ips_max_age)
+        else:
+            self.user_ips_max_age = None
+
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
         self.hs_disabled_message = config.get("hs_disabled_message", "")
@@ -736,6 +743,12 @@ class ServerConfig(Config):
         # Defaults to `7d`. Set to `null` to disable.
         #
         redaction_retention_period: 7d
+
+        # How long to track users' last seen time and IPs in the database.
+        #
+        # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
+        #
+        #user_ips_max_age: 14d
         """
             % locals()
         )
