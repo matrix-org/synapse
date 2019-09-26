@@ -1,1 +1,0 @@
-Setting metrics_flags.known_servers to True in the configuration will publish the synapse_federation_known_servers metric over Prometheus. This represents the total number of servers your server knows about (i.e. is in rooms with), including itself.

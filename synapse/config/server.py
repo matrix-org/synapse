@@ -48,6 +48,13 @@ ROOM_COMPLEXITY_TOO_GREAT = (
     "to join this room."
 )
 
+METRICS_PORT_WARNING = """\
+The metrics_port configuration option is deprecated in Synapse 0.31 in favour of
+a listener. Please see
+https://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md
+on how to configure the new listener.
+--------------------------------------------------------------------------------"""
+
 
 class ServerConfig(Config):
     def read_config(self, config, **kwargs):
@@ -171,6 +178,13 @@ class ServerConfig(Config):
             )
         else:
             self.redaction_retention_period = None
+
+        # How long to keep entries in the `users_ips` table.
+        user_ips_max_age = config.get("user_ips_max_age", "28d")
+        if user_ips_max_age is not None:
+            self.user_ips_max_age = self.parse_duration(user_ips_max_age)
+        else:
+            self.user_ips_max_age = None
 
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
@@ -334,14 +348,7 @@ class ServerConfig(Config):
 
         metrics_port = config.get("metrics_port")
         if metrics_port:
-            logger.warn(
-                (
-                    "The metrics_port configuration option is deprecated in Synapse 0.31 "
-                    "in favour of a listener. Please see "
-                    "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md"
-                    " on how to configure the new listener."
-                )
-            )
+            logger.warning(METRICS_PORT_WARNING)
 
             self.listeners.append(
                 {
@@ -355,10 +362,8 @@ class ServerConfig(Config):
 
         _check_resource_config(self.listeners)
 
-        # An experimental option to try and periodically clean up extremities
-        # by sending dummy events.
         self.cleanup_extremities_with_dummy_events = config.get(
-            "cleanup_extremities_with_dummy_events", False
+            "cleanup_extremities_with_dummy_events", True
         )
 
     def has_tls_listener(self):
@@ -738,6 +743,12 @@ class ServerConfig(Config):
         # Defaults to `7d`. Set to `null` to disable.
         #
         redaction_retention_period: 7d
+
+        # How long to track users' last seen time and IPs in the database.
+        #
+        # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
+        #
+        #user_ips_max_age: 14d
         """
             % locals()
         )
