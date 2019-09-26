@@ -1,1 +1,0 @@
-Add `POST /add_threepid/msisdn/submit_token` endpoint for proxying submitToken on an account_threepid_handler.
