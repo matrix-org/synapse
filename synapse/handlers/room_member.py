@@ -25,7 +25,6 @@ from twisted.internet import defer
 from synapse import types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
-from synapse.http.client import SimpleHttpClient
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -54,11 +53,6 @@ class RoomMemberHandler(object):
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
-        # We create a blacklisting instance of SimpleHttpClient for contacting identity
-        # servers specified by clients
-        self.simple_http_client = SimpleHttpClient(
-            hs, ip_blacklist=hs.config.federation_ip_range_blacklist
-        )
 
         self.federation_handler = hs.get_handlers().federation_handler
         self.directory_handler = hs.get_handlers().directory_handler

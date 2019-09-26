@@ -565,7 +565,7 @@ class IdentityHandler(BaseHandler):
             raise SynapseError(400, "Error contacting the identity server")
 
     @defer.inlineCallbacks
-    def lookup_3pid(self, id_server, medium, address, id_access_token=None):
+    def _lookup_3pid(self, id_server, medium, address, id_access_token=None):
         """Looks up a 3pid in the passed identity server.
 
         Args:
@@ -649,7 +649,7 @@ class IdentityHandler(BaseHandler):
         """
         # Check what hashing details are supported by this identity server
         try:
-            hash_details = yield self.http_client.get_json(
+            hash_details = yield self.blacklisting_http_client.get_json(
                 "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
                 {"access_token": id_access_token},
             )
@@ -716,7 +716,7 @@ class IdentityHandler(BaseHandler):
         headers = {"Authorization": create_id_access_token_header(id_access_token)}
 
         try:
-            lookup_results = yield self.http_client.post_json_get_json(
+            lookup_results = yield self.blacklisting_http_client.post_json_get_json(
                 "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
                 {
                     "addresses": [lookup_value],
@@ -750,7 +750,7 @@ class IdentityHandler(BaseHandler):
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
             try:
-                key_data = yield self.http_client.get_json(
+                key_data = yield self.blacklisting_http_client.get_json(
                     "%s%s/_matrix/identity/api/v1/pubkey/%s"
                     % (id_server_scheme, server_hostname, key_name)
                 )
@@ -843,7 +843,7 @@ class IdentityHandler(BaseHandler):
             # Attempt a v2 lookup
             url = base_url + "/v2/store-invite"
             try:
-                data = yield self.http_client.post_json_get_json(
+                data = yield self.blacklisting_http_client.post_json_get_json(
                     url,
                     invite_config,
                     {"Authorization": create_id_access_token_header(id_access_token)},
@@ -863,7 +863,9 @@ class IdentityHandler(BaseHandler):
             url = base_url + "/api/v1/store-invite"
 
             try:
-                data = yield self.http_client.post_json_get_json(url, invite_config)
+                data = yield self.blacklisting_http_client.post_json_get_json(
+                    url, invite_config
+                )
             except TimeoutError:
                 raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
@@ -879,7 +881,7 @@ class IdentityHandler(BaseHandler):
                 # types. This is especially true with old instances of Sydent, see
                 # https://github.com/matrix-org/sydent/pull/170
                 try:
-                    data = yield self.http_client.post_urlencoded_get_json(
+                    data = yield self.blacklisting_http_client.post_urlencoded_get_json(
                         url, invite_config
                     )
                 except HttpResponseException as e:
