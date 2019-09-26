@@ -327,7 +327,7 @@ class SimpleHttpClient(object):
         Args:
             uri (str):
             args (dict[str, str|List[str]]): query params
-            headers (dict[bytes, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str]]|None): If not None, a map from
                header name to a list of values for that header
 
         Returns:
@@ -371,7 +371,7 @@ class SimpleHttpClient(object):
         Args:
             uri (str):
             post_json (object):
-            headers (dict[bytes, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str]]|None): If not None, a map from
                header name to a list of values for that header
 
         Returns:
@@ -414,7 +414,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[bytes, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -438,7 +438,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[bytes, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -482,7 +482,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[bytes, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -516,7 +516,7 @@ class SimpleHttpClient(object):
         Args:
             url (str): The URL to GET
             output_stream (file): File to write the response body to.
-            headers (dict[bytes, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             A (int,dict,string,int) tuple of the file length, dict of the response

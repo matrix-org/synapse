@@ -1,1 +1,1 @@
-Ensure header dicts passed to SimpleHttpClient using `bytes` instead of `str` for keys.
+Edit header dicts docstrings in SimpleHttpClient to note that `str` or `bytes` can be passed as header keys.
