@@ -16,6 +16,7 @@
 
 import hmac
 import logging
+from typing import List, Union
 
 from six import string_types
 
@@ -28,16 +29,25 @@ from synapse.api.errors import (
     Codes,
     LimitExceededError,
     SynapseError,
+    ThreepidValidationError,
     UnrecognizedRequestError,
 )
+from synapse.config import ConfigError
+from synapse.config.captcha import CaptchaConfig
+from synapse.config.consent_config import ConsentConfig
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
+from synapse.config.registration import RegistrationConfig
 from synapse.config.server import is_threepid_reserved
+from synapse.handlers.auth import AuthHandler
+from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
@@ -70,30 +80,86 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         super(EmailRegisterRequestTokenRestServlet, self).__init__()
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
+        self.config = hs.config
+
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            from synapse.push.mailer import Mailer, load_jinja2_templates
+
+            template_html, template_text = load_jinja2_templates(
+                self.config.email_template_dir,
+                [
+                    self.config.email_registration_template_html,
+                    self.config.email_registration_template_text,
+                ],
+                apply_format_ts_filter=True,
+                apply_mxc_to_http_filter=True,
+                public_baseurl=self.config.public_baseurl,
+            )
+            self.mailer = Mailer(
+                hs=self.hs,
+                app_name=self.config.email_app_name,
+                template_html=template_html,
+                template_text=template_text,
+            )
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "Email registration has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration has been disabled on this server"
+            )
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(
-            body, ["id_server", "client_secret", "email", "send_attempt"]
-        )
+        assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
 
-        if not check_3pid_allowed(self.hs, "email", body["email"]):
+        # Extract params from body
+        client_secret = body["client_secret"]
+        email = body["email"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
+
+        if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "email", body["email"]
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        ret = yield self.identity_handler.requestEmailToken(**body)
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            assert self.hs.config.account_threepid_delegate_email
+
+            # Have the configured identity server handle the request
+            ret = yield self.identity_handler.requestEmailToken(
+                self.hs.config.account_threepid_delegate_email,
+                email,
+                client_secret,
+                send_attempt,
+                next_link,
+            )
+        else:
+            # Send registration emails from Synapse
+            sid = yield self.identity_handler.send_threepid_validation(
+                email,
+                client_secret,
+                send_attempt,
+                self.mailer.send_registration_mail,
+                next_link,
+            )
+
+            # Wrap the session id in a JSON object
+            ret = {"sid": sid}
+
         return 200, ret
 
 
@@ -114,11 +180,15 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(
-            body,
-            ["id_server", "client_secret", "country", "phone_number", "send_attempt"],
+            body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
+        client_secret = body["client_secret"]
+        country = body["country"]
+        phone_number = body["phone_number"]
+        send_attempt = body["send_attempt"]
+        next_link = body.get("next_link")  # Optional param
 
-        msisdn = phone_number_to_msisdn(body["country"], body["phone_number"])
+        msisdn = phone_number_to_msisdn(country, phone_number)
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
@@ -127,17 +197,118 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
             "msisdn", msisdn
         )
 
-        if existingUid is not None:
+        if existing_user_id is not None:
             raise SynapseError(
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
 
-        ret = yield self.identity_handler.requestMsisdnToken(**body)
+        if not self.hs.config.account_threepid_delegate_msisdn:
+            logger.warn(
+                "No upstream msisdn account_threepid_delegate configured on the server to "
+                "handle this request"
+            )
+            raise SynapseError(
+                400, "Registration by phone number is not supported on this homeserver"
+            )
+
+        ret = yield self.identity_handler.requestMsisdnToken(
+            self.hs.config.account_threepid_delegate_msisdn,
+            country,
+            phone_number,
+            client_secret,
+            send_attempt,
+            next_link,
+        )
+
         return 200, ret
+
+
+class RegistrationSubmitTokenServlet(RestServlet):
+    """Handles registration 3PID validation token submission"""
+
+    PATTERNS = client_patterns(
+        "/registration/(?P<medium>[^/]*)/submit_token$", releases=(), unstable=True
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(RegistrationSubmitTokenServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.config = hs.config
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.failure_email_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.failure_email_template, = load_jinja2_templates(
+                self.config.email_template_dir,
+                [self.config.email_registration_template_failure_html],
+            )
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, medium):
+        if medium != "email":
+            raise SynapseError(
+                400, "This medium is currently not supported for registration"
+            )
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warn(
+                    "User registration via email has been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based registration is disabled on this server"
+            )
+
+        sid = parse_string(request, "sid", required=True)
+        client_secret = parse_string(request, "client_secret", required=True)
+        token = parse_string(request, "token", required=True)
+
+        # Attempt to validate a 3PID session
+        try:
+            # Mark the session as valid
+            next_link = yield self.store.validate_threepid_session(
+                sid, client_secret, token, self.clock.time_msec()
+            )
+
+            # Perform a 302 redirect if next_link is set
+            if next_link:
+                if next_link.startswith("file:///"):
+                    logger.warn(
+                        "Not redirecting to next_link as it is a local file: address"
+                    )
+                else:
+                    request.setResponseCode(302)
+                    request.setHeader("Location", next_link)
+                    finish_request(request)
+                    return None
+
+            # Otherwise show the success template
+            html = self.config.email_registration_template_success_html_content
+
+            request.setResponseCode(200)
+        except ThreepidValidationError as e:
+            request.setResponseCode(e.code)
+
+            # Show a failure page with a reason
+            template_vars = {"failure_reason": e.msg}
+            html = self.failure_email_template.render(**template_vars)
+
+        request.write(html.encode("utf-8"))
+        finish_request(request)
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -169,6 +340,11 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
+        if not self.hs.config.enable_registration:
+            raise SynapseError(
+                403, "Registration has been disabled", errcode=Codes.FORBIDDEN
+            )
+
         ip = self.hs.get_ip_from_request(request)
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             yield wait_deferred
@@ -200,6 +376,10 @@ class RegisterRestServlet(RestServlet):
         self.macaroon_gen = hs.get_macaroon_generator()
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.clock = hs.get_clock()
+
+        self._registration_flows = _calculate_registration_flows(
+            hs.config, self.auth_handler
+        )
 
     @interactive_auth_handler
     @defer.inlineCallbacks
@@ -321,69 +501,8 @@ class RegisterRestServlet(RestServlet):
                 assigned_user_id=registered_user_id,
             )
 
-        # FIXME: need a better error than "no auth flow found" for scenarios
-        # where we required 3PID for registration but the user didn't give one
-        require_email = "email" in self.hs.config.registrations_require_3pid
-        require_msisdn = "msisdn" in self.hs.config.registrations_require_3pid
-
-        show_msisdn = True
-        if self.hs.config.disable_msisdn_registration:
-            show_msisdn = False
-            require_msisdn = False
-
-        flows = []
-        if self.hs.config.enable_registration_captcha:
-            # only support 3PIDless registration if no 3PIDs are required
-            if not require_email and not require_msisdn:
-                # Also add a dummy flow here, otherwise if a client completes
-                # recaptcha first we'll assume they were going for this flow
-                # and complete the request, when they could have been trying to
-                # complete one of the flows with email/msisdn auth.
-                flows.extend([[LoginType.RECAPTCHA, LoginType.DUMMY]])
-            # only support the email-only flow if we don't require MSISDN 3PIDs
-            if not require_msisdn:
-                flows.extend([[LoginType.RECAPTCHA, LoginType.EMAIL_IDENTITY]])
-
-            if show_msisdn:
-                # only support the MSISDN-only flow if we don't require email 3PIDs
-                if not require_email:
-                    flows.extend([[LoginType.RECAPTCHA, LoginType.MSISDN]])
-                # always let users provide both MSISDN & email
-                flows.extend(
-                    [[LoginType.RECAPTCHA, LoginType.MSISDN, LoginType.EMAIL_IDENTITY]]
-                )
-        else:
-            # only support 3PIDless registration if no 3PIDs are required
-            if not require_email and not require_msisdn:
-                flows.extend([[LoginType.DUMMY]])
-            # only support the email-only flow if we don't require MSISDN 3PIDs
-            if not require_msisdn:
-                flows.extend([[LoginType.EMAIL_IDENTITY]])
-
-            if show_msisdn:
-                # only support the MSISDN-only flow if we don't require email 3PIDs
-                if not require_email or require_msisdn:
-                    flows.extend([[LoginType.MSISDN]])
-                # always let users provide both MSISDN & email
-                flows.extend([[LoginType.MSISDN, LoginType.EMAIL_IDENTITY]])
-
-        # Append m.login.terms to all flows if we're requiring consent
-        if self.hs.config.user_consent_at_registration:
-            new_flows = []
-            for flow in flows:
-                inserted = False
-                # m.login.terms should go near the end but before msisdn or email auth
-                for i, stage in enumerate(flow):
-                    if stage == LoginType.EMAIL_IDENTITY or stage == LoginType.MSISDN:
-                        flow.insert(i, LoginType.TERMS)
-                        inserted = True
-                        break
-                if not inserted:
-                    flow.append(LoginType.TERMS)
-            flows.extend(new_flows)
-
         auth_result, params, session_id = yield self.auth_handler.check_auth(
-            flows, body, self.hs.get_ip_from_request(request)
+            self._registration_flows, body, self.hs.get_ip_from_request(request)
         )
 
         # Check that we're not trying to register a denied 3pid.
@@ -438,11 +557,11 @@ class RegisterRestServlet(RestServlet):
                         medium = auth_result[login_type]["medium"]
                         address = auth_result[login_type]["address"]
 
-                        existingUid = yield self.store.get_user_id_by_threepid(
+                        existing_user_id = yield self.store.get_user_id_by_threepid(
                             medium, address
                         )
 
-                        if existingUid is not None:
+                        if existing_user_id is not None:
                             raise SynapseError(
                                 400,
                                 "%s is already in use" % medium,
@@ -481,8 +600,6 @@ class RegisterRestServlet(RestServlet):
                 user_id=registered_user_id,
                 auth_result=auth_result,
                 access_token=return_dict.get("access_token"),
-                bind_email=params.get("bind_email"),
-                bind_msisdn=params.get("bind_msisdn"),
             )
 
         return 200, return_dict
@@ -548,8 +665,86 @@ class RegisterRestServlet(RestServlet):
         )
 
 
+def _calculate_registration_flows(
+    # technically `config` has to provide *all* of these interfaces, not just one
+    config: Union[RegistrationConfig, ConsentConfig, CaptchaConfig],
+    auth_handler: AuthHandler,
+) -> List[List[str]]:
+    """Get a suitable flows list for registration
+
+    Args:
+        config: server configuration
+        auth_handler: authorization handler
+
+    Returns: a list of supported flows
+    """
+    # FIXME: need a better error than "no auth flow found" for scenarios
+    # where we required 3PID for registration but the user didn't give one
+    require_email = "email" in config.registrations_require_3pid
+    require_msisdn = "msisdn" in config.registrations_require_3pid
+
+    show_msisdn = True
+    show_email = True
+
+    if config.disable_msisdn_registration:
+        show_msisdn = False
+        require_msisdn = False
+
+    enabled_auth_types = auth_handler.get_enabled_auth_types()
+    if LoginType.EMAIL_IDENTITY not in enabled_auth_types:
+        show_email = False
+        if require_email:
+            raise ConfigError(
+                "Configuration requires email address at registration, but email "
+                "validation is not configured"
+            )
+
+    if LoginType.MSISDN not in enabled_auth_types:
+        show_msisdn = False
+        if require_msisdn:
+            raise ConfigError(
+                "Configuration requires msisdn at registration, but msisdn "
+                "validation is not configured"
+            )
+
+    flows = []
+
+    # only support 3PIDless registration if no 3PIDs are required
+    if not require_email and not require_msisdn:
+        # Add a dummy step here, otherwise if a client completes
+        # recaptcha first we'll assume they were going for this flow
+        # and complete the request, when they could have been trying to
+        # complete one of the flows with email/msisdn auth.
+        flows.append([LoginType.DUMMY])
+
+    # only support the email-only flow if we don't require MSISDN 3PIDs
+    if show_email and not require_msisdn:
+        flows.append([LoginType.EMAIL_IDENTITY])
+
+    # only support the MSISDN-only flow if we don't require email 3PIDs
+    if show_msisdn and not require_email:
+        flows.append([LoginType.MSISDN])
+
+    if show_email and show_msisdn:
+        # always let users provide both MSISDN & email
+        flows.append([LoginType.MSISDN, LoginType.EMAIL_IDENTITY])
+
+    # Prepend m.login.terms to all flows if we're requiring consent
+    if config.user_consent_at_registration:
+        for flow in flows:
+            flow.insert(0, LoginType.TERMS)
+
+    # Prepend recaptcha to all flows if we're requiring captcha
+    if config.enable_registration_captcha:
+        for flow in flows:
+            flow.insert(0, LoginType.RECAPTCHA)
+
+    return flows
+
+
 def register_servlets(hs, http_server):
     EmailRegisterRequestTokenRestServlet(hs).register(http_server)
     MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
     UsernameAvailabilityRestServlet(hs).register(http_server)
+    RegistrationSubmitTokenServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)

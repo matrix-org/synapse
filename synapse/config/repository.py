@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 matrix.org
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 import os
 from collections import namedtuple
 
+from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
@@ -33,17 +34,6 @@ THUMBNAIL_SIZE_YAML = """\
         #    height: %(height)i
         #    method: %(method)s
 """
-
-MISSING_NETADDR = "Missing netaddr library. This is required for URL preview API."
-
-MISSING_LXML = """Missing lxml library. This is required for URL preview API.
-
-    Install by running:
-        pip install lxml
-
-    Requires libxslt1-dev system package.
-    """
-
 
 ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
@@ -171,16 +161,10 @@ class ContentRepositoryConfig(Config):
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
             try:
-                import lxml
+                check_requirements("url_preview")
 
-                lxml  # To stop unused lint.
-            except ImportError:
-                raise ConfigError(MISSING_LXML)
-
-            try:
-                from netaddr import IPSet
-            except ImportError:
-                raise ConfigError(MISSING_NETADDR)
+            except DependencyException as e:
+                raise ConfigError(e.message)
 
             if "url_preview_ip_range_blacklist" not in config:
                 raise ConfigError(
@@ -188,6 +172,9 @@ class ContentRepositoryConfig(Config):
                     "blacklist in url_preview_ip_range_blacklist for url previewing "
                     "to work"
                 )
+
+            # netaddr is a dependency for url_preview
+            from netaddr import IPSet
 
             self.url_preview_ip_range_blacklist = IPSet(
                 config["url_preview_ip_range_blacklist"]

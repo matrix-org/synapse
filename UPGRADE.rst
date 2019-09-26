@@ -2,58 +2,159 @@ Upgrading Synapse
 =================
 
 Before upgrading check if any special steps are required to upgrade from the
-what you currently have installed to current version of synapse. The extra
+what you currently have installed to current version of Synapse. The extra
 instructions that may be required are listed later in this document.
 
-1. If synapse was installed in a virtualenv then activate that virtualenv before
-   upgrading. If synapse is installed in a virtualenv in ``~/synapse/env`` then
-   run:
+* If Synapse was installed using `prebuilt packages
+  <INSTALL.md#prebuilt-packages>`_, you will need to follow the normal process
+  for upgrading those packages.
 
-   .. code:: bash
+* If Synapse was installed from source, then:
+
+  1. Activate the virtualenv before upgrading. For example, if Synapse is
+     installed in a virtualenv in ``~/synapse/env`` then run:
+
+     .. code:: bash
 
        source ~/synapse/env/bin/activate
 
-2. If synapse was installed using pip then upgrade to the latest version by
-   running:
+  2. If Synapse was installed using pip then upgrade to the latest version by
+     running:
 
-   .. code:: bash
+     .. code:: bash
 
-       pip install --upgrade matrix-synapse[all]
+       pip install --upgrade matrix-synapse
 
-       # restart synapse
-       synctl restart
+     If Synapse was installed using git then upgrade to the latest version by
+     running:
 
-
-   If synapse was installed using git then upgrade to the latest version by
-   running:
-
-   .. code:: bash
-
-       # Pull the latest version of the master branch.
+     .. code:: bash
+     
        git pull
+       pip install --upgrade .
 
-       # Update synapse and its python dependencies.
-       pip install --upgrade .[all]
+  3. Restart Synapse:
 
-       # restart synapse
+     .. code:: bash
+
        ./synctl restart
 
-
-To check whether your update was successful, you can check the Server header
-returned by the Client-Server API:
+To check whether your update was successful, you can check the running server
+version with:
 
 .. code:: bash
 
-    # replace <host.name> with the hostname of your synapse homeserver.
-    # You may need to specify a port (eg, :8448) if your server is not
-    # configured on port 443.
-    curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
+    # you may need to replace 'localhost:8008' if synapse is not configured
+    # to listen on port 8008.
+
+    curl http://localhost:8008/_synapse/admin/v1/server_version
+
+Rolling back to older versions
+------------------------------
+
+Rolling back to previous releases can be difficult, due to database schema
+changes between releases. Where we have been able to test the rollback process,
+this will be noted below.
+
+In general, you will need to undo any changes made during the upgrade process,
+for example:
+
+* pip:
+
+  .. code:: bash
+
+     source env/bin/activate
+     # replace `1.3.0` accordingly:
+     pip install matrix-synapse==1.3.0
+
+* Debian:
+
+  .. code:: bash
+
+     # replace `1.3.0` and `stretch` accordingly:
+     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+
+Upgrading to v1.4.0
+===================
+
+Config options
+--------------
+
+**Note: Registration by email address or phone number will not work in this release unless
+some config options are changed from their defaults.**
+
+This is due to Synapse v1.4.0 now defaulting to sending registration and password reset tokens
+itself. This is for security reasons as well as putting less reliance on identity servers.
+However, currently Synapse only supports sending emails, and does not have support for
+phone-based password reset or account registration. If Synapse is configured to handle these on
+its own, phone-based password resets and registration will be disabled. For Synapse to send
+emails, the ``email`` block of the config must be filled out. If not, then password resets and
+registration via email will be disabled entirely.
+
+This release also deprecates the ``email.trust_identity_server_for_password_resets`` option and
+replaces it with the ``account_threepid_delegates`` dictionary. This option defines whether the
+homeserver should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset or
+registration messages via email and SMS.
+
+If ``email.trust_identity_server_for_password_resets`` is set to ``true``, and
+``account_threepid_delegates.email`` is not set, then the first entry in
+``trusted_third_party_id_servers`` will be used as the account threepid delegate for email.
+This is to ensure compatibility with existing Synapse installs that set up external server
+handling for these tasks before v1.4.0. If ``email.trust_identity_server_for_password_resets``
+is ``true`` and no trusted identity server domains are configured, Synapse will throw an error.
+
+If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent and a threepid
+type in ``account_threepid_delegates`` is not set to a domain, then Synapse will attempt to
+send password reset and registration messages for that type.
+
+Email templates
+---------------
+
+If you have configured a custom template directory with the ``email.template_dir`` option, be
+aware that there are new templates regarding registration. ``registration.html`` and
+``registration.txt`` have been added and contain the content that is sent to a client upon
+registering via an email address.
+
+``registration_success.html`` and ``registration_failure.html`` are also new HTML templates
+that will be shown to the user when they click the link in their registration emai , either
+showing them a success or failure page (assuming a redirect URL is not configured).
+
+Synapse will expect these files to exist inside the configured template directory. To view the
+default templates, see `synapse/res/templates
+<https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
+
+Rolling back to v1.3.1
+----------------------
+
+If you encounter problems with v1.4.0, it should be possible to roll back to
+v1.3.1, subject to the following:
+
+* The 'room statistics' engine was heavily reworked in this release (see
+  `#5971 <https://github.com/matrix-org/synapse/pull/5971>`_), including
+  significant changes to the database schema, which are not easily
+  reverted. This will cause the room statistics engine to stop updating when
+  you downgrade.
+
+  The room statistics are essentially unused in v1.3.1 (in future versions of
+  Synapse, they will be used to populate the room directory), so there should
+  be no loss of functionality. However, the statistics engine will write errors
+  to the logs, which can be avoided by setting the following in `homeserver.yaml`:
+
+  .. code:: yaml
+
+    stats:
+      enabled: false
+
+  Don't forget to re-enable it when you upgrade again, in preparation for its
+  use in the room directory!
 
 Upgrading to v1.2.0
 ===================
 
 Some counter metrics have been renamed, with the old names deprecated. See
-`the metrics documentation <docs/metrics-howto.rst#renaming-of-metrics--deprecation-of-old-names-in-12>`_
+`the metrics documentation <docs/metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12>`_
 for details.
 
 Upgrading to v1.1.0
@@ -131,6 +232,19 @@ server for password resets, set ``trust_identity_server_for_password_resets`` to
 
 See the `sample configuration file <docs/sample_config.yaml>`_
 for more details on these settings.
+
+New email templates
+---------------
+Some new templates have been added to the default template directory for the purpose of the
+homeserver sending its own password reset emails. If you have configured a custom
+``template_dir`` in your Synapse config, these files will need to be added.
+
+``password_reset.html`` and ``password_reset.txt`` are HTML and plain text templates
+respectively that contain the contents of what will be emailed to the user upon attempting to
+reset their password via email. ``password_reset_success.html`` and
+``password_reset_failure.html`` are HTML files that the content of which (assuming no redirect
+URL is set) will be shown to the user after they attempt to click the link in the email sent
+to them.
 
 Upgrading to v0.99.0
 ====================

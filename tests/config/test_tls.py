@@ -16,6 +16,7 @@
 
 import os
 
+import idna
 import yaml
 
 from OpenSSL import SSL
@@ -235,3 +236,42 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         )
 
         self.assertTrue(conf.acme_enabled)
+
+    def test_whitelist_idna_failure(self):
+        """
+        The federation certificate whitelist will not allow IDNA domain names.
+        """
+        config = {
+            "federation_certificate_verification_whitelist": [
+                "example.com",
+                "*.ドメイン.テスト",
+            ]
+        }
+        t = TestConfig()
+        e = self.assertRaises(
+            ConfigError, t.read_config, config, config_dir_path="", data_dir_path=""
+        )
+        self.assertIn("IDNA domain names", str(e))
+
+    def test_whitelist_idna_result(self):
+        """
+        The federation certificate whitelist will match on IDNA encoded names.
+        """
+        config = {
+            "federation_certificate_verification_whitelist": [
+                "example.com",
+                "*.xn--eckwd4c7c.xn--zckzah",
+            ]
+        }
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        cf = ClientTLSOptionsFactory(t)
+
+        # Not in the whitelist
+        opts = cf.get_options(b"notexample.com")
+        self.assertTrue(opts._verifier._verify_certs)
+
+        # Caught by the wildcard
+        opts = cf.get_options(idna.encode("テスト.ドメイン.テスト"))
+        self.assertFalse(opts._verifier._verify_certs)

@@ -46,6 +46,7 @@ from synapse.http import (
     redact_uri,
 )
 from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.caches import CACHE_SIZE_FACTOR
 
@@ -269,42 +270,56 @@ class SimpleHttpClient(object):
         # log request but strip `access_token` (AS requests for example include this)
         logger.info("Sending request %s %s", method, redact_uri(uri))
 
-        try:
-            body_producer = None
-            if data is not None:
-                body_producer = QuieterFileBodyProducer(BytesIO(data))
+        with start_active_span(
+            "outgoing-client-request",
+            tags={
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
+                tags.HTTP_METHOD: method,
+                tags.HTTP_URL: uri,
+            },
+            finish_on_close=True,
+        ):
+            try:
+                body_producer = None
+                if data is not None:
+                    body_producer = QuieterFileBodyProducer(BytesIO(data))
 
-            request_deferred = treq.request(
-                method,
-                uri,
-                agent=self.agent,
-                data=body_producer,
-                headers=headers,
-                **self._extra_treq_args
-            )
-            request_deferred = timeout_deferred(
-                request_deferred,
-                60,
-                self.hs.get_reactor(),
-                cancelled_to_request_timed_out_error,
-            )
-            response = yield make_deferred_yieldable(request_deferred)
+                request_deferred = treq.request(
+                    method,
+                    uri,
+                    agent=self.agent,
+                    data=body_producer,
+                    headers=headers,
+                    **self._extra_treq_args
+                )
+                request_deferred = timeout_deferred(
+                    request_deferred,
+                    60,
+                    self.hs.get_reactor(),
+                    cancelled_to_request_timed_out_error,
+                )
+                response = yield make_deferred_yieldable(request_deferred)
 
-            incoming_responses_counter.labels(method, response.code).inc()
-            logger.info(
-                "Received response to %s %s: %s", method, redact_uri(uri), response.code
-            )
-            return response
-        except Exception as e:
-            incoming_responses_counter.labels(method, "ERR").inc()
-            logger.info(
-                "Error sending request to  %s %s: %s %s",
-                method,
-                redact_uri(uri),
-                type(e).__name__,
-                e.args[0],
-            )
-            raise
+                incoming_responses_counter.labels(method, response.code).inc()
+                logger.info(
+                    "Received response to %s %s: %s",
+                    method,
+                    redact_uri(uri),
+                    response.code,
+                )
+                return response
+            except Exception as e:
+                incoming_responses_counter.labels(method, "ERR").inc()
+                logger.info(
+                    "Error sending request to  %s %s: %s %s",
+                    method,
+                    redact_uri(uri),
+                    type(e).__name__,
+                    e.args[0],
+                )
+                set_tag(tags.ERROR, True)
+                set_tag("error_reason", e.args[0])
+                raise
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}, headers=None):

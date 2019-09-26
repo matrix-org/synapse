@@ -1,0 +1,6 @@
+A request to add an email address to your Matrix account has been received. If this was you,
+please click the link below to confirm adding this email:
+
+{{ link }}
+
+If this was not you, you can safely ignore this email. Thank you.

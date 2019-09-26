@@ -1,0 +1,1 @@
+Return 403 on `/register/available` if registration has been disabled.

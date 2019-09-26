@@ -1,0 +1,1 @@
+Remove unused `origin` argument on FederationHandler.add_display_name_to_third_party_invite.
