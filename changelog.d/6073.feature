@@ -1,1 +1,0 @@
-Return a clearer error message when a timeout occurs when attempting to contact an identity server.

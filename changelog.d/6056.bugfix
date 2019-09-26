@@ -1,1 +1,0 @@
-Remove POST method from password reset submit_token endpoint until we implement submit_url functionality.

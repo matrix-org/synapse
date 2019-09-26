@@ -1072,6 +1072,10 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 # This setting supercedes an older setting named `perspectives`. The old format
 # is still supported for backwards-compatibility, but it is deprecated.
 #
+# 'trusted_key_servers' defaults to matrix.org, but using it will generate a
+# warning on start-up. To suppress this warning, set
+# 'suppress_key_server_warning' to true.
+#
 # Options for each entry in the list include:
 #
 #    server_name: the name of the server. required.
@@ -1096,11 +1100,13 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #      "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
 #  - server_name: "my_other_trusted_server.example.com"
 #
-# The default configuration is:
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+# Uncomment the following to disable the warning that is emitted when the
+# trusted_key_servers include 'matrix.org'. See above.
 #
-#trusted_key_servers:
-#  - server_name: "matrix.org"
-#
+#suppress_key_server_warning: true
 
 # The signing keys to use when acting as a trusted key server. If not specified
 # defaults to the server signing key.
