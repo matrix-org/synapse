@@ -17,7 +17,7 @@ import email.utils
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreationPreset
 from synapse.api.errors import SynapseError
 from synapse.config._base import ConfigError
 from synapse.types import get_domain_from_id
@@ -336,6 +336,14 @@ class RoomAccessRules(object):
         # called before check_event_allowed.
         if event.type == EventTypes.ThirdPartyInvite:
             return True
+
+        # We only need to process "join" and "invite" memberships, in order to be backward
+        # compatible, e.g. if a user from a blacklisted server joined a restricted room
+        # before the rules started being enforced on the server, that user must be able to
+        # leave it.
+        if event.membership not in [Membership.JOIN, Membership.INVITE]:
+            return True
+
         invitee_domain = get_domain_from_id(event.state_key)
         return invitee_domain not in self.domains_forbidden_when_restricted
 

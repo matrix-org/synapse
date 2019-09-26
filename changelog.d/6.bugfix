@@ -1,0 +1,1 @@
+Don't forbid membership events which membership isn't 'join' or 'invite' in restricted rooms, so that users who got into these rooms before the access rules started to be enforced can leave them.
