@@ -565,7 +565,7 @@ class IdentityHandler(BaseHandler):
             raise SynapseError(400, "Error contacting the identity server")
 
     @defer.inlineCallbacks
-    def _lookup_3pid(self, id_server, medium, address, id_access_token=None):
+    def lookup_3pid(self, id_server, medium, address, id_access_token=None):
         """Looks up a 3pid in the passed identity server.
 
         Args:
