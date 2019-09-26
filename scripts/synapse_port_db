@@ -31,21 +31,11 @@ from twisted.enterprise import adbapi
 from twisted.internet import defer, reactor
 
 from synapse.config.homeserver import HomeServerConfig
+from synapse.server import HomeServer
+from synapse.storage import DataStore
 from synapse.storage._base import LoggingTransaction
-from synapse.storage.client_ips import ClientIpStore
-from synapse.storage.deviceinbox import DeviceInboxStore
-from synapse.storage.devices import DeviceStore
 from synapse.storage.engines import create_engine
-from synapse.storage.events_bg_updates import EventsBackgroundUpdatesStore
-from synapse.storage.media_repository import MediaRepositoryStore
 from synapse.storage.prepare_database import prepare_database
-from synapse.storage.registration import RegistrationStore
-from synapse.storage.roommember import RoomMemberStore
-from synapse.storage.search import SearchStore
-from synapse.storage.state import StateStore
-from synapse.storage.stats import StatsStore
-from synapse.storage.user_directory import UserDirectoryStore
-from synapse.util import Clock
 
 logger = logging.getLogger("synapse_port_db")
 
@@ -110,42 +100,7 @@ APPEND_ONLY_TABLES = [
 end_error_exec_info = None
 
 
-class MockHomeserver(object):
-    def __init__(self, config, database_engine, db_conn, db_pool):
-        self.config = config
-        self.hostname = config.server_name
-        self.database_engine = database_engine
-
-        self.db_conn = db_conn
-        self.db_pool = db_pool
-        self.clock = Clock(reactor)
-
-    def get_reactor(self):
-        return reactor
-
-    def get_clock(self):
-        return self.clock
-
-    def get_db_pool(self):
-        return self.db_pool
-
-    def get_db_conn(self):
-        return self.db_conn
-
-
-class Store(
-    ClientIpStore,
-    DeviceInboxStore,
-    DeviceStore,
-    EventsBackgroundUpdatesStore,
-    MediaRepositoryStore,
-    RegistrationStore,
-    RoomMemberStore,
-    SearchStore,
-    StateStore,
-    StatsStore,
-    UserDirectoryStore,
-):
+class Store(DataStore):
     def __init__(self, db_conn, hs):
         super(Store, self).__init__(db_conn, hs)
         self.db_pool = hs.get_db_pool()
@@ -199,6 +154,25 @@ class Store(
         except Exception:
             logger.exception("Failed to insert: %s", table)
             raise
+
+
+class MockHomeserver(HomeServer):
+    DATASTORE_CLASS = Store
+
+    def __init__(self, config, database_engine, db_conn, db_pool):
+        super(MockHomeserver, self).__init__(
+            config.server_name,
+            reactor=reactor,
+            config=config,
+            database_engine=database_engine,
+        )
+
+        self.database_engine = database_engine
+        self.db_conn = db_conn
+        self.db_pool = db_pool
+
+    def get_db_conn(self):
+        return self.db_conn
 
 
 class Porter(object):
@@ -492,17 +466,15 @@ class Porter(object):
             self.progress.set_state("Preparing SQLite3")
             sqlite_conn = self.setup_db(sqlite_config, sqlite_engine)
 
-            self.sqlite_store = Store(
+            hs = MockHomeserver(
+                self.hs_config,
+                sqlite_engine,
                 sqlite_conn,
-                MockHomeserver(
-                    self.hs_config,
-                    sqlite_engine,
-                    sqlite_conn,
-                    sqlite_db_pool,
-                ),
+                sqlite_db_pool,
             )
-            # Commit any uncommitted transactions.
-            sqlite_conn.commit()
+
+            hs.setup()
+            self.sqlite_store = hs.get_datastore()
 
             # Check if all background updates are done, abort if not.
             updates_complete = yield self.sqlite_store.has_completed_background_updates()
@@ -517,17 +489,15 @@ class Porter(object):
             self.progress.set_state("Preparing PostgreSQL")
             postgres_conn = self.setup_db(postgres_config, postgres_engine)
 
-            self.postgres_store = Store(
+            hs = MockHomeserver(
+                self.hs_config,
+                postgres_engine,
                 postgres_conn,
-                MockHomeserver(
-                    self.hs_config,
-                    postgres_engine,
-                    postgres_conn,
-                    postgres_db_pool,
-                ),
+                postgres_db_pool,
             )
-            # Commit any uncommitted transactions.
-            postgres_conn.commit()
+
+            hs.setup()
+            self.postgres_store = hs.get_datastore()
 
             yield self.postgres_store.runInteraction(
                 "postgres_engine.check_database",
