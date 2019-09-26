@@ -21,25 +21,24 @@ import logging
 import urllib
 
 from canonicaljson import json
+from signedjson.key import decode_verify_key_bytes
+from signedjson.sign import verify_signed_json
+from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 from twisted.internet.error import TimeoutError
 
 from synapse.api.errors import (
+    AuthError,
     CodeMessageException,
     Codes,
     HttpResponseException,
     SynapseError,
-    AuthError,
 )
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.client import SimpleHttpClient
-from synapse.util.stringutils import random_string
 from synapse.util.hash import sha256_and_url_safe_base64
-
-from signedjson.key import decode_verify_key_bytes
-from signedjson.sign import verify_signed_json
-from unpaddedbase64 import decode_base64
+from synapse.util.stringutils import random_string
 
 from ._base import BaseHandler
 
@@ -620,7 +619,7 @@ class IdentityHandler(BaseHandler):
             data = yield self.blacklisting_http_client.get_json(
                 "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
                 {"medium": medium, "address": address},
-                )
+            )
 
             if "mxid" in data:
                 if "signatures" not in data:
@@ -653,7 +652,7 @@ class IdentityHandler(BaseHandler):
             hash_details = yield self.http_client.get_json(
                 "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
                 {"access_token": id_access_token},
-                )
+            )
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
@@ -668,7 +667,7 @@ class IdentityHandler(BaseHandler):
                 400,
                 "Non-dict object from %s%s during v2 hash_details request: %s"
                 % (id_server_scheme, id_server, hash_details),
-                )
+            )
 
         # Extract information from hash_details
         supported_lookup_algorithms = hash_details.get("algorithms")
@@ -683,7 +682,7 @@ class IdentityHandler(BaseHandler):
                 400,
                 "Invalid hash details received from identity server %s%s: %s"
                 % (id_server_scheme, id_server, hash_details),
-                )
+            )
 
         # Check if any of the supported lookup algorithms are present
         if LookupAlgorithm.SHA256 in supported_lookup_algorithms:
@@ -725,7 +724,7 @@ class IdentityHandler(BaseHandler):
                     "pepper": lookup_pepper,
                 },
                 headers=headers,
-                )
+            )
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except Exception as e:
@@ -864,9 +863,7 @@ class IdentityHandler(BaseHandler):
             url = base_url + "/api/v1/store-invite"
 
             try:
-                data = yield self.http_client.post_json_get_json(
-                    url, invite_config
-                )
+                data = yield self.http_client.post_json_get_json(url, invite_config)
             except TimeoutError:
                 raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:

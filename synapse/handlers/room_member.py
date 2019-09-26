@@ -674,8 +674,9 @@ class RoomMemberHandler(object):
                 403, "Looking up third-party identifiers is denied from this server"
             )
 
-        invitee = yield self.identity_handler.lookup_3pid(id_server, medium, address,
-                                                          id_access_token)
+        invitee = yield self.identity_handler.lookup_3pid(
+            id_server, medium, address, id_access_token
+        )
 
         if invitee:
             yield self.update_membership(
