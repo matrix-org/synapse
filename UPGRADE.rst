@@ -95,6 +95,27 @@ matrix.org instances).
 
 For more details on why these changes are necessary see (link to blog).
 
+Custom Email templates
+----------------------
+
+If you have configured a custom template directory with the
+``email.template_dir`` option, be aware that there are new templates regarding
+registration and threepid management that must be included.
+
+* ``registration.html`` and ``registration.txt``
+* ``registration_success.html`` and ``registration_failure.html``
+* ``add_threepid.html`` and  ``add_threepid.txt``
+* ``add_threepid_failure.html`` and ``add_threepid_success.html``
+
+Synapse will expect these files to exist inside the configured template
+directory. To view the default templates, see `synapse/res/templates
+<https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
+
+3pid verification
+-----------------
+
+Email
+~~~~~
 Following upgrade, to continue verifying email (e.g. as part of the
 registration process), admins can either:-
 
@@ -102,12 +123,8 @@ registration process), admins can either:-
 * Run or choose an identity server which allows delegated email verification
   and delegate to it.
 
-
-Email
------
-
 Configure SMTP in Synapse
-~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++
 
 To configure an SMTP server for Synapse, modify the configuration section
 headed ``email``, and be sure to have at least the ``smtp_host, smtp_port``
@@ -121,7 +138,7 @@ See the `sample configuration file
 for more details on these settings.
 
 Delegate Email to an identity server
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++++++++
 
 Some admins will wish to continue using email verification as part of the
 registration process, but will not immediately have an appropriate SMTP server
@@ -165,7 +182,7 @@ SMTP server (see above).
 that type.
 
 SMS
----
+~~~
 
 Following upgrade, the only way to maintain the ability for a homeserver to
 send SMS will be to continue to delegate phone number verification via the
@@ -190,22 +207,6 @@ and the matrix.org and vector.im identity servers will continue to support
 delegated phone number verification via SMS until such time as it is possible
 for admins to configure their servers to send SMS directly. More details will
 follow in a future release.
-
-Custom Email templates
-----------------------
-
-If you have configured a custom template directory with the
-``email.template_dir`` option, be aware that there are new templates regarding
-registration and threepid management that must be included.
-
-* ``registration.html`` and ``registration.txt``
-* ``registration_success.html`` and ``registration_failure.html``
-* ``add_threepid.html`` and  ``add_threepid.txt``
-* ``add_threepid_failure.html`` and ``add_threepid_success.html``
-
-Synapse will expect these files to exist inside the configured template
-directory. To view the default templates, see `synapse/res/templates
-<https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
 
 Rolling back to v1.3.1
 ----------------------
