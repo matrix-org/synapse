@@ -868,6 +868,34 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
         # No context was requested, so we should get none.
         self.assertEqual(results["results"][0]["context"], {})
 
+    def test_finds_message_url(self):
+        """
+        The search functionality will search for content in messages if asked to
+        do so.
+        """
+        # The other user sends some messages
+        self.helper.send(self.room, body="Hi!", tok=self.other_access_token)
+        self.helper.send(self.room, body="There!", tok=self.other_access_token)
+        self.helper.send(self.room, body="https://www.youtube.com/watch?v=dQw4w9WgXcQ", tok=self.other_access_token)
+
+
+        request, channel = self.make_request(
+            "POST",
+            "/search?access_token=%s" % (self.access_token,),
+            {"search_categories":
+                 {"room_events":
+                      {"search_term": "youtube",
+                       "order_by": "recent"}}},
+        )
+        self.render(request)
+
+        # Check we get the results we expect -- one search result, of the sent
+        # messages
+        self.assertEqual(channel.code, 200)
+        results = channel.json_body["search_categories"]["room_events"]
+        self.assertEqual(results["count"], 1)
+        self.assertEqual(results["results"][0]["result"]["content"]["body"], "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
     def test_include_context(self):
         """
         When event_context includes include_profile, profile information will be
