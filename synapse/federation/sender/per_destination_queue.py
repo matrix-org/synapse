@@ -189,6 +189,11 @@ class PerDestinationQueue(object):
 
             pending_pdus = []
             while True:
+                if self._transaction_manager.deprioritise_transmission:
+                    # if the event-processing loop has got behind, sleep to give it
+                    # a chance to catch up
+                    yield self._clock.sleep(2)
+
                 # We have to keep 2 free slots for presence and rr_edus
                 limit = MAX_EDUS_PER_TRANSACTION - 2
 
