@@ -280,7 +280,9 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
 
         # Make @inviter:test invite @invitee:test in a new room.
         room_id = self.helper.create_room_as(inviter_id, tok=inviter_tok)
-        self.helper.invite(room=room_id, src=inviter_id, targ=invitee_id, tok=inviter_tok)
+        self.helper.invite(
+            room=room_id, src=inviter_id, targ=invitee_id, tok=inviter_tok
+        )
 
         # Make sure the invite is here.
         pending_invites = self.get_success(store.get_invited_rooms_for_user(invitee_id))
