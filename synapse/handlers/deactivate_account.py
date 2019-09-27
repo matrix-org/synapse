@@ -120,7 +120,7 @@ class DeactivateAccountHandler(BaseHandler):
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
 
-        # Reject all pending invites for the user, so that it doesn't show up in the
+        # Reject all pending invites for the user, so that they do not show up in the
         # invitees list of rooms.
         yield self._reject_pending_invites_for_user(user_id)
 
