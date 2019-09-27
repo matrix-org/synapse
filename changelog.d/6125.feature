@@ -1,1 +1,1 @@
-Reject all pending invite for a user during deactivation.
+Reject all pending invites for a user during deactivation.
