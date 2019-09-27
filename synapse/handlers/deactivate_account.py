@@ -121,8 +121,8 @@ class DeactivateAccountHandler(BaseHandler):
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
 
-        # Reject all pending invites for the user, so that they do not show up in the
-        # invitees list of rooms.
+        # Reject all pending invites for the user, so that the user doesn't show up in the
+        # "invited" section of rooms' members list.
         yield self._reject_pending_invites_for_user(user_id)
 
         # Remove all information on the user from the account_validity table.
@@ -143,8 +143,6 @@ class DeactivateAccountHandler(BaseHandler):
         """
         user = UserID.from_string(user_id)
         pending_invites = yield self.store.get_invited_rooms_for_user(user_id)
-
-        logger.info(pending_invites)
 
         for room in pending_invites:
             try:
