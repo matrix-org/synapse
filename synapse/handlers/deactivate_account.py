@@ -157,7 +157,9 @@ class DeactivateAccountHandler(BaseHandler):
                     require_consent=False,
                 )
                 logger.info(
-                    "Rejected invite for user %r in room %r", user_id, room.room_id
+                    "Rejected invite for deactivated user %r in room %r",
+                    user_id,
+                    room.room_id,
                 )
             except Exception:
                 logger.exception(
