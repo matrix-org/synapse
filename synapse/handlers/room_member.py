@@ -213,11 +213,11 @@ class RoomMemberHandler(object):
 
             if predecessor:
                 # It is an upgraded room. Copy over old tags
-                self.copy_room_tags_and_direct_to_room(
+                yield self.copy_room_tags_and_direct_to_room(
                     predecessor["room_id"], room_id, user_id
                 )
                 # Move over old push rules
-                self.store.move_push_rules_from_room_to_room_for_user(
+                yield self.store.move_push_rules_from_room_to_room_for_user(
                     predecessor["room_id"], room_id, user_id
                 )
         elif event.membership == Membership.LEAVE:

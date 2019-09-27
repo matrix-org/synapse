@@ -17,7 +17,10 @@
 """ This is a reference implementation of a Matrix home server.
 """
 
+import os
 import sys
+
+from tests.patch_inline_callbacks import do_patch
 
 # Check that we're not running on an unsupported Python version.
 if sys.version_info < (3, 5):
@@ -36,3 +39,6 @@ except ImportError:
     pass
 
 __version__ = "1.4.0rc1"
+
+if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
+    do_patch()
