@@ -1,0 +1,114 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import argparse
+import logging
+import sys
+
+import yaml
+
+from twisted.internet import defer, reactor
+
+from synapse.config.homeserver import HomeServerConfig
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.server import HomeServer
+from synapse.storage.engines import create_engine
+from synapse.storage import DataStore
+
+
+class MockHomeserver(HomeServer):
+    DATASTORE_CLASS = DataStore
+
+    def __init__(self, config, database_engine, **kwargs):
+        super(MockHomeserver, self).__init__(
+            config.server_name,
+            reactor=reactor,
+            config=config,
+            database_engine=database_engine,
+            **kwargs
+        )
+
+        self.database_engine = database_engine
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="A script to update the schema of a given database"
+    )
+    parser.add_argument("-v", action='store_true')
+    parser.add_argument(
+        "--database-config",
+        type=argparse.FileType('r'),
+        required=True,
+        help="A database config file for either a SQLite3 database or a PostgreSQL one.",
+    )
+
+    args = parser.parse_args()
+
+    logging_config = {
+        "level": logging.DEBUG if args.v else logging.INFO,
+        "format": "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
+    }
+
+    logging.basicConfig(**logging_config)
+
+    hs_config = yaml.safe_load(args.database_config)
+
+    config = HomeServerConfig()
+    config.parse_config_dict(hs_config, "", "")
+
+    if "database" in hs_config:
+        database_config = hs_config["database"]
+
+        if "name" not in database_config:
+            sys.stderr.write("Malformed database config: no 'name'\n")
+            sys.exit(2)
+        if database_config["name"] not in ["psycopg2", "sqlite3"]:
+            sys.stderr.write(
+                "Database must use either the 'psycopg2' connector or the 'sqlite3'"
+                " one.\n"
+            )
+            sys.exit(3)
+
+    else:
+        sys.stderr.write("The configuration file must have a 'database' section.\n")
+        sys.exit(4)
+
+    hs = MockHomeserver(
+        config,
+        create_engine(database_config),
+        db_config=config.database_config,
+    )
+    hs.setup()
+    store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def run_background_updates():
+        ready = yield store.has_completed_background_updates()
+
+        while not ready:
+            yield store.do_next_background_update(100)
+            ready = yield store.has_completed_background_updates()
+
+        reactor.stop()
+
+    # Manually apply all background updates on the database.
+    reactor.callWhenRunning(lambda: run_as_background_process("bg_updates", run_background_updates))
+
+    reactor.run()
+
