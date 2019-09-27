@@ -132,7 +132,7 @@ class DeactivateAccountHandler(BaseHandler):
         # Mark the user as deactivated.
         yield self.store.set_user_deactivated_status(user_id, True)
 
-        return identity_server_supports_unbinding
+        defer.returnValue(identity_server_supports_unbinding)
 
     @defer.inlineCallbacks
     def _reject_pending_invites_for_user(self, user_id):
