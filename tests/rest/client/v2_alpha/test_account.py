@@ -23,8 +23,8 @@ from email.parser import Parser
 import pkg_resources
 
 import synapse.rest.admin
-from synapse.api.constants import LoginType
-from synapse.rest.client.v1 import login
+from synapse.api.constants import LoginType, Membership
+from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account, register
 
 from tests import unittest
@@ -248,6 +248,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         account.register_servlets,
+        room.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
