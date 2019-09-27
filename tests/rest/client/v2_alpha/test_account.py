@@ -23,8 +23,8 @@ from email.parser import Parser
 import pkg_resources
 
 import synapse.rest.admin
-from synapse.api.constants import LoginType
-from synapse.rest.client.v1 import login
+from synapse.api.constants import LoginType, Membership
+from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account, register
 
 from tests import unittest
@@ -244,16 +244,69 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         account.register_servlets,
+        room.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver()
-        return hs
+        self.hs = self.setup_test_homeserver()
+        return self.hs
 
     def test_deactivate_account(self):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
+        self.deactivate(user_id, tok)
+
+        store = self.hs.get_datastore()
+
+        # Check that the user has been marked as deactivated.
+        self.assertTrue(self.get_success(store.get_user_deactivated_status(user_id)))
+
+        # Check that this access token has been invalidated.
+        request, channel = self.make_request("GET", "account/whoami")
+        self.render(request)
+        self.assertEqual(request.code, 401)
+
+    @unittest.INFO
+    def test_pending_invites(self):
+        """Tests that deactivating a user rejects every pending invite for them."""
+        store = self.hs.get_datastore()
+
+        inviter_id = self.register_user("inviter", "test")
+        inviter_tok = self.login("inviter", "test")
+
+        invitee_id = self.register_user("invitee", "test")
+        invitee_tok = self.login("invitee", "test")
+
+        # Make @inviter:test invite @invitee:test in a new room.
+        room_id = self.helper.create_room_as(inviter_id, tok=inviter_tok)
+        self.helper.invite(
+            room=room_id,
+            src=inviter_id,
+            targ=invitee_id,
+            tok=inviter_tok,
+        )
+
+        # Make sure the invite is here.
+        pending_invites = self.get_success(store.get_invited_rooms_for_user(invitee_id))
+        self.assertEqual(len(pending_invites), 1, pending_invites)
+        self.assertEqual(pending_invites[0].room_id, room_id, pending_invites)
+
+        # Deactivate @invitee:test.
+        self.deactivate(invitee_id, invitee_tok)
+
+        # Check that the invite isn't there anymore.
+        pending_invites = self.get_success(store.get_invited_rooms_for_user(invitee_id))
+        self.assertEqual(len(pending_invites), 0, pending_invites)
+
+        # Check that the membership of @invitee:test in the room is now "leave".
+        memberships = self.get_success(
+            store.get_rooms_for_user_where_membership_is(invitee_id, [Membership.LEAVE])
+        )
+        self.assertEqual(len(memberships), 1, memberships)
+        self.assertEqual(memberships[0].room_id, room_id, memberships)
+
+    def deactivate(self, user_id, tok):
         request_data = json.dumps(
             {
                 "auth": {
@@ -270,12 +323,3 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(request.code, 200)
 
-        store = self.hs.get_datastore()
-
-        # Check that the user has been marked as deactivated.
-        self.assertTrue(self.get_success(store.get_user_deactivated_status(user_id)))
-
-        # Check that this access token has been invalidated.
-        request, channel = self.make_request("GET", "account/whoami")
-        self.render(request)
-        self.assertEqual(request.code, 401)
