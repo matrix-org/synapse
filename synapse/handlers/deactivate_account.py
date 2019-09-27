@@ -122,7 +122,7 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Reject all pending invites for the user, so that it doesn't show up in the
         # invitees list of rooms.
-        self._reject_pending_invites_for_user(user_id)
+        yield self._reject_pending_invites_for_user(user_id)
 
         # Remove all information on the user from the account_validity table.
         if self._account_validity_enabled:
@@ -133,6 +133,7 @@ class DeactivateAccountHandler(BaseHandler):
 
         return identity_server_supports_unbinding
 
+    @defer.inlineCallbacks
     def _reject_pending_invites_for_user(self, user_id):
         """Reject pending invites addressed to a given user ID.
 
@@ -141,6 +142,8 @@ class DeactivateAccountHandler(BaseHandler):
         """
         user = UserID.from_string(user_id)
         pending_invites = yield self.store.get_invited_rooms_for_user(user_id)
+
+        logger.info(pending_invites)
 
         for room in pending_invites:
             try:
@@ -151,6 +154,11 @@ class DeactivateAccountHandler(BaseHandler):
                     "leave",
                     ratelimit=False,
                     require_consent=False,
+                )
+                logger.info(
+                    "Rejected invite for user %r in room %r",
+                    user_id,
+                    room.room_id,
                 )
             except Exception:
                 logger.exception(
