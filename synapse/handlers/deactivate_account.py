@@ -120,6 +120,10 @@ class DeactivateAccountHandler(BaseHandler):
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
 
+        # Reject all pending invites for the user, so that it doesn't show up in the
+        # invitees list of rooms.
+        self._reject_pending_invites_for_user(user_id)
+
         # Remove all information on the user from the account_validity table.
         if self._account_validity_enabled:
             yield self.store.delete_account_validity_for_user(user_id)
@@ -128,6 +132,33 @@ class DeactivateAccountHandler(BaseHandler):
         yield self.store.set_user_deactivated_status(user_id, True)
 
         return identity_server_supports_unbinding
+
+    def _reject_pending_invites_for_user(self, user_id):
+        """Reject pending invites addressed to a given user ID.
+
+        Args:
+            user_id (str): The user ID to reject pending invites for.
+        """
+        user = UserID.from_string(user_id)
+        pending_invites = yield self.store.get_invited_rooms_for_user(user_id)
+
+        for room in pending_invites:
+            try:
+                yield self._room_member_handler.update_membership(
+                    create_requester(user),
+                    user,
+                    room.room_id,
+                    "leave",
+                    ratelimit=False,
+                    require_consent=False,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to reject invite for user %r in room %r:"
+                    " ignoring and continuing",
+                    user_id,
+                    room.room_id,
+                )
 
     def _start_user_parting(self):
         """
