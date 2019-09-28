@@ -322,6 +322,7 @@ class SearchStore(BackgroundUpdateStore):
         """
         if not self.hs.config.enable_search:
             return
+
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
                 "INSERT INTO event_search"
@@ -334,7 +335,8 @@ class SearchStore(BackgroundUpdateStore):
                     entry.event_id,
                     entry.room_id,
                     entry.key,
-                    entry.value,
+                    # Only store words while discarding special characters
+                    ' '.join(re.findall(r"([\w\-]+)", entry.value, re.UNICODE)),
                     entry.stream_ordering,
                     entry.origin_server_ts,
                 )

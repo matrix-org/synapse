@@ -875,16 +875,15 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
         """
         # The other user sends some messages
         self.helper.send(self.room, body="Hi!", tok=self.other_access_token)
-        self.helper.send(self.room, body="There!", tok=self.other_access_token)
         self.helper.send(self.room, body="https://www.youtube.com/watch?v=dQw4w9WgXcQ", tok=self.other_access_token)
-
+        self.helper.send(self.room, body="There!", tok=self.other_access_token)
 
         request, channel = self.make_request(
             "POST",
             "/search?access_token=%s" % (self.access_token,),
             {"search_categories":
                  {"room_events":
-                      {"search_term": "youtube",
+                      {"search_term": "www.youtube.com",
                        "order_by": "recent"}}},
         )
         self.render(request)
