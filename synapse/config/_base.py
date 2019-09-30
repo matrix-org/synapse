@@ -20,6 +20,7 @@ import errno
 import os
 from collections import OrderedDict
 from textwrap import dedent
+from typing import Optional
 
 from six import integer_types
 
@@ -499,7 +500,7 @@ class RootConfig(object):
 
 
 class Config(object):
-    def __init__(self, root_config=None):
+    def __init__(self, root_config: Optional[RootConfig] = None):
         self.root = root_config
 
     def __getattr__(self, item, from_root=False):
