@@ -20,15 +20,11 @@ import logging
 
 from six.moves import http_client
 
-from signedjson.key import decode_verify_key_bytes
-from signedjson.sign import verify_signed_json
-from unpaddedbase64 import decode_base64
-
 from twisted.internet import defer
 
 from synapse import types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, HttpResponseException, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -36,8 +32,6 @@ from synapse.util.distributor import user_joined_room, user_left_room
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
-
-id_server_scheme = "https://"
 
 
 class RoomMemberHandler(object):
@@ -59,10 +53,10 @@ class RoomMemberHandler(object):
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
-        self.simple_http_client = hs.get_simple_http_client()
 
         self.federation_handler = hs.get_handlers().federation_handler
         self.directory_handler = hs.get_handlers().directory_handler
+        self.identity_handler = hs.get_handlers().identity_handler
         self.registration_handler = hs.get_registration_handler()
         self.profile_handler = hs.get_profile_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -100,7 +94,7 @@ class RoomMemberHandler(object):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _remote_reject_invite(self, remote_room_hosts, room_id, target):
+    def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
         """Attempt to reject an invite for a room this server is not in. If we
         fail to do so we locally mark the invite as rejected.
 
@@ -510,9 +504,7 @@ class RoomMemberHandler(object):
         return res
 
     @defer.inlineCallbacks
-    def send_membership_event(
-        self, requester, event, context, remote_room_hosts=None, ratelimit=True
-    ):
+    def send_membership_event(self, requester, event, context, ratelimit=True):
         """
         Change the membership status of a user in a room.
 
@@ -522,16 +514,10 @@ class RoomMemberHandler(object):
                 act as the sender, will be skipped.
             event (SynapseEvent): The membership event.
             context: The context of the event.
-            is_guest (bool): Whether the sender is a guest.
-            room_hosts ([str]): Homeservers which are likely to already be in
-                the room, and could be danced with in order to join this
-                homeserver for the first time.
             ratelimit (bool): Whether to rate limit this request.
         Raises:
             SynapseError if there was a problem changing the membership.
         """
-        remote_room_hosts = remote_room_hosts or []
-
         target_user = UserID.from_string(event.state_key)
         room_id = event.room_id
 
@@ -634,7 +620,7 @@ class RoomMemberHandler(object):
             servers.remove(room_alias.domain)
         servers.insert(0, room_alias.domain)
 
-        return (RoomID.from_string(room_id), servers)
+        return RoomID.from_string(room_id), servers
 
     @defer.inlineCallbacks
     def _get_inviter(self, user_id, room_id):
@@ -646,7 +632,15 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def do_3pid_invite(
-        self, room_id, inviter, medium, address, id_server, requester, txn_id
+        self,
+        room_id,
+        inviter,
+        medium,
+        address,
+        id_server,
+        requester,
+        txn_id,
+        id_access_token=None,
     ):
         if self.config.block_non_admin_invites:
             is_requester_admin = yield self.auth.is_server_admin(requester.user)
@@ -669,7 +663,14 @@ class RoomMemberHandler(object):
                 Codes.FORBIDDEN,
             )
 
-        invitee = yield self._lookup_3pid(id_server, medium, address)
+        if not self._enable_lookup:
+            raise SynapseError(
+                403, "Looking up third-party identifiers is denied from this server"
+            )
+
+        invitee = yield self.identity_handler.lookup_3pid(
+            id_server, medium, address, id_access_token
+        )
 
         if invitee:
             yield self.update_membership(
@@ -677,67 +678,27 @@ class RoomMemberHandler(object):
             )
         else:
             yield self._make_and_store_3pid_invite(
-                requester, id_server, medium, address, room_id, inviter, txn_id=txn_id
+                requester,
+                id_server,
+                medium,
+                address,
+                room_id,
+                inviter,
+                txn_id=txn_id,
+                id_access_token=id_access_token,
             )
-
-    @defer.inlineCallbacks
-    def _lookup_3pid(self, id_server, medium, address):
-        """Looks up a 3pid in the passed identity server.
-
-        Args:
-            id_server (str): The server name (including port, if required)
-                of the identity server to use.
-            medium (str): The type of the third party identifier (e.g. "email").
-            address (str): The third party identifier (e.g. "foo@example.com").
-
-        Returns:
-            str: the matrix ID of the 3pid, or None if it is not recognized.
-        """
-        if not self._enable_lookup:
-            raise SynapseError(
-                403, "Looking up third-party identifiers is denied from this server"
-            )
-        try:
-            data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
-                {"medium": medium, "address": address},
-            )
-
-            if "mxid" in data:
-                if "signatures" not in data:
-                    raise AuthError(401, "No signatures on 3pid binding")
-                yield self._verify_any_signature(data, id_server)
-                return data["mxid"]
-
-        except IOError as e:
-            logger.warn("Error from identity server lookup: %s" % (e,))
-            return None
-
-    @defer.inlineCallbacks
-    def _verify_any_signature(self, data, server_hostname):
-        if server_hostname not in data["signatures"]:
-            raise AuthError(401, "No signature from server %s" % (server_hostname,))
-        for key_name, signature in data["signatures"][server_hostname].items():
-            key_data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/pubkey/%s"
-                % (id_server_scheme, server_hostname, key_name)
-            )
-            if "public_key" not in key_data:
-                raise AuthError(
-                    401, "No public key named %s from %s" % (key_name, server_hostname)
-                )
-            verify_signed_json(
-                data,
-                server_hostname,
-                decode_verify_key_bytes(
-                    key_name, decode_base64(key_data["public_key"])
-                ),
-            )
-            return
 
     @defer.inlineCallbacks
     def _make_and_store_3pid_invite(
-        self, requester, id_server, medium, address, room_id, user, txn_id
+        self,
+        requester,
+        id_server,
+        medium,
+        address,
+        room_id,
+        user,
+        txn_id,
+        id_access_token=None,
     ):
         room_state = yield self.state_handler.get_current_state(room_id)
 
@@ -773,7 +734,7 @@ class RoomMemberHandler(object):
             room_avatar_url = room_avatar_event.content.get("url", "")
 
         token, public_keys, fallback_public_key, display_name = (
-            yield self._ask_id_server_for_third_party_invite(
+            yield self.identity_handler.ask_id_server_for_third_party_invite(
                 requester=requester,
                 id_server=id_server,
                 medium=medium,
@@ -786,6 +747,7 @@ class RoomMemberHandler(object):
                 room_name=room_name,
                 inviter_display_name=inviter_display_name,
                 inviter_avatar_url=inviter_avatar_url,
+                id_access_token=id_access_token,
             )
         )
 
@@ -807,103 +769,6 @@ class RoomMemberHandler(object):
             ratelimit=False,
             txn_id=txn_id,
         )
-
-    @defer.inlineCallbacks
-    def _ask_id_server_for_third_party_invite(
-        self,
-        requester,
-        id_server,
-        medium,
-        address,
-        room_id,
-        inviter_user_id,
-        room_alias,
-        room_avatar_url,
-        room_join_rules,
-        room_name,
-        inviter_display_name,
-        inviter_avatar_url,
-    ):
-        """
-        Asks an identity server for a third party invite.
-
-        Args:
-            requester (Requester)
-            id_server (str): hostname + optional port for the identity server.
-            medium (str): The literal string "email".
-            address (str): The third party address being invited.
-            room_id (str): The ID of the room to which the user is invited.
-            inviter_user_id (str): The user ID of the inviter.
-            room_alias (str): An alias for the room, for cosmetic notifications.
-            room_avatar_url (str): The URL of the room's avatar, for cosmetic
-                notifications.
-            room_join_rules (str): The join rules of the email (e.g. "public").
-            room_name (str): The m.room.name of the room.
-            inviter_display_name (str): The current display name of the
-                inviter.
-            inviter_avatar_url (str): The URL of the inviter's avatar.
-
-        Returns:
-            A deferred tuple containing:
-                token (str): The token which must be signed to prove authenticity.
-                public_keys ([{"public_key": str, "key_validity_url": str}]):
-                    public_key is a base64-encoded ed25519 public key.
-                fallback_public_key: One element from public_keys.
-                display_name (str): A user-friendly name to represent the invited
-                    user.
-        """
-
-        is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
-            id_server_scheme,
-            id_server,
-        )
-
-        invite_config = {
-            "medium": medium,
-            "address": address,
-            "room_id": room_id,
-            "room_alias": room_alias,
-            "room_avatar_url": room_avatar_url,
-            "room_join_rules": room_join_rules,
-            "room_name": room_name,
-            "sender": inviter_user_id,
-            "sender_display_name": inviter_display_name,
-            "sender_avatar_url": inviter_avatar_url,
-        }
-
-        try:
-            data = yield self.simple_http_client.post_json_get_json(
-                is_url, invite_config
-            )
-        except HttpResponseException as e:
-            # Some identity servers may only support application/x-www-form-urlencoded
-            # types. This is especially true with old instances of Sydent, see
-            # https://github.com/matrix-org/sydent/pull/170
-            logger.info(
-                "Failed to POST %s with JSON, falling back to urlencoded form: %s",
-                is_url,
-                e,
-            )
-            data = yield self.simple_http_client.post_urlencoded_get_json(
-                is_url, invite_config
-            )
-
-        # TODO: Check for success
-        token = data["token"]
-        public_keys = data.get("public_keys", [])
-        if "public_key" in data:
-            fallback_public_key = {
-                "public_key": data["public_key"],
-                "key_validity_url": "%s%s/_matrix/identity/api/v1/pubkey/isvalid"
-                % (id_server_scheme, id_server),
-            }
-        else:
-            fallback_public_key = public_keys[0]
-
-        if not public_keys:
-            public_keys.append(fallback_public_key)
-        display_name = data["display_name"]
-        return token, public_keys, fallback_public_key, display_name
 
     @defer.inlineCallbacks
     def _is_host_in_room(self, current_state_ids):
@@ -1057,7 +922,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             # The 'except' clause is very broad, but we need to
             # capture everything from DNS failures upwards
             #
-            logger.warn("Failed to reject invite: %s", e)
+            logger.warning("Failed to reject invite: %s", e)
 
             yield self.store.locally_reject_invite(target.to_string(), room_id)
             return {}
