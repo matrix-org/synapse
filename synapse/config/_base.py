@@ -500,7 +500,7 @@ class RootConfig(object):
 
 
 class Config(object):
-    def __init__(self, root_config: Optional[RootConfig] = None):
+    def __init__(self, root_config):
         self.root = root_config
 
     def __getattr__(self, item, from_root=False):
