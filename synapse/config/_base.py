@@ -18,9 +18,8 @@
 import argparse
 import errno
 import os
-from textwrap import dedent
 from collections import OrderedDict
-
+from textwrap import dedent
 
 from six import integer_types
 
