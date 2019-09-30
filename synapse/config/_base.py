@@ -19,6 +19,8 @@ import argparse
 import errno
 import os
 from textwrap import dedent
+from collections import OrderedDict
+
 
 from six import integer_types
 
@@ -51,127 +53,100 @@ Missing mandatory `server_name` config option.
 """
 
 
-class Config(object):
-    @staticmethod
-    def parse_size(value):
-        if isinstance(value, integer_types):
-            return value
-        sizes = {"K": 1024, "M": 1024 * 1024}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
+def path_exists(file_path):
+    """Check if a file exists
 
-    @staticmethod
-    def parse_duration(value):
-        if isinstance(value, integer_types):
-            return value
-        second = 1000
-        minute = 60 * second
-        hour = 60 * minute
-        day = 24 * hour
-        week = 7 * day
-        year = 365 * day
-        sizes = {"s": second, "m": minute, "h": hour, "d": day, "w": week, "y": year}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
+    Unlike os.path.exists, this throws an exception if there is an error
+    checking if the file exists (for example, if there is a perms error on
+    the parent dir).
 
-    @staticmethod
-    def abspath(file_path):
-        return os.path.abspath(file_path) if file_path else file_path
+    Returns:
+        bool: True if the file exists; False if not.
+    """
+    try:
+        os.stat(file_path)
+        return True
+    except OSError as e:
+        if e.errno != errno.ENOENT:
+            raise e
+        return False
 
-    @classmethod
-    def path_exists(cls, file_path):
-        """Check if a file exists
 
-        Unlike os.path.exists, this throws an exception if there is an error
-        checking if the file exists (for example, if there is a perms error on
-        the parent dir).
+class RootConfig(object):
 
-        Returns:
-            bool: True if the file exists; False if not.
-        """
-        try:
-            os.stat(file_path)
-            return True
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise e
-            return False
+    config_classes = []
+
+    def __init__(self):
+        self._configs = OrderedDict()
+
+        for config_class in self.config_classes:
+            if hasattr(config_class, "section"):
+                name = config_class.section
+            else:
+                name = config_class.__name__.replace("Config", "").lower()
+
+            try:
+                conf = config_class(self)
+            except Exception as e:
+                raise Exception("Failed making %s: %r" % (name, e))
+            conf.section = name
+            self._configs[name] = conf
+
+        print(self._configs)
+
+    def invoke_all(self, func_name, *args, **kwargs):
+
+        res = OrderedDict()
+
+        for name, config in self._configs.items():
+            if hasattr(config, func_name):
+                res[name] = getattr(config, func_name)(*args, **kwargs)
+
+        return res
 
     @classmethod
-    def check_file(cls, file_path, config_name):
-        if file_path is None:
-            raise ConfigError("Missing config for %s." % (config_name,))
-        try:
-            os.stat(file_path)
-        except OSError as e:
-            raise ConfigError(
-                "Error accessing file '%s' (config for %s): %s"
-                % (file_path, config_name, e.strerror)
-            )
-        return cls.abspath(file_path)
+    def invoke_all_static(cls, func_name, *args, **kwargs):
+        for config in cls.config_classes:
+            if hasattr(config, func_name):
+                getattr(config, func_name)(*args, **kwargs)
 
-    @classmethod
-    def ensure_directory(cls, dir_path):
-        dir_path = cls.abspath(dir_path)
-        try:
-            os.makedirs(dir_path)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
-        if not os.path.isdir(dir_path):
-            raise ConfigError("%s is not a directory" % (dir_path,))
-        return dir_path
+    def __getattr__(self, item):
+        if item in self._configs.keys():
+            return self._configs[item]
 
-    @classmethod
-    def read_file(cls, file_path, config_name):
-        cls.check_file(file_path, config_name)
-        with open(file_path) as file_stream:
-            return file_stream.read()
+        return self._get_unclassed_config(None, item)
 
-    def invoke_all(self, name, *args, **kargs):
-        """Invoke all instance methods with the given name and arguments in the
-        class's MRO.
+    def _get_unclassed_config(self, asking_section, item):
+
+        for key, val in self._configs.items():
+            if key == asking_section:
+                continue
+
+            if item in dir(val):
+                return getattr(val, item)
+
+        raise AttributeError(item, "not found in %s" % (list(self._configs.keys()),))
+
+    def parse_config_dict(self, config_dict, config_dir_path=None, data_dir_path=None):
+        """Read the information from the config dict into this Config object.
 
         Args:
-            name (str): Name of function to invoke
-            *args
-            **kwargs
+            config_dict (dict): Configuration data, as read from the yaml
 
-        Returns:
-            list: The list of the return values from each method called
+            config_dir_path (str): The path where the config files are kept. Used to
+                create filenames for things like the log config and the signing key.
+
+            data_dir_path (str): The path where the data files are kept. Used to create
+                filenames for things like the database and media store.
         """
-        results = []
-        for cls in type(self).mro():
-            if name in cls.__dict__:
-                results.append(getattr(cls, name)(self, *args, **kargs))
-        return results
+        self.invoke_all(
+            "read_config",
+            config_dict,
+            config_dir_path=config_dir_path,
+            data_dir_path=data_dir_path,
+        )
 
-    @classmethod
-    def invoke_all_static(cls, name, *args, **kargs):
-        """Invoke all static methods with the given name and arguments in the
-        class's MRO.
-
-        Args:
-            name (str): Name of function to invoke
-            *args
-            **kwargs
-
-        Returns:
-            list: The list of the return values from each method called
-        """
-        results = []
-        for c in cls.mro():
-            if name in c.__dict__:
-                results.append(getattr(c, name)(*args, **kargs))
-        return results
+    read_config = parse_config_dict
 
     def generate_config(
         self,
@@ -187,6 +162,7 @@ class Config(object):
         tls_private_key_path=None,
         acme_domain=None,
     ):
+
         """Build a default configuration file
 
         This is used when the user explicitly asks us to generate a config file
@@ -242,6 +218,7 @@ class Config(object):
         Returns:
             str: the yaml config file
         """
+
         return "\n\n".join(
             dedent(conf)
             for conf in self.invoke_all(
@@ -257,96 +234,8 @@ class Config(object):
                 tls_certificate_path=tls_certificate_path,
                 tls_private_key_path=tls_private_key_path,
                 acme_domain=acme_domain,
-            )
+            ).values()
         )
-
-    @classmethod
-    def load_config(cls, description, argv):
-        """Parse the commandline and config files
-
-        Doesn't support config-file-generation: used by the worker apps.
-
-        Returns: Config object.
-        """
-        config_parser = argparse.ArgumentParser(description=description)
-        cls.add_arguments_to_parser(config_parser)
-        obj, _ = cls.load_config_with_parser(config_parser, argv)
-
-        return obj
-
-    @classmethod
-    def add_arguments_to_parser(cls, config_parser):
-        """Adds all the config flags to an ArgumentParser.
-
-        Doesn't support config-file-generation: used by the worker apps.
-
-        Used for workers where we want to add extra flags/subcommands.
-
-        Args:
-            config_parser (ArgumentParser): App description
-        """
-
-        config_parser.add_argument(
-            "-c",
-            "--config-path",
-            action="append",
-            metavar="CONFIG_FILE",
-            help="Specify config file. Can be given multiple times and"
-            " may specify directories containing *.yaml files.",
-        )
-
-        config_parser.add_argument(
-            "--keys-directory",
-            metavar="DIRECTORY",
-            help="Where files such as certs and signing keys are stored when"
-            " their location is not given explicitly in the config."
-            " Defaults to the directory containing the last config file",
-        )
-
-        cls.invoke_all_static("add_arguments", config_parser)
-
-    @classmethod
-    def load_config_with_parser(cls, parser, argv):
-        """Parse the commandline and config files with the given parser
-
-        Doesn't support config-file-generation: used by the worker apps.
-
-        Used for workers where we want to add extra flags/subcommands.
-
-        Args:
-            parser (ArgumentParser)
-            argv (list[str])
-
-        Returns:
-            tuple[HomeServerConfig, argparse.Namespace]: Returns the parsed
-            config object and the parsed argparse.Namespace object from
-            `parser.parse_args(..)`
-        """
-
-        obj = cls()
-
-        config_args = parser.parse_args(argv)
-
-        config_files = find_config_files(search_paths=config_args.config_path)
-
-        if not config_files:
-            parser.error("Must supply a config file.")
-
-        if config_args.keys_directory:
-            config_dir_path = config_args.keys_directory
-        else:
-            config_dir_path = os.path.dirname(config_files[-1])
-        config_dir_path = os.path.abspath(config_dir_path)
-        data_dir_path = os.getcwd()
-
-        config_dict = read_config_files(config_files)
-        obj.parse_config_dict(
-            config_dict, config_dir_path=config_dir_path, data_dir_path=data_dir_path
-        )
-
-        obj.invoke_all("read_arguments", config_args)
-
-        return obj, config_args
 
     @classmethod
     def load_or_generate_config(cls, description, argv):
@@ -444,7 +333,7 @@ class Config(object):
                 )
 
             (config_path,) = config_files
-            if not cls.path_exists(config_path):
+            if not path_exists(config_path):
                 print("Generating config file %s" % (config_path,))
 
                 if config_args.data_directory:
@@ -469,7 +358,7 @@ class Config(object):
                     open_private_ports=config_args.open_private_ports,
                 )
 
-                if not cls.path_exists(config_dir_path):
+                if not path_exists(config_dir_path):
                     os.makedirs(config_dir_path)
                 with open(config_path, "w") as config_file:
                     config_file.write("# vim:ft=yaml\n\n")
@@ -518,27 +407,176 @@ class Config(object):
 
         return obj
 
-    def parse_config_dict(self, config_dict, config_dir_path, data_dir_path):
-        """Read the information from the config dict into this Config object.
+    @classmethod
+    def load_config(cls, description, argv):
+        """Parse the commandline and config files
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Returns: Config object.
+        """
+        config_parser = argparse.ArgumentParser(description=description)
+        cls.add_arguments_to_parser(config_parser)
+        obj, _ = cls.load_config_with_parser(config_parser, argv)
+
+        return obj
+
+    @classmethod
+    def add_arguments_to_parser(cls, config_parser):
+        """Adds all the config flags to an ArgumentParser.
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Used for workers where we want to add extra flags/subcommands.
 
         Args:
-            config_dict (dict): Configuration data, as read from the yaml
-
-            config_dir_path (str): The path where the config files are kept. Used to
-                create filenames for things like the log config and the signing key.
-
-            data_dir_path (str): The path where the data files are kept. Used to create
-                filenames for things like the database and media store.
+            config_parser (ArgumentParser): App description
         """
-        self.invoke_all(
-            "read_config",
-            config_dict,
-            config_dir_path=config_dir_path,
-            data_dir_path=data_dir_path,
+
+        config_parser.add_argument(
+            "-c",
+            "--config-path",
+            action="append",
+            metavar="CONFIG_FILE",
+            help="Specify config file. Can be given multiple times and"
+            " may specify directories containing *.yaml files.",
         )
+
+        config_parser.add_argument(
+            "--keys-directory",
+            metavar="DIRECTORY",
+            help="Where files such as certs and signing keys are stored when"
+            " their location is not given explicitly in the config."
+            " Defaults to the directory containing the last config file",
+        )
+
+        cls.invoke_all_static("add_arguments", config_parser)
+
+    @classmethod
+    def load_config_with_parser(cls, parser, argv):
+        """Parse the commandline and config files with the given parser
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Used for workers where we want to add extra flags/subcommands.
+
+        Args:
+            parser (ArgumentParser)
+            argv (list[str])
+
+        Returns:
+            tuple[HomeServerConfig, argparse.Namespace]: Returns the parsed
+            config object and the parsed argparse.Namespace object from
+            `parser.parse_args(..)`
+        """
+
+        obj = cls()
+
+        config_args = parser.parse_args(argv)
+
+        config_files = find_config_files(search_paths=config_args.config_path)
+
+        if not config_files:
+            parser.error("Must supply a config file.")
+
+        if config_args.keys_directory:
+            config_dir_path = config_args.keys_directory
+        else:
+            config_dir_path = os.path.dirname(config_files[-1])
+        config_dir_path = os.path.abspath(config_dir_path)
+        data_dir_path = os.getcwd()
+
+        config_dict = read_config_files(config_files)
+        obj.parse_config_dict(
+            config_dict, config_dir_path=config_dir_path, data_dir_path=data_dir_path
+        )
+
+        obj.invoke_all("read_arguments", config_args)
+
+        return obj, config_args
 
     def generate_missing_files(self, config_dict, config_dir_path):
         self.invoke_all("generate_files", config_dict, config_dir_path)
+
+
+class Config(object):
+    def __init__(self, root_config=None):
+        self.root = root_config
+
+    def __getattr__(self, item, from_root=False):
+        if self.root is None or from_root:
+            raise AttributeError(item)
+        else:
+            return self.root._get_unclassed_config(self.section, item)
+
+    @staticmethod
+    def parse_size(value):
+        if isinstance(value, integer_types):
+            return value
+        sizes = {"K": 1024, "M": 1024 * 1024}
+        size = 1
+        suffix = value[-1]
+        if suffix in sizes:
+            value = value[:-1]
+            size = sizes[suffix]
+        return int(value) * size
+
+    @staticmethod
+    def parse_duration(value):
+        if isinstance(value, integer_types):
+            return value
+        second = 1000
+        minute = 60 * second
+        hour = 60 * minute
+        day = 24 * hour
+        week = 7 * day
+        year = 365 * day
+        sizes = {"s": second, "m": minute, "h": hour, "d": day, "w": week, "y": year}
+        size = 1
+        suffix = value[-1]
+        if suffix in sizes:
+            value = value[:-1]
+            size = sizes[suffix]
+        return int(value) * size
+
+    @staticmethod
+    def abspath(file_path):
+        return os.path.abspath(file_path) if file_path else file_path
+
+    @classmethod
+    def path_exists(cls, file_path):
+        return path_exists(file_path)
+
+    @classmethod
+    def check_file(cls, file_path, config_name):
+        if file_path is None:
+            raise ConfigError("Missing config for %s." % (config_name,))
+        try:
+            os.stat(file_path)
+        except OSError as e:
+            raise ConfigError(
+                "Error accessing file '%s' (config for %s): %s"
+                % (file_path, config_name, e.strerror)
+            )
+        return cls.abspath(file_path)
+
+    @classmethod
+    def ensure_directory(cls, dir_path):
+        dir_path = cls.abspath(dir_path)
+        try:
+            os.makedirs(dir_path)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+        if not os.path.isdir(dir_path):
+            raise ConfigError("%s is not a directory" % (dir_path,))
+        return dir_path
+
+    @classmethod
+    def read_file(cls, file_path, config_name):
+        cls.check_file(file_path, config_name)
+        with open(file_path) as file_stream:
+            return file_stream.read()
 
 
 def read_config_files(config_files):
