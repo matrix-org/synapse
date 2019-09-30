@@ -15,6 +15,7 @@
 
 import os
 from collections import namedtuple
+from typing import Dict, List
 
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
@@ -61,7 +62,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         Dictionary mapping from media type string to list of
         ThumbnailRequirement tuples.
     """
-    requirements = {}
+    requirements = {}  # type: Dict[str, List]
     for size in thumbnail_sizes:
         width = size["width"]
         height = size["height"]
@@ -130,7 +131,7 @@ class ContentRepositoryConfig(Config):
         #
         # We don't create the storage providers here as not all workers need
         # them to be started.
-        self.media_storage_providers = []
+        self.media_storage_providers = []  # type: List[tuple]
 
         for provider_config in storage_providers:
             # We special case the module "file_system" so as not to need to

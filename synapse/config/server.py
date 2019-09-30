@@ -19,6 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
+from typing import List
 
 import attr
 import yaml
@@ -243,7 +244,7 @@ class ServerConfig(Config):
         # events with profile information that differ from the target's global profile.
         self.allow_per_room_profiles = config.get("allow_per_room_profiles", True)
 
-        self.listeners = []
+        self.listeners = []  # type: List[dict]
         for listener in config.get("listeners", []):
             if not isinstance(listener.get("port", None), int):
                 raise ConfigError(
@@ -287,7 +288,10 @@ class ServerConfig(Config):
                 validator=attr.validators.instance_of(bool), default=False
             )
             complexity = attr.ib(
-                validator=attr.validators.instance_of((int, float)), default=1.0
+                validator=attr.validators.instance_of(
+                    (float, int)  # type: ignore[arg-type]
+                ),
+                default=1.0,
             )
             complexity_error = attr.ib(
                 validator=attr.validators.instance_of(str),
@@ -366,7 +370,7 @@ class ServerConfig(Config):
             "cleanup_extremities_with_dummy_events", True
         )
 
-    def has_tls_listener(self):
+    def has_tls_listener(self) -> bool:
         return any(l["tls"] for l in self.listeners)
 
     def generate_config_section(

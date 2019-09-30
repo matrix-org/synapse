@@ -91,10 +91,10 @@ class RootConfig(object):
             conf.section = name
             self._configs[name] = conf
 
-        print(self._configs)
-
     def invoke_all(self, func_name, *args, **kwargs):
-
+        """
+        Invoke a function on all instantiated config classes.
+        """
         res = OrderedDict()
 
         for name, config in self._configs.items():
@@ -644,3 +644,6 @@ def find_config_files(search_paths):
             else:
                 config_files.append(config_path)
     return config_files
+
+
+__all__ = ["Config", "RootConfig"]

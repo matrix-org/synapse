@@ -18,6 +18,7 @@ import os
 import warnings
 from datetime import datetime
 from hashlib import sha256
+from typing import List
 
 import six
 
@@ -57,7 +58,7 @@ class TlsConfig(Config):
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
 
-        if self.has_tls_listener():
+        if self.server.has_tls_listener(False):
             if not self.tls_certificate_file:
                 raise ConfigError(
                     "tls_certificate_path must be specified if TLS-enabled listeners are "
@@ -108,7 +109,7 @@ class TlsConfig(Config):
         )
 
         # Support globs (*) in whitelist values
-        self.federation_certificate_verification_whitelist = []
+        self.federation_certificate_verification_whitelist = []  # type: List[str]
         for entry in fed_whitelist_entries:
             try:
                 entry_regex = glob_to_regex(entry.encode("ascii").decode("ascii"))
