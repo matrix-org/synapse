@@ -210,11 +210,6 @@ class PushRulesWorkerStore(
             actions=rule["actions"],
         )
 
-        logger.info("### Deleting old push rule with id %s", rule["rule_id"])
-
-        # Delete push rule for the old room
-        yield self.delete_push_rule(user_id, rule["rule_id"])
-
     @defer.inlineCallbacks
     def move_push_rules_from_room_to_room_for_user(
         self, old_room_id, new_room_id, user_id
