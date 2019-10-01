@@ -1389,6 +1389,22 @@ class EventsStore(
             ],
         )
 
+        for event, _ in events_and_contexts:
+            if not event.internal_metadata.is_redacted():
+                # If we're persisting an unredacted event we go and ensure
+                # that we mark any redactions that reference this event as
+                # requiring censoring.
+                self._simple_update_txn(
+                    txn,
+                    table="redactions",
+                    keyvalues={
+                        "redacts": event.event_id,
+                    },
+                    updatevalues={
+                        "have_censored": False,
+                    }
+                )
+
     def _store_rejected_events_txn(self, txn, events_and_contexts):
         """Add rows to the 'rejections' table for received events which were
         rejected
@@ -1589,7 +1605,7 @@ class EventsStore(
         sql = """
             SELECT redact_event.event_id, redacts FROM redactions
             INNER JOIN events AS redact_event USING (event_id)
-            INNER JOIN events AS original_event ON (
+            LEFT JOIN events AS original_event ON (
                 redact_event.room_id = original_event.room_id
                 AND redacts = original_event.event_id
             )
