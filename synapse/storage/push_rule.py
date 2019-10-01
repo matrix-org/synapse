@@ -231,8 +231,6 @@ class PushRulesWorkerStore(
         )
         user_push_rules = yield self.get_push_rules_for_user(user_id)
 
-        logger.info("### Got push rules: %s", user_push_rules)
-
         # Get rules relating to the old room, move them to the new room, then
         # delete them from the old room
         for rule in user_push_rules:
