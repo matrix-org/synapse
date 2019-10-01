@@ -314,7 +314,7 @@ listeners:
 #
 # Defaults to `7d`. Set to `null` to disable.
 #
-redaction_retention_period: 7d
+#redaction_retention_period: 28d
 
 # How long to track users' last seen time and IPs in the database.
 #
