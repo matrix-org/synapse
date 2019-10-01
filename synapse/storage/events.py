@@ -1589,36 +1589,29 @@ class EventsStore(
         if self.hs.config.redaction_retention_period is None:
             return
 
-        max_pos = yield self.find_first_stream_ordering_after_ts(
-            self._clock.time_msec() - self.hs.config.redaction_retention_period
-        )
+        before_ts = self._clock.time_msec() - self.hs.config.redaction_retention_period
 
         # We fetch all redactions that:
         #   1. point to an event we have,
-        #   2. has a stream ordering from before the cut off, and
+        #   2. has a received_ts from before the cut off, and
         #   3. we haven't yet censored.
         #
         # This is limited to 100 events to ensure that we don't try and do too
         # much at once. We'll get called again so this should eventually catch
         # up.
-        #
-        # We use the range [-max_pos, max_pos] to handle backfilled events,
-        # which are given negative stream ordering.
         sql = """
-            SELECT redact_event.event_id, redacts FROM redactions
-            INNER JOIN events AS redact_event USING (event_id)
+            SELECT redactions.event_id, redacts FROM redactions
             LEFT JOIN events AS original_event ON (
-                redact_event.room_id = original_event.room_id
-                AND redacts = original_event.event_id
+                redacts = original_event.event_id
             )
             WHERE NOT have_censored
-            AND ? <= redact_event.stream_ordering AND redact_event.stream_ordering <= ?
-            ORDER BY redact_event.stream_ordering ASC
+            AND redactions.received_ts <= ?
+            ORDER BY redactions.received_ts ASC
             LIMIT ?
         """
 
         rows = yield self._execute(
-            "_censor_redactions_fetch", None, sql, -max_pos, max_pos, 100
+            "_censor_redactions_fetch", None, sql, before_ts, 100
         )
 
         updates = []
