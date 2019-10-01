@@ -237,7 +237,6 @@ class PushRulesWorkerStore(
         # delete them from the old room
         for rule in user_push_rules:
             conditions = rule.get("conditions", [])
-            logger.info("### Rule: %s, conditions: %s", rule, conditions)
             if any(
                 (c.get("key") == "room_id" and c.get("pattern") == old_room_id)
                 for c in conditions
