@@ -1397,12 +1397,8 @@ class EventsStore(
                 self._simple_update_txn(
                     txn,
                     table="redactions",
-                    keyvalues={
-                        "redacts": event.event_id,
-                    },
-                    updatevalues={
-                        "have_censored": False,
-                    }
+                    keyvalues={"redacts": event.event_id},
+                    updatevalues={"have_censored": False},
                 )
 
     def _store_rejected_events_txn(self, txn, events_and_contexts):
@@ -1568,9 +1564,15 @@ class EventsStore(
     def _store_redaction(self, txn, event):
         # invalidate the cache for the redacted event
         txn.call_after(self._invalidate_get_event_cache, event.redacts)
-        txn.execute(
-            "INSERT INTO redactions (event_id, redacts) VALUES (?,?)",
-            (event.event_id, event.redacts),
+
+        self._simple_insert_txn(
+            txn,
+            table="redactions",
+            values={
+                "event_id": event.event_id,
+                "redacts": event.redacts,
+                "received_ts": self._clock.time_msec(),
+            },
         )
 
     @defer.inlineCallbacks
