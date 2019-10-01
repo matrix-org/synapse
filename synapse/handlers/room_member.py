@@ -211,6 +211,8 @@ class RoomMemberHandler(object):
             # Check if this is an upgraded room
             predecessor = yield self.store.get_room_predecessor(room_id)
 
+            logger.info("### Predecessor for %s: %s", room_id, predecessor)
+
             if predecessor:
                 # It is an upgraded room. Copy over old tags
                 self.copy_room_tags_and_direct_to_room(
@@ -240,30 +242,46 @@ class RoomMemberHandler(object):
         Returns:
             Deferred[None]
         """
+        logger.info(
+            "### Copying room tags and direct room state from %s to %s for %s",
+            old_room_id,
+            new_room_id,
+            user_id,
+        )
         # Retrieve user account data for predecessor room
         user_account_data, _ = yield self.store.get_account_data_for_user(user_id)
 
         # Copy direct message state if applicable
         direct_rooms = user_account_data.get("m.direct", {})
 
+        logger.info("### Found direct rooms: %s", direct_rooms)
+
         # Check which key this room is under
         if isinstance(direct_rooms, dict):
             for key, room_id_list in direct_rooms.items():
                 if old_room_id in room_id_list and new_room_id not in room_id_list:
                     # Add new room_id to this key
+                    logger.info("### Appending %s to %s", new_room_id, key)
                     direct_rooms[key].append(new_room_id)
 
                     # Save back to user's m.direct account data
+                    logger.info("### Saving account data")
                     yield self.store.add_account_data_for_user(
                         user_id, "m.direct", direct_rooms
                     )
                     break
 
         # Copy room tags if applicable
+        logger.info("### Copying room tags")
         room_tags = yield self.store.get_tags_for_room(user_id, old_room_id)
+
+        logger.info("### Got tags for old room id %s: %s", old_room_id, room_tags)
 
         # Copy each room tag to the new room
         for tag, tag_content in room_tags.items():
+            logger.info(
+                "### Adding tag %s with content %s to %s", tag, tag_content, new_room_id
+            )
             yield self.store.add_tag_to_room(user_id, new_room_id, tag, tag_content)
 
     @defer.inlineCallbacks

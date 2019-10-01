@@ -191,6 +191,7 @@ class PushRulesWorkerStore(
             user_id (str): ID of user the push rule belongs to.
             rule (Dict): A push rule.
         """
+        logger.info("### Moving rule to %s: %s", new_room_id, rule)
         # Create new rule id
         rule_id_scope = "/".join(rule["rule_id"].split("/")[:-1])
         new_rule_id = rule_id_scope + "/" + new_room_id
@@ -209,6 +210,8 @@ class PushRulesWorkerStore(
             actions=rule["actions"],
         )
 
+        logger.info("### Deleting old push rule with id %s", rule["rule_id"])
+
         # Delete push rule for the old room
         yield self.delete_push_rule(user_id, rule["rule_id"])
 
@@ -225,12 +228,21 @@ class PushRulesWorkerStore(
             user_id (str): ID of user to copy push rules for.
         """
         # Retrieve push rules for this user
+        logger.info(
+            "### Copying push rules from %s to %s for %s",
+            old_room_id,
+            new_room_id,
+            user_id,
+        )
         user_push_rules = yield self.get_push_rules_for_user(user_id)
+
+        logger.info("### Got push rules: %s", user_push_rules)
 
         # Get rules relating to the old room, move them to the new room, then
         # delete them from the old room
         for rule in user_push_rules:
             conditions = rule.get("conditions", [])
+            logger.info("### Rule: %s, conditions: %s", rule, conditions)
             if any(
                 (c.get("key") == "room_id" and c.get("pattern") == old_room_id)
                 for c in conditions
@@ -349,6 +361,7 @@ class PushRuleStore(PushRulesWorkerStore):
         before=None,
         after=None,
     ):
+        logger.info("### add_push_rule adding rule id: %s", rule_id)
         conditions_json = json.dumps(conditions)
         actions_json = json.dumps(actions)
         with self._push_rules_stream_id_gen.get_next() as ids:
@@ -393,6 +406,7 @@ class PushRuleStore(PushRulesWorkerStore):
         before,
         after,
     ):
+        logger.info("### Relative transaction running")
         # Lock the table since otherwise we'll have annoying races between the
         # SELECT here and the UPSERT below.
         self.database_engine.lock_table(txn, "push_rules")
