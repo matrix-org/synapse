@@ -30,6 +30,8 @@ from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.storage import DataStore
 
+logger = logging.getLogger("update_database")
+
 
 class MockHomeserver(HomeServer):
     DATASTORE_CLASS = DataStore
@@ -48,7 +50,10 @@ class MockHomeserver(HomeServer):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="A script to update the schema of a given database"
+        description=(
+            "A script to update the schema of a given database and run background updates"
+            " on it."
+        )
     )
     parser.add_argument("-v", action='store_true')
     parser.add_argument(
@@ -67,6 +72,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(**logging_config)
 
+    # Load, process and sanity-check the config.
     hs_config = yaml.safe_load(args.database_config)
 
     config = HomeServerConfig()
@@ -89,26 +95,38 @@ if __name__ == "__main__":
         sys.stderr.write("The configuration file must have a 'database' section.\n")
         sys.exit(4)
 
+    # Instantiate and initialise the homeserver object.
     hs = MockHomeserver(
         config,
         create_engine(database_config),
         db_config=config.database_config,
     )
+    # setup() creates (if needed) and updates the database schema.
     hs.setup()
     store = hs.get_datastore()
 
     @defer.inlineCallbacks
     def run_background_updates():
+        # Check if there are background updates to be run.
         ready = yield store.has_completed_background_updates()
 
+        if not ready:
+            logger.info("Running pending background updates.")
+
         while not ready:
+            # Run the pending background updates.
             yield store.do_next_background_update(100)
             ready = yield store.has_completed_background_updates()
 
+        logger.info("Finished update, exiting.")
+
+        # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 
-    # Manually apply all background updates on the database.
-    reactor.callWhenRunning(lambda: run_as_background_process("bg_updates", run_background_updates))
+    # Apply all background updates on the database.
+    reactor.callWhenRunning(lambda: run_as_background_process(
+        "background_updates", run_background_updates
+    ))
 
     reactor.run()
 
