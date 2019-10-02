@@ -174,6 +174,9 @@ class RoomWorkerStore(SQLBaseStore):
 
             query_args += [last_joined_members, last_joined_members, last_room_id]
 
+        if ignore_non_federatable:
+            where_clauses.append("is_federatable")
+
         if search_filter and search_filter.get("generic_search_term", None):
             search_term = "%" + search_filter["generic_search_term"] + "%"
 
