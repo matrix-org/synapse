@@ -318,6 +318,7 @@ class StreamToken(
     )
 ):
     _SEPARATOR = "_"
+    START = None  # type: StreamToken
 
     @classmethod
     def from_string(cls, string):
@@ -402,7 +403,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     followed by the "stream_ordering" id of the event it comes after.
     """
 
-    __slots__ = []
+    __slots__ = []  # type: list
 
     @classmethod
     def parse(cls, string):
