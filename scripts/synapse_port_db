@@ -31,6 +31,7 @@ from twisted.enterprise import adbapi
 from twisted.internet import defer, reactor
 
 from synapse.config.homeserver import HomeServerConfig
+from synapse.logging.context import PreserveLoggingContext
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage._base import LoggingTransaction
@@ -105,6 +106,7 @@ class Store(DataStore):
         super(Store, self).__init__(db_conn, hs)
         self.db_pool = hs.get_db_pool()
 
+    @defer.inlineCallbacks
     def runInteraction(self, desc, func, *args, **kwargs):
         def r(conn):
             try:
@@ -130,7 +132,8 @@ class Store(DataStore):
                 logger.debug("[TXN FAIL] {%s} %s", desc, e)
                 raise
 
-        return self.db_pool.runWithConnection(r)
+        with PreserveLoggingContext():
+            return (yield self.db_pool.runWithConnection(r))
 
     def execute(self, f, *args, **kwargs):
         return self.runInteraction(f.__name__, f, *args, **kwargs)
@@ -960,14 +963,6 @@ if __name__ == "__main__":
         logging_config["filename"] = "port-synapse.log"
 
     logging.basicConfig(**logging_config)
-
-    # TODO: The store initialisation (or the call to has_completed_background_updates) is
-    #   causing some logging contexts to be lost. Currently figuring out what exactly does
-    #   that is not trivial, because we don't have an efficient way to know what lost its
-    #   context, only to know when we realise a context has been lost. This doesn't seem
-    #   to impact synapse_port_db, though, so for now we can just ignore warnings about
-    #   it, but that is something we should fix in the future.
-    logging.getLogger("synapse.logging.context").setLevel(logging.ERROR)
 
     sqlite_config = {
         "name": "sqlite3",
