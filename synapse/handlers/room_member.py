@@ -452,14 +452,14 @@ class RoomMemberHandler(object):
                 )
 
                 # Copy over user state if this is a join on an remote upgraded room
-                self.copy_user_state_on_room_upgrade(
+                yield self.copy_user_state_on_room_upgrade(
                     room_id, requester.user.to_string()
                 )
 
                 return remote_join_response
 
             # Copy over user state if this is a join on an local upgraded room
-            self.copy_user_state_on_room_upgrade(room_id, requester.user.to_string())
+            yield self.copy_user_state_on_room_upgrade(room_id, requester.user.to_string())
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
