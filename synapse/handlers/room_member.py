@@ -205,23 +205,6 @@ class RoomMemberHandler(object):
             if newly_joined:
                 yield self._user_joined_room(target, room_id)
 
-            # Copy over direct message status and room tags if this is a join
-            # on an upgraded room
-
-            # Check if this is an upgraded room
-            predecessor = yield self.store.get_room_predecessor(room_id)
-
-            logger.info("### Predecessor for %s: %s", room_id, predecessor)
-
-            if predecessor:
-                # It is an upgraded room. Copy over old tags
-                self.copy_room_tags_and_direct_to_room(
-                    predecessor["room_id"], room_id, user_id
-                )
-                # Copy over push rules
-                yield self.store.copy_push_rules_from_room_to_room_for_user(
-                    predecessor["room_id"], room_id, user_id
-                )
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
@@ -465,6 +448,24 @@ class RoomMemberHandler(object):
                     # This should be an auth check, but guests are a local concept,
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
+
+            # Copy over direct message status and room tags if this is a join
+            # on an upgraded room
+
+            # Check if this is an upgraded room
+            predecessor = yield self.store.get_room_predecessor(room_id)
+
+            logger.info("###! Predecessor for %s: %s", room_id, predecessor)
+
+            if predecessor:
+                # It is an upgraded room. Copy over old tags
+                self.copy_room_tags_and_direct_to_room(
+                    predecessor["room_id"], room_id, requester.user.to_string()
+                )
+                # Copy over push rules
+                yield self.store.copy_push_rules_from_room_to_room_for_user(
+                    predecessor["room_id"], room_id, requester.user.to_string()
+                )
 
             if not is_host_in_room:
                 inviter = yield self._get_inviter(target.to_string(), room_id)
