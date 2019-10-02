@@ -459,6 +459,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         state_ids = yield self.get_current_state_ids(room_id)
         create_id = state_ids.get((EventTypes.Create, ""))
+        logger.info("### State IDs: %s, Room ID: %s, Create ID: %s", state_ids, room_id, create_id)
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
