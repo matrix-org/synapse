@@ -361,6 +361,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
 
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
+
         handler = self.hs.get_room_list_handler()
         if server:
             data = yield handler.get_remote_public_room_list(
@@ -397,6 +401,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             network_tuple = ThirdPartyInstanceID(None, None)
         else:
             network_tuple = ThirdPartyInstanceID.from_string(third_party_instance_id)
+
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
 
         handler = self.hs.get_room_list_handler()
         if server:
