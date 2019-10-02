@@ -2703,7 +2703,9 @@ class FederationHandler(BaseHandler):
             # invite has been revoked.
             if original_invite.content:
                 display_name = original_invite.content["display_name"]
-                event_dict["content"]["third_party_invite"]["display_name"] = display_name
+                event_dict["content"]["third_party_invite"][
+                    "display_name"
+                ] = display_name
             else:
                 # Don't discard or raise an error here because that's not the right place
                 # to do auth checks. The auth check will fail on this invite because we
