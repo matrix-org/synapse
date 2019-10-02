@@ -150,6 +150,24 @@ class RoomWorkerStore(SQLBaseStore):
         where_clauses = []
         query_args = []
 
+        if network_tuple:
+            if network_tuple.appservice_id:
+                published_sql = """
+                    SELECT room_id from appservice_room_list
+                    WHERE appservice_id = ? AND network_id = ?
+                """
+                query_args.append(network_tuple.appservice_id)
+                query_args.append(network_tuple.network_id)
+            else:
+                published_sql = """
+                    SELECT room_id FROM rooms WHERE is_public
+                """
+        else:
+            published_sql = """
+                SELECT room_id FROM rooms WHERE is_public
+                UNION SELECT room_id from appservice_room_list
+            """
+
         # Work out the bounds if we're given them, these bounds look slightly
         # odd, but are designed to help query planner use indices by pulling
         # out a common bound.
@@ -174,6 +192,9 @@ class RoomWorkerStore(SQLBaseStore):
 
             query_args += [last_joined_members, last_joined_members, last_room_id]
 
+        if ignore_non_federatable:
+            where_clauses.append("is_federatable")
+
         if search_filter and search_filter.get("generic_search_term", None):
             search_term = "%" + search_filter["generic_search_term"] + "%"
 
@@ -187,24 +208,6 @@ class RoomWorkerStore(SQLBaseStore):
                 """
             )
             query_args += [search_term, search_term, search_term]
-
-        if network_tuple:
-            if network_tuple.appservice_id:
-                published_sql = """
-                    SELECT room_id from appservice_room_list
-                    WHERE appservice_id = ? AND network_id = ?
-                """
-                query_args.append(network_tuple.appservice_id)
-                query_args.append(network_tuple.network_id)
-            else:
-                published_sql = """
-                    SELECT room_id FROM rooms WHERE is_public
-                """
-        else:
-            published_sql = """
-                SELECT room_id FROM rooms WHERE is_public
-                UNION SELECT room_id from appservice_room_list
-            """
 
         where_clause = ""
         if where_clauses:
