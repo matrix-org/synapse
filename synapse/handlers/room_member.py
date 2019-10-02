@@ -217,7 +217,7 @@ class RoomMemberHandler(object):
                     predecessor["room_id"], room_id, user_id
                 )
                 # Copy over push rules
-                self.store.copy_push_rules_from_room_to_room_for_user(
+                yield self.store.copy_push_rules_from_room_to_room_for_user(
                     predecessor["room_id"], room_id, user_id
                 )
         elif event.membership == Membership.LEAVE:

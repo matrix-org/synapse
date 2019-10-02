@@ -231,7 +231,7 @@ class PushRulesWorkerStore(
                 (c.get("key") == "room_id" and c.get("pattern") == old_room_id)
                 for c in conditions
             ):
-                self.copy_push_rule_from_room_to_room(new_room_id, user_id, rule)
+                yield self.copy_push_rule_from_room_to_room(new_room_id, user_id, rule)
 
     @defer.inlineCallbacks
     def bulk_get_push_rules_for_room(self, event, context):
