@@ -238,6 +238,20 @@ class EventsWorkerStore(SQLBaseStore):
             # we have to recheck auth now.
 
             if not allow_rejected and entry.event.type == EventTypes.Redaction:
+                if not hasattr(entry.event, "redacts"):
+                    # A redacted redaction doesn't have a `redacts` key, in
+                    # which case lets just withhold the event.
+                    #
+                    # Note: Most of the time if the redactions has been
+                    # redacted we still have the un-redacted event in the DB
+                    # and so we'll still see the `redacts` key. However, this
+                    # isn't always true e.g. if we have censored the event.
+                    logger.debug(
+                        "Withholding redaction event %s as we don't have redacts key",
+                        event_id,
+                    )
+                    continue
+
                 redacted_event_id = entry.event.redacts
                 event_map = yield self._get_events_from_cache_or_db([redacted_event_id])
                 original_event_entry = event_map.get(redacted_event_id)

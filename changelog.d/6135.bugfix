@@ -1,0 +1,1 @@
+Fix bug in background update that adds last seen information to the `devices` table, and improve its performance on Postgres.
