@@ -1,0 +1,1 @@
+Fix fetching censored redactions from DB, which caused APIs like initial sync to fail if it tried to include the censored redaction.
