@@ -503,6 +503,9 @@ class Config(object):
         self.root = root_config
 
     def __getattr__(self, item, from_root=False):
+        if item in ["generate_config_section", "read_config"]:
+            raise AttributeError(item)
+
         if self.root is None or from_root:
             raise AttributeError(item)
         else:
