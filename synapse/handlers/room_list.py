@@ -143,12 +143,12 @@ class RoomListHandler(BaseHandler):
         if since_token:
             batch_token = RoomListNextBatch.from_token(since_token)
 
-            last_room_id = batch_token.last_room_id
+            bounds = (batch_token.last_joined_members, batch_token.last_room_id)
             forwards = batch_token.direction_is_forward
         else:
             batch_token = None
+            bounds = None
 
-            last_room_id = None
             forwards = True
 
         # we request one more than wanted to see if there are more pages to come
@@ -158,7 +158,7 @@ class RoomListHandler(BaseHandler):
             network_tuple,
             search_filter,
             probing_limit,
-            last_room_id=last_room_id,
+            bounds=bounds,
             forwards=forwards,
             ignore_non_federatable=from_federation,
         )
@@ -194,30 +194,38 @@ class RoomListHandler(BaseHandler):
             more_to_come = False
 
         if num_results > 0:
-            final_room_id = results[-1]["room_id"]
-            initial_room_id = results[0]["room_id"]
+            final_entry = results[-1]
+            initial_entry = results[0]
 
             if forwards:
                 if batch_token:
                     # If there was a token given then we assume that there
                     # must be previous results.
                     response["prev_batch"] = RoomListNextBatch(
-                        last_room_id=initial_room_id, direction_is_forward=False
+                        last_joined_members=initial_entry["num_joined_members"],
+                        last_room_id=initial_entry["room_id"],
+                        direction_is_forward=False,
                     ).to_token()
 
                 if more_to_come:
                     response["next_batch"] = RoomListNextBatch(
-                        last_room_id=final_room_id, direction_is_forward=True
+                        last_joined_members=final_entry["num_joined_members"],
+                        last_room_id=final_entry["room_id"],
+                        direction_is_forward=True,
                     ).to_token()
             else:
                 if batch_token:
                     response["next_batch"] = RoomListNextBatch(
-                        last_room_id=final_room_id, direction_is_forward=True
+                        last_joined_members=final_entry["num_joined_members"],
+                        last_room_id=final_entry["room_id"],
+                        direction_is_forward=True,
                     ).to_token()
 
                 if more_to_come:
                     response["prev_batch"] = RoomListNextBatch(
-                        last_room_id=initial_room_id, direction_is_forward=False
+                        last_joined_members=initial_entry["num_joined_members"],
+                        last_room_id=initial_entry["room_id"],
+                        direction_is_forward=False,
                     ).to_token()
 
         for room in results:
@@ -450,12 +458,17 @@ class RoomListNextBatch(
     namedtuple(
         "RoomListNextBatch",
         (
+            "last_joined_members",  # The count to get rooms after/before
             "last_room_id",  # The room_id to get rooms after/before
             "direction_is_forward",  # Bool if this is a next_batch, false if prev_batch
         ),
     )
 ):
-    KEY_DICT = {"last_room_id": "r", "direction_is_forward": "d"}
+    KEY_DICT = {
+        "last_joined_members": "m",
+        "last_room_id": "r",
+        "direction_is_forward": "d",
+    }
 
     REVERSE_KEY_DICT = {v: k for k, v in KEY_DICT.items()}
 

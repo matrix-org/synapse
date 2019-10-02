@@ -17,6 +17,7 @@
 import collections
 import logging
 import re
+from typing import Optional, Tuple
 
 from canonicaljson import json
 
@@ -25,6 +26,7 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.search import SearchStore
+from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
@@ -119,24 +121,25 @@ class RoomWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_largest_public_rooms(
         self,
-        network_tuple,
-        search_filter,
-        limit,
-        last_room_id,
-        forwards,
-        ignore_non_federatable=False,
+        network_tuple: Optional[ThirdPartyInstanceID],
+        search_filter: Optional[dict],
+        limit: Optional[int],
+        bounds: Optional[Tuple[int, str]],
+        forwards: bool,
+        ignore_non_federatable: bool = False,
     ):
         """Gets the largest public rooms (where largest is in terms of joined
         members, as tracked in the statistics table).
 
         Args:
-            network_tuple (ThirdPartyInstanceID|None):
-            search_filter (dict|None):
-            limit (int|None): Maxmimum number of rows to return, unlimited otherwise.
-            last_room_id (str|None): if present, a room ID which bounds the
-                result set, and is always *excluded* from the result set.
-            forwards (bool): true iff going forwards, going backwards otherwise
-            ignore_non_federatable (bool): If true filters out non-federatable rooms.
+            network_tuple
+            search_filter
+            limit: Maxmimum number of rows to return, unlimited otherwise.
+            bounds: An uppoer or lower bound to apply to result set if given,
+                consists of a joined member count and room_id (these are
+                excluded from result set).
+            forwards: true iff going forwards, going backwards otherwise
+            ignore_non_federatable: If true filters out non-federatable rooms.
 
         Returns:
             Rooms in order: biggest number of joined users first.
@@ -147,13 +150,29 @@ class RoomWorkerStore(SQLBaseStore):
         where_clauses = []
         query_args = []
 
-        if last_room_id:
+        # Work out the bounds if we're given them, these bounds look slightly
+        # odd, but are designed to help query planner use indices by pulling
+        # out a common bound.
+        if bounds:
+            last_joined_members, last_room_id = bounds
             if forwards:
-                where_clauses.append("room_id < ?")
+                where_clauses.append(
+                    """
+                        joined_members <= ? AND (
+                            joined_members < ? OR room_id < ?
+                        )
+                    """
+                )
             else:
-                where_clauses.append("? < room_id")
+                where_clauses.append(
+                    """
+                        joined_members >= ? AND (
+                            joined_members > ? OR room_id > ?
+                        )
+                    """
+                )
 
-            query_args += [last_room_id]
+            query_args += [last_joined_members, last_joined_members, last_room_id]
 
         if search_filter and search_filter.get("generic_search_term", None):
             search_term = "%" + search_filter["generic_search_term"] + "%"
