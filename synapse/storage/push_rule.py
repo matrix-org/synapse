@@ -183,8 +183,8 @@ class PushRulesWorkerStore(
         return results
 
     @defer.inlineCallbacks
-    def move_push_rule_from_room_to_room(self, new_room_id, user_id, rule):
-        """Move a single push rule from one room to another for a specific user.
+    def copy_push_rule_from_room_to_room(self, new_room_id, user_id, rule):
+        """Copy a single push rule from one room to another for a specific user.
 
         Args:
             new_room_id (str): ID of the new room.
@@ -211,10 +211,10 @@ class PushRulesWorkerStore(
         )
 
     @defer.inlineCallbacks
-    def move_push_rules_from_room_to_room_for_user(
+    def copy_push_rules_from_room_to_room_for_user(
         self, old_room_id, new_room_id, user_id
     ):
-        """Move all of the push rules from one room to another for a specific
+        """Copy all of the push rules from one room to another for a specific
         user.
 
         Args:
@@ -231,15 +231,14 @@ class PushRulesWorkerStore(
         )
         user_push_rules = yield self.get_push_rules_for_user(user_id)
 
-        # Get rules relating to the old room, move them to the new room, then
-        # delete them from the old room
+        # Get rules relating to the old room and copy them to the new room
         for rule in user_push_rules:
             conditions = rule.get("conditions", [])
             if any(
                 (c.get("key") == "room_id" and c.get("pattern") == old_room_id)
                 for c in conditions
             ):
-                self.move_push_rule_from_room_to_room(new_room_id, user_id, rule)
+                yield self.copy_push_rule_from_room_to_room(new_room_id, user_id, rule)
 
     @defer.inlineCallbacks
     def bulk_get_push_rules_for_room(self, event, context):
