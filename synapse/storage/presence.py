@@ -18,10 +18,9 @@ from collections import namedtuple
 from twisted.internet import defer
 
 from synapse.api.constants import PresenceState
+from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.util import batch_iter
 from synapse.util.caches.descriptors import cached, cachedList
-
-from ._base import SQLBaseStore
 
 
 class UserPresenceState(
@@ -119,14 +118,13 @@ class PresenceStore(SQLBaseStore):
         )
 
         # Delete old rows to stop database from getting really big
-        sql = (
-            "DELETE FROM presence_stream WHERE" " stream_id < ?" " AND user_id IN (%s)"
-        )
+        sql = "DELETE FROM presence_stream WHERE stream_id < ? AND "
 
         for states in batch_iter(presence_states, 50):
-            args = [stream_id]
-            args.extend(s.user_id for s in states)
-            txn.execute(sql % (",".join("?" for _ in states),), args)
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "user_id", [s.user_id for s in states]
+            )
+            txn.execute(sql + clause, [stream_id] + list(args))
 
     def get_all_presence_updates(self, last_id, current_id):
         if last_id == current_id:

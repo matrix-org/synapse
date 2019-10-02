@@ -24,6 +24,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.storage._base import add_in_list_sql_clause
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 from .background_updates import BackgroundUpdateStore
@@ -385,8 +386,9 @@ class SearchStore(SearchBackgroundUpdateStore):
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
         if len(room_ids) < 500:
-            clauses.append("room_id IN (%s)" % (",".join(["?"] * len(room_ids)),))
-            args.extend(room_ids)
+            add_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids, clauses, args
+            )
 
         local_clauses = []
         for key in keys:
@@ -492,8 +494,9 @@ class SearchStore(SearchBackgroundUpdateStore):
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
         if len(room_ids) < 500:
-            clauses.append("room_id IN (%s)" % (",".join(["?"] * len(room_ids)),))
-            args.extend(room_ids)
+            add_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids, clauses, args
+            )
 
         local_clauses = []
         for key in keys:

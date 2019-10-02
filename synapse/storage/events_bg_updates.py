@@ -21,6 +21,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.background_updates import BackgroundUpdateStore
 
 logger = logging.getLogger(__name__)
@@ -312,12 +313,13 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     INNER JOIN event_json USING (event_id)
                     LEFT JOIN rejections USING (event_id)
                     WHERE
-                        prev_event_id IN (%s)
-                        AND NOT events.outlier
-                """ % (
-                    ",".join("?" for _ in to_check),
+                        NOT events.outlier
+                        AND
+                """
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "prev_event_id", to_check
                 )
-                txn.execute(sql, to_check)
+                txn.execute(sql + clause, list(args))
 
                 for prev_event_id, event_id, metadata, rejected in txn:
                     if event_id in graph:
