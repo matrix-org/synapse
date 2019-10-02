@@ -24,7 +24,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.engines import Sqlite3Engine
 from synapse.storage.search import SearchStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
@@ -77,27 +76,29 @@ class RoomWorkerStore(SQLBaseStore):
         def _count_public_rooms_txn(txn):
             query_args = []
 
-            appservice_where = ""
             if network_tuple:
-                appservice_where = "WHERE appservice_id = ? AND network_id = ?"
-                query_args.append(network_tuple.appservice_id or "")
-                query_args.append(network_tuple.network_id or "")
+                if network_tuple.appservice_id:
+                    published_sql = """
+                        SELECT room_id from appservice_room_list
+                        WHERE appservice_id = ? AND network_id = ?
+                    """
+                    query_args.append(network_tuple.appservice_id)
+                    query_args.append(network_tuple.network_id)
+                else:
+                    published_sql = """
+                        SELECT room_id FROM rooms WHERE is_public
+                    """
+            else:
+                published_sql = """
+                    SELECT room_id FROM rooms WHERE is_public
+                    UNION SELECT room_id from appservice_room_list
+            """
 
             sql = """
                 SELECT
                     COALESCE(COUNT(*), 0)
                 FROM (
-                    SELECT room_id FROM public_room_list_stream
-                    INNER JOIN (
-                        SELECT
-                            room_id, MAX(stream_id) AS stream_id, appservice_id,
-                            network_id
-                        FROM public_room_list_stream
-                        %(appservice_where)s
-                        GROUP BY room_id, appservice_id, network_id
-                    ) grouped USING (room_id, stream_id)
-                    GROUP BY room_id
-                    HAVING %(or_operator)s(visibility)
+                    %(published_sql)s
                 ) published
                 INNER JOIN room_stats_state USING (room_id)
                 INNER JOIN room_stats_current USING (room_id)
@@ -107,10 +108,7 @@ class RoomWorkerStore(SQLBaseStore):
                     )
                     AND joined_members > 0
             """ % {
-                "appservice_where": appservice_where,
-                "or_operator": "MAX"
-                if isinstance(self.database_engine, Sqlite3Engine)
-                else "bool_or",
+                "published_sql": published_sql
             }
 
             txn.execute(sql, query_args)
@@ -212,9 +210,6 @@ class RoomWorkerStore(SQLBaseStore):
         """ % {
             "published_sql": published_sql,
             "where_clause": where_clause,
-            "or_operator": "MAX"
-            if isinstance(self.database_engine, Sqlite3Engine)
-            else "bool_or",
             "dir": "DESC" if forwards else "ASC",
         }
 
