@@ -452,6 +452,8 @@ class RoomMemberHandler(object):
             # Copy over direct message status and room tags if this is a join
             # on an upgraded room
 
+            logger.info("### Checking Predecessor")
+
             # Check if this is an upgraded room
             predecessor = yield self.store.get_room_predecessor(room_id)
 
