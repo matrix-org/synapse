@@ -464,19 +464,18 @@ class RoomMemberHandler(object):
                 if requester.is_guest:
                     content["kind"] = "guest"
 
-                ret = yield self._remote_join(
+                remote_join_response = yield self._remote_join(
                     requester, remote_room_hosts, room_id, target, content
                 )
 
                 # Copy over direct message status and room tags if this is a join
                 # on an upgraded room
 
-                logger.info("### Checking Predecessor")
-
                 # Check if this is an upgraded room
                 predecessor = yield self.store.get_room_predecessor(room_id)
 
-                logger.info("###! Predecessor for %s: %s", room_id, predecessor)
+                logger.debug("Found predecessor for %s: %s. Copying over room tags and push "
+                             "rules", room_id, predecessor)
 
                 if predecessor:
                     # It is an upgraded room. Copy over old tags
@@ -488,7 +487,7 @@ class RoomMemberHandler(object):
                         predecessor["room_id"], room_id, requester.user.to_string()
                     )
 
-                return ret
+                return remote_join_response
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
