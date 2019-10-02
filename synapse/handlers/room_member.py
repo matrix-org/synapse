@@ -449,26 +449,6 @@ class RoomMemberHandler(object):
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
 
-            # Copy over direct message status and room tags if this is a join
-            # on an upgraded room
-
-            logger.info("### Checking Predecessor")
-
-            # Check if this is an upgraded room
-            predecessor = yield self.store.get_room_predecessor(room_id)
-
-            logger.info("###! Predecessor for %s: %s", room_id, predecessor)
-
-            if predecessor:
-                # It is an upgraded room. Copy over old tags
-                yield self.copy_room_tags_and_direct_to_room(
-                    predecessor["room_id"], room_id, requester.user.to_string()
-                )
-                # Copy over push rules
-                yield self.store.copy_push_rules_from_room_to_room_for_user(
-                    predecessor["room_id"], room_id, requester.user.to_string()
-                )
-
             if not is_host_in_room:
                 inviter = yield self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):
@@ -487,6 +467,27 @@ class RoomMemberHandler(object):
                 ret = yield self._remote_join(
                     requester, remote_room_hosts, room_id, target, content
                 )
+
+                # Copy over direct message status and room tags if this is a join
+                # on an upgraded room
+
+                logger.info("### Checking Predecessor")
+
+                # Check if this is an upgraded room
+                predecessor = yield self.store.get_room_predecessor(room_id)
+
+                logger.info("###! Predecessor for %s: %s", room_id, predecessor)
+
+                if predecessor:
+                    # It is an upgraded room. Copy over old tags
+                    yield self.copy_room_tags_and_direct_to_room(
+                        predecessor["room_id"], room_id, requester.user.to_string()
+                    )
+                    # Copy over push rules
+                    yield self.store.copy_push_rules_from_room_to_room_for_user(
+                        predecessor["room_id"], room_id, requester.user.to_string()
+                    )
+
                 return ret
 
         elif effective_membership_state == Membership.LEAVE:
