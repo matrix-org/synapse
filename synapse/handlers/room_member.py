@@ -459,7 +459,7 @@ class RoomMemberHandler(object):
 
             if predecessor:
                 # It is an upgraded room. Copy over old tags
-                self.copy_room_tags_and_direct_to_room(
+                yield self.copy_room_tags_and_direct_to_room(
                     predecessor["room_id"], room_id, requester.user.to_string()
                 )
                 # Copy over push rules
