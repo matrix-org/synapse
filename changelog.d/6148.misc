@@ -1,0 +1,1 @@
+Improve performance of `find_next_generated_user_id` DB query.

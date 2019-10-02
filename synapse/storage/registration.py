@@ -493,7 +493,9 @@ class RegistrationWorkerStore(SQLBaseStore):
         """
 
         def _find_next_generated_user_id(txn):
-            txn.execute("SELECT name FROM users")
+            # We bound between '@1' and '@a' to avoid pulling the entire table
+            # out.
+            txn.execute("SELECT name FROM users WHERE '@1' <= name AND name < '@a'")
 
             regex = re.compile(r"^@(\d+):")
 
