@@ -204,22 +204,6 @@ class RoomMemberHandler(object):
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
                 yield self._user_joined_room(target, room_id)
-
-            # Copy over direct message status and room tags if this is a join
-            # on an upgraded room
-
-            # Check if this is an upgraded room
-            predecessor = yield self.store.get_room_predecessor(room_id)
-
-            if predecessor:
-                # It is an upgraded room. Copy over old tags
-                self.copy_room_tags_and_direct_to_room(
-                    predecessor["room_id"], room_id, user_id
-                )
-                # Copy over push rules
-                yield self.store.copy_push_rules_from_room_to_room_for_user(
-                    predecessor["room_id"], room_id, user_id
-                )
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
@@ -463,10 +447,34 @@ class RoomMemberHandler(object):
                 if requester.is_guest:
                     content["kind"] = "guest"
 
-                ret = yield self._remote_join(
+                remote_join_response = yield self._remote_join(
                     requester, remote_room_hosts, room_id, target, content
                 )
-                return ret
+
+                # Copy over direct message status and room tags if this is a join
+                # on an upgraded room
+
+                # Check if this is an upgraded room
+                predecessor = yield self.store.get_room_predecessor(room_id)
+
+                logger.debug(
+                    "Found predecessor for %s: %s. Copying over room tags and push "
+                    "rules",
+                    room_id,
+                    predecessor,
+                )
+
+                if predecessor:
+                    # It is an upgraded room. Copy over old tags
+                    yield self.copy_room_tags_and_direct_to_room(
+                        predecessor["room_id"], room_id, requester.user.to_string()
+                    )
+                    # Copy over push rules
+                    yield self.store.copy_push_rules_from_room_to_room_for_user(
+                        predecessor["room_id"], room_id, requester.user.to_string()
+                    )
+
+                return remote_join_response
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
