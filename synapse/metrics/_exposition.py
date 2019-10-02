@@ -36,7 +36,7 @@ from twisted.web.resource import Resource
 try:
     from prometheus_client.samples import Sample
 except ImportError:
-    Sample = namedtuple(  # type: ignore[no-redef]
+    Sample = namedtuple(  # type: ignore[no-redef] # noqa
         "Sample", ["name", "labels", "value", "timestamp", "exemplar"]
     )
 

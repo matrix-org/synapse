@@ -147,8 +147,8 @@ def check_requirements(for_feature=None):
                 "Needed %s, got %s==%s"
                 % (
                     dependency,
-                    e.dist.project_name,  # type: ignore[attr-defined]
-                    e.dist.version,  # type: ignore[attr-defined]
+                    e.dist.project_name,  # type: ignore[attr-defined] # noqa
+                    e.dist.version,  # type: ignore[attr-defined] # noqa
                 )
             )
         except DistributionNotFound:
@@ -175,8 +175,8 @@ def check_requirements(for_feature=None):
                     "Needed optional %s, got %s==%s"
                     % (
                         dependency,
-                        e.dist.project_name,  # type: ignore[attr-defined]
-                        e.dist.version,  # type: ignore[attr-defined]
+                        e.dist.project_name,  # type: ignore[attr-defined] # noqa
+                        e.dist.version,  # type: ignore[attr-defined] # noqa
                     )
                 )
             except DistributionNotFound:

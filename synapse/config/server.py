@@ -289,7 +289,7 @@ class ServerConfig(Config):
             )
             complexity = attr.ib(
                 validator=attr.validators.instance_of(
-                    (float, int)  # type: ignore[arg-type]
+                    (float, int)  # type: ignore[arg-type] # noqa
                 ),
                 default=1.0,
             )

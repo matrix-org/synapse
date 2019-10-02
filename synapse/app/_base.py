@@ -263,7 +263,9 @@ def start(hs, listeners=None):
         refresh_certificate(hs)
 
         # Start the tracer
-        synapse.logging.opentracing.init_tracer(hs.config)  # type: ignore[attr-defined]
+        synapse.logging.opentracing.init_tracer(  # type: ignore[attr-defined] # noqa
+            hs.config
+        )
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)

@@ -20,7 +20,6 @@ import errno
 import os
 from collections import OrderedDict
 from textwrap import dedent
-from typing import Optional
 
 from six import integer_types
 
