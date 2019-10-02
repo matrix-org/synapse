@@ -451,30 +451,15 @@ class RoomMemberHandler(object):
                     requester, remote_room_hosts, room_id, target, content
                 )
 
-                # Copy over direct message status and room tags if this is a join
-                # on an upgraded room
-
-                # Check if this is an upgraded room
-                predecessor = yield self.store.get_room_predecessor(room_id)
-
-                logger.debug(
-                    "Found predecessor for %s: %s. Copying over room tags and push "
-                    "rules",
-                    room_id,
-                    predecessor,
+                # Copy over user state if this is a join on an remote upgraded room
+                self.copy_user_state_on_room_upgrade(
+                    room_id, requester.user.to_string()
                 )
 
-                if predecessor:
-                    # It is an upgraded room. Copy over old tags
-                    yield self.copy_room_tags_and_direct_to_room(
-                        predecessor["room_id"], room_id, requester.user.to_string()
-                    )
-                    # Copy over push rules
-                    yield self.store.copy_push_rules_from_room_to_room_for_user(
-                        predecessor["room_id"], room_id, requester.user.to_string()
-                    )
-
                 return remote_join_response
+
+            # Copy over user state if this is a join on an local upgraded room
+            self.copy_user_state_on_room_upgrade(room_id, requester.user.to_string())
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
@@ -510,6 +495,28 @@ class RoomMemberHandler(object):
             require_consent=require_consent,
         )
         return res
+
+    @defer.inlineCallbacks
+    def copy_user_state_on_room_upgrade(self, new_room_id, user_id):
+        # Check if this is an upgraded room
+        predecessor = yield self.store.get_room_predecessor(new_room_id)
+        if not predecessor:
+            return
+
+        logger.debug(
+            "Found predecessor for %s: %s. Copying over room tags and push " "rules",
+            new_room_id,
+            predecessor,
+        )
+
+        # It is an upgraded room. Copy over old tags
+        yield self.copy_room_tags_and_direct_to_room(
+            predecessor["room_id"], new_room_id, user_id
+        )
+        # Copy over push rules
+        yield self.store.copy_push_rules_from_room_to_room_for_user(
+            predecessor["room_id"], new_room_id, user_id
+        )
 
     @defer.inlineCallbacks
     def send_membership_event(self, requester, event, context, ratelimit=True):
