@@ -20,7 +20,7 @@ import errno
 import os
 from collections import OrderedDict
 from textwrap import dedent
-from typing import MutableMapping, Any, Optional
+from typing import Any, MutableMapping, Optional
 
 from six import integer_types
 
@@ -175,6 +175,7 @@ class RootConfig(object):
     section name, defined in the Config or dynamically set to be the name of the
     class, lower-cased and with "Config" removed.
     """
+
     config_classes = []
 
     def __init__(self):
