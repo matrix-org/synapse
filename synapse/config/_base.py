@@ -71,6 +71,89 @@ def path_exists(file_path):
         return False
 
 
+class Config(object):
+    def __init__(self, root_config=None):
+        self.root = root_config
+
+    def __getattr__(self, item, from_root=False):
+        if item in ["generate_config_section", "read_config"]:
+            raise AttributeError(item)
+
+        if self.root is None or from_root:
+            raise AttributeError(item)
+        else:
+            return self.root._get_unclassed_config(self.section, item)
+
+    @staticmethod
+    def parse_size(value):
+        if isinstance(value, integer_types):
+            return value
+        sizes = {"K": 1024, "M": 1024 * 1024}
+        size = 1
+        suffix = value[-1]
+        if suffix in sizes:
+            value = value[:-1]
+            size = sizes[suffix]
+        return int(value) * size
+
+    @staticmethod
+    def parse_duration(value):
+        if isinstance(value, integer_types):
+            return value
+        second = 1000
+        minute = 60 * second
+        hour = 60 * minute
+        day = 24 * hour
+        week = 7 * day
+        year = 365 * day
+        sizes = {"s": second, "m": minute, "h": hour, "d": day, "w": week, "y": year}
+        size = 1
+        suffix = value[-1]
+        if suffix in sizes:
+            value = value[:-1]
+            size = sizes[suffix]
+        return int(value) * size
+
+    @staticmethod
+    def abspath(file_path):
+        return os.path.abspath(file_path) if file_path else file_path
+
+    @classmethod
+    def path_exists(cls, file_path):
+        return path_exists(file_path)
+
+    @classmethod
+    def check_file(cls, file_path, config_name):
+        if file_path is None:
+            raise ConfigError("Missing config for %s." % (config_name,))
+        try:
+            os.stat(file_path)
+        except OSError as e:
+            raise ConfigError(
+                "Error accessing file '%s' (config for %s): %s"
+                % (file_path, config_name, e.strerror)
+            )
+        return cls.abspath(file_path)
+
+    @classmethod
+    def ensure_directory(cls, dir_path):
+        dir_path = cls.abspath(dir_path)
+        try:
+            os.makedirs(dir_path)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+        if not os.path.isdir(dir_path):
+            raise ConfigError("%s is not a directory" % (dir_path,))
+        return dir_path
+
+    @classmethod
+    def read_file(cls, file_path, config_name):
+        cls.check_file(file_path, config_name)
+        with open(file_path) as file_stream:
+            return file_stream.read()
+
+
 class RootConfig(object):
 
     config_classes = []
@@ -496,89 +579,6 @@ class RootConfig(object):
 
     def generate_missing_files(self, config_dict, config_dir_path):
         self.invoke_all("generate_files", config_dict, config_dir_path)
-
-
-class Config(object):
-    def __init__(self, root_config=None):
-        self.root = root_config
-
-    def __getattr__(self, item, from_root=False):
-        if item in ["generate_config_section", "read_config"]:
-            raise AttributeError(item)
-
-        if self.root is None or from_root:
-            raise AttributeError(item)
-        else:
-            return self.root._get_unclassed_config(self.section, item)
-
-    @staticmethod
-    def parse_size(value):
-        if isinstance(value, integer_types):
-            return value
-        sizes = {"K": 1024, "M": 1024 * 1024}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
-
-    @staticmethod
-    def parse_duration(value):
-        if isinstance(value, integer_types):
-            return value
-        second = 1000
-        minute = 60 * second
-        hour = 60 * minute
-        day = 24 * hour
-        week = 7 * day
-        year = 365 * day
-        sizes = {"s": second, "m": minute, "h": hour, "d": day, "w": week, "y": year}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
-
-    @staticmethod
-    def abspath(file_path):
-        return os.path.abspath(file_path) if file_path else file_path
-
-    @classmethod
-    def path_exists(cls, file_path):
-        return path_exists(file_path)
-
-    @classmethod
-    def check_file(cls, file_path, config_name):
-        if file_path is None:
-            raise ConfigError("Missing config for %s." % (config_name,))
-        try:
-            os.stat(file_path)
-        except OSError as e:
-            raise ConfigError(
-                "Error accessing file '%s' (config for %s): %s"
-                % (file_path, config_name, e.strerror)
-            )
-        return cls.abspath(file_path)
-
-    @classmethod
-    def ensure_directory(cls, dir_path):
-        dir_path = cls.abspath(dir_path)
-        try:
-            os.makedirs(dir_path)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
-        if not os.path.isdir(dir_path):
-            raise ConfigError("%s is not a directory" % (dir_path,))
-        return dir_path
-
-    @classmethod
-    def read_file(cls, file_path, config_name):
-        cls.check_file(file_path, config_name)
-        with open(file_path) as file_stream:
-            return file_stream.read()
 
 
 def read_config_files(config_files):
