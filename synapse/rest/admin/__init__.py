@@ -34,7 +34,6 @@ from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
-    GetUsersPaginatedRestServlet,
     ResetPasswordRestServlet,
     SearchUsersRestServlet,
     UserAdminServlet,
@@ -201,7 +200,6 @@ def register_servlets_for_client_rest_resource(hs, http_server):
     PurgeHistoryRestServlet(hs).register(http_server)
     UsersRestServlet(hs).register(http_server)
     ResetPasswordRestServlet(hs).register(http_server)
-    GetUsersPaginatedRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     ShutdownRoomRestServlet(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
