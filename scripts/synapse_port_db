@@ -60,6 +60,8 @@ BOOLEAN_COLUMNS = {
     "local_group_membership": ["is_publicised", "is_admin"],
     "e2e_room_keys": ["is_verified"],
     "account_validity": ["email_sent"],
+    "room_stats_state": ["is_federatable"],
+    "redactions": ["have_censored"],
 }
 
 
