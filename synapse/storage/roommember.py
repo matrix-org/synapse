@@ -16,7 +16,6 @@
 
 import logging
 from collections import namedtuple
-from typing import Iterable
 
 from six import iteritems, itervalues
 
