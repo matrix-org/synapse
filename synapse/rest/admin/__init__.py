@@ -39,6 +39,7 @@ from synapse.rest.admin.users import (
     UserAdminServlet,
     UserRegisterServlet,
     UsersRestServlet,
+    UsersRestServletV2,
     WhoisRestServlet,
 )
 from synapse.util.versionstring import get_version_string
@@ -190,6 +191,7 @@ def register_servlets(hs, http_server):
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
+    UsersRestServletV2(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):

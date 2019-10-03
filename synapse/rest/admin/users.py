@@ -25,6 +25,8 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_boolean,
+    parse_integer,
     parse_json_object_from_request,
     parse_string,
 )
@@ -56,6 +58,45 @@ class UsersRestServlet(RestServlet):
         ret = await self.admin_handler.get_users()
 
         return 200, ret
+
+
+class UsersRestServletV2(RestServlet):
+    PATTERNS = (re.compile("^/_synapse/admin/v2/users$"),)
+
+    """Get request to list all local users.
+    This needs user to have administrator access in Synapse.
+
+    GET /_synapse/admin/v2/users?offset=0&limit=10&guests=false
+
+    returns:
+        200 OK with list of users if success otherwise an error.
+
+    The parameters `offset` and `limit` are required only for pagination.
+    Per default a `limit` of 100 is used. If the endpoint returns less entries
+    than specified by `limit` then there are no more users left.
+    The parameter `name` can be used to filter by user name.
+    The parameter `guests` can be used to exclude guest users.
+    The parameter `deactivated` can be used to include deactivated users.
+    """
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.admin_handler = hs.get_handlers().admin_handler
+
+    async def on_GET(self, request):
+        await assert_requester_is_admin(self.auth, request)
+
+        start = parse_integer(request, "offset", default=0)
+        limit = parse_integer(request, "limit", default=100)
+        name = parse_string(request, "name", default=None)
+        guests = parse_boolean(request, "guests", default=True)
+        deactivated = parse_boolean(request, "deactivated", default=False)
+
+        users = await self.admin_handler.get_users_paginate(
+            start, limit, name, guests, deactivated
+        )
+        return 200, {"users": users, "next_token": start + len(users)}
 
 
 class UserRegisterServlet(RestServlet):
