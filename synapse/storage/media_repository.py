@@ -15,11 +15,10 @@
 from synapse.storage.background_updates import BackgroundUpdateStore
 
 
-class MediaRepositoryStore(BackgroundUpdateStore):
-    """Persistence for attachments and avatars"""
+class MediaRepositoryBackgroundUpdateStore(BackgroundUpdateStore):
 
     def __init__(self, db_conn, hs):
-        super(MediaRepositoryStore, self).__init__(db_conn, hs)
+        super(MediaRepositoryBackgroundUpdateStore, self).__init__(db_conn, hs)
 
         self.register_background_index_update(
             update_name="local_media_repository_url_idx",
@@ -28,6 +27,13 @@ class MediaRepositoryStore(BackgroundUpdateStore):
             columns=["created_ts"],
             where_clause="url_cache IS NOT NULL",
         )
+
+
+class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
+    """Persistence for attachments and avatars"""
+
+    def __init__(self, db_conn, hs):
+        super(MediaRepositoryStore, self).__init__(db_conn, hs)
 
     def get_local_media(self, media_id):
         """Get the metadata for a local piece of media
