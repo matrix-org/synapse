@@ -592,11 +592,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         list_name="event_ids",
         inlineCallbacks=True,
     )
-    def _get_membership_from_event_ids(self, event_ids: Iterable[str]):
+    def _get_membership_from_event_ids(self, event_ids):
         """Lookup profile info for set of member event IDs.
 
         Args:
-            event_ids: The member event IDs to lookup
+            event_ids (Iterable[str]): The member event IDs to lookup
 
         Returns:
             Deferred[dict[str, Tuple[str, ProfileInfo]|None]]: Map from event ID
