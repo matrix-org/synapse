@@ -453,33 +453,72 @@ class Porter(object):
 
         return db_conn
 
+    def get_sqlite_store(self):
+        sqlite_db_pool = adbapi.ConnectionPool(
+            self.sqlite_config["name"], **self.sqlite_config["args"]
+        )
+        sqlite_engine = create_engine(self.sqlite_config)
+
+        self.progress.set_state("Preparing SQLite3")
+        sqlite_conn = self.setup_db(sqlite_config, sqlite_engine)
+
+        hs = MockHomeserver(
+            self.hs_config,
+            sqlite_engine,
+            sqlite_conn,
+            sqlite_db_pool,
+        )
+
+        hs.setup()
+        return hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def get_postgres_store(self):
+        postgres_db_pool = adbapi.ConnectionPool(
+            self.postgres_config["name"], **self.postgres_config["args"]
+        )
+        postgres_engine = create_engine(self.postgres_config)
+
+        self.progress.set_state("Preparing PostgreSQL")
+        postgres_conn = self.setup_db(postgres_config, postgres_engine)
+
+        hs = MockHomeserver(
+            self.hs_config,
+            postgres_engine,
+            postgres_conn,
+            postgres_db_pool,
+        )
+
+        hs.setup()
+        postgres_store = hs.get_datastore()
+
+        yield postgres_store.runInteraction(
+            "postgres_engine.check_database",
+            postgres_engine.check_database,
+        )
+
+        defer.returnValue(postgres_store)
+
+    @defer.inlineCallbacks
+    def run_background_updates_on_postgres(self):
+        # Manually apply all background updates on the PostgreSQL database.
+        postgres_ready = yield self.postgres_store.has_completed_background_updates()
+
+        if not postgres_ready:
+            # Only say that we're running background updates when there are background
+            # updates to run.
+            self.progress.set_state("Running background updates on PostgreSQL")
+
+        while not postgres_ready:
+            yield self.postgres_store.do_next_background_update(100)
+            postgres_ready = yield (
+                self.postgres_store.has_completed_background_updates()
+            )
+
     @defer.inlineCallbacks
     def run(self):
         try:
-            sqlite_db_pool = adbapi.ConnectionPool(
-                self.sqlite_config["name"], **self.sqlite_config["args"]
-            )
-
-            postgres_db_pool = adbapi.ConnectionPool(
-                self.postgres_config["name"], **self.postgres_config["args"]
-            )
-
-            sqlite_engine = create_engine(sqlite_config)
-            postgres_engine = create_engine(postgres_config)
-
-            # Step 1. Set up databases.
-            self.progress.set_state("Preparing SQLite3")
-            sqlite_conn = self.setup_db(sqlite_config, sqlite_engine)
-
-            hs = MockHomeserver(
-                self.hs_config,
-                sqlite_engine,
-                sqlite_conn,
-                sqlite_db_pool,
-            )
-
-            hs.setup()
-            self.sqlite_store = hs.get_datastore()
+            self.sqlite_store = self.get_sqlite_store()
 
             # Check if all background updates are done, abort if not.
             updates_complete = yield self.sqlite_store.has_completed_background_updates()
@@ -491,37 +530,9 @@ class Porter(object):
                 )
                 defer.returnValue(None)
 
-            self.progress.set_state("Preparing PostgreSQL")
-            postgres_conn = self.setup_db(postgres_config, postgres_engine)
+            self.postgres_store = yield self.get_postgres_store()
 
-            hs = MockHomeserver(
-                self.hs_config,
-                postgres_engine,
-                postgres_conn,
-                postgres_db_pool,
-            )
-
-            hs.setup()
-            self.postgres_store = hs.get_datastore()
-
-            yield self.postgres_store.runInteraction(
-                "postgres_engine.check_database",
-                postgres_engine.check_database,
-            )
-
-            # Manually apply all background updates on the PostgreSQL database.
-            postgres_ready = yield self.postgres_store.has_completed_background_updates()
-
-            if not postgres_ready:
-                # Only say that we're running background updates when there are background
-                # updates to run.
-                self.progress.set_state("Running background updates on PostgreSQL")
-
-            while not postgres_ready:
-                yield self.postgres_store.do_next_background_update(100)
-                postgres_ready = yield (
-                    self.postgres_store.has_completed_background_updates()
-                )
+            yield self.run_background_updates_on_postgres()
 
             self.progress.set_state("Creating port tables")
 
