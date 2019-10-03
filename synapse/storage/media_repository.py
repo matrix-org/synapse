@@ -16,7 +16,6 @@ from synapse.storage.background_updates import BackgroundUpdateStore
 
 
 class MediaRepositoryBackgroundUpdateStore(BackgroundUpdateStore):
-
     def __init__(self, db_conn, hs):
         super(MediaRepositoryBackgroundUpdateStore, self).__init__(db_conn, hs)
 

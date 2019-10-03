@@ -337,7 +337,6 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
 
 
 class SearchStore(SearchBackgroundUpdateStore):
-
     def __init__(self, db_conn, hs):
         super(SearchStore, self).__init__(db_conn, hs)
 

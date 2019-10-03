@@ -1288,7 +1288,9 @@ class StateGroupWorkerStore(
         return self.runInteraction("store_state_group", _store_state_group_txn)
 
 
-class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore, BackgroundUpdateStore):
+class StateBackgroundUpdateStore(
+    StateGroupBackgroundUpdateStore, BackgroundUpdateStore
+):
 
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
