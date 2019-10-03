@@ -49,10 +49,6 @@ class TransactionManager(object):
         # HACK to get unique tx id
         self._next_txn_id = int(self.clock.time_msec())
 
-        # the federation sender sometimes sets this to delay transaction transmission,
-        # if the sender gets behind.
-        self.deprioritise_transmission = False
-
     @measure_func("_send_new_transaction")
     @defer.inlineCallbacks
     def send_new_transaction(self, destination, pending_pdus, pending_edus):
