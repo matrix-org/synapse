@@ -1,0 +1,17 @@
+server_name: "test"
+
+report_stats: false
+
+database:
+  name: "psycopg2"
+  args:
+#    user: postgres
+#    host: postgres
+#    password: postgres
+#    database: synapse
+    user: synapse_db_port
+    host: localhost
+    password: "db_port"
+    database: port_db_test
+    cp_min: 5
+    cp_max: 10

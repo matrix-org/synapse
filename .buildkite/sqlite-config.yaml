@@ -1,0 +1,8 @@
+server_name: "test"
+
+report_stats: false
+
+database:
+  name: "sqlite3"
+  args:
+    database: ".buildkite/test_db.db"
