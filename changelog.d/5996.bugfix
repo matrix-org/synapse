@@ -1,1 +1,0 @@
-federation_certificate_verification_whitelist now will not cause TypeErrors to be raised (a regression in 1.3). Additionally, it now supports internationalised domain names in their non-canonical representation.
