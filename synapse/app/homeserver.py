@@ -341,8 +341,6 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    synapse.config.logger.setup_logging(config, use_worker_options=False)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -355,6 +353,8 @@ def setup(config_options):
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
+
+    synapse.config.logger.setup_logging(hs, config, use_worker_options=False)
 
     logger.info("Preparing database: %s...", config.database_config["name"])
 
@@ -447,7 +447,7 @@ def setup(config_options):
                 reactor.stop()
             sys.exit(1)
 
-    reactor.addSystemEventTrigger("before", "startup", start)
+    reactor.callWhenRunning(start)
 
     return hs
 
@@ -561,10 +561,12 @@ def run(hs):
 
         stats["database_engine"] = hs.get_datastore().database_engine_name
         stats["database_server_version"] = hs.get_datastore().get_server_version()
-        logger.info("Reporting stats to matrix.org: %s" % (stats,))
+        logger.info(
+            "Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats)
+        )
         try:
             yield hs.get_simple_http_client().put_json(
-                "https://matrix.org/report-usage-stats/push", stats
+                hs.config.report_stats_endpoint, stats
             )
         except Exception as e:
             logger.warn("Error reporting stats: %s", e)

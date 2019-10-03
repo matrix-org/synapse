@@ -44,7 +44,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs_config["max_mau_value"] = 50
         hs_config["limit_usage_by_mau"] = True
 
-        hs = self.setup_test_homeserver(config=hs_config, expire_access_token=True)
+        hs = self.setup_test_homeserver(config=hs_config)
         return hs
 
     def prepare(self, reactor, clock, hs):
@@ -171,17 +171,42 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
-    def test_auto_create_auto_join_rooms_when_support_user_exists(self):
+    def test_auto_create_auto_join_rooms_when_user_is_not_a_real_user(self):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
 
-        self.store.is_support_user = Mock(return_value=True)
+        self.store.is_real_user = Mock(return_value=False)
         user_id = self.get_success(self.handler.register_user(localpart="support"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
         directory_handler = self.hs.get_handlers().directory_handler
         room_alias = RoomAlias.from_string(room_alias_str)
         self.get_failure(directory_handler.get_association(room_alias), SynapseError)
+
+    def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self):
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+
+        self.store.count_real_users = Mock(return_value=1)
+        self.store.is_real_user = Mock(return_value=True)
+        user_id = self.get_success(self.handler.register_user(localpart="real"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        self.assertTrue(room_id["room_id"] in rooms)
+        self.assertEqual(len(rooms), 1)
+
+    def test_auto_create_auto_join_rooms_when_user_is_not_the_first_real_user(self):
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+
+        self.store.count_real_users = Mock(return_value=2)
+        self.store.is_real_user = Mock(return_value=True)
+        user_id = self.get_success(self.handler.register_user(localpart="real"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertEqual(len(rooms), 0)
 
     def test_auto_create_auto_join_where_no_consent(self):
         """Test to ensure that the first user is not auto-joined to a room if
@@ -283,4 +308,4 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
                 user, requester, displayname, by_admin=True
             )
 
-        return (user_id, token)
+        return user_id, token

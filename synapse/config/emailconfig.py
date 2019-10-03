@@ -20,6 +20,7 @@ from __future__ import print_function
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
 import os
+from enum import Enum
 
 import pkg_resources
 
@@ -74,19 +75,48 @@ class EmailConfig(Config):
             "renew_at"
         )
 
-        email_trust_identity_server_for_password_resets = email_config.get(
-            "trust_identity_server_for_password_resets", False
+        self.threepid_behaviour_email = (
+            # Have Synapse handle the email sending if account_threepid_delegates.email
+            # is not defined
+            # msisdn is currently always remote while Synapse does not support any method of
+            # sending SMS messages
+            ThreepidBehaviour.REMOTE
+            if self.account_threepid_delegate_email
+            else ThreepidBehaviour.LOCAL
         )
-        self.email_password_reset_behaviour = (
-            "remote" if email_trust_identity_server_for_password_resets else "local"
-        )
-        self.password_resets_were_disabled_due_to_email_config = False
-        if self.email_password_reset_behaviour == "local" and email_config == {}:
+        # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
+        # use an identity server to password reset tokens on its behalf. We now warn the user
+        # if they have this set and tell them to use the updated option, while using a default
+        # identity server in the process.
+        self.using_identity_server_from_trusted_list = False
+        if (
+            not self.account_threepid_delegate_email
+            and config.get("trust_identity_server_for_password_resets", False) is True
+        ):
+            # Use the first entry in self.trusted_third_party_id_servers instead
+            if self.trusted_third_party_id_servers:
+                # XXX: It's a little confusing that account_threepid_delegate_email is modified
+                # both in RegistrationConfig and here. We should factor this bit out
+                self.account_threepid_delegate_email = self.trusted_third_party_id_servers[
+                    0
+                ]
+                self.using_identity_server_from_trusted_list = True
+            else:
+                raise ConfigError(
+                    "Attempted to use an identity server from"
+                    '"trusted_third_party_id_servers" but it is empty.'
+                )
+
+        self.local_threepid_handling_disabled_due_to_email_config = False
+        if (
+            self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
+            and email_config == {}
+        ):
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
-            self.password_resets_were_disabled_due_to_email_config = True
+            self.local_threepid_handling_disabled_due_to_email_config = True
 
-            self.email_password_reset_behaviour = "off"
+            self.threepid_behaviour_email = ThreepidBehaviour.OFF
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
@@ -96,7 +126,7 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.email_password_reset_behaviour == "local"
+            or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
         ):
             # make sure we can import the required deps
             import jinja2
@@ -106,7 +136,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.email_password_reset_behaviour == "local":
+        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             required = ["smtp_host", "smtp_port", "notif_from"]
 
             missing = []
@@ -115,7 +145,7 @@ class EmailConfig(Config):
                     missing.append("email." + k)
 
             if config.get("public_baseurl") is None:
-                missing.append("public_base_url")
+                missing.append("public_baseurl")
 
             if len(missing) > 0:
                 raise RuntimeError(
@@ -125,28 +155,63 @@ class EmailConfig(Config):
                     % (", ".join(missing),)
                 )
 
-            # Templates for password reset emails
+            # These email templates have placeholders in them, and thus must be
+            # parsed using a templating engine during a request
             self.email_password_reset_template_html = email_config.get(
                 "password_reset_template_html", "password_reset.html"
             )
             self.email_password_reset_template_text = email_config.get(
                 "password_reset_template_text", "password_reset.txt"
             )
-            self.email_password_reset_failure_template = email_config.get(
-                "password_reset_failure_template", "password_reset_failure.html"
+            self.email_registration_template_html = email_config.get(
+                "registration_template_html", "registration.html"
             )
-            # This template does not support any replaceable variables, so we will
-            # read it from the disk once during setup
-            email_password_reset_success_template = email_config.get(
-                "password_reset_success_template", "password_reset_success.html"
+            self.email_registration_template_text = email_config.get(
+                "registration_template_text", "registration.txt"
+            )
+            self.email_add_threepid_template_html = email_config.get(
+                "add_threepid_template_html", "add_threepid.html"
+            )
+            self.email_add_threepid_template_text = email_config.get(
+                "add_threepid_template_text", "add_threepid.txt"
+            )
+
+            self.email_password_reset_template_failure_html = email_config.get(
+                "password_reset_template_failure_html", "password_reset_failure.html"
+            )
+            self.email_registration_template_failure_html = email_config.get(
+                "registration_template_failure_html", "registration_failure.html"
+            )
+            self.email_add_threepid_template_failure_html = email_config.get(
+                "add_threepid_template_failure_html", "add_threepid_failure.html"
+            )
+
+            # These templates do not support any placeholder variables, so we
+            # will read them from disk once during setup
+            email_password_reset_template_success_html = email_config.get(
+                "password_reset_template_success_html", "password_reset_success.html"
+            )
+            email_registration_template_success_html = email_config.get(
+                "registration_template_success_html", "registration_success.html"
+            )
+            email_add_threepid_template_success_html = email_config.get(
+                "add_threepid_template_success_html", "add_threepid_success.html"
             )
 
             # Check templates exist
             for f in [
                 self.email_password_reset_template_html,
                 self.email_password_reset_template_text,
-                self.email_password_reset_failure_template,
-                email_password_reset_success_template,
+                self.email_registration_template_html,
+                self.email_registration_template_text,
+                self.email_add_threepid_template_html,
+                self.email_add_threepid_template_text,
+                self.email_password_reset_template_failure_html,
+                self.email_registration_template_failure_html,
+                self.email_add_threepid_template_failure_html,
+                email_password_reset_template_success_html,
+                email_registration_template_success_html,
+                email_add_threepid_template_success_html,
             ]:
                 p = os.path.join(self.email_template_dir, f)
                 if not os.path.isfile(p):
@@ -154,10 +219,22 @@ class EmailConfig(Config):
 
             # Retrieve content of web templates
             filepath = os.path.join(
-                self.email_template_dir, email_password_reset_success_template
+                self.email_template_dir, email_password_reset_template_success_html
             )
-            self.email_password_reset_success_html_content = self.read_file(
+            self.email_password_reset_template_success_html = self.read_file(
                 filepath, "email.password_reset_template_success_html"
+            )
+            filepath = os.path.join(
+                self.email_template_dir, email_registration_template_success_html
+            )
+            self.email_registration_template_success_html_content = self.read_file(
+                filepath, "email.registration_template_success_html"
+            )
+            filepath = os.path.join(
+                self.email_template_dir, email_add_threepid_template_success_html
+            )
+            self.email_add_threepid_template_success_html_content = self.read_file(
+                filepath, "email.add_threepid_template_success_html"
             )
 
         if self.email_enable_notifs:
@@ -239,19 +316,6 @@ class EmailConfig(Config):
         #   #
         #   riot_base_url: "http://localhost/riot"
         #
-        #   # Enable sending password reset emails via the configured, trusted
-        #   # identity servers
-        #   #
-        #   # IMPORTANT! This will give a malicious or overtaken identity server
-        #   # the ability to reset passwords for your users! Make absolutely sure
-        #   # that you want to do this! It is strongly recommended that password
-        #   # reset emails be sent by the homeserver instead
-        #   #
-        #   # If this option is set to false and SMTP options have not been
-        #   # configured, resetting user passwords via email will be disabled
-        #   #
-        #   #trust_identity_server_for_password_resets: false
-        #
         #   # Configure the time that a validation email or text message code
         #   # will expire after sending
         #   #
@@ -283,9 +347,47 @@ class EmailConfig(Config):
         #   #password_reset_template_html: password_reset.html
         #   #password_reset_template_text: password_reset.txt
         #
+        #   # Templates for registration emails sent by the homeserver
+        #   #
+        #   #registration_template_html: registration.html
+        #   #registration_template_text: registration.txt
+        #
+        #   # Templates for validation emails sent by the homeserver when adding an email to
+        #   # your user account
+        #   #
+        #   #add_threepid_template_html: add_threepid.html
+        #   #add_threepid_template_text: add_threepid.txt
+        #
         #   # Templates for password reset success and failure pages that a user
         #   # will see after attempting to reset their password
         #   #
         #   #password_reset_template_success_html: password_reset_success.html
         #   #password_reset_template_failure_html: password_reset_failure.html
+        #
+        #   # Templates for registration success and failure pages that a user
+        #   # will see after attempting to register using an email or phone
+        #   #
+        #   #registration_template_success_html: registration_success.html
+        #   #registration_template_failure_html: registration_failure.html
+        #
+        #   # Templates for success and failure pages that a user will see after attempting
+        #   # to add an email or phone to their account
+        #   #
+        #   #add_threepid_success_html: add_threepid_success.html
+        #   #add_threepid_failure_html: add_threepid_failure.html
         """
+
+
+class ThreepidBehaviour(Enum):
+    """
+    Enum to define the behaviour of Synapse with regards to when it contacts an identity
+    server for 3pid registration and password resets
+
+    REMOTE = use an external server to send tokens
+    LOCAL = send tokens ourselves
+    OFF = disable registration via 3pid and password resets
+    """
+
+    REMOTE = "remote"
+    LOCAL = "local"
+    OFF = "off"

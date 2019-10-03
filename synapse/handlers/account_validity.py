@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 class AccountValidityHandler(object):
     def __init__(self, hs):
         self.hs = hs
+        self.config = hs.config
         self.store = self.hs.get_datastore()
         self.sendmail = self.hs.get_sendmail()
         self.clock = self.hs.get_clock()
@@ -62,9 +63,14 @@ class AccountValidityHandler(object):
             self._raw_from = email.utils.parseaddr(self._from_string)[1]
 
             self._template_html, self._template_text = load_jinja2_templates(
-                config=self.hs.config,
-                template_html_name=self.hs.config.email_expiry_template_html,
-                template_text_name=self.hs.config.email_expiry_template_text,
+                self.config.email_template_dir,
+                [
+                    self.config.email_expiry_template_html,
+                    self.config.email_expiry_template_text,
+                ],
+                apply_format_ts_filter=True,
+                apply_mxc_to_http_filter=True,
+                public_baseurl=self.config.public_baseurl,
             )
 
             # Check the renewal emails to send and send them every 30min.
@@ -226,10 +232,18 @@ class AccountValidityHandler(object):
 
         Args:
             renewal_token (str): Token sent with the renewal request.
+        Returns:
+            bool: Whether the provided token is valid.
         """
-        user_id = yield self.store.get_user_from_renewal_token(renewal_token)
+        try:
+            user_id = yield self.store.get_user_from_renewal_token(renewal_token)
+        except StoreError:
+            defer.returnValue(False)
+
         logger.debug("Renewing an account for user %s", user_id)
         yield self.renew_account_for_user(user_id)
+
+        defer.returnValue(True)
 
     @defer.inlineCallbacks
     def renew_account_for_user(self, user_id, expiration_ts=None, email_sent=False):

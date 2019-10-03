@@ -183,7 +183,6 @@ class PreviewUrlResource(DirectServeResource):
             if isinstance(og, six.text_type):
                 og = og.encode("utf8")
             return og
-            return
 
         media_info = yield self._download_url(url, user)
 

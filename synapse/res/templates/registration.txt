@@ -1,0 +1,10 @@
+Hello there,
+
+You have asked us to register this email with a new Matrix account. If this
+was you, please click the link below to confirm your email address:
+
+{{ link }}
+
+If this was not you, you can safely disregard this email.
+
+Thank you.

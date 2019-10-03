@@ -22,9 +22,10 @@ from netaddr import IPAddress
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import EventTypes, JoinRules, Membership, UserTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -178,6 +179,7 @@ class Auth(object):
     def get_public_keys(self, invite_event):
         return event_auth.get_public_keys(invite_event)
 
+    @opentracing.trace
     @defer.inlineCallbacks
     def get_user_by_req(
         self, request, allow_guest=False, rights="access", allow_expired=False
@@ -209,6 +211,7 @@ class Auth(object):
             user_id, app_service = yield self._get_appservice_user_id(request)
             if user_id:
                 request.authenticated_entity = user_id
+                opentracing.set_tag("authenticated_entity", user_id)
 
                 if ip_addr and self.hs.config.track_appservice_user_ips:
                     yield self.store.insert_client_ip(
@@ -259,6 +262,7 @@ class Auth(object):
                 )
 
             request.authenticated_entity = user.to_string()
+            opentracing.set_tag("authenticated_entity", user.to_string())
 
             return synapse.types.create_requester(
                 user, token_id, is_guest, device_id, app_service=app_service
@@ -272,25 +276,25 @@ class Auth(object):
             self.get_access_token_from_request(request)
         )
         if app_service is None:
-            return (None, None)
+            return None, None
 
         if app_service.ip_range_whitelist:
             ip_address = IPAddress(self.hs.get_ip_from_request(request))
             if ip_address not in app_service.ip_range_whitelist:
-                return (None, None)
+                return None, None
 
         if b"user_id" not in request.args:
-            return (app_service.sender, app_service)
+            return app_service.sender, app_service
 
         user_id = request.args[b"user_id"][0].decode("utf8")
         if app_service.sender == user_id:
-            return (app_service.sender, app_service)
+            return app_service.sender, app_service
 
         if not app_service.is_interested_in_user(user_id):
             raise AuthError(403, "Application service cannot masquerade as this user.")
         if not (yield self.store.get_user_by_id(user_id)):
             raise AuthError(403, "Application service has not registered this user")
-        return (user_id, app_service)
+        return user_id, app_service
 
     @defer.inlineCallbacks
     def get_user_by_access_token(self, token, rights="access"):
@@ -410,21 +414,16 @@ class Auth(object):
         try:
             user_id = self.get_user_id_from_macaroon(macaroon)
 
-            has_expiry = False
             guest = False
             for caveat in macaroon.caveats:
-                if caveat.caveat_id.startswith("time "):
-                    has_expiry = True
-                elif caveat.caveat_id == "guest = true":
+                if caveat.caveat_id == "guest = true":
                     guest = True
 
-            self.validate_macaroon(
-                macaroon, rights, self.hs.config.expire_access_token, user_id=user_id
-            )
+            self.validate_macaroon(macaroon, rights, user_id=user_id)
         except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
             raise InvalidClientTokenError("Invalid macaroon passed.")
 
-        if not has_expiry and rights == "access":
+        if rights == "access":
             self.token_cache[token] = (user_id, guest)
 
         return user_id, guest
@@ -450,7 +449,7 @@ class Auth(object):
                 return caveat.caveat_id[len(user_prefix) :]
         raise InvalidClientTokenError("No user caveat in macaroon")
 
-    def validate_macaroon(self, macaroon, type_string, verify_expiry, user_id):
+    def validate_macaroon(self, macaroon, type_string, user_id):
         """
         validate that a Macaroon is understood by and was signed by this server.
 
@@ -458,7 +457,6 @@ class Auth(object):
             macaroon(pymacaroons.Macaroon): The macaroon to validate
             type_string(str): The kind of token required (e.g. "access",
                               "delete_pusher")
-            verify_expiry(bool): Whether to verify whether the macaroon has expired.
             user_id (str): The user_id required
         """
         v = pymacaroons.Verifier()
@@ -471,19 +469,7 @@ class Auth(object):
         v.satisfy_exact("type = " + type_string)
         v.satisfy_exact("user_id = %s" % user_id)
         v.satisfy_exact("guest = true")
-
-        # verify_expiry should really always be True, but there exist access
-        # tokens in the wild which expire when they should not, so we can't
-        # enforce expiry yet (so we have to allow any caveat starting with
-        # 'time < ' in access tokens).
-        #
-        # On the other hand, short-term login tokens (as used by CAS login, for
-        # example) have an expiry time which we do want to enforce.
-
-        if verify_expiry:
-            v.satisfy_general(self._verify_expiry)
-        else:
-            v.satisfy_general(lambda c: c.startswith("time < "))
+        v.satisfy_general(self._verify_expiry)
 
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
@@ -708,7 +694,7 @@ class Auth(object):
             #  * The user is a guest user, and has joined the room
             # else it will throw.
             member_event = yield self.check_user_was_in_room(room_id, user_id)
-            return (member_event.membership, member_event.event_id)
+            return member_event.membership, member_event.event_id
         except AuthError:
             visibility = yield self.state.get_current_state(
                 room_id, EventTypes.RoomHistoryVisibility, ""
@@ -717,14 +703,13 @@ class Auth(object):
                 visibility
                 and visibility.content["history_visibility"] == "world_readable"
             ):
-                return (Membership.JOIN, None)
-                return
+                return Membership.JOIN, None
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )
 
     @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None, threepid=None):
+    def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
@@ -737,6 +722,9 @@ class Auth(object):
                 with a MAU blocked server, normally they would be rejected but their
                 threepid is on the reserved list. user_id and
                 threepid should never be set at the same time.
+
+            user_type(str|None): If present, is used to decide whether to check against
+                certain blocking reasons like MAU.
         """
 
         # Never fail an auth check for the server notices users or support user
@@ -774,6 +762,10 @@ class Auth(object):
                     self.hs.config.mau_limits_reserved_threepids, threepid
                 ):
                     return
+            elif user_type == UserTypes.SUPPORT:
+                # If the user does not exist yet and is of type "support",
+                # allow registration. Support users are excluded from MAU checks.
+                return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:

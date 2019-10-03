@@ -80,7 +80,7 @@ class RoomUpgradeRestServlet(RestServlet):
 
         ret = {"replacement_room": new_room_id}
 
-        return (200, ret)
+        return 200, ret
 
 
 def register_servlets(hs, http_server):

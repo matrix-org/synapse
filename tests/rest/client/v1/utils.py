@@ -128,8 +128,12 @@ class RestHelper(object):
 
         return channel.json_body
 
-    def send_state(self, room_id, event_type, body, tok, expect_code=200):
-        path = "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, event_type)
+    def send_state(self, room_id, event_type, body, tok, expect_code=200, state_key=""):
+        path = "/_matrix/client/r0/rooms/%s/state/%s/%s" % (
+            room_id,
+            event_type,
+            state_key,
+        )
         if tok:
             path = path + "?access_token=%s" % tok
 

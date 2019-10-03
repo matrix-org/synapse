@@ -24,7 +24,7 @@ from twisted.internet import defer
 from twisted.internet.defer import succeed
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RelationTypes
+from synapse.api.constants import EventTypes, Membership, RelationTypes, UserTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -222,6 +222,13 @@ class MessageHandler(object):
         }
 
 
+# The duration (in ms) after which rooms should be removed
+# `_rooms_to_exclude_from_dummy_event_insertion` (with the effect that we will try
+# to generate a dummy event for them once more)
+#
+_DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY = 7 * 24 * 60 * 60 * 1000
+
+
 class EventCreationHandler(object):
     def __init__(self, hs):
         self.hs = hs
@@ -257,6 +264,13 @@ class EventCreationHandler(object):
         self._block_events_without_consent_error = (
             self.config.block_events_without_consent_error
         )
+
+        # Rooms which should be excluded from dummy insertion. (For instance,
+        # those without local users who can send events into the room).
+        #
+        # map from room id to time-of-last-attempt.
+        #
+        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: dict[str, int]
 
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
         # config options, but *only* if we have a configuration for which we are
@@ -469,6 +483,9 @@ class EventCreationHandler(object):
 
         u = yield self.store.get_user_by_id(user_id)
         assert u is not None
+        if u["user_type"] in (UserTypes.SUPPORT, UserTypes.BOT):
+            # support and bot users are not required to consent
+            return
         if u["appservice_id"] is not None:
             # users registered by an appservice are exempt
             return
@@ -726,7 +743,27 @@ class EventCreationHandler(object):
         assert not self.config.worker_app
 
         if ratelimit:
-            yield self.base_handler.ratelimit(requester)
+            # We check if this is a room admin redacting an event so that we
+            # can apply different ratelimiting. We do this by simply checking
+            # it's not a self-redaction (to avoid having to look up whether the
+            # user is actually admin or not).
+            is_admin_redaction = False
+            if event.type == EventTypes.Redaction:
+                original_event = yield self.store.get_event(
+                    event.redacts,
+                    check_redacted=False,
+                    get_prev_content=False,
+                    allow_rejected=False,
+                    allow_none=True,
+                )
+
+                is_admin_redaction = (
+                    original_event and event.sender != original_event.sender
+                )
+
+            yield self.base_handler.ratelimit(
+                requester, is_admin_redaction=is_admin_redaction
+            )
 
         yield self.base_handler.maybe_kick_guest_users(event, context)
 
@@ -795,13 +832,15 @@ class EventCreationHandler(object):
                 get_prev_content=False,
                 allow_rejected=False,
                 allow_none=True,
-                check_room_id=event.room_id,
             )
 
             # we can make some additional checks now if we have the original event.
             if original_event:
                 if original_event.type == EventTypes.Create:
                     raise AuthError(403, "Redacting create events is not permitted")
+
+                if original_event.room_id != event.room_id:
+                    raise SynapseError(400, "Cannot redact event from a different room")
 
             prev_state_ids = yield context.get_prev_state_ids(self.store)
             auth_events_ids = yield self.auth.compute_auth_events(
@@ -863,9 +902,11 @@ class EventCreationHandler(object):
         """Background task to send dummy events into rooms that have a large
         number of extremities
         """
-
+        self._expire_rooms_to_exclude_from_dummy_event_insertion()
         room_ids = yield self.store.get_rooms_with_many_extremities(
-            min_count=10, limit=5
+            min_count=10,
+            limit=5,
+            room_id_filter=self._rooms_to_exclude_from_dummy_event_insertion.keys(),
         )
 
         for room_id in room_ids:
@@ -879,32 +920,61 @@ class EventCreationHandler(object):
             members = yield self.state.get_current_users_in_room(
                 room_id, latest_event_ids=latest_event_ids
             )
+            dummy_event_sent = False
+            for user_id in members:
+                if not self.hs.is_mine_id(user_id):
+                    continue
+                requester = create_requester(user_id)
+                try:
+                    event, context = yield self.create_event(
+                        requester,
+                        {
+                            "type": "org.matrix.dummy_event",
+                            "content": {},
+                            "room_id": room_id,
+                            "sender": user_id,
+                        },
+                        prev_events_and_hashes=prev_events_and_hashes,
+                    )
 
-            user_id = None
-            for member in members:
-                if self.hs.is_mine_id(member):
-                    user_id = member
+                    event.internal_metadata.proactively_send = False
+
+                    yield self.send_nonmember_event(
+                        requester, event, context, ratelimit=False
+                    )
+                    dummy_event_sent = True
                     break
+                except ConsentNotGivenError:
+                    logger.info(
+                        "Failed to send dummy event into room %s for user %s due to "
+                        "lack of consent. Will try another user" % (room_id, user_id)
+                    )
+                except AuthError:
+                    logger.info(
+                        "Failed to send dummy event into room %s for user %s due to "
+                        "lack of power. Will try another user" % (room_id, user_id)
+                    )
 
-            if not user_id:
-                # We don't have a joined user.
-                # TODO: We should do something here to stop the room from
-                # appearing next time.
-                continue
+            if not dummy_event_sent:
+                # Did not find a valid user in the room, so remove from future attempts
+                # Exclusion is time limited, so the room will be rechecked in the future
+                # dependent on _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
+                logger.info(
+                    "Failed to send dummy event into room %s. Will exclude it from "
+                    "future attempts until cache expires" % (room_id,)
+                )
+                now = self.clock.time_msec()
+                self._rooms_to_exclude_from_dummy_event_insertion[room_id] = now
 
-            requester = create_requester(user_id)
-
-            event, context = yield self.create_event(
-                requester,
-                {
-                    "type": "org.matrix.dummy_event",
-                    "content": {},
-                    "room_id": room_id,
-                    "sender": user_id,
-                },
-                prev_events_and_hashes=prev_events_and_hashes,
+    def _expire_rooms_to_exclude_from_dummy_event_insertion(self):
+        expire_before = self.clock.time_msec() - _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
+        to_expire = set()
+        for room_id, time in self._rooms_to_exclude_from_dummy_event_insertion.items():
+            if time < expire_before:
+                to_expire.add(room_id)
+        for room_id in to_expire:
+            logger.debug(
+                "Expiring room id %s from dummy event insertion exclusion cache",
+                room_id,
             )
-
-            event.internal_metadata.proactively_send = False
-
-            yield self.send_nonmember_event(requester, event, context, ratelimit=False)
+            del self._rooms_to_exclude_from_dummy_event_insertion[room_id]
