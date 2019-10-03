@@ -1,4 +1,4 @@
-# -*- CODING: UTF-8 -*-
+# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 Michael Telatynski <7t3chguy@gmail.com>
@@ -603,7 +603,7 @@ class GroupsServerHandler(object):
         invited_users = yield self.store.get_invited_users_in_group(group_id)
         if user_id in invited_users:
             raise SynapseError(
-                403, "User already invited to group", errcode=Codes.BAD_STATE
+                400, "User already invited to group", errcode=Codes.BAD_STATE
             )
 
         user_results = yield self.store.get_users_in_group(

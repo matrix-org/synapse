@@ -1,1 +1,1 @@
-Return a 403:M_BAD_STATE upon attempt to invite into a community a user who has already joined the community.
+Fix a problem where users could be invited twice to the same group.
