@@ -299,6 +299,94 @@ class RootConfig(object):
         )
 
     @classmethod
+    def load_config(cls, description, argv):
+        """Parse the commandline and config files
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Returns: Config object.
+        """
+        config_parser = argparse.ArgumentParser(description=description)
+        cls.add_arguments_to_parser(config_parser)
+        obj, _ = cls.load_config_with_parser(config_parser, argv)
+
+        return obj
+
+    @classmethod
+    def add_arguments_to_parser(cls, config_parser):
+        """Adds all the config flags to an ArgumentParser.
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Used for workers where we want to add extra flags/subcommands.
+
+        Args:
+            config_parser (ArgumentParser): App description
+        """
+
+        config_parser.add_argument(
+            "-c",
+            "--config-path",
+            action="append",
+            metavar="CONFIG_FILE",
+            help="Specify config file. Can be given multiple times and"
+            " may specify directories containing *.yaml files.",
+        )
+
+        config_parser.add_argument(
+            "--keys-directory",
+            metavar="DIRECTORY",
+            help="Where files such as certs and signing keys are stored when"
+            " their location is not given explicitly in the config."
+            " Defaults to the directory containing the last config file",
+        )
+
+        cls.invoke_all_static("add_arguments", config_parser)
+
+    @classmethod
+    def load_config_with_parser(cls, parser, argv):
+        """Parse the commandline and config files with the given parser
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Used for workers where we want to add extra flags/subcommands.
+
+        Args:
+            parser (ArgumentParser)
+            argv (list[str])
+
+        Returns:
+            tuple[HomeServerConfig, argparse.Namespace]: Returns the parsed
+            config object and the parsed argparse.Namespace object from
+            `parser.parse_args(..)`
+        """
+
+        obj = cls()
+
+        config_args = parser.parse_args(argv)
+
+        config_files = find_config_files(search_paths=config_args.config_path)
+
+        if not config_files:
+            parser.error("Must supply a config file.")
+
+        if config_args.keys_directory:
+            config_dir_path = config_args.keys_directory
+        else:
+            config_dir_path = os.path.dirname(config_files[-1])
+        config_dir_path = os.path.abspath(config_dir_path)
+        data_dir_path = os.getcwd()
+
+        config_dict = read_config_files(config_files)
+        obj.parse_config_dict(
+            config_dict, config_dir_path=config_dir_path, data_dir_path=data_dir_path
+        )
+
+        obj.invoke_all("read_arguments", config_args)
+
+        return obj, config_args
+
+    @classmethod
     def load_or_generate_config(cls, description, argv):
         """Parse the commandline and config files
 
@@ -467,94 +555,6 @@ class RootConfig(object):
         obj.invoke_all("read_arguments", args)
 
         return obj
-
-    @classmethod
-    def load_config(cls, description, argv):
-        """Parse the commandline and config files
-
-        Doesn't support config-file-generation: used by the worker apps.
-
-        Returns: Config object.
-        """
-        config_parser = argparse.ArgumentParser(description=description)
-        cls.add_arguments_to_parser(config_parser)
-        obj, _ = cls.load_config_with_parser(config_parser, argv)
-
-        return obj
-
-    @classmethod
-    def add_arguments_to_parser(cls, config_parser):
-        """Adds all the config flags to an ArgumentParser.
-
-        Doesn't support config-file-generation: used by the worker apps.
-
-        Used for workers where we want to add extra flags/subcommands.
-
-        Args:
-            config_parser (ArgumentParser): App description
-        """
-
-        config_parser.add_argument(
-            "-c",
-            "--config-path",
-            action="append",
-            metavar="CONFIG_FILE",
-            help="Specify config file. Can be given multiple times and"
-            " may specify directories containing *.yaml files.",
-        )
-
-        config_parser.add_argument(
-            "--keys-directory",
-            metavar="DIRECTORY",
-            help="Where files such as certs and signing keys are stored when"
-            " their location is not given explicitly in the config."
-            " Defaults to the directory containing the last config file",
-        )
-
-        cls.invoke_all_static("add_arguments", config_parser)
-
-    @classmethod
-    def load_config_with_parser(cls, parser, argv):
-        """Parse the commandline and config files with the given parser
-
-        Doesn't support config-file-generation: used by the worker apps.
-
-        Used for workers where we want to add extra flags/subcommands.
-
-        Args:
-            parser (ArgumentParser)
-            argv (list[str])
-
-        Returns:
-            tuple[HomeServerConfig, argparse.Namespace]: Returns the parsed
-            config object and the parsed argparse.Namespace object from
-            `parser.parse_args(..)`
-        """
-
-        obj = cls()
-
-        config_args = parser.parse_args(argv)
-
-        config_files = find_config_files(search_paths=config_args.config_path)
-
-        if not config_files:
-            parser.error("Must supply a config file.")
-
-        if config_args.keys_directory:
-            config_dir_path = config_args.keys_directory
-        else:
-            config_dir_path = os.path.dirname(config_files[-1])
-        config_dir_path = os.path.abspath(config_dir_path)
-        data_dir_path = os.getcwd()
-
-        config_dict = read_config_files(config_files)
-        obj.parse_config_dict(
-            config_dict, config_dir_path=config_dir_path, data_dir_path=data_dir_path
-        )
-
-        obj.invoke_all("read_arguments", config_args)
-
-        return obj, config_args
 
     def parse_config_dict(self, config_dict, config_dir_path=None, data_dir_path=None):
         """Read the information from the config dict into this Config object.
