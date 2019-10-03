@@ -91,24 +91,6 @@ class RootConfig(object):
             conf.section = name
             self._configs[name] = conf
 
-    def invoke_all(self, func_name, *args, **kwargs):
-        """
-        Invoke a function on all instantiated config classes.
-        """
-        res = OrderedDict()
-
-        for name, config in self._configs.items():
-            if hasattr(config, func_name):
-                res[name] = getattr(config, func_name)(*args, **kwargs)
-
-        return res
-
-    @classmethod
-    def invoke_all_static(cls, func_name, *args, **kwargs):
-        for config in cls.config_classes:
-            if hasattr(config, func_name):
-                getattr(config, func_name)(*args, **kwargs)
-
     def __getattr__(self, item):
         if item in self._configs.keys():
             return self._configs[item]
@@ -126,26 +108,23 @@ class RootConfig(object):
 
         raise AttributeError(item, "not found in %s" % (list(self._configs.keys()),))
 
-    def parse_config_dict(self, config_dict, config_dir_path=None, data_dir_path=None):
-        """Read the information from the config dict into this Config object.
-
-        Args:
-            config_dict (dict): Configuration data, as read from the yaml
-
-            config_dir_path (str): The path where the config files are kept. Used to
-                create filenames for things like the log config and the signing key.
-
-            data_dir_path (str): The path where the data files are kept. Used to create
-                filenames for things like the database and media store.
+    def invoke_all(self, func_name, *args, **kwargs):
         """
-        self.invoke_all(
-            "read_config",
-            config_dict,
-            config_dir_path=config_dir_path,
-            data_dir_path=data_dir_path,
-        )
+        Invoke a function on all instantiated config classes.
+        """
+        res = OrderedDict()
 
-    read_config = parse_config_dict
+        for name, config in self._configs.items():
+            if hasattr(config, func_name):
+                res[name] = getattr(config, func_name)(*args, **kwargs)
+
+        return res
+
+    @classmethod
+    def invoke_all_static(cls, func_name, *args, **kwargs):
+        for config in cls.config_classes:
+            if hasattr(config, func_name):
+                getattr(config, func_name)(*args, **kwargs)
 
     def generate_config(
         self,
@@ -493,6 +472,27 @@ class RootConfig(object):
         obj.invoke_all("read_arguments", config_args)
 
         return obj, config_args
+
+    def parse_config_dict(self, config_dict, config_dir_path=None, data_dir_path=None):
+        """Read the information from the config dict into this Config object.
+
+        Args:
+            config_dict (dict): Configuration data, as read from the yaml
+
+            config_dir_path (str): The path where the config files are kept. Used to
+                create filenames for things like the log config and the signing key.
+
+            data_dir_path (str): The path where the data files are kept. Used to create
+                filenames for things like the database and media store.
+        """
+        self.invoke_all(
+            "read_config",
+            config_dict,
+            config_dir_path=config_dir_path,
+            data_dir_path=data_dir_path,
+        )
+
+    read_config = parse_config_dict
 
     def generate_missing_files(self, config_dict, config_dir_path):
         self.invoke_all("generate_files", config_dict, config_dir_path)
