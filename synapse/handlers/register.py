@@ -217,7 +217,6 @@ class RegistrationHandler(BaseHandler):
 
         else:
             # autogen a sequential user ID
-            attempts = 0
             user = None
             while not user:
                 localpart = yield self._generate_user_id()
@@ -238,7 +237,6 @@ class RegistrationHandler(BaseHandler):
                     # if user id is taken, just generate another
                     user = None
                     user_id = None
-                    attempts += 1
 
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
