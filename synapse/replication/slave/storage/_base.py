@@ -13,22 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage._base import SQLBaseStore
+import logging
+
+import six
+
+from synapse.storage._base import _CURRENT_STATE_CACHE_NAME, SQLBaseStore
 from synapse.storage.engines import PostgresEngine
 
 from ._slaved_id_tracker import SlavedIdTracker
 
-import logging
-
 logger = logging.getLogger(__name__)
+
+
+def __func__(inp):
+    if six.PY3:
+        return inp
+    else:
+        return inp.__func__
 
 
 class BaseSlavedStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
-        super(BaseSlavedStore, self).__init__(hs)
+        super(BaseSlavedStore, self).__init__(db_conn, hs)
         if isinstance(self.database_engine, PostgresEngine):
             self._cache_id_gen = SlavedIdTracker(
-                db_conn, "cache_invalidation_stream", "stream_id",
+                db_conn, "cache_invalidation_stream", "stream_id"
             )
         else:
             self._cache_id_gen = None
@@ -45,12 +54,12 @@ class BaseSlavedStore(SQLBaseStore):
         if stream_name == "caches":
             self._cache_id_gen.advance(token)
             for row in rows:
-                try:
-                    getattr(self, row.cache_func).invalidate(tuple(row.keys))
-                except AttributeError:
-                    # We probably haven't pulled in the cache in this worker,
-                    # which is fine.
-                    pass
+                if row.cache_func == _CURRENT_STATE_CACHE_NAME:
+                    room_id = row.keys[0]
+                    members_changed = set(row.keys[1:])
+                    self._invalidate_state_caches(room_id, members_changed)
+                else:
+                    self._attempt_to_invalidate_cache(row.cache_func, tuple(row.keys))
 
     def _invalidate_cache_and_stream(self, txn, cache_func, keys):
         txn.call_after(cache_func.invalidate, keys)

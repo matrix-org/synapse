@@ -14,22 +14,22 @@
 # limitations under the License.
 
 
-from tests import unittest
-from twisted.internet import defer
-
 from mock import Mock, NonCallableMock
+
+from twisted.internet import defer
 
 import synapse.types
 from synapse.api.errors import AuthError
-from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.profile import MasterProfileHandler
 from synapse.types import UserID
 
+from tests import unittest
 from tests.utils import setup_test_homeserver
 
 
 class ProfileHandlers(object):
     def __init__(self, hs):
-        self.profile_handler = ProfileHandler(hs)
+        self.profile_handler = MasterProfileHandler(hs)
 
 
 class ProfileTestCase(unittest.TestCase):
@@ -37,32 +37,29 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.mock_federation = Mock(spec=[
-            "make_query",
-            "register_edu_handler",
-        ])
+        self.mock_federation = Mock()
+        self.mock_registry = Mock()
 
         self.query_handlers = {}
 
         def register_query_handler(query_type, handler):
             self.query_handlers[query_type] = handler
 
-        self.mock_federation.register_query_handler = register_query_handler
+        self.mock_registry.register_query_handler = register_query_handler
 
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             http_client=None,
             handlers=None,
             resource_for_federation=Mock(),
-            replication_layer=self.mock_federation,
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ])
+            federation_client=self.mock_federation,
+            federation_server=Mock(),
+            federation_registry=self.mock_registry,
+            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
 
         self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.send_message.return_value = (True, 0)
-
-        hs.handlers = ProfileHandlers(hs)
+        self.ratelimiter.can_do_action.return_value = (True, 0)
 
         self.store = hs.get_datastore()
 
@@ -72,13 +69,11 @@ class ProfileTestCase(unittest.TestCase):
 
         yield self.store.create_profile(self.frank.localpart)
 
-        self.handler = hs.get_handlers().profile_handler
+        self.handler = hs.get_profile_handler()
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
-        yield self.store.set_profile_displayname(
-            self.frank.localpart, "Frank"
-        )
+        yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
 
         displayname = yield self.handler.get_displayname(self.frank)
 
@@ -87,22 +82,18 @@ class ProfileTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_set_my_name(self):
         yield self.handler.set_displayname(
-            self.frank,
-            synapse.types.create_requester(self.frank),
-            "Frank Jr."
+            self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
         )
 
         self.assertEquals(
             (yield self.store.get_profile_displayname(self.frank.localpart)),
-            "Frank Jr."
+            "Frank Jr.",
         )
 
     @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
         d = self.handler.set_displayname(
-            self.frank,
-            synapse.types.create_requester(self.bob),
-            "Frank Jr."
+            self.frank, synapse.types.create_requester(self.bob), "Frank Jr."
         )
 
         yield self.assertFailure(d, AuthError)
@@ -147,11 +138,12 @@ class ProfileTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
         yield self.handler.set_avatar_url(
-            self.frank, synapse.types.create_requester(self.frank),
-            "http://my.server/pic.gif"
+            self.frank,
+            synapse.types.create_requester(self.frank),
+            "http://my.server/pic.gif",
         )
 
         self.assertEquals(
             (yield self.store.get_profile_avatar_url(self.frank.localpart)),
-            "http://my.server/pic.gif"
+            "http://my.server/pic.gif",
         )

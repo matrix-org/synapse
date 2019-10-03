@@ -13,30 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.http.servlet import (
-    RestServlet, parse_string, parse_integer
-)
-from synapse.events.utils import (
-    serialize_event, format_event_for_client_v2_without_room_id,
-)
+from synapse.events.utils import format_event_for_client_v2_without_room_id
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
 
-from ._base import client_v2_patterns
-
-import logging
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationsServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/notifications$", releases=())
+    PATTERNS = client_patterns("/notifications$")
 
     def __init__(self, hs):
         super(NotificationsServlet, self).__init__()
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -54,7 +51,7 @@ class NotificationsServlet(RestServlet):
         )
 
         receipts_by_room = yield self.store.get_receipts_for_user_with_orderings(
-            user_id, 'm.read'
+            user_id, "m.read"
         )
 
         notif_event_ids = [pa["event_id"] for pa in push_actions]
@@ -70,10 +67,12 @@ class NotificationsServlet(RestServlet):
                 "profile_tag": pa["profile_tag"],
                 "actions": pa["actions"],
                 "ts": pa["received_ts"],
-                "event": serialize_event(
-                    notif_events[pa["event_id"]],
-                    self.clock.time_msec(),
-                    event_format=format_event_for_client_v2_without_room_id,
+                "event": (
+                    yield self._event_serializer.serialize_event(
+                        notif_events[pa["event_id"]],
+                        self.clock.time_msec(),
+                        event_format=format_event_for_client_v2_without_room_id,
+                    )
                 ),
             }
 
@@ -83,17 +82,13 @@ class NotificationsServlet(RestServlet):
                 receipt = receipts_by_room[pa["room_id"]]
 
                 returned_pa["read"] = (
-                    receipt["topological_ordering"], receipt["stream_ordering"]
-                ) >= (
-                    pa["topological_ordering"], pa["stream_ordering"]
-                )
+                    receipt["topological_ordering"],
+                    receipt["stream_ordering"],
+                ) >= (pa["topological_ordering"], pa["stream_ordering"])
             returned_push_actions.append(returned_pa)
-            next_token = pa["stream_ordering"]
+            next_token = str(pa["stream_ordering"])
 
-        defer.returnValue((200, {
-            "notifications": returned_push_actions,
-            "next_token": next_token,
-        }))
+        return 200, {"notifications": returned_push_actions, "next_token": next_token}
 
 
 def register_servlets(hs, http_server):

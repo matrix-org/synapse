@@ -14,23 +14,205 @@
 # limitations under the License.
 
 import logging
-import ujson
+
+from canonicaljson import json
 
 from twisted.internet import defer
 
-from .background_updates import BackgroundUpdateStore
-
+from synapse.logging.opentracing import log_kv, set_tag, trace
+from synapse.storage._base import SQLBaseStore
+from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.util.caches.expiringcache import ExpiringCache
-
 
 logger = logging.getLogger(__name__)
 
 
-class DeviceInboxStore(BackgroundUpdateStore):
+class DeviceInboxWorkerStore(SQLBaseStore):
+    def get_to_device_stream_token(self):
+        return self._device_inbox_id_gen.get_current_token()
+
+    def get_new_messages_for_device(
+        self, user_id, device_id, last_stream_id, current_stream_id, limit=100
+    ):
+        """
+        Args:
+            user_id(str): The recipient user_id.
+            device_id(str): The recipient device_id.
+            current_stream_id(int): The current position of the to device
+                message stream.
+        Returns:
+            Deferred ([dict], int): List of messages for the device and where
+                in the stream the messages got to.
+        """
+        has_changed = self._device_inbox_stream_cache.has_entity_changed(
+            user_id, last_stream_id
+        )
+        if not has_changed:
+            return defer.succeed(([], current_stream_id))
+
+        def get_new_messages_for_device_txn(txn):
+            sql = (
+                "SELECT stream_id, message_json FROM device_inbox"
+                " WHERE user_id = ? AND device_id = ?"
+                " AND ? < stream_id AND stream_id <= ?"
+                " ORDER BY stream_id ASC"
+                " LIMIT ?"
+            )
+            txn.execute(
+                sql, (user_id, device_id, last_stream_id, current_stream_id, limit)
+            )
+            messages = []
+            for row in txn:
+                stream_pos = row[0]
+                messages.append(json.loads(row[1]))
+            if len(messages) < limit:
+                stream_pos = current_stream_id
+            return messages, stream_pos
+
+        return self.runInteraction(
+            "get_new_messages_for_device", get_new_messages_for_device_txn
+        )
+
+    @trace
+    @defer.inlineCallbacks
+    def delete_messages_for_device(self, user_id, device_id, up_to_stream_id):
+        """
+        Args:
+            user_id(str): The recipient user_id.
+            device_id(str): The recipient device_id.
+            up_to_stream_id(int): Where to delete messages up to.
+        Returns:
+            A deferred that resolves to the number of messages deleted.
+        """
+        # If we have cached the last stream id we've deleted up to, we can
+        # check if there is likely to be anything that needs deleting
+        last_deleted_stream_id = self._last_device_delete_cache.get(
+            (user_id, device_id), None
+        )
+
+        set_tag("last_deleted_stream_id", last_deleted_stream_id)
+
+        if last_deleted_stream_id:
+            has_changed = self._device_inbox_stream_cache.has_entity_changed(
+                user_id, last_deleted_stream_id
+            )
+            if not has_changed:
+                log_kv({"message": "No changes in cache since last check"})
+                return 0
+
+        def delete_messages_for_device_txn(txn):
+            sql = (
+                "DELETE FROM device_inbox"
+                " WHERE user_id = ? AND device_id = ?"
+                " AND stream_id <= ?"
+            )
+            txn.execute(sql, (user_id, device_id, up_to_stream_id))
+            return txn.rowcount
+
+        count = yield self.runInteraction(
+            "delete_messages_for_device", delete_messages_for_device_txn
+        )
+
+        log_kv(
+            {"message": "deleted {} messages for device".format(count), "count": count}
+        )
+
+        # Update the cache, ensuring that we only ever increase the value
+        last_deleted_stream_id = self._last_device_delete_cache.get(
+            (user_id, device_id), 0
+        )
+        self._last_device_delete_cache[(user_id, device_id)] = max(
+            last_deleted_stream_id, up_to_stream_id
+        )
+
+        return count
+
+    @trace
+    def get_new_device_msgs_for_remote(
+        self, destination, last_stream_id, current_stream_id, limit
+    ):
+        """
+        Args:
+            destination(str): The name of the remote server.
+            last_stream_id(int|long): The last position of the device message stream
+                that the server sent up to.
+            current_stream_id(int|long): The current position of the device
+                message stream.
+        Returns:
+            Deferred ([dict], int|long): List of messages for the device and where
+                in the stream the messages got to.
+        """
+
+        set_tag("destination", destination)
+        set_tag("last_stream_id", last_stream_id)
+        set_tag("current_stream_id", current_stream_id)
+        set_tag("limit", limit)
+
+        has_changed = self._device_federation_outbox_stream_cache.has_entity_changed(
+            destination, last_stream_id
+        )
+        if not has_changed or last_stream_id == current_stream_id:
+            log_kv({"message": "No new messages in stream"})
+            return defer.succeed(([], current_stream_id))
+
+        if limit <= 0:
+            # This can happen if we run out of room for EDUs in the transaction.
+            return defer.succeed(([], last_stream_id))
+
+        @trace
+        def get_new_messages_for_remote_destination_txn(txn):
+            sql = (
+                "SELECT stream_id, messages_json FROM device_federation_outbox"
+                " WHERE destination = ?"
+                " AND ? < stream_id AND stream_id <= ?"
+                " ORDER BY stream_id ASC"
+                " LIMIT ?"
+            )
+            txn.execute(sql, (destination, last_stream_id, current_stream_id, limit))
+            messages = []
+            for row in txn:
+                stream_pos = row[0]
+                messages.append(json.loads(row[1]))
+            if len(messages) < limit:
+                log_kv({"message": "Set stream position to current position"})
+                stream_pos = current_stream_id
+            return messages, stream_pos
+
+        return self.runInteraction(
+            "get_new_device_msgs_for_remote",
+            get_new_messages_for_remote_destination_txn,
+        )
+
+    @trace
+    def delete_device_msgs_for_remote(self, destination, up_to_stream_id):
+        """Used to delete messages when the remote destination acknowledges
+        their receipt.
+
+        Args:
+            destination(str): The destination server_name
+            up_to_stream_id(int): Where to delete messages up to.
+        Returns:
+            A deferred that resolves when the messages have been deleted.
+        """
+
+        def delete_messages_for_remote_destination_txn(txn):
+            sql = (
+                "DELETE FROM device_federation_outbox"
+                " WHERE destination = ?"
+                " AND stream_id <= ?"
+            )
+            txn.execute(sql, (destination, up_to_stream_id))
+
+        return self.runInteraction(
+            "delete_device_msgs_for_remote", delete_messages_for_remote_destination_txn
+        )
+
+
+class DeviceInboxStore(DeviceInboxWorkerStore, BackgroundUpdateStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
 
-    def __init__(self, hs):
-        super(DeviceInboxStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(DeviceInboxStore, self).__init__(db_conn, hs)
 
         self.register_background_index_update(
             "device_inbox_stream_index",
@@ -40,8 +222,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
         )
 
         self.register_background_update_handler(
-            self.DEVICE_INBOX_STREAM_ID,
-            self._background_drop_index_device_inbox,
+            self.DEVICE_INBOX_STREAM_ID, self._background_drop_index_device_inbox
         )
 
         # Map of (user_id, device_id) to the last stream_id that has been
@@ -53,9 +234,11 @@ class DeviceInboxStore(BackgroundUpdateStore):
             expiry_ms=30 * 60 * 1000,
         )
 
+    @trace
     @defer.inlineCallbacks
-    def add_messages_to_device_inbox(self, local_messages_by_user_then_device,
-                                     remote_messages_by_destination):
+    def add_messages_to_device_inbox(
+        self, local_messages_by_user_then_device, remote_messages_by_destination
+    ):
         """Used to send messages from this server.
 
         Args:
@@ -85,28 +268,23 @@ class DeviceInboxStore(BackgroundUpdateStore):
             )
             rows = []
             for destination, edu in remote_messages_by_destination.items():
-                edu_json = ujson.dumps(edu)
+                edu_json = json.dumps(edu)
                 rows.append((destination, stream_id, now_ms, edu_json))
             txn.executemany(sql, rows)
 
         with self._device_inbox_id_gen.get_next() as stream_id:
             now_ms = self.clock.time_msec()
             yield self.runInteraction(
-                "add_messages_to_device_inbox",
-                add_messages_txn,
-                now_ms,
-                stream_id,
+                "add_messages_to_device_inbox", add_messages_txn, now_ms, stream_id
             )
             for user_id in local_messages_by_user_then_device.keys():
-                self._device_inbox_stream_cache.entity_has_changed(
-                    user_id, stream_id
-                )
+                self._device_inbox_stream_cache.entity_has_changed(user_id, stream_id)
             for destination in remote_messages_by_destination.keys():
                 self._device_federation_outbox_stream_cache.entity_has_changed(
                     destination, stream_id
                 )
 
-        defer.returnValue(self._device_inbox_id_gen.get_current_token())
+        return self._device_inbox_id_gen.get_current_token()
 
     @defer.inlineCallbacks
     def add_messages_from_remote_to_device_inbox(
@@ -117,7 +295,8 @@ class DeviceInboxStore(BackgroundUpdateStore):
             # origin. This can happen if the origin doesn't receive our
             # acknowledgement from the first time we received the message.
             already_inserted = self._simple_select_one_txn(
-                txn, table="device_federation_inbox",
+                txn,
+                table="device_federation_inbox",
                 keyvalues={"origin": origin, "message_id": message_id},
                 retcols=("message_id",),
                 allow_none=True,
@@ -128,7 +307,8 @@ class DeviceInboxStore(BackgroundUpdateStore):
             # Add an entry for this message_id so that we know we've processed
             # it.
             self._simple_insert_txn(
-                txn, table="device_federation_inbox",
+                txn,
+                table="device_federation_inbox",
                 values={
                     "origin": origin,
                     "message_id": message_id,
@@ -151,33 +331,25 @@ class DeviceInboxStore(BackgroundUpdateStore):
                 stream_id,
             )
             for user_id in local_messages_by_user_then_device.keys():
-                self._device_inbox_stream_cache.entity_has_changed(
-                    user_id, stream_id
-                )
+                self._device_inbox_stream_cache.entity_has_changed(user_id, stream_id)
 
-        defer.returnValue(stream_id)
+        return stream_id
 
-    def _add_messages_to_local_device_inbox_txn(self, txn, stream_id,
-                                                messages_by_user_then_device):
-        sql = (
-            "UPDATE device_max_stream_id"
-            " SET stream_id = ?"
-            " WHERE stream_id < ?"
-        )
+    def _add_messages_to_local_device_inbox_txn(
+        self, txn, stream_id, messages_by_user_then_device
+    ):
+        sql = "UPDATE device_max_stream_id" " SET stream_id = ?" " WHERE stream_id < ?"
         txn.execute(sql, (stream_id, stream_id))
 
         local_by_user_then_device = {}
         for user_id, messages_by_device in messages_by_user_then_device.items():
             messages_json_for_user = {}
-            devices = messages_by_device.keys()
+            devices = list(messages_by_device.keys())
             if len(devices) == 1 and devices[0] == "*":
                 # Handle wildcard device_ids.
-                sql = (
-                    "SELECT device_id FROM devices"
-                    " WHERE user_id = ?"
-                )
+                sql = "SELECT device_id FROM devices" " WHERE user_id = ?"
                 txn.execute(sql, (user_id,))
-                message_json = ujson.dumps(messages_by_device["*"])
+                message_json = json.dumps(messages_by_device["*"])
                 for row in txn:
                     # Add the message for all devices for this user on this
                     # server.
@@ -199,7 +371,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
                     # Only insert into the local inbox if the device exists on
                     # this server
                     device = row[0]
-                    message_json = ujson.dumps(messages_by_device[device])
+                    message_json = json.dumps(messages_by_device[device])
                     messages_json_for_user[device] = message_json
 
             if messages_json_for_user:
@@ -219,93 +391,6 @@ class DeviceInboxStore(BackgroundUpdateStore):
                 rows.append((user_id, device_id, stream_id, message_json))
 
         txn.executemany(sql, rows)
-
-    def get_new_messages_for_device(
-        self, user_id, device_id, last_stream_id, current_stream_id, limit=100
-    ):
-        """
-        Args:
-            user_id(str): The recipient user_id.
-            device_id(str): The recipient device_id.
-            current_stream_id(int): The current position of the to device
-                message stream.
-        Returns:
-            Deferred ([dict], int): List of messages for the device and where
-                in the stream the messages got to.
-        """
-        has_changed = self._device_inbox_stream_cache.has_entity_changed(
-            user_id, last_stream_id
-        )
-        if not has_changed:
-            return defer.succeed(([], current_stream_id))
-
-        def get_new_messages_for_device_txn(txn):
-            sql = (
-                "SELECT stream_id, message_json FROM device_inbox"
-                " WHERE user_id = ? AND device_id = ?"
-                " AND ? < stream_id AND stream_id <= ?"
-                " ORDER BY stream_id ASC"
-                " LIMIT ?"
-            )
-            txn.execute(sql, (
-                user_id, device_id, last_stream_id, current_stream_id, limit
-            ))
-            messages = []
-            for row in txn:
-                stream_pos = row[0]
-                messages.append(ujson.loads(row[1]))
-            if len(messages) < limit:
-                stream_pos = current_stream_id
-            return (messages, stream_pos)
-
-        return self.runInteraction(
-            "get_new_messages_for_device", get_new_messages_for_device_txn,
-        )
-
-    @defer.inlineCallbacks
-    def delete_messages_for_device(self, user_id, device_id, up_to_stream_id):
-        """
-        Args:
-            user_id(str): The recipient user_id.
-            device_id(str): The recipient device_id.
-            up_to_stream_id(int): Where to delete messages up to.
-        Returns:
-            A deferred that resolves to the number of messages deleted.
-        """
-        # If we have cached the last stream id we've deleted up to, we can
-        # check if there is likely to be anything that needs deleting
-        last_deleted_stream_id = self._last_device_delete_cache.get(
-            (user_id, device_id), None
-        )
-        if last_deleted_stream_id:
-            has_changed = self._device_inbox_stream_cache.has_entity_changed(
-                user_id, last_deleted_stream_id
-            )
-            if not has_changed:
-                defer.returnValue(0)
-
-        def delete_messages_for_device_txn(txn):
-            sql = (
-                "DELETE FROM device_inbox"
-                " WHERE user_id = ? AND device_id = ?"
-                " AND stream_id <= ?"
-            )
-            txn.execute(sql, (user_id, device_id, up_to_stream_id))
-            return txn.rowcount
-
-        count = yield self.runInteraction(
-            "delete_messages_for_device", delete_messages_for_device_txn
-        )
-
-        # Update the cache, ensuring that we only ever increase the value
-        last_deleted_stream_id = self._last_device_delete_cache.get(
-            (user_id, device_id), 0
-        )
-        self._last_device_delete_cache[(user_id, device_id)] = max(
-            last_deleted_stream_id, up_to_stream_id
-        )
-
-        defer.returnValue(count)
 
     def get_all_new_device_messages(self, last_pos, current_pos, limit):
         """
@@ -351,88 +436,15 @@ class DeviceInboxStore(BackgroundUpdateStore):
             "get_all_new_device_messages", get_all_new_device_messages_txn
         )
 
-    def get_to_device_stream_token(self):
-        return self._device_inbox_id_gen.get_current_token()
-
-    def get_new_device_msgs_for_remote(
-        self, destination, last_stream_id, current_stream_id, limit=100
-    ):
-        """
-        Args:
-            destination(str): The name of the remote server.
-            last_stream_id(int|long): The last position of the device message stream
-                that the server sent up to.
-            current_stream_id(int|long): The current position of the device
-                message stream.
-        Returns:
-            Deferred ([dict], int|long): List of messages for the device and where
-                in the stream the messages got to.
-        """
-
-        has_changed = self._device_federation_outbox_stream_cache.has_entity_changed(
-            destination, last_stream_id
-        )
-        if not has_changed or last_stream_id == current_stream_id:
-            return defer.succeed(([], current_stream_id))
-
-        def get_new_messages_for_remote_destination_txn(txn):
-            sql = (
-                "SELECT stream_id, messages_json FROM device_federation_outbox"
-                " WHERE destination = ?"
-                " AND ? < stream_id AND stream_id <= ?"
-                " ORDER BY stream_id ASC"
-                " LIMIT ?"
-            )
-            txn.execute(sql, (
-                destination, last_stream_id, current_stream_id, limit
-            ))
-            messages = []
-            for row in txn:
-                stream_pos = row[0]
-                messages.append(ujson.loads(row[1]))
-            if len(messages) < limit:
-                stream_pos = current_stream_id
-            return (messages, stream_pos)
-
-        return self.runInteraction(
-            "get_new_device_msgs_for_remote",
-            get_new_messages_for_remote_destination_txn,
-        )
-
-    def delete_device_msgs_for_remote(self, destination, up_to_stream_id):
-        """Used to delete messages when the remote destination acknowledges
-        their receipt.
-
-        Args:
-            destination(str): The destination server_name
-            up_to_stream_id(int): Where to delete messages up to.
-        Returns:
-            A deferred that resolves when the messages have been deleted.
-        """
-        def delete_messages_for_remote_destination_txn(txn):
-            sql = (
-                "DELETE FROM device_federation_outbox"
-                " WHERE destination = ?"
-                " AND stream_id <= ?"
-            )
-            txn.execute(sql, (destination, up_to_stream_id))
-
-        return self.runInteraction(
-            "delete_device_msgs_for_remote",
-            delete_messages_for_remote_destination_txn
-        )
-
     @defer.inlineCallbacks
     def _background_drop_index_device_inbox(self, progress, batch_size):
         def reindex_txn(conn):
             txn = conn.cursor()
-            txn.execute(
-                "DROP INDEX IF EXISTS device_inbox_stream_id"
-            )
+            txn.execute("DROP INDEX IF EXISTS device_inbox_stream_id")
             txn.close()
 
         yield self.runWithConnection(reindex_txn)
 
         yield self._end_background_update(self.DEVICE_INBOX_STREAM_ID)
 
-        defer.returnValue(1)
+        return 1

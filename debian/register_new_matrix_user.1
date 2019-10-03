@@ -1,0 +1,72 @@
+.\" generated with Ronn/v0.7.3
+.\" http://github.com/rtomayko/ronn/tree/0.7.3
+.
+.TH "REGISTER_NEW_MATRIX_USER" "1" "February 2017" "" ""
+.
+.SH "NAME"
+\fBregister_new_matrix_user\fR \- Used to register new users with a given home server when registration has been disabled
+.
+.SH "SYNOPSIS"
+\fBregister_new_matrix_user\fR options\.\.\.
+.
+.SH "DESCRIPTION"
+\fBregister_new_matrix_user\fR registers new users with a given home server when registration has been disabled\. For this to work, the home server must be configured with the \'registration_shared_secret\' option set\.
+.
+.P
+This accepts the user credentials like the username, password, is user an admin or not and registers the user onto the homeserver database\. Also, a YAML file containing the shared secret can be provided\. If not, the shared secret can be provided via the command line\.
+.
+.P
+By default it assumes the home server URL to be \fBhttps://localhost:8448\fR\. This can be changed via the \fBserver_url\fR command line option\.
+.
+.SH "FILES"
+A sample YAML file accepted by \fBregister_new_matrix_user\fR is described below:
+.
+.IP "" 4
+.
+.nf
+
+registration_shared_secret: "s3cr3t"
+.
+.fi
+.
+.IP "" 0
+.
+.SH "OPTIONS"
+.
+.TP
+\fB\-u\fR, \fB\-\-user\fR
+Local part of the new user\. Will prompt if omitted\.
+.
+.TP
+\fB\-p\fR, \fB\-\-password\fR
+New password for user\. Will prompt if omitted\. Supplying the password on the command line is not recommended\. Use the STDIN instead\.
+.
+.TP
+\fB\-a\fR, \fB\-\-admin\fR
+Register new user as an admin\. Will prompt if omitted\.
+.
+.TP
+\fB\-c\fR, \fB\-\-config\fR
+Path to server config file containing the shared secret\.
+.
+.TP
+\fB\-k\fR, \fB\-\-shared\-secret\fR
+Shared secret as defined in server config file\. This is an optional parameter as it can be also supplied via the YAML file\.
+.
+.TP
+\fBserver_url\fR
+URL of the home server\. Defaults to \'https://localhost:8448\'\.
+.
+.SH "EXAMPLES"
+.
+.nf
+
+$ register_new_matrix_user \-u user1 \-p p@ssword \-a \-c config\.yaml
+.
+.fi
+.
+.SH "COPYRIGHT"
+This man page was written by Rahul De <\fIrahulde@swecha\.net\fR> for Debian GNU/Linux distribution\.
+.
+.SH "SEE ALSO"
+synctl(1), synapse_port_db(1), hash_password(1)

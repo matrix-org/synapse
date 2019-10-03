@@ -15,19 +15,18 @@
 
 """This module contains base REST classes for constructing client v1 servlets.
 """
-
-from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
+import logging
 import re
 
-import logging
+from twisted.internet import defer
 
+from synapse.api.errors import InteractiveAuthIncompleteError
+from synapse.api.urls import CLIENT_API_PREFIX
 
 logger = logging.getLogger(__name__)
 
 
-def client_v2_patterns(path_regex, releases=(0,),
-                       v2_alpha=True,
-                       unstable=True):
+def client_patterns(path_regex, releases=(0,), unstable=True, v1=False):
     """Creates a regex compiled client path with the correct client path
     prefix.
 
@@ -38,12 +37,61 @@ def client_v2_patterns(path_regex, releases=(0,),
         SRE_Pattern
     """
     patterns = []
-    if v2_alpha:
-        patterns.append(re.compile("^" + CLIENT_V2_ALPHA_PREFIX + path_regex))
+
     if unstable:
-        unstable_prefix = CLIENT_V2_ALPHA_PREFIX.replace("/v2_alpha", "/unstable")
+        unstable_prefix = CLIENT_API_PREFIX + "/unstable"
         patterns.append(re.compile("^" + unstable_prefix + path_regex))
+    if v1:
+        v1_prefix = CLIENT_API_PREFIX + "/api/v1"
+        patterns.append(re.compile("^" + v1_prefix + path_regex))
     for release in releases:
-        new_prefix = CLIENT_V2_ALPHA_PREFIX.replace("/v2_alpha", "/r%d" % release)
+        new_prefix = CLIENT_API_PREFIX + "/r%d" % (release,)
         patterns.append(re.compile("^" + new_prefix + path_regex))
+
     return patterns
+
+
+def set_timeline_upper_limit(filter_json, filter_timeline_limit):
+    if filter_timeline_limit < 0:
+        return  # no upper limits
+    timeline = filter_json.get("room", {}).get("timeline", {})
+    if "limit" in timeline:
+        filter_json["room"]["timeline"]["limit"] = min(
+            filter_json["room"]["timeline"]["limit"], filter_timeline_limit
+        )
+
+
+def interactive_auth_handler(orig):
+    """Wraps an on_POST method to handle InteractiveAuthIncompleteErrors
+
+    Takes a on_POST method which returns a deferred (errcode, body) response
+    and adds exception handling to turn a InteractiveAuthIncompleteError into
+    a 401 response.
+
+    Normal usage is:
+
+    @interactive_auth_handler
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        # ...
+        yield self.auth_handler.check_auth
+            """
+
+    def wrapped(*args, **kwargs):
+        res = defer.maybeDeferred(orig, *args, **kwargs)
+        res.addErrback(_catch_incomplete_interactive_auth)
+        return res
+
+    return wrapped
+
+
+def _catch_incomplete_interactive_auth(f):
+    """helper for interactive_auth_handler
+
+    Catches InteractiveAuthIncompleteErrors and turns them into 401 responses
+
+    Args:
+        f (failure.Failure):
+    """
+    f.trap(InteractiveAuthIncompleteError)
+    return 401, f.value.result

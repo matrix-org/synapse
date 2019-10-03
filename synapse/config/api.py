@@ -12,29 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
-
 from synapse.api.constants import EventTypes
+
+from ._base import Config
 
 
 class ApiConfig(Config):
+    def read_config(self, config, **kwargs):
+        self.room_invite_state_types = config.get(
+            "room_invite_state_types",
+            [
+                EventTypes.JoinRules,
+                EventTypes.CanonicalAlias,
+                EventTypes.RoomAvatar,
+                EventTypes.RoomEncryption,
+                EventTypes.Name,
+            ],
+        )
 
-    def read_config(self, config):
-        self.room_invite_state_types = config.get("room_invite_state_types", [
-            EventTypes.JoinRules,
-            EventTypes.CanonicalAlias,
-            EventTypes.RoomAvatar,
-            EventTypes.Name,
-        ])
-
-    def default_config(cls, **kwargs):
+    def generate_config_section(cls, **kwargs):
         return """\
         ## API Configuration ##
 
         # A list of event types that will be included in the room_invite_state
-        room_invite_state_types:
-            - "{JoinRules}"
-            - "{CanonicalAlias}"
-            - "{RoomAvatar}"
-            - "{Name}"
-        """.format(**vars(EventTypes))
+        #
+        #room_invite_state_types:
+        #  - "{JoinRules}"
+        #  - "{CanonicalAlias}"
+        #  - "{RoomAvatar}"
+        #  - "{RoomEncryption}"
+        #  - "{Name}"
+        """.format(
+            **vars(EventTypes)
+        )

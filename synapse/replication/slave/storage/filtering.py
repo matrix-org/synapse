@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStore
 from synapse.storage.filtering import FilteringStore
+
+from ._base import BaseSlavedStore
 
 
 class SlavedFilteringStore(BaseSlavedStore):

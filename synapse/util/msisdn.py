@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import phonenumbers
+
 from synapse.api.errors import SynapseError
 
 
@@ -35,6 +36,6 @@ def phone_number_to_msisdn(country, number):
         phoneNumber = phonenumbers.parse(number, country)
     except phonenumbers.NumberParseException:
         raise SynapseError(400, "Unable to parse phone number")
-    return phonenumbers.format_number(
-        phoneNumber, phonenumbers.PhoneNumberFormat.E164
-    )[1:]
+    return phonenumbers.format_number(phoneNumber, phonenumbers.PhoneNumberFormat.E164)[
+        1:
+    ]

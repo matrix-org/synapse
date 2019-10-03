@@ -14,9 +14,9 @@
 # limitations under the License.
 
 
-from .. import unittest
-
 from synapse.util.caches.treecache import TreeCache
+
+from .. import unittest
 
 
 class TreeCacheTestCase(unittest.TestCase):

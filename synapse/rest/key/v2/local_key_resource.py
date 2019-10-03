@@ -14,13 +14,15 @@
 # limitations under the License.
 
 
-from twisted.web.resource import Resource
-from synapse.http.server import respond_with_json_bytes
-from signedjson.sign import sign_json
-from unpaddedbase64 import encode_base64
-from canonicaljson import encode_canonical_json
 import logging
 
+from canonicaljson import encode_canonical_json
+from signedjson.sign import sign_json
+from unpaddedbase64 import encode_base64
+
+from twisted.web.resource import Resource
+
+from synapse.http.server import respond_with_json_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,6 @@ class LocalKey(Resource):
     isLeaf = True
 
     def __init__(self, hs):
-        self.version_string = hs.version_string
         self.config = hs.config
         self.clock = hs.clock
         self.update_response_body(self.clock.time_msec())
@@ -79,34 +80,27 @@ class LocalKey(Resource):
         for key in self.config.signing_key:
             verify_key_bytes = key.verify_key.encode()
             key_id = "%s:%s" % (key.alg, key.version)
-            verify_keys[key_id] = {
-                u"key": encode_base64(verify_key_bytes)
-            }
+            verify_keys[key_id] = {"key": encode_base64(verify_key_bytes)}
 
         old_verify_keys = {}
-        for key in self.config.old_signing_keys:
-            key_id = "%s:%s" % (key.alg, key.version)
+        for key_id, key in self.config.old_signing_keys.items():
             verify_key_bytes = key.encode()
             old_verify_keys[key_id] = {
-                u"key": encode_base64(verify_key_bytes),
-                u"expired_ts": key.expired,
+                "key": encode_base64(verify_key_bytes),
+                "expired_ts": key.expired_ts,
             }
 
         tls_fingerprints = self.config.tls_fingerprints
 
         json_object = {
-            u"valid_until_ts": self.valid_until_ts,
-            u"server_name": self.config.server_name,
-            u"verify_keys": verify_keys,
-            u"old_verify_keys": old_verify_keys,
-            u"tls_fingerprints": tls_fingerprints,
+            "valid_until_ts": self.valid_until_ts,
+            "server_name": self.config.server_name,
+            "verify_keys": verify_keys,
+            "old_verify_keys": old_verify_keys,
+            "tls_fingerprints": tls_fingerprints,
         }
         for key in self.config.signing_key:
-            json_object = sign_json(
-                json_object,
-                self.config.server_name,
-                key,
-            )
+            json_object = sign_json(json_object, self.config.server_name, key)
         return json_object
 
     def render_GET(self, request):
@@ -114,7 +108,4 @@ class LocalKey(Resource):
         # Update the expiry time if less than half the interval remains.
         if time_now + self.config.key_refresh_interval / 2 > self.valid_until_ts:
             self.update_response_body(time_now)
-        return respond_with_json_bytes(
-            request, 200, self.response_body,
-            version_string=self.version_string
-        )
+        return respond_with_json_bytes(request, 200, self.response_body)

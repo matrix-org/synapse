@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import deque
 import contextlib
 import threading
+from collections import deque
 
 
 class IdGenerator(object):
@@ -43,9 +43,9 @@ def _load_current_id(db_conn, table, column, step=1):
     """
     cur = db_conn.cursor()
     if step == 1:
-        cur.execute("SELECT MAX(%s) FROM %s" % (column, table,))
+        cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
     else:
-        cur.execute("SELECT MIN(%s) FROM %s" % (column, table,))
+        cur.execute("SELECT MIN(%s) FROM %s" % (column, table))
     val, = cur.fetchone()
     cur.close()
     current_id = int(val) if val else step
@@ -77,6 +77,7 @@ class StreamIdGenerator(object):
         with stream_id_gen.get_next() as stream_id:
             # ... persist event ...
     """
+
     def __init__(self, db_conn, table, column, extra_tables=[], step=1):
         assert step != 0
         self._lock = threading.Lock()
@@ -84,8 +85,7 @@ class StreamIdGenerator(object):
         self._current = _load_current_id(db_conn, table, column, step)
         for table, column in extra_tables:
             self._current = (max if step > 0 else min)(
-                self._current,
-                _load_current_id(db_conn, table, column, step)
+                self._current, _load_current_id(db_conn, table, column, step)
             )
         self._unfinished_ids = deque()
 
@@ -121,7 +121,7 @@ class StreamIdGenerator(object):
             next_ids = range(
                 self._current + self._step,
                 self._current + self._step * (n + 1),
-                self._step
+                self._step,
             )
             self._current += n * self._step
 
@@ -195,6 +195,6 @@ class ChainedIdGenerator(object):
         with self._lock:
             if self._unfinished_ids:
                 stream_id, chained_id = self._unfinished_ids[0]
-                return (stream_id - 1, chained_id)
+                return stream_id - 1, chained_id
 
-            return (self._current_max, self.chained_generator.get_current_token())
+            return self._current_max, self.chained_generator.get_current_token()

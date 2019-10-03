@@ -12,15 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import synapse.util.async
 
-from ._base import SQLBaseStore
-from . import engines
+import logging
+
+from canonicaljson import json
 
 from twisted.internet import defer
 
-import ujson as json
-import logging
+from synapse.metrics.background_process_metrics import run_as_background_process
+
+from . import engines
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,9 @@ class BackgroundUpdatePerformance(object):
         Returns:
             A duration in ms as a float
         """
-        if self.total_item_count == 0:
+        if self.avg_duration_ms == 0:
+            return 0
+        elif self.total_item_count == 0:
             return None
         else:
             # Use the exponential moving average so that we can adapt to
@@ -62,7 +66,9 @@ class BackgroundUpdatePerformance(object):
         Returns:
             A duration in ms as a float
         """
-        if self.total_item_count == 0:
+        if self.total_duration_ms == 0:
+            return 0
+        elif self.total_item_count == 0:
             return None
         else:
             return float(self.total_item_count) / float(self.total_duration_ms)
@@ -80,25 +86,27 @@ class BackgroundUpdateStore(SQLBaseStore):
     BACKGROUND_UPDATE_INTERVAL_MS = 1000
     BACKGROUND_UPDATE_DURATION_MS = 100
 
-    def __init__(self, hs):
-        super(BackgroundUpdateStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(BackgroundUpdateStore, self).__init__(db_conn, hs)
         self._background_update_performance = {}
         self._background_update_queue = []
         self._background_update_handlers = {}
+        self._all_done = False
+
+    def start_doing_background_updates(self):
+        run_as_background_process("background_updates", self._run_background_updates)
 
     @defer.inlineCallbacks
-    def start_doing_background_updates(self):
+    def _run_background_updates(self):
         logger.info("Starting background schema updates")
-
         while True:
-            yield synapse.util.async.sleep(
-                self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.)
+            yield self.hs.get_clock().sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0)
 
             try:
                 result = yield self.do_next_background_update(
                     self.BACKGROUND_UPDATE_DURATION_MS
                 )
-            except:
+            except Exception:
                 logger.exception("Error doing update")
             else:
                 if result is None:
@@ -106,7 +114,59 @@ class BackgroundUpdateStore(SQLBaseStore):
                         "No more background updates to do."
                         " Unscheduling background update task."
                     )
-                    defer.returnValue(None)
+                    self._all_done = True
+                    return None
+
+    @defer.inlineCallbacks
+    def has_completed_background_updates(self):
+        """Check if all the background updates have completed
+
+        Returns:
+            Deferred[bool]: True if all background updates have completed
+        """
+        # if we've previously determined that there is nothing left to do, that
+        # is easy
+        if self._all_done:
+            return True
+
+        # obviously, if we have things in our queue, we're not done.
+        if self._background_update_queue:
+            return False
+
+        # otherwise, check if there are updates to be run. This is important,
+        # as we may be running on a worker which doesn't perform the bg updates
+        # itself, but still wants to wait for them to happen.
+        updates = yield self._simple_select_onecol(
+            "background_updates",
+            keyvalues=None,
+            retcol="1",
+            desc="has_completed_background_updates",
+        )
+        if not updates:
+            self._all_done = True
+            return True
+
+        return False
+
+    async def has_completed_background_update(self, update_name) -> bool:
+        """Check if the given background update has finished running.
+        """
+
+        if self._all_done:
+            return True
+
+        if update_name in self._background_update_queue:
+            return False
+
+        update_exists = await self._simple_select_one_onecol(
+            "background_updates",
+            keyvalues={"update_name": update_name},
+            retcol="1",
+            desc="has_completed_background_update",
+            allow_none=True,
+        )
+
+        return not update_exists
 
     @defer.inlineCallbacks
     def do_next_background_update(self, desired_duration_ms):
@@ -129,23 +189,22 @@ class BackgroundUpdateStore(SQLBaseStore):
             in_flight = set(update["update_name"] for update in updates)
             for update in updates:
                 if update["depends_on"] not in in_flight:
-                    self._background_update_queue.append(update['update_name'])
+                    self._background_update_queue.append(update["update_name"])
 
         if not self._background_update_queue:
             # no work left to do
-            defer.returnValue(None)
+            return None
 
         # pop from the front, and add back to the back
         update_name = self._background_update_queue.pop(0)
         self._background_update_queue.append(update_name)
 
         res = yield self._do_background_update(update_name, desired_duration_ms)
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def _do_background_update(self, update_name, desired_duration_ms):
-        logger.info("Starting update batch on background update '%s'",
-                    update_name)
+        logger.info("Starting update batch on background update '%s'", update_name)
 
         update_handler = self._background_update_handlers[update_name]
 
@@ -167,7 +226,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         progress_json = yield self._simple_select_one_onecol(
             "background_updates",
             keyvalues={"update_name": update_name},
-            retcol="progress_json"
+            retcol="progress_json",
         )
 
         progress = json.loads(progress_json)
@@ -179,9 +238,11 @@ class BackgroundUpdateStore(SQLBaseStore):
         duration_ms = time_stop - time_start
 
         logger.info(
-            "Updating %r. Updated %r items in %rms."
+            "Running background update %r. Processed %r items in %rms."
             " (total_rate=%r/ms, current_rate=%r/ms, total_updated=%r, batch_size=%r)",
-            update_name, items_updated, duration_ms,
+            update_name,
+            items_updated,
+            duration_ms,
             performance.total_items_per_ms(),
             performance.average_items_per_ms(),
             performance.total_item_count,
@@ -190,7 +251,7 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         performance.update(items_updated, duration_ms)
 
-        defer.returnValue(len(self._background_update_performance))
+        return len(self._background_update_performance)
 
     def register_background_update_handler(self, update_name, update_handler):
         """Register a handler for doing a background update.
@@ -201,7 +262,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         * An integer count of the number of items to update in this batch.
 
         The handler should return a deferred integer count of items updated.
-        The hander is responsible for updating the progress of the update.
+        The handler is responsible for updating the progress of the update.
 
         Args:
             update_name(str): The name of the update that this code handles.
@@ -209,8 +270,36 @@ class BackgroundUpdateStore(SQLBaseStore):
         """
         self._background_update_handlers[update_name] = update_handler
 
-    def register_background_index_update(self, update_name, index_name,
-                                         table, columns, where_clause=None):
+    def register_noop_background_update(self, update_name):
+        """Register a noop handler for a background update.
+
+        This is useful when we previously did a background update, but no
+        longer wish to do the update. In this case the background update should
+        be removed from the schema delta files, but there may still be some
+        users who have the background update queued, so this method should
+        also be called to clear the update.
+
+        Args:
+            update_name (str): Name of update
+        """
+
+        @defer.inlineCallbacks
+        def noop_update(progress, batch_size):
+            yield self._end_background_update(update_name)
+            return 1
+
+        self.register_background_update_handler(update_name, noop_update)
+
+    def register_background_index_update(
+        self,
+        update_name,
+        index_name,
+        table,
+        columns,
+        where_clause=None,
+        unique=False,
+        psql_only=False,
+    ):
         """Helper for store classes to do a background index addition
 
         To use:
@@ -226,50 +315,82 @@ class BackgroundUpdateStore(SQLBaseStore):
             index_name (str): name of index to add
             table (str): table to add index to
             columns (list[str]): columns/expressions to include in index
+            unique (bool): true to make a UNIQUE index
+            psql_only: true to only create this index on psql databases (useful
+                for virtual sqlite tables)
         """
 
-        # if this is postgres, we add the indexes concurrently. Otherwise
-        # we fall back to doing it inline
-        if isinstance(self.database_engine, engines.PostgresEngine):
-            conc = True
-        else:
-            conc = False
-            # We don't use partial indices on SQLite as it wasn't introduced
-            # until 3.8, and wheezy has 3.7
-            where_clause = None
-
-        sql = (
-            "CREATE INDEX %(conc)s %(name)s ON %(table)s (%(columns)s)"
-            " %(where_clause)s"
-        ) % {
-            "conc": "CONCURRENTLY" if conc else "",
-            "name": index_name,
-            "table": table,
-            "columns": ", ".join(columns),
-            "where_clause": "WHERE " + where_clause if where_clause else ""
-        }
-
-        def create_index_concurrently(conn):
+        def create_index_psql(conn):
             conn.rollback()
             # postgres insists on autocommit for the index
             conn.set_session(autocommit=True)
-            c = conn.cursor()
-            c.execute(sql)
-            conn.set_session(autocommit=False)
 
-        def create_index(conn):
+            try:
+                c = conn.cursor()
+
+                # If a previous attempt to create the index was interrupted,
+                # we may already have a half-built index. Let's just drop it
+                # before trying to create it again.
+
+                sql = "DROP INDEX IF EXISTS %s" % (index_name,)
+                logger.debug("[SQL] %s", sql)
+                c.execute(sql)
+
+                sql = (
+                    "CREATE %(unique)s INDEX CONCURRENTLY %(name)s"
+                    " ON %(table)s"
+                    " (%(columns)s) %(where_clause)s"
+                ) % {
+                    "unique": "UNIQUE" if unique else "",
+                    "name": index_name,
+                    "table": table,
+                    "columns": ", ".join(columns),
+                    "where_clause": "WHERE " + where_clause if where_clause else "",
+                }
+                logger.debug("[SQL] %s", sql)
+                c.execute(sql)
+            finally:
+                conn.set_session(autocommit=False)
+
+        def create_index_sqlite(conn):
+            # Sqlite doesn't support concurrent creation of indexes.
+            #
+            # We don't use partial indices on SQLite as it wasn't introduced
+            # until 3.8, and wheezy and CentOS 7 have 3.7
+            #
+            # We assume that sqlite doesn't give us invalid indices; however
+            # we may still end up with the index existing but the
+            # background_updates not having been recorded if synapse got shut
+            # down at the wrong moment - hance we use IF NOT EXISTS. (SQLite
+            # has supported CREATE TABLE|INDEX IF NOT EXISTS since 3.3.0.)
+            sql = (
+                "CREATE %(unique)s INDEX IF NOT EXISTS %(name)s ON %(table)s"
+                " (%(columns)s)"
+            ) % {
+                "unique": "UNIQUE" if unique else "",
+                "name": index_name,
+                "table": table,
+                "columns": ", ".join(columns),
+            }
+
             c = conn.cursor()
+            logger.debug("[SQL] %s", sql)
             c.execute(sql)
+
+        if isinstance(self.database_engine, engines.PostgresEngine):
+            runner = create_index_psql
+        elif psql_only:
+            runner = None
+        else:
+            runner = create_index_sqlite
 
         @defer.inlineCallbacks
         def updater(progress, batch_size):
-            logger.info("Adding index %s to %s", index_name, table)
-            if conc:
-                yield self.runWithConnection(create_index_concurrently)
-            else:
-                yield self.runWithConnection(create_index)
+            if runner is not None:
+                logger.info("Adding index %s to %s", index_name, table)
+                yield self.runWithConnection(runner)
             yield self._end_background_update(update_name)
-            defer.returnValue(1)
+            return 1
 
         self.register_background_update_handler(update_name, updater)
 
@@ -291,7 +412,7 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         return self._simple_insert(
             "background_updates",
-            {"update_name": update_name, "progress_json": progress_json}
+            {"update_name": update_name, "progress_json": progress_json},
         )
 
     def _end_background_update(self, update_name):

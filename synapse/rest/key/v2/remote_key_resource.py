@@ -12,22 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import request_handler, respond_with_json_bytes
-from synapse.http.servlet import parse_integer, parse_json_object_from_request
-from synapse.api.errors import SynapseError, Codes
-from synapse.crypto.keyring import KeyLookupError
+import logging
 
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
+from canonicaljson import encode_canonical_json, json
+from signedjson.sign import sign_json
+
 from twisted.internet import defer
 
+from synapse.api.errors import Codes, SynapseError
+from synapse.crypto.keyring import ServerKeyFetcher
+from synapse.http.server import (
+    DirectServeResource,
+    respond_with_json_bytes,
+    wrap_json_request_handler,
+)
+from synapse.http.servlet import parse_integer, parse_json_object_from_request
 
-from io import BytesIO
-import logging
 logger = logging.getLogger(__name__)
 
 
-class RemoteKey(Resource):
+class RemoteKey(DirectServeResource):
     """HTTP resource for retreiving the TLS certificate and NACL signature
     verification keys for a collection of servers. Checks that the reported
     X.509 TLS certificate matches the one used in the HTTPS connection. Checks
@@ -89,54 +93,50 @@ class RemoteKey(Resource):
     isLeaf = True
 
     def __init__(self, hs):
-        self.keyring = hs.get_keyring()
+        self.fetcher = ServerKeyFetcher(hs)
         self.store = hs.get_datastore()
-        self.version_string = hs.version_string
         self.clock = hs.get_clock()
+        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.config = hs.config
 
-    def render_GET(self, request):
-        self.async_render_GET(request)
-        return NOT_DONE_YET
-
-    @request_handler()
-    @defer.inlineCallbacks
-    def async_render_GET(self, request):
+    @wrap_json_request_handler
+    async def _async_render_GET(self, request):
         if len(request.postpath) == 1:
             server, = request.postpath
-            query = {server: {}}
+            query = {server.decode("ascii"): {}}
         elif len(request.postpath) == 2:
             server, key_id = request.postpath
-            minimum_valid_until_ts = parse_integer(
-                request, "minimum_valid_until_ts"
-            )
+            minimum_valid_until_ts = parse_integer(request, "minimum_valid_until_ts")
             arguments = {}
             if minimum_valid_until_ts is not None:
                 arguments["minimum_valid_until_ts"] = minimum_valid_until_ts
-            query = {server: {key_id: arguments}}
+            query = {server.decode("ascii"): {key_id.decode("ascii"): arguments}}
         else:
-            raise SynapseError(
-                404, "Not found %r" % request.postpath, Codes.NOT_FOUND
-            )
-        yield self.query_keys(request, query, query_remote_on_cache_miss=True)
+            raise SynapseError(404, "Not found %r" % request.postpath, Codes.NOT_FOUND)
 
-    def render_POST(self, request):
-        self.async_render_POST(request)
-        return NOT_DONE_YET
+        await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
-    @request_handler()
-    @defer.inlineCallbacks
-    def async_render_POST(self, request):
+    @wrap_json_request_handler
+    async def _async_render_POST(self, request):
         content = parse_json_object_from_request(request)
 
         query = content["server_keys"]
 
-        yield self.query_keys(request, query, query_remote_on_cache_miss=True)
+        await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
     @defer.inlineCallbacks
     def query_keys(self, request, query, query_remote_on_cache_miss=False):
         logger.info("Handling query for keys %r", query)
+
         store_queries = []
         for server_name, key_ids in query.items():
+            if (
+                self.federation_domain_whitelist is not None
+                and server_name not in self.federation_domain_whitelist
+            ):
+                logger.debug("Federation denied with %s", server_name)
+                continue
+
             if not key_ids:
                 key_ids = (None,)
             for key_id in key_ids:
@@ -150,9 +150,7 @@ class RemoteKey(Resource):
 
         cache_misses = dict()
         for (server_name, key_id, from_server), results in cached.items():
-            results = [
-                (result["ts_added_ms"], result) for result in results
-            ]
+            results = [(result["ts_added_ms"], result) for result in results]
 
             if not results and key_id is not None:
                 cache_misses.setdefault(server_name, set()).add(key_id)
@@ -169,23 +167,30 @@ class RemoteKey(Resource):
                         logger.debug(
                             "Cached response for %r/%r is older than requested"
                             ": valid_until (%r) < minimum_valid_until (%r)",
-                            server_name, key_id,
-                            ts_valid_until_ms, req_valid_until
+                            server_name,
+                            key_id,
+                            ts_valid_until_ms,
+                            req_valid_until,
                         )
                         miss = True
                     else:
                         logger.debug(
                             "Cached response for %r/%r is newer than requested"
                             ": valid_until (%r) >= minimum_valid_until (%r)",
-                            server_name, key_id,
-                            ts_valid_until_ms, req_valid_until
+                            server_name,
+                            key_id,
+                            ts_valid_until_ms,
+                            req_valid_until,
                         )
                 elif (ts_added_ms + ts_valid_until_ms) / 2 < time_now_ms:
                     logger.debug(
                         "Cached response for %r/%r is too old"
                         ": (added (%r) + valid_until (%r)) / 2 < now (%r)",
-                        server_name, key_id,
-                        ts_added_ms, ts_valid_until_ms, time_now_ms
+                        server_name,
+                        key_id,
+                        ts_added_ms,
+                        ts_valid_until_ms,
+                        time_now_ms,
                     )
                     # We more than half way through the lifetime of the
                     # response. We should fetch a fresh copy.
@@ -194,8 +199,11 @@ class RemoteKey(Resource):
                     logger.debug(
                         "Cached response for %r/%r is still valid"
                         ": (added (%r) + valid_until (%r)) / 2 < now (%r)",
-                        server_name, key_id,
-                        ts_added_ms, ts_valid_until_ms, time_now_ms
+                        server_name,
+                        key_id,
+                        ts_added_ms,
+                        ts_valid_until_ms,
+                        time_now_ms,
                     )
 
                 if miss:
@@ -206,31 +214,17 @@ class RemoteKey(Resource):
                     json_results.add(bytes(result["key_json"]))
 
         if cache_misses and query_remote_on_cache_miss:
-            for server_name, key_ids in cache_misses.items():
-                try:
-                    yield self.keyring.get_server_verify_key_v2_direct(
-                        server_name, key_ids
-                    )
-                except KeyLookupError as e:
-                    logger.info("Failed to fetch key: %s", e)
-                except:
-                    logger.exception("Failed to get key for %r", server_name)
-            yield self.query_keys(
-                request, query, query_remote_on_cache_miss=False
-            )
+            yield self.fetcher.get_keys(cache_misses)
+            yield self.query_keys(request, query, query_remote_on_cache_miss=False)
         else:
-            result_io = BytesIO()
-            result_io.write(b"{\"server_keys\":")
-            sep = b"["
-            for json_bytes in json_results:
-                result_io.write(sep)
-                result_io.write(json_bytes)
-                sep = b","
-            if sep == b"[":
-                result_io.write(sep)
-            result_io.write(b"]}")
+            signed_keys = []
+            for key_json in json_results:
+                key_json = json.loads(key_json)
+                for signing_key in self.config.key_server_signing_keys:
+                    key_json = sign_json(key_json, self.config.server_name, signing_key)
 
-            respond_with_json_bytes(
-                request, 200, result_io.getvalue(),
-                version_string=self.version_string
-            )
+                signed_keys.append(key_json)
+
+            results = {"server_keys": signed_keys}
+
+            respond_with_json_bytes(request, 200, encode_canonical_json(results))

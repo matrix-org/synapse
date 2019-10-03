@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,148 +14,198 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import cgi
+import collections
+import http.client
+import logging
+import types
+import urllib
+from io import BytesIO
 
-from synapse.api.errors import (
-    cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError, Codes
-)
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.util.caches import intern_dict
-from synapse.util.metrics import Measure
-import synapse.metrics
-import synapse.events
-
-from canonicaljson import (
-    encode_canonical_json, encode_pretty_printed_json
-)
+from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
 
 from twisted.internet import defer
-from twisted.web import server, resource
+from twisted.python import failure
+from twisted.web import resource
 from twisted.web.server import NOT_DONE_YET
+from twisted.web.static import NoRangeStaticProducer
 from twisted.web.util import redirectTo
 
-import collections
-import logging
-import urllib
-import ujson
+import synapse.events
+import synapse.metrics
+from synapse.api.errors import (
+    CodeMessageException,
+    Codes,
+    SynapseError,
+    UnrecognizedRequestError,
+)
+from synapse.logging.context import preserve_fn
+from synapse.logging.opentracing import trace_servlet
+from synapse.util.caches import intern_dict
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
-
-incoming_requests_counter = metrics.register_counter(
-    "requests",
-    labels=["method", "servlet", "tag"],
-)
-outgoing_responses_counter = metrics.register_counter(
-    "responses",
-    labels=["method", "code"],
-)
-
-response_timer = metrics.register_distribution(
-    "response_time",
-    labels=["method", "servlet", "tag"]
-)
-
-response_ru_utime = metrics.register_distribution(
-    "response_ru_utime", labels=["method", "servlet", "tag"]
-)
-
-response_ru_stime = metrics.register_distribution(
-    "response_ru_stime", labels=["method", "servlet", "tag"]
-)
-
-response_db_txn_count = metrics.register_distribution(
-    "response_db_txn_count", labels=["method", "servlet", "tag"]
-)
-
-response_db_txn_duration = metrics.register_distribution(
-    "response_db_txn_duration", labels=["method", "servlet", "tag"]
-)
+HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
+<html lang=en>
+  <head>
+    <meta charset="utf-8">
+    <title>Error {code}</title>
+  </head>
+  <body>
+     <p>{msg}</p>
+  </body>
+</html>
+"""
 
 
-_next_request_id = 0
+def wrap_json_request_handler(h):
+    """Wraps a request handler method with exception handling.
 
+    Also does the wrapping with request.processing as per wrap_async_request_handler.
 
-def request_handler(include_metrics=False):
-    """Decorator for ``wrap_request_handler``"""
-    return lambda request_handler: wrap_request_handler(request_handler, include_metrics)
+    The handler method must have a signature of "handle_foo(self, request)",
+    where "request" must be a SynapseRequest.
 
-
-def wrap_request_handler(request_handler, include_metrics=False):
-    """Wraps a method that acts as a request handler with the necessary logging
-    and exception handling.
-
-    The method must have a signature of "handle_foo(self, request)". The
-    argument "self" must have "version_string" and "clock" attributes. The
-    argument "request" must be a twisted HTTP request.
-
-    The method must return a deferred. If the deferred succeeds we assume that
-    a response has been sent. If the deferred fails with a SynapseError we use
+    The handler must return a deferred or a coroutine. If the deferred succeeds
+    we assume that a response has been sent. If the deferred fails with a SynapseError we use
     it to send a JSON response with the appropriate HTTP reponse code. If the
     deferred fails with any other type of error we send a 500 reponse.
-
-    We insert a unique request-id into the logging context for this request and
-    log the response and duration for this request.
     """
 
-    @defer.inlineCallbacks
-    def wrapped_request_handler(self, request):
-        global _next_request_id
-        request_id = "%s-%s" % (request.method, _next_request_id)
-        _next_request_id += 1
+    async def wrapped_request_handler(self, request):
+        try:
+            await h(self, request)
+        except SynapseError as e:
+            code = e.code
+            logger.info("%s SynapseError: %s - %s", request, code, e.msg)
 
-        with LoggingContext(request_id) as request_context:
-            with Measure(self.clock, "wrapped_request_handler"):
-                request_metrics = RequestMetrics()
-                request_metrics.start(self.clock, name=self.__class__.__name__)
-
-                request_context.request = request_id
-                with request.processing():
+            # Only respond with an error response if we haven't already started
+            # writing, otherwise lets just kill the connection
+            if request.startedWriting:
+                if request.transport:
                     try:
-                        with PreserveLoggingContext(request_context):
-                            if include_metrics:
-                                yield request_handler(self, request, request_metrics)
-                            else:
-                                yield request_handler(self, request)
-                    except CodeMessageException as e:
-                        code = e.code
-                        if isinstance(e, SynapseError):
-                            logger.info(
-                                "%s SynapseError: %s - %s", request, code, e.msg
-                            )
-                        else:
-                            logger.exception(e)
-                        outgoing_responses_counter.inc(request.method, str(code))
-                        respond_with_json(
-                            request, code, cs_exception(e), send_cors=True,
-                            pretty_print=_request_user_agent_is_curl(request),
-                            version_string=self.version_string,
-                        )
-                    except:
-                        logger.exception(
-                            "Failed handle request %s.%s on %r: %r",
-                            request_handler.__module__,
-                            request_handler.__name__,
-                            self,
-                            request
-                        )
-                        respond_with_json(
-                            request,
-                            500,
-                            {
-                                "error": "Internal server error",
-                                "errcode": Codes.UNKNOWN,
-                            },
-                            send_cors=True
-                        )
-                    finally:
-                        try:
-                            request_metrics.stop(
-                                self.clock, request
-                            )
-                        except Exception as e:
-                            logger.warn("Failed to stop metrics: %r", e)
-    return wrapped_request_handler
+                        request.transport.abortConnection()
+                    except Exception:
+                        # abortConnection throws if the connection is already closed
+                        pass
+            else:
+                respond_with_json(
+                    request,
+                    code,
+                    e.error_dict(),
+                    send_cors=True,
+                    pretty_print=_request_user_agent_is_curl(request),
+                )
+
+        except Exception:
+            # failure.Failure() fishes the original Failure out
+            # of our stack, and thus gives us a sensible stack
+            # trace.
+            f = failure.Failure()
+            logger.error(
+                "Failed handle request via %r: %r",
+                request.request_metrics.name,
+                request,
+                exc_info=(f.type, f.value, f.getTracebackObject()),
+            )
+            # Only respond with an error response if we haven't already started
+            # writing, otherwise lets just kill the connection
+            if request.startedWriting:
+                if request.transport:
+                    try:
+                        request.transport.abortConnection()
+                    except Exception:
+                        # abortConnection throws if the connection is already closed
+                        pass
+            else:
+                respond_with_json(
+                    request,
+                    500,
+                    {"error": "Internal server error", "errcode": Codes.UNKNOWN},
+                    send_cors=True,
+                    pretty_print=_request_user_agent_is_curl(request),
+                )
+
+    return wrap_async_request_handler(wrapped_request_handler)
+
+
+def wrap_html_request_handler(h):
+    """Wraps a request handler method with exception handling.
+
+    Also does the wrapping with request.processing as per wrap_async_request_handler.
+
+    The handler method must have a signature of "handle_foo(self, request)",
+    where "request" must be a SynapseRequest.
+    """
+
+    async def wrapped_request_handler(self, request):
+        try:
+            return await h(self, request)
+        except Exception:
+            f = failure.Failure()
+            return _return_html_error(f, request)
+
+    return wrap_async_request_handler(wrapped_request_handler)
+
+
+def _return_html_error(f, request):
+    """Sends an HTML error page corresponding to the given failure
+
+    Args:
+        f (twisted.python.failure.Failure):
+        request (twisted.web.iweb.IRequest):
+    """
+    if f.check(CodeMessageException):
+        cme = f.value
+        code = cme.code
+        msg = cme.msg
+
+        if isinstance(cme, SynapseError):
+            logger.info("%s SynapseError: %s - %s", request, code, msg)
+        else:
+            logger.error(
+                "Failed handle request %r",
+                request,
+                exc_info=(f.type, f.value, f.getTracebackObject()),
+            )
+    else:
+        code = http.client.INTERNAL_SERVER_ERROR
+        msg = "Internal server error"
+
+        logger.error(
+            "Failed handle request %r",
+            request,
+            exc_info=(f.type, f.value, f.getTracebackObject()),
+        )
+
+    body = HTML_ERROR_TEMPLATE.format(code=code, msg=cgi.escape(msg)).encode("utf-8")
+    request.setResponseCode(code)
+    request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+    request.setHeader(b"Content-Length", b"%i" % (len(body),))
+    request.write(body)
+    finish_request(request)
+
+
+def wrap_async_request_handler(h):
+    """Wraps an async request handler so that it calls request.processing.
+
+    This helps ensure that work done by the request handler after the request is completed
+    is correctly recorded against the request metrics/logs.
+
+    The handler method must have a signature of "handle_foo(self, request)",
+    where "request" must be a SynapseRequest.
+
+    The handler may return a deferred, in which case the completion of the request isn't
+    logged until the deferred completes.
+    """
+
+    async def wrapped_async_request_handler(self, request):
+        with request.processing():
+            await h(self, request)
+
+    # we need to preserve_fn here, because the synchronous render method won't yield for
+    # us (obviously)
+    return preserve_fn(wrapped_async_request_handler)
 
 
 class HttpServer(object):
@@ -183,7 +234,7 @@ class JsonResource(HttpServer, resource.Resource):
     """ This implements the HttpServer interface and provides JSON support for
     Resources.
 
-    Register callbacks via register_path()
+    Register callbacks via register_paths()
 
     Callbacks can return a tuple of status code and a dict in which case the
     the dict will automatically be sent to the client as a JSON object.
@@ -195,7 +246,9 @@ class JsonResource(HttpServer, resource.Resource):
 
     isLeaf = True
 
-    _PathEntry = collections.namedtuple("_PathEntry", ["pattern", "callback"])
+    _PathEntry = collections.namedtuple(
+        "_PathEntry", ["pattern", "callback", "servlet_classname"]
+    )
 
     def __init__(self, hs, canonical_json=True):
         resource.Resource.__init__(self)
@@ -203,138 +256,173 @@ class JsonResource(HttpServer, resource.Resource):
         self.canonical_json = canonical_json
         self.clock = hs.get_clock()
         self.path_regexs = {}
-        self.version_string = hs.version_string
         self.hs = hs
 
-    def register_paths(self, method, path_patterns, callback):
+    def register_paths(
+        self, method, path_patterns, callback, servlet_classname, trace=True
+    ):
+        """
+        Registers a request handler against a regular expression. Later request URLs are
+        checked against these regular expressions in order to identify an appropriate
+        handler for that request.
+
+        Args:
+            method (str): GET, POST etc
+
+            path_patterns (Iterable[str]): A list of regular expressions to which
+                the request URLs are compared.
+
+            callback (function): The handler for the request. Usually a Servlet
+
+            servlet_classname (str): The name of the handler to be used in prometheus
+                and opentracing logs.
+
+            trace (bool): Whether we should start a span to trace the servlet.
+        """
+        method = method.encode("utf-8")  # method is bytes on py3
+
+        if trace:
+            # We don't extract the context from the servlet because we can't
+            # trust the sender
+            callback = trace_servlet(servlet_classname)(callback)
+
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
-                self._PathEntry(path_pattern, callback)
+                self._PathEntry(path_pattern, callback, servlet_classname)
             )
 
     def render(self, request):
         """ This gets called by twisted every time someone sends us a request.
         """
-        self._async_render(request)
-        return server.NOT_DONE_YET
+        defer.ensureDeferred(self._async_render(request))
+        return NOT_DONE_YET
 
-    # Disable metric reporting because _async_render does its own metrics.
-    # It does its own metric reporting because _async_render dispatches to
-    # a callback and it's the class name of that callback we want to report
-    # against rather than the JsonResource itself.
-    @request_handler(include_metrics=True)
-    @defer.inlineCallbacks
-    def _async_render(self, request, request_metrics):
+    @wrap_json_request_handler
+    async def _async_render(self, request):
         """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
             path.
         """
-        if request.method == "OPTIONS":
-            self._send_response(request, 200, {})
-            return
+        callback, servlet_classname, group_dict = self._get_handler_for_request(request)
+
+        # Make sure we have a name for this handler in prometheus.
+        request.request_metrics.name = servlet_classname
+
+        # Now trigger the callback. If it returns a response, we send it
+        # here. If it throws an exception, that is handled by the wrapper
+        # installed by @request_handler.
+        kwargs = intern_dict(
+            {
+                name: urllib.parse.unquote(value) if value else value
+                for name, value in group_dict.items()
+            }
+        )
+
+        callback_return = callback(request, **kwargs)
+
+        # Is it synchronous? We'll allow this for now.
+        if isinstance(callback_return, (defer.Deferred, types.CoroutineType)):
+            callback_return = await callback_return
+
+        if callback_return is not None:
+            code, response = callback_return
+            self._send_response(request, code, response)
+
+    def _get_handler_for_request(self, request):
+        """Finds a callback method to handle the given request
+
+        Args:
+            request (twisted.web.http.Request):
+
+        Returns:
+            Tuple[Callable, str, dict[unicode, unicode]]: callback method, the
+                label to use for that method in prometheus metrics, and the
+                dict mapping keys to path components as specified in the
+                handler's path match regexp.
+
+                The callback will normally be a method registered via
+                register_paths, so will return (possibly via Deferred) either
+                None, or a tuple of (http code, response body).
+        """
+        if request.method == b"OPTIONS":
+            return _options_handler, "options_request_handler", {}
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request.path)
-            if not m:
-                continue
-
-            # We found a match! Trigger callback and then return the
-            # returned response. We pass both the request and any
-            # matched groups from the regex to the callback.
-
-            callback = path_entry.callback
-
-            kwargs = intern_dict({
-                name: urllib.unquote(value).decode("UTF-8") if value else value
-                for name, value in m.groupdict().items()
-            })
-
-            callback_return = yield callback(request, **kwargs)
-            if callback_return is not None:
-                code, response = callback_return
-                self._send_response(request, code, response)
-
-            servlet_instance = getattr(callback, "__self__", None)
-            if servlet_instance is not None:
-                servlet_classname = servlet_instance.__class__.__name__
-            else:
-                servlet_classname = "%r" % callback
-
-            request_metrics.name = servlet_classname
-
-            return
+            m = path_entry.pattern.match(request.path.decode("ascii"))
+            if m:
+                # We found a match!
+                return path_entry.callback, path_entry.servlet_classname, m.groupdict()
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        raise UnrecognizedRequestError()
+        return _unrecognised_request_handler, "unrecognised_request_handler", {}
 
-    def _send_response(self, request, code, response_json_object,
-                       response_code_message=None):
-        # could alternatively use request.notifyFinish() and flip a flag when
-        # the Deferred fires, but since the flag is RIGHT THERE it seems like
-        # a waste.
-        if request._disconnected:
-            logger.warn(
-                "Not sending response to request %s, already disconnected.",
-                request)
-            return
-
-        outgoing_responses_counter.inc(request.method, str(code))
-
+    def _send_response(
+        self, request, code, response_json_object, response_code_message=None
+    ):
         # TODO: Only enable CORS for the requests that need it.
         respond_with_json(
-            request, code, response_json_object,
+            request,
+            code,
+            response_json_object,
             send_cors=True,
             response_code_message=response_code_message,
             pretty_print=_request_user_agent_is_curl(request),
-            version_string=self.version_string,
             canonical_json=self.canonical_json,
         )
 
 
-class RequestMetrics(object):
-    def start(self, clock, name):
-        self.start = clock.time_msec()
-        self.start_context = LoggingContext.current_context()
-        self.name = name
+class DirectServeResource(resource.Resource):
+    def render(self, request):
+        """
+        Render the request, using an asynchronous render handler if it exists.
+        """
+        async_render_callback_name = "_async_render_" + request.method.decode("ascii")
 
-    def stop(self, clock, request):
-        context = LoggingContext.current_context()
+        # Try and get the async renderer
+        callback = getattr(self, async_render_callback_name, None)
 
-        tag = ""
-        if context:
-            tag = context.tag
+        # No async renderer for this request method.
+        if not callback:
+            return super().render(request)
 
-            if context != self.start_context:
-                logger.warn(
-                    "Context have unexpectedly changed %r, %r",
-                    context, self.start_context
-                )
-                return
+        resp = callback(request)
 
-        incoming_requests_counter.inc(request.method, self.name, tag)
+        # If it's a coroutine, turn it into a Deferred
+        if isinstance(resp, types.CoroutineType):
+            defer.ensureDeferred(resp)
 
-        response_timer.inc_by(
-            clock.time_msec() - self.start, request.method,
-            self.name, tag
-        )
+        return NOT_DONE_YET
 
-        ru_utime, ru_stime = context.get_resource_usage()
 
-        response_ru_utime.inc_by(
-            ru_utime, request.method, self.name, tag
-        )
-        response_ru_stime.inc_by(
-            ru_stime, request.method, self.name, tag
-        )
-        response_db_txn_count.inc_by(
-            context.db_txn_count, request.method, self.name, tag
-        )
-        response_db_txn_duration.inc_by(
-            context.db_txn_duration, request.method, self.name, tag
-        )
+def _options_handler(request):
+    """Request handler for OPTIONS requests
+
+    This is a request handler suitable for return from
+    _get_handler_for_request. It returns a 200 and an empty body.
+
+    Args:
+        request (twisted.web.http.Request):
+
+    Returns:
+        Tuple[int, dict]: http code, response body.
+    """
+    return 200, {}
+
+
+def _unrecognised_request_handler(request):
+    """Request handler for unrecognised requests
+
+    This is a request handler suitable for return from
+    _get_handler_for_request. It actually just raises an
+    UnrecognizedRequestError.
+
+    Args:
+        request (twisted.web.http.Request):
+    """
+    raise UnrecognizedRequestError()
 
 
 class RootRedirect(resource.Resource):
@@ -345,7 +433,7 @@ class RootRedirect(resource.Resource):
         self.url = path
 
     def render_GET(self, request):
-        return redirectTo(self.url, request)
+        return redirectTo(self.url.encode("ascii"), request)
 
     def getChild(self, name, request):
         if len(name) == 0:
@@ -353,28 +441,45 @@ class RootRedirect(resource.Resource):
         return resource.Resource.getChild(self, name, request)
 
 
-def respond_with_json(request, code, json_object, send_cors=False,
-                      response_code_message=None, pretty_print=False,
-                      version_string="", canonical_json=True):
+def respond_with_json(
+    request,
+    code,
+    json_object,
+    send_cors=False,
+    response_code_message=None,
+    pretty_print=False,
+    canonical_json=True,
+):
+    # could alternatively use request.notifyFinish() and flip a flag when
+    # the Deferred fires, but since the flag is RIGHT THERE it seems like
+    # a waste.
+    if request._disconnected:
+        logger.warn(
+            "Not sending response to request %s, already disconnected.", request
+        )
+        return
+
     if pretty_print:
-        json_bytes = encode_pretty_printed_json(json_object) + "\n"
+        json_bytes = encode_pretty_printed_json(json_object) + b"\n"
     else:
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
+            # canonicaljson already encodes to bytes
             json_bytes = encode_canonical_json(json_object)
         else:
-            # ujson doesn't like frozen_dicts.
-            json_bytes = ujson.dumps(json_object, ensure_ascii=False)
+            json_bytes = json.dumps(json_object).encode("utf-8")
 
     return respond_with_json_bytes(
-        request, code, json_bytes,
+        request,
+        code,
+        json_bytes,
         send_cors=send_cors,
         response_code_message=response_code_message,
-        version_string=version_string
     )
 
 
-def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
-                            version_string="", response_code_message=None):
+def respond_with_json_bytes(
+    request, code, json_bytes, send_cors=False, response_code_message=None
+):
     """Sends encoded JSON in response to the given request.
 
     Args:
@@ -388,14 +493,18 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
 
     request.setResponseCode(code, message=response_code_message)
     request.setHeader(b"Content-Type", b"application/json")
-    request.setHeader(b"Server", version_string)
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
+    request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
     if send_cors:
         set_cors_headers(request)
 
-    request.write(json_bytes)
-    finish_request(request)
+    # todo: we can almost certainly avoid this copy and encode the json straight into
+    # the bytesIO, but it would involve faffing around with string->bytes wrappers.
+    bytes_io = BytesIO(json_bytes)
+
+    producer = NoRangeStaticProducer(request, bytes_io)
+    producer.start()
     return NOT_DONE_YET
 
 
@@ -406,13 +515,13 @@ def set_cors_headers(request):
     Args:
         request (twisted.web.http.Request): The http request to add CORs to.
     """
-    request.setHeader("Access-Control-Allow-Origin", "*")
+    request.setHeader(b"Access-Control-Allow-Origin", b"*")
     request.setHeader(
-        "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"
+        b"Access-Control-Allow-Methods", b"GET, POST, PUT, DELETE, OPTIONS"
     )
     request.setHeader(
-        "Access-Control-Allow-Headers",
-        "Origin, X-Requested-With, Content-Type, Accept"
+        b"Access-Control-Allow-Headers",
+        b"Origin, X-Requested-With, Content-Type, Accept, Authorization",
     )
 
 
@@ -436,10 +545,8 @@ def finish_request(request):
 
 
 def _request_user_agent_is_curl(request):
-    user_agents = request.requestHeaders.getRawHeaders(
-        "User-Agent", default=[]
-    )
+    user_agents = request.requestHeaders.getRawHeaders(b"User-Agent", default=[])
     for user_agent in user_agents:
-        if "curl" in user_agent:
+        if b"curl" in user_agent:
             return True
     return False

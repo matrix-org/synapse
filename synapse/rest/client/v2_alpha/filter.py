@@ -13,22 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, SynapseError, StoreError, Codes
+from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
-from ._base import client_v2_patterns
-
-import logging
-
+from ._base import client_patterns, set_timeline_upper_limit
 
 logger = logging.getLogger(__name__)
 
 
 class GetFilterRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/user/(?P<user_id>[^/]*)/filter/(?P<filter_id>[^/]*)")
+    PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/filter/(?P<filter_id>[^/]*)")
 
     def __init__(self, hs):
         super(GetFilterRestServlet, self).__init__()
@@ -49,22 +48,21 @@ class GetFilterRestServlet(RestServlet):
 
         try:
             filter_id = int(filter_id)
-        except:
+        except Exception:
             raise SynapseError(400, "Invalid filter_id")
 
         try:
             filter = yield self.filtering.get_user_filter(
-                user_localpart=target_user.localpart,
-                filter_id=filter_id,
+                user_localpart=target_user.localpart, filter_id=filter_id
             )
 
-            defer.returnValue((200, filter.get_filter_json()))
+            return 200, filter.get_filter_json()
         except (KeyError, StoreError):
             raise SynapseError(400, "No such filter", errcode=Codes.NOT_FOUND)
 
 
 class CreateFilterRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/user/(?P<user_id>[^/]*)/filter")
+    PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/filter")
 
     def __init__(self, hs):
         super(CreateFilterRestServlet, self).__init__()
@@ -85,12 +83,13 @@ class CreateFilterRestServlet(RestServlet):
             raise AuthError(403, "Can only create filters for local users")
 
         content = parse_json_object_from_request(request)
+        set_timeline_upper_limit(content, self.hs.config.filter_timeline_limit)
+
         filter_id = yield self.filtering.add_user_filter(
-            user_localpart=target_user.localpart,
-            user_filter=content,
+            user_localpart=target_user.localpart, user_filter=content
         )
 
-        defer.returnValue((200, {"filter_id": str(filter_id)}))
+        return 200, {"filter_id": str(filter_id)}
 
 
 def register_servlets(hs, http_server):

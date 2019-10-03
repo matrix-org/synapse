@@ -1,7 +1,15 @@
 #! /usr/bin/python
 
+from __future__ import print_function
+
+import argparse
 import ast
+import os
+import re
+import sys
+
 import yaml
+
 
 class DefinitionVisitor(ast.NodeVisitor):
     def __init__(self):
@@ -11,10 +19,10 @@ class DefinitionVisitor(ast.NodeVisitor):
         self.names = {}
         self.attrs = set()
         self.definitions = {
-            'def': self.functions,
-            'class': self.classes,
-            'names': self.names,
-            'attrs': self.attrs,
+            "def": self.functions,
+            "class": self.classes,
+            "names": self.names,
+            "attrs": self.attrs,
         }
 
     def visit_Name(self, node):
@@ -39,20 +47,23 @@ class DefinitionVisitor(ast.NodeVisitor):
 
 
 def non_empty(defs):
-    functions = {name: non_empty(f) for name, f in defs['def'].items()}
-    classes = {name: non_empty(f) for name, f in defs['class'].items()}
+    functions = {name: non_empty(f) for name, f in defs["def"].items()}
+    classes = {name: non_empty(f) for name, f in defs["class"].items()}
     result = {}
-    if functions: result['def'] = functions
-    if classes: result['class'] = classes
-    names = defs['names']
+    if functions:
+        result["def"] = functions
+    if classes:
+        result["class"] = classes
+    names = defs["names"]
     uses = []
-    for name in names.get('Load', ()):
-        if name not in names.get('Param', ()) and name not in names.get('Store', ()):
+    for name in names.get("Load", ()):
+        if name not in names.get("Param", ()) and name not in names.get("Store", ()):
             uses.append(name)
-    uses.extend(defs['attrs'])
-    if uses: result['uses'] = uses
-    result['names'] = names
-    result['attrs'] = defs['attrs']
+    uses.extend(defs["attrs"])
+    if uses:
+        result["uses"] = uses
+    result["names"] = names
+    result["attrs"] = defs["attrs"]
     return result
 
 
@@ -70,34 +81,33 @@ def definitions_in_file(filepath):
 
 
 def defined_names(prefix, defs, names):
-    for name, funcs in defs.get('def', {}).items():
-        names.setdefault(name, {'defined': []})['defined'].append(prefix + name)
+    for name, funcs in defs.get("def", {}).items():
+        names.setdefault(name, {"defined": []})["defined"].append(prefix + name)
         defined_names(prefix + name + ".", funcs, names)
 
-    for name, funcs in defs.get('class', {}).items():
-        names.setdefault(name, {'defined': []})['defined'].append(prefix + name)
+    for name, funcs in defs.get("class", {}).items():
+        names.setdefault(name, {"defined": []})["defined"].append(prefix + name)
         defined_names(prefix + name + ".", funcs, names)
 
 
 def used_names(prefix, item, defs, names):
-    for name, funcs in defs.get('def', {}).items():
+    for name, funcs in defs.get("def", {}).items():
         used_names(prefix + name + ".", name, funcs, names)
 
-    for name, funcs in defs.get('class', {}).items():
+    for name, funcs in defs.get("class", {}).items():
         used_names(prefix + name + ".", name, funcs, names)
 
-    path = prefix.rstrip('.')
-    for used in defs.get('uses', ()):
+    path = prefix.rstrip(".")
+    for used in defs.get("uses", ()):
         if used in names:
             if item:
-                names[item].setdefault('uses', []).append(used)
-            names[used].setdefault('used', {}).setdefault(item, []).append(path)
+                names[item].setdefault("uses", []).append(used)
+            names[used].setdefault("used", {}).setdefault(item, []).append(path)
 
 
-if __name__ == '__main__':
-    import sys, os, argparse, re
+if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Find definitions.')
+    parser = argparse.ArgumentParser(description="Find definitions.")
     parser.add_argument(
         "--unused", action="store_true", help="Only list unused definitions"
     )
@@ -105,24 +115,28 @@ if __name__ == '__main__':
         "--ignore", action="append", metavar="REGEXP", help="Ignore a pattern"
     )
     parser.add_argument(
-        "--pattern", action="append", metavar="REGEXP",
-        help="Search for a pattern"
+        "--pattern", action="append", metavar="REGEXP", help="Search for a pattern"
     )
     parser.add_argument(
-        "directories", nargs='+', metavar="DIR",
-        help="Directories to search for definitions"
+        "directories",
+        nargs="+",
+        metavar="DIR",
+        help="Directories to search for definitions",
     )
     parser.add_argument(
-        "--referrers", default=0, type=int,
-        help="Include referrers up to the given depth"
+        "--referrers",
+        default=0,
+        type=int,
+        help="Include referrers up to the given depth",
     )
     parser.add_argument(
-        "--referred", default=0, type=int,
-        help="Include referred down to the given depth"
+        "--referred",
+        default=0,
+        type=int,
+        help="Include referred down to the given depth",
     )
     parser.add_argument(
-        "--format", default="yaml",
-        help="Output format, one of 'yaml' or 'dot'"
+        "--format", default="yaml", help="Output format, one of 'yaml' or 'dot'"
     )
     args = parser.parse_args()
 
@@ -150,7 +164,7 @@ if __name__ == '__main__':
             continue
         if ignore and any(pattern.match(name) for pattern in ignore):
             continue
-        if args.unused and definition.get('used'):
+        if args.unused and definition.get("used"):
             continue
         result[name] = definition
 
@@ -162,7 +176,7 @@ if __name__ == '__main__':
             for used_by in entry.get("used", ()):
                 referrers.add(used_by)
         for name, definition in names.items():
-            if not name in referrers:
+            if name not in referrers:
                 continue
             if ignore and any(pattern.match(name) for pattern in ignore):
                 continue
@@ -176,21 +190,21 @@ if __name__ == '__main__':
             for uses in entry.get("uses", ()):
                 referred.add(uses)
         for name, definition in names.items():
-            if not name in referred:
+            if name not in referred:
                 continue
             if ignore and any(pattern.match(name) for pattern in ignore):
                 continue
             result[name] = definition
 
-    if args.format == 'yaml':
+    if args.format == "yaml":
         yaml.dump(result, sys.stdout, default_flow_style=False)
-    elif args.format == 'dot':
-        print "digraph {"
+    elif args.format == "dot":
+        print("digraph {")
         for name, entry in result.items():
-            print name
+            print(name)
             for used_by in entry.get("used", ()):
                 if used_by in result:
-                    print used_by, "->", name
-        print "}"
+                    print(used_by, "->", name)
+        print("}")
     else:
         raise ValueError("Unknown format %r" % (args.format))

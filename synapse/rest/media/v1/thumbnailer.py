@@ -13,24 +13,56 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import PIL.Image as Image
+import logging
 from io import BytesIO
 
-import logging
+import PIL.Image as Image
 
 logger = logging.getLogger(__name__)
+
+EXIF_ORIENTATION_TAG = 0x0112
+EXIF_TRANSPOSE_MAPPINGS = {
+    2: Image.FLIP_LEFT_RIGHT,
+    3: Image.ROTATE_180,
+    4: Image.FLIP_TOP_BOTTOM,
+    5: Image.TRANSPOSE,
+    6: Image.ROTATE_270,
+    7: Image.TRANSVERSE,
+    8: Image.ROTATE_90,
+}
 
 
 class Thumbnailer(object):
 
-    FORMATS = {
-        "image/jpeg": "JPEG",
-        "image/png": "PNG",
-    }
+    FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
 
     def __init__(self, input_path):
         self.image = Image.open(input_path)
         self.width, self.height = self.image.size
+        self.transpose_method = None
+        try:
+            # We don't use ImageOps.exif_transpose since it crashes with big EXIF
+            image_exif = self.image._getexif()
+            if image_exif is not None:
+                image_orientation = image_exif.get(EXIF_ORIENTATION_TAG)
+                self.transpose_method = EXIF_TRANSPOSE_MAPPINGS.get(image_orientation)
+        except Exception as e:
+            # A lot of parsing errors can happen when parsing EXIF
+            logger.info("Error parsing image EXIF information: %s", e)
+
+    def transpose(self):
+        """Transpose the image using its EXIF Orientation tag
+
+        Returns:
+            Tuple[int, int]: (width, height) containing the new image size in pixels.
+        """
+        if self.transpose_method is not None:
+            self.image = self.image.transpose(self.transpose_method)
+            self.width, self.height = self.image.size
+            self.transpose_method = None
+            # We don't need EXIF any more
+            self.image.info["exif"] = None
+        return self.image.size
 
     def aspect(self, max_width, max_height):
         """Calculate the largest size that preserves aspect ratio which
@@ -46,9 +78,9 @@ class Thumbnailer(object):
         """
 
         if max_width * self.height < max_height * self.width:
-            return (max_width, (max_width * self.height) // self.width)
+            return max_width, (max_width * self.height) // self.width
         else:
-            return ((max_height * self.width) // self.height, max_height)
+            return (max_height * self.width) // self.height, max_height
 
     def _resize(self, width, height):
         # 1-bit or 8-bit color palette images need converting to RGB
@@ -58,12 +90,16 @@ class Thumbnailer(object):
             self.image = self.image.convert("RGB")
         return self.image.resize((width, height), Image.ANTIALIAS)
 
-    def scale(self, output_path, width, height, output_type):
-        """Rescales the image to the given dimensions"""
-        scaled = self._resize(width, height)
-        return self.save_image(scaled, output_type, output_path)
+    def scale(self, width, height, output_type):
+        """Rescales the image to the given dimensions.
 
-    def crop(self, output_path, width, height, output_type):
+        Returns:
+            BytesIO: the bytes of the encoded image ready to be written to disk
+        """
+        scaled = self._resize(width, height)
+        return self._encode_image(scaled, output_type)
+
+    def crop(self, width, height, output_type):
         """Rescales and crops the image to the given dimensions preserving
         aspect::
             (w_in / h_in) = (w_scaled / h_scaled)
@@ -73,6 +109,9 @@ class Thumbnailer(object):
         Args:
             max_width: The largest possible width.
             max_height: The larget possible height.
+
+        Returns:
+            BytesIO: the bytes of the encoded image ready to be written to disk
         """
         if width * self.height > height * self.width:
             scaled_height = (width * self.height) // self.width
@@ -86,13 +125,9 @@ class Thumbnailer(object):
             crop_left = (scaled_width - width) // 2
             crop_right = width + crop_left
             cropped = scaled_image.crop((crop_left, 0, crop_right, height))
-        return self.save_image(cropped, output_type, output_path)
+        return self._encode_image(cropped, output_type)
 
-    def save_image(self, output_image, output_type, output_path):
+    def _encode_image(self, output_image, output_type):
         output_bytes_io = BytesIO()
         output_image.save(output_bytes_io, self.FORMATS[output_type], quality=80)
-        output_bytes = output_bytes_io.getvalue()
-        with open(output_path, "wb") as output_file:
-            output_file.write(output_bytes)
-        logger.info("Stored thumbnail in file %r", output_path)
-        return len(output_bytes)
+        return output_bytes_io
