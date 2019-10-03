@@ -220,7 +220,7 @@ class RegistrationHandler(BaseHandler):
             attempts = 0
             user = None
             while not user:
-                localpart = yield self._generate_user_id(attempts > 0)
+                localpart = yield self._generate_user_id()
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 yield self.check_user_id_not_appservice_exclusive(user_id)
@@ -379,10 +379,10 @@ class RegistrationHandler(BaseHandler):
                 )
 
     @defer.inlineCallbacks
-    def _generate_user_id(self, reseed=False):
-        if reseed or self._next_generated_user_id is None:
+    def _generate_user_id(self):
+        if self._next_generated_user_id is None:
             with (yield self._generate_user_id_linearizer.queue(())):
-                if reseed or self._next_generated_user_id is None:
+                if self._next_generated_user_id is None:
                     self._next_generated_user_id = (
                         yield self.store.find_next_generated_user_id_localpart()
                     )
