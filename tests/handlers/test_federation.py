@@ -69,11 +69,11 @@ class FederationTestCase(unittest.HomeserverTestCase):
                                 "magic.forest": {
                                     "ed25519:3": "fQpGIW1Snz+pwLZu6sTy2aHy/DYWWTspTJRPyNp0PKkymfIsNffysMl6ObMMFdIJhk6g6pwlIqZ54rxo8SLmAg"
                                 }
-                            }
-                        }
-                    }
-                }
-            }
+                            },
+                        },
+                    },
+                },
+            },
         )
 
         failure = self.get_failure(d, AuthError).value
