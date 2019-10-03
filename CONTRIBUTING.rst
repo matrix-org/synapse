@@ -62,6 +62,14 @@ Please ensure your changes match the cosmetic style of the existing project,
 and **never** mix cosmetic and functional changes in the same commit, as it
 makes it horribly hard to review otherwise.
 
+Before doing a commit, ensure the changes you've made don't produce
+linting errors. You can do this by running the linters as follows. Ensure to
+commit any files that were auto-corrected.
+
+::
+
+    ./scripts-dev/lint.sh
+
 Changelog
 ~~~~~~~~~
 
