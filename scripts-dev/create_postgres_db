@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright 2019 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import argparse
+import logging
+import sys
+
+import yaml
+
+from synapse.config.homeserver import HomeServerConfig
+from synapse.storage.engines import create_engine
+
+logger = logging.getLogger("create_postgres_db")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description=(
+            "A script to create a PostgreSQL database from a config file."
+        )
+    )
+    parser.add_argument("-v", action='store_true')
+    parser.add_argument(
+        "--postgres-config",
+        type=argparse.FileType('r'),
+        required=True,
+        help="A database config file for a PostgreSQL one.",
+    )
+
+    args = parser.parse_args()
+
+    logging_config = {
+        "level": logging.DEBUG if args.v else logging.INFO,
+        "format": "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
+    }
+
+    logging.basicConfig(**logging_config)
+
+    # Load, process and sanity-check the config.
+    hs_config = yaml.safe_load(args.postgres_config)
+
+    config = HomeServerConfig()
+    config.parse_config_dict(hs_config, "", "")
+
+    if "database" in hs_config:
+        postgres_config = hs_config["database"]
+
+        if "name" not in postgres_config:
+            sys.stderr.write("Malformed database config: no 'name'\n")
+            sys.exit(2)
+        if postgres_config["name"] != "psycopg2":
+            sys.stderr.write("Database must use the 'psycopg2' connector.\n")
+            sys.exit(3)
+
+    else:
+        sys.stderr.write("The configuration file must have a 'database' section.\n")
+        sys.exit(4)
+
+    db_engine = create_engine(postgres_config)
+
+    # connect to postgres to create the base database.
+    db_conn = db_engine.module.connect(
+            **{
+                k: v
+                for k, v in postgres_config.get("args", {}).items()
+                if not k.startswith("cp_") and k != "database"
+            }
+        )
+    db_conn.autocommit = True
+    cur = db_conn.cursor()
+    cur.execute(
+        "CREATE DATABASE %s;" % (
+            postgres_config.get("args", {}).get("database", "synapse"),
+        )
+    )
+    cur.close()
+    db_conn.close()
+
