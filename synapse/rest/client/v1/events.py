@@ -67,10 +67,10 @@ class EventStreamRestServlet(RestServlet):
             is_guest=is_guest,
         )
 
-        return (200, chunk)
+        return 200, chunk
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
 
 # TODO: Unit test gets, with and without auth, with different kinds of events.
@@ -91,9 +91,9 @@ class EventRestServlet(RestServlet):
         time_now = self.clock.time_msec()
         if event:
             event = yield self._event_serializer.serialize_event(event, time_now)
-            return (200, event)
+            return 200, event
         else:
-            return (404, "Event not found.")
+            return 404, "Event not found."
 
 
 def register_servlets(hs, http_server):

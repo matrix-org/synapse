@@ -560,6 +560,18 @@ class RoomCreationHandler(BaseHandler):
 
         yield self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
+        power_level_content_override = config.get("power_level_content_override")
+        if (
+            power_level_content_override
+            and "users" in power_level_content_override
+            and user_id not in power_level_content_override["users"]
+        ):
+            raise SynapseError(
+                400,
+                "Not a valid power_level_content_override: 'users' did not contain %s"
+                % (user_id,),
+            )
+
         invite_3pid_list = config.get("invite_3pid", [])
 
         visibility = config.get("visibility", None)
@@ -567,8 +579,8 @@ class RoomCreationHandler(BaseHandler):
 
         room_id = yield self._generate_room_id(creator_id=user_id, is_public=is_public)
 
+        directory_handler = self.hs.get_handlers().directory_handler
         if room_alias:
-            directory_handler = self.hs.get_handlers().directory_handler
             yield directory_handler.create_association(
                 requester=requester,
                 room_id=room_id,
@@ -604,7 +616,7 @@ class RoomCreationHandler(BaseHandler):
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
-            power_level_content_override=config.get("power_level_content_override"),
+            power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
         )
 
@@ -653,6 +665,7 @@ class RoomCreationHandler(BaseHandler):
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
+            id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
             yield self.hs.get_room_member_handler().do_3pid_invite(
@@ -663,6 +676,7 @@ class RoomCreationHandler(BaseHandler):
                 id_server,
                 requester,
                 txn_id=None,
+                id_access_token=id_access_token,
             )
 
         result = {"room_id": room_id}
@@ -840,7 +854,6 @@ class RoomContextHandler(object):
         )
         if not event:
             return None
-            return
 
         filtered = yield (filter_evts([event]))
         if not filtered:

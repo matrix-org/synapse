@@ -17,8 +17,11 @@
 
 import logging
 import os.path
+import re
+from textwrap import indent
 
 import attr
+import yaml
 from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -44,6 +47,13 @@ ROOM_COMPLEXITY_TOO_GREAT = (
     "Please speak to your server administrator, or upgrade your instance "
     "to join this room."
 )
+
+METRICS_PORT_WARNING = """\
+The metrics_port configuration option is deprecated in Synapse 0.31 in favour of
+a listener. Please see
+https://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md
+on how to configure the new listener.
+--------------------------------------------------------------------------------"""
 
 
 class ServerConfig(Config):
@@ -158,6 +168,23 @@ class ServerConfig(Config):
         )
 
         self.mau_trial_days = config.get("mau_trial_days", 0)
+
+        # How long to keep redacted events in the database in unredacted form
+        # before redacting them.
+        redaction_retention_period = config.get("redaction_retention_period", "7d")
+        if redaction_retention_period is not None:
+            self.redaction_retention_period = self.parse_duration(
+                redaction_retention_period
+            )
+        else:
+            self.redaction_retention_period = None
+
+        # How long to keep entries in the `users_ips` table.
+        user_ips_max_age = config.get("user_ips_max_age", "28d")
+        if user_ips_max_age is not None:
+            self.user_ips_max_age = self.parse_duration(user_ips_max_age)
+        else:
+            self.user_ips_max_age = None
 
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
@@ -321,14 +348,7 @@ class ServerConfig(Config):
 
         metrics_port = config.get("metrics_port")
         if metrics_port:
-            logger.warn(
-                (
-                    "The metrics_port configuration option is deprecated in Synapse 0.31 "
-                    "in favour of a listener. Please see "
-                    "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.rst"
-                    " on how to configure the new listener."
-                )
-            )
+            logger.warning(METRICS_PORT_WARNING)
 
             self.listeners.append(
                 {
@@ -342,17 +362,15 @@ class ServerConfig(Config):
 
         _check_resource_config(self.listeners)
 
-        # An experimental option to try and periodically clean up extremities
-        # by sending dummy events.
         self.cleanup_extremities_with_dummy_events = config.get(
-            "cleanup_extremities_with_dummy_events", False
+            "cleanup_extremities_with_dummy_events", True
         )
 
     def has_tls_listener(self):
         return any(l["tls"] for l in self.listeners)
 
     def generate_config_section(
-        self, server_name, data_dir_path, open_private_ports, **kwargs
+        self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
     ):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
@@ -366,11 +384,68 @@ class ServerConfig(Config):
         # Bring DEFAULT_ROOM_VERSION into the local-scope for use in the
         # default config string
         default_room_version = DEFAULT_ROOM_VERSION
+        secure_listeners = []
+        unsecure_listeners = []
+        private_addresses = ["::1", "127.0.0.1"]
+        if listeners:
+            for listener in listeners:
+                if listener["tls"]:
+                    secure_listeners.append(listener)
+                else:
+                    # If we don't want open ports we need to bind the listeners
+                    # to some address other than 0.0.0.0. Here we chose to use
+                    # localhost.
+                    # If the addresses are already bound we won't overwrite them
+                    # however.
+                    if not open_private_ports:
+                        listener.setdefault("bind_addresses", private_addresses)
 
-        unsecure_http_binding = "port: %i\n            tls: false" % (unsecure_port,)
-        if not open_private_ports:
-            unsecure_http_binding += (
-                "\n            bind_addresses: ['::1', '127.0.0.1']"
+                    unsecure_listeners.append(listener)
+
+            secure_http_bindings = indent(
+                yaml.dump(secure_listeners), " " * 10
+            ).lstrip()
+
+            unsecure_http_bindings = indent(
+                yaml.dump(unsecure_listeners), " " * 10
+            ).lstrip()
+
+        if not unsecure_listeners:
+            unsecure_http_bindings = (
+                """- port: %(unsecure_port)s
+            tls: false
+            type: http
+            x_forwarded: true"""
+                % locals()
+            )
+
+            if not open_private_ports:
+                unsecure_http_bindings += (
+                    "\n            bind_addresses: ['::1', '127.0.0.1']"
+                )
+
+            unsecure_http_bindings += """
+
+            resources:
+              - names: [client, federation]
+                compress: false"""
+
+            if listeners:
+                # comment out this block
+                unsecure_http_bindings = "#" + re.sub(
+                    "\n {10}",
+                    lambda match: match.group(0) + "#",
+                    unsecure_http_bindings,
+                )
+
+        if not secure_listeners:
+            secure_http_bindings = (
+                """#- port: %(bind_port)s
+          #  type: http
+          #  tls: true
+          #  resources:
+          #    - names: [client, federation]"""
+                % locals()
             )
 
         return (
@@ -475,6 +550,9 @@ class ServerConfig(Config):
         # blacklist IP address CIDR ranges. If this option is not specified, or
         # specified with an empty list, no ip range blacklist will be enforced.
         #
+        # As of Synapse v1.4.0 this option also affects any outbound requests to identity
+        # servers provided by user input.
+        #
         # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
         # listed here, since they correspond to unroutable addresses.)
         #
@@ -501,8 +579,8 @@ class ServerConfig(Config):
         #
         #   type: the type of listener. Normally 'http', but other valid options are:
         #       'manhole' (see docs/manhole.md),
-        #       'metrics' (see docs/metrics-howto.rst),
-        #       'replication' (see docs/workers.rst).
+        #       'metrics' (see docs/metrics-howto.md),
+        #       'replication' (see docs/workers.md).
         #
         #   tls: set to true to enable TLS for this listener. Will use the TLS
         #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -537,12 +615,12 @@ class ServerConfig(Config):
         #
         #   media: the media API (/_matrix/media).
         #
-        #   metrics: the metrics interface. See docs/metrics-howto.rst.
+        #   metrics: the metrics interface. See docs/metrics-howto.md.
         #
         #   openid: OpenID authentication.
         #
         #   replication: the HTTP replication API (/_synapse/replication). See
-        #       docs/workers.rst.
+        #       docs/workers.md.
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
@@ -556,25 +634,15 @@ class ServerConfig(Config):
           # will also need to give Synapse a TLS key and certificate: see the TLS section
           # below.)
           #
-          #- port: %(bind_port)s
-          #  type: http
-          #  tls: true
-          #  resources:
-          #    - names: [client, federation]
+          %(secure_http_bindings)s
 
           # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
           # that unwraps TLS.
           #
           # If you plan to use a reverse proxy, please see
-          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
           #
-          - %(unsecure_http_binding)s
-            type: http
-            x_forwarded: true
-
-            resources:
-              - names: [client, federation]
-                compress: false
+          %(unsecure_http_bindings)s
 
             # example additional_resources:
             #
@@ -668,6 +736,19 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #allow_per_room_profiles: false
+
+        # How long to keep redacted events in unredacted form in the database. After
+        # this period redacted events get replaced with their redacted form in the DB.
+        #
+        # Defaults to `7d`. Set to `null` to disable.
+        #
+        #redaction_retention_period: 28d
+
+        # How long to track users' last seen time and IPs in the database.
+        #
+        # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
+        #
+        #user_ips_max_age: 14d
         """
             % locals()
         )

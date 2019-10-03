@@ -15,6 +15,8 @@
 
 import logging
 import threading
+from asyncio import iscoroutine
+from functools import wraps
 
 import six
 
@@ -173,7 +175,7 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
     Args:
         desc (str): a description for this background process type
-        func: a function, which may return a Deferred
+        func: a function, which may return a Deferred or a coroutine
         args: positional args for func
         kwargs: keyword args for func
 
@@ -197,7 +199,17 @@ def run_as_background_process(desc, func, *args, **kwargs):
                 _background_processes.setdefault(desc, set()).add(proc)
 
             try:
-                yield func(*args, **kwargs)
+                result = func(*args, **kwargs)
+
+                # We probably don't have an ensureDeferred in our call stack to handle
+                # coroutine results, so we need to ensureDeferred here.
+                #
+                # But we need this check because ensureDeferred doesn't like being
+                # called on immediate values (as opposed to Deferreds or coroutines).
+                if iscoroutine(result):
+                    result = defer.ensureDeferred(result)
+
+                return (yield result)
             except Exception:
                 logger.exception("Background process '%s' threw an exception", desc)
             finally:
@@ -208,3 +220,20 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
     with PreserveLoggingContext():
         return run()
+
+
+def wrap_as_background_process(desc):
+    """Decorator that wraps a function that gets called as a background
+    process.
+
+    Equivalent of calling the function with `run_as_background_process`
+    """
+
+    def wrap_as_background_process_inner(func):
+        @wraps(func)
+        def wrap_as_background_process_inner_2(*args, **kwargs):
+            return run_as_background_process(desc, func, *args, **kwargs)
+
+        return wrap_as_background_process_inner_2
+
+    return wrap_as_background_process_inner

@@ -294,12 +294,10 @@ class ApplicationServicesHandler(object):
             # we don't know if they are unknown or not since it isn't one of our
             # users. We can't poke ASes.
             return False
-            return
 
         user_info = yield self.store.get_user_by_id(user_id)
         if user_info:
             return False
-            return
 
         # user not found; could be the AS though, so check.
         services = self.store.get_app_services()

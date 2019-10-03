@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from typing import Set
 
 from pkg_resources import (
     DistributionNotFound,
@@ -47,9 +48,9 @@ REQUIREMENTS = [
     "idna>=2.5",
     # validating SSL certs for IP addresses requires service_identity 18.1.
     "service_identity>=18.1.0",
-    # our logcontext handling relies on the ability to cancel inlineCallbacks
-    # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
-    "Twisted>=18.7.0",
+    # Twisted 18.9 introduces some logger improvements that the structured
+    # logger utilises
+    "Twisted>=18.9.0",
     "treq>=15.1",
     # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
     "pyopenssl>=16.0.0",
@@ -97,7 +98,7 @@ CONDITIONAL_REQUIREMENTS = {
     "jwt": ["pyjwt>=1.6.4"],
 }
 
-ALL_OPTIONAL_REQUIREMENTS = set()
+ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
 
 for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
     # Exclude systemd as it's a system-based requirement.
@@ -147,7 +148,13 @@ def check_requirements(for_feature=None):
             )
         except DistributionNotFound:
             deps_needed.append(dependency)
-            errors.append("Needed %s but it was not installed" % (dependency,))
+            if for_feature:
+                errors.append(
+                    "Needed %s for the '%s' feature but it was not installed"
+                    % (dependency, for_feature)
+                )
+            else:
+                errors.append("Needed %s but it was not installed" % (dependency,))
 
     if not for_feature:
         # Check the optional dependencies are up to date. We allow them to not be
@@ -168,8 +175,8 @@ def check_requirements(for_feature=None):
                 pass
 
     if deps_needed:
-        for e in errors:
-            logging.error(e)
+        for err in errors:
+            logging.error(err)
 
         raise DependencyException(deps_needed)
 
