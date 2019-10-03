@@ -37,9 +37,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
-        room_id = self.helper.create_room_as(
-            room_creator=user_id, tok=tok
-        )
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
 
         # Send a 3PID invite event with an empty body so it's considered as a revoked one.
         invite_token = "sometoken"
