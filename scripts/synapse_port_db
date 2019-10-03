@@ -42,8 +42,10 @@ from synapse.storage.events_bg_updates import EventsBackgroundUpdatesStore
 from synapse.storage.media_repository import MediaRepositoryBackgroundUpdateStore
 from synapse.storage.prepare_database import prepare_database
 from synapse.storage.registration import RegistrationBackgroundUpdateStore
+from synapse.storage.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.search import SearchBackgroundUpdateStore
 from synapse.storage.state import StateBackgroundUpdateStore
+from synapse.storage.stats import StatsStore
 from synapse.storage.user_directory import UserDirectoryBackgroundUpdateStore
 
 logger = logging.getLogger("synapse_port_db")
@@ -117,9 +119,11 @@ class Store(
     EventsBackgroundUpdatesStore,
     MediaRepositoryBackgroundUpdateStore,
     RegistrationBackgroundUpdateStore,
+    RoomMemberBackgroundUpdateStore,
     SearchBackgroundUpdateStore,
     StateBackgroundUpdateStore,
     UserDirectoryBackgroundUpdateStore,
+    StatsStore,
 ):
     def __init__(self, db_conn, hs):
         super(Store, self).__init__(db_conn, hs)
