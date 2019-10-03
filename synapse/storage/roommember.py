@@ -568,7 +568,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 missing_member_event_ids.append(event_id)
 
         if missing_member_event_ids:
-            event_to_memberships = yield self._get_membership_from_event_ids(
+            event_to_memberships = yield self._get_joined_profiles_from_event_ids(
                 missing_member_event_ids
             )
             users_in_room.update((row for row in event_to_memberships.values() if row))
@@ -584,23 +584,24 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return users_in_room
 
     @cached(max_entries=10000)
-    def _get_membership_from_event_id(self, event_id):
+    def _get_joined_profile_from_event_id(self, event_id):
         raise NotADirectoryError()
 
     @cachedList(
-        cached_method_name="_get_membership_from_event_id",
+        cached_method_name="_get_joined_profile_from_event_id",
         list_name="event_ids",
         inlineCallbacks=True,
     )
-    def _get_membership_from_event_ids(self, event_ids):
-        """Lookup profile info for set of member event IDs.
+    def _get_joined_profiles_from_event_ids(self, event_ids):
+        """For given set of member event_ids check if they point to a join
+        event and if so return the associated user and profile info.
 
         Args:
             event_ids (Iterable[str]): The member event IDs to lookup
 
         Returns:
             Deferred[dict[str, Tuple[str, ProfileInfo]|None]]: Map from event ID
-            to `user_id` and ProfileInfo (or None if couldn't find event).
+            to `user_id` and ProfileInfo (or None if not join event).
         """
 
         rows = yield self._simple_select_many_batch(
