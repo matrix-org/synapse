@@ -20,6 +20,7 @@ import errno
 import os
 from collections import OrderedDict
 from textwrap import dedent
+from typing import MutableMapping, Any, Optional
 
 from six import integer_types
 
@@ -72,14 +73,24 @@ def path_exists(file_path):
 
 
 class Config(object):
+    """
+    A configuration section, containing configuration keys and values.
+    """
+
     def __init__(self, root_config=None):
         self.root = root_config
 
-    def __getattr__(self, item, from_root=False):
+    def __getattr__(self, item: str) -> Any:
+        """
+        Try and fetch a configuration option that does not exist on this class.
+
+        This is so that existing configs that rely on `self.value`, where value
+        is actually from a different config section, continue to work.
+        """
         if item in ["generate_config_section", "read_config"]:
             raise AttributeError(item)
 
-        if self.root is None or from_root:
+        if self.root is None:
             raise AttributeError(item)
         else:
             return self.root._get_unclassed_config(self.section, item)
@@ -155,7 +166,15 @@ class Config(object):
 
 
 class RootConfig(object):
+    """
+    Holder of an application's configuration.
 
+    What configuration this objects hold is defined by `config_classes`, a list
+    of Config objects that will be instantiated and given the contents of a
+    configuration file to read. They can then be accessed on this class by their
+    section name, defined in the Config or dynamically set to be the name of the
+    class, lower-cased and with "Config" removed.
+    """
     config_classes = []
 
     def __init__(self):
@@ -174,14 +193,32 @@ class RootConfig(object):
             conf.section = name
             self._configs[name] = conf
 
-    def __getattr__(self, item):
+    def __getattr__(self, item: str) -> Any:
+        """
+        Redirect lookups on this object either to config objects, or values on
+        config objects, so that `config.tls.blah` works, as well as legacy uses
+        of things like `config.server_name`. It will first look up the config
+        section name, and then values on those config classes.
+        """
         if item in self._configs.keys():
             return self._configs[item]
 
         return self._get_unclassed_config(None, item)
 
-    def _get_unclassed_config(self, asking_section, item):
+    def _get_unclassed_config(self, asking_section: Optional[str], item: str):
+        """
+        Fetch a config value from one of the instantiated config classes that
+        has not been fetched directly.
 
+        Args:
+            asking_section: If this check is coming from a Config child, which
+                one? This section will not be asked if it has the value.
+            item: The configuration value key.
+
+        Raises:
+            AttributeError if no config classes have the config key. The body
+                will contain what sections were checked.
+        """
         for key, val in self._configs.items():
             if key == asking_section:
                 continue
@@ -191,9 +228,18 @@ class RootConfig(object):
 
         raise AttributeError(item, "not found in %s" % (list(self._configs.keys()),))
 
-    def invoke_all(self, func_name, *args, **kwargs):
+    def invoke_all(self, func_name: str, *args, **kwargs) -> MutableMapping[str, Any]:
         """
-        Invoke a function on all instantiated config classes.
+        Invoke a function on all instantiated config objects this RootConfig is
+        configured to use.
+
+        Args:
+            func_name: Name of function to invoke
+            *args
+            **kwargs
+        Returns:
+            ordered dictionary of config section name and the result of the
+            function from it.
         """
         res = OrderedDict()
 
@@ -204,7 +250,19 @@ class RootConfig(object):
         return res
 
     @classmethod
-    def invoke_all_static(cls, func_name, *args, **kwargs):
+    def invoke_all_static(cls, func_name: str, *args, **kwargs):
+        """
+        Invoke a static function on config objects this RootConfig is
+        configured to use.
+
+        Args:
+            func_name: Name of function to invoke
+            *args
+            **kwargs
+        Returns:
+            ordered dictionary of config section name and the result of the
+            function from it.
+        """
         for config in cls.config_classes:
             if hasattr(config, func_name):
                 getattr(config, func_name)(*args, **kwargs)
@@ -223,8 +281,8 @@ class RootConfig(object):
         tls_private_key_path=None,
         acme_domain=None,
     ):
-
-        """Build a default configuration file
+        """
+        Build a default configuration file
 
         This is used when the user explicitly asks us to generate a config file
         (eg with --generate_config).
