@@ -33,10 +33,18 @@ from twisted.internet import defer, reactor
 from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.context import PreserveLoggingContext
 from synapse.server import HomeServer
-from synapse.storage import DataStore
 from synapse.storage._base import LoggingTransaction
+from synapse.storage.client_ips import ClientIpBackgroundUpdateStore
+from synapse.storage.deviceinbox import DeviceInboxBackgroundUpdateStore
+from synapse.storage.devices import DeviceBackgroundUpdateStore
 from synapse.storage.engines import create_engine
+from synapse.storage.events_bg_updates import EventsBackgroundUpdatesStore
+from synapse.storage.media_repository import MediaRepositoryBackgroundUpdateStore
 from synapse.storage.prepare_database import prepare_database
+from synapse.storage.registration import RegistrationBackgroundUpdateStore
+from synapse.storage.search import SearchBackgroundUpdateStore
+from synapse.storage.state import StateBackgroundUpdateStore
+from synapse.storage.user_directory import UserDirectoryBackgroundUpdateStore
 
 logger = logging.getLogger("synapse_port_db")
 
@@ -102,8 +110,17 @@ APPEND_ONLY_TABLES = [
 
 end_error_exec_info = None
 
-
-class Store(DataStore):
+class Store(
+    ClientIpBackgroundUpdateStore,
+    DeviceInboxBackgroundUpdateStore,
+    DeviceBackgroundUpdateStore,
+    EventsBackgroundUpdatesStore,
+    MediaRepositoryBackgroundUpdateStore,
+    RegistrationBackgroundUpdateStore,
+    SearchBackgroundUpdateStore,
+    StateBackgroundUpdateStore,
+    UserDirectoryBackgroundUpdateStore,
+):
     def __init__(self, db_conn, hs):
         super(Store, self).__init__(db_conn, hs)
         self.db_pool = hs.get_db_pool()
