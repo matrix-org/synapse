@@ -33,14 +33,14 @@ logger = logging.getLogger(__name__)
 LAST_SEEN_GRANULARITY = 120 * 1000
 
 
-class ClientIpStore(background_updates.BackgroundUpdateStore):
+class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
 
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen", keylen=4, max_entries=50000 * CACHE_SIZE_FACTOR
         )
 
-        super(ClientIpStore, self).__init__(db_conn, hs)
+        super(ClientIpBackgroundUpdateStore, self).__init__(db_conn, hs)
 
         self.user_ips_max_age = hs.config.user_ips_max_age
 
@@ -91,19 +91,6 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self.register_background_update_handler(
             "devices_last_seen", self._devices_last_seen_update
         )
-
-        # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
-        self._batch_row_update = {}
-
-        self._client_ip_looper = self._clock.looping_call(
-            self._update_client_ips_batch, 5 * 1000
-        )
-        self.hs.get_reactor().addSystemEventTrigger(
-            "before", "shutdown", self._update_client_ips_batch
-        )
-
-        if self.user_ips_max_age:
-            self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
 
     @defer.inlineCallbacks
     def _remove_user_ip_nonunique(self, progress, batch_size):
@@ -304,6 +291,110 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         return batch_size
 
     @defer.inlineCallbacks
+    def _devices_last_seen_update(self, progress, batch_size):
+        """Background update to insert last seen info into devices table
+        """
+
+        last_user_id = progress.get("last_user_id", "")
+        last_device_id = progress.get("last_device_id", "")
+
+        def _devices_last_seen_update_txn(txn):
+            # This consists of two queries:
+            #
+            #   1. The sub-query searches for the next N devices and joins
+            #      against user_ips to find the max last_seen associated with
+            #      that device.
+            #   2. The outer query then joins again against user_ips on
+            #      user/device/last_seen. This *should* hopefully only
+            #      return one row, but if it does return more than one then
+            #      we'll just end up updating the same device row multiple
+            #      times, which is fine.
+
+            if self.database_engine.supports_tuple_comparison:
+                where_clause = "(user_id, device_id) > (?, ?)"
+                where_args = [last_user_id, last_device_id]
+            else:
+                # We explicitly do a `user_id >= ? AND (...)` here to ensure
+                # that an index is used, as doing `user_id > ? OR (user_id = ? AND ...)`
+                # makes it hard for query optimiser to tell that it can use the
+                # index on user_id
+                where_clause = "user_id >= ? AND (user_id > ? OR device_id > ?)"
+                where_args = [last_user_id, last_user_id, last_device_id]
+
+            sql = """
+                SELECT
+                    last_seen, ip, user_agent, user_id, device_id
+                FROM (
+                    SELECT
+                        user_id, device_id, MAX(u.last_seen) AS last_seen
+                    FROM devices
+                    INNER JOIN user_ips AS u USING (user_id, device_id)
+                    WHERE %(where_clause)s
+                    GROUP BY user_id, device_id
+                    ORDER BY user_id ASC, device_id ASC
+                    LIMIT ?
+                ) c
+                INNER JOIN user_ips AS u USING (user_id, device_id, last_seen)
+            """ % {
+                "where_clause": where_clause
+            }
+            txn.execute(sql, where_args + [batch_size])
+
+            rows = txn.fetchall()
+            if not rows:
+                return 0
+
+            sql = """
+                UPDATE devices
+                SET last_seen = ?, ip = ?, user_agent = ?
+                WHERE user_id = ? AND device_id = ?
+            """
+            txn.execute_batch(sql, rows)
+
+            _, _, _, user_id, device_id = rows[-1]
+            self._background_update_progress_txn(
+                txn,
+                "devices_last_seen",
+                {"last_user_id": user_id, "last_device_id": device_id},
+            )
+
+            return len(rows)
+
+        updated = yield self.runInteraction(
+            "_devices_last_seen_update", _devices_last_seen_update_txn
+        )
+
+        if not updated:
+            yield self._end_background_update("devices_last_seen")
+
+        return updated
+
+
+class ClientIpStore(ClientIpBackgroundUpdateStore):
+    def __init__(self, db_conn, hs):
+
+        self.client_ip_last_seen = Cache(
+            name="client_ip_last_seen", keylen=4, max_entries=50000 * CACHE_SIZE_FACTOR
+        )
+
+        super(ClientIpStore, self).__init__(db_conn, hs)
+
+        self.user_ips_max_age = hs.config.user_ips_max_age
+
+        # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
+        self._batch_row_update = {}
+
+        self._client_ip_looper = self._clock.looping_call(
+            self._update_client_ips_batch, 5 * 1000
+        )
+        self.hs.get_reactor().addSystemEventTrigger(
+            "before", "shutdown", self._update_client_ips_batch
+        )
+
+        if self.user_ips_max_age:
+            self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
+
+    @defer.inlineCallbacks
     def insert_client_ip(
         self, user_id, access_token, ip, user_agent, device_id, now=None
     ):
@@ -453,85 +544,6 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             }
             for (access_token, ip), (user_agent, last_seen) in iteritems(results)
         )
-
-    @defer.inlineCallbacks
-    def _devices_last_seen_update(self, progress, batch_size):
-        """Background update to insert last seen info into devices table
-        """
-
-        last_user_id = progress.get("last_user_id", "")
-        last_device_id = progress.get("last_device_id", "")
-
-        def _devices_last_seen_update_txn(txn):
-            # This consists of two queries:
-            #
-            #   1. The sub-query searches for the next N devices and joins
-            #      against user_ips to find the max last_seen associated with
-            #      that device.
-            #   2. The outer query then joins again against user_ips on
-            #      user/device/last_seen. This *should* hopefully only
-            #      return one row, but if it does return more than one then
-            #      we'll just end up updating the same device row multiple
-            #      times, which is fine.
-
-            if self.database_engine.supports_tuple_comparison:
-                where_clause = "(user_id, device_id) > (?, ?)"
-                where_args = [last_user_id, last_device_id]
-            else:
-                # We explicitly do a `user_id >= ? AND (...)` here to ensure
-                # that an index is used, as doing `user_id > ? OR (user_id = ? AND ...)`
-                # makes it hard for query optimiser to tell that it can use the
-                # index on user_id
-                where_clause = "user_id >= ? AND (user_id > ? OR device_id > ?)"
-                where_args = [last_user_id, last_user_id, last_device_id]
-
-            sql = """
-                SELECT
-                    last_seen, ip, user_agent, user_id, device_id
-                FROM (
-                    SELECT
-                        user_id, device_id, MAX(u.last_seen) AS last_seen
-                    FROM devices
-                    INNER JOIN user_ips AS u USING (user_id, device_id)
-                    WHERE %(where_clause)s
-                    GROUP BY user_id, device_id
-                    ORDER BY user_id ASC, device_id ASC
-                    LIMIT ?
-                ) c
-                INNER JOIN user_ips AS u USING (user_id, device_id, last_seen)
-            """ % {
-                "where_clause": where_clause
-            }
-            txn.execute(sql, where_args + [batch_size])
-
-            rows = txn.fetchall()
-            if not rows:
-                return 0
-
-            sql = """
-                UPDATE devices
-                SET last_seen = ?, ip = ?, user_agent = ?
-                WHERE user_id = ? AND device_id = ?
-            """
-            txn.execute_batch(sql, rows)
-
-            _, _, _, user_id, device_id = rows[-1]
-            self._background_update_progress_txn(
-                txn,
-                "devices_last_seen",
-                {"last_user_id": user_id, "last_device_id": device_id},
-            )
-
-            return len(rows)
-
-        updated = yield self.runInteraction(
-            "_devices_last_seen_update", _devices_last_seen_update_txn
-        )
-
-        if not updated:
-            yield self._end_background_update("devices_last_seen")
-
-        return updated
 
     @wrap_as_background_process("prune_old_user_ips")
     async def _prune_old_user_ips(self):
