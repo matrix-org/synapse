@@ -584,7 +584,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=10000)
     def _get_joined_profile_from_event_id(self, event_id):
-        raise NotADirectoryError()
+        raise NotImplementedError()
 
     @cachedList(
         cached_method_name="_get_joined_profile_from_event_id",
