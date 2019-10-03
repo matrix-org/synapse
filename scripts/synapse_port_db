@@ -112,6 +112,7 @@ APPEND_ONLY_TABLES = [
 
 end_error_exec_info = None
 
+
 class Store(
     ClientIpBackgroundUpdateStore,
     DeviceInboxBackgroundUpdateStore,
