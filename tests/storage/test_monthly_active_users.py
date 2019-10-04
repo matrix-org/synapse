@@ -147,9 +147,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.reap_monthly_active_users()
         self.pump()
         count = self.store.get_monthly_active_count()
-        self.assertEquals(
-            self.get_success(count), self.hs.config.max_mau_value
-        )
+        self.assertEquals(self.get_success(count), self.hs.config.max_mau_value)
 
         self.reactor.advance(FORTY_DAYS)
         self.store.reap_monthly_active_users()
@@ -170,7 +168,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
             user = "@user%d:server" % i
             email = "user%d@example.com" % i
             self.store.upsert_monthly_active_user(user)
-            threepids.append({"medium": "email", "address": email},)
+            threepids.append({"medium": "email", "address": email})
             # Need to ensure that the most recent entries in the
             # monthly_active_users table are reserved
             now = int(self.hs.get_clock().time_msec())
@@ -193,9 +191,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.reap_monthly_active_users()
         self.pump()
         count = self.store.get_monthly_active_count()
-        self.assertEquals(
-            self.get_success(count), self.hs.config.max_mau_value
-        )
+        self.assertEquals(self.get_success(count), self.hs.config.max_mau_value)
 
     def test_populate_monthly_users_is_guest(self):
         # Test that guest users are not added to mau list
