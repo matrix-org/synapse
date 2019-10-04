@@ -330,13 +330,21 @@ class SearchStore(BackgroundUpdateStore):
                 " VALUES (?,?,?,to_tsvector('english', ?),?,?)"
             )
 
+            # About the word extraction: PostgreSQL appears to be optimized for words,
+            # so it chokes on code and werd formatting such as URIs.
+            # This improves search indexing by only picking up the words.
+            # For example: "https://github.com/matrix-org/synapse/pull/6132"
+            # Becomes "https github com matrix org synapse pull 6132"
+            # Postgres seems to like that a LOT more in terms of search performance.
+            # See https://github.com/matrix-org/synapse/issues/3024 for more details
+
             args = (
                 (
                     entry.event_id,
                     entry.room_id,
                     entry.key,
                     # Only store words while discarding special characters
-                    ' '.join(re.findall(r"([\w\-]+)", entry.value, re.UNICODE)),
+                    ' '.join(_extract_search_keywords(entry)),
                     entry.stream_ordering,
                     entry.origin_server_ts,
                 )
@@ -685,6 +693,17 @@ class SearchStore(BackgroundUpdateStore):
 def _to_postgres_options(options_dict):
     return "'%s'" % (",".join("%s=%s" % (k, v) for k, v in options_dict.items()),)
 
+def _extract_search_keywords(entry):
+    """
+    Extract an iterator of words from the string.
+
+    For instance: https://github.com/matrix-org/synapse/issues/3024
+    Becomes: ["https","github","com","matrix-org","synapse","issues","3024"]
+
+    :param entry: A string to be pre-processed for searching.
+    :return: List of words in the string.
+    """
+    return re.finditer(r"([\w\-]+)", entry.value, re.UNICODE)
 
 def _parse_query(database_engine, search_term):
     """Takes a plain unicode string from the user and converts it into a form
@@ -694,7 +713,9 @@ def _parse_query(database_engine, search_term):
     """
 
     # Pull out the individual words, discarding any non-word characters.
-    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+    # This improves search performance as the Postgres fulltext search (probably SQLite as well)
+    # are more optimized for English words.
+    results = _extract_search_keywords(search_term)
 
     if isinstance(database_engine, PostgresEngine):
         return " & ".join(result + ":*" for result in results)
