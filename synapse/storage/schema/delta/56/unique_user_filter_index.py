@@ -23,6 +23,10 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
             %s
             DROP INDEX user_filters_by_user_id_filter_id;
             DELETE FROM user_filters;
+            ALTER TABLE user_filters
+               ALTER COLUMN user_id SET NOT NULL
+               ALTER COLUMN filter_id SET NOT NULL
+               ALTER COLUMN filter_json SET NOT NULL;
             INSERT INTO user_filters(user_id, filter_id, filter_json)
                 SELECT * FROM user_filters_migration;
             DROP TABLE user_filters_migration;
