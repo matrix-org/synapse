@@ -2600,20 +2600,14 @@ class FederationHandler(BaseHandler):
             )
         if original_invite:
             # If the m.room.third_party_invite event's content is empty, it means the
-            # invite has been revoked.
-            if original_invite.content:
-                display_name = original_invite.content["display_name"]
-                event_dict["content"]["third_party_invite"][
-                    "display_name"
-                ] = display_name
-            else:
-                # Don't discard or raise an error here because that's not the right place
-                # to do auth checks. The auth check will fail on this invite because we
-                # won't be able to fetch public keys from the m.room.third_party_invite
-                # event's content (because it's empty).
-                logger.info(
-                    "Found invite event for third_party_invite but it has been revoked"
-                )
+            # invite has been revoked. In this case, we don't have to raise an error here
+            # because the auth check will fail on the invite (because it's not able to
+            # fetch public keys from the m.room.third_party_invite event's content, which
+            # is empty.
+            display_name = original_invite.content.get("display_name")
+            event_dict["content"]["third_party_invite"][
+                "display_name"
+            ] = display_name
         else:
             logger.info(
                 "Could not find invite event for third_party_invite: %r", event_dict
