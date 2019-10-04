@@ -255,7 +255,7 @@ class PresenceHandler(object):
         self.unpersisted_users_changes = set()
 
         if unpersisted:
-            logger.info("Persisting %d upersisted presence updates", len(unpersisted))
+            logger.info("Persisting %d unpersisted presence updates", len(unpersisted))
             yield self.store.update_presence(
                 [self.user_to_current_state[user_id] for user_id in unpersisted]
             )
@@ -333,7 +333,7 @@ class PresenceHandler(object):
         """Checks the presence of users that have timed out and updates as
         appropriate.
         """
-        logger.info("Handling presence timeouts")
+        logger.debug("Handling presence timeouts")
         now = self.clock.time_msec()
 
         # Fetch the list of users that *may* have timed out. Things may have
@@ -1032,7 +1032,7 @@ class PresenceEventSource(object):
                 #
                 # Hence this guard where we just return nothing so that the sync
                 # doesn't return. C.f. #5503.
-                return ([], max_token)
+                return [], max_token
 
             presence = self.get_presence_handler()
             stream_change_cache = self.store.presence_stream_cache
@@ -1279,7 +1279,7 @@ def get_interested_parties(store, states):
         # Always notify self
         users_to_states.setdefault(state.user_id, []).append(state)
 
-    return (room_ids_to_states, users_to_states)
+    return room_ids_to_states, users_to_states
 
 
 @defer.inlineCallbacks

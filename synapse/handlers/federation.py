@@ -326,8 +326,9 @@ class FederationHandler(BaseHandler):
                     ours = yield self.store.get_state_groups_ids(room_id, seen)
 
                     # state_maps is a list of mappings from (type, state_key) to event_id
-                    # type: list[dict[tuple[str, str], str]]
-                    state_maps = list(ours.values())
+                    state_maps = list(
+                        ours.values()
+                    )  # type: list[dict[tuple[str, str], str]]
 
                     # we don't need this any more, let's delete it.
                     del ours
@@ -978,6 +979,9 @@ class FederationHandler(BaseHandler):
                 except NotRetryingDestination as e:
                     logger.info(str(e))
                     continue
+                except RequestSendFailed as e:
+                    logger.info("Falied to get backfill from %s because %s", dom, e)
+                    continue
                 except FederationDeniedError as e:
                     logger.info(e)
                     continue
@@ -1204,11 +1208,28 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_make_join_request(self, room_id, user_id):
+    def on_make_join_request(self, origin, room_id, user_id):
         """ We've received a /make_join/ request, so we create a partial
         join event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.
+
+        Args:
+            origin (str): The (verified) server name of the requesting server.
+            room_id (str): Room to create join event in
+            user_id (str): The user to create the join for
+
+        Returns:
+            Deferred[FrozenEvent]
         """
+
+        if get_domain_from_id(user_id) != origin:
+            logger.info(
+                "Got /make_join request for user %r from different origin %s, ignoring",
+                user_id,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
+
         event_content = {"membership": Membership.JOIN}
 
         room_version = yield self.store.get_room_version(room_id)
@@ -1407,15 +1428,31 @@ class FederationHandler(BaseHandler):
         assert event.user_id == user_id
         assert event.state_key == user_id
         assert event.room_id == room_id
-        return (origin, event, format_ver)
+        return origin, event, format_ver
 
     @defer.inlineCallbacks
     @log_function
-    def on_make_leave_request(self, room_id, user_id):
+    def on_make_leave_request(self, origin, room_id, user_id):
         """ We've received a /make_leave/ request, so we create a partial
         leave event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.
+
+        Args:
+            origin (str): The (verified) server name of the requesting server.
+            room_id (str): Room to create leave event in
+            user_id (str): The user to create the leave for
+
+        Returns:
+            Deferred[FrozenEvent]
         """
+        if get_domain_from_id(user_id) != origin:
+            logger.info(
+                "Got /make_leave request for user %r from different origin %s, ignoring",
+                user_id,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
+
         room_version = yield self.store.get_room_version(room_id)
         builder = self.event_builder_factory.new(
             room_version,
@@ -2493,11 +2530,16 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_exchange_third_party_invite_request(self, origin, room_id, event_dict):
+    def on_exchange_third_party_invite_request(self, room_id, event_dict):
         """Handle an exchange_third_party_invite request from a remote server
 
         The remote server will call this when it wants to turn a 3pid invite
         into a normal m.room.member invite.
+
+        Args:
+            room_id (str): The ID of the room.
+
+            event_dict (dict[str, Any]): Dictionary containing the event body.
 
         Returns:
             Deferred: resolves (to None)
@@ -2528,7 +2570,7 @@ class FederationHandler(BaseHandler):
         )
 
         try:
-            self.auth.check_from_context(room_version, event, context)
+            yield self.auth.check_from_context(room_version, event, context)
         except AuthError as e:
             logger.warn("Denying third party invite %r because %s", event, e)
             raise e
@@ -2557,7 +2599,12 @@ class FederationHandler(BaseHandler):
                 original_invite_id, allow_none=True
             )
         if original_invite:
-            display_name = original_invite.content["display_name"]
+            # If the m.room.third_party_invite event's content is empty, it means the
+            # invite has been revoked. In this case, we don't have to raise an error here
+            # because the auth check will fail on the invite (because it's not able to
+            # fetch public keys from the m.room.third_party_invite event's content, which
+            # is empty).
+            display_name = original_invite.content.get("display_name")
             event_dict["content"]["third_party_invite"]["display_name"] = display_name
         else:
             logger.info(
@@ -2763,3 +2810,28 @@ class FederationHandler(BaseHandler):
             )
         else:
             return user_joined_room(self.distributor, user, room_id)
+
+    @defer.inlineCallbacks
+    def get_room_complexity(self, remote_room_hosts, room_id):
+        """
+        Fetch the complexity of a remote room over federation.
+
+        Args:
+            remote_room_hosts (list[str]): The remote servers to ask.
+            room_id (str): The room ID to ask about.
+
+        Returns:
+            Deferred[dict] or Deferred[None]: Dict contains the complexity
+            metric versions, while None means we could not fetch the complexity.
+        """
+
+        for host in remote_room_hosts:
+            res = yield self.federation_client.get_room_complexity(host, room_id)
+
+            # We got a result, return it.
+            if res:
+                defer.returnValue(res)
+
+        # We fell off the bottom, couldn't get the complexity from anyone. Oh
+        # well.
+        defer.returnValue(None)

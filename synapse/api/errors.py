@@ -17,6 +17,7 @@
 """Contains exceptions and error codes."""
 
 import logging
+from typing import Dict
 
 from six import iteritems
 from six.moves import http_client
@@ -61,6 +62,7 @@ class Codes(object):
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
     WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
     EXPIRED_ACCOUNT = "ORG_MATRIX_EXPIRED_ACCOUNT"
+    USER_DEACTIVATED = "M_USER_DEACTIVATED"
 
 
 class CodeMessageException(RuntimeError):
@@ -110,7 +112,7 @@ class ProxiedRequestError(SynapseError):
     def __init__(self, code, msg, errcode=Codes.UNKNOWN, additional_fields=None):
         super(ProxiedRequestError, self).__init__(code, msg, errcode)
         if additional_fields is None:
-            self._additional_fields = {}
+            self._additional_fields = {}  # type: Dict
         else:
             self._additional_fields = dict(additional_fields)
 
@@ -151,7 +153,7 @@ class UserDeactivatedError(SynapseError):
             msg (str): The human-readable error message
         """
         super(UserDeactivatedError, self).__init__(
-            code=http_client.FORBIDDEN, msg=msg, errcode=Codes.UNKNOWN
+            code=http_client.FORBIDDEN, msg=msg, errcode=Codes.USER_DEACTIVATED
         )
 
 

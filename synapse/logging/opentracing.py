@@ -43,6 +43,9 @@ OpenTracing to be easily disabled in Synapse and thereby have OpenTracing as
 an optional dependency. This does however limit the number of modifiable spans
 at any point in the code to one. From here out references to `opentracing`
 in the code snippets refer to the Synapses module.
+Most methods provided in the module have a direct correlation to those provided
+by opentracing. Refer to docs there for a more in-depth documentation on some of
+the args and methods.
 
 Tracing
 -------
@@ -68,52 +71,62 @@ set a tag on the current active span.
 Tracing functions
 -----------------
 
-Functions can be easily traced using decorators. There is a decorator for
-'normal' function and for functions which are actually deferreds. The name of
+Functions can be easily traced using decorators. The name of
 the function becomes the operation name for the span.
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import trace, trace_deferred
+   from synapse.logging.opentracing import trace
 
-   # Start a span using 'normal_function' as the operation name
+   # Start a span using 'interesting_function' as the operation name
    @trace
-   def normal_function(*args, **kwargs):
+   def interesting_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
 
-   # Start a span using 'deferred_function' as the operation name
-   @trace_deferred
-   @defer.inlineCallbacks
-   def deferred_function(*args, **kwargs):
-       # We start
-       yield we_wait
-       # we finish
-       return something_usual_and_useful
 
-Operation names can be explicitly set for functions by using
-``trace_using_operation_name`` and
-``trace_deferred_using_operation_name``
+Operation names can be explicitly set for a function by passing the
+operation name to ``trace``
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import (
-       trace_using_operation_name,
-       trace_deferred_using_operation_name
-   )
+   from synapse.logging.opentracing import trace
 
-   @trace_using_operation_name("A *much* better operation name")
-   def normal_function(*args, **kwargs):
+   @trace(opname="a_better_operation_name")
+   def interesting_badly_named_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
 
-   @trace_deferred_using_operation_name("Another exciting operation name!")
-   @defer.inlineCallbacks
-   def deferred_function(*args, **kwargs):
-       # We start
-       yield we_wait
-       # we finish
-       return something_usual_and_useful
+Setting Tags
+------------
+
+To set a tag on the active span do
+
+.. code-block:: python
+
+   from synapse.logging.opentracing import set_tag
+
+   set_tag(tag_name, tag_value)
+
+There's a convenient decorator to tag all the args of the method. It uses
+inspection in order to use the formal parameter names prefixed with 'ARG_' as
+tag names. It uses kwarg names as tag names without the prefix.
+
+.. code-block:: python
+
+   from synapse.logging.opentracing import tag_args
+
+   @tag_args
+   def set_fates(clotho, lachesis, atropos, father="Zues", mother="Themis"):
+       pass
+
+   set_fates("the story", "the end", "the act")
+   # This will have the following tags
+   #  - ARG_clotho: "the story"
+   #  - ARG_lachesis: "the end"
+   #  - ARG_atropos: "the act"
+   #  - father: "Zues"
+   #  - mother: "Themis"
 
 Contexts and carriers
 ---------------------
@@ -136,6 +149,9 @@ unchartered waters will require the enforcement of the whitelist.
 ``logging/opentracing.py`` has a ``whitelisted_homeserver`` method which takes
 in a destination and compares it to the whitelist.
 
+Most injection methods take a 'destination' arg. The context will only be injected
+if the destination matches the whitelist or the destination is None.
+
 =======
 Gotchas
 =======
@@ -154,6 +170,7 @@ import inspect
 import logging
 import re
 from functools import wraps
+from typing import Dict
 
 from canonicaljson import json
 
@@ -161,16 +178,54 @@ from twisted.internet import defer
 
 from synapse.config import ConfigError
 
+# Helper class
+
+
+class _DummyTagNames(object):
+    """wrapper of opentracings tags. We need to have them if we
+    want to reference them without opentracing around. Clearly they
+    should never actually show up in a trace. `set_tags` overwrites
+    these with the correct ones."""
+
+    INVALID_TAG = "invalid-tag"
+    COMPONENT = INVALID_TAG
+    DATABASE_INSTANCE = INVALID_TAG
+    DATABASE_STATEMENT = INVALID_TAG
+    DATABASE_TYPE = INVALID_TAG
+    DATABASE_USER = INVALID_TAG
+    ERROR = INVALID_TAG
+    HTTP_METHOD = INVALID_TAG
+    HTTP_STATUS_CODE = INVALID_TAG
+    HTTP_URL = INVALID_TAG
+    MESSAGE_BUS_DESTINATION = INVALID_TAG
+    PEER_ADDRESS = INVALID_TAG
+    PEER_HOSTNAME = INVALID_TAG
+    PEER_HOST_IPV4 = INVALID_TAG
+    PEER_HOST_IPV6 = INVALID_TAG
+    PEER_PORT = INVALID_TAG
+    PEER_SERVICE = INVALID_TAG
+    SAMPLING_PRIORITY = INVALID_TAG
+    SERVICE = INVALID_TAG
+    SPAN_KIND = INVALID_TAG
+    SPAN_KIND_CONSUMER = INVALID_TAG
+    SPAN_KIND_PRODUCER = INVALID_TAG
+    SPAN_KIND_RPC_CLIENT = INVALID_TAG
+    SPAN_KIND_RPC_SERVER = INVALID_TAG
+
+
 try:
     import opentracing
+
+    tags = opentracing.tags
 except ImportError:
     opentracing = None
+    tags = _DummyTagNames
 try:
     from jaeger_client import Config as JaegerConfig
     from synapse.logging.scopecontextmanager import LogContextScopeManager
 except ImportError:
-    JaegerConfig = None
-    LogContextScopeManager = None
+    JaegerConfig = None  # type: ignore
+    LogContextScopeManager = None  # type: ignore
 
 
 logger = logging.getLogger(__name__)
@@ -185,8 +240,7 @@ _homeserver_whitelist = None
 
 
 def only_if_tracing(func):
-    """Executes the function only if we're tracing. Otherwise return.
-    Assumes the function wrapped may return None"""
+    """Executes the function only if we're tracing. Otherwise returns None."""
 
     @wraps(func)
     def _only_if_tracing_inner(*args, **kwargs):
@@ -196,6 +250,41 @@ def only_if_tracing(func):
             return
 
     return _only_if_tracing_inner
+
+
+def ensure_active_span(message, ret=None):
+    """Executes the operation only if opentracing is enabled and there is an active span.
+    If there is no active span it logs message at the error level.
+
+    Args:
+        message (str): Message which fills in "There was no active span when trying to %s"
+            in the error log if there is no active span and opentracing is enabled.
+        ret (object): return value if opentracing is None or there is no active span.
+
+    Returns (object): The result of the func or ret if opentracing is disabled or there
+        was no active span.
+    """
+
+    def ensure_active_span_inner_1(func):
+        @wraps(func)
+        def ensure_active_span_inner_2(*args, **kwargs):
+            if not opentracing:
+                return ret
+
+            if not opentracing.tracer.active_span:
+                logger.error(
+                    "There was no active span when trying to %s."
+                    " Did you forget to start one or did a context slip?",
+                    message,
+                )
+
+                return ret
+
+            return func(*args, **kwargs)
+
+        return ensure_active_span_inner_2
+
+    return ensure_active_span_inner_1
 
 
 @contextlib.contextmanager
@@ -239,10 +328,6 @@ def init_tracer(config):
         scope_manager=LogContextScopeManager(config),
     ).initialize_tracer()
 
-    # Set up tags to be opentracing's tags
-    global tags
-    tags = opentracing.tags
-
 
 # Whitelisting
 
@@ -269,7 +354,7 @@ def whitelisted_homeserver(destination):
     Args:
         destination (str)
         """
-    _homeserver_whitelist
+
     if _homeserver_whitelist:
         return _homeserver_whitelist.match(destination)
     return False
@@ -299,30 +384,28 @@ def start_active_span(
     if opentracing is None:
         return _noop_context_manager()
 
-    else:
-        # We need to enter the scope here for the logcontext to become active
-        return opentracing.tracer.start_active_span(
-            operation_name,
-            child_of=child_of,
-            references=references,
-            tags=tags,
-            start_time=start_time,
-            ignore_active_span=ignore_active_span,
-            finish_on_close=finish_on_close,
-        )
+    return opentracing.tracer.start_active_span(
+        operation_name,
+        child_of=child_of,
+        references=references,
+        tags=tags,
+        start_time=start_time,
+        ignore_active_span=ignore_active_span,
+        finish_on_close=finish_on_close,
+    )
 
 
 def start_active_span_follows_from(operation_name, contexts):
     if opentracing is None:
         return _noop_context_manager()
-    else:
-        references = [opentracing.follows_from(context) for context in contexts]
-        scope = start_active_span(operation_name, references=references)
-        return scope
+
+    references = [opentracing.follows_from(context) for context in contexts]
+    scope = start_active_span(operation_name, references=references)
+    return scope
 
 
-def start_active_span_from_context(
-    headers,
+def start_active_span_from_request(
+    request,
     operation_name,
     references=None,
     tags=None,
@@ -331,9 +414,9 @@ def start_active_span_from_context(
     finish_on_close=True,
 ):
     """
-    Extracts a span context from Twisted Headers.
+    Extracts a span context from a Twisted Request.
     args:
-        headers (twisted.web.http_headers.Headers)
+        headers (twisted.web.http.Request)
 
         For the other args see opentracing.tracer
 
@@ -347,7 +430,9 @@ def start_active_span_from_context(
     if opentracing is None:
         return _noop_context_manager()
 
-    header_dict = {k.decode(): v[0].decode() for k, v in headers.getAllRawHeaders()}
+    header_dict = {
+        k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
+    }
     context = opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
 
     return opentracing.tracer.start_active_span(
@@ -413,19 +498,19 @@ def start_active_span_from_edu(
 # Opentracing setters for tags, logs, etc
 
 
-@only_if_tracing
+@ensure_active_span("set a tag")
 def set_tag(key, value):
     """Sets a tag on the active span"""
     opentracing.tracer.active_span.set_tag(key, value)
 
 
-@only_if_tracing
+@ensure_active_span("log")
 def log_kv(key_values, timestamp=None):
     """Log to the active span"""
     opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
 
-@only_if_tracing
+@ensure_active_span("set the traces operation name")
 def set_operation_name(operation_name):
     """Sets the operation name of the active span"""
     opentracing.tracer.active_span.set_operation_name(operation_name)
@@ -434,13 +519,18 @@ def set_operation_name(operation_name):
 # Injection and extraction
 
 
-@only_if_tracing
-def inject_active_span_twisted_headers(headers, destination):
+@ensure_active_span("inject the span into a header")
+def inject_active_span_twisted_headers(headers, destination, check_destination=True):
     """
     Injects a span context into twisted headers in-place
 
     Args:
         headers (twisted.web.http_headers.Headers)
+        destination (str): address of entity receiving the span context. If check_destination
+            is true the context will only be injected if the destination matches the
+            opentracing whitelist
+        check_destination (bool): If false, destination will be ignored and the context
+            will always be injected.
         span (opentracing.Span)
 
     Returns:
@@ -454,25 +544,30 @@ def inject_active_span_twisted_headers(headers, destination):
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
 
-    if not whitelisted_homeserver(destination):
+    if check_destination and not whitelisted_homeserver(destination):
         return
 
     span = opentracing.tracer.active_span
-    carrier = {}
+    carrier = {}  # type: Dict[str, str]
     opentracing.tracer.inject(span, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
         headers.addRawHeaders(key, value)
 
 
-@only_if_tracing
-def inject_active_span_byte_dict(headers, destination):
+@ensure_active_span("inject the span into a byte dict")
+def inject_active_span_byte_dict(headers, destination, check_destination=True):
     """
     Injects a span context into a dict where the headers are encoded as byte
     strings
 
     Args:
         headers (dict)
+        destination (str): address of entity receiving the span context. If check_destination
+            is true the context will only be injected if the destination matches the
+            opentracing whitelist
+        check_destination (bool): If false, destination will be ignored and the context
+            will always be injected.
         span (opentracing.Span)
 
     Returns:
@@ -485,28 +580,30 @@ def inject_active_span_byte_dict(headers, destination):
         here:
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
-    if not whitelisted_homeserver(destination):
+    if check_destination and not whitelisted_homeserver(destination):
         return
 
     span = opentracing.tracer.active_span
 
-    carrier = {}
+    carrier = {}  # type: Dict[str, str]
     opentracing.tracer.inject(span, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
         headers[key.encode()] = [value.encode()]
 
 
-@only_if_tracing
-def inject_active_span_text_map(carrier, destination=None):
+@ensure_active_span("inject the span into a text map")
+def inject_active_span_text_map(carrier, destination, check_destination=True):
     """
     Injects a span context into a dict
 
     Args:
         carrier (dict)
-        destination (str): the name of the remote server. The span context
-        will only be injected if the destination matches the homeserver_whitelist
-        or destination is None.
+        destination (str): address of entity receiving the span context. If check_destination
+            is true the context will only be injected if the destination matches the
+            opentracing whitelist
+        check_destination (bool): If false, destination will be ignored and the context
+            will always be injected.
 
     Returns:
         In-place modification of carrier
@@ -519,7 +616,7 @@ def inject_active_span_text_map(carrier, destination=None):
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
 
-    if destination and not whitelisted_homeserver(destination):
+    if check_destination and not whitelisted_homeserver(destination):
         return
 
     opentracing.tracer.inject(
@@ -527,12 +624,37 @@ def inject_active_span_text_map(carrier, destination=None):
     )
 
 
+@ensure_active_span("get the active span context as a dict", ret={})
+def get_active_span_text_map(destination=None):
+    """
+    Gets a span context as a dict. This can be used instead of manually
+    injecting a span into an empty carrier.
+
+    Args:
+        destination (str): the name of the remote server.
+
+    Returns:
+        dict: the active span's context if opentracing is enabled, otherwise empty.
+    """
+
+    if destination and not whitelisted_homeserver(destination):
+        return {}
+
+    carrier = {}  # type: Dict[str, str]
+    opentracing.tracer.inject(
+        opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
+    )
+
+    return carrier
+
+
+@ensure_active_span("get the span context as a string.", ret={})
 def active_span_context_as_string():
     """
     Returns:
         The active span context encoded as a string.
     """
-    carrier = {}
+    carrier = {}  # type: Dict[str, str]
     if opentracing:
         opentracing.tracer.inject(
             opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
@@ -566,70 +688,30 @@ def extract_text_map(carrier):
 # Tracing decorators
 
 
-def trace(func):
+def trace(func=None, opname=None):
     """
     Decorator to trace a function.
-    Sets the operation name to that of the function's.
+    Sets the operation name to that of the function's or that given
+    as operation_name. See the module's doc string for usage
+    examples.
     """
-    if opentracing is None:
-        return func
 
-    @wraps(func)
-    def _trace_inner(self, *args, **kwargs):
-        if opentracing is None:
-            return func(self, *args, **kwargs)
-
-        scope = start_active_span(func.__name__)
-        scope.__enter__()
-
-        try:
-            result = func(self, *args, **kwargs)
-            if isinstance(result, defer.Deferred):
-
-                def call_back(result):
-                    scope.__exit__(None, None, None)
-                    return result
-
-                def err_back(result):
-                    scope.span.set_tag(tags.ERROR, True)
-                    scope.__exit__(None, None, None)
-                    return result
-
-                result.addCallbacks(call_back, err_back)
-
-            else:
-                scope.__exit__(None, None, None)
-
-            return result
-
-        except Exception as e:
-            scope.__exit__(type(e), None, e.__traceback__)
-            raise
-
-    return _trace_inner
-
-
-def trace_using_operation_name(operation_name):
-    """Decorator to trace a function. Explicitely sets the operation_name."""
-
-    def trace(func):
-        """
-        Decorator to trace a function.
-        Sets the operation name to that of the function's.
-        """
+    def decorator(func):
         if opentracing is None:
             return func
 
-        @wraps(func)
-        def _trace_inner(self, *args, **kwargs):
-            if opentracing is None:
-                return func(self, *args, **kwargs)
+        _opname = opname if opname else func.__name__
 
-            scope = start_active_span(operation_name)
+        @wraps(func)
+        def _trace_inner(*args, **kwargs):
+            if opentracing is None:
+                return func(*args, **kwargs)
+
+            scope = start_active_span(_opname)
             scope.__enter__()
 
             try:
-                result = func(self, *args, **kwargs)
+                result = func(*args, **kwargs)
                 if isinstance(result, defer.Deferred):
 
                     def call_back(result):
@@ -642,6 +724,7 @@ def trace_using_operation_name(operation_name):
                         return result
 
                     result.addCallbacks(call_back, err_back)
+
                 else:
                     scope.__exit__(None, None, None)
 
@@ -653,7 +736,10 @@ def trace_using_operation_name(operation_name):
 
         return _trace_inner
 
-    return trace
+    if func:
+        return decorator(func)
+    else:
+        return decorator
 
 
 def tag_args(func):
@@ -665,76 +751,54 @@ def tag_args(func):
         return func
 
     @wraps(func)
-    def _tag_args_inner(self, *args, **kwargs):
+    def _tag_args_inner(*args, **kwargs):
         argspec = inspect.getargspec(func)
         for i, arg in enumerate(argspec.args[1:]):
             set_tag("ARG_" + arg, args[i])
         set_tag("args", args[len(argspec.args) :])
         set_tag("kwargs", kwargs)
-        return func(self, *args, **kwargs)
+        return func(*args, **kwargs)
 
     return _tag_args_inner
 
 
-def trace_servlet(servlet_name, func):
+def trace_servlet(servlet_name, extract_context=False):
     """Decorator which traces a serlet. It starts a span with some servlet specific
-    tags such as the servlet_name and request information"""
-    if not opentracing:
-        return func
+    tags such as the servlet_name and request information
 
-    @wraps(func)
-    @defer.inlineCallbacks
-    def _trace_servlet_inner(request, *args, **kwargs):
-        with start_active_span(
-            "incoming-client-request",
-            tags={
+    Args:
+        servlet_name (str): The name to be used for the span's operation_name
+        extract_context (bool): Whether to attempt to extract the opentracing
+            context from the request the servlet is handling.
+
+    """
+
+    def _trace_servlet_inner_1(func):
+        if not opentracing:
+            return func
+
+        @wraps(func)
+        @defer.inlineCallbacks
+        def _trace_servlet_inner(request, *args, **kwargs):
+            request_tags = {
                 "request_id": request.get_request_id(),
                 tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
                 tags.HTTP_METHOD: request.get_method(),
                 tags.HTTP_URL: request.get_redacted_uri(),
                 tags.PEER_HOST_IPV6: request.getClientIP(),
-                "servlet_name": servlet_name,
-            },
-        ):
-            result = yield defer.maybeDeferred(func, request, *args, **kwargs)
-            return result
+            }
 
-    return _trace_servlet_inner
+            if extract_context:
+                scope = start_active_span_from_request(
+                    request, servlet_name, tags=request_tags
+                )
+            else:
+                scope = start_active_span(servlet_name, tags=request_tags)
 
+            with scope:
+                result = yield defer.maybeDeferred(func, request, *args, **kwargs)
+                return result
 
-# Helper class
+        return _trace_servlet_inner
 
-
-class _DummyTagNames(object):
-    """wrapper of opentracings tags. We need to have them if we
-    want to reference them without opentracing around. Clearly they
-    should never actually show up in a trace. `set_tags` overwrites
-    these with the correct ones."""
-
-    INVALID_TAG = "invalid-tag"
-    COMPONENT = INVALID_TAG
-    DATABASE_INSTANCE = INVALID_TAG
-    DATABASE_STATEMENT = INVALID_TAG
-    DATABASE_TYPE = INVALID_TAG
-    DATABASE_USER = INVALID_TAG
-    ERROR = INVALID_TAG
-    HTTP_METHOD = INVALID_TAG
-    HTTP_STATUS_CODE = INVALID_TAG
-    HTTP_URL = INVALID_TAG
-    MESSAGE_BUS_DESTINATION = INVALID_TAG
-    PEER_ADDRESS = INVALID_TAG
-    PEER_HOSTNAME = INVALID_TAG
-    PEER_HOST_IPV4 = INVALID_TAG
-    PEER_HOST_IPV6 = INVALID_TAG
-    PEER_PORT = INVALID_TAG
-    PEER_SERVICE = INVALID_TAG
-    SAMPLING_PRIORITY = INVALID_TAG
-    SERVICE = INVALID_TAG
-    SPAN_KIND = INVALID_TAG
-    SPAN_KIND_CONSUMER = INVALID_TAG
-    SPAN_KIND_PRODUCER = INVALID_TAG
-    SPAN_KIND_RPC_CLIENT = INVALID_TAG
-    SPAN_KIND_RPC_SERVER = INVALID_TAG
-
-
-tags = _DummyTagNames
+    return _trace_servlet_inner_1

@@ -21,7 +21,11 @@ from six.moves import urllib
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.urls import FEDERATION_V1_PREFIX, FEDERATION_V2_PREFIX
+from synapse.api.urls import (
+    FEDERATION_UNSTABLE_PREFIX,
+    FEDERATION_V1_PREFIX,
+    FEDERATION_V2_PREFIX,
+)
 from synapse.logging.utils import log_function
 
 logger = logging.getLogger(__name__)
@@ -323,21 +327,37 @@ class TransportLayerClient(object):
         include_all_networks=False,
         third_party_instance_id=None,
     ):
-        path = _create_v1_path("/publicRooms")
+        if search_filter:
+            # this uses MSC2197 (Search Filtering over Federation)
+            path = _create_v1_path("/publicRooms")
 
-        args = {"include_all_networks": "true" if include_all_networks else "false"}
-        if third_party_instance_id:
-            args["third_party_instance_id"] = (third_party_instance_id,)
-        if limit:
-            args["limit"] = [str(limit)]
-        if since_token:
-            args["since"] = [since_token]
+            data = {"include_all_networks": "true" if include_all_networks else "false"}
+            if third_party_instance_id:
+                data["third_party_instance_id"] = third_party_instance_id
+            if limit:
+                data["limit"] = str(limit)
+            if since_token:
+                data["since"] = since_token
 
-        # TODO(erikj): Actually send the search_filter across federation.
+            data["filter"] = search_filter
 
-        response = yield self.client.get_json(
-            destination=remote_server, path=path, args=args, ignore_backoff=True
-        )
+            response = yield self.client.post_json(
+                destination=remote_server, path=path, data=data, ignore_backoff=True
+            )
+        else:
+            path = _create_v1_path("/publicRooms")
+
+            args = {"include_all_networks": "true" if include_all_networks else "false"}
+            if third_party_instance_id:
+                args["third_party_instance_id"] = (third_party_instance_id,)
+            if limit:
+                args["limit"] = [str(limit)]
+            if since_token:
+                args["since"] = [since_token]
+
+            response = yield self.client.get_json(
+                destination=remote_server, path=path, args=args, ignore_backoff=True
+            )
 
         return response
 
@@ -935,6 +955,23 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
+    def get_room_complexity(self, destination, room_id):
+        """
+        Args:
+            destination (str): The remote server
+            room_id (str): The room ID to ask about.
+        """
+        path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/rooms/%s/complexity", room_id)
+
+        return self.client.get_json(destination=destination, path=path)
+
+
+def _create_path(federation_prefix, path, *args):
+    """
+    Ensures that all args are url encoded.
+    """
+    return federation_prefix + path % tuple(urllib.parse.quote(arg, "") for arg in args)
+
 
 def _create_v1_path(path, *args):
     """Creates a path against V1 federation API from the path template and
@@ -951,9 +988,7 @@ def _create_v1_path(path, *args):
     Returns:
         str
     """
-    return FEDERATION_V1_PREFIX + path % tuple(
-        urllib.parse.quote(arg, "") for arg in args
-    )
+    return _create_path(FEDERATION_V1_PREFIX, path, *args)
 
 
 def _create_v2_path(path, *args):
@@ -971,6 +1006,4 @@ def _create_v2_path(path, *args):
     Returns:
         str
     """
-    return FEDERATION_V2_PREFIX + path % tuple(
-        urllib.parse.quote(arg, "") for arg in args
-    )
+    return _create_path(FEDERATION_V2_PREFIX, path, *args)

@@ -83,7 +83,7 @@ class TypingHandler(object):
         self._room_typing = {}
 
     def _handle_timeouts(self):
-        logger.info("Checking for typing timeouts")
+        logger.debug("Checking for typing timeouts")
 
         now = self.clock.time_msec()
 
@@ -319,4 +319,4 @@ class TypingNotificationEventSource(object):
         return self.get_typing_handler()._latest_room_serial
 
     def get_pagination_rows(self, user, pagination_config, key):
-        return ([], pagination_config.from_key)
+        return [], pagination_config.from_key

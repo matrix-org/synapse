@@ -33,7 +33,7 @@ class LogoutRestServlet(RestServlet):
         self._device_handler = hs.get_device_handler()
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -49,7 +49,7 @@ class LogoutRestServlet(RestServlet):
                 requester.user.to_string(), requester.device_id
             )
 
-        return (200, {})
+        return 200, {}
 
 
 class LogoutAllRestServlet(RestServlet):
@@ -62,7 +62,7 @@ class LogoutAllRestServlet(RestServlet):
         self._device_handler = hs.get_device_handler()
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -75,7 +75,7 @@ class LogoutAllRestServlet(RestServlet):
         # .. and then delete any access tokens which weren't associated with
         # devices.
         yield self._auth_handler.delete_access_tokens_for_user(user_id)
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

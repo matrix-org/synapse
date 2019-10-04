@@ -33,6 +33,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.config._base import ConfigError
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.async_helpers import Linearizer
@@ -317,14 +318,14 @@ class MediaRepository(object):
 
             responder = yield self.media_storage.fetch_media(file_info)
             if responder:
-                return (responder, media_info)
+                return responder, media_info
 
         # Failed to find the file anywhere, lets download it.
 
         media_info = yield self._download_remote_file(server_name, media_id, file_id)
 
         responder = yield self.media_storage.fetch_media(file_info)
-        return (responder, media_info)
+        return responder, media_info
 
     @defer.inlineCallbacks
     def _download_remote_file(self, server_name, media_id, file_id):
@@ -525,7 +526,7 @@ class MediaRepository(object):
             try:
                 file_info = FileInfo(
                     server_name=server_name,
-                    file_id=media_id,
+                    file_id=file_id,
                     thumbnail=True,
                     thumbnail_width=t_width,
                     thumbnail_height=t_height,
@@ -753,8 +754,11 @@ class MediaRepositoryResource(Resource):
     """
 
     def __init__(self, hs):
-        Resource.__init__(self)
+        # If we're not configured to use it, raise if we somehow got here.
+        if not hs.config.can_load_media_repo:
+            raise ConfigError("Synapse is not configured to use a media repo.")
 
+        super().__init__()
         media_repo = hs.get_media_repository()
 
         self.putChild(b"upload", UploadResource(hs, media_repo))

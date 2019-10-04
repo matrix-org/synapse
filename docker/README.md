@@ -17,7 +17,7 @@ By default, the image expects a single volume, located at ``/data``, that will h
 * the appservices configuration.
 
 You are free to use separate volumes depending on storage endpoints at your
-disposal. For instance, ``/data/media`` coud be stored on a large but low
+disposal. For instance, ``/data/media`` could be stored on a large but low
 performance hdd storage while other files could be stored on high performance
 endpoints.
 
@@ -27,8 +27,8 @@ configuration file there. Multiple application services are supported.
 
 ## Generating a configuration file
 
-The first step is to genearte a valid config file. To do this, you can run the
-image with the `generate` commandline option.
+The first step is to generate a valid config file. To do this, you can run the
+image with the `generate` command line option.
 
 You will need to specify values for the `SYNAPSE_SERVER_NAME` and
 `SYNAPSE_REPORT_STATS` environment variable, and mount a docker volume to store
@@ -59,7 +59,7 @@ The following environment variables are supported in `generate` mode:
 * `SYNAPSE_CONFIG_PATH`: path to the file to be generated. Defaults to
   `<SYNAPSE_CONFIG_DIR>/homeserver.yaml`.
 * `SYNAPSE_DATA_DIR`: where the generated config will put persistent data
-  such as the datatase and media store. Defaults to `/data`.
+  such as the database and media store. Defaults to `/data`.
 * `UID`, `GID`: the user id and group id to use for creating the data
   directories. Defaults to `991`, `991`.
 
@@ -89,6 +89,8 @@ The following environment variables are supported in run mode:
   `/data`.
 * `SYNAPSE_CONFIG_PATH`: path to the config file. Defaults to
   `<SYNAPSE_CONFIG_DIR>/homeserver.yaml`.
+* `SYNAPSE_WORKER`: module to execute, used when running synapse with workers.
+   Defaults to `synapse.app.homeserver`, which is suitable for non-worker mode.
 * `UID`, `GID`: the user and group id to run Synapse as. Defaults to `991`, `991`.
 * `TZ`: the [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) the container will run with. Defaults to `UTC`.
 
@@ -115,7 +117,7 @@ not given).
 
 To migrate from a dynamic configuration file to a static one, run the docker
 container once with the environment variables set, and `migrate_config`
-commandline option. For example:
+command line option. For example:
 
 ```
 docker run -it --rm \

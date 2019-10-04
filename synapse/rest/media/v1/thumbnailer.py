@@ -78,9 +78,17 @@ class Thumbnailer(object):
         """
 
         if max_width * self.height < max_height * self.width:
-            return (max_width, (max_width * self.height) // self.width)
+            return max_width, (max_width * self.height) // self.width
         else:
-            return ((max_height * self.width) // self.height, max_height)
+            return (max_height * self.width) // self.height, max_height
+
+    def _resize(self, width, height):
+        # 1-bit or 8-bit color palette images need converting to RGB
+        # otherwise they will be scaled using nearest neighbour which
+        # looks awful
+        if self.image.mode in ["1", "P"]:
+            self.image = self.image.convert("RGB")
+        return self.image.resize((width, height), Image.ANTIALIAS)
 
     def scale(self, width, height, output_type):
         """Rescales the image to the given dimensions.
@@ -88,7 +96,7 @@ class Thumbnailer(object):
         Returns:
             BytesIO: the bytes of the encoded image ready to be written to disk
         """
-        scaled = self.image.resize((width, height), Image.ANTIALIAS)
+        scaled = self._resize(width, height)
         return self._encode_image(scaled, output_type)
 
     def crop(self, width, height, output_type):
@@ -107,13 +115,13 @@ class Thumbnailer(object):
         """
         if width * self.height > height * self.width:
             scaled_height = (width * self.height) // self.width
-            scaled_image = self.image.resize((width, scaled_height), Image.ANTIALIAS)
+            scaled_image = self._resize(width, scaled_height)
             crop_top = (scaled_height - height) // 2
             crop_bottom = height + crop_top
             cropped = scaled_image.crop((0, crop_top, width, crop_bottom))
         else:
             scaled_width = (height * self.width) // self.height
-            scaled_image = self.image.resize((scaled_width, height), Image.ANTIALIAS)
+            scaled_image = self._resize(scaled_width, height)
             crop_left = (scaled_width - width) // 2
             crop_right = width + crop_left
             cropped = scaled_image.crop((crop_left, 0, crop_right, height))

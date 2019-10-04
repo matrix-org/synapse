@@ -378,7 +378,7 @@ class SyncHandler(object):
                 event_copy = {k: v for (k, v) in iteritems(event) if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
-        return (now_token, ephemeral_by_room)
+        return now_token, ephemeral_by_room
 
     @defer.inlineCallbacks
     def _load_filtered_recents(
@@ -578,7 +578,6 @@ class SyncHandler(object):
 
         if not last_events:
             return None
-            return
 
         last_event = last_events[-1]
         state_ids = yield self.store.get_state_ids_for_event(
@@ -781,9 +780,16 @@ class SyncHandler(object):
                     lazy_load_members=lazy_load_members,
                 )
             elif batch.limited:
-                state_at_timeline_start = yield self.store.get_state_ids_for_event(
-                    batch.events[0].event_id, state_filter=state_filter
-                )
+                if batch:
+                    state_at_timeline_start = yield self.store.get_state_ids_for_event(
+                        batch.events[0].event_id, state_filter=state_filter
+                    )
+                else:
+                    # We can get here if the user has ignored the senders of all
+                    # the recent events.
+                    state_at_timeline_start = yield self.get_state_at(
+                        room_id, stream_position=now_token, state_filter=state_filter
+                    )
 
                 # for now, we disable LL for gappy syncs - see
                 # https://github.com/vector-im/riot-web/issues/7211#issuecomment-419976346
@@ -803,9 +809,17 @@ class SyncHandler(object):
                     room_id, stream_position=since_token, state_filter=state_filter
                 )
 
-                current_state_ids = yield self.store.get_state_ids_for_event(
-                    batch.events[-1].event_id, state_filter=state_filter
-                )
+                if batch:
+                    current_state_ids = yield self.store.get_state_ids_for_event(
+                        batch.events[-1].event_id, state_filter=state_filter
+                    )
+                else:
+                    # Its not clear how we get here, but empirically we do
+                    # (#5407). Logging has been added elsewhere to try and
+                    # figure out where this state comes from.
+                    current_state_ids = yield self.get_state_at(
+                        room_id, stream_position=now_token, state_filter=state_filter
+                    )
 
                 state_ids = _calculate_state(
                     timeline_contains=timeline_state,
@@ -1311,7 +1325,7 @@ class SyncHandler(object):
                     )
                     if not tags_by_room:
                         logger.debug("no-oping sync")
-                        return ([], [], [], [])
+                        return [], [], [], []
 
         ignored_account_data = yield self.store.get_global_account_data_by_type_for_user(
             "m.ignored_user_list", user_id=user_id
@@ -1621,7 +1635,7 @@ class SyncHandler(object):
                 )
             room_entries.append(entry)
 
-        return (room_entries, invited, newly_joined_rooms, newly_left_rooms)
+        return room_entries, invited, newly_joined_rooms, newly_left_rooms
 
     @defer.inlineCallbacks
     def _get_all_rooms(self, sync_result_builder, ignored_users):
@@ -1695,7 +1709,7 @@ class SyncHandler(object):
                     )
                 )
 
-        return (room_entries, invited, [])
+        return room_entries, invited, []
 
     @defer.inlineCallbacks
     def _generate_room_entry(
@@ -1748,6 +1762,10 @@ class SyncHandler(object):
             recents=events,
             newly_joined_room=newly_joined,
         )
+
+        # Note: `batch` can be both empty and limited here in the case where
+        # `_load_filtered_recents` can't find any events the user should see
+        # (e.g. due to having ignored the sender of the last 50 events).
 
         if newly_joined:
             # debug for https://github.com/matrix-org/synapse/issues/4422

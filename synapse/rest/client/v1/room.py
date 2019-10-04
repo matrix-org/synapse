@@ -39,6 +39,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
@@ -81,6 +82,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
         )
 
     def on_PUT(self, request, txn_id):
+        set_tag("txn_id", txn_id)
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     @defer.inlineCallbacks
@@ -91,14 +93,14 @@ class RoomCreateRestServlet(TransactionRestServlet):
             requester, self.get_room_config(request)
         )
 
-        return (200, info)
+        return 200, info
 
     def get_room_config(self, request):
         user_supplied_config = parse_json_object_from_request(request)
         return user_supplied_config
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
 
 # TODO: Needs unit testing for generic events
@@ -173,13 +175,16 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         if format == "event":
             event = format_event_for_client_v2(data.get_dict())
-            return (200, event)
+            return 200, event
         elif format == "content":
-            return (200, data.get_dict()["content"])
+            return 200, data.get_dict()["content"]
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, event_type, state_key, txn_id=None):
         requester = yield self.auth.get_user_by_req(request)
+
+        if txn_id:
+            set_tag("txn_id", txn_id)
 
         content = parse_json_object_from_request(request)
 
@@ -209,8 +214,9 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         ret = {}
         if event:
+            set_tag("event_id", event.event_id)
             ret = {"event_id": event.event_id}
-        return (200, ret)
+        return 200, ret
 
 
 # TODO: Needs unit testing for generic events + feedback
@@ -244,12 +250,15 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             requester, event_dict, txn_id=txn_id
         )
 
-        return (200, {"event_id": event.event_id})
+        set_tag("event_id", event.event_id)
+        return 200, {"event_id": event.event_id}
 
     def on_GET(self, request, room_id, event_type, txn_id):
-        return (200, "Not implemented")
+        return 200, "Not implemented"
 
     def on_PUT(self, request, room_id, event_type, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, event_type, txn_id
         )
@@ -307,9 +316,11 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             third_party_signed=content.get("third_party_signed", None),
         )
 
-        return (200, {"room_id": room_id})
+        return 200, {"room_id": room_id}
 
     def on_PUT(self, request, room_identifier, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_identifier, txn_id
         )
@@ -350,6 +361,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
 
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
+
         handler = self.hs.get_room_list_handler()
         if server:
             data = yield handler.get_remote_public_room_list(
@@ -360,7 +375,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                 limit=limit, since_token=since_token
             )
 
-        return (200, data)
+        return 200, data
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -387,6 +402,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         else:
             network_tuple = ThirdPartyInstanceID.from_string(third_party_instance_id)
 
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
+
         handler = self.hs.get_room_list_handler()
         if server:
             data = yield handler.get_remote_public_room_list(
@@ -405,7 +424,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                 network_tuple=network_tuple,
             )
 
-        return (200, data)
+        return 200, data
 
 
 # TODO: Needs unit testing
@@ -456,7 +475,7 @@ class RoomMemberListRestServlet(RestServlet):
                 continue
             chunk.append(event)
 
-        return (200, {"chunk": chunk})
+        return 200, {"chunk": chunk}
 
 
 # deprecated in favour of /members?membership=join?
@@ -477,7 +496,7 @@ class JoinedRoomMemberListRestServlet(RestServlet):
             requester, room_id
         )
 
-        return (200, {"joined": users_with_profile})
+        return 200, {"joined": users_with_profile}
 
 
 # TODO: Needs better unit testing
@@ -510,7 +529,7 @@ class RoomMessageListRestServlet(RestServlet):
             event_filter=event_filter,
         )
 
-        return (200, msgs)
+        return 200, msgs
 
 
 # TODO: Needs unit testing
@@ -531,7 +550,7 @@ class RoomStateRestServlet(RestServlet):
             user_id=requester.user.to_string(),
             is_guest=requester.is_guest,
         )
-        return (200, events)
+        return 200, events
 
 
 # TODO: Needs unit testing
@@ -550,7 +569,7 @@ class RoomInitialSyncRestServlet(RestServlet):
         content = yield self.initial_sync_handler.room_initial_sync(
             room_id=room_id, requester=requester, pagin_config=pagination_config
         )
-        return (200, content)
+        return 200, content
 
 
 class RoomEventServlet(RestServlet):
@@ -568,14 +587,22 @@ class RoomEventServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        event = yield self.event_handler.get_event(requester.user, room_id, event_id)
+        try:
+            event = yield self.event_handler.get_event(
+                requester.user, room_id, event_id
+            )
+        except AuthError:
+            # This endpoint is supposed to return a 404 when the requester does
+            # not have permission to access the event
+            # https://matrix.org/docs/spec/client_server/r0.5.0#get-matrix-client-r0-rooms-roomid-event-eventid
+            raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
         if event:
             event = yield self._event_serializer.serialize_event(event, time_now)
-            return (200, event)
-        else:
-            return (404, "Event not found.")
+            return 200, event
+
+        return SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
 
 class RoomEventContextServlet(RestServlet):
@@ -625,7 +652,7 @@ class RoomEventContextServlet(RestServlet):
             results["state"], time_now
         )
 
-        return (200, results)
+        return 200, results
 
 
 class RoomForgetRestServlet(TransactionRestServlet):
@@ -644,9 +671,11 @@ class RoomForgetRestServlet(TransactionRestServlet):
 
         yield self.room_member_handler.forget(user=requester.user, room_id=room_id)
 
-        return (200, {})
+        return 200, {}
 
     def on_PUT(self, request, room_id, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, txn_id
         )
@@ -693,9 +722,9 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 content["id_server"],
                 requester,
                 txn_id,
+                content.get("id_access_token"),
             )
-            return (200, {})
-            return
+            return 200, {}
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
@@ -721,7 +750,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         if membership_action == "join":
             return_value["room_id"] = room_id
 
-        return (200, return_value)
+        return 200, return_value
 
     def _has_3pid_invite_keys(self, content):
         for key in {"id_server", "medium", "address"}:
@@ -730,6 +759,8 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         return True
 
     def on_PUT(self, request, room_id, membership_action, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, membership_action, txn_id
         )
@@ -763,9 +794,12 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
             txn_id=txn_id,
         )
 
-        return (200, {"event_id": event.event_id})
+        set_tag("event_id", event.event_id)
+        return 200, {"event_id": event.event_id}
 
     def on_PUT(self, request, room_id, event_id, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, event_id, txn_id
         )
@@ -808,7 +842,7 @@ class RoomTypingRestServlet(RestServlet):
                 target_user=target_user, auth_user=requester.user, room_id=room_id
             )
 
-        return (200, {})
+        return 200, {}
 
 
 class SearchRestServlet(RestServlet):
@@ -830,7 +864,7 @@ class SearchRestServlet(RestServlet):
             requester.user, content, batch
         )
 
-        return (200, results)
+        return 200, results
 
 
 class JoinedRoomsRestServlet(RestServlet):
@@ -846,7 +880,7 @@ class JoinedRoomsRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
         room_ids = yield self.store.get_rooms_for_user(requester.user.to_string())
-        return (200, {"joined_rooms": list(room_ids)})
+        return 200, {"joined_rooms": list(room_ids)}
 
 
 def register_txn_path(servlet, regex_string, http_server, with_get=False):
