@@ -1,9 +1,5 @@
 # Synapse Docker
 
-FIXME: this is out-of-date as of
-https://github.com/matrix-org/synapse/issues/5518. Contributions to bring it up
-to date would be welcome.
-
 ### Configuration
 
 A sample ``docker-compose.yml`` is provided, including example labels for
