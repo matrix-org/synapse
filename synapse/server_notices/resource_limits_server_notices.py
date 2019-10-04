@@ -91,6 +91,18 @@ class ResourceLimitsServerNotices(object):
         currently_blocked, ref_events = yield self._is_room_currently_blocked(room_id)
 
         try:
+            if (
+                self._config.mau_alerting_threshold > 0
+                and self._config.mau_alerting_threshold > self._config.max_mau_value
+            ):
+                # Alerting disabled, reset room if necessary and return
+                if currently_blocked:
+                    content = {"pinned": ref_events}
+                    yield self._server_notices_manager.send_notice(
+                        user_id, content, EventTypes.Pinned, ""
+                    )
+                return
+
             # Normally should always pass in user_id if you have it, but in
             # this case are checking what would happen to other users if they
             # were to arrive.
