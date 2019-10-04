@@ -331,7 +331,7 @@ class SearchStore(BackgroundUpdateStore):
             )
 
             # About the word extraction: PostgreSQL appears to be optimized for words,
-            # so it chokes on code and werd formatting such as URIs.
+            # so it chokes on code and weird formatting such as URIs.
             # This improves search indexing by only picking up the words.
             # For example: "https://github.com/matrix-org/synapse/pull/6132"
             # Becomes "https github com matrix org synapse pull 6132"
