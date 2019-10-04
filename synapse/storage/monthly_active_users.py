@@ -97,6 +97,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
             txn.execute(sql, query_args)
 
+            max_mau_value = self.hs.config.max_mau_value
             if self.hs.config.limit_usage_by_mau:
                 # If MAU user count still exceeds the MAU threshold, then delete on
                 # a least recently active basis.
@@ -106,29 +107,44 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 # While Postgres does not require 'LIMIT', but also does not support
                 # negative LIMIT values. So there is no way to write it that both can
                 # support
-                safe_guard = self.hs.config.max_mau_value - len(self.reserved_users)
-                # Must be greater than zero for postgres
-                safe_guard = safe_guard if safe_guard > 0 else 0
-                query_args = [safe_guard]
-
-                base_sql = """
-                    DELETE FROM monthly_active_users
-                    WHERE user_id NOT IN (
-                        SELECT user_id FROM monthly_active_users
-                        ORDER BY timestamp DESC
-                        LIMIT ?
+                if len(self.reserved_users) == 0:
+                    sql = """
+                        DELETE FROM monthly_active_users
+                        WHERE user_id NOT IN (
+                            SELECT user_id FROM monthly_active_users
+                            ORDER BY timestamp DESC
+                            LIMIT ?
                         )
-                    """
+                        """
+                    txn.execute(sql, (max_mau_value,))
                 # Need if/else since 'AND user_id NOT IN ({})' fails on Postgres
                 # when len(reserved_users) == 0. Works fine on sqlite.
-                if len(self.reserved_users) > 0:
-                    query_args.extend(self.reserved_users)
-                    sql = base_sql + """ AND user_id NOT IN ({})""".format(
+                else:
+                    safe_guard = max_mau_value - len(self.reserved_users)
+                    # Must be greater than zero for postgres
+                    safe_guard = safe_guard if safe_guard > 0 else 0
+                    # It is important to filter reserved users twice to guard
+                    # against the case where the reserved user is present in the
+                    # SELECT, meaning that a legitmate mau is deleted.
+                    sql = """
+                        DELETE FROM monthly_active_users
+                        WHERE user_id NOT IN (
+                            SELECT user_id FROM monthly_active_users
+                            WHERE user_id NOT IN ({})""".format(
+                        ",".join(questionmarks)
+                    ) + """
+                            ORDER BY timestamp DESC
+                            LIMIT ?
+                        )
+                        AND user_id NOT IN ({})""".format(
                         ",".join(questionmarks)
                     )
-                else:
-                    sql = base_sql
-                txn.execute(sql, query_args)
+                    query_args = []
+                    query_args.extend(self.reserved_users)
+                    query_args.append(safe_guard)
+                    query_args.extend(self.reserved_users)
+
+                    txn.execute(sql, query_args)
 
         yield self.runInteraction("reap_monthly_active_users", _reap_users)
         # It seems poor to invalidate the whole cache, Postgres supports
@@ -167,12 +183,18 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Defered[int]: Number of real reserved users
         """
         count = 0
+        users = ()
         for tp in self.hs.config.mau_limits_reserved_threepids:
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 tp["medium"], tp["address"]
             )
             if user_id:
                 count = count + 1
+                users = users + (user_id,)
+
+        # Update reserved_users to ensure it stays in sync, this is important
+        # for reaping.
+        self.reserved_users = users
         return count
 
     @defer.inlineCallbacks
