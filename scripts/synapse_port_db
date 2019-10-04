@@ -32,7 +32,6 @@ from twisted.internet import defer, reactor
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.context import PreserveLoggingContext
-from synapse.server import HomeServer
 from synapse.storage._base import LoggingTransaction
 from synapse.storage.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.deviceinbox import DeviceInboxBackgroundUpdateStore
@@ -47,6 +46,7 @@ from synapse.storage.search import SearchBackgroundUpdateStore
 from synapse.storage.state import StateBackgroundUpdateStore
 from synapse.storage.stats import StatsStore
 from synapse.storage.user_directory import UserDirectoryBackgroundUpdateStore
+from synapse.util import Clock
 
 logger = logging.getLogger("synapse_port_db")
 
@@ -182,23 +182,23 @@ class Store(
             raise
 
 
-class MockHomeserver(HomeServer):
-    DATASTORE_CLASS = Store
-
+class MockHomeserver:
     def __init__(self, config, database_engine, db_conn, db_pool):
-        super(MockHomeserver, self).__init__(
-            config.server_name,
-            reactor=reactor,
-            config=config,
-            database_engine=database_engine,
-        )
-
         self.database_engine = database_engine
         self.db_conn = db_conn
         self.db_pool = db_pool
+        self.clock = Clock(reactor)
+        self.config = config
+        self.hostname = config.server_name
 
     def get_db_conn(self):
         return self.db_conn
+
+    def get_db_pool(self):
+        return self.db_pool
+
+    def get_clock(self):
+        return self.clock
 
 
 class Porter(object):
@@ -490,8 +490,7 @@ class Porter(object):
             sqlite_db_pool,
         )
 
-        hs.setup()
-        return hs.get_datastore()
+        return Store(sqlite_conn, hs)
 
     @defer.inlineCallbacks
     def get_postgres_store(self):
@@ -510,8 +509,7 @@ class Porter(object):
             postgres_db_pool,
         )
 
-        hs.setup()
-        postgres_store = hs.get_datastore()
+        postgres_store = Store(postgres_conn, hs)
 
         yield postgres_store.runInteraction(
             "postgres_engine.check_database",
