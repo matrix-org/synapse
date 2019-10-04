@@ -148,7 +148,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.pump()
         count = self.store.get_monthly_active_count()
         self.assertEquals(
-            self.get_success(count), initial_users - self.hs.config.max_mau_value
+            self.get_success(count), self.hs.config.max_mau_value
         )
 
         self.reactor.advance(FORTY_DAYS)
@@ -196,15 +196,6 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.assertEquals(
             self.get_success(count), self.hs.config.max_mau_value
         )
-
-    def _populate_reserved_users(self, user, email):
-        """Helper function that registers userpopulates reserved users"""
-        # Test reserved registed users
-        self.store.register_user(user_id=user, password_hash=None)
-        self.pump()
-
-        now = int(self.hs.get_clock().time_msec())
-        self.store.user_add_threepid(user, "email", email, now, now)
 
     def test_populate_monthly_users_is_guest(self):
         # Test that guest users are not added to mau list
