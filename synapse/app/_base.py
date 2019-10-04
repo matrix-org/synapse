@@ -128,7 +128,7 @@ def start_reactor(
             if print_pidfile:
                 print(pid_file)
 
-            daemon = _daemonize.Daemonize2(
+            daemon = _daemonize.Daemonize(
                 app=appname,
                 pid=pid_file,
                 action=run,

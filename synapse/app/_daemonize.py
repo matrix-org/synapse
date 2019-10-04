@@ -20,7 +20,7 @@ import traceback
 __version__ = "2.5.0"
 
 
-class Daemonize2(object):
+class Daemonize(object):
     """
     Daemonize object.
 
@@ -107,6 +107,7 @@ class Daemonize2(object):
             sys.exit(1)
 
         with open(self.outfile, 'w+') as f:
+            f.write("***STARTED STDIO REDIRECT FILE")
             os.dup2(f.fileno(), 2)
             os.dup2(f.fileno(), 1)
 
@@ -134,7 +135,6 @@ class Daemonize2(object):
 
         self.logger.warning("Starting daemon.")
 
-        print("################## PRINTED TO STDERR FROM _daemonize!!!!!!!!!", file=sys.stderr)
 
         try:
             self.action()
