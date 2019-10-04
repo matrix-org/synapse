@@ -2603,7 +2603,7 @@ class FederationHandler(BaseHandler):
             # invite has been revoked. In this case, we don't have to raise an error here
             # because the auth check will fail on the invite (because it's not able to
             # fetch public keys from the m.room.third_party_invite event's content, which
-            # is empty.
+            # is empty).
             display_name = original_invite.content.get("display_name")
             event_dict["content"]["third_party_invite"]["display_name"] = display_name
         else:
