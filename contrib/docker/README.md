@@ -14,9 +14,10 @@ Specify a ``SYNAPSE_CONFIG_PATH``, preferably to a persistent path,
 to use manual configuration. To generate a fresh ``homeserver.yaml``, simply run:
 
 ```
-docker-compose run --rm -e SYNAPSE_SERVER_NAME=my.matrix.host e SYNAPSE_REPORT_STATS=yes synapse generate
+docker-compose run --rm -e SYNAPSE_SERVER_NAME=my.matrix.host -e SYNAPSE_REPORT_STATS=yes synapse generate
 ```
 
+Above command contains variable SYNAPSE_REPORT_STATS which is opt-in only. You are free to say 'no' here. 
 This will also generate necessary signing keys.
 Then, customize your configuration and run the server:
 
