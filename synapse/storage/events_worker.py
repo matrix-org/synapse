@@ -29,14 +29,10 @@ from synapse.api.room_versions import EventFormatVersions
 from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
-from synapse.logging.context import (
-    LoggingContext,
-    PreserveLoggingContext,
-    make_deferred_yieldable,
-    run_in_background,
-)
+from synapse.logging.context import LoggingContext, PreserveLoggingContext
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
+from synapse.util import batch_iter
 from synapse.util.metrics import Measure
 
 from ._base import SQLBaseStore
@@ -138,8 +134,11 @@ class EventsWorkerStore(SQLBaseStore):
                 If there is a mismatch, behave as per allow_none.
 
         Returns:
-            Deferred : A FrozenEvent.
+            Deferred[EventBase|None]
         """
+        if not isinstance(event_id, str):
+            raise TypeError("Invalid event event_id %r" % (event_id,))
+
         events = yield self.get_events_as_list(
             [event_id],
             check_redacted=check_redacted,
@@ -156,7 +155,7 @@ class EventsWorkerStore(SQLBaseStore):
         if event is None and not allow_none:
             raise NotFoundError("Could not find event %s" % (event_id,))
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def get_events(
@@ -186,7 +185,7 @@ class EventsWorkerStore(SQLBaseStore):
             allow_rejected=allow_rejected,
         )
 
-        defer.returnValue({e.event_id: e for e in events})
+        return {e.event_id: e for e in events}
 
     @defer.inlineCallbacks
     def get_events_as_list(
@@ -216,11 +215,132 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         if not event_ids:
-            defer.returnValue([])
+            return []
 
-        event_id_list = event_ids
-        event_ids = set(event_ids)
+        # there may be duplicates so we cast the list to a set
+        event_entry_map = yield self._get_events_from_cache_or_db(
+            set(event_ids), allow_rejected=allow_rejected
+        )
 
+        events = []
+        for event_id in event_ids:
+            entry = event_entry_map.get(event_id, None)
+            if not entry:
+                continue
+
+            if not allow_rejected:
+                assert not entry.event.rejected_reason, (
+                    "rejected event returned from _get_events_from_cache_or_db despite "
+                    "allow_rejected=False"
+                )
+
+            # We may not have had the original event when we received a redaction, so
+            # we have to recheck auth now.
+
+            if not allow_rejected and entry.event.type == EventTypes.Redaction:
+                if not hasattr(entry.event, "redacts"):
+                    # A redacted redaction doesn't have a `redacts` key, in
+                    # which case lets just withhold the event.
+                    #
+                    # Note: Most of the time if the redactions has been
+                    # redacted we still have the un-redacted event in the DB
+                    # and so we'll still see the `redacts` key. However, this
+                    # isn't always true e.g. if we have censored the event.
+                    logger.debug(
+                        "Withholding redaction event %s as we don't have redacts key",
+                        event_id,
+                    )
+                    continue
+
+                redacted_event_id = entry.event.redacts
+                event_map = yield self._get_events_from_cache_or_db([redacted_event_id])
+                original_event_entry = event_map.get(redacted_event_id)
+                if not original_event_entry:
+                    # we don't have the redacted event (or it was rejected).
+                    #
+                    # We assume that the redaction isn't authorized for now; if the
+                    # redacted event later turns up, the redaction will be re-checked,
+                    # and if it is found valid, the original will get redacted before it
+                    # is served to the client.
+                    logger.debug(
+                        "Withholding redaction event %s since we don't (yet) have the "
+                        "original %s",
+                        event_id,
+                        redacted_event_id,
+                    )
+                    continue
+
+                original_event = original_event_entry.event
+                if original_event.type == EventTypes.Create:
+                    # we never serve redactions of Creates to clients.
+                    logger.info(
+                        "Withholding redaction %s of create event %s",
+                        event_id,
+                        redacted_event_id,
+                    )
+                    continue
+
+                if original_event.room_id != entry.event.room_id:
+                    logger.info(
+                        "Withholding redaction %s of event %s from a different room",
+                        event_id,
+                        redacted_event_id,
+                    )
+                    continue
+
+                if entry.event.internal_metadata.need_to_check_redaction():
+                    original_domain = get_domain_from_id(original_event.sender)
+                    redaction_domain = get_domain_from_id(entry.event.sender)
+                    if original_domain != redaction_domain:
+                        # the senders don't match, so this is forbidden
+                        logger.info(
+                            "Withholding redaction %s whose sender domain %s doesn't "
+                            "match that of redacted event %s %s",
+                            event_id,
+                            redaction_domain,
+                            redacted_event_id,
+                            original_domain,
+                        )
+                        continue
+
+                    # Update the cache to save doing the checks again.
+                    entry.event.internal_metadata.recheck_redaction = False
+
+            if check_redacted and entry.redacted_event:
+                event = entry.redacted_event
+            else:
+                event = entry.event
+
+            events.append(event)
+
+            if get_prev_content:
+                if "replaces_state" in event.unsigned:
+                    prev = yield self.get_event(
+                        event.unsigned["replaces_state"],
+                        get_prev_content=False,
+                        allow_none=True,
+                    )
+                    if prev:
+                        event.unsigned = dict(event.unsigned)
+                        event.unsigned["prev_content"] = prev.content
+                        event.unsigned["prev_sender"] = prev.sender
+
+        return events
+
+    @defer.inlineCallbacks
+    def _get_events_from_cache_or_db(self, event_ids, allow_rejected=False):
+        """Fetch a bunch of events from the cache or the database.
+
+        If events are pulled from the database, they will be cached for future lookups.
+
+        Args:
+            event_ids (Iterable[str]): The event_ids of the events to fetch
+            allow_rejected (bool): Whether to include rejected events
+
+        Returns:
+            Deferred[Dict[str, _EventCacheEntry]]:
+                map from event id to result
+        """
         event_entry_map = self._get_events_from_cache(
             event_ids, allow_rejected=allow_rejected
         )
@@ -231,93 +351,18 @@ class EventsWorkerStore(SQLBaseStore):
             log_ctx = LoggingContext.current_context()
             log_ctx.record_event_fetch(len(missing_events_ids))
 
-            # Note that _enqueue_events is also responsible for turning db rows
+            # Note that _get_events_from_db is also responsible for turning db rows
             # into FrozenEvents (via _get_event_from_row), which involves seeing if
             # the events have been redacted, and if so pulling the redaction event out
             # of the database to check it.
             #
-            # _enqueue_events is a bit of a rubbish name but naming is hard.
-            missing_events = yield self._enqueue_events(
+            missing_events = yield self._get_events_from_db(
                 missing_events_ids, allow_rejected=allow_rejected
             )
 
             event_entry_map.update(missing_events)
 
-        events = []
-        for event_id in event_id_list:
-            entry = event_entry_map.get(event_id, None)
-            if not entry:
-                continue
-
-            # Starting in room version v3, some redactions need to be rechecked if we
-            # didn't have the redacted event at the time, so we recheck on read
-            # instead.
-            if not allow_rejected and entry.event.type == EventTypes.Redaction:
-                if entry.event.internal_metadata.need_to_check_redaction():
-                    # XXX: we need to avoid calling get_event here.
-                    #
-                    # The problem is that we end up at this point when an event
-                    # which has been redacted is pulled out of the database by
-                    # _enqueue_events, because _enqueue_events needs to check
-                    # the redaction before it can cache the redacted event. So
-                    # obviously, calling get_event to get the redacted event out
-                    # of the database gives us an infinite loop.
-                    #
-                    # For now (quick hack to fix during 0.99 release cycle), we
-                    # just go and fetch the relevant row from the db, but it
-                    # would be nice to think about how we can cache this rather
-                    # than hit the db every time we access a redaction event.
-                    #
-                    # One thought on how to do this:
-                    #  1. split get_events_as_list up so that it is divided into
-                    #     (a) get the rawish event from the db/cache, (b) do the
-                    #     redaction/rejection filtering
-                    #  2. have _get_event_from_row just call the first half of
-                    #     that
-
-                    orig_sender = yield self._simple_select_one_onecol(
-                        table="events",
-                        keyvalues={"event_id": entry.event.redacts},
-                        retcol="sender",
-                        allow_none=True,
-                    )
-
-                    expected_domain = get_domain_from_id(entry.event.sender)
-                    if (
-                        orig_sender
-                        and get_domain_from_id(orig_sender) == expected_domain
-                    ):
-                        # This redaction event is allowed. Mark as not needing a
-                        # recheck.
-                        entry.event.internal_metadata.recheck_redaction = False
-                    else:
-                        # We don't have the event that is being redacted, so we
-                        # assume that the event isn't authorized for now. (If we
-                        # later receive the event, then we will always redact
-                        # it anyway, since we have this redaction)
-                        continue
-
-            if allow_rejected or not entry.event.rejected_reason:
-                if check_redacted and entry.redacted_event:
-                    event = entry.redacted_event
-                else:
-                    event = entry.event
-
-                events.append(event)
-
-                if get_prev_content:
-                    if "replaces_state" in event.unsigned:
-                        prev = yield self.get_event(
-                            event.unsigned["replaces_state"],
-                            get_prev_content=False,
-                            allow_none=True,
-                        )
-                        if prev:
-                            event.unsigned = dict(event.unsigned)
-                            event.unsigned["prev_content"] = prev.content
-                            event.unsigned["prev_sender"] = prev.sender
-
-        defer.returnValue(events)
+        return event_entry_map
 
     def _invalidate_get_event_cache(self, event_id):
         self._get_event_cache.invalidate((event_id,))
@@ -326,8 +371,8 @@ class EventsWorkerStore(SQLBaseStore):
         """Fetch events from the caches
 
         Args:
-            events (list(str)): list of event_ids to fetch
-            allow_rejected (bool): Whether to teturn events that were rejected
+            events (Iterable[str]): list of event_ids to fetch
+            allow_rejected (bool): Whether to return events that were rejected
             update_metrics (bool): Whether to update the cache hit ratio metrics
 
         Returns:
@@ -385,30 +430,27 @@ class EventsWorkerStore(SQLBaseStore):
                 ids to be fetched, and a deferred to be completed once the
                 events have been fetched.
 
+                The deferreds are callbacked with a dictionary mapping from event id
+                to event row. Note that it may well contain additional events that
+                were not part of this request.
         """
         with Measure(self._clock, "_fetch_event_list"):
             try:
-                event_id_lists = list(zip(*event_list))[0]
-                event_ids = [item for sublist in event_id_lists for item in sublist]
-
-                rows = self._new_transaction(
-                    conn, "do_fetch", [], [], self._fetch_event_rows, event_ids
+                events_to_fetch = set(
+                    event_id for events, _ in event_list for event_id in events
                 )
 
-                row_dict = {r["event_id"]: r for r in rows}
+                row_dict = self._new_transaction(
+                    conn, "do_fetch", [], [], self._fetch_event_rows, events_to_fetch
+                )
 
                 # We only want to resolve deferreds from the main thread
-                def fire(lst, res):
-                    for ids, d in lst:
-                        if not d.called:
-                            try:
-                                with PreserveLoggingContext():
-                                    d.callback([res[i] for i in ids if i in res])
-                            except Exception:
-                                logger.exception("Failed to callback")
+                def fire():
+                    for _, d in event_list:
+                        d.callback(row_dict)
 
                 with PreserveLoggingContext():
-                    self.hs.get_reactor().callFromThread(fire, event_list, row_dict)
+                    self.hs.get_reactor().callFromThread(fire)
             except Exception as e:
                 logger.exception("do_fetch")
 
@@ -423,13 +465,98 @@ class EventsWorkerStore(SQLBaseStore):
                     self.hs.get_reactor().callFromThread(fire, event_list, e)
 
     @defer.inlineCallbacks
-    def _enqueue_events(self, events, allow_rejected=False):
+    def _get_events_from_db(self, event_ids, allow_rejected=False):
+        """Fetch a bunch of events from the database.
+
+        Returned events will be added to the cache for future lookups.
+
+        Args:
+            event_ids (Iterable[str]): The event_ids of the events to fetch
+            allow_rejected (bool): Whether to include rejected events
+
+        Returns:
+            Deferred[Dict[str, _EventCacheEntry]]:
+                map from event id to result. May return extra events which
+                weren't asked for.
+        """
+        fetched_events = {}
+        events_to_fetch = event_ids
+
+        while events_to_fetch:
+            row_map = yield self._enqueue_events(events_to_fetch)
+
+            # we need to recursively fetch any redactions of those events
+            redaction_ids = set()
+            for event_id in events_to_fetch:
+                row = row_map.get(event_id)
+                fetched_events[event_id] = row
+                if row:
+                    redaction_ids.update(row["redactions"])
+
+            events_to_fetch = redaction_ids.difference(fetched_events.keys())
+            if events_to_fetch:
+                logger.debug("Also fetching redaction events %s", events_to_fetch)
+
+        # build a map from event_id to EventBase
+        event_map = {}
+        for event_id, row in fetched_events.items():
+            if not row:
+                continue
+            assert row["event_id"] == event_id
+
+            rejected_reason = row["rejected_reason"]
+
+            if not allow_rejected and rejected_reason:
+                continue
+
+            d = json.loads(row["json"])
+            internal_metadata = json.loads(row["internal_metadata"])
+
+            format_version = row["format_version"]
+            if format_version is None:
+                # This means that we stored the event before we had the concept
+                # of a event format version, so it must be a V1 event.
+                format_version = EventFormatVersions.V1
+
+            original_ev = event_type_from_format_version(format_version)(
+                event_dict=d,
+                internal_metadata_dict=internal_metadata,
+                rejected_reason=rejected_reason,
+            )
+
+            event_map[event_id] = original_ev
+
+        # finally, we can decide whether each one nededs redacting, and build
+        # the cache entries.
+        result_map = {}
+        for event_id, original_ev in event_map.items():
+            redactions = fetched_events[event_id]["redactions"]
+            redacted_event = self._maybe_redact_event_row(
+                original_ev, redactions, event_map
+            )
+
+            cache_entry = _EventCacheEntry(
+                event=original_ev, redacted_event=redacted_event
+            )
+
+            self._get_event_cache.prefill((event_id,), cache_entry)
+            result_map[event_id] = cache_entry
+
+        return result_map
+
+    @defer.inlineCallbacks
+    def _enqueue_events(self, events):
         """Fetches events from the database using the _event_fetch_list. This
         allows batch and bulk fetching of events - it allows us to fetch events
         without having to create a new transaction for each request for events.
+
+        Args:
+            events (Iterable[str]): events to be fetched.
+
+        Returns:
+            Deferred[Dict[str, Dict]]: map from event id to row data from the database.
+                May contain events that weren't requested.
         """
-        if not events:
-            defer.returnValue({})
 
         events_d = defer.Deferred()
         with self._event_fetch_lock:
@@ -448,130 +575,154 @@ class EventsWorkerStore(SQLBaseStore):
                 "fetch_events", self.runWithConnection, self._do_fetch
             )
 
-        logger.debug("Loading %d events", len(events))
+        logger.debug("Loading %d events: %s", len(events), events)
         with PreserveLoggingContext():
-            rows = yield events_d
-        logger.debug("Loaded %d events (%d rows)", len(events), len(rows))
+            row_map = yield events_d
+        logger.debug("Loaded %d events (%d rows)", len(events), len(row_map))
 
-        if not allow_rejected:
-            rows[:] = [r for r in rows if not r["rejects"]]
+        return row_map
 
-        res = yield make_deferred_yieldable(
-            defer.gatherResults(
-                [
-                    run_in_background(
-                        self._get_event_from_row,
-                        row["internal_metadata"],
-                        row["json"],
-                        row["redacts"],
-                        rejected_reason=row["rejects"],
-                        format_version=row["format_version"],
-                    )
-                    for row in rows
-                ],
-                consumeErrors=True,
-            )
-        )
+    def _fetch_event_rows(self, txn, event_ids):
+        """Fetch event rows from the database
 
-        defer.returnValue({e.event.event_id: e for e in res if e})
+        Events which are not found are omitted from the result.
 
-    def _fetch_event_rows(self, txn, events):
-        rows = []
-        N = 200
-        for i in range(1 + len(events) // N):
-            evs = events[i * N : (i + 1) * N]
-            if not evs:
-                break
+        The returned per-event dicts contain the following keys:
 
+         * event_id (str)
+
+         * json (str): json-encoded event structure
+
+         * internal_metadata (str): json-encoded internal metadata dict
+
+         * format_version (int|None): The format of the event. Hopefully one
+           of EventFormatVersions. 'None' means the event predates
+           EventFormatVersions (so the event is format V1).
+
+         * rejected_reason (str|None): if the event was rejected, the reason
+           why.
+
+         * redactions (List[str]): a list of event-ids which (claim to) redact
+           this event.
+
+        Args:
+            txn (twisted.enterprise.adbapi.Connection):
+            event_ids (Iterable[str]): event IDs to fetch
+
+        Returns:
+            Dict[str, Dict]: a map from event id to event info.
+        """
+        event_dict = {}
+        for evs in batch_iter(event_ids, 200):
             sql = (
                 "SELECT "
-                " e.event_id as event_id, "
+                " e.event_id, "
                 " e.internal_metadata,"
                 " e.json,"
                 " e.format_version, "
-                " r.redacts as redacts,"
-                " rej.event_id as rejects "
+                " rej.reason "
                 " FROM event_json as e"
                 " LEFT JOIN rejections as rej USING (event_id)"
-                " LEFT JOIN redactions as r ON e.event_id = r.redacts"
                 " WHERE e.event_id IN (%s)"
             ) % (",".join(["?"] * len(evs)),)
 
             txn.execute(sql, evs)
-            rows.extend(self.cursor_to_dict(txn))
 
-        return rows
+            for row in txn:
+                event_id = row[0]
+                event_dict[event_id] = {
+                    "event_id": event_id,
+                    "internal_metadata": row[1],
+                    "json": row[2],
+                    "format_version": row[3],
+                    "rejected_reason": row[4],
+                    "redactions": [],
+                }
 
-    @defer.inlineCallbacks
-    def _get_event_from_row(
-        self, internal_metadata, js, redacted, format_version, rejected_reason=None
-    ):
-        with Measure(self._clock, "_get_event_from_row"):
-            d = json.loads(js)
-            internal_metadata = json.loads(internal_metadata)
+            # check for redactions
+            redactions_sql = (
+                "SELECT event_id, redacts FROM redactions WHERE redacts IN (%s)"
+            ) % (",".join(["?"] * len(evs)),)
 
-            if rejected_reason:
-                rejected_reason = yield self._simple_select_one_onecol(
-                    table="rejections",
-                    keyvalues={"event_id": rejected_reason},
-                    retcol="reason",
-                    desc="_get_event_from_row_rejected_reason",
+            txn.execute(redactions_sql, evs)
+
+            for (redacter, redacted) in txn:
+                d = event_dict.get(redacted)
+                if d:
+                    d["redactions"].append(redacter)
+
+        return event_dict
+
+    def _maybe_redact_event_row(self, original_ev, redactions, event_map):
+        """Given an event object and a list of possible redacting event ids,
+        determine whether to honour any of those redactions and if so return a redacted
+        event.
+
+        Args:
+             original_ev (EventBase):
+             redactions (iterable[str]): list of event ids of potential redaction events
+             event_map (dict[str, EventBase]): other events which have been fetched, in
+                 which we can look up the redaaction events. Map from event id to event.
+
+        Returns:
+            Deferred[EventBase|None]: if the event should be redacted, a pruned
+                event object. Otherwise, None.
+        """
+        if original_ev.type == "m.room.create":
+            # we choose to ignore redactions of m.room.create events.
+            return None
+
+        for redaction_id in redactions:
+            redaction_event = event_map.get(redaction_id)
+            if not redaction_event or redaction_event.rejected_reason:
+                # we don't have the redaction event, or the redaction event was not
+                # authorized.
+                logger.debug(
+                    "%s was redacted by %s but redaction not found/authed",
+                    original_ev.event_id,
+                    redaction_id,
                 )
+                continue
 
-            if format_version is None:
-                # This means that we stored the event before we had the concept
-                # of a event format version, so it must be a V1 event.
-                format_version = EventFormatVersions.V1
-
-            original_ev = event_type_from_format_version(format_version)(
-                event_dict=d,
-                internal_metadata_dict=internal_metadata,
-                rejected_reason=rejected_reason,
-            )
-
-            redacted_event = None
-            if redacted:
-                redacted_event = prune_event(original_ev)
-
-                redaction_id = yield self._simple_select_one_onecol(
-                    table="redactions",
-                    keyvalues={"redacts": redacted_event.event_id},
-                    retcol="event_id",
-                    desc="_get_event_from_row_redactions",
+            if redaction_event.room_id != original_ev.room_id:
+                logger.debug(
+                    "%s was redacted by %s but redaction was in a different room!",
+                    original_ev.event_id,
+                    redaction_id,
                 )
+                continue
 
-                redacted_event.unsigned["redacted_by"] = redaction_id
-                # Get the redaction event.
+            # Starting in room version v3, some redactions need to be
+            # rechecked if we didn't have the redacted event at the
+            # time, so we recheck on read instead.
+            if redaction_event.internal_metadata.need_to_check_redaction():
+                expected_domain = get_domain_from_id(original_ev.sender)
+                if get_domain_from_id(redaction_event.sender) == expected_domain:
+                    # This redaction event is allowed. Mark as not needing a recheck.
+                    redaction_event.internal_metadata.recheck_redaction = False
+                else:
+                    # Senders don't match, so the event isn't actually redacted
+                    logger.debug(
+                        "%s was redacted by %s but the senders don't match",
+                        original_ev.event_id,
+                        redaction_id,
+                    )
+                    continue
 
-                because = yield self.get_event(
-                    redaction_id, check_redacted=False, allow_none=True
-                )
+            logger.debug("Redacting %s due to %s", original_ev.event_id, redaction_id)
 
-                if because:
-                    # It's fine to do add the event directly, since get_pdu_json
-                    # will serialise this field correctly
-                    redacted_event.unsigned["redacted_because"] = because
+            # we found a good redaction event. Redact!
+            redacted_event = prune_event(original_ev)
+            redacted_event.unsigned["redacted_by"] = redaction_id
 
-                    # Starting in room version v3, some redactions need to be
-                    # rechecked if we didn't have the redacted event at the
-                    # time, so we recheck on read instead.
-                    if because.internal_metadata.need_to_check_redaction():
-                        expected_domain = get_domain_from_id(original_ev.sender)
-                        if get_domain_from_id(because.sender) == expected_domain:
-                            # This redaction event is allowed. Mark as not needing a
-                            # recheck.
-                            because.internal_metadata.recheck_redaction = False
-                        else:
-                            # Senders don't match, so the event isn't actually redacted
-                            redacted_event = None
+            # It's fine to add the event directly, since get_pdu_json
+            # will serialise this field correctly
+            redacted_event.unsigned["redacted_because"] = redaction_event
 
-            cache_entry = _EventCacheEntry(
-                event=original_ev, redacted_event=redacted_event
-            )
+            return redacted_event
 
-            self._get_event_cache.prefill((original_ev.event_id,), cache_entry)
-
-        defer.returnValue(cache_entry)
+        # no valid redaction found for this event
+        return None
 
     @defer.inlineCallbacks
     def have_events_in_timeline(self, event_ids):
@@ -587,7 +738,7 @@ class EventsWorkerStore(SQLBaseStore):
             desc="have_events_in_timeline",
         )
 
-        defer.returnValue(set(r["event_id"] for r in rows))
+        return set(r["event_id"] for r in rows)
 
     @defer.inlineCallbacks
     def have_seen_events(self, event_ids):
@@ -613,7 +764,7 @@ class EventsWorkerStore(SQLBaseStore):
         input_iterator = iter(event_ids)
         for chunk in iter(lambda: list(itertools.islice(input_iterator, 100)), []):
             yield self.runInteraction("have_seen_events", have_seen_events_txn, chunk)
-        defer.returnValue(results)
+        return results
 
     def get_seen_events_with_rejections(self, event_ids):
         """Given a list of event ids, check if we rejected them.
@@ -724,4 +875,4 @@ class EventsWorkerStore(SQLBaseStore):
         # it.
         complexity_v1 = round(state_events / 500, 2)
 
-        defer.returnValue({"v1": complexity_v1})
+        return {"v1": complexity_v1}

@@ -95,7 +95,7 @@ class BulkPushRuleEvaluator(object):
                         invited
                     )
 
-        defer.returnValue(rules_by_user)
+        return rules_by_user
 
     @cached()
     def _get_rules_for_room(self, room_id):
@@ -134,7 +134,7 @@ class BulkPushRuleEvaluator(object):
 
         pl_event = auth_events.get(POWER_KEY)
 
-        defer.returnValue((pl_event.content if pl_event else {}, sender_level))
+        return pl_event.content if pl_event else {}, sender_level
 
     @defer.inlineCallbacks
     def action_for_event_by_user(self, event, context):
@@ -283,13 +283,13 @@ class RulesForRoom(object):
         if state_group and self.state_group == state_group:
             logger.debug("Using cached rules for %r", self.room_id)
             self.room_push_rule_cache_metrics.inc_hits()
-            defer.returnValue(self.rules_by_user)
+            return self.rules_by_user
 
         with (yield self.linearizer.queue(())):
             if state_group and self.state_group == state_group:
                 logger.debug("Using cached rules for %r", self.room_id)
                 self.room_push_rule_cache_metrics.inc_hits()
-                defer.returnValue(self.rules_by_user)
+                return self.rules_by_user
 
             self.room_push_rule_cache_metrics.inc_misses()
 
@@ -366,7 +366,7 @@ class RulesForRoom(object):
             logger.debug(
                 "Returning push rules for %r %r", self.room_id, ret_rules_by_user.keys()
             )
-        defer.returnValue(ret_rules_by_user)
+        return ret_rules_by_user
 
     @defer.inlineCallbacks
     def _update_rules_with_member_event_ids(

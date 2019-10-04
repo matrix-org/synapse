@@ -46,7 +46,7 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
         @defer.inlineCallbacks
         def cb():
             yield Clock(reactor).sleep(0)
-            defer.returnValue("yay")
+            return "yay"
 
         @defer.inlineCallbacks
         def test():

@@ -97,40 +97,38 @@ class ApplicationServiceApi(SimpleHttpClient):
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
         if service.url is None:
-            defer.returnValue(False)
+            return False
         uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
         response = None
         try:
             response = yield self.get_json(uri, {"access_token": service.hs_token})
             if response is not None:  # just an empty json object
-                defer.returnValue(True)
+                return True
         except CodeMessageException as e:
             if e.code == 404:
-                defer.returnValue(False)
-                return
+                return False
             logger.warning("query_user to %s received %s", uri, e.code)
         except Exception as ex:
             logger.warning("query_user to %s threw exception %s", uri, ex)
-        defer.returnValue(False)
+        return False
 
     @defer.inlineCallbacks
     def query_alias(self, service, alias):
         if service.url is None:
-            defer.returnValue(False)
+            return False
         uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
         response = None
         try:
             response = yield self.get_json(uri, {"access_token": service.hs_token})
             if response is not None:  # just an empty json object
-                defer.returnValue(True)
+                return True
         except CodeMessageException as e:
             logger.warning("query_alias to %s received %s", uri, e.code)
             if e.code == 404:
-                defer.returnValue(False)
-                return
+                return False
         except Exception as ex:
             logger.warning("query_alias to %s threw exception %s", uri, ex)
-        defer.returnValue(False)
+        return False
 
     @defer.inlineCallbacks
     def query_3pe(self, service, kind, protocol, fields):
@@ -141,7 +139,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         else:
             raise ValueError("Unrecognised 'kind' argument %r to query_3pe()", kind)
         if service.url is None:
-            defer.returnValue([])
+            return []
 
         uri = "%s%s/thirdparty/%s/%s" % (
             service.url,
@@ -155,7 +153,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 logger.warning(
                     "query_3pe to %s returned an invalid response %r", uri, response
                 )
-                defer.returnValue([])
+                return []
 
             ret = []
             for r in response:
@@ -166,14 +164,14 @@ class ApplicationServiceApi(SimpleHttpClient):
                         "query_3pe to %s returned an invalid result %r", uri, r
                     )
 
-            defer.returnValue(ret)
+            return ret
         except Exception as ex:
             logger.warning("query_3pe to %s threw exception %s", uri, ex)
-            defer.returnValue([])
+            return []
 
     def get_3pe_protocol(self, service, protocol):
         if service.url is None:
-            defer.returnValue({})
+            return {}
 
         @defer.inlineCallbacks
         def _get():
@@ -189,7 +187,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                     logger.warning(
                         "query_3pe_protocol to %s did not return a" " valid result", uri
                     )
-                    defer.returnValue(None)
+                    return None
 
                 for instance in info.get("instances", []):
                     network_id = instance.get("network_id", None)
@@ -198,10 +196,10 @@ class ApplicationServiceApi(SimpleHttpClient):
                             service.id, network_id
                         ).to_string()
 
-                defer.returnValue(info)
+                return info
             except Exception as ex:
                 logger.warning("query_3pe_protocol to %s threw exception %s", uri, ex)
-                defer.returnValue(None)
+                return None
 
         key = (service.id, protocol)
         return self.protocol_meta_cache.wrap(key, _get)
@@ -209,7 +207,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     @defer.inlineCallbacks
     def push_bulk(self, service, events, txn_id=None):
         if service.url is None:
-            defer.returnValue(True)
+            return True
 
         events = self._serialize(events)
 
@@ -229,14 +227,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             )
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(events))
-            defer.returnValue(True)
-            return
+            return True
         except CodeMessageException as e:
             logger.warning("push_bulk to %s received %s", uri, e.code)
         except Exception as ex:
             logger.warning("push_bulk to %s threw exception %s", uri, ex)
         failed_transactions_counter.labels(service.id).inc()
-        defer.returnValue(False)
+        return False
 
     def _serialize(self, events):
         time_now = self.clock.time_msec()

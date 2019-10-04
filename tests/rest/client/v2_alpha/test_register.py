@@ -34,19 +34,12 @@ from tests import unittest
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [register.register_servlets]
+    url = b"/_matrix/client/r0/register"
 
-    def make_homeserver(self, reactor, clock):
-
-        self.url = b"/_matrix/client/r0/register"
-
-        self.hs = self.setup_test_homeserver()
-        self.hs.config.enable_registration = True
-        self.hs.config.registrations_require_3pid = []
-        self.hs.config.auto_join_rooms = []
-        self.hs.config.enable_registration_captcha = False
-        self.hs.config.allow_guest_access = True
-
-        return self.hs
+    def default_config(self, name="test"):
+        config = super().default_config(name)
+        config["allow_guest_access"] = True
+        return config
 
     def test_POST_appservice_registration_valid(self):
         user_id = "@as_user_kermit:test"
@@ -199,6 +192,73 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    def test_advertised_flows(self):
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        flows = channel.json_body["flows"]
+
+        # with the stock config, we only expect the dummy flow
+        self.assertCountEqual([["m.login.dummy"]], (f["stages"] for f in flows))
+
+    @unittest.override_config(
+        {
+            "enable_registration_captcha": True,
+            "user_consent": {
+                "version": "1",
+                "template_dir": "/",
+                "require_at_registration": True,
+            },
+            "account_threepid_delegates": {
+                "email": "https://id_server",
+                "msisdn": "https://id_server",
+            },
+        }
+    )
+    def test_advertised_flows_captcha_and_terms_and_3pids(self):
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        flows = channel.json_body["flows"]
+
+        self.assertCountEqual(
+            [
+                ["m.login.recaptcha", "m.login.terms", "m.login.dummy"],
+                ["m.login.recaptcha", "m.login.terms", "m.login.email.identity"],
+                ["m.login.recaptcha", "m.login.terms", "m.login.msisdn"],
+                [
+                    "m.login.recaptcha",
+                    "m.login.terms",
+                    "m.login.msisdn",
+                    "m.login.email.identity",
+                ],
+            ],
+            (f["stages"] for f in flows),
+        )
+
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://test_server",
+            "registrations_require_3pid": ["email"],
+            "disable_msisdn_registration": True,
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_advertised_flows_no_msisdn_email_required(self):
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        flows = channel.json_body["flows"]
+
+        # with the stock config, we expect all four combinations of 3pid
+        self.assertCountEqual(
+            [["m.login.email.identity"]], (f["stages"] for f in flows)
+        )
+
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
 
@@ -323,6 +383,8 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             "renew_at": 172800000,  # Time in ms for 2 days
             "renew_by_email_enabled": True,
             "renew_email_subject": "Renew your account",
+            "account_renewed_html_path": "account_renewed.html",
+            "invalid_token_html_path": "invalid_token.html",
         }
 
         # Email config.
@@ -373,6 +435,19 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+        # Check that we're getting HTML back.
+        content_type = None
+        for header in channel.result.get("headers", []):
+            if header[0] == b"Content-Type":
+                content_type = header[1]
+        self.assertEqual(content_type, b"text/html; charset=utf-8", channel.result)
+
+        # Check that the HTML we're getting is the one we expect on a successful renewal.
+        expected_html = self.hs.config.account_validity.account_renewed_html_content
+        self.assertEqual(
+            channel.result["body"], expected_html.encode("utf8"), channel.result
+        )
+
         # Move 3 days forward. If the renewal failed, every authed request with
         # our access token should be denied from now, otherwise they should
         # succeed.
@@ -380,6 +455,28 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_renewal_invalid_token(self):
+        # Hit the renewal endpoint with an invalid token and check that it behaves as
+        # expected, i.e. that it responds with 404 Not Found and the correct HTML.
+        url = "/_matrix/client/unstable/account_validity/renew?token=123"
+        request, channel = self.make_request(b"GET", url)
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"404", channel.result)
+
+        # Check that we're getting HTML back.
+        content_type = None
+        for header in channel.result.get("headers", []):
+            if header[0] == b"Content-Type":
+                content_type = header[1]
+        self.assertEqual(content_type, b"text/html; charset=utf-8", channel.result)
+
+        # Check that the HTML we're getting is the one we expect when using an
+        # invalid/unknown token.
+        expected_html = self.hs.config.account_validity.invalid_token_html_content
+        self.assertEqual(
+            channel.result["body"], expected_html.encode("utf8"), channel.result
+        )
 
     def test_manual_email_send(self):
         self.email_attempts = []
@@ -435,7 +532,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
                 added_at=now,
             )
         )
-        return (user_id, tok)
+        return user_id, tok
 
     def test_manual_email_send_expired_account(self):
         user_id = self.register_user("kermit", "monkey")

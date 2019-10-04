@@ -55,9 +55,8 @@ from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
-from synapse.metrics import RegistryProxy
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.module_api import ModuleApi
 from synapse.python_dependencies import check_requirements
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
@@ -342,8 +341,6 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    synapse.config.logger.setup_logging(config, use_worker_options=False)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -356,6 +353,8 @@ def setup(config_options):
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
+
+    synapse.config.logger.setup_logging(hs, config, use_worker_options=False)
 
     logger.info("Preparing database: %s...", config.database_config["name"])
 
@@ -407,7 +406,7 @@ def setup(config_options):
         if provision:
             yield acme.provision_certificate()
 
-        defer.returnValue(provision)
+        return provision
 
     @defer.inlineCallbacks
     def reprovision_acme():
@@ -562,10 +561,12 @@ def run(hs):
 
         stats["database_engine"] = hs.get_datastore().database_engine_name
         stats["database_server_version"] = hs.get_datastore().get_server_version()
-        logger.info("Reporting stats to matrix.org: %s" % (stats,))
+        logger.info(
+            "Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats)
+        )
         try:
             yield hs.get_simple_http_client().put_json(
-                "https://matrix.org/report-usage-stats/push", stats
+                hs.config.report_stats_endpoint, stats
             )
         except Exception as e:
             logger.warn("Error reporting stats: %s", e)

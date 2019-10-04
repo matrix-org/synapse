@@ -70,6 +70,7 @@ class PaginationHandler(object):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
+        self._server_name = hs.hostname
 
         self.pagination_lock = ReadWriteLock()
         self._purges_in_progress_by_room = set()
@@ -152,6 +153,22 @@ class PaginationHandler(object):
             PurgeStatus|None
         """
         return self._purges_by_id.get(purge_id)
+
+    async def purge_room(self, room_id):
+        """Purge the given room from the database"""
+        with (await self.pagination_lock.write(room_id)):
+            # check we know about the room
+            await self.store.get_room_version(room_id)
+
+            # first check that we have no users in this room
+            joined = await defer.maybeDeferred(
+                self.store.is_host_joined, room_id, self._server_name
+            )
+
+            if joined:
+                raise SynapseError(400, "Users are still joined to this room")
+
+            await self.store.purge_room(room_id)
 
     @defer.inlineCallbacks
     def get_messages(
@@ -242,13 +259,11 @@ class PaginationHandler(object):
             )
 
         if not events:
-            defer.returnValue(
-                {
-                    "chunk": [],
-                    "start": pagin_config.from_token.to_string(),
-                    "end": next_token.to_string(),
-                }
-            )
+            return {
+                "chunk": [],
+                "start": pagin_config.from_token.to_string(),
+                "end": next_token.to_string(),
+            }
 
         state = None
         if event_filter and event_filter.lazy_load_members() and len(events) > 0:
@@ -286,4 +301,4 @@ class PaginationHandler(object):
                 )
             )
 
-        defer.returnValue(chunk)
+        return chunk

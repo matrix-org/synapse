@@ -30,8 +30,7 @@ from synapse.http.server import JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
@@ -71,12 +70,12 @@ class PresenceStatusStubServlet(RestServlet):
         except HttpResponseException as e:
             raise e.to_synapse_error()
 
-        defer.returnValue((200, result))
+        return 200, result
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         yield self.auth.get_user_by_req(request)
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class KeyUploadServlet(RestServlet):
@@ -127,11 +126,11 @@ class KeyUploadServlet(RestServlet):
                 self.main_uri + request.uri.decode("ascii"), body, headers=headers
             )
 
-            defer.returnValue((200, result))
+            return 200, result
         else:
             # Just interested in counts.
             result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
-            defer.returnValue((200, {"one_time_key_counts": result}))
+            return 200, {"one_time_key_counts": result}
 
 
 class FrontendProxySlavedStore(
@@ -233,8 +232,6 @@ def start(config_options):
 
     assert config.worker_main_http_uri is not None
 
-    setup_logging(config, use_worker_options=True)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -247,8 +244,12 @@ def start(config_options):
         database_engine=database_engine,
     )
 
+    setup_logging(ss, config, use_worker_options=True)
+
     ss.setup()
-    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ss, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-frontend-proxy", config)
 

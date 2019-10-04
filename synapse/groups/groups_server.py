@@ -86,7 +86,7 @@ class GroupsServerHandler(object):
             if not is_admin:
                 raise SynapseError(403, "User is not admin in group")
 
-        defer.returnValue(group)
+        return group
 
     @defer.inlineCallbacks
     def get_group_summary(self, group_id, requester_user_id):
@@ -152,22 +152,20 @@ class GroupsServerHandler(object):
             group_id, requester_user_id
         )
 
-        defer.returnValue(
-            {
-                "profile": profile,
-                "users_section": {
-                    "users": users,
-                    "roles": roles,
-                    "total_user_count_estimate": 0,  # TODO
-                },
-                "rooms_section": {
-                    "rooms": rooms,
-                    "categories": categories,
-                    "total_room_count_estimate": 0,  # TODO
-                },
-                "user": membership_info,
-            }
-        )
+        return {
+            "profile": profile,
+            "users_section": {
+                "users": users,
+                "roles": roles,
+                "total_user_count_estimate": 0,  # TODO
+            },
+            "rooms_section": {
+                "rooms": rooms,
+                "categories": categories,
+                "total_room_count_estimate": 0,  # TODO
+            },
+            "user": membership_info,
+        }
 
     @defer.inlineCallbacks
     def update_group_summary_room(
@@ -193,7 +191,7 @@ class GroupsServerHandler(object):
             is_public=is_public,
         )
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def delete_group_summary_room(
@@ -209,7 +207,7 @@ class GroupsServerHandler(object):
             group_id=group_id, room_id=room_id, category_id=category_id
         )
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def set_group_join_policy(self, group_id, requester_user_id, content):
@@ -229,7 +227,7 @@ class GroupsServerHandler(object):
 
         yield self.store.set_group_join_policy(group_id, join_policy=join_policy)
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def get_group_categories(self, group_id, requester_user_id):
@@ -238,7 +236,7 @@ class GroupsServerHandler(object):
         yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         categories = yield self.store.get_group_categories(group_id=group_id)
-        defer.returnValue({"categories": categories})
+        return {"categories": categories}
 
     @defer.inlineCallbacks
     def get_group_category(self, group_id, requester_user_id, category_id):
@@ -250,7 +248,7 @@ class GroupsServerHandler(object):
             group_id=group_id, category_id=category_id
         )
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def update_group_category(self, group_id, requester_user_id, category_id, content):
@@ -270,7 +268,7 @@ class GroupsServerHandler(object):
             profile=profile,
         )
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def delete_group_category(self, group_id, requester_user_id, category_id):
@@ -284,7 +282,7 @@ class GroupsServerHandler(object):
             group_id=group_id, category_id=category_id
         )
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def get_group_roles(self, group_id, requester_user_id):
@@ -293,7 +291,7 @@ class GroupsServerHandler(object):
         yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         roles = yield self.store.get_group_roles(group_id=group_id)
-        defer.returnValue({"roles": roles})
+        return {"roles": roles}
 
     @defer.inlineCallbacks
     def get_group_role(self, group_id, requester_user_id, role_id):
@@ -302,7 +300,7 @@ class GroupsServerHandler(object):
         yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         res = yield self.store.get_group_role(group_id=group_id, role_id=role_id)
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def update_group_role(self, group_id, requester_user_id, role_id, content):
@@ -320,7 +318,7 @@ class GroupsServerHandler(object):
             group_id=group_id, role_id=role_id, is_public=is_public, profile=profile
         )
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def delete_group_role(self, group_id, requester_user_id, role_id):
@@ -332,7 +330,7 @@ class GroupsServerHandler(object):
 
         yield self.store.remove_group_role(group_id=group_id, role_id=role_id)
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def update_group_summary_user(
@@ -356,7 +354,7 @@ class GroupsServerHandler(object):
             is_public=is_public,
         )
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def delete_group_summary_user(self, group_id, requester_user_id, user_id, role_id):
@@ -370,7 +368,7 @@ class GroupsServerHandler(object):
             group_id=group_id, user_id=user_id, role_id=role_id
         )
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def get_group_profile(self, group_id, requester_user_id):
@@ -392,7 +390,7 @@ class GroupsServerHandler(object):
             group_description = {key: group[key] for key in cols}
             group_description["is_openly_joinable"] = group["join_policy"] == "open"
 
-            defer.returnValue(group_description)
+            return group_description
         else:
             raise SynapseError(404, "Unknown group")
 
@@ -462,9 +460,7 @@ class GroupsServerHandler(object):
 
         # TODO: If admin add lists of users whose attestations have timed out
 
-        defer.returnValue(
-            {"chunk": chunk, "total_user_count_estimate": len(user_results)}
-        )
+        return {"chunk": chunk, "total_user_count_estimate": len(user_results)}
 
     @defer.inlineCallbacks
     def get_invited_users_in_group(self, group_id, requester_user_id):
@@ -495,9 +491,7 @@ class GroupsServerHandler(object):
                 logger.warn("Error getting profile for %s: %s", user_id, e)
             user_profiles.append(user_profile)
 
-        defer.returnValue(
-            {"chunk": user_profiles, "total_user_count_estimate": len(invited_users)}
-        )
+        return {"chunk": user_profiles, "total_user_count_estimate": len(invited_users)}
 
     @defer.inlineCallbacks
     def get_rooms_in_group(self, group_id, requester_user_id):
@@ -534,9 +528,7 @@ class GroupsServerHandler(object):
 
         chunk.sort(key=lambda e: -e["num_joined_members"])
 
-        defer.returnValue(
-            {"chunk": chunk, "total_room_count_estimate": len(room_results)}
-        )
+        return {"chunk": chunk, "total_room_count_estimate": len(room_results)}
 
     @defer.inlineCallbacks
     def add_room_to_group(self, group_id, requester_user_id, room_id, content):
@@ -552,7 +544,7 @@ class GroupsServerHandler(object):
 
         yield self.store.add_room_to_group(group_id, room_id, is_public=is_public)
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def update_room_in_group(
@@ -575,7 +567,7 @@ class GroupsServerHandler(object):
         else:
             raise SynapseError(400, "Uknown config option")
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def remove_room_from_group(self, group_id, requester_user_id, room_id):
@@ -587,7 +579,7 @@ class GroupsServerHandler(object):
 
         yield self.store.remove_room_from_group(group_id, room_id)
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def invite_to_group(self, group_id, user_id, requester_user_id, content):
@@ -656,9 +648,9 @@ class GroupsServerHandler(object):
             )
         elif res["state"] == "invite":
             yield self.store.add_group_invite(group_id, user_id)
-            defer.returnValue({"state": "invite"})
+            return {"state": "invite"}
         elif res["state"] == "reject":
-            defer.returnValue({"state": "reject"})
+            return {"state": "reject"}
         else:
             raise SynapseError(502, "Unknown state returned by HS")
 
@@ -691,7 +683,7 @@ class GroupsServerHandler(object):
             remote_attestation=remote_attestation,
         )
 
-        defer.returnValue(local_attestation)
+        return local_attestation
 
     @defer.inlineCallbacks
     def accept_invite(self, group_id, requester_user_id, content):
@@ -711,7 +703,7 @@ class GroupsServerHandler(object):
 
         local_attestation = yield self._add_user(group_id, requester_user_id, content)
 
-        defer.returnValue({"state": "join", "attestation": local_attestation})
+        return {"state": "join", "attestation": local_attestation}
 
     @defer.inlineCallbacks
     def join_group(self, group_id, requester_user_id, content):
@@ -728,7 +720,7 @@ class GroupsServerHandler(object):
 
         local_attestation = yield self._add_user(group_id, requester_user_id, content)
 
-        defer.returnValue({"state": "join", "attestation": local_attestation})
+        return {"state": "join", "attestation": local_attestation}
 
     @defer.inlineCallbacks
     def knock(self, group_id, requester_user_id, content):
@@ -781,7 +773,7 @@ class GroupsServerHandler(object):
         if not self.hs.is_mine_id(user_id):
             yield self.store.maybe_delete_remote_profile_cache(user_id)
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def create_group(self, group_id, requester_user_id, content):
@@ -857,7 +849,7 @@ class GroupsServerHandler(object):
                 avatar_url=user_profile.get("avatar_url"),
             )
 
-        defer.returnValue({"group_id": group_id})
+        return {"group_id": group_id}
 
     @defer.inlineCallbacks
     def delete_group(self, group_id, requester_user_id):

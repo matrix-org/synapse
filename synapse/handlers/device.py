@@ -25,6 +25,7 @@ from synapse.api.errors import (
     HttpResponseException,
     RequestSendFailed,
 )
+from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
@@ -45,6 +46,7 @@ class DeviceWorkerHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self._auth_handler = hs.get_auth_handler()
 
+    @trace
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
         """
@@ -56,6 +58,7 @@ class DeviceWorkerHandler(BaseHandler):
             defer.Deferred: list[dict[str, X]]: info on each device
         """
 
+        set_tag("user_id", user_id)
         device_map = yield self.store.get_devices_by_user(user_id)
 
         ips = yield self.store.get_last_client_ip_by_device(user_id, device_id=None)
@@ -64,8 +67,10 @@ class DeviceWorkerHandler(BaseHandler):
         for device in devices:
             _update_device_from_client_ips(device, ips)
 
-        defer.returnValue(devices)
+        log_kv(device_map)
+        return devices
 
+    @trace
     @defer.inlineCallbacks
     def get_device(self, user_id, device_id):
         """ Retrieve the given device
@@ -85,9 +90,14 @@ class DeviceWorkerHandler(BaseHandler):
             raise errors.NotFoundError
         ips = yield self.store.get_last_client_ip_by_device(user_id, device_id)
         _update_device_from_client_ips(device, ips)
-        defer.returnValue(device)
+
+        set_tag("device", device)
+        set_tag("ips", ips)
+
+        return device
 
     @measure_func("device.get_user_ids_changed")
+    @trace
     @defer.inlineCallbacks
     def get_user_ids_changed(self, user_id, from_token):
         """Get list of users that have had the devices updated, or have newly
@@ -97,6 +107,9 @@ class DeviceWorkerHandler(BaseHandler):
             user_id (str)
             from_token (StreamToken)
         """
+
+        set_tag("user_id", user_id)
+        set_tag("from_token", from_token)
         now_room_key = yield self.store.get_room_events_max_id()
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
@@ -148,6 +161,9 @@ class DeviceWorkerHandler(BaseHandler):
             # special-case for an empty prev state: include all members
             # in the changed list
             if not event_ids:
+                log_kv(
+                    {"event": "encountered empty previous state", "room_id": room_id}
+                )
                 for key, event_id in iteritems(current_state_ids):
                     etype, state_key = key
                     if etype != EventTypes.Member:
@@ -200,9 +216,11 @@ class DeviceWorkerHandler(BaseHandler):
             possibly_joined = []
             possibly_left = []
 
-        defer.returnValue(
-            {"changed": list(possibly_joined), "left": list(possibly_left)}
-        )
+        result = {"changed": list(possibly_joined), "left": list(possibly_left)}
+
+        log_kv(result)
+
+        return result
 
 
 class DeviceHandler(DeviceWorkerHandler):
@@ -211,12 +229,12 @@ class DeviceHandler(DeviceWorkerHandler):
 
         self.federation_sender = hs.get_federation_sender()
 
-        self._edu_updater = DeviceListEduUpdater(hs, self)
+        self.device_list_updater = DeviceListUpdater(hs, self)
 
         federation_registry = hs.get_federation_registry()
 
         federation_registry.register_edu_handler(
-            "m.device_list_update", self._edu_updater.incoming_device_list_update
+            "m.device_list_update", self.device_list_updater.incoming_device_list_update
         )
         federation_registry.register_query_handler(
             "user_devices", self.on_federation_query_user_devices
@@ -250,7 +268,7 @@ class DeviceHandler(DeviceWorkerHandler):
             )
             if new_device:
                 yield self.notify_device_update(user_id, [device_id])
-            defer.returnValue(device_id)
+            return device_id
 
         # if the device id is not specified, we'll autogen one, but loop a few
         # times in case of a clash.
@@ -264,11 +282,12 @@ class DeviceHandler(DeviceWorkerHandler):
             )
             if new_device:
                 yield self.notify_device_update(user_id, [device_id])
-                defer.returnValue(device_id)
+                return device_id
             attempts += 1
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
 
+    @trace
     @defer.inlineCallbacks
     def delete_device(self, user_id, device_id):
         """ Delete the given device
@@ -286,6 +305,10 @@ class DeviceHandler(DeviceWorkerHandler):
         except errors.StoreError as e:
             if e.code == 404:
                 # no match
+                set_tag("error", True)
+                log_kv(
+                    {"reason": "User doesn't have device id.", "device_id": device_id}
+                )
                 pass
             else:
                 raise
@@ -298,6 +321,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         yield self.notify_device_update(user_id, [device_id])
 
+    @trace
     @defer.inlineCallbacks
     def delete_all_devices_for_user(self, user_id, except_device_id=None):
         """Delete all of the user's devices
@@ -333,6 +357,8 @@ class DeviceHandler(DeviceWorkerHandler):
         except errors.StoreError as e:
             if e.code == 404:
                 # no match
+                set_tag("error", True)
+                set_tag("reason", "User doesn't have that device id.")
                 pass
             else:
                 raise
@@ -373,6 +399,7 @@ class DeviceHandler(DeviceWorkerHandler):
             else:
                 raise
 
+    @trace
     @measure_func("notify_device_update")
     @defer.inlineCallbacks
     def notify_device_update(self, user_id, device_ids):
@@ -387,6 +414,8 @@ class DeviceHandler(DeviceWorkerHandler):
         if self.hs.is_mine_id(user_id):
             hosts.update(get_domain_from_id(u) for u in users_who_share_room)
             hosts.discard(self.server_name)
+
+        set_tag("target_hosts", hosts)
 
         position = yield self.store.add_device_change_to_streams(
             user_id, device_ids, list(hosts)
@@ -407,13 +436,12 @@ class DeviceHandler(DeviceWorkerHandler):
             )
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
+                log_kv({"message": "sent device update to host", "host": host})
 
     @defer.inlineCallbacks
     def on_federation_query_user_devices(self, user_id):
         stream_id, devices = yield self.store.get_devices_with_keys_by_user(user_id)
-        defer.returnValue(
-            {"user_id": user_id, "stream_id": stream_id, "devices": devices}
-        )
+        return {"user_id": user_id, "stream_id": stream_id, "devices": devices}
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
@@ -430,7 +458,7 @@ def _update_device_from_client_ips(device, client_ips):
     device.update({"last_seen_ts": ip.get("last_seen"), "last_seen_ip": ip.get("ip")})
 
 
-class DeviceListEduUpdater(object):
+class DeviceListUpdater(object):
     "Handles incoming device list updates from federation and updates the DB"
 
     def __init__(self, hs, device_handler):
@@ -455,12 +483,15 @@ class DeviceListEduUpdater(object):
             iterable=True,
         )
 
+    @trace
     @defer.inlineCallbacks
     def incoming_device_list_update(self, origin, edu_content):
         """Called on incoming device list update from federation. Responsible
         for parsing the EDU and adding to pending updates list.
         """
 
+        set_tag("origin", origin)
+        set_tag("edu_content", edu_content)
         user_id = edu_content.pop("user_id")
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
@@ -475,12 +506,30 @@ class DeviceListEduUpdater(object):
                 device_id,
                 origin,
             )
+
+            set_tag("error", True)
+            log_kv(
+                {
+                    "message": "Got a device list update edu from a user and "
+                    "device which does not match the origin of the request.",
+                    "user_id": user_id,
+                    "device_id": device_id,
+                }
+            )
             return
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
         if not room_ids:
             # We don't share any rooms with this user. Ignore update, as we
             # probably won't get any further updates.
+            set_tag("error", True)
+            log_kv(
+                {
+                    "message": "Got an update from a user for which "
+                    "we don't share any rooms",
+                    "other user_id": user_id,
+                }
+            )
             logger.warning(
                 "Got device list update edu for %r/%r, but don't share a room",
                 user_id,
@@ -523,75 +572,7 @@ class DeviceListEduUpdater(object):
             logger.debug("Need to re-sync devices for %r? %r", user_id, resync)
 
             if resync:
-                # Fetch all devices for the user.
-                origin = get_domain_from_id(user_id)
-                try:
-                    result = yield self.federation.query_user_devices(origin, user_id)
-                except (
-                    NotRetryingDestination,
-                    RequestSendFailed,
-                    HttpResponseException,
-                ):
-                    # TODO: Remember that we are now out of sync and try again
-                    # later
-                    logger.warn("Failed to handle device list update for %s", user_id)
-                    # We abort on exceptions rather than accepting the update
-                    # as otherwise synapse will 'forget' that its device list
-                    # is out of date. If we bail then we will retry the resync
-                    # next time we get a device list update for this user_id.
-                    # This makes it more likely that the device lists will
-                    # eventually become consistent.
-                    return
-                except FederationDeniedError as e:
-                    logger.info(e)
-                    return
-                except Exception:
-                    # TODO: Remember that we are now out of sync and try again
-                    # later
-                    logger.exception(
-                        "Failed to handle device list update for %s", user_id
-                    )
-                    return
-
-                stream_id = result["stream_id"]
-                devices = result["devices"]
-
-                # If the remote server has more than ~1000 devices for this user
-                # we assume that something is going horribly wrong (e.g. a bot
-                # that logs in and creates a new device every time it tries to
-                # send a message).  Maintaining lots of devices per user in the
-                # cache can cause serious performance issues as if this request
-                # takes more than 60s to complete, internal replication from the
-                # inbound federation worker to the synapse master may time out
-                # causing the inbound federation to fail and causing the remote
-                # server to retry, causing a DoS.  So in this scenario we give
-                # up on storing the total list of devices and only handle the
-                # delta instead.
-                if len(devices) > 1000:
-                    logger.warn(
-                        "Ignoring device list snapshot for %s as it has >1K devs (%d)",
-                        user_id,
-                        len(devices),
-                    )
-                    devices = []
-
-                for device in devices:
-                    logger.debug(
-                        "Handling resync update %r/%r, ID: %r",
-                        user_id,
-                        device["device_id"],
-                        stream_id,
-                    )
-
-                yield self.store.update_remote_device_list_cache(
-                    user_id, devices, stream_id
-                )
-                device_ids = [device["device_id"] for device in devices]
-                yield self.device_handler.notify_device_update(user_id, device_ids)
-
-                # We clobber the seen updates since we've re-synced from a given
-                # point.
-                self._seen_updates[user_id] = set([stream_id])
+                yield self.user_device_resync(user_id)
             else:
                 # Simply update the single device, since we know that is the only
                 # change (because of the single prev_id matching the current cache)
@@ -623,7 +604,7 @@ class DeviceListEduUpdater(object):
         for _, stream_id, prev_ids, _ in updates:
             if not prev_ids:
                 # We always do a resync if there are no previous IDs
-                defer.returnValue(True)
+                return True
 
             for prev_id in prev_ids:
                 if prev_id == extremity:
@@ -633,8 +614,90 @@ class DeviceListEduUpdater(object):
                 elif prev_id in stream_id_in_updates:
                     continue
                 else:
-                    defer.returnValue(True)
+                    return True
 
             stream_id_in_updates.add(stream_id)
 
-        defer.returnValue(False)
+        return False
+
+    @defer.inlineCallbacks
+    def user_device_resync(self, user_id):
+        """Fetches all devices for a user and updates the device cache with them.
+
+        Args:
+            user_id (str): The user's id whose device_list will be updated.
+        Returns:
+            Deferred[dict]: a dict with device info as under the "devices" in the result of this
+            request:
+            https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
+        """
+        log_kv({"message": "Doing resync to update device list."})
+        # Fetch all devices for the user.
+        origin = get_domain_from_id(user_id)
+        try:
+            result = yield self.federation.query_user_devices(origin, user_id)
+        except (NotRetryingDestination, RequestSendFailed, HttpResponseException):
+            # TODO: Remember that we are now out of sync and try again
+            # later
+            logger.warn("Failed to handle device list update for %s", user_id)
+            # We abort on exceptions rather than accepting the update
+            # as otherwise synapse will 'forget' that its device list
+            # is out of date. If we bail then we will retry the resync
+            # next time we get a device list update for this user_id.
+            # This makes it more likely that the device lists will
+            # eventually become consistent.
+            return
+        except FederationDeniedError as e:
+            set_tag("error", True)
+            log_kv({"reason": "FederationDeniedError"})
+            logger.info(e)
+            return
+        except Exception as e:
+            # TODO: Remember that we are now out of sync and try again
+            # later
+            set_tag("error", True)
+            log_kv(
+                {"message": "Exception raised by federation request", "exception": e}
+            )
+            logger.exception("Failed to handle device list update for %s", user_id)
+            return
+        log_kv({"result": result})
+        stream_id = result["stream_id"]
+        devices = result["devices"]
+
+        # If the remote server has more than ~1000 devices for this user
+        # we assume that something is going horribly wrong (e.g. a bot
+        # that logs in and creates a new device every time it tries to
+        # send a message).  Maintaining lots of devices per user in the
+        # cache can cause serious performance issues as if this request
+        # takes more than 60s to complete, internal replication from the
+        # inbound federation worker to the synapse master may time out
+        # causing the inbound federation to fail and causing the remote
+        # server to retry, causing a DoS.  So in this scenario we give
+        # up on storing the total list of devices and only handle the
+        # delta instead.
+        if len(devices) > 1000:
+            logger.warn(
+                "Ignoring device list snapshot for %s as it has >1K devs (%d)",
+                user_id,
+                len(devices),
+            )
+            devices = []
+
+        for device in devices:
+            logger.debug(
+                "Handling resync update %r/%r, ID: %r",
+                user_id,
+                device["device_id"],
+                stream_id,
+            )
+
+        yield self.store.update_remote_device_list_cache(user_id, devices, stream_id)
+        device_ids = [device["device_id"] for device in devices]
+        yield self.device_handler.notify_device_update(user_id, device_ids)
+
+        # We clobber the seen updates since we've re-synced from a given
+        # point.
+        self._seen_updates[user_id] = set([stream_id])
+
+        defer.returnValue(result)

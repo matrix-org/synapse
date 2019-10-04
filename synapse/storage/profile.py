@@ -34,15 +34,12 @@ class ProfileWorkerStore(SQLBaseStore):
         except StoreError as e:
             if e.code == 404:
                 # no match
-                defer.returnValue(ProfileInfo(None, None))
-                return
+                return ProfileInfo(None, None)
             else:
                 raise
 
-        defer.returnValue(
-            ProfileInfo(
-                avatar_url=profile["avatar_url"], display_name=profile["displayname"]
-            )
+        return ProfileInfo(
+            avatar_url=profile["avatar_url"], display_name=profile["displayname"]
         )
 
     def get_profile_displayname(self, user_localpart):
@@ -168,7 +165,7 @@ class ProfileStore(ProfileWorkerStore):
         )
 
         if res:
-            defer.returnValue(True)
+            return True
 
         res = yield self._simple_select_one_onecol(
             table="group_invites",
@@ -179,4 +176,4 @@ class ProfileStore(ProfileWorkerStore):
         )
 
         if res:
-            defer.returnValue(True)
+            return True

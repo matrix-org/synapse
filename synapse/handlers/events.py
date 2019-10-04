@@ -143,7 +143,7 @@ class EventStreamHandler(BaseHandler):
                 "end": tokens[1].to_string(),
             }
 
-            defer.returnValue(chunk)
+            return chunk
 
 
 class EventHandler(BaseHandler):
@@ -166,8 +166,7 @@ class EventHandler(BaseHandler):
         event = yield self.store.get_event(event_id, check_room_id=room_id)
 
         if not event:
-            defer.returnValue(None)
-            return
+            return None
 
         users = yield self.store.get_users_in_room(event.room_id)
         is_peeking = user.to_string() not in users
@@ -179,4 +178,4 @@ class EventHandler(BaseHandler):
         if not filtered:
             raise AuthError(403, "You don't have permission to access that event.")
 
-        defer.returnValue(event)
+        return event

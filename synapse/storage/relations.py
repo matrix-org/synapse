@@ -17,8 +17,6 @@ import logging
 
 import attr
 
-from twisted.internet import defer
-
 from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore
@@ -60,7 +58,7 @@ class PaginationChunk(object):
 class RelationPaginationToken(object):
     """Pagination token for relation pagination API.
 
-    As the results are order by topological ordering, we can use the
+    As the results are in topological order, we can use the
     `topological_ordering` and `stream_ordering` fields of the events at the
     boundaries of the chunk as pagination tokens.
 
@@ -363,7 +361,7 @@ class RelationsWorkerStore(SQLBaseStore):
             return
 
         edit_event = yield self.get_event(edit_id, allow_none=True)
-        defer.returnValue(edit_event)
+        return edit_event
 
     def has_user_annotated_event(self, parent_id, event_type, aggregation_key, sender):
         """Check if a user has already annotated an event with the same key

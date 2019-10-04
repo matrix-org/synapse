@@ -29,8 +29,7 @@ from synapse.config.logger import setup_logging
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext, run_in_background
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
@@ -198,8 +197,6 @@ def start(config_options):
 
     assert config.worker_app == "synapse.app.user_dir"
 
-    setup_logging(config, use_worker_options=True)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -224,8 +221,12 @@ def start(config_options):
         database_engine=database_engine,
     )
 
+    setup_logging(ss, config, use_worker_options=True)
+
     ss.setup()
-    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ss, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-user-dir", config)
 

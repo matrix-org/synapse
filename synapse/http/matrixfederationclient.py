@@ -49,6 +49,12 @@ from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import BlacklistingAgentWrapper, IPBlacklistingResolver
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.opentracing import (
+    inject_active_span_byte_dict,
+    set_tag,
+    start_active_span,
+    tags,
+)
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
 
@@ -157,7 +163,7 @@ def _handle_json_response(reactor, timeout_sec, request, response):
         response.code,
         response.phrase.decode("ascii", errors="replace"),
     )
-    defer.returnValue(body)
+    return body
 
 
 class MatrixFederationHttpClient(object):
@@ -255,7 +261,7 @@ class MatrixFederationHttpClient(object):
 
             response = yield self._send_request(request, **send_request_args)
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     def _send_request(
@@ -339,9 +345,24 @@ class MatrixFederationHttpClient(object):
         else:
             query_bytes = b""
 
-        headers_dict = {b"User-Agent": [self.version_string_bytes]}
+        scope = start_active_span(
+            "outgoing-federation-request",
+            tags={
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
+                tags.PEER_ADDRESS: request.destination,
+                tags.HTTP_METHOD: request.method,
+                tags.HTTP_URL: request.path,
+            },
+            finish_on_close=True,
+        )
 
-        with limiter:
+        # Inject the span into the headers
+        headers_dict = {}
+        inject_active_span_byte_dict(headers_dict, request.destination)
+
+        headers_dict[b"User-Agent"] = [self.version_string_bytes]
+
+        with limiter, scope:
             # XXX: Would be much nicer to retry only at the transaction-layer
             # (once we have reliable transactions in place)
             if long_retries:
@@ -418,6 +439,8 @@ class MatrixFederationHttpClient(object):
                         response.code,
                         response.phrase.decode("ascii", errors="replace"),
                     )
+
+                    set_tag(tags.HTTP_STATUS_CODE, response.code)
 
                     if 200 <= response.code < 300:
                         pass
@@ -499,8 +522,7 @@ class MatrixFederationHttpClient(object):
                         _flatten_response_never_received(e),
                     )
                     raise
-
-            defer.returnValue(response)
+        return response
 
     def build_auth_headers(
         self, destination, method, url_bytes, content=None, destination_is=None
@@ -624,7 +646,7 @@ class MatrixFederationHttpClient(object):
             self.reactor, self.default_timeout, request, response
         )
 
-        defer.returnValue(body)
+        return body
 
     @defer.inlineCallbacks
     def post_json(
@@ -693,7 +715,7 @@ class MatrixFederationHttpClient(object):
         body = yield _handle_json_response(
             self.reactor, _sec_timeout, request, response
         )
-        defer.returnValue(body)
+        return body
 
     @defer.inlineCallbacks
     def get_json(
@@ -758,7 +780,7 @@ class MatrixFederationHttpClient(object):
             self.reactor, self.default_timeout, request, response
         )
 
-        defer.returnValue(body)
+        return body
 
     @defer.inlineCallbacks
     def delete_json(
@@ -816,7 +838,7 @@ class MatrixFederationHttpClient(object):
         body = yield _handle_json_response(
             self.reactor, self.default_timeout, request, response
         )
-        defer.returnValue(body)
+        return body
 
     @defer.inlineCallbacks
     def get_file(
@@ -882,7 +904,7 @@ class MatrixFederationHttpClient(object):
             response.phrase.decode("ascii", errors="replace"),
             length,
         )
-        defer.returnValue((length, headers))
+        return (length, headers)
 
 
 class _ReadBodyToFileProtocol(protocol.Protocol):

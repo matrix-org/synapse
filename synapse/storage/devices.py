@@ -21,6 +21,12 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.logging.opentracing import (
+    get_active_span_text_map,
+    set_tag,
+    trace,
+    whitelisted_homeserver,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import Cache, SQLBaseStore, db_to_json
 from synapse.storage.background_updates import BackgroundUpdateStore
@@ -71,8 +77,9 @@ class DeviceWorkerStore(SQLBaseStore):
             desc="get_devices_by_user",
         )
 
-        defer.returnValue({d["device_id"]: d for d in devices})
+        return {d["device_id"]: d for d in devices}
 
+    @trace
     @defer.inlineCallbacks
     def get_devices_by_remote(self, destination, from_stream_id, limit):
         """Get stream of updates to send to remote servers
@@ -88,7 +95,7 @@ class DeviceWorkerStore(SQLBaseStore):
             destination, int(from_stream_id)
         )
         if not has_changed:
-            defer.returnValue((now_stream_id, []))
+            return now_stream_id, []
 
         # We retrieve n+1 devices from the list of outbound pokes where n is
         # our outbound device update limit. We then check if the very last
@@ -111,7 +118,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         # Return an empty list if there are no updates
         if not updates:
-            defer.returnValue((now_stream_id, []))
+            return now_stream_id, []
 
         # if we have exceeded the limit, we need to exclude any results with the
         # same stream_id as the last row.
@@ -127,8 +134,15 @@ class DeviceWorkerStore(SQLBaseStore):
         # (user_id, device_id) entries into a map, with the value being
         # the max stream_id across each set of duplicate entries
         #
-        # maps (user_id, device_id) -> stream_id
+        # maps (user_id, device_id) -> (stream_id, opentracing_context)
         # as long as their stream_id does not match that of the last row
+        #
+        # opentracing_context contains the opentracing metadata for the request
+        # that created the poke
+        #
+        # The most recent request's opentracing_context is used as the
+        # context which created the Edu.
+
         query_map = {}
         for update in updates:
             if stream_id_cutoff is not None and update[2] >= stream_id_cutoff:
@@ -136,7 +150,14 @@ class DeviceWorkerStore(SQLBaseStore):
                 break
 
             key = (update[0], update[1])
-            query_map[key] = max(query_map.get(key, 0), update[2])
+
+            update_context = update[3]
+            update_stream_id = update[2]
+
+            previous_update_stream_id, _ = query_map.get(key, (0, None))
+
+            if update_stream_id > previous_update_stream_id:
+                query_map[key] = (update_stream_id, update_context)
 
         # If we didn't find any updates with a stream_id lower than the cutoff, it
         # means that there are more than limit updates all of which have the same
@@ -147,13 +168,13 @@ class DeviceWorkerStore(SQLBaseStore):
         # skip that stream_id and return an empty list, and continue with the next
         # stream_id next time.
         if not query_map:
-            defer.returnValue((stream_id_cutoff, []))
+            return stream_id_cutoff, []
 
         results = yield self._get_device_update_edus_by_remote(
             destination, from_stream_id, query_map
         )
 
-        defer.returnValue((now_stream_id, results))
+        return now_stream_id, results
 
     def _get_devices_by_remote_txn(
         self, txn, destination, from_stream_id, now_stream_id, limit
@@ -171,7 +192,7 @@ class DeviceWorkerStore(SQLBaseStore):
             List: List of device updates
         """
         sql = """
-            SELECT user_id, device_id, stream_id FROM device_lists_outbound_pokes
+            SELECT user_id, device_id, stream_id, opentracing_context FROM device_lists_outbound_pokes
             WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
             ORDER BY stream_id
             LIMIT ?
@@ -187,8 +208,9 @@ class DeviceWorkerStore(SQLBaseStore):
         Args:
             destination (str): The host the device updates are intended for
             from_stream_id (int): The minimum stream_id to filter updates by, exclusive
-            query_map (Dict[(str, str): int]): Dictionary mapping
-                user_id/device_id to update stream_id
+            query_map (Dict[(str, str): (int, str|None)]): Dictionary mapping
+                user_id/device_id to update stream_id and the relevent json-encoded
+                opentracing context
 
         Returns:
             List[Dict]: List of objects representing an device update EDU
@@ -210,12 +232,13 @@ class DeviceWorkerStore(SQLBaseStore):
                 destination, user_id, from_stream_id
             )
             for device_id, device in iteritems(user_devices):
-                stream_id = query_map[(user_id, device_id)]
+                stream_id, opentracing_context = query_map[(user_id, device_id)]
                 result = {
                     "user_id": user_id,
                     "device_id": device_id,
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
+                    "org.matrix.opentracing_context": opentracing_context,
                 }
 
                 prev_id = stream_id
@@ -232,7 +255,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
                 results.append(result)
 
-        defer.returnValue(results)
+        return results
 
     def _get_last_device_update_for_remote_user(
         self, destination, user_id, from_stream_id
@@ -299,6 +322,7 @@ class DeviceWorkerStore(SQLBaseStore):
     def get_device_stream_token(self):
         return self._device_list_id_gen.get_current_token()
 
+    @trace
     @defer.inlineCallbacks
     def get_user_devices_from_cache(self, query_list):
         """Get the devices (and keys if any) for remote users from the cache.
@@ -330,7 +354,10 @@ class DeviceWorkerStore(SQLBaseStore):
             else:
                 results[user_id] = yield self._get_cached_devices_for_user(user_id)
 
-        defer.returnValue((user_ids_not_in_cache, results))
+        set_tag("in_cache", results)
+        set_tag("not_in_cache", user_ids_not_in_cache)
+
+        return user_ids_not_in_cache, results
 
     @cachedInlineCallbacks(num_args=2, tree=True)
     def _get_cached_user_device(self, user_id, device_id):
@@ -340,7 +367,7 @@ class DeviceWorkerStore(SQLBaseStore):
             retcol="content",
             desc="_get_cached_user_device",
         )
-        defer.returnValue(db_to_json(content))
+        return db_to_json(content)
 
     @cachedInlineCallbacks()
     def _get_cached_devices_for_user(self, user_id):
@@ -350,9 +377,9 @@ class DeviceWorkerStore(SQLBaseStore):
             retcols=("device_id", "content"),
             desc="_get_cached_devices_for_user",
         )
-        defer.returnValue(
-            {device["device_id"]: db_to_json(device["content"]) for device in devices}
-        )
+        return {
+            device["device_id"]: db_to_json(device["content"]) for device in devices
+        }
 
     def get_devices_with_keys_by_user(self, user_id):
         """Get all devices (with any device keys) for a user
@@ -482,7 +509,7 @@ class DeviceWorkerStore(SQLBaseStore):
         results = {user_id: None for user_id in user_ids}
         results.update({row["user_id"]: row["stream_id"] for row in rows})
 
-        defer.returnValue(results)
+        return results
 
 
 class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
@@ -543,7 +570,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         """
         key = (user_id, device_id)
         if self.device_id_exists_cache.get(key, None):
-            defer.returnValue(False)
+            return False
 
         try:
             inserted = yield self._simple_insert(
@@ -557,7 +584,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                 or_ignore=True,
             )
             self.device_id_exists_cache.prefill(key, True)
-            defer.returnValue(inserted)
+            return inserted
         except Exception as e:
             logger.error(
                 "store_device with device_id=%s(%r) user_id=%s(%r)"
@@ -780,7 +807,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                 hosts,
                 stream_id,
             )
-        defer.returnValue(stream_id)
+        return stream_id
 
     def _add_device_change_txn(self, txn, user_id, device_ids, hosts, stream_id):
         now = self._clock.time_msec()
@@ -814,6 +841,8 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             ],
         )
 
+        context = get_active_span_text_map()
+
         self._simple_insert_many_txn(
             txn,
             table="device_lists_outbound_pokes",
@@ -825,6 +854,9 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "device_id": device_id,
                     "sent": False,
                     "ts": now,
+                    "opentracing_context": json.dumps(context)
+                    if whitelisted_homeserver(destination)
+                    else "{}",
                 }
                 for destination in hosts
                 for device_id in device_ids
@@ -889,4 +921,4 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
 
         yield self.runWithConnection(f)
         yield self._end_background_update(DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES)
-        defer.returnValue(1)
+        return 1

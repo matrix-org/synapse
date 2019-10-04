@@ -36,7 +36,7 @@ that your email address is probably `user@example.com` rather than
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, 3.7, or 2.7
+- Python 3.5, 3.6, or 3.7
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
@@ -349,6 +349,13 @@ sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
 ```
 
+### Void Linux
+
+Synapse can be found in the void repositories as 'synapse':
+
+    xbps-install -Su
+    xbps-install -S synapse
+
 ### FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
@@ -373,7 +380,7 @@ is suitable for local testing, but for any practical use, you will either need
 to enable a reverse proxy, or configure Synapse to expose an HTTPS port.
 
 For information on using a reverse proxy, see
-[docs/reverse_proxy.rst](docs/reverse_proxy.rst).
+[docs/reverse_proxy.md](docs/reverse_proxy.md).
 
 To configure Synapse to expose an HTTPS port, you will need to edit
 `homeserver.yaml`, as follows:
@@ -419,12 +426,11 @@ If Synapse is not configured with an SMTP server, password reset via email will
 
 ## Registering a user
 
-You will need at least one user on your server in order to use a Matrix
-client. Users can be registered either via a Matrix client, or via a
-commandline script.
+The easiest way to create a new user is to do so from a client like [Riot](https://riot.im).
 
-To get started, it is easiest to use the command line to register new
-users. This can be done as follows:
+Alternatively you can do so from the command line if you have installed via pip.
+
+This can be done as follows:
 
 ```
 $ source ~/synapse/env/bin/activate
@@ -447,7 +453,7 @@ on your server even if `enable_registration` is `false`.
 ## Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server.  See [docs/turn-howto.rst](docs/turn-howto.rst) for details.
+a TURN server.  See [docs/turn-howto.md](docs/turn-howto.md) for details.
 
 ## URL previews
 

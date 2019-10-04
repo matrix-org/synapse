@@ -67,6 +67,10 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             self.DELETE_SOFT_FAILED_EXTREMITIES, self._cleanup_extremities_bg_update
         )
 
+        self.register_background_update_handler(
+            "redactions_received_ts", self._redactions_received_ts
+        )
+
     @defer.inlineCallbacks
     def _background_reindex_fields_sender(self, progress, batch_size):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
@@ -135,7 +139,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _background_reindex_origin_server_ts(self, progress, batch_size):
@@ -212,7 +216,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_ORIGIN_SERVER_TS_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _cleanup_extremities_bg_update(self, progress, batch_size):
@@ -396,4 +400,61 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 "_cleanup_extremities_bg_update_drop_table", _drop_table_txn
             )
 
-        defer.returnValue(num_handled)
+        return num_handled
+
+    @defer.inlineCallbacks
+    def _redactions_received_ts(self, progress, batch_size):
+        """Handles filling out the `received_ts` column in redactions.
+        """
+        last_event_id = progress.get("last_event_id", "")
+
+        def _redactions_received_ts_txn(txn):
+            # Fetch the set of event IDs that we want to update
+            sql = """
+                SELECT event_id FROM redactions
+                WHERE event_id > ?
+                ORDER BY event_id ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (last_event_id, batch_size))
+
+            rows = txn.fetchall()
+            if not rows:
+                return 0
+
+            upper_event_id, = rows[-1]
+
+            # Update the redactions with the received_ts.
+            #
+            # Note: Not all events have an associated received_ts, so we
+            # fallback to using origin_server_ts. If we for some reason don't
+            # have an origin_server_ts, lets just use the current timestamp.
+            #
+            # We don't want to leave it null, as then we'll never try and
+            # censor those redactions.
+            sql = """
+                UPDATE redactions
+                SET received_ts = (
+                    SELECT COALESCE(received_ts, origin_server_ts, ?) FROM events
+                    WHERE events.event_id = redactions.event_id
+                )
+                WHERE ? <= event_id AND event_id <= ?
+            """
+
+            txn.execute(sql, (self._clock.time_msec(), last_event_id, upper_event_id))
+
+            self._background_update_progress_txn(
+                txn, "redactions_received_ts", {"last_event_id": upper_event_id}
+            )
+
+            return len(rows)
+
+        count = yield self.runInteraction(
+            "_redactions_received_ts", _redactions_received_ts_txn
+        )
+
+        if not count:
+            yield self._end_background_update("redactions_received_ts")
+
+        return count

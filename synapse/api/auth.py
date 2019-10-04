@@ -22,10 +22,17 @@ from netaddr import IPAddress
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, JoinRules, Membership
-from synapse.api.errors import AuthError, Codes, ResourceLimitError
+from synapse.api.constants import EventTypes, JoinRules, Membership, UserTypes
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientTokenError,
+    MissingClientTokenError,
+    ResourceLimitError,
+)
 from synapse.config.server import is_threepid_reserved
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
@@ -63,7 +70,6 @@ class Auth(object):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
-        self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
 
         self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
         register_cache("cache", "token_cache", self.token_cache)
@@ -123,7 +129,7 @@ class Auth(object):
             )
 
         self._check_joined_room(member, user_id, room_id)
-        defer.returnValue(member)
+        return member
 
     @defer.inlineCallbacks
     def check_user_was_in_room(self, room_id, user_id):
@@ -151,13 +157,13 @@ class Auth(object):
             if forgot:
                 raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
 
-        defer.returnValue(member)
+        return member
 
     @defer.inlineCallbacks
     def check_host_in_room(self, room_id, host):
         with Measure(self.clock, "check_host_in_room"):
             latest_event_ids = yield self.store.is_host_joined(room_id, host)
-            defer.returnValue(latest_event_ids)
+            return latest_event_ids
 
     def _check_joined_room(self, member, user_id, room_id):
         if not member or member.membership != Membership.JOIN:
@@ -189,22 +195,23 @@ class Auth(object):
         Returns:
             defer.Deferred: resolves to a ``synapse.types.Requester`` object
         Raises:
-            AuthError if no user by that token exists or the token is invalid.
+            InvalidClientCredentialsError if no user by that token exists or the token
+                is invalid.
+            AuthError if access is denied for the user in the access token
         """
-        # Can optionally look elsewhere in the request (e.g. headers)
         try:
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
                 b"User-Agent", default=[b""]
             )[0].decode("ascii", "surrogateescape")
 
-            access_token = self.get_access_token_from_request(
-                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
-            )
+            access_token = self.get_access_token_from_request(request)
 
             user_id, app_service = yield self._get_appservice_user_id(request)
             if user_id:
                 request.authenticated_entity = user_id
+                opentracing.set_tag("authenticated_entity", user_id)
+                opentracing.set_tag("appservice_id", app_service.id)
 
                 if ip_addr and self.hs.config.track_appservice_user_ips:
                     yield self.store.insert_client_ip(
@@ -215,9 +222,7 @@ class Auth(object):
                         device_id="dummy-device",  # stubbed
                     )
 
-                defer.returnValue(
-                    synapse.types.create_requester(user_id, app_service=app_service)
-                )
+                return synapse.types.create_requester(user_id, app_service=app_service)
 
             user_info = yield self.get_user_by_access_token(access_token, rights)
             user = user_info["user"]
@@ -257,46 +262,41 @@ class Auth(object):
                 )
 
             request.authenticated_entity = user.to_string()
+            opentracing.set_tag("authenticated_entity", user.to_string())
+            if device_id:
+                opentracing.set_tag("device_id", device_id)
 
-            defer.returnValue(
-                synapse.types.create_requester(
-                    user, token_id, is_guest, device_id, app_service=app_service
-                )
+            return synapse.types.create_requester(
+                user, token_id, is_guest, device_id, app_service=app_service
             )
         except KeyError:
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                "Missing access token.",
-                errcode=Codes.MISSING_TOKEN,
-            )
+            raise MissingClientTokenError()
 
     @defer.inlineCallbacks
     def _get_appservice_user_id(self, request):
         app_service = self.store.get_app_service_by_token(
-            self.get_access_token_from_request(
-                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
-            )
+            self.get_access_token_from_request(request)
         )
         if app_service is None:
-            defer.returnValue((None, None))
+            return None, None
 
         if app_service.ip_range_whitelist:
             ip_address = IPAddress(self.hs.get_ip_from_request(request))
             if ip_address not in app_service.ip_range_whitelist:
-                defer.returnValue((None, None))
+                return None, None
 
         if b"user_id" not in request.args:
-            defer.returnValue((app_service.sender, app_service))
+            return app_service.sender, app_service
 
         user_id = request.args[b"user_id"][0].decode("utf8")
         if app_service.sender == user_id:
-            defer.returnValue((app_service.sender, app_service))
+            return app_service.sender, app_service
 
         if not app_service.is_interested_in_user(user_id):
             raise AuthError(403, "Application service cannot masquerade as this user.")
         if not (yield self.store.get_user_by_id(user_id)):
             raise AuthError(403, "Application service has not registered this user")
-        defer.returnValue((user_id, app_service))
+        return user_id, app_service
 
     @defer.inlineCallbacks
     def get_user_by_access_token(self, token, rights="access"):
@@ -313,14 +313,26 @@ class Auth(object):
                `token_id` (int|None): access token id. May be None if guest
                `device_id` (str|None): device corresponding to access token
         Raises:
-            AuthError if no user by that token exists or the token is invalid.
+            InvalidClientCredentialsError if no user by that token exists or the token
+                is invalid.
         """
 
         if rights == "access":
             # first look in the database
             r = yield self._look_up_user_by_access_token(token)
             if r:
-                defer.returnValue(r)
+                valid_until_ms = r["valid_until_ms"]
+                if (
+                    valid_until_ms is not None
+                    and valid_until_ms < self.clock.time_msec()
+                ):
+                    # there was a valid access token, but it has expired.
+                    # soft-logout the user.
+                    raise InvalidClientTokenError(
+                        msg="Access token has expired", soft_logout=True
+                    )
+
+                return r
 
         # otherwise it needs to be a valid macaroon
         try:
@@ -331,11 +343,7 @@ class Auth(object):
                 if not guest:
                     # non-guest access tokens must be in the database
                     logger.warning("Unrecognised access token - not in store.")
-                    raise AuthError(
-                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                        "Unrecognised access token.",
-                        errcode=Codes.UNKNOWN_TOKEN,
-                    )
+                    raise InvalidClientTokenError()
 
                 # Guest access tokens are not stored in the database (there can
                 # only be one access token per guest, anyway).
@@ -350,16 +358,10 @@ class Auth(object):
                 # guest tokens.
                 stored_user = yield self.store.get_user_by_id(user_id)
                 if not stored_user:
-                    raise AuthError(
-                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                        "Unknown user_id %s" % user_id,
-                        errcode=Codes.UNKNOWN_TOKEN,
-                    )
+                    raise InvalidClientTokenError("Unknown user_id %s" % user_id)
                 if not stored_user["is_guest"]:
-                    raise AuthError(
-                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                        "Guest access token used for regular user",
-                        errcode=Codes.UNKNOWN_TOKEN,
+                    raise InvalidClientTokenError(
+                        "Guest access token used for regular user"
                     )
                 ret = {
                     "user": user,
@@ -378,7 +380,7 @@ class Auth(object):
                 }
             else:
                 raise RuntimeError("Unknown rights setting %s", rights)
-            defer.returnValue(ret)
+            return ret
         except (
             _InvalidMacaroonException,
             pymacaroons.exceptions.MacaroonException,
@@ -386,11 +388,7 @@ class Auth(object):
             ValueError,
         ) as e:
             logger.warning("Invalid macaroon in auth: %s %s", type(e), e)
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                "Invalid macaroon passed.",
-                errcode=Codes.UNKNOWN_TOKEN,
-            )
+            raise InvalidClientTokenError("Invalid macaroon passed.")
 
     def _parse_and_validate_macaroon(self, token, rights="access"):
         """Takes a macaroon and tries to parse and validate it. This is cached
@@ -418,25 +416,16 @@ class Auth(object):
         try:
             user_id = self.get_user_id_from_macaroon(macaroon)
 
-            has_expiry = False
             guest = False
             for caveat in macaroon.caveats:
-                if caveat.caveat_id.startswith("time "):
-                    has_expiry = True
-                elif caveat.caveat_id == "guest = true":
+                if caveat.caveat_id == "guest = true":
                     guest = True
 
-            self.validate_macaroon(
-                macaroon, rights, self.hs.config.expire_access_token, user_id=user_id
-            )
+            self.validate_macaroon(macaroon, rights, user_id=user_id)
         except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                "Invalid macaroon passed.",
-                errcode=Codes.UNKNOWN_TOKEN,
-            )
+            raise InvalidClientTokenError("Invalid macaroon passed.")
 
-        if not has_expiry and rights == "access":
+        if rights == "access":
             self.token_cache[token] = (user_id, guest)
 
         return user_id, guest
@@ -453,19 +442,16 @@ class Auth(object):
             (str) user id
 
         Raises:
-            AuthError if there is no user_id caveat in the macaroon
+            InvalidClientCredentialsError if there is no user_id caveat in the
+                macaroon
         """
         user_prefix = "user_id = "
         for caveat in macaroon.caveats:
             if caveat.caveat_id.startswith(user_prefix):
                 return caveat.caveat_id[len(user_prefix) :]
-        raise AuthError(
-            self.TOKEN_NOT_FOUND_HTTP_STATUS,
-            "No user caveat in macaroon",
-            errcode=Codes.UNKNOWN_TOKEN,
-        )
+        raise InvalidClientTokenError("No user caveat in macaroon")
 
-    def validate_macaroon(self, macaroon, type_string, verify_expiry, user_id):
+    def validate_macaroon(self, macaroon, type_string, user_id):
         """
         validate that a Macaroon is understood by and was signed by this server.
 
@@ -473,7 +459,6 @@ class Auth(object):
             macaroon(pymacaroons.Macaroon): The macaroon to validate
             type_string(str): The kind of token required (e.g. "access",
                               "delete_pusher")
-            verify_expiry(bool): Whether to verify whether the macaroon has expired.
             user_id (str): The user_id required
         """
         v = pymacaroons.Verifier()
@@ -486,19 +471,7 @@ class Auth(object):
         v.satisfy_exact("type = " + type_string)
         v.satisfy_exact("user_id = %s" % user_id)
         v.satisfy_exact("guest = true")
-
-        # verify_expiry should really always be True, but there exist access
-        # tokens in the wild which expire when they should not, so we can't
-        # enforce expiry yet (so we have to allow any caveat starting with
-        # 'time < ' in access tokens).
-        #
-        # On the other hand, short-term login tokens (as used by CAS login, for
-        # example) have an expiry time which we do want to enforce.
-
-        if verify_expiry:
-            v.satisfy_general(self._verify_expiry)
-        else:
-            v.satisfy_general(lambda c: c.startswith("time < "))
+        v.satisfy_general(self._verify_expiry)
 
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
@@ -517,7 +490,7 @@ class Auth(object):
     def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
-            defer.returnValue(None)
+            return None
 
         # we use ret.get() below because *lots* of unit tests stub out
         # get_user_by_access_token in a way where it only returns a couple of
@@ -527,26 +500,18 @@ class Auth(object):
             "token_id": ret.get("token_id", None),
             "is_guest": False,
             "device_id": ret.get("device_id"),
+            "valid_until_ms": ret.get("valid_until_ms"),
         }
-        defer.returnValue(user_info)
+        return user_info
 
     def get_appservice_by_req(self, request):
-        try:
-            token = self.get_access_token_from_request(
-                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
-            )
-            service = self.store.get_app_service_by_token(token)
-            if not service:
-                logger.warn("Unrecognised appservice access token.")
-                raise AuthError(
-                    self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                    "Unrecognised access token.",
-                    errcode=Codes.UNKNOWN_TOKEN,
-                )
-            request.authenticated_entity = service.sender
-            return defer.succeed(service)
-        except KeyError:
-            raise AuthError(self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.")
+        token = self.get_access_token_from_request(request)
+        service = self.store.get_app_service_by_token(token)
+        if not service:
+            logger.warn("Unrecognised appservice access token.")
+            raise InvalidClientTokenError()
+        request.authenticated_entity = service.sender
+        return defer.succeed(service)
 
     def is_server_admin(self, user):
         """ Check if the given user is a local server admin.
@@ -562,7 +527,7 @@ class Auth(object):
     @defer.inlineCallbacks
     def compute_auth_events(self, event, current_state_ids, for_verification=False):
         if event.type == EventTypes.Create:
-            defer.returnValue([])
+            return []
 
         auth_ids = []
 
@@ -623,22 +588,7 @@ class Auth(object):
             if member_event.content["membership"] == Membership.JOIN:
                 auth_ids.append(member_event.event_id)
 
-        defer.returnValue(auth_ids)
-
-    def check_redaction(self, room_version, event, auth_events):
-        """Check whether the event sender is allowed to redact the target event.
-
-        Returns:
-            True if the the sender is allowed to redact the target event if the
-                target event was created by them.
-            False if the sender is allowed to redact the target event with no
-                further checks.
-
-        Raises:
-            AuthError if the event sender is definitely not allowed to redact
-                the target event.
-        """
-        return event_auth.check_redaction(room_version, event, auth_events)
+        return auth_ids
 
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id, user):
@@ -652,7 +602,7 @@ class Auth(object):
 
         is_admin = yield self.is_server_admin(user)
         if is_admin:
-            defer.returnValue(True)
+            return True
 
         user_id = user.to_string()
         yield self.check_joined_room(room_id, user_id)
@@ -692,20 +642,16 @@ class Auth(object):
         return bool(query_params) or bool(auth_headers)
 
     @staticmethod
-    def get_access_token_from_request(request, token_not_found_http_status=401):
+    def get_access_token_from_request(request):
         """Extracts the access_token from the request.
 
         Args:
             request: The http request.
-            token_not_found_http_status(int): The HTTP status code to set in the
-                AuthError if the token isn't found. This is used in some of the
-                legacy APIs to change the status code to 403 from the default of
-                401 since some of the old clients depended on auth errors returning
-                403.
         Returns:
             unicode: The access_token
         Raises:
-            AuthError: If there isn't an access_token in the request.
+            MissingClientTokenError: If there isn't a single access_token in the
+                request
         """
 
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
@@ -714,34 +660,20 @@ class Auth(object):
             # Try the get the access_token from a "Authorization: Bearer"
             # header
             if query_params is not None:
-                raise AuthError(
-                    token_not_found_http_status,
-                    "Mixing Authorization headers and access_token query parameters.",
-                    errcode=Codes.MISSING_TOKEN,
+                raise MissingClientTokenError(
+                    "Mixing Authorization headers and access_token query parameters."
                 )
             if len(auth_headers) > 1:
-                raise AuthError(
-                    token_not_found_http_status,
-                    "Too many Authorization headers.",
-                    errcode=Codes.MISSING_TOKEN,
-                )
+                raise MissingClientTokenError("Too many Authorization headers.")
             parts = auth_headers[0].split(b" ")
             if parts[0] == b"Bearer" and len(parts) == 2:
                 return parts[1].decode("ascii")
             else:
-                raise AuthError(
-                    token_not_found_http_status,
-                    "Invalid Authorization header.",
-                    errcode=Codes.MISSING_TOKEN,
-                )
+                raise MissingClientTokenError("Invalid Authorization header.")
         else:
             # Try to get the access_token from the query params.
             if not query_params:
-                raise AuthError(
-                    token_not_found_http_status,
-                    "Missing access token.",
-                    errcode=Codes.MISSING_TOKEN,
-                )
+                raise MissingClientTokenError()
 
             return query_params[0].decode("ascii")
 
@@ -764,7 +696,7 @@ class Auth(object):
             #  * The user is a guest user, and has joined the room
             # else it will throw.
             member_event = yield self.check_user_was_in_room(room_id, user_id)
-            defer.returnValue((member_event.membership, member_event.event_id))
+            return member_event.membership, member_event.event_id
         except AuthError:
             visibility = yield self.state.get_current_state(
                 room_id, EventTypes.RoomHistoryVisibility, ""
@@ -773,14 +705,13 @@ class Auth(object):
                 visibility
                 and visibility.content["history_visibility"] == "world_readable"
             ):
-                defer.returnValue((Membership.JOIN, None))
-                return
+                return Membership.JOIN, None
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )
 
     @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None, threepid=None):
+    def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
@@ -793,6 +724,9 @@ class Auth(object):
                 with a MAU blocked server, normally they would be rejected but their
                 threepid is on the reserved list. user_id and
                 threepid should never be set at the same time.
+
+            user_type(str|None): If present, is used to decide whether to check against
+                certain blocking reasons like MAU.
         """
 
         # Never fail an auth check for the server notices users or support user
@@ -830,6 +764,10 @@ class Auth(object):
                     self.hs.config.mau_limits_reserved_threepids, threepid
                 ):
                     return
+            elif user_type == UserTypes.SUPPORT:
+                # If the user does not exist yet and is of type "support",
+                # allow registration. Support users are excluded from MAU checks.
+                return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:

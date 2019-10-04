@@ -65,7 +65,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         yield self.store.persist_event(event, context)
 
-        defer.returnValue(event)
+        return event
 
     def assertStateMapEqual(self, s1, s2):
         for t in s1:

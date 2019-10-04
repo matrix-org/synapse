@@ -128,7 +128,7 @@ class RoomCreationHandler(BaseHandler):
             old_room_id,
             new_version,  # args for _upgrade_room
         )
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def _upgrade_room(self, requester, old_room_id, new_version):
@@ -193,7 +193,7 @@ class RoomCreationHandler(BaseHandler):
             requester, old_room_id, new_room_id, old_room_state
         )
 
-        defer.returnValue(new_room_id)
+        return new_room_id
 
     @defer.inlineCallbacks
     def _update_upgraded_room_pls(
@@ -560,6 +560,18 @@ class RoomCreationHandler(BaseHandler):
 
         yield self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
+        power_level_content_override = config.get("power_level_content_override")
+        if (
+            power_level_content_override
+            and "users" in power_level_content_override
+            and user_id not in power_level_content_override["users"]
+        ):
+            raise SynapseError(
+                400,
+                "Not a valid power_level_content_override: 'users' did not contain %s"
+                % (user_id,),
+            )
+
         invite_3pid_list = config.get("invite_3pid", [])
 
         visibility = config.get("visibility", None)
@@ -567,8 +579,8 @@ class RoomCreationHandler(BaseHandler):
 
         room_id = yield self._generate_room_id(creator_id=user_id, is_public=is_public)
 
+        directory_handler = self.hs.get_handlers().directory_handler
         if room_alias:
-            directory_handler = self.hs.get_handlers().directory_handler
             yield directory_handler.create_association(
                 requester=requester,
                 room_id=room_id,
@@ -604,7 +616,7 @@ class RoomCreationHandler(BaseHandler):
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
-            power_level_content_override=config.get("power_level_content_override"),
+            power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
         )
 
@@ -653,6 +665,7 @@ class RoomCreationHandler(BaseHandler):
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
+            id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
             yield self.hs.get_room_member_handler().do_3pid_invite(
@@ -663,6 +676,7 @@ class RoomCreationHandler(BaseHandler):
                 id_server,
                 requester,
                 txn_id=None,
+                id_access_token=id_access_token,
             )
 
         result = {"room_id": room_id}
@@ -671,7 +685,7 @@ class RoomCreationHandler(BaseHandler):
             result["room_alias"] = room_alias.to_string()
             yield directory_handler.send_room_alias_update_event(requester, room_id)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _send_events_for_new_room(
@@ -796,7 +810,7 @@ class RoomCreationHandler(BaseHandler):
                     room_creator_user_id=creator_id,
                     is_public=is_public,
                 )
-                defer.returnValue(gen_room_id)
+                return gen_room_id
             except StoreError:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a room ID.")
@@ -839,8 +853,7 @@ class RoomContextHandler(object):
             event_id, get_prev_content=True, allow_none=True
         )
         if not event:
-            defer.returnValue(None)
-            return
+            return None
 
         filtered = yield (filter_evts([event]))
         if not filtered:
@@ -890,7 +903,7 @@ class RoomContextHandler(object):
 
         results["end"] = token.copy_and_replace("room_key", results["end"]).to_string()
 
-        defer.returnValue(results)
+        return results
 
 
 class RoomEventSource(object):
@@ -941,7 +954,7 @@ class RoomEventSource(object):
             else:
                 end_key = to_key
 
-        defer.returnValue((events, end_key))
+        return (events, end_key)
 
     def get_current_key(self):
         return self.store.get_room_events_max_id()
@@ -959,4 +972,4 @@ class RoomEventSource(object):
             limit=config.limit,
         )
 
-        defer.returnValue((events, next_key))
+        return (events, next_key)

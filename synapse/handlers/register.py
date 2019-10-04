@@ -24,13 +24,11 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     ConsentNotGivenError,
-    InvalidCaptchaError,
     LimitExceededError,
     RegistrationError,
     SynapseError,
 )
 from synapse.config.server import is_threepid_reserved
-from synapse.http.client import CaptchaServerHttpClient
 from synapse.http.servlet import assert_params_in_dict
 from synapse.replication.http.login import RegisterDeviceReplicationServlet
 from synapse.replication.http.register import (
@@ -39,7 +37,6 @@ from synapse.replication.http.register import (
 )
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
-from synapse.util.threepids import check_3pid_allowed
 
 from ._base import BaseHandler
 
@@ -59,7 +56,6 @@ class RegistrationHandler(BaseHandler):
         self._auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
-        self.captcha_client = CaptchaServerHttpClient(hs)
         self.identity_handler = self.hs.get_handlers().identity_handler
         self.ratelimiter = hs.get_registration_ratelimiter()
 
@@ -83,6 +79,8 @@ class RegistrationHandler(BaseHandler):
         else:
             self.device_handler = hs.get_device_handler()
             self.pusher_pool = hs.get_pusherpool()
+
+        self.session_lifetime = hs.config.session_lifetime
 
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None, assigned_user_id=None):
@@ -138,11 +136,10 @@ class RegistrationHandler(BaseHandler):
                 )
 
     @defer.inlineCallbacks
-    def register(
+    def register_user(
         self,
         localpart=None,
         password=None,
-        generate_token=True,
         guest_access_token=None,
         make_guest=False,
         admin=False,
@@ -160,11 +157,6 @@ class RegistrationHandler(BaseHandler):
             password (unicode) : The password to assign to this user so they can
               login again. This can be None which means they cannot login again
               via a password (e.g. the user is an application service user).
-            generate_token (bool): Whether a new access token should be
-              generated. Having this be True should be considered deprecated,
-              since it offers no means of associating a device_id with the
-              access_token. Instead you should call auth_handler.issue_access_token
-              after registration.
             user_type (str|None): type of user. One of the values from
               api.constants.UserTypes, or None for a normal user.
             default_display_name (unicode|None): if set, the new user's displayname
@@ -172,7 +164,7 @@ class RegistrationHandler(BaseHandler):
             address (str|None): the IP address used to perform the registration.
             bind_emails (List[str]): list of emails to bind to this account.
         Returns:
-            A tuple of (user_id, access_token).
+            Deferred[str]: user_id
         Raises:
             RegistrationError if there was a problem registering.
         """
@@ -206,12 +198,8 @@ class RegistrationHandler(BaseHandler):
             elif default_display_name is None:
                 default_display_name = localpart
 
-            token = None
-            if generate_token:
-                token = self.macaroon_gen.generate_access_token(user_id)
             yield self.register_with_store(
                 user_id=user_id,
-                token=token,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
@@ -230,21 +218,17 @@ class RegistrationHandler(BaseHandler):
         else:
             # autogen a sequential user ID
             attempts = 0
-            token = None
             user = None
             while not user:
                 localpart = yield self._generate_user_id(attempts > 0)
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 yield self.check_user_id_not_appservice_exclusive(user_id)
-                if generate_token:
-                    token = self.macaroon_gen.generate_access_token(user_id)
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
                     yield self.register_with_store(
                         user_id=user_id,
-                        token=token,
                         password_hash=password_hash,
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
@@ -254,10 +238,15 @@ class RegistrationHandler(BaseHandler):
                     # if user id is taken, just generate another
                     user = None
                     user_id = None
-                    token = None
                     attempts += 1
+
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
+        else:
+            logger.info(
+                "Skipping auto-join for %s because consent is required at registration",
+                user_id,
+            )
 
         # Bind any specified emails to this account
         current_time = self.hs.get_clock().time_msec()
@@ -272,7 +261,7 @@ class RegistrationHandler(BaseHandler):
             # Bind email to new account
             yield self._register_email_threepid(user_id, threepid_dict, None, False)
 
-        defer.returnValue((user_id, token))
+        return user_id
 
     @defer.inlineCallbacks
     def _auto_join_rooms(self, user_id):
@@ -286,18 +275,15 @@ class RegistrationHandler(BaseHandler):
         fake_requester = create_requester(user_id)
 
         # try to create the room if we're the first real user on the server. Note
-        # that an auto-generated support user is not a real user and will never be
+        # that an auto-generated support or bot user is not a real user and will never be
         # the user to create the room
         should_auto_create_rooms = False
-        is_support = yield self.store.is_support_user(user_id)
-        # There is an edge case where the first user is the support user, then
-        # the room is never created, though this seems unlikely and
-        # recoverable from given the support user being involved in the first
-        # place.
-        if self.hs.config.autocreate_auto_join_rooms and not is_support:
-            count = yield self.store.count_all_users()
+        is_real_user = yield self.store.is_real_user(user_id)
+        if self.hs.config.autocreate_auto_join_rooms and is_real_user:
+            count = yield self.store.count_real_users()
             should_auto_create_rooms = count == 1
         for r in self.hs.config.auto_join_rooms:
+            logger.info("Auto-joining %s to %s", user_id, r)
             try:
                 if should_auto_create_rooms:
                     room_alias = RoomAlias.from_string(r)
@@ -366,71 +352,7 @@ class RegistrationHandler(BaseHandler):
             appservice_id=service_id,
             create_profile_with_displayname=user.localpart,
         )
-        defer.returnValue(user_id)
-
-    @defer.inlineCallbacks
-    def check_recaptcha(self, ip, private_key, challenge, response):
-        """
-        Checks a recaptcha is correct.
-
-        Used only by c/s api v1
-        """
-
-        captcha_response = yield self._validate_captcha(
-            ip, private_key, challenge, response
-        )
-        if not captcha_response["valid"]:
-            logger.info(
-                "Invalid captcha entered from %s. Error: %s",
-                ip,
-                captcha_response["error_url"],
-            )
-            raise InvalidCaptchaError(error_url=captcha_response["error_url"])
-        else:
-            logger.info("Valid captcha entered from %s", ip)
-
-    @defer.inlineCallbacks
-    def register_email(self, threepidCreds):
-        """
-        Registers emails with an identity server.
-
-        Used only by c/s api v1
-        """
-
-        for c in threepidCreds:
-            logger.info(
-                "validating threepidcred sid %s on id server %s",
-                c["sid"],
-                c["idServer"],
-            )
-            try:
-                threepid = yield self.identity_handler.threepid_from_creds(c)
-            except Exception:
-                logger.exception("Couldn't validate 3pid")
-                raise RegistrationError(400, "Couldn't validate 3pid")
-
-            if not threepid:
-                raise RegistrationError(400, "Couldn't validate 3pid")
-            logger.info(
-                "got threepid with medium '%s' and address '%s'",
-                threepid["medium"],
-                threepid["address"],
-            )
-
-            if not check_3pid_allowed(self.hs, threepid["medium"], threepid["address"]):
-                raise RegistrationError(403, "Third party identifier is not allowed")
-
-    @defer.inlineCallbacks
-    def bind_emails(self, user_id, threepidCreds):
-        """Links emails with a user ID and informs an identity server.
-
-        Used only by c/s api v1
-        """
-
-        # Now we have a matrix ID, bind it to the threepids we were given
-        for c in threepidCreds:
-            # XXX: This should be a deferred list, shouldn't it?
-            yield self.identity_handler.bind_threepid(c, user_id)
+        return user_id
 
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
         # don't allow people to register the server notices mxid
@@ -467,98 +389,10 @@ class RegistrationHandler(BaseHandler):
 
         id = self._next_generated_user_id
         self._next_generated_user_id += 1
-        defer.returnValue(str(id))
-
-    @defer.inlineCallbacks
-    def _validate_captcha(self, ip_addr, private_key, challenge, response):
-        """Validates the captcha provided.
-
-        Used only by c/s api v1
-
-        Returns:
-            dict: Containing 'valid'(bool) and 'error_url'(str) if invalid.
-
-        """
-        response = yield self._submit_captcha(ip_addr, private_key, challenge, response)
-        # parse Google's response. Lovely format..
-        lines = response.split("\n")
-        json = {
-            "valid": lines[0] == "true",
-            "error_url": "http://www.recaptcha.net/recaptcha/api/challenge?"
-            + "error=%s" % lines[1],
-        }
-        defer.returnValue(json)
-
-    @defer.inlineCallbacks
-    def _submit_captcha(self, ip_addr, private_key, challenge, response):
-        """
-        Used only by c/s api v1
-        """
-        data = yield self.captcha_client.post_urlencoded_get_raw(
-            "http://www.recaptcha.net:80/recaptcha/api/verify",
-            args={
-                "privatekey": private_key,
-                "remoteip": ip_addr,
-                "challenge": challenge,
-                "response": response,
-            },
-        )
-        defer.returnValue(data)
-
-    @defer.inlineCallbacks
-    def get_or_create_user(self, requester, localpart, displayname, password_hash=None):
-        """Creates a new user if the user does not exist,
-        else revokes all previous access tokens and generates a new one.
-
-        Args:
-            localpart : The local part of the user ID to register. If None,
-              one will be randomly generated.
-        Returns:
-            A tuple of (user_id, access_token).
-        Raises:
-            RegistrationError if there was a problem registering.
-
-        NB this is only used in tests. TODO: move it to the test package!
-        """
-        if localpart is None:
-            raise SynapseError(400, "Request must include user id")
-        yield self.auth.check_auth_blocking()
-        need_register = True
-
-        try:
-            yield self.check_username(localpart)
-        except SynapseError as e:
-            if e.errcode == Codes.USER_IN_USE:
-                need_register = False
-            else:
-                raise
-
-        user = UserID(localpart, self.hs.hostname)
-        user_id = user.to_string()
-        token = self.macaroon_gen.generate_access_token(user_id)
-
-        if need_register:
-            yield self.register_with_store(
-                user_id=user_id,
-                token=token,
-                password_hash=password_hash,
-                create_profile_with_displayname=user.localpart,
-            )
-        else:
-            yield self._auth_handler.delete_access_tokens_for_user(user_id)
-            yield self.store.add_access_token_to_user(user_id=user_id, token=token)
-
-        if displayname is not None:
-            logger.info("setting user display name: %s -> %s", user_id, displayname)
-            yield self.profile_handler.set_displayname(
-                user, requester, displayname, by_admin=True
-            )
-
-        defer.returnValue((user_id, token))
+        return str(id)
 
     @defer.inlineCallbacks
     def _join_user_to_room(self, requester, room_identifier):
-        room_id = None
         room_member_handler = self.hs.get_room_member_handler()
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
@@ -585,7 +419,6 @@ class RegistrationHandler(BaseHandler):
     def register_with_store(
         self,
         user_id,
-        token=None,
         password_hash=None,
         was_guest=False,
         make_guest=False,
@@ -599,9 +432,6 @@ class RegistrationHandler(BaseHandler):
 
         Args:
             user_id (str): The desired user ID to register.
-            token (str): The desired access token to use for this user. If this
-                is not None, the given access token is associated with the user
-                id.
             password_hash (str|None): Optional. The password hash for this user.
             was_guest (bool): Optional. Whether this is a guest account being
                 upgraded to a non-guest account.
@@ -637,7 +467,6 @@ class RegistrationHandler(BaseHandler):
         if self.hs.config.worker_app:
             return self._register_client(
                 user_id=user_id,
-                token=token,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
@@ -648,9 +477,8 @@ class RegistrationHandler(BaseHandler):
                 address=address,
             )
         else:
-            return self.store.register(
+            return self.store.register_user(
                 user_id=user_id,
-                token=token,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
@@ -663,6 +491,8 @@ class RegistrationHandler(BaseHandler):
     @defer.inlineCallbacks
     def register_device(self, user_id, device_id, initial_display_name, is_guest=False):
         """Register a device for a user and generate an access token.
+
+        The access token will be limited by the homeserver's session_lifetime config.
 
         Args:
             user_id (str): full canonical @user:id
@@ -683,26 +513,33 @@ class RegistrationHandler(BaseHandler):
                 initial_display_name=initial_display_name,
                 is_guest=is_guest,
             )
-            defer.returnValue((r["device_id"], r["access_token"]))
-        else:
-            device_id = yield self.device_handler.check_device_registered(
-                user_id, device_id, initial_display_name
-            )
-            if is_guest:
-                access_token = self.macaroon_gen.generate_access_token(
-                    user_id, ["guest = true"]
-                )
-            else:
-                access_token = yield self._auth_handler.get_access_token_for_user_id(
-                    user_id, device_id=device_id
-                )
+            return r["device_id"], r["access_token"]
 
-            defer.returnValue((device_id, access_token))
+        valid_until_ms = None
+        if self.session_lifetime is not None:
+            if is_guest:
+                raise Exception(
+                    "session_lifetime is not currently implemented for guest access"
+                )
+            valid_until_ms = self.clock.time_msec() + self.session_lifetime
+
+        device_id = yield self.device_handler.check_device_registered(
+            user_id, device_id, initial_display_name
+        )
+        if is_guest:
+            assert valid_until_ms is None
+            access_token = self.macaroon_gen.generate_access_token(
+                user_id, ["guest = true"]
+            )
+        else:
+            access_token = yield self._auth_handler.get_access_token_for_user_id(
+                user_id, device_id=device_id, valid_until_ms=valid_until_ms
+            )
+
+        return (device_id, access_token)
 
     @defer.inlineCallbacks
-    def post_registration_actions(
-        self, user_id, auth_result, access_token, bind_email, bind_msisdn
-    ):
+    def post_registration_actions(self, user_id, auth_result, access_token):
         """A user has completed registration
 
         Args:
@@ -711,18 +548,10 @@ class RegistrationHandler(BaseHandler):
                 registered user.
             access_token (str|None): The access token of the newly logged in
                 device, or None if `inhibit_login` enabled.
-            bind_email (bool): Whether to bind the email with the identity
-                server.
-            bind_msisdn (bool): Whether to bind the msisdn with the identity
-                server.
         """
         if self.hs.config.worker_app:
             yield self._post_registration_client(
-                user_id=user_id,
-                auth_result=auth_result,
-                access_token=access_token,
-                bind_email=bind_email,
-                bind_msisdn=bind_msisdn,
+                user_id=user_id, auth_result=auth_result, access_token=access_token
             )
             return
 
@@ -735,13 +564,11 @@ class RegistrationHandler(BaseHandler):
             ):
                 yield self.store.upsert_monthly_active_user(user_id)
 
-            yield self._register_email_threepid(
-                user_id, threepid, access_token, bind_email
-            )
+            yield self._register_email_threepid(user_id, threepid, access_token)
 
         if auth_result and LoginType.MSISDN in auth_result:
             threepid = auth_result[LoginType.MSISDN]
-            yield self._register_msisdn_threepid(user_id, threepid, bind_msisdn)
+            yield self._register_msisdn_threepid(user_id, threepid)
 
         if auth_result and LoginType.TERMS in auth_result:
             yield self._on_user_consented(user_id, self.hs.config.user_consent_version)
@@ -760,13 +587,11 @@ class RegistrationHandler(BaseHandler):
         yield self.post_consent_actions(user_id)
 
     @defer.inlineCallbacks
-    def _register_email_threepid(self, user_id, threepid, token, bind_email):
+    def _register_email_threepid(self, user_id, threepid, token):
         """Add an email address as a 3pid identifier
 
         Also adds an email pusher for the email address, if configured in the
         HS config
-
-        Also optionally binds emails to the given user_id on the identity server
 
         Must be called on master.
 
@@ -775,8 +600,6 @@ class RegistrationHandler(BaseHandler):
             threepid (object): m.login.email.identity auth response
             token (str|None): access_token for the user, or None if not logged
                 in.
-            bind_email (bool): true if the client requested the email to be
-                bound at the identity server
         Returns:
             defer.Deferred:
         """
@@ -818,29 +641,15 @@ class RegistrationHandler(BaseHandler):
                 data={},
             )
 
-        if bind_email:
-            logger.info("bind_email specified: binding")
-            logger.debug("Binding emails %s to %s" % (threepid, user_id))
-            yield self.identity_handler.bind_threepid(
-                threepid["threepid_creds"], user_id
-            )
-        else:
-            logger.info("bind_email not specified: not binding email")
-
     @defer.inlineCallbacks
-    def _register_msisdn_threepid(self, user_id, threepid, bind_msisdn):
+    def _register_msisdn_threepid(self, user_id, threepid):
         """Add a phone number as a 3pid identifier
-
-        Also optionally binds msisdn to the given user_id on the identity server
 
         Must be called on master.
 
         Args:
             user_id (str): id of user
             threepid (object): m.login.msisdn auth response
-            token (str): access_token for the user
-            bind_email (bool): true if the client requested the email to be
-                bound at the identity server
         Returns:
             defer.Deferred:
         """
@@ -850,18 +659,9 @@ class RegistrationHandler(BaseHandler):
             if ex.errcode == Codes.MISSING_PARAM:
                 # This will only happen if the ID server returns a malformed response
                 logger.info("Can't add incomplete 3pid")
-                defer.returnValue(None)
+                return None
             raise
 
         yield self._auth_handler.add_threepid(
             user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
         )
-
-        if bind_msisdn:
-            logger.info("bind_msisdn specified: binding")
-            logger.debug("Binding msisdn %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(
-                threepid["threepid_creds"], user_id
-            )
-        else:
-            logger.info("bind_msisdn not specified: not binding msisdn")

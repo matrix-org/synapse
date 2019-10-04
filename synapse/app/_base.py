@@ -15,7 +15,9 @@
 
 import gc
 import logging
+import os
 import signal
+import socket
 import sys
 import traceback
 
@@ -34,21 +36,23 @@ from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 
+# list of tuples of function, args list, kwargs dict
 _sighup_callbacks = []
 
 
-def register_sighup(func):
+def register_sighup(func, *args, **kwargs):
     """
     Register a function to be called when a SIGHUP occurs.
 
     Args:
         func (function): Function to be called when sent a SIGHUP signal.
-            Will be called with a single argument, the homeserver.
+            Will be called with a single default argument, the homeserver.
+        *args, **kwargs: args and kwargs to be passed to the target function.
     """
-    _sighup_callbacks.append(func)
+    _sighup_callbacks.append((func, args, kwargs))
 
 
-def start_worker_reactor(appname, config):
+def start_worker_reactor(appname, config, run_command=reactor.run):
     """ Run the reactor in the main process
 
     Daemonizes if necessary, and then configures some resources, before starting
@@ -57,6 +61,7 @@ def start_worker_reactor(appname, config):
     Args:
         appname (str): application name which will be sent to syslog
         config (synapse.config.Config): config object
+        run_command (Callable[]): callable that actually runs the reactor
     """
 
     logger = logging.getLogger(config.worker_app)
@@ -69,11 +74,19 @@ def start_worker_reactor(appname, config):
         daemonize=config.worker_daemonize,
         print_pidfile=config.print_pidfile,
         logger=logger,
+        run_command=run_command,
     )
 
 
 def start_reactor(
-    appname, soft_file_limit, gc_thresholds, pid_file, daemonize, print_pidfile, logger
+    appname,
+    soft_file_limit,
+    gc_thresholds,
+    pid_file,
+    daemonize,
+    print_pidfile,
+    logger,
+    run_command=reactor.run,
 ):
     """ Run the reactor in the main process
 
@@ -88,6 +101,7 @@ def start_reactor(
         daemonize (bool): true to run the reactor in a background process
         print_pidfile (bool): whether to print the pid file, if daemonize is True
         logger (logging.Logger): logger instance to pass to Daemonize
+        run_command (Callable[]): callable that actually runs the reactor
     """
 
     install_dns_limiter(reactor)
@@ -97,7 +111,7 @@ def start_reactor(
         change_resource_limit(soft_file_limit)
         if gc_thresholds:
             gc.set_threshold(*gc_thresholds)
-        reactor.run()
+        run_command()
 
     # make sure that we run the reactor with the sentinel log context,
     # otherwise other PreserveLoggingContext instances will get confused
@@ -139,8 +153,7 @@ def listen_metrics(bind_addresses, port):
     """
     Start Prometheus metrics server.
     """
-    from synapse.metrics import RegistryProxy
-    from prometheus_client import start_http_server
+    from synapse.metrics import RegistryProxy, start_http_server
 
     for host in bind_addresses:
         logger.info("Starting metrics listener on %s:%d", host, port)
@@ -233,8 +246,14 @@ def start(hs, listeners=None):
         if hasattr(signal, "SIGHUP"):
 
             def handle_sighup(*args, **kwargs):
-                for i in _sighup_callbacks:
-                    i(hs)
+                # Tell systemd our state, if we're using it. This will silently fail if
+                # we're not using systemd.
+                sdnotify(b"RELOADING=1")
+
+                for i, args, kwargs in _sighup_callbacks:
+                    i(hs, *args, **kwargs)
+
+                sdnotify(b"READY=1")
 
             signal.signal(signal.SIGHUP, handle_sighup)
 
@@ -243,11 +262,17 @@ def start(hs, listeners=None):
         # Load the certificate from disk.
         refresh_certificate(hs)
 
+        # Start the tracer
+        synapse.logging.opentracing.init_tracer(  # type: ignore[attr-defined] # noqa
+            hs.config
+        )
+
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)
         hs.get_datastore().start_profiling()
 
         setup_sentry(hs)
+        setup_sdnotify(hs)
     except Exception:
         traceback.print_exc(file=sys.stderr)
         reactor = hs.get_reactor()
@@ -278,6 +303,21 @@ def setup_sentry(hs):
         name = hs.config.worker_name if hs.config.worker_name else "master"
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)
+
+
+def setup_sdnotify(hs):
+    """Adds process state hooks to tell systemd what we are up to.
+    """
+
+    # Tell systemd our state, if we're using it. This will silently fail if
+    # we're not using systemd.
+    hs.get_reactor().addSystemEventTrigger(
+        "after", "startup", sdnotify, b"READY=1\nMAINPID=%i" % (os.getpid(),)
+    )
+
+    hs.get_reactor().addSystemEventTrigger(
+        "before", "shutdown", sdnotify, b"STOPPING=1"
+    )
 
 
 def install_dns_limiter(reactor, max_dns_requests_in_flight=100):
@@ -373,3 +413,35 @@ class _DeferredResolutionReceiver(object):
     def resolutionComplete(self):
         self._deferred.callback(())
         self._receiver.resolutionComplete()
+
+
+sdnotify_sockaddr = os.getenv("NOTIFY_SOCKET")
+
+
+def sdnotify(state):
+    """
+    Send a notification to systemd, if the NOTIFY_SOCKET env var is set.
+
+    This function is based on the sdnotify python package, but since it's only a few
+    lines of code, it's easier to duplicate it here than to add a dependency on a
+    package which many OSes don't include as a matter of principle.
+
+    Args:
+        state (bytes): notification to send
+    """
+    if not isinstance(state, bytes):
+        raise TypeError("sdnotify should be called with a bytes")
+    if not sdnotify_sockaddr:
+        return
+    addr = sdnotify_sockaddr
+    if addr[0] == "@":
+        addr = "\0" + addr[1:]
+
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+            sock.connect(addr)
+            sock.sendall(state)
+    except Exception as e:
+        # this is a bit surprising, since we don't expect to have a NOTIFY_SOCKET
+        # unless systemd is expecting us to notify it.
+        logger.warning("Unable to send notification to systemd: %s", e)

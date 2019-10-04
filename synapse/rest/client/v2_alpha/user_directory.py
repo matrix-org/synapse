@@ -60,7 +60,7 @@ class UserDirectorySearchRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         if not self.hs.config.user_directory_search_enabled:
-            defer.returnValue((200, {"limited": False, "results": []}))
+            return 200, {"limited": False, "results": []}
 
         body = parse_json_object_from_request(request)
 
@@ -76,7 +76,7 @@ class UserDirectorySearchRestServlet(RestServlet):
             user_id, search_term, limit
         )
 
-        defer.returnValue((200, results))
+        return 200, results
 
 
 def register_servlets(hs, http_server):

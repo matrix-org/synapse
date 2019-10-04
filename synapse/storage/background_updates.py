@@ -115,7 +115,7 @@ class BackgroundUpdateStore(SQLBaseStore):
                         " Unscheduling background update task."
                     )
                     self._all_done = True
-                    defer.returnValue(None)
+                    return None
 
     @defer.inlineCallbacks
     def has_completed_background_updates(self):
@@ -127,11 +127,11 @@ class BackgroundUpdateStore(SQLBaseStore):
         # if we've previously determined that there is nothing left to do, that
         # is easy
         if self._all_done:
-            defer.returnValue(True)
+            return True
 
         # obviously, if we have things in our queue, we're not done.
         if self._background_update_queue:
-            defer.returnValue(False)
+            return False
 
         # otherwise, check if there are updates to be run. This is important,
         # as we may be running on a worker which doesn't perform the bg updates
@@ -140,13 +140,33 @@ class BackgroundUpdateStore(SQLBaseStore):
             "background_updates",
             keyvalues=None,
             retcol="1",
-            desc="check_background_updates",
+            desc="has_completed_background_updates",
         )
         if not updates:
             self._all_done = True
-            defer.returnValue(True)
+            return True
 
-        defer.returnValue(False)
+        return False
+
+    async def has_completed_background_update(self, update_name) -> bool:
+        """Check if the given background update has finished running.
+        """
+
+        if self._all_done:
+            return True
+
+        if update_name in self._background_update_queue:
+            return False
+
+        update_exists = await self._simple_select_one_onecol(
+            "background_updates",
+            keyvalues={"update_name": update_name},
+            retcol="1",
+            desc="has_completed_background_update",
+            allow_none=True,
+        )
+
+        return not update_exists
 
     @defer.inlineCallbacks
     def do_next_background_update(self, desired_duration_ms):
@@ -173,14 +193,14 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         if not self._background_update_queue:
             # no work left to do
-            defer.returnValue(None)
+            return None
 
         # pop from the front, and add back to the back
         update_name = self._background_update_queue.pop(0)
         self._background_update_queue.append(update_name)
 
         res = yield self._do_background_update(update_name, desired_duration_ms)
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def _do_background_update(self, update_name, desired_duration_ms):
@@ -218,7 +238,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         duration_ms = time_stop - time_start
 
         logger.info(
-            "Updating %r. Updated %r items in %rms."
+            "Running background update %r. Processed %r items in %rms."
             " (total_rate=%r/ms, current_rate=%r/ms, total_updated=%r, batch_size=%r)",
             update_name,
             items_updated,
@@ -231,7 +251,7 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         performance.update(items_updated, duration_ms)
 
-        defer.returnValue(len(self._background_update_performance))
+        return len(self._background_update_performance)
 
     def register_background_update_handler(self, update_name, update_handler):
         """Register a handler for doing a background update.
@@ -266,7 +286,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         @defer.inlineCallbacks
         def noop_update(progress, batch_size):
             yield self._end_background_update(update_name)
-            defer.returnValue(1)
+            return 1
 
         self.register_background_update_handler(update_name, noop_update)
 
@@ -370,7 +390,7 @@ class BackgroundUpdateStore(SQLBaseStore):
                 logger.info("Adding index %s to %s", index_name, table)
                 yield self.runWithConnection(runner)
             yield self._end_background_update(update_name)
-            defer.returnValue(1)
+            return 1
 
         self.register_background_update_handler(update_name, updater)
 

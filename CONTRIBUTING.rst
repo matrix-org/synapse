@@ -30,11 +30,10 @@ use github's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
-We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Buildkite
-<https://buildkite.com/matrix-dot-org/synapse>`_ for continuous integration.
-Buildkite builds need to be authorised by a maintainer. If your change breaks
-the build, this will be shown in GitHub, so please keep an eye on the pull
-request for feedback.
+We use `Buildkite <https://buildkite.com/matrix-dot-org/synapse>`_ for
+continuous integration.  Buildkite builds need to be authorised by a
+maintainer. If your change breaks the build, this will be shown in GitHub, so
+please keep an eye on the pull request for feedback.
 
 To run unit tests in a local development environment, you can use:
 
@@ -57,7 +56,7 @@ Code style
 
 All Matrix projects have a well-defined code-style - and sometimes we've even
 got as far as documenting it... For instance, synapse's code style doc lives
-at https://github.com/matrix-org/synapse/tree/master/docs/code_style.rst.
+at https://github.com/matrix-org/synapse/tree/master/docs/code_style.md.
 
 Please ensure your changes match the cosmetic style of the existing project,
 and **never** mix cosmetic and functional changes in the same commit, as it
@@ -70,13 +69,21 @@ All changes, even minor ones, need a corresponding changelog / newsfragment
 entry. These are managed by Towncrier
 (https://github.com/hawkowl/towncrier).
 
-To create a changelog entry, make a new file in the ``changelog.d``
-file named in the format of ``PRnumber.type``. The type can be
-one of ``feature``, ``bugfix``, ``removal`` (also used for
-deprecations), or ``misc`` (for internal-only changes).
+To create a changelog entry, make a new file in the ``changelog.d`` file named
+in the format of ``PRnumber.type``. The type can be one of the following:
 
-The content of the file is your changelog entry, which can contain Markdown
-formatting. The entry should end with a full stop ('.') for consistency.
+* ``feature``.
+* ``bugfix``.
+* ``docker`` (for updates to the Docker image).
+* ``doc`` (for updates to the documentation).
+* ``removal`` (also used for deprecations).
+* ``misc`` (for internal-only changes).
+
+The content of the file is your changelog entry, which should be a short
+description of your change in the same style as the rest of our `changelog
+<https://github.com/matrix-org/synapse/blob/master/CHANGES.md>`_. The file can
+contain Markdown formatting, and should end with a full stop ('.') for
+consistency.
 
 Adding credits to the changelog is encouraged, we value your
 contributions and would like to have you shouted out in the release notes!

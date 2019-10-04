@@ -86,7 +86,7 @@ class ServerNoticesManager(object):
         res = yield self._event_creation_handler.create_and_send_nonmember_event(
             requester, event_dict, ratelimit=False
         )
-        defer.returnValue(res)
+        return res
 
     @cachedInlineCallbacks()
     def get_notice_room_for_user(self, user_id):
@@ -120,7 +120,7 @@ class ServerNoticesManager(object):
                 # we found a room which our user shares with the system notice
                 # user
                 logger.info("Using room %s", room.room_id)
-                defer.returnValue(room.room_id)
+                return room.room_id
 
         # apparently no existing notice room: create a new one
         logger.info("Creating server notices room for %s", user_id)
@@ -158,4 +158,4 @@ class ServerNoticesManager(object):
         self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
         logger.info("Created server notices room %s for %s", room_id, user_id)
-        defer.returnValue(room_id)
+        return room_id

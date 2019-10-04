@@ -16,8 +16,7 @@
 import logging
 from collections import namedtuple
 
-from six import PY3, iteritems
-from six.moves import range
+from six import iteritems
 
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
@@ -25,8 +24,8 @@ from unpaddedbase64 import decode_base64, encode_base64
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.errors import Codes, HttpResponseException
 from synapse.types import ThirdPartyInstanceID
-from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -35,7 +34,6 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 REMOTE_ROOM_LIST_POLL_INTERVAL = 60 * 1000
-
 
 # This is used to indicate we should only return rooms published to the main list.
 EMPTY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
@@ -71,6 +69,8 @@ class RoomListHandler(BaseHandler):
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
+            from_federation (bool): true iff the request comes from the federation
+                API
         """
         if not self.enable_room_list_search:
             return defer.succeed({"chunk": [], "total_room_count_estimate": 0})
@@ -132,239 +132,117 @@ class RoomListHandler(BaseHandler):
             from_federation (bool): Whether this request originated from a
                 federating server or a client. Used for room filtering.
             timeout (int|None): Amount of seconds to wait for a response before
-                timing out.
+                timing out. TODO
         """
-        if since_token and since_token != "END":
-            since_token = RoomListNextBatch.from_token(since_token)
-        else:
-            since_token = None
 
-        rooms_to_order_value = {}
-        rooms_to_num_joined = {}
+        # Pagination tokens work by storing the room ID sent in the last batch,
+        # plus the direction (forwards or backwards). Next batch tokens always
+        # go forwards, prev batch tokens always go backwards.
 
-        newly_visible = []
-        newly_unpublished = []
         if since_token:
-            stream_token = since_token.stream_ordering
-            current_public_id = yield self.store.get_current_public_room_stream_id()
-            public_room_stream_id = since_token.public_room_stream_id
-            newly_visible, newly_unpublished = yield self.store.get_public_room_changes(
-                public_room_stream_id, current_public_id, network_tuple=network_tuple
-            )
-        else:
-            stream_token = yield self.store.get_room_max_stream_ordering()
-            public_room_stream_id = yield self.store.get_current_public_room_stream_id()
+            batch_token = RoomListNextBatch.from_token(since_token)
 
-        room_ids = yield self.store.get_public_room_ids_at_stream_id(
-            public_room_stream_id, network_tuple=network_tuple
+            bounds = (batch_token.last_joined_members, batch_token.last_room_id)
+            forwards = batch_token.direction_is_forward
+        else:
+            batch_token = None
+            bounds = None
+
+            forwards = True
+
+        # we request one more than wanted to see if there are more pages to come
+        probing_limit = limit + 1 if limit is not None else None
+
+        results = yield self.store.get_largest_public_rooms(
+            network_tuple,
+            search_filter,
+            probing_limit,
+            bounds=bounds,
+            forwards=forwards,
+            ignore_non_federatable=from_federation,
         )
 
-        # We want to return rooms in a particular order: the number of joined
-        # users. We then arbitrarily use the room_id as a tie breaker.
+        def build_room_entry(room):
+            entry = {
+                "room_id": room["room_id"],
+                "name": room["name"],
+                "topic": room["topic"],
+                "canonical_alias": room["canonical_alias"],
+                "num_joined_members": room["joined_members"],
+                "avatar_url": room["avatar"],
+                "world_readable": room["history_visibility"] == "world_readable",
+                "guest_can_join": room["guest_access"] == "can_join",
+            }
 
-        @defer.inlineCallbacks
-        def get_order_for_room(room_id):
-            # Most of the rooms won't have changed between the since token and
-            # now (especially if the since token is "now"). So, we can ask what
-            # the current users are in a room (that will hit a cache) and then
-            # check if the room has changed since the since token. (We have to
-            # do it in that order to avoid races).
-            # If things have changed then fall back to getting the current state
-            # at the since token.
-            joined_users = yield self.store.get_users_in_room(room_id)
-            if self.store.has_room_changed_since(room_id, stream_token):
-                latest_event_ids = yield self.store.get_forward_extremeties_for_room(
-                    room_id, stream_token
-                )
+            # Filter out Nones – rather omit the field altogether
+            return {k: v for k, v in entry.items() if v is not None}
 
-                if not latest_event_ids:
-                    return
+        results = [build_room_entry(r) for r in results]
 
-                joined_users = yield self.state_handler.get_current_users_in_room(
-                    room_id, latest_event_ids
-                )
+        response = {}
+        num_results = len(results)
+        if limit is not None:
+            more_to_come = num_results == probing_limit
 
-            num_joined_users = len(joined_users)
-            rooms_to_num_joined[room_id] = num_joined_users
+            # Depending on direction we trim either the front or back.
+            if forwards:
+                results = results[:limit]
+            else:
+                results = results[-limit:]
+        else:
+            more_to_come = False
 
-            if num_joined_users == 0:
-                return
+        if num_results > 0:
+            final_entry = results[-1]
+            initial_entry = results[0]
 
-            # We want larger rooms to be first, hence negating num_joined_users
-            rooms_to_order_value[room_id] = (-num_joined_users, room_id)
+            if forwards:
+                if batch_token:
+                    # If there was a token given then we assume that there
+                    # must be previous results.
+                    response["prev_batch"] = RoomListNextBatch(
+                        last_joined_members=initial_entry["num_joined_members"],
+                        last_room_id=initial_entry["room_id"],
+                        direction_is_forward=False,
+                    ).to_token()
 
-        logger.info(
-            "Getting ordering for %i rooms since %s", len(room_ids), stream_token
+                if more_to_come:
+                    response["next_batch"] = RoomListNextBatch(
+                        last_joined_members=final_entry["num_joined_members"],
+                        last_room_id=final_entry["room_id"],
+                        direction_is_forward=True,
+                    ).to_token()
+            else:
+                if batch_token:
+                    response["next_batch"] = RoomListNextBatch(
+                        last_joined_members=final_entry["num_joined_members"],
+                        last_room_id=final_entry["room_id"],
+                        direction_is_forward=True,
+                    ).to_token()
+
+                if more_to_come:
+                    response["prev_batch"] = RoomListNextBatch(
+                        last_joined_members=initial_entry["num_joined_members"],
+                        last_room_id=initial_entry["room_id"],
+                        direction_is_forward=False,
+                    ).to_token()
+
+        for room in results:
+            # populate search result entries with additional fields, namely
+            # 'aliases'
+            room_id = room["room_id"]
+
+            aliases = yield self.store.get_aliases_for_room(room_id)
+            if aliases:
+                room["aliases"] = aliases
+
+        response["chunk"] = results
+
+        response["total_room_count_estimate"] = yield self.store.count_public_rooms(
+            network_tuple, ignore_non_federatable=from_federation
         )
-        yield concurrently_execute(get_order_for_room, room_ids, 10)
 
-        sorted_entries = sorted(rooms_to_order_value.items(), key=lambda e: e[1])
-        sorted_rooms = [room_id for room_id, _ in sorted_entries]
-
-        # `sorted_rooms` should now be a list of all public room ids that is
-        # stable across pagination. Therefore, we can use indices into this
-        # list as our pagination tokens.
-
-        # Filter out rooms that we don't want to return
-        rooms_to_scan = [
-            r
-            for r in sorted_rooms
-            if r not in newly_unpublished and rooms_to_num_joined[r] > 0
-        ]
-
-        total_room_count = len(rooms_to_scan)
-
-        if since_token:
-            # Filter out rooms we've already returned previously
-            # `since_token.current_limit` is the index of the last room we
-            # sent down, so we exclude it and everything before/after it.
-            if since_token.direction_is_forward:
-                rooms_to_scan = rooms_to_scan[since_token.current_limit + 1 :]
-            else:
-                rooms_to_scan = rooms_to_scan[: since_token.current_limit]
-                rooms_to_scan.reverse()
-
-        logger.info("After sorting and filtering, %i rooms remain", len(rooms_to_scan))
-
-        # _append_room_entry_to_chunk will append to chunk but will stop if
-        # len(chunk) > limit
-        #
-        # Normally we will generate enough results on the first iteration here,
-        #  but if there is a search filter, _append_room_entry_to_chunk may
-        # filter some results out, in which case we loop again.
-        #
-        # We don't want to scan over the entire range either as that
-        # would potentially waste a lot of work.
-        #
-        # XXX if there is no limit, we may end up DoSing the server with
-        # calls to get_current_state_ids for every single room on the
-        # server. Surely we should cap this somehow?
-        #
-        if limit:
-            step = limit + 1
-        else:
-            # step cannot be zero
-            step = len(rooms_to_scan) if len(rooms_to_scan) != 0 else 1
-
-        chunk = []
-        for i in range(0, len(rooms_to_scan), step):
-            if timeout and self.clock.time() > timeout:
-                raise Exception("Timed out searching room directory")
-
-            batch = rooms_to_scan[i : i + step]
-            logger.info("Processing %i rooms for result", len(batch))
-            yield concurrently_execute(
-                lambda r: self._append_room_entry_to_chunk(
-                    r,
-                    rooms_to_num_joined[r],
-                    chunk,
-                    limit,
-                    search_filter,
-                    from_federation=from_federation,
-                ),
-                batch,
-                5,
-            )
-            logger.info("Now %i rooms in result", len(chunk))
-            if len(chunk) >= limit + 1:
-                break
-
-        chunk.sort(key=lambda e: (-e["num_joined_members"], e["room_id"]))
-
-        # Work out the new limit of the batch for pagination, or None if we
-        # know there are no more results that would be returned.
-        # i.e., [since_token.current_limit..new_limit] is the batch of rooms
-        # we've returned (or the reverse if we paginated backwards)
-        # We tried to pull out limit + 1 rooms above, so if we have <= limit
-        # then we know there are no more results to return
-        new_limit = None
-        if chunk and (not limit or len(chunk) > limit):
-
-            if not since_token or since_token.direction_is_forward:
-                if limit:
-                    chunk = chunk[:limit]
-                last_room_id = chunk[-1]["room_id"]
-            else:
-                if limit:
-                    chunk = chunk[-limit:]
-                last_room_id = chunk[0]["room_id"]
-
-            new_limit = sorted_rooms.index(last_room_id)
-
-        results = {"chunk": chunk, "total_room_count_estimate": total_room_count}
-
-        if since_token:
-            results["new_rooms"] = bool(newly_visible)
-
-        if not since_token or since_token.direction_is_forward:
-            if new_limit is not None:
-                results["next_batch"] = RoomListNextBatch(
-                    stream_ordering=stream_token,
-                    public_room_stream_id=public_room_stream_id,
-                    current_limit=new_limit,
-                    direction_is_forward=True,
-                ).to_token()
-
-            if since_token:
-                results["prev_batch"] = since_token.copy_and_replace(
-                    direction_is_forward=False,
-                    current_limit=since_token.current_limit + 1,
-                ).to_token()
-        else:
-            if new_limit is not None:
-                results["prev_batch"] = RoomListNextBatch(
-                    stream_ordering=stream_token,
-                    public_room_stream_id=public_room_stream_id,
-                    current_limit=new_limit,
-                    direction_is_forward=False,
-                ).to_token()
-
-            if since_token:
-                results["next_batch"] = since_token.copy_and_replace(
-                    direction_is_forward=True,
-                    current_limit=since_token.current_limit - 1,
-                ).to_token()
-
-        defer.returnValue(results)
-
-    @defer.inlineCallbacks
-    def _append_room_entry_to_chunk(
-        self,
-        room_id,
-        num_joined_users,
-        chunk,
-        limit,
-        search_filter,
-        from_federation=False,
-    ):
-        """Generate the entry for a room in the public room list and append it
-        to the `chunk` if it matches the search filter
-
-        Args:
-            room_id (str): The ID of the room.
-            num_joined_users (int): The number of joined users in the room.
-            chunk (list)
-            limit (int|None): Maximum amount of rooms to display. Function will
-                return if length of chunk is greater than limit + 1.
-            search_filter (dict|None)
-            from_federation (bool): Whether this request originated from a
-                federating server or a client. Used for room filtering.
-        """
-        if limit and len(chunk) > limit + 1:
-            # We've already got enough, so lets just drop it.
-            return
-
-        result = yield self.generate_room_entry(room_id, num_joined_users)
-        if not result:
-            return
-
-        if from_federation and not result.get("m.federate", True):
-            # This is a room that other servers cannot join. Do not show them
-            # this room.
-            return
-
-        if _matches_room_entry(result, search_filter):
-            chunk.append(result)
+        return response
 
     @cachedInlineCallbacks(num_args=1, cache_context=True)
     def generate_room_entry(
@@ -420,7 +298,7 @@ class RoomListHandler(BaseHandler):
         if join_rules_event:
             join_rule = join_rules_event.content.get("join_rule", None)
             if not allow_private and join_rule and join_rule != JoinRules.PUBLIC:
-                defer.returnValue(None)
+                return None
 
         # Return whether this room is open to federation users or not
         create_event = current_state.get((EventTypes.Create, ""))
@@ -469,7 +347,7 @@ class RoomListHandler(BaseHandler):
             if avatar_url:
                 result["avatar_url"] = avatar_url
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def get_remote_public_room_list(
@@ -482,10 +360,36 @@ class RoomListHandler(BaseHandler):
         third_party_instance_id=None,
     ):
         if not self.enable_room_list_search:
-            defer.returnValue({"chunk": [], "total_room_count_estimate": 0})
+            return {"chunk": [], "total_room_count_estimate": 0}
 
         if search_filter:
-            # We currently don't support searching across federation, so we have
+            # Searching across federation is defined in MSC2197.
+            # However, the remote homeserver may or may not actually support it.
+            # So we first try an MSC2197 remote-filtered search, then fall back
+            # to a locally-filtered search if we must.
+
+            try:
+                res = yield self._get_remote_list_cached(
+                    server_name,
+                    limit=limit,
+                    since_token=since_token,
+                    include_all_networks=include_all_networks,
+                    third_party_instance_id=third_party_instance_id,
+                    search_filter=search_filter,
+                )
+                return res
+            except HttpResponseException as hre:
+                syn_err = hre.to_synapse_error()
+                if hre.code in (404, 405) or syn_err.errcode in (
+                    Codes.UNRECOGNIZED,
+                    Codes.NOT_FOUND,
+                ):
+                    logger.debug("Falling back to locally-filtered /publicRooms")
+                else:
+                    raise  # Not an error that should trigger a fallback.
+
+            # if we reach this point, then we fall back to the situation where
+            # we currently don't support searching across federation, so we have
             # to do it manually without pagination
             limit = None
             since_token = None
@@ -507,7 +411,7 @@ class RoomListHandler(BaseHandler):
                 ]
             }
 
-        defer.returnValue(res)
+        return res
 
     def _get_remote_list_cached(
         self,
@@ -553,18 +457,15 @@ class RoomListNextBatch(
     namedtuple(
         "RoomListNextBatch",
         (
-            "stream_ordering",  # stream_ordering of the first public room list
-            "public_room_stream_id",  # public room stream id for first public room list
-            "current_limit",  # The number of previous rooms returned
+            "last_joined_members",  # The count to get rooms after/before
+            "last_room_id",  # The room_id to get rooms after/before
             "direction_is_forward",  # Bool if this is a next_batch, false if prev_batch
         ),
     )
 ):
-
     KEY_DICT = {
-        "stream_ordering": "s",
-        "public_room_stream_id": "p",
-        "current_limit": "n",
+        "last_joined_members": "m",
+        "last_room_id": "r",
         "direction_is_forward": "d",
     }
 
@@ -572,13 +473,7 @@ class RoomListNextBatch(
 
     @classmethod
     def from_token(cls, token):
-        if PY3:
-            # The argument raw=False is only available on new versions of
-            # msgpack, and only really needed on Python 3. Gate it behind
-            # a PY3 check to avoid causing issues on Debian-packaged versions.
-            decoded = msgpack.loads(decode_base64(token), raw=False)
-        else:
-            decoded = msgpack.loads(decode_base64(token))
+        decoded = msgpack.loads(decode_base64(token), raw=False)
         return RoomListNextBatch(
             **{cls.REVERSE_KEY_DICT[key]: val for key, val in decoded.items()}
         )

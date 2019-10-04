@@ -61,7 +61,7 @@ class SrvResolverTestCase(unittest.TestCase):
                 # should have restored our context
                 self.assertIs(LoggingContext.current_context(), ctx)
 
-                defer.returnValue(result)
+                return result
 
         test_d = do_lookup()
         self.assertNoResult(test_d)
@@ -83,8 +83,10 @@ class SrvResolverTestCase(unittest.TestCase):
 
         service_name = b"test_service.example.com"
 
-        entry = Mock(spec_set=["expires"])
+        entry = Mock(spec_set=["expires", "priority", "weight"])
         entry.expires = 0
+        entry.priority = 0
+        entry.weight = 0
 
         cache = {service_name: [entry]}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
@@ -105,8 +107,10 @@ class SrvResolverTestCase(unittest.TestCase):
 
         service_name = b"test_service.example.com"
 
-        entry = Mock(spec_set=["expires"])
+        entry = Mock(spec_set=["expires", "priority", "weight"])
         entry.expires = 999999999
+        entry.priority = 0
+        entry.weight = 0
 
         cache = {service_name: [entry]}
         resolver = SrvResolver(

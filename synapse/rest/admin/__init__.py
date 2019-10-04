@@ -27,7 +27,7 @@ from twisted.internet import defer
 
 import synapse
 from synapse.api.constants import Membership, UserTypes
-from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
     RestServlet,
@@ -36,38 +36,23 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.rest.admin._base import assert_requester_is_admin, assert_user_is_admin
+from synapse.rest.admin._base import (
+    assert_requester_is_admin,
+    assert_user_is_admin,
+    historical_admin_path_patterns,
+)
+from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
+from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
+from synapse.rest.admin.users import UserAdminServlet
 from synapse.types import UserID, create_requester
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 
 
-def historical_admin_path_patterns(path_regex):
-    """Returns the list of patterns for an admin endpoint, including historical ones
-
-    This is a backwards-compatibility hack. Previously, the Admin API was exposed at
-    various paths under /_matrix/client. This function returns a list of patterns
-    matching those paths (as well as the new one), so that existing scripts which rely
-    on the endpoints being available there are not broken.
-
-    Note that this should only be used for existing endpoints: new ones should just
-    register for the /_synapse/admin path.
-    """
-    return list(
-        re.compile(prefix + path_regex)
-        for prefix in (
-            "^/_synapse/admin/v1",
-            "^/_matrix/client/api/v1/admin",
-            "^/_matrix/client/unstable/admin",
-            "^/_matrix/client/r0/admin",
-        )
-    )
-
-
 class UsersRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -84,7 +69,7 @@ class UsersRestServlet(RestServlet):
 
         ret = yield self.handlers.admin_handler.get_users()
 
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 class VersionServlet(RestServlet):
@@ -135,7 +120,7 @@ class UserRegisterServlet(RestServlet):
 
         nonce = self.hs.get_secrets().token_hex(64)
         self.nonces[nonce] = int(self.reactor.seconds())
-        return (200, {"nonce": nonce})
+        return 200, {"nonce": nonce}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -219,16 +204,15 @@ class UserRegisterServlet(RestServlet):
 
         register = RegisterRestServlet(self.hs)
 
-        (user_id, _) = yield register.registration_handler.register(
+        user_id = yield register.registration_handler.register_user(
             localpart=body["username"].lower(),
             password=body["password"],
             admin=bool(admin),
-            generate_token=False,
             user_type=user_type,
         )
 
         result = yield register._create_registration_details(user_id, body)
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class WhoisRestServlet(RestServlet):
@@ -253,26 +237,7 @@ class WhoisRestServlet(RestServlet):
 
         ret = yield self.handlers.admin_handler.get_whois(target_user)
 
-        defer.returnValue((200, ret))
-
-
-class PurgeMediaCacheRestServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/purge_media_cache")
-
-    def __init__(self, hs):
-        self.media_repository = hs.get_media_repository()
-        self.auth = hs.get_auth()
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        yield assert_requester_is_admin(self.auth, request)
-
-        before_ts = parse_integer(request, "before_ts", required=True)
-        logger.info("before_ts: %r", before_ts)
-
-        ret = yield self.media_repository.delete_old_remote_media(before_ts)
-
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 class PurgeHistoryRestServlet(RestServlet):
@@ -357,7 +322,7 @@ class PurgeHistoryRestServlet(RestServlet):
             room_id, token, delete_local_events=delete_local_events
         )
 
-        defer.returnValue((200, {"purge_id": purge_id}))
+        return 200, {"purge_id": purge_id}
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
@@ -382,7 +347,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        defer.returnValue((200, purge_status.asdict()))
+        return 200, purge_status.asdict()
 
 
 class DeactivateAccountRestServlet(RestServlet):
@@ -414,7 +379,7 @@ class DeactivateAccountRestServlet(RestServlet):
         else:
             id_server_unbind_result = "no-support"
 
-        defer.returnValue((200, {"id_server_unbind_result": id_server_unbind_result}))
+        return 200, {"id_server_unbind_result": id_server_unbind_result}
 
 
 class ShutdownRoomRestServlet(RestServlet):
@@ -532,61 +497,15 @@ class ShutdownRoomRestServlet(RestServlet):
             room_id, new_room_id, requester_user_id
         )
 
-        defer.returnValue(
-            (
-                200,
-                {
-                    "kicked_users": kicked_users,
-                    "failed_to_kick_users": failed_to_kick_users,
-                    "local_aliases": aliases_for_room,
-                    "new_room_id": new_room_id,
-                },
-            )
+        return (
+            200,
+            {
+                "kicked_users": kicked_users,
+                "failed_to_kick_users": failed_to_kick_users,
+                "local_aliases": aliases_for_room,
+                "new_room_id": new_room_id,
+            },
         )
-
-
-class QuarantineMediaInRoom(RestServlet):
-    """Quarantines all media in a room so that no one can download it via
-    this server.
-    """
-
-    PATTERNS = historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
-
-    def __init__(self, hs):
-        self.store = hs.get_datastore()
-        self.auth = hs.get_auth()
-
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
-        yield assert_user_is_admin(self.auth, requester.user)
-
-        num_quarantined = yield self.store.quarantine_media_ids_in_room(
-            room_id, requester.user.to_string()
-        )
-
-        defer.returnValue((200, {"num_quarantined": num_quarantined}))
-
-
-class ListMediaInRoom(RestServlet):
-    """Lists all of the media in a given room.
-    """
-
-    PATTERNS = historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media")
-
-    def __init__(self, hs):
-        self.store = hs.get_datastore()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
-
-        local_mxcs, remote_mxcs = yield self.store.get_media_mxcs_in_room(room_id)
-
-        defer.returnValue((200, {"local": local_mxcs, "remote": remote_mxcs}))
 
 
 class ResetPasswordRestServlet(RestServlet):
@@ -630,7 +549,7 @@ class ResetPasswordRestServlet(RestServlet):
         yield self._set_password_handler.set_password(
             target_user_id, new_password, requester
         )
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class GetUsersPaginatedRestServlet(RestServlet):
@@ -672,7 +591,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
-        defer.returnValue((200, ret))
+        return 200, ret
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
@@ -700,7 +619,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 class SearchUsersRestServlet(RestServlet):
@@ -743,7 +662,7 @@ class SearchUsersRestServlet(RestServlet):
         logger.info("term: %s ", term)
 
         ret = yield self.handlers.admin_handler.search_users(term)
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 class DeleteGroupAdminRestServlet(RestServlet):
@@ -766,7 +685,7 @@ class DeleteGroupAdminRestServlet(RestServlet):
             raise SynapseError(400, "Can only delete local groups")
 
         yield self.group_server.delete_group(group_id, requester.user.to_string())
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class AccountValidityRenewServlet(RestServlet):
@@ -797,7 +716,7 @@ class AccountValidityRenewServlet(RestServlet):
         )
 
         res = {"expiration_ts": expiration_ts}
-        defer.returnValue((200, res))
+        return 200, res
 
 
 ########################################################################################
@@ -821,14 +740,15 @@ def register_servlets(hs, http_server):
     Register all the admin servlets.
     """
     register_servlets_for_client_rest_resource(hs, http_server)
+    PurgeRoomServlet(hs).register(http_server)
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
+    UserAdminServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):
     """Register only the servlets which need to be exposed on /_matrix/client/xxx"""
     WhoisRestServlet(hs).register(http_server)
-    PurgeMediaCacheRestServlet(hs).register(http_server)
     PurgeHistoryStatusRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     PurgeHistoryRestServlet(hs).register(http_server)
@@ -837,10 +757,16 @@ def register_servlets_for_client_rest_resource(hs, http_server):
     GetUsersPaginatedRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     ShutdownRoomRestServlet(hs).register(http_server)
-    QuarantineMediaInRoom(hs).register(http_server)
-    ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
     DeleteGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
+
+    # Load the media repo ones if we're using them. Otherwise load the servlets which
+    # don't need a media repo (typically readonly admin APIs).
+    if hs.config.can_load_media_repo:
+        register_servlets_for_media_repo(hs, http_server)
+    else:
+        ListMediaInRoom(hs).register(http_server)
+
     # don't add more things here: new servlets should only be exposed on
     # /_synapse/admin so should not go here. Instead register them in AdminRestResource.

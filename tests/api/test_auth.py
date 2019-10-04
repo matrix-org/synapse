@@ -21,7 +21,15 @@ from twisted.internet import defer
 
 import synapse.handlers.auth
 from synapse.api.auth import Auth
-from synapse.api.errors import AuthError, Codes, ResourceLimitError
+from synapse.api.constants import UserTypes
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientCredentialsError,
+    InvalidClientTokenError,
+    MissingClientTokenError,
+    ResourceLimitError,
+)
 from synapse.types import UserID
 
 from tests import unittest
@@ -70,7 +78,9 @@ class AuthTestCase(unittest.TestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, InvalidClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
     def test_get_user_by_req_user_missing_token(self):
         user_info = {"name": self.test_user, "token_id": "ditto"}
@@ -79,7 +89,9 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, MissingClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_MISSING_TOKEN")
 
     @defer.inlineCallbacks
     def test_get_user_by_req_appservice_valid_token(self):
@@ -133,7 +145,9 @@ class AuthTestCase(unittest.TestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, InvalidClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
     def test_get_user_by_req_appservice_bad_token(self):
         self.store.get_app_service_by_token = Mock(return_value=None)
@@ -143,7 +157,9 @@ class AuthTestCase(unittest.TestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, InvalidClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
     def test_get_user_by_req_appservice_missing_token(self):
         app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
@@ -153,7 +169,9 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, MissingClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_MISSING_TOKEN")
 
     @defer.inlineCallbacks
     def test_get_user_by_req_appservice_valid_token_valid_user_id(self):
@@ -244,10 +262,12 @@ class AuthTestCase(unittest.TestCase):
         USER_ID = "@percy:matrix.org"
         self.store.add_access_token_to_user = Mock()
 
-        token = yield self.hs.handlers.auth_handler.issue_access_token(
-            USER_ID, "DEVICE"
+        token = yield self.hs.handlers.auth_handler.get_access_token_for_user_id(
+            USER_ID, "DEVICE", valid_until_ms=None
         )
-        self.store.add_access_token_to_user.assert_called_with(USER_ID, token, "DEVICE")
+        self.store.add_access_token_to_user.assert_called_with(
+            USER_ID, token, "DEVICE", None
+        )
 
         def get_user(tok):
             if token != tok:
@@ -280,7 +300,7 @@ class AuthTestCase(unittest.TestCase):
         request.args[b"access_token"] = [guest_tok.encode("ascii")]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
 
-        with self.assertRaises(AuthError) as cm:
+        with self.assertRaises(InvalidClientCredentialsError) as cm:
             yield self.auth.get_user_by_req(request, allow_guest=True)
 
         self.assertEqual(401, cm.exception.code)
@@ -317,6 +337,23 @@ class AuthTestCase(unittest.TestCase):
         yield self.auth.check_auth_blocking()
 
     @defer.inlineCallbacks
+    def test_blocking_mau__depending_on_user_type(self):
+        self.hs.config.max_mau_value = 50
+        self.hs.config.limit_usage_by_mau = True
+
+        self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
+        # Support users allowed
+        yield self.auth.check_auth_blocking(user_type=UserTypes.SUPPORT)
+        self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
+        # Bots not allowed
+        with self.assertRaises(ResourceLimitError):
+            yield self.auth.check_auth_blocking(user_type=UserTypes.BOT)
+        self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
+        # Real users not allowed
+        with self.assertRaises(ResourceLimitError):
+            yield self.auth.check_auth_blocking()
+
+    @defer.inlineCallbacks
     def test_reserved_threepid(self):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 1
@@ -325,7 +362,7 @@ class AuthTestCase(unittest.TestCase):
         unknown_threepid = {"medium": "email", "address": "unreserved@server.com"}
         self.hs.config.mau_limits_reserved_threepids = [threepid]
 
-        yield self.store.register(user_id="user1", token="123", password_hash=None)
+        yield self.store.register_user(user_id="user1", password_hash=None)
         with self.assertRaises(ResourceLimitError):
             yield self.auth.check_auth_blocking()
 

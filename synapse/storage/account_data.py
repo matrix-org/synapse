@@ -90,7 +90,7 @@ class AccountDataWorkerStore(SQLBaseStore):
                 room_data = by_room.setdefault(row["room_id"], {})
                 room_data[row["account_data_type"]] = json.loads(row["content"])
 
-            return (global_account_data, by_room)
+            return global_account_data, by_room
 
         return self.runInteraction(
             "get_account_data_for_user", get_account_data_for_user_txn
@@ -111,9 +111,9 @@ class AccountDataWorkerStore(SQLBaseStore):
         )
 
         if result:
-            defer.returnValue(json.loads(result))
+            return json.loads(result)
         else:
-            defer.returnValue(None)
+            return None
 
     @cached(num_args=2)
     def get_account_data_for_room(self, user_id, room_id):
@@ -205,7 +205,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             )
             txn.execute(sql, (last_room_id, current_id, limit))
             room_results = txn.fetchall()
-            return (global_results, room_results)
+            return global_results, room_results
 
         return self.runInteraction(
             "get_all_updated_account_data_txn", get_updated_account_data_txn
@@ -244,13 +244,13 @@ class AccountDataWorkerStore(SQLBaseStore):
                 room_account_data = account_data_by_room.setdefault(row[0], {})
                 room_account_data[row[1]] = json.loads(row[2])
 
-            return (global_account_data, account_data_by_room)
+            return global_account_data, account_data_by_room
 
         changed = self._account_data_stream_cache.has_entity_changed(
             user_id, int(stream_id)
         )
         if not changed:
-            return ({}, {})
+            return {}, {}
 
         return self.runInteraction(
             "get_updated_account_data_for_user", get_updated_account_data_for_user_txn
@@ -264,11 +264,9 @@ class AccountDataWorkerStore(SQLBaseStore):
             on_invalidate=cache_context.invalidate,
         )
         if not ignored_account_data:
-            defer.returnValue(False)
+            return False
 
-        defer.returnValue(
-            ignored_user_id in ignored_account_data.get("ignored_users", {})
-        )
+        return ignored_user_id in ignored_account_data.get("ignored_users", {})
 
 
 class AccountDataStore(AccountDataWorkerStore):
@@ -332,7 +330,7 @@ class AccountDataStore(AccountDataWorkerStore):
             )
 
         result = self._account_data_id_gen.get_current_token()
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def add_account_data_for_user(self, user_id, account_data_type, content):
@@ -373,7 +371,7 @@ class AccountDataStore(AccountDataWorkerStore):
             )
 
         result = self._account_data_id_gen.get_current_token()
-        defer.returnValue(result)
+        return result
 
     def _update_max_stream_id(self, next_id):
         """Update the max stream_id

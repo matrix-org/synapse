@@ -47,7 +47,7 @@ class GroupServlet(RestServlet):
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, group_description))
+        return 200, group_description
 
     @defer.inlineCallbacks
     def on_POST(self, request, group_id):
@@ -59,7 +59,7 @@ class GroupServlet(RestServlet):
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class GroupSummaryServlet(RestServlet):
@@ -83,7 +83,7 @@ class GroupSummaryServlet(RestServlet):
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, get_group_summary))
+        return 200, get_group_summary
 
 
 class GroupSummaryRoomsCatServlet(RestServlet):
@@ -120,7 +120,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
             content=content,
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, group_id, category_id, room_id):
@@ -131,7 +131,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
             group_id, requester_user_id, room_id=room_id, category_id=category_id
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
 
 class GroupCategoryServlet(RestServlet):
@@ -157,7 +157,7 @@ class GroupCategoryServlet(RestServlet):
             group_id, requester_user_id, category_id=category_id
         )
 
-        defer.returnValue((200, category))
+        return 200, category
 
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id, category_id):
@@ -169,7 +169,7 @@ class GroupCategoryServlet(RestServlet):
             group_id, requester_user_id, category_id=category_id, content=content
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, group_id, category_id):
@@ -180,7 +180,7 @@ class GroupCategoryServlet(RestServlet):
             group_id, requester_user_id, category_id=category_id
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
 
 class GroupCategoriesServlet(RestServlet):
@@ -204,7 +204,7 @@ class GroupCategoriesServlet(RestServlet):
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, category))
+        return 200, category
 
 
 class GroupRoleServlet(RestServlet):
@@ -228,7 +228,7 @@ class GroupRoleServlet(RestServlet):
             group_id, requester_user_id, role_id=role_id
         )
 
-        defer.returnValue((200, category))
+        return 200, category
 
     @defer.inlineCallbacks
     def on_PUT(self, request, group_id, role_id):
@@ -240,7 +240,7 @@ class GroupRoleServlet(RestServlet):
             group_id, requester_user_id, role_id=role_id, content=content
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, group_id, role_id):
@@ -251,7 +251,7 @@ class GroupRoleServlet(RestServlet):
             group_id, requester_user_id, role_id=role_id
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
 
 class GroupRolesServlet(RestServlet):
@@ -275,7 +275,7 @@ class GroupRolesServlet(RestServlet):
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, category))
+        return 200, category
 
 
 class GroupSummaryUsersRoleServlet(RestServlet):
@@ -312,7 +312,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
             content=content,
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, group_id, role_id, user_id):
@@ -323,7 +323,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
             group_id, requester_user_id, user_id=user_id, role_id=role_id
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
 
 class GroupRoomServlet(RestServlet):
@@ -347,7 +347,7 @@ class GroupRoomServlet(RestServlet):
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupUsersServlet(RestServlet):
@@ -371,7 +371,7 @@ class GroupUsersServlet(RestServlet):
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupInvitedUsersServlet(RestServlet):
@@ -395,7 +395,7 @@ class GroupInvitedUsersServlet(RestServlet):
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSettingJoinPolicyServlet(RestServlet):
@@ -420,7 +420,7 @@ class GroupSettingJoinPolicyServlet(RestServlet):
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupCreateServlet(RestServlet):
@@ -450,7 +450,7 @@ class GroupCreateServlet(RestServlet):
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupAdminRoomsServlet(RestServlet):
@@ -477,7 +477,7 @@ class GroupAdminRoomsServlet(RestServlet):
             group_id, requester_user_id, room_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, group_id, room_id):
@@ -488,7 +488,7 @@ class GroupAdminRoomsServlet(RestServlet):
             group_id, requester_user_id, room_id
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupAdminRoomsConfigServlet(RestServlet):
@@ -516,7 +516,7 @@ class GroupAdminRoomsConfigServlet(RestServlet):
             group_id, requester_user_id, room_id, config_key, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupAdminUsersInviteServlet(RestServlet):
@@ -546,7 +546,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
             group_id, user_id, requester_user_id, config
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupAdminUsersKickServlet(RestServlet):
@@ -573,7 +573,7 @@ class GroupAdminUsersKickServlet(RestServlet):
             group_id, user_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSelfLeaveServlet(RestServlet):
@@ -598,7 +598,7 @@ class GroupSelfLeaveServlet(RestServlet):
             group_id, requester_user_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSelfJoinServlet(RestServlet):
@@ -623,7 +623,7 @@ class GroupSelfJoinServlet(RestServlet):
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSelfAcceptInviteServlet(RestServlet):
@@ -648,7 +648,7 @@ class GroupSelfAcceptInviteServlet(RestServlet):
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSelfUpdatePublicityServlet(RestServlet):
@@ -672,7 +672,7 @@ class GroupSelfUpdatePublicityServlet(RestServlet):
         publicise = content["publicise"]
         yield self.store.update_group_publicity(group_id, requester_user_id, publicise)
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class PublicisedGroupsForUserServlet(RestServlet):
@@ -694,7 +694,7 @@ class PublicisedGroupsForUserServlet(RestServlet):
 
         result = yield self.groups_handler.get_publicised_groups_for_user(user_id)
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class PublicisedGroupsForUsersServlet(RestServlet):
@@ -719,7 +719,7 @@ class PublicisedGroupsForUsersServlet(RestServlet):
 
         result = yield self.groups_handler.bulk_get_publicised_groups(user_ids)
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupsForUserServlet(RestServlet):
@@ -741,7 +741,7 @@ class GroupsForUserServlet(RestServlet):
 
         result = yield self.groups_handler.get_joined_groups(requester_user_id)
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 def register_servlets(hs, http_server):

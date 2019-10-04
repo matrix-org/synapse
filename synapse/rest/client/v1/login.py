@@ -29,6 +29,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -121,10 +122,10 @@ class LoginRestServlet(RestServlet):
             ({"type": t} for t in self.auth_handler.get_supported_login_types())
         )
 
-        return (200, {"flows": flows})
+        return 200, {"flows": flows}
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -152,7 +153,7 @@ class LoginRestServlet(RestServlet):
         well_known_data = self._well_known_builder.get_well_known()
         if well_known_data:
             result["well_known"] = well_known_data
-        defer.returnValue((200, result))
+        return 200, result
 
     @defer.inlineCallbacks
     def _do_other_login(self, login_submission):
@@ -212,7 +213,7 @@ class LoginRestServlet(RestServlet):
                 result = yield self._register_device_with_callback(
                     canonical_user_id, login_submission, callback_3pid
                 )
-                defer.returnValue(result)
+                return result
 
             # No password providers were able to handle this 3pid
             # Check local store
@@ -241,7 +242,7 @@ class LoginRestServlet(RestServlet):
         result = yield self._register_device_with_callback(
             canonical_user_id, login_submission, callback
         )
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _register_device_with_callback(self, user_id, login_submission, callback=None):
@@ -273,7 +274,7 @@ class LoginRestServlet(RestServlet):
         if callback is not None:
             yield callback(result)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def do_token_login(self, login_submission):
@@ -283,20 +284,8 @@ class LoginRestServlet(RestServlet):
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
 
-        device_id = login_submission.get("device_id")
-        initial_display_name = login_submission.get("initial_device_display_name")
-        device_id, access_token = yield self.registration_handler.register_device(
-            user_id, device_id, initial_display_name
-        )
-
-        result = {
-            "user_id": user_id,  # may have changed
-            "access_token": access_token,
-            "home_server": self.hs.hostname,
-            "device_id": device_id,
-        }
-
-        defer.returnValue(result)
+        result = yield self._register_device_with_callback(user_id, login_submission)
+        return result
 
     @defer.inlineCallbacks
     def do_jwt_login(self, login_submission):
@@ -323,36 +312,17 @@ class LoginRestServlet(RestServlet):
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID(user, self.hs.hostname).to_string()
-        device_id = login_submission.get("device_id")
-        initial_display_name = login_submission.get("initial_device_display_name")
 
-        auth_handler = self.auth_handler
-        registered_user_id = yield auth_handler.check_user_exists(user_id)
-        if registered_user_id:
-            device_id, access_token = yield self.registration_handler.register_device(
-                registered_user_id, device_id, initial_display_name
+        registered_user_id = yield self.auth_handler.check_user_exists(user_id)
+        if not registered_user_id:
+            registered_user_id = yield self.registration_handler.register_user(
+                localpart=user
             )
 
-            result = {
-                "user_id": registered_user_id,
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            }
-        else:
-            user_id, access_token = (
-                yield self.registration_handler.register(localpart=user)
-            )
-            device_id, access_token = yield self.registration_handler.register_device(
-                user_id, device_id, initial_display_name
-            )
-
-            result = {
-                "user_id": user_id,  # may have changed
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            }
-
-        defer.returnValue(result)
+        result = yield self._register_device_with_callback(
+            registered_user_id, login_submission
+        )
+        return result
 
 
 class BaseSSORedirectServlet(RestServlet):
@@ -426,7 +396,7 @@ class CasTicketServlet(RestServlet):
             # even if that's being used old-http style to signal end-of-data
             body = pde.response
         result = yield self.handle_cas_response(request, body, client_redirect_url)
-        defer.returnValue(result)
+        return result
 
     def handle_cas_response(self, request, cas_response_body, client_redirect_url):
         user, attributes = self.parse_cas_response(cas_response_body)
@@ -534,13 +504,22 @@ class SSOAuthHandler(object):
         user_id = UserID(localpart, self._hostname).to_string()
         registered_user_id = yield self._auth_handler.check_user_exists(user_id)
         if not registered_user_id:
-            registered_user_id, _ = (
-                yield self._registration_handler.register(
-                    localpart=localpart,
-                    generate_token=False,
-                    default_display_name=user_display_name,
-                )
+            registered_user_id = yield self._registration_handler.register_user(
+                localpart=localpart, default_display_name=user_display_name
             )
+
+        self.complete_sso_login(registered_user_id, request, client_redirect_url)
+
+    def complete_sso_login(
+        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+    ):
+        """Having figured out a mxid for this user, complete the HTTP request
+
+        Args:
+            registered_user_id:
+            request:
+            client_redirect_url:
+        """
 
         login_token = self._macaroon_gen.generate_short_term_login_token(
             registered_user_id

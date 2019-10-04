@@ -86,7 +86,21 @@ _CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 class LoggingTransaction(object):
     """An object that almost-transparently proxies for the 'txn' object
     passed to the constructor. Adds logging and metrics to the .execute()
-    method."""
+    method.
+
+    Args:
+        txn: The database transcation object to wrap.
+        name (str): The name of this transactions for logging.
+        database_engine (Sqlite3Engine|PostgresEngine)
+        after_callbacks(list|None): A list that callbacks will be appended to
+            that have been added by `call_after` which should be run on
+            successful completion of the transaction. None indicates that no
+            callbacks should be allowed to be scheduled to run.
+        exception_callbacks(list|None): A list that callbacks will be appended
+            to that have been added by `call_on_exception` which should be run
+            if transaction ends with an error. None indicates that no callbacks
+            should be allowed to be scheduled to run.
+    """
 
     __slots__ = [
         "txn",
@@ -97,7 +111,7 @@ class LoggingTransaction(object):
     ]
 
     def __init__(
-        self, txn, name, database_engine, after_callbacks, exception_callbacks
+        self, txn, name, database_engine, after_callbacks=None, exception_callbacks=None
     ):
         object.__setattr__(self, "txn", txn)
         object.__setattr__(self, "name", name)
@@ -499,7 +513,7 @@ class SQLBaseStore(object):
                 after_callback(*after_args, **after_kwargs)
             raise
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def runWithConnection(self, func, *args, **kwargs):
@@ -539,7 +553,7 @@ class SQLBaseStore(object):
         with PreserveLoggingContext():
             result = yield self._db_pool.runWithConnection(inner_func, *args, **kwargs)
 
-        defer.returnValue(result)
+        return result
 
     @staticmethod
     def cursor_to_dict(cursor):
@@ -601,8 +615,8 @@ class SQLBaseStore(object):
             # a cursor after we receive an error from the db.
             if not or_ignore:
                 raise
-            defer.returnValue(False)
-        defer.returnValue(True)
+            return False
+        return True
 
     @staticmethod
     def _simple_insert_txn(txn, table, values):
@@ -694,7 +708,7 @@ class SQLBaseStore(object):
                     insertion_values,
                     lock=lock,
                 )
-                defer.returnValue(result)
+                return result
             except self.database_engine.module.IntegrityError as e:
                 attempts += 1
                 if attempts >= 5:
@@ -1107,7 +1121,7 @@ class SQLBaseStore(object):
         results = []
 
         if not iterable:
-            defer.returnValue(results)
+            return results
 
         # iterables can not be sliced, so convert it to a list first
         it_list = list(iterable)
@@ -1128,7 +1142,7 @@ class SQLBaseStore(object):
 
             results.extend(rows)
 
-        defer.returnValue(results)
+        return results
 
     @classmethod
     def _simple_select_many_txn(cls, txn, table, column, iterable, keyvalues, retcols):
@@ -1381,14 +1395,22 @@ class SQLBaseStore(object):
         """
         txn.call_after(self._invalidate_state_caches, room_id, members_changed)
 
-        # We need to be careful that the size of the `members_changed` list
-        # isn't so large that it causes problems sending over replication, so we
-        # send them in chunks.
-        # Max line length is 16K, and max user ID length is 255, so 50 should
-        # be safe.
-        for chunk in batch_iter(members_changed, 50):
-            keys = itertools.chain([room_id], chunk)
-            self._send_invalidation_to_replication(txn, _CURRENT_STATE_CACHE_NAME, keys)
+        if members_changed:
+            # We need to be careful that the size of the `members_changed` list
+            # isn't so large that it causes problems sending over replication, so we
+            # send them in chunks.
+            # Max line length is 16K, and max user ID length is 255, so 50 should
+            # be safe.
+            for chunk in batch_iter(members_changed, 50):
+                keys = itertools.chain([room_id], chunk)
+                self._send_invalidation_to_replication(
+                    txn, _CURRENT_STATE_CACHE_NAME, keys
+                )
+        else:
+            # if no members changed, we still need to invalidate the other caches.
+            self._send_invalidation_to_replication(
+                txn, _CURRENT_STATE_CACHE_NAME, [room_id]
+            )
 
     def _invalidate_state_caches(self, room_id, members_changed):
         """Invalidates caches that are based on the current state, but does

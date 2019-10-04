@@ -27,8 +27,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext, run_in_background
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import __func__
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.events import SlavedEventStore
@@ -185,8 +184,6 @@ def start(config_options):
 
     assert config.worker_app == "synapse.app.pusher"
 
-    setup_logging(config, use_worker_options=True)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     if config.start_pushers:
@@ -211,13 +208,15 @@ def start(config_options):
         database_engine=database_engine,
     )
 
+    setup_logging(ps, config, use_worker_options=True)
+
     ps.setup()
 
     def start():
         _base.start(ps, config.worker_listeners)
         ps.get_pusherpool().start()
 
-    reactor.callWhenRunning(start)
+    reactor.addSystemEventTrigger("before", "startup", start)
 
     _base.start_worker_reactor("synapse-pusher", config)
 

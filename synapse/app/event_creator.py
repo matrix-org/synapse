@@ -28,8 +28,7 @@ from synapse.config.logger import setup_logging
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
@@ -176,8 +175,6 @@ def start(config_options):
 
     assert config.worker_replication_http_port is not None
 
-    setup_logging(config, use_worker_options=True)
-
     # This should only be done on the user directory worker or the master
     config.update_user_directory = False
 
@@ -193,8 +190,12 @@ def start(config_options):
         database_engine=database_engine,
     )
 
+    setup_logging(ss, config, use_worker_options=True)
+
     ss.setup()
-    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ss, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-event-creator", config)
 

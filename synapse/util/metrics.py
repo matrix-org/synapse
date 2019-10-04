@@ -60,14 +60,16 @@ in_flight = InFlightGauge(
 )
 
 
-def measure_func(name):
+def measure_func(name=None):
     def wrapper(func):
+        block_name = func.__name__ if name is None else name
+
         @wraps(func)
         @defer.inlineCallbacks
         def measured_func(self, *args, **kwargs):
-            with Measure(self.clock, name):
+            with Measure(self.clock, block_name):
                 r = yield func(self, *args, **kwargs)
-            defer.returnValue(r)
+            return r
 
         return measured_func
 

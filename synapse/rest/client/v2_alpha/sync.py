@@ -174,7 +174,7 @@ class SyncRestServlet(RestServlet):
             time_now, sync_result, requester.access_token_id, filter
         )
 
-        defer.returnValue((200, response_content))
+        return 200, response_content
 
     @defer.inlineCallbacks
     def encode_response(self, time_now, sync_result, access_token_id, filter):
@@ -205,27 +205,23 @@ class SyncRestServlet(RestServlet):
             event_formatter,
         )
 
-        defer.returnValue(
-            {
-                "account_data": {"events": sync_result.account_data},
-                "to_device": {"events": sync_result.to_device},
-                "device_lists": {
-                    "changed": list(sync_result.device_lists.changed),
-                    "left": list(sync_result.device_lists.left),
-                },
-                "presence": SyncRestServlet.encode_presence(
-                    sync_result.presence, time_now
-                ),
-                "rooms": {"join": joined, "invite": invited, "leave": archived},
-                "groups": {
-                    "join": sync_result.groups.join,
-                    "invite": sync_result.groups.invite,
-                    "leave": sync_result.groups.leave,
-                },
-                "device_one_time_keys_count": sync_result.device_one_time_keys_count,
-                "next_batch": sync_result.next_batch.to_string(),
-            }
-        )
+        return {
+            "account_data": {"events": sync_result.account_data},
+            "to_device": {"events": sync_result.to_device},
+            "device_lists": {
+                "changed": list(sync_result.device_lists.changed),
+                "left": list(sync_result.device_lists.left),
+            },
+            "presence": SyncRestServlet.encode_presence(sync_result.presence, time_now),
+            "rooms": {"join": joined, "invite": invited, "leave": archived},
+            "groups": {
+                "join": sync_result.groups.join,
+                "invite": sync_result.groups.invite,
+                "leave": sync_result.groups.leave,
+            },
+            "device_one_time_keys_count": sync_result.device_one_time_keys_count,
+            "next_batch": sync_result.next_batch.to_string(),
+        }
 
     @staticmethod
     def encode_presence(events, time_now):
@@ -273,7 +269,7 @@ class SyncRestServlet(RestServlet):
                 event_formatter=event_formatter,
             )
 
-        defer.returnValue(joined)
+        return joined
 
     @defer.inlineCallbacks
     def encode_invited(self, rooms, time_now, token_id, event_formatter):
@@ -309,7 +305,7 @@ class SyncRestServlet(RestServlet):
             invited_state.append(invite)
             invited[room.room_id] = {"invite_state": {"events": invited_state}}
 
-        defer.returnValue(invited)
+        return invited
 
     @defer.inlineCallbacks
     def encode_archived(self, rooms, time_now, token_id, event_fields, event_formatter):
@@ -342,7 +338,7 @@ class SyncRestServlet(RestServlet):
                 event_formatter=event_formatter,
             )
 
-        defer.returnValue(joined)
+        return joined
 
     @defer.inlineCallbacks
     def encode_room(
@@ -414,7 +410,7 @@ class SyncRestServlet(RestServlet):
             result["unread_notifications"] = room.unread_notifications
             result["summary"] = room.summary
 
-        defer.returnValue(result)
+        return result
 
 
 def register_servlets(hs, http_server):

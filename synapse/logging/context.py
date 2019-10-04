@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +26,7 @@ See doc/log_contexts.rst for details on how this works.
 import logging
 import threading
 import types
+from typing import Any, List
 
 from twisted.internet import defer, threads
 
@@ -41,13 +43,17 @@ try:
     # exception.
     resource.getrusage(RUSAGE_THREAD)
 
+    is_thread_resource_usage_supported = True
+
     def get_thread_resource_usage():
         return resource.getrusage(RUSAGE_THREAD)
 
 
 except Exception:
     # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
-    # won't track resource usage by returning None.
+    # won't track resource usage.
+    is_thread_resource_usage_supported = False
+
     def get_thread_resource_usage():
         return None
 
@@ -186,6 +192,7 @@ class LoggingContext(object):
         "alive",
         "request",
         "tag",
+        "scope",
     ]
 
     thread_local = threading.local()
@@ -193,13 +200,17 @@ class LoggingContext(object):
     class Sentinel(object):
         """Sentinel to represent the root context"""
 
-        __slots__ = []
+        __slots__ = []  # type: List[Any]
 
         def __str__(self):
             return "sentinel"
 
         def copy_to(self, record):
             pass
+
+        def copy_to_twisted_log_entry(self, record):
+            record["request"] = None
+            record["scope"] = None
 
         def start(self):
             pass
@@ -238,6 +249,7 @@ class LoggingContext(object):
         self.request = None
         self.tag = ""
         self.alive = True
+        self.scope = None
 
         self.parent_context = parent_context
 
@@ -322,9 +334,18 @@ class LoggingContext(object):
         another LoggingContext
         """
 
-        # 'request' is the only field we currently use in the logger, so that's
-        # all we need to copy
+        # we track the current request
         record.request = self.request
+
+        # we also track the current scope:
+        record.scope = self.scope
+
+    def copy_to_twisted_log_entry(self, record):
+        """
+        Copy logging fields from this context to a Twisted log record.
+        """
+        record["request"] = self.request
+        record["scope"] = self.scope
 
     def start(self):
         if get_thread_id() != self.main_thread:
@@ -343,7 +364,11 @@ class LoggingContext(object):
 
         # When we stop, let's record the cpu used since we started
         if not self.usage_start:
-            logger.warning("Called stop on logcontext %s without calling start", self)
+            # Log a warning on platforms that support thread usage tracking
+            if is_thread_resource_usage_supported:
+                logger.warning(
+                    "Called stop on logcontext %s without calling start", self
+                )
             return
 
         utime_delta, stime_delta = self._get_cputime()

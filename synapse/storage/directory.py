@@ -46,8 +46,7 @@ class DirectoryWorkerStore(SQLBaseStore):
         )
 
         if not room_id:
-            defer.returnValue(None)
-            return
+            return None
 
         servers = yield self._simple_select_onecol(
             "room_alias_servers",
@@ -57,10 +56,9 @@ class DirectoryWorkerStore(SQLBaseStore):
         )
 
         if not servers:
-            defer.returnValue(None)
-            return
+            return None
 
-        defer.returnValue(RoomAliasMapping(room_id, room_alias.to_string(), servers))
+        return RoomAliasMapping(room_id, room_alias.to_string(), servers)
 
     def get_room_alias_creator(self, room_alias):
         return self._simple_select_one_onecol(
@@ -125,7 +123,7 @@ class DirectoryStore(DirectoryWorkerStore):
             raise SynapseError(
                 409, "Room alias %s already exists" % room_alias.to_string()
             )
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def delete_room_alias(self, room_alias):
@@ -133,7 +131,7 @@ class DirectoryStore(DirectoryWorkerStore):
             "delete_room_alias", self._delete_room_alias_txn, room_alias
         )
 
-        defer.returnValue(room_id)
+        return room_id
 
     def _delete_room_alias_txn(self, txn, room_alias):
         txn.execute(

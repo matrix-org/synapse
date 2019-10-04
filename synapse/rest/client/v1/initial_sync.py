@@ -42,7 +42,7 @@ class InitialSyncRestServlet(RestServlet):
             include_archived=include_archived,
         )
 
-        defer.returnValue((200, content))
+        return 200, content
 
 
 def register_servlets(hs, http_server):

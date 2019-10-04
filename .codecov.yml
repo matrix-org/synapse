@@ -1,5 +1,4 @@
-comment:
-  layout: "diff"
+comment: off
 
 coverage:
   status:

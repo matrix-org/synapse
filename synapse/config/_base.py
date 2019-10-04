@@ -137,10 +137,40 @@ class Config(object):
             return file_stream.read()
 
     def invoke_all(self, name, *args, **kargs):
+        """Invoke all instance methods with the given name and arguments in the
+        class's MRO.
+
+        Args:
+            name (str): Name of function to invoke
+            *args
+            **kwargs
+
+        Returns:
+            list: The list of the return values from each method called
+        """
         results = []
         for cls in type(self).mro():
             if name in cls.__dict__:
                 results.append(getattr(cls, name)(self, *args, **kargs))
+        return results
+
+    @classmethod
+    def invoke_all_static(cls, name, *args, **kargs):
+        """Invoke all static methods with the given name and arguments in the
+        class's MRO.
+
+        Args:
+            name (str): Name of function to invoke
+            *args
+            **kwargs
+
+        Returns:
+            list: The list of the return values from each method called
+        """
+        results = []
+        for c in cls.mro():
+            if name in c.__dict__:
+                results.append(getattr(c, name)(*args, **kargs))
         return results
 
     def generate_config(
@@ -151,6 +181,11 @@ class Config(object):
         generate_secrets=False,
         report_stats=None,
         open_private_ports=False,
+        listeners=None,
+        database_conf=None,
+        tls_certificate_path=None,
+        tls_private_key_path=None,
+        acme_domain=None,
     ):
         """Build a default configuration file
 
@@ -177,6 +212,33 @@ class Config(object):
             open_private_ports (bool): True to leave private ports (such as the non-TLS
                 HTTP listener) open to the internet.
 
+            listeners (list(dict)|None): A list of descriptions of the listeners
+                synapse should start with each of which specifies a port (str), a list of
+                resources (list(str)), tls (bool) and type (str). For example:
+                [{
+                    "port": 8448,
+                    "resources": [{"names": ["federation"]}],
+                    "tls": True,
+                    "type": "http",
+                },
+                {
+                    "port": 443,
+                    "resources": [{"names": ["client"]}],
+                    "tls": False,
+                    "type": "http",
+                }],
+
+
+            database (str|None): The database type to configure, either `psycog2`
+                or `sqlite3`.
+
+            tls_certificate_path (str|None): The path to the tls certificate.
+
+            tls_private_key_path (str|None): The path to the tls private key.
+
+            acme_domain (str|None): The domain acme will try to validate. If
+                specified acme will be enabled.
+
         Returns:
             str: the yaml config file
         """
@@ -190,6 +252,11 @@ class Config(object):
                 generate_secrets=generate_secrets,
                 report_stats=report_stats,
                 open_private_ports=open_private_ports,
+                listeners=listeners,
+                database_conf=database_conf,
+                tls_certificate_path=tls_certificate_path,
+                tls_private_key_path=tls_private_key_path,
+                acme_domain=acme_domain,
             )
         )
 
@@ -202,6 +269,23 @@ class Config(object):
         Returns: Config object.
         """
         config_parser = argparse.ArgumentParser(description=description)
+        cls.add_arguments_to_parser(config_parser)
+        obj, _ = cls.load_config_with_parser(config_parser, argv)
+
+        return obj
+
+    @classmethod
+    def add_arguments_to_parser(cls, config_parser):
+        """Adds all the config flags to an ArgumentParser.
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Used for workers where we want to add extra flags/subcommands.
+
+        Args:
+            config_parser (ArgumentParser): App description
+        """
+
         config_parser.add_argument(
             "-c",
             "--config-path",
@@ -219,16 +303,34 @@ class Config(object):
             " Defaults to the directory containing the last config file",
         )
 
+        cls.invoke_all_static("add_arguments", config_parser)
+
+    @classmethod
+    def load_config_with_parser(cls, parser, argv):
+        """Parse the commandline and config files with the given parser
+
+        Doesn't support config-file-generation: used by the worker apps.
+
+        Used for workers where we want to add extra flags/subcommands.
+
+        Args:
+            parser (ArgumentParser)
+            argv (list[str])
+
+        Returns:
+            tuple[HomeServerConfig, argparse.Namespace]: Returns the parsed
+            config object and the parsed argparse.Namespace object from
+            `parser.parse_args(..)`
+        """
+
         obj = cls()
 
-        obj.invoke_all("add_arguments", config_parser)
-
-        config_args = config_parser.parse_args(argv)
+        config_args = parser.parse_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
 
         if not config_files:
-            config_parser.error("Must supply a config file.")
+            parser.error("Must supply a config file.")
 
         if config_args.keys_directory:
             config_dir_path = config_args.keys_directory
@@ -244,7 +346,7 @@ class Config(object):
 
         obj.invoke_all("read_arguments", config_args)
 
-        return obj
+        return obj, config_args
 
     @classmethod
     def load_or_generate_config(cls, description, argv):
@@ -401,7 +503,7 @@ class Config(object):
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
 
-        obj.invoke_all("add_arguments", parser)
+        obj.invoke_all_static("add_arguments", parser)
         args = parser.parse_args(remaining_args)
 
         config_dict = read_config_files(config_files)

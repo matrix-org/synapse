@@ -28,6 +28,11 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.logging.opentracing import (
+    inject_active_span_byte_dict,
+    trace,
+    trace_servlet,
+)
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
 
@@ -128,6 +133,7 @@ class ReplicationEndpoint(object):
 
         client = hs.get_simple_http_client()
 
+        @trace(opname="outgoing_replication_request")
         @defer.inlineCallbacks
         def send_request(**kwargs):
             data = yield cls._serialize_payload(**kwargs)
@@ -165,8 +171,10 @@ class ReplicationEndpoint(object):
                 # have a good idea that the request has either succeeded or failed on
                 # the master, and so whether we should clean up or not.
                 while True:
+                    headers = {}
+                    inject_active_span_byte_dict(headers, None, check_destination=False)
                     try:
-                        result = yield request_func(uri, data)
+                        result = yield request_func(uri, data, headers=headers)
                         break
                     except CodeMessageException as e:
                         if e.code != 504 or not cls.RETRY_ON_TIMEOUT:
@@ -185,7 +193,7 @@ class ReplicationEndpoint(object):
             except RequestSendFailed as e:
                 raise_from(SynapseError(502, "Failed to talk to master"), e)
 
-            defer.returnValue(result)
+            return result
 
         return send_request
 
@@ -205,7 +213,12 @@ class ReplicationEndpoint(object):
         args = "/".join("(?P<%s>[^/]+)" % (arg,) for arg in url_args)
         pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
 
-        http_server.register_paths(method, [pattern], handler)
+        handler = trace_servlet(self.__class__.__name__, extract_context=True)(handler)
+        # We don't let register paths trace this servlet using the default tracing
+        # options because we wish to extract the context explicitly.
+        http_server.register_paths(
+            method, [pattern], handler, self.__class__.__name__, trace=False
+        )
 
     def _cached_handler(self, request, txn_id, **kwargs):
         """Called on new incoming requests when caching is enabled. Checks

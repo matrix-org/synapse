@@ -20,6 +20,7 @@ import os
 import platform
 import threading
 import time
+from typing import Dict, Union
 
 import six
 
@@ -29,12 +30,20 @@ from prometheus_client.core import REGISTRY, GaugeMetricFamily, HistogramMetricF
 
 from twisted.internet import reactor
 
+import synapse
+from synapse.metrics._exposition import (
+    MetricsResource,
+    generate_latest,
+    start_http_server,
+)
+from synapse.util.versionstring import get_version_string
+
 logger = logging.getLogger(__name__)
 
+METRICS_PREFIX = "/_synapse/metrics"
+
 running_on_pypy = platform.python_implementation() == "PyPy"
-all_metrics = []
-all_collectors = []
-all_gauges = {}
+all_gauges = {}  # type: Dict[str, Union[LaterGauge, InFlightGauge, BucketCollector]]
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
@@ -116,7 +125,7 @@ class InFlightGauge(object):
         )
 
         # Counts number of in flight blocks for a given set of label values
-        self._registrations = {}
+        self._registrations = {}  # type: Dict
 
         # Protects access to _registrations
         self._lock = threading.Lock()
@@ -217,7 +226,7 @@ class BucketCollector(object):
         # Fetch the data -- this must be synchronous!
         data = self.data_collector()
 
-        buckets = {}
+        buckets = {}  # type: Dict[float, int]
 
         res = []
         for x in data.keys():
@@ -377,6 +386,16 @@ event_processing_last_ts = Gauge("synapse_event_processing_last_ts", "", ["name"
 # finished being processed.
 event_processing_lag = Gauge("synapse_event_processing_lag", "", ["name"])
 
+# Build info of the running server.
+build_info = Gauge(
+    "synapse_build_info", "Build information", ["pythonversion", "version", "osversion"]
+)
+build_info.labels(
+    " ".join([platform.python_implementation(), platform.python_version()]),
+    get_version_string(synapse),
+    " ".join([platform.system(), platform.release()]),
+).set(1)
+
 last_ticked = time.time()
 
 
@@ -470,3 +489,12 @@ try:
         gc.disable()
 except AttributeError:
     pass
+
+__all__ = [
+    "MetricsResource",
+    "generate_latest",
+    "start_http_server",
+    "LaterGauge",
+    "InFlightGauge",
+    "BucketCollector",
+]

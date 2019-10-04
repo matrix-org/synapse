@@ -64,7 +64,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             user_id, device_id, initial_display_name, is_guest
         )
 
-        defer.returnValue((200, {"device_id": device_id, "access_token": access_token}))
+        return 200, {"device_id": device_id, "access_token": access_token}
 
 
 def register_servlets(hs, http_server):

@@ -18,6 +18,7 @@ import json
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.logging.opentracing import log_kv, trace
 
 from ._base import SQLBaseStore
 
@@ -61,7 +62,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         row["session_data"] = json.loads(row["session_data"])
 
-        defer.returnValue(row)
+        return row
 
     @defer.inlineCallbacks
     def set_e2e_room_key(self, user_id, version, room_id, session_id, room_key):
@@ -82,11 +83,11 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             table="e2e_room_keys",
             keyvalues={
                 "user_id": user_id,
+                "version": version,
                 "room_id": room_id,
                 "session_id": session_id,
             },
             values={
-                "version": version,
                 "first_message_index": room_key["first_message_index"],
                 "forwarded_count": room_key["forwarded_count"],
                 "is_verified": room_key["is_verified"],
@@ -94,7 +95,16 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             },
             lock=False,
         )
+        log_kv(
+            {
+                "message": "Set room key",
+                "room_id": room_id,
+                "session_id": session_id,
+                "room_key": room_key,
+            }
+        )
 
+    @trace
     @defer.inlineCallbacks
     def get_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk get the E2E room keys for a given backup, optionally filtered to a given
@@ -118,7 +128,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         try:
             version = int(version)
         except ValueError:
-            defer.returnValue({"rooms": {}})
+            return {"rooms": {}}
 
         keyvalues = {"user_id": user_id, "version": version}
         if room_id:
@@ -151,8 +161,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "session_data": json.loads(row["session_data"]),
             }
 
-        defer.returnValue(sessions)
+        return sessions
 
+    @trace
     @defer.inlineCallbacks
     def delete_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
@@ -236,6 +247,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "get_e2e_room_keys_version_info", _get_e2e_room_keys_version_info_txn
         )
 
+    @trace
     def create_e2e_room_keys_version(self, user_id, info):
         """Atomically creates a new version of this user's e2e_room_keys store
         with the given version info.
@@ -276,6 +288,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
+    @trace
     def update_e2e_room_keys_version(self, user_id, version, info):
         """Update a given backup version
 
@@ -292,6 +305,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="update_e2e_room_keys_version",
         )
 
+    @trace
     def delete_e2e_room_keys_version(self, user_id, version=None):
         """Delete a given backup version of the user's room keys.
         Doesn't delete their actual key data.

@@ -85,7 +85,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "extra_users": [u.to_string() for u in extra_users],
         }
 
-        defer.returnValue(payload)
+        return payload
 
     @defer.inlineCallbacks
     def _handle_request(self, request, event_id):
@@ -117,7 +117,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             requester, event, context, ratelimit=ratelimit, extra_users=extra_users
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

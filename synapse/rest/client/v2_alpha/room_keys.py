@@ -135,7 +135,7 @@ class RoomKeysServlet(RestServlet):
             body = {"rooms": {room_id: body}}
 
         yield self.e2e_room_keys_handler.upload_room_keys(user_id, version, body)
-        defer.returnValue((200, {}))
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, session_id):
@@ -218,7 +218,7 @@ class RoomKeysServlet(RestServlet):
             else:
                 room_keys = room_keys["rooms"][room_id]
 
-        defer.returnValue((200, room_keys))
+        return 200, room_keys
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, room_id, session_id):
@@ -242,7 +242,7 @@ class RoomKeysServlet(RestServlet):
         yield self.e2e_room_keys_handler.delete_room_keys(
             user_id, version, room_id, session_id
         )
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class RoomKeysNewVersionServlet(RestServlet):
@@ -293,7 +293,7 @@ class RoomKeysNewVersionServlet(RestServlet):
         info = parse_json_object_from_request(request)
 
         new_version = yield self.e2e_room_keys_handler.create_version(user_id, info)
-        defer.returnValue((200, {"version": new_version}))
+        return 200, {"version": new_version}
 
     # we deliberately don't have a PUT /version, as these things really should
     # be immutable to avoid people footgunning
@@ -338,7 +338,7 @@ class RoomKeysVersionServlet(RestServlet):
         except SynapseError as e:
             if e.code == 404:
                 raise SynapseError(404, "No backup found", Codes.NOT_FOUND)
-        defer.returnValue((200, info))
+        return 200, info
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, version):
@@ -358,7 +358,7 @@ class RoomKeysVersionServlet(RestServlet):
         user_id = requester.user.to_string()
 
         yield self.e2e_room_keys_handler.delete_version(user_id, version)
-        defer.returnValue((200, {}))
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_PUT(self, request, version):
@@ -392,7 +392,7 @@ class RoomKeysVersionServlet(RestServlet):
             )
 
         yield self.e2e_room_keys_handler.update_version(user_id, version, info)
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

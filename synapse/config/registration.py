@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from distutils.util import strtobool
+
+import pkg_resources
 
 from synapse.config._base import Config, ConfigError
 from synapse.types import RoomAlias
@@ -41,8 +44,36 @@ class AccountValidityConfig(Config):
 
             self.startup_job_max_delta = self.period * 10.0 / 100.0
 
-        if self.renew_by_email_enabled and "public_baseurl" not in synapse_config:
-            raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+        if self.renew_by_email_enabled:
+            if "public_baseurl" not in synapse_config:
+                raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+
+        template_dir = config.get("template_dir")
+
+        if not template_dir:
+            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
+
+        if "account_renewed_html_path" in config:
+            file_path = os.path.join(template_dir, config["account_renewed_html_path"])
+
+            self.account_renewed_html_content = self.read_file(
+                file_path, "account_validity.account_renewed_html_path"
+            )
+        else:
+            self.account_renewed_html_content = (
+                "<html><body>Your account has been successfully renewed.</body><html>"
+            )
+
+        if "invalid_token_html_path" in config:
+            file_path = os.path.join(template_dir, config["invalid_token_html_path"])
+
+            self.invalid_token_html_content = self.read_file(
+                file_path, "account_validity.invalid_token_html_path"
+            )
+        else:
+            self.invalid_token_html_content = (
+                "<html><body>Invalid renewal token.</body><html>"
+            )
 
 
 class RegistrationConfig(Config):
@@ -68,6 +99,10 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config.get(
             "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
+        account_threepid_delegates = config.get("account_threepid_delegates") or {}
+        self.account_threepid_delegate_email = account_threepid_delegates.get("email")
+        self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
+
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
@@ -83,6 +118,11 @@ class RegistrationConfig(Config):
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False
         )
+
+        session_lifetime = config.get("session_lifetime")
+        if session_lifetime is not None:
+            session_lifetime = self.parse_duration(session_lifetime)
+        self.session_lifetime = session_lifetime
 
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
@@ -140,6 +180,27 @@ class RegistrationConfig(Config):
         #  period: 6w
         #  renew_at: 1w
         #  renew_email_subject: "Renew your %%(app)s account"
+        #  # Directory in which Synapse will try to find the HTML files to serve to the
+        #  # user when trying to renew an account. Optional, defaults to
+        #  # synapse/res/templates.
+        #  template_dir: "res/templates"
+        #  # HTML to be displayed to the user after they successfully renewed their
+        #  # account. Optional.
+        #  account_renewed_html_path: "account_renewed.html"
+        #  # HTML to be displayed when the user tries to renew an account with an invalid
+        #  # renewal token. Optional.
+        #  invalid_token_html_path: "invalid_token.html"
+
+        # Time that a user's session remains valid for, after they log in.
+        #
+        # Note that this is not currently compatible with guest logins.
+        #
+        # Note also that this is calculated at login time: changes are not applied
+        # retrospectively to users who have already logged in.
+        #
+        # By default, this is infinite.
+        #
+        #session_lifetime: 24h
 
         # The user must provide all of the below types of 3PID when registering.
         #
@@ -200,9 +261,43 @@ class RegistrationConfig(Config):
         # Also defines the ID server which will be called when an account is
         # deactivated (one will be picked arbitrarily).
         #
+        # Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
+        # server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
+        # background migration script, informing itself that the identity server all of its
+        # 3PIDs have been bound to is likely one of the below.
+        #
+        # As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
+        # it is now solely used for the purposes of the background migration script, and can be
+        # removed once it has run.
         #trusted_third_party_id_servers:
         #  - matrix.org
         #  - vector.im
+
+        # Handle threepid (email/phone etc) registration and password resets through a set of
+        # *trusted* identity servers. Note that this allows the configured identity server to
+        # reset passwords for accounts!
+        #
+        # Be aware that if `email` is not set, and SMTP options have not been
+        # configured in the email config block, registration and user password resets via
+        # email will be globally disabled.
+        #
+        # Additionally, if `msisdn` is not set, registration and password resets via msisdn
+        # will be disabled regardless. This is due to Synapse currently not supporting any
+        # method of sending SMS messages on its own.
+        #
+        # To enable using an identity server for operations regarding a particular third-party
+        # identifier type, set the value to the URL of that identity server as shown in the
+        # examples below.
+        #
+        # Servers handling the these requests must answer the `/requestToken` endpoints defined
+        # by the Matrix Identity Service API specification:
+        # https://matrix.org/docs/spec/identity_service/latest
+        #
+        # If a delegate is specified, the config option public_baseurl must also be filled out.
+        #
+        account_threepid_delegates:
+            #email: https://example.com     # Delegate email sending to example.org
+            #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
@@ -221,7 +316,8 @@ class RegistrationConfig(Config):
             % locals()
         )
 
-    def add_arguments(self, parser):
+    @staticmethod
+    def add_arguments(parser):
         reg_group = parser.add_argument_group("registration")
         reg_group.add_argument(
             "--enable-registration",

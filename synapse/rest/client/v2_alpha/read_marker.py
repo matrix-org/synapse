@@ -59,7 +59,7 @@ class ReadMarkerRestServlet(RestServlet):
                 event_id=read_marker_event_id,
             )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

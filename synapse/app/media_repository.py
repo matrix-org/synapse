@@ -26,16 +26,17 @@ from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
+from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
@@ -72,6 +73,12 @@ class MediaRepositoryServer(HomeServer):
                     resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "media":
                     media_repo = self.get_media_repository_resource()
+
+                    # We need to serve the admin servlets for media on the
+                    # worker.
+                    admin_resource = JsonResource(self, canonical_json=False)
+                    register_servlets_for_media_repo(self, admin_resource)
+
                     resources.update(
                         {
                             MEDIA_PREFIX: media_repo,
@@ -79,6 +86,7 @@ class MediaRepositoryServer(HomeServer):
                             CONTENT_REPO_PREFIX: ContentRepoResource(
                                 self, self.config.uploads_path
                             ),
+                            "/_synapse/admin": admin_resource,
                         }
                     )
 
@@ -147,8 +155,6 @@ def start(config_options):
             "Please add ``enable_media_repo: false`` to the main config\n"
         )
 
-    setup_logging(config, use_worker_options=True)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -161,8 +167,12 @@ def start(config_options):
         database_engine=database_engine,
     )
 
+    setup_logging(ss, config, use_worker_options=True)
+
     ss.setup()
-    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ss, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-media-repository", config)
 
