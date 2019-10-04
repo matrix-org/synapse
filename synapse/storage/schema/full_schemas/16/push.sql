@@ -59,8 +59,9 @@ CREATE TABLE IF NOT EXISTS user_filters(
   filter_json bytea
 );
 
-CREATE UNIQUE INDEX user_filters_by_user_id_filter_id_unique
-  ON user_filters(user_id, filter_id);
+CREATE INDEX user_filters_by_user_id_filter_id ON user_filters(
+    user_id, filter_id
+);
 
 CREATE TABLE IF NOT EXISTS push_rules_enable (
   id BIGINT PRIMARY KEY,
