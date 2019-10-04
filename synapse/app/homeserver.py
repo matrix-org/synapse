@@ -644,6 +644,7 @@ def run(hs):
         daemonize=hs.config.daemonize,
         print_pidfile=hs.config.print_pidfile,
         logger=logger,
+        outfile=hs.config.out_file
     )
 
 

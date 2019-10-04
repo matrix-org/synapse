@@ -68,6 +68,7 @@ class ServerConfig(Config):
             raise ConfigError(str(e))
 
         self.pid_file = self.abspath(config.get("pid_file"))
+        self.out_file = self.abspath(config.get("out_file"))
         self.web_client_location = config.get("web_client_location", None)
         self.soft_file_limit = config.get("soft_file_limit", 0)
         self.daemonize = config.get("daemonize")
@@ -384,6 +385,7 @@ class ServerConfig(Config):
             unsecure_port = 8008
 
         pid_file = os.path.join(data_dir_path, "homeserver.pid")
+        out_file = os.path.join(data_dir_path, "homeserver.out")
 
         # Bring DEFAULT_ROOM_VERSION into the local-scope for use in the
         # default config string
@@ -466,6 +468,11 @@ class ServerConfig(Config):
         # When running as a daemon, the file to store the pid in
         #
         pid_file: %(pid_file)s
+
+
+        # When running as a daemon, the file to redirect stdout and stderr to
+        #
+        out_file: %(out_file)%
 
         # The path to the web client which will be served at /_matrix/client/
         # if 'webclient' is configured under the 'listeners' configuration.

@@ -21,7 +21,7 @@ import socket
 import sys
 import traceback
 
-from daemonize import Daemonize
+from synapse.app import _daemonize 
 
 from twisted.internet import defer, error, reactor
 from twisted.protocols.tls import TLSMemoryBIOFactory
@@ -71,6 +71,7 @@ def start_worker_reactor(appname, config, run_command=reactor.run):
         soft_file_limit=config.soft_file_limit,
         gc_thresholds=config.gc_thresholds,
         pid_file=config.worker_pid_file,
+        outfile=config.out_file,
         daemonize=config.worker_daemonize,
         print_pidfile=config.print_pidfile,
         logger=logger,
@@ -83,6 +84,7 @@ def start_reactor(
     soft_file_limit,
     gc_thresholds,
     pid_file,
+    outfile,
     daemonize,
     print_pidfile,
     logger,
@@ -126,13 +128,14 @@ def start_reactor(
             if print_pidfile:
                 print(pid_file)
 
-            daemon = Daemonize(
+            daemon = _daemonize.Daemonize2(
                 app=appname,
                 pid=pid_file,
                 action=run,
                 auto_close_fds=False,
                 verbose=True,
                 logger=logger,
+                outfile=outfile
             )
             daemon.start()
         else:
