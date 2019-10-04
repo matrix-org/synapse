@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.web.resource import Resource
-
 import logging
+
+from twisted.web.resource import NoResource
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +40,15 @@ def create_resource_tree(desired_tree, root_resource):
     # extra resources to existing nodes. See self._resource_id for the key.
     resource_mappings = {}
     for full_path, res in desired_tree.items():
+        # twisted requires all resources to be bytes
+        full_path = full_path.encode("utf-8")
+
         logger.info("Attaching %s to path %s", res, full_path)
         last_resource = root_resource
-        for path_seg in full_path.split('/')[1:-1]:
+        for path_seg in full_path.split(b"/")[1:-1]:
             if path_seg not in last_resource.listNames():
                 # resource doesn't exist, so make a "dummy resource"
-                child_resource = Resource()
+                child_resource = NoResource()
                 last_resource.putChild(path_seg, child_resource)
                 res_id = _resource_id(last_resource, path_seg)
                 resource_mappings[res_id] = child_resource
@@ -57,7 +60,7 @@ def create_resource_tree(desired_tree, root_resource):
 
         # ===========================
         # now attach the actual desired resource
-        last_path_seg = full_path.split('/')[-1]
+        last_path_seg = full_path.split(b"/")[-1]
 
         # if there is already a resource here, thieve its children and
         # replace it
@@ -67,9 +70,7 @@ def create_resource_tree(desired_tree, root_resource):
             # to be replaced with the desired resource.
             existing_dummy_resource = resource_mappings[res_id]
             for child_name in existing_dummy_resource.listNames():
-                child_res_id = _resource_id(
-                    existing_dummy_resource, child_name
-                )
+                child_res_id = _resource_id(existing_dummy_resource, child_name)
                 child_resource = resource_mappings[child_res_id]
                 # steal the children
                 res.putChild(child_name, child_resource)

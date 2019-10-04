@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,49 +16,39 @@
 
 """Tests REST events for /rooms paths."""
 
-# twisted imports
-from twisted.internet import defer
-
-import synapse.rest.client.v1.room
-from synapse.types import UserID
-
-from ....utils import MockHttpResource, MockClock, setup_test_homeserver
-from .utils import RestTestCase
-
 from mock import Mock, NonCallableMock
 
+from twisted.internet import defer
+
+from synapse.rest.client.v1 import room
+from synapse.types import UserID
+
+from tests import unittest
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 
 
-class RoomTypingTestCase(RestTestCase):
+class RoomTypingTestCase(unittest.HomeserverTestCase):
     """ Tests /rooms/$room_id/typing/$user_id REST API. """
+
     user_id = "@sid:red"
 
     user = UserID.from_string(user_id)
+    servlets = [room.register_servlets]
 
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.clock = MockClock()
+    def make_homeserver(self, reactor, clock):
 
-        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
-        self.auth_user_id = self.user_id
-
-        hs = yield setup_test_homeserver(
+        hs = self.setup_test_homeserver(
             "red",
-            clock=self.clock,
             http_client=None,
-            replication_layer=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
+            federation_client=Mock(),
+            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
-        self.hs = hs
 
         self.event_source = hs.get_event_sources().sources["typing"]
 
         self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.send_message.return_value = (True, 0)
+        self.ratelimiter.can_do_action.return_value = (True, 0)
 
         hs.get_handlers().federation_handler = Mock()
 
@@ -68,10 +59,11 @@ class RoomTypingTestCase(RestTestCase):
                 "is_guest": False,
             }
 
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
+
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
         def get_room_members(room_id):
@@ -95,63 +87,70 @@ class RoomTypingTestCase(RestTestCase):
                 else:
                     if remotedomains is not None:
                         remotedomains.add(member.domain)
-        hs.get_handlers().room_member_handler.fetch_room_distributions_into = (
+
+        hs.get_room_member_handler().fetch_room_distributions_into = (
             fetch_room_distributions_into
         )
 
-        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
+        return hs
 
-        self.room_id = yield self.create_room_as(self.user_id)
+    def prepare(self, reactor, clock, hs):
+        self.room_id = self.helper.create_room_as(self.user_id)
         # Need another user to make notifications actually work
-        yield self.join(self.room_id, user="@jim:red")
+        self.helper.join(self.room_id, user="@jim:red")
 
-    @defer.inlineCallbacks
     def test_set_typing(self):
-        (code, _) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": true, "timeout": 30000}'
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            b'{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, code)
+        self.render(request)
+        self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
-        events = yield self.event_source.get_new_events(
-            from_key=0,
-            room_ids=[self.room_id],
+        events = self.event_source.get_new_events(from_key=0, room_ids=[self.room_id])
+        self.assertEquals(
+            events[0],
+            [
+                {
+                    "type": "m.typing",
+                    "room_id": self.room_id,
+                    "content": {"user_ids": [self.user_id]},
+                }
+            ],
         )
-        self.assertEquals(events[0], [{
-            "type": "m.typing",
-            "room_id": self.room_id,
-            "content": {
-                "user_ids": [self.user_id],
-            }
-        }])
 
-    @defer.inlineCallbacks
     def test_set_not_typing(self):
-        (code, _) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": false}'
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            b'{"typing": false}',
         )
-        self.assertEquals(200, code)
+        self.render(request)
+        self.assertEquals(200, channel.code)
 
-    @defer.inlineCallbacks
     def test_typing_timeout(self):
-        (code, _) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": true, "timeout": 30000}'
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            b'{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, code)
+        self.render(request)
+        self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
 
-        self.clock.advance_time(36)
+        self.reactor.advance(36)
 
         self.assertEquals(self.event_source.get_current_key(), 2)
 
-        (code, _) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": true, "timeout": 30000}'
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            b'{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, code)
+        self.render(request)
+        self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 3)

@@ -1,0 +1,31 @@
+#!/bin/sh -e
+
+# Attempt to undo some of the braindamage caused by
+# https://github.com/matrix-org/package-synapse-debian/issues/18.
+#
+# Due to reasons [1], the old python2 matrix-synapse package will not stop the
+# service when the package is uninstalled. Our maintainer scripts will do the
+# right thing in terms of ensuring the service is enabled and unmasked, but
+# then do a `systemctl start matrix-synapse`, which of course does nothing -
+# leaving the old (py2) service running.
+#
+# There should normally be no reason for the service to be running during our
+# preinst, so we assume that if it *is* running, it's due to that situation,
+# and stop it.
+#
+# [1] dh_systemd_start doesn't do anything because it sees that there is an
+#     init.d script with the same name, so leaves it to dh_installinit.
+#
+#     dh_installinit doesn't do anything because somebody gave it a --no-start
+#     for unknown reasons.
+
+if [ -x /bin/systemctl ]; then
+    if /bin/systemctl --quiet is-active -- matrix-synapse; then
+        echo >&2 "stopping existing matrix-synapse service"
+        /bin/systemctl stop matrix-synapse || true
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0

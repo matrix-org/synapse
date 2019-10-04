@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 import synapse.api.errors
+
 import tests.unittest
 import tests.utils
 
@@ -27,68 +28,133 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield tests.utils.setup_test_homeserver()
+        hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
 
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
     def test_store_new_device(self):
-        yield self.store.store_device(
-            "user_id", "device_id", "display_name"
-        )
+        yield self.store.store_device("user_id", "device_id", "display_name")
 
         res = yield self.store.get_device("user_id", "device_id")
-        self.assertDictContainsSubset({
-            "user_id": "user_id",
-            "device_id": "device_id",
-            "display_name": "display_name",
-        }, res)
+        self.assertDictContainsSubset(
+            {
+                "user_id": "user_id",
+                "device_id": "device_id",
+                "display_name": "display_name",
+            },
+            res,
+        )
 
     @defer.inlineCallbacks
     def test_get_devices_by_user(self):
-        yield self.store.store_device(
-            "user_id", "device1", "display_name 1"
-        )
-        yield self.store.store_device(
-            "user_id", "device2", "display_name 2"
-        )
-        yield self.store.store_device(
-            "user_id2", "device3", "display_name 3"
-        )
+        yield self.store.store_device("user_id", "device1", "display_name 1")
+        yield self.store.store_device("user_id", "device2", "display_name 2")
+        yield self.store.store_device("user_id2", "device3", "display_name 3")
 
         res = yield self.store.get_devices_by_user("user_id")
         self.assertEqual(2, len(res.keys()))
-        self.assertDictContainsSubset({
-            "user_id": "user_id",
-            "device_id": "device1",
-            "display_name": "display_name 1",
-        }, res["device1"])
-        self.assertDictContainsSubset({
-            "user_id": "user_id",
-            "device_id": "device2",
-            "display_name": "display_name 2",
-        }, res["device2"])
+        self.assertDictContainsSubset(
+            {
+                "user_id": "user_id",
+                "device_id": "device1",
+                "display_name": "display_name 1",
+            },
+            res["device1"],
+        )
+        self.assertDictContainsSubset(
+            {
+                "user_id": "user_id",
+                "device_id": "device2",
+                "display_name": "display_name 2",
+            },
+            res["device2"],
+        )
+
+    @defer.inlineCallbacks
+    def test_get_devices_by_remote(self):
+        device_ids = ["device_id1", "device_id2"]
+
+        # Add two device updates with a single stream_id
+        yield self.store.add_device_change_to_streams(
+            "user_id", device_ids, ["somehost"]
+        )
+
+        # Get all device updates ever meant for this remote
+        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+            "somehost", -1, limit=100
+        )
+
+        # Check original device_ids are contained within these updates
+        self._check_devices_in_updates(device_ids, device_updates)
+
+    @defer.inlineCallbacks
+    def test_get_devices_by_remote_limited(self):
+        # Test breaking the update limit in 1, 101, and 1 device_id segments
+
+        # first add one device
+        device_ids1 = ["device_id0"]
+        yield self.store.add_device_change_to_streams(
+            "user_id", device_ids1, ["someotherhost"]
+        )
+
+        # then add 101
+        device_ids2 = ["device_id" + str(i + 1) for i in range(101)]
+        yield self.store.add_device_change_to_streams(
+            "user_id", device_ids2, ["someotherhost"]
+        )
+
+        # then one more
+        device_ids3 = ["newdevice"]
+        yield self.store.add_device_change_to_streams(
+            "user_id", device_ids3, ["someotherhost"]
+        )
+
+        #
+        # now read them back.
+        #
+
+        # first we should get a single update
+        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+            "someotherhost", -1, limit=100
+        )
+        self._check_devices_in_updates(device_ids1, device_updates)
+
+        # Then we should get an empty list back as the 101 devices broke the limit
+        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+            "someotherhost", now_stream_id, limit=100
+        )
+        self.assertEqual(len(device_updates), 0)
+
+        # The 101 devices should've been cleared, so we should now just get one device
+        # update
+        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+            "someotherhost", now_stream_id, limit=100
+        )
+        self._check_devices_in_updates(device_ids3, device_updates)
+
+    def _check_devices_in_updates(self, expected_device_ids, device_updates):
+        """Check that an specific device ids exist in a list of device update EDUs"""
+        self.assertEqual(len(device_updates), len(expected_device_ids))
+
+        received_device_ids = {update["device_id"] for update in device_updates}
+        self.assertEqual(received_device_ids, set(expected_device_ids))
 
     @defer.inlineCallbacks
     def test_update_device(self):
-        yield self.store.store_device(
-            "user_id", "device_id", "display_name 1"
-        )
+        yield self.store.store_device("user_id", "device_id", "display_name 1")
 
         res = yield self.store.get_device("user_id", "device_id")
         self.assertEqual("display_name 1", res["display_name"])
 
         # do a no-op first
-        yield self.store.update_device(
-            "user_id", "device_id",
-        )
+        yield self.store.update_device("user_id", "device_id")
         res = yield self.store.get_device("user_id", "device_id")
         self.assertEqual("display_name 1", res["display_name"])
 
         # do the update
         yield self.store.update_device(
-            "user_id", "device_id",
-            new_display_name="display_name 2",
+            "user_id", "device_id", new_display_name="display_name 2"
         )
 
         # check it worked
@@ -99,7 +165,6 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
     def test_update_unknown_device(self):
         with self.assertRaises(synapse.api.errors.StoreError) as cm:
             yield self.store.update_device(
-                "user_id", "unknown_device_id",
-                new_display_name="display_name 2",
+                "user_id", "unknown_device_id", new_display_name="display_name 2"
             )
         self.assertEqual(404, cm.exception.code)

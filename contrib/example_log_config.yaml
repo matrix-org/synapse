@@ -1,7 +1,7 @@
-# Example log_config file for synapse. To enable, point `log_config` to it in 
+# Example log_config file for synapse. To enable, point `log_config` to it in
 # `homeserver.yaml`, and restart synapse.
 #
-# This configuration will produce similar results to the defaults within 
+# This configuration will produce similar results to the defaults within
 # synapse, but can be edited to give more flexibility.
 
 version: 1
@@ -12,13 +12,14 @@ formatters:
 
 filters:
   context:
-    (): synapse.util.logcontext.LoggingContextFilter
+    (): synapse.logging.context.LoggingContextFilter
     request: ""
 
 handlers:
   # example output to console
   console:
     class: logging.StreamHandler
+    formatter: fmt
     filters: [context]
 
   # example output to file - to enable, edit 'root' config below.
@@ -29,12 +30,12 @@ handlers:
     maxBytes: 100000000
     backupCount: 3
     filters: [context]
-
+    encoding: utf8
 
 root:
     level: INFO
     handlers: [console] # to use file handler instead, switch to [file]
-    
+
 loggers:
     synapse:
         level: INFO

@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
-
 from synapse.api.errors import SynapseError
-from synapse.server import HomeServer
-from synapse.types import UserID, RoomAlias
+from synapse.types import GroupID, RoomAlias, UserID, map_username_to_mxid_localpart
 
-mock_homeserver = HomeServer(hostname="my.domain")
+from tests import unittest
+from tests.utils import TestHomeServer
+
+mock_homeserver = TestHomeServer(hostname="my.domain")
 
 
 class UserIDTestCase(unittest.TestCase):
@@ -60,3 +60,49 @@ class RoomAliasTestCase(unittest.TestCase):
         room = RoomAlias("channel", "my.domain")
 
         self.assertEquals(room.to_string(), "#channel:my.domain")
+
+
+class GroupIDTestCase(unittest.TestCase):
+    def test_parse(self):
+        group_id = GroupID.from_string("+group/=_-.123:my.domain")
+        self.assertEqual("group/=_-.123", group_id.localpart)
+        self.assertEqual("my.domain", group_id.domain)
+
+    def test_validate(self):
+        bad_ids = ["$badsigil:domain", "+:empty"] + [
+            "+group" + c + ":domain" for c in "A%?æ£"
+        ]
+        for id_string in bad_ids:
+            try:
+                GroupID.from_string(id_string)
+                self.fail("Parsing '%s' should raise exception" % id_string)
+            except SynapseError as exc:
+                self.assertEqual(400, exc.code)
+                self.assertEqual("M_UNKNOWN", exc.errcode)
+
+
+class MapUsernameTestCase(unittest.TestCase):
+    def testPassThrough(self):
+        self.assertEqual(map_username_to_mxid_localpart("test1234"), "test1234")
+
+    def testUpperCase(self):
+        self.assertEqual(map_username_to_mxid_localpart("tEST_1234"), "test_1234")
+        self.assertEqual(
+            map_username_to_mxid_localpart("tEST_1234", case_sensitive=True),
+            "t_e_s_t__1234",
+        )
+
+    def testSymbols(self):
+        self.assertEqual(
+            map_username_to_mxid_localpart("test=$?_1234"), "test=3d=24=3f_1234"
+        )
+
+    def testLeadingUnderscore(self):
+        self.assertEqual(map_username_to_mxid_localpart("_test_1234"), "=5ftest_1234")
+
+    def testNonAscii(self):
+        # this should work with either a unicode or a bytes
+        self.assertEqual(map_username_to_mxid_localpart("têst"), "t=c3=aast")
+        self.assertEqual(
+            map_username_to_mxid_localpart("têst".encode("utf-8")), "t=c3=aast"
+        )

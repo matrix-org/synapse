@@ -14,51 +14,48 @@
 # limitations under the License.
 
 """This module contains REST servlets to do with event streaming, /events."""
+import logging
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.http.servlet import RestServlet
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.streams.config import PaginationConfig
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.events.utils import serialize_event
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 
 
-class EventStreamRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/events$")
+class EventStreamRestServlet(RestServlet):
+    PATTERNS = client_patterns("/events$", v1=True)
 
     DEFAULT_LONGPOLL_TIME_MS = 30000
 
     def __init__(self, hs):
-        super(EventStreamRestServlet, self).__init__(hs)
+        super(EventStreamRestServlet, self).__init__()
         self.event_stream_handler = hs.get_event_stream_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(
-            request,
-            allow_guest=True,
-        )
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         is_guest = requester.is_guest
         room_id = None
         if is_guest:
-            if "room_id" not in request.args:
+            if b"room_id" not in request.args:
                 raise SynapseError(400, "Guest users must specify room_id param")
-        if "room_id" in request.args:
-            room_id = request.args["room_id"][0]
+        if b"room_id" in request.args:
+            room_id = request.args[b"room_id"][0].decode("ascii")
 
         pagin_config = PaginationConfig.from_request(request)
         timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
-        if "timeout" in request.args:
+        if b"timeout" in request.args:
             try:
-                timeout = int(request.args["timeout"][0])
+                timeout = int(request.args[b"timeout"][0])
             except ValueError:
                 raise SynapseError(400, "timeout must be in milliseconds.")
 
-        as_client_event = "raw" not in request.args
+        as_client_event = b"raw" not in request.args
 
         chunk = yield self.event_stream_handler.get_stream(
             requester.user.to_string(),
@@ -70,31 +67,33 @@ class EventStreamRestServlet(ClientV1RestServlet):
             is_guest=is_guest,
         )
 
-        defer.returnValue((200, chunk))
+        return 200, chunk
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
 
 # TODO: Unit test gets, with and without auth, with different kinds of events.
-class EventRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/events/(?P<event_id>[^/]*)$")
+class EventRestServlet(RestServlet):
+    PATTERNS = client_patterns("/events/(?P<event_id>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(EventRestServlet, self).__init__(hs)
+        super(EventRestServlet, self).__init__()
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def on_GET(self, request, event_id):
         requester = yield self.auth.get_user_by_req(request)
-        event = yield self.event_handler.get_event(requester.user, event_id)
+        event = yield self.event_handler.get_event(requester.user, None, event_id)
 
         time_now = self.clock.time_msec()
         if event:
-            defer.returnValue((200, serialize_event(event, time_now)))
+            event = yield self._event_serializer.serialize_event(event, time_now)
+            return 200, event
         else:
-            defer.returnValue((404, "Event not found."))
+            return 404, "Event not found."
 
 
 def register_servlets(hs, http_server):

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,25 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
+import logging
+
+from six.moves import range
+
+from canonicaljson import json
+
 from twisted.internet import defer
 
-import ujson as json
-import logging
+from synapse.storage.account_data import AccountDataWorkerStore
+from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
 
-class TagsStore(SQLBaseStore):
-    def get_max_account_data_stream_id(self):
-        """Get the current max stream id for the private user data stream
-
-        Returns:
-            A deferred int.
-        """
-        return self._account_data_id_gen.get_current_token()
-
+class TagsWorkerStore(AccountDataWorkerStore):
     @cached()
     def get_tags_for_user(self, user_id):
         """Get all the tags for a user.
@@ -69,7 +66,7 @@ class TagsStore(SQLBaseStore):
             room_id string, tag string and content string.
         """
         if last_id == current_id:
-            defer.returnValue([])
+            return []
 
         def get_all_updated_tags_txn(txn):
             sql = (
@@ -87,15 +84,13 @@ class TagsStore(SQLBaseStore):
 
         def get_tag_content(txn, tag_ids):
             sql = (
-                "SELECT tag, content"
-                " FROM room_tags"
-                " WHERE user_id=? AND room_id=?"
+                "SELECT tag, content" " FROM room_tags" " WHERE user_id=? AND room_id=?"
             )
             results = []
             for stream_id, user_id, room_id in tag_ids:
                 txn.execute(sql, (user_id, room_id))
                 tags = []
-                for tag, content in txn.fetchall():
+                for tag, content in txn:
                     tags.append(json.dumps(tag) + ":" + content)
                 tag_json = "{" + ",".join(tags) + "}"
                 results.append((stream_id, user_id, room_id, tag_json))
@@ -104,15 +99,15 @@ class TagsStore(SQLBaseStore):
 
         batch_size = 50
         results = []
-        for i in xrange(0, len(tag_ids), batch_size):
+        for i in range(0, len(tag_ids), batch_size):
             tags = yield self.runInteraction(
                 "get_all_updated_tag_content",
                 get_tag_content,
-                tag_ids[i:i + batch_size],
+                tag_ids[i : i + batch_size],
             )
             results.extend(tags)
 
-        defer.returnValue(results)
+        return results
 
     @defer.inlineCallbacks
     def get_updated_tags(self, user_id, stream_id):
@@ -126,24 +121,23 @@ class TagsStore(SQLBaseStore):
             A deferred dict mapping from room_id strings to lists of tag
             strings for all the rooms that changed since the stream_id token.
         """
+
         def get_updated_tags_txn(txn):
             sql = (
                 "SELECT room_id from room_tags_revisions"
                 " WHERE user_id = ? AND stream_id > ?"
             )
             txn.execute(sql, (user_id, stream_id))
-            room_ids = [row[0] for row in txn.fetchall()]
+            room_ids = [row[0] for row in txn]
             return room_ids
 
         changed = self._account_data_stream_cache.has_entity_changed(
             user_id, int(stream_id)
         )
         if not changed:
-            defer.returnValue({})
+            return {}
 
-        room_ids = yield self.runInteraction(
-            "get_updated_tags", get_updated_tags_txn
-        )
+        room_ids = yield self.runInteraction("get_updated_tags", get_updated_tags_txn)
 
         results = {}
         if room_ids:
@@ -151,7 +145,7 @@ class TagsStore(SQLBaseStore):
             for room_id in room_ids:
                 results[room_id] = tags_by_room.get(room_id, {})
 
-        defer.returnValue(results)
+        return results
 
     def get_tags_for_room(self, user_id, room_id):
         """Get all the tags for the given room
@@ -166,10 +160,12 @@ class TagsStore(SQLBaseStore):
             keyvalues={"user_id": user_id, "room_id": room_id},
             retcols=("tag", "content"),
             desc="get_tags_for_room",
-        ).addCallback(lambda rows: {
-            row["tag"]: json.loads(row["content"]) for row in rows
-        })
+        ).addCallback(
+            lambda rows: {row["tag"]: json.loads(row["content"]) for row in rows}
+        )
 
+
+class TagsStore(TagsWorkerStore):
     @defer.inlineCallbacks
     def add_tag_to_room(self, user_id, room_id, tag, content):
         """Add a tag to a room for a user.
@@ -187,14 +183,8 @@ class TagsStore(SQLBaseStore):
             self._simple_upsert_txn(
                 txn,
                 table="room_tags",
-                keyvalues={
-                    "user_id": user_id,
-                    "room_id": room_id,
-                    "tag": tag,
-                },
-                values={
-                    "content": content_json,
-                }
+                keyvalues={"user_id": user_id, "room_id": room_id, "tag": tag},
+                values={"content": content_json},
             )
             self._update_revision_txn(txn, user_id, room_id, next_id)
 
@@ -204,7 +194,7 @@ class TagsStore(SQLBaseStore):
         self.get_tags_for_user.invalidate((user_id,))
 
         result = self._account_data_id_gen.get_current_token()
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def remove_tag_from_room(self, user_id, room_id, tag):
@@ -212,6 +202,7 @@ class TagsStore(SQLBaseStore):
         Returns:
             A deferred that completes once the tag has been removed
         """
+
         def remove_tag_txn(txn, next_id):
             sql = (
                 "DELETE FROM room_tags "
@@ -226,7 +217,7 @@ class TagsStore(SQLBaseStore):
         self.get_tags_for_user.invalidate((user_id,))
 
         result = self._account_data_id_gen.get_current_token()
-        defer.returnValue(result)
+        return result
 
     def _update_revision_txn(self, txn, user_id, room_id, next_id):
         """Update the latest revision of the tags for the given user and room.
@@ -239,8 +230,7 @@ class TagsStore(SQLBaseStore):
         """
 
         txn.call_after(
-            self._account_data_stream_cache.entity_has_changed,
-            user_id, next_id
+            self._account_data_stream_cache.entity_has_changed, user_id, next_id
         )
 
         update_max_id_sql = (

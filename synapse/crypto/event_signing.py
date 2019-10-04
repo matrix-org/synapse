@@ -15,72 +15,114 @@
 # limitations under the License.
 
 
-from synapse.api.errors import SynapseError, Codes
-from synapse.events.utils import prune_event
-
-from canonicaljson import encode_canonical_json
-from unpaddedbase64 import encode_base64, decode_base64
-from signedjson.sign import sign_json
-
 import hashlib
 import logging
+
+from canonicaljson import encode_canonical_json
+from signedjson.sign import sign_json
+from unpaddedbase64 import decode_base64, encode_base64
+
+from synapse.api.errors import Codes, SynapseError
+from synapse.events.utils import prune_event, prune_event_dict
 
 logger = logging.getLogger(__name__)
 
 
 def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     """Check whether the hash for this PDU matches the contents"""
-    name, expected_hash = compute_content_hash(event, hash_algorithm)
-    logger.debug("Expecting hash: %s", encode_base64(expected_hash))
-    if name not in event.hashes:
+    name, expected_hash = compute_content_hash(event.get_pdu_json(), hash_algorithm)
+    logger.debug(
+        "Verifying content hash on %s (expecting: %s)",
+        event.event_id,
+        encode_base64(expected_hash),
+    )
+
+    # some malformed events lack a 'hashes'. Protect against it being missing
+    # or a weird type by basically treating it the same as an unhashed event.
+    hashes = event.get("hashes")
+    if not isinstance(hashes, dict):
+        raise SynapseError(400, "Malformed 'hashes'", Codes.UNAUTHORIZED)
+
+    if name not in hashes:
         raise SynapseError(
             400,
-            "Algorithm %s not in hashes %s" % (
-                name, list(event.hashes),
-            ),
+            "Algorithm %s not in hashes %s" % (name, list(hashes)),
             Codes.UNAUTHORIZED,
         )
-    message_hash_base64 = event.hashes[name]
+    message_hash_base64 = hashes[name]
     try:
         message_hash_bytes = decode_base64(message_hash_base64)
-    except:
+    except Exception:
         raise SynapseError(
-            400,
-            "Invalid base64: %s" % (message_hash_base64,),
-            Codes.UNAUTHORIZED,
+            400, "Invalid base64: %s" % (message_hash_base64,), Codes.UNAUTHORIZED
         )
     return message_hash_bytes == expected_hash
 
 
-def compute_content_hash(event, hash_algorithm):
-    event_json = event.get_pdu_json()
-    event_json.pop("age_ts", None)
-    event_json.pop("unsigned", None)
-    event_json.pop("signatures", None)
-    event_json.pop("hashes", None)
-    event_json.pop("outlier", None)
-    event_json.pop("destinations", None)
+def compute_content_hash(event_dict, hash_algorithm):
+    """Compute the content hash of an event, which is the hash of the
+    unredacted event.
 
-    event_json_bytes = encode_canonical_json(event_json)
+    Args:
+        event_dict (dict): The unredacted event as a dict
+        hash_algorithm: A hasher from `hashlib`, e.g. hashlib.sha256, to use
+            to hash the event
+
+    Returns:
+        tuple[str, bytes]: A tuple of the name of hash and the hash as raw
+        bytes.
+    """
+    event_dict = dict(event_dict)
+    event_dict.pop("age_ts", None)
+    event_dict.pop("unsigned", None)
+    event_dict.pop("signatures", None)
+    event_dict.pop("hashes", None)
+    event_dict.pop("outlier", None)
+    event_dict.pop("destinations", None)
+
+    event_json_bytes = encode_canonical_json(event_dict)
 
     hashed = hash_algorithm(event_json_bytes)
-    return (hashed.name, hashed.digest())
+    return hashed.name, hashed.digest()
 
 
 def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
+    """Computes the event reference hash. This is the hash of the redacted
+    event.
+
+    Args:
+        event (FrozenEvent)
+        hash_algorithm: A hasher from `hashlib`, e.g. hashlib.sha256, to use
+            to hash the event
+
+    Returns:
+        tuple[str, bytes]: A tuple of the name of hash and the hash as raw
+        bytes.
+    """
     tmp_event = prune_event(event)
-    event_json = tmp_event.get_pdu_json()
-    event_json.pop("signatures", None)
-    event_json.pop("age_ts", None)
-    event_json.pop("unsigned", None)
-    event_json_bytes = encode_canonical_json(event_json)
+    event_dict = tmp_event.get_pdu_json()
+    event_dict.pop("signatures", None)
+    event_dict.pop("age_ts", None)
+    event_dict.pop("unsigned", None)
+    event_json_bytes = encode_canonical_json(event_dict)
     hashed = hash_algorithm(event_json_bytes)
-    return (hashed.name, hashed.digest())
+    return hashed.name, hashed.digest()
 
 
-def compute_event_signature(event, signature_name, signing_key):
-    tmp_event = prune_event(event)
-    redact_json = tmp_event.get_pdu_json()
+def compute_event_signature(event_dict, signature_name, signing_key):
+    """Compute the signature of the event for the given name and key.
+
+    Args:
+        event_dict (dict): The event as a dict
+        signature_name (str): The name of the entity signing the event
+            (typically the server's hostname).
+        signing_key (syutil.crypto.SigningKey): The key to sign with
+
+    Returns:
+        dict[str, dict[str, str]]: Returns a dictionary in the same format of
+        an event's signatures field.
+    """
+    redact_json = prune_event_dict(event_dict)
     redact_json.pop("age_ts", None)
     redact_json.pop("unsigned", None)
     logger.debug("Signing event: %s", encode_canonical_json(redact_json))
@@ -89,25 +131,24 @@ def compute_event_signature(event, signature_name, signing_key):
     return redact_json["signatures"]
 
 
-def add_hashes_and_signatures(event, signature_name, signing_key,
-                              hash_algorithm=hashlib.sha256):
-    # if hasattr(event, "old_state_events"):
-    #     state_json_bytes = encode_canonical_json(
-    #         [e.event_id for e in event.old_state_events.values()]
-    #     )
-    #     hashed = hash_algorithm(state_json_bytes)
-    #     event.state_hash = {
-    #         hashed.name: encode_base64(hashed.digest())
-    #     }
+def add_hashes_and_signatures(
+    event_dict, signature_name, signing_key, hash_algorithm=hashlib.sha256
+):
+    """Add content hash and sign the event
 
-    name, digest = compute_content_hash(event, hash_algorithm=hash_algorithm)
+    Args:
+        event_dict (dict): The event to add hashes to and sign
+        signature_name (str): The name of the entity signing the event
+            (typically the server's hostname).
+        signing_key (syutil.crypto.SigningKey): The key to sign with
+        hash_algorithm: A hasher from `hashlib`, e.g. hashlib.sha256, to use
+            to hash the event
+    """
 
-    if not hasattr(event, "hashes"):
-        event.hashes = {}
-    event.hashes[name] = encode_base64(digest)
+    name, digest = compute_content_hash(event_dict, hash_algorithm=hash_algorithm)
 
-    event.signatures = compute_event_signature(
-        event,
-        signature_name=signature_name,
-        signing_key=signing_key,
+    event_dict.setdefault("hashes", {})[name] = encode_base64(digest)
+
+    event_dict["signatures"] = compute_event_signature(
+        event_dict, signature_name=signature_name, signing_key=signing_key
     )

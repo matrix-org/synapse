@@ -18,10 +18,9 @@ import logging
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.constants import Membership, EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import LimitExceededError
 from synapse.types import UserID
-
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +45,7 @@ class BaseHandler(object):
         self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
         self.ratelimiter = hs.get_ratelimiter()
+        self.admin_redaction_ratelimiter = hs.get_admin_redaction_ratelimiter()
         self.clock = hs.get_clock()
         self.hs = hs
 
@@ -53,7 +53,23 @@ class BaseHandler(object):
 
         self.event_builder_factory = hs.get_event_builder_factory()
 
-    def ratelimit(self, requester):
+    @defer.inlineCallbacks
+    def ratelimit(self, requester, update=True, is_admin_redaction=False):
+        """Ratelimits requests.
+
+        Args:
+            requester (Requester)
+            update (bool): Whether to record that a request is being processed.
+                Set to False when doing multiple checks for one request (e.g.
+                to check up front if we would reject the request), and set to
+                True for the last call for a given request.
+            is_admin_redaction (bool): Whether this is a room admin/moderator
+                redacting an event. If so then we may apply different
+                ratelimits depending on config.
+
+        Raises:
+            LimitExceededError if the request should be ratelimited
+        """
         time_now = self.clock.time()
         user_id = requester.user.to_string()
 
@@ -67,14 +83,47 @@ class BaseHandler(object):
         if requester.app_service and not requester.app_service.is_rate_limited():
             return
 
-        allowed, time_allowed = self.ratelimiter.send_message(
-            user_id, time_now,
-            msg_rate_hz=self.hs.config.rc_messages_per_second,
-            burst_count=self.hs.config.rc_message_burst_count,
-        )
+        # Check if there is a per user override in the DB.
+        override = yield self.store.get_ratelimit_for_user(user_id)
+        if override:
+            # If overriden with a null Hz then ratelimiting has been entirely
+            # disabled for the user
+            if not override.messages_per_second:
+                return
+
+            messages_per_second = override.messages_per_second
+            burst_count = override.burst_count
+        else:
+            # We default to different values if this is an admin redaction and
+            # the config is set
+            if is_admin_redaction and self.hs.config.rc_admin_redaction:
+                messages_per_second = self.hs.config.rc_admin_redaction.per_second
+                burst_count = self.hs.config.rc_admin_redaction.burst_count
+            else:
+                messages_per_second = self.hs.config.rc_message.per_second
+                burst_count = self.hs.config.rc_message.burst_count
+
+        if is_admin_redaction and self.hs.config.rc_admin_redaction:
+            # If we have separate config for admin redactions we use a separate
+            # ratelimiter
+            allowed, time_allowed = self.admin_redaction_ratelimiter.can_do_action(
+                user_id,
+                time_now,
+                rate_hz=messages_per_second,
+                burst_count=burst_count,
+                update=update,
+            )
+        else:
+            allowed, time_allowed = self.ratelimiter.can_do_action(
+                user_id,
+                time_now,
+                rate_hz=messages_per_second,
+                burst_count=burst_count,
+                update=update,
+            )
         if not allowed:
             raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now)),
+                retry_after_ms=int(1000 * (time_allowed - time_now))
             )
 
     @defer.inlineCallbacks
@@ -85,15 +134,16 @@ class BaseHandler(object):
             guest_access = event.content.get("guest_access", "forbidden")
             if guest_access != "can_join":
                 if context:
+                    current_state_ids = yield context.get_current_state_ids(self.store)
                     current_state = yield self.store.get_events(
-                        context.current_state_ids.values()
+                        list(current_state_ids.values())
                     )
                 else:
                     current_state = yield self.state_handler.get_current_state(
                         event.room_id
                     )
 
-                current_state = current_state.values()
+                current_state = list(current_state.values())
 
                 logger.info("maybe_kick_guest_users %r", current_state)
                 yield self.kick_guest_users(current_state)
@@ -111,7 +161,7 @@ class BaseHandler(object):
 
                 if member_event.content["membership"] not in {
                     Membership.JOIN,
-                    Membership.INVITE
+                    Membership.INVITE,
                 }:
                     continue
 
@@ -128,15 +178,15 @@ class BaseHandler(object):
                 # and having homeservers have their own users leave keeps more
                 # of that decision-making and control local to the guest-having
                 # homeserver.
-                requester = synapse.types.create_requester(
-                    target_user, is_guest=True)
-                handler = self.hs.get_handlers().room_member_handler
+                requester = synapse.types.create_requester(target_user, is_guest=True)
+                handler = self.hs.get_room_member_handler()
                 yield handler.update_membership(
                     requester,
                     target_user,
                     member_event.room_id,
                     "leave",
                     ratelimit=False,
+                    require_consent=False,
                 )
             except Exception as e:
-                logger.warn("Error kicking guest user: %s" % (e,))
+                logger.exception("Error kicking guest user: %s" % (e,))

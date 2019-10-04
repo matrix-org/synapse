@@ -1,0 +1,8 @@
+[run]
+branch = True
+parallel = True
+include=$TOP/synapse/*
+data_file = $TOP/.coverage
+
+[report]
+precision = 2

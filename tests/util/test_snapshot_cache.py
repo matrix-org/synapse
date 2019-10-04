@@ -14,14 +14,14 @@
 # limitations under the License.
 
 
-from .. import unittest
+from twisted.internet.defer import Deferred
 
 from synapse.util.caches.snapshot_cache import SnapshotCache
-from twisted.internet.defer import Deferred
+
+from .. import unittest
 
 
 class SnapshotCacheTestCase(unittest.TestCase):
-
     def setUp(self):
         self.cache = SnapshotCache()
         self.cache.DURATION_MS = 1
@@ -53,7 +53,9 @@ class SnapshotCacheTestCase(unittest.TestCase):
         # before the cache expires returns a resolved deferred.
         get_result_at_11 = self.cache.get(11, "key")
         self.assertIsNotNone(get_result_at_11)
-        self.assertTrue(get_result_at_11.called)
+        if isinstance(get_result_at_11, Deferred):
+            # The cache may return the actual result rather than a deferred
+            self.assertTrue(get_result_at_11.called)
 
         # Check that getting the key after the deferred has resolved
         # after the cache expires returns None

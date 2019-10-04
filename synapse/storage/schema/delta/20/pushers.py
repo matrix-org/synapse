@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 
 def run_create(cur, database_engine, *args, **kwargs):
     logger.info("Porting pushers table...")
-    cur.execute("""
+    cur.execute(
+        """
         CREATE TABLE IF NOT EXISTS pushers2 (
           id BIGINT PRIMARY KEY,
           user_name TEXT NOT NULL,
@@ -48,27 +49,34 @@ def run_create(cur, database_engine, *args, **kwargs):
           failing_since BIGINT,
           UNIQUE (app_id, pushkey, user_name)
         )
-    """)
-    cur.execute("""SELECT
+    """
+    )
+    cur.execute(
+        """SELECT
         id, user_name, access_token, profile_tag, kind,
         app_id, app_display_name, device_display_name,
         pushkey, ts, lang, data, last_token, last_success,
         failing_since
         FROM pushers
-    """)
+    """
+    )
     count = 0
     for row in cur.fetchall():
         row = list(row)
         row[8] = bytes(row[8]).decode("utf-8")
         row[11] = bytes(row[11]).decode("utf-8")
-        cur.execute(database_engine.convert_param_style("""
+        cur.execute(
+            database_engine.convert_param_style(
+                """
             INSERT into pushers2 (
             id, user_name, access_token, profile_tag, kind,
             app_id, app_display_name, device_display_name,
             pushkey, ts, lang, data, last_token, last_success,
             failing_since
-            ) values (%s)""" % (','.join(['?' for _ in range(len(row))]))),
-            row
+            ) values (%s)"""
+                % (",".join(["?" for _ in range(len(row))]))
+            ),
+            row,
         )
         count += 1
     cur.execute("DROP TABLE pushers")

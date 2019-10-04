@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,24 +24,26 @@ import argparse
 from synapse.events import FrozenEvent
 from synapse.util.frozenutils import unfreeze
 
+from six import string_types
+
 
 def make_graph(file_name, room_id, file_prefix, limit):
-    print "Reading lines"
+    print("Reading lines")
     with open(file_name) as f:
         lines = f.readlines()
 
-    print "Read lines"
+    print("Read lines")
 
     events = [FrozenEvent(json.loads(line)) for line in lines]
 
-    print "Loaded events."
+    print("Loaded events.")
 
     events.sort(key=lambda e: e.depth)
 
-    print "Sorted events"
+    print("Sorted events")
 
     if limit:
-        events = events[-int(limit):]
+        events = events[-int(limit) :]
 
     node_map = {}
 
@@ -48,31 +52,32 @@ def make_graph(file_name, room_id, file_prefix, limit):
     for event in events:
         t = datetime.datetime.fromtimestamp(
             float(event.origin_server_ts) / 1000
-        ).strftime('%Y-%m-%d %H:%M:%S,%f')
+        ).strftime("%Y-%m-%d %H:%M:%S,%f")
 
         content = json.dumps(unfreeze(event.get_dict()["content"]), indent=4)
         content = content.replace("\n", "<br/>\n")
 
-        print content
+        print(content)
         content = []
         for key, value in unfreeze(event.get_dict()["content"]).items():
             if value is None:
                 value = "<null>"
-            elif isinstance(value, basestring):
+            elif isinstance(value, string_types):
                 pass
             else:
                 value = json.dumps(value)
 
             content.append(
-                "<b>%s</b>: %s," % (
-                    cgi.escape(key, quote=True).encode("ascii", 'xmlcharrefreplace'),
-                    cgi.escape(value, quote=True).encode("ascii", 'xmlcharrefreplace'),
+                "<b>%s</b>: %s,"
+                % (
+                    cgi.escape(key, quote=True).encode("ascii", "xmlcharrefreplace"),
+                    cgi.escape(value, quote=True).encode("ascii", "xmlcharrefreplace"),
                 )
             )
 
         content = "<br/>\n".join(content)
 
-        print content
+        print(content)
 
         label = (
             "<"
@@ -92,25 +97,19 @@ def make_graph(file_name, room_id, file_prefix, limit):
             "depth": event.depth,
         }
 
-        node = pydot.Node(
-            name=event.event_id,
-            label=label,
-        )
+        node = pydot.Node(name=event.event_id, label=label)
 
         node_map[event.event_id] = node
         graph.add_node(node)
 
-    print "Created Nodes"
+    print("Created Nodes")
 
     for event in events:
         for prev_id, _ in event.prev_events:
             try:
                 end_node = node_map[prev_id]
             except:
-                end_node = pydot.Node(
-                    name=prev_id,
-                    label="<<b>%s</b>>" % (prev_id,),
-                )
+                end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
 
                 node_map[prev_id] = end_node
                 graph.add_node(end_node)
@@ -118,33 +117,33 @@ def make_graph(file_name, room_id, file_prefix, limit):
             edge = pydot.Edge(node_map[event.event_id], end_node)
             graph.add_edge(edge)
 
-    print "Created edges"
+    print("Created edges")
 
-    graph.write('%s.dot' % file_prefix, format='raw', prog='dot')
+    graph.write("%s.dot" % file_prefix, format="raw", prog="dot")
 
-    print "Created Dot"
+    print("Created Dot")
 
-    graph.write_svg("%s.svg" % file_prefix, prog='dot')
+    graph.write_svg("%s.svg" % file_prefix, prog="dot")
 
-    print "Created svg"
+    print("Created svg")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate a PDU graph for a given room by reading "
-                    "from a file with line deliminated events. \n"
-                    "Requires pydot."
+        "from a file with line deliminated events. \n"
+        "Requires pydot."
     )
     parser.add_argument(
-        "-p", "--prefix", dest="prefix",
+        "-p",
+        "--prefix",
+        dest="prefix",
         help="String to prefix output files with",
-        default="graph_output"
+        default="graph_output",
     )
-    parser.add_argument(
-        "-l", "--limit",
-        help="Only retrieve the last N events.",
-    )
-    parser.add_argument('event_file')
-    parser.add_argument('room')
+    parser.add_argument("-l", "--limit", help="Only retrieve the last N events.")
+    parser.add_argument("event_file")
+    parser.add_argument("room")
 
     args = parser.parse_args()
 

@@ -13,18 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+from collections import namedtuple
+
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, AuthError
-from synapse.util.logcontext import preserve_fn
+from synapse.api.errors import AuthError, SynapseError
+from synapse.logging.context import run_in_background
+from synapse.types import UserID, get_domain_from_id
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
-from synapse.types import UserID, get_domain_from_id
-
-import logging
-
-from collections import namedtuple
-import ujson as json
 
 logger = logging.getLogger(__name__)
 
@@ -57,26 +56,34 @@ class TypingHandler(object):
 
         self.federation = hs.get_federation_sender()
 
-        hs.get_replication_layer().register_edu_handler("m.typing", self._recv_edu)
+        hs.get_federation_registry().register_edu_handler("m.typing", self._recv_edu)
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
 
         self._member_typing_until = {}  # clock time we expect to stop
         self._member_last_federation_poke = {}
 
+        self._latest_room_serial = 0
+        self._reset()
+
+        # caches which room_ids changed at which serials
+        self._typing_stream_change_cache = StreamChangeCache(
+            "TypingStreamChangeCache", self._latest_room_serial
+        )
+
+        self.clock.looping_call(self._handle_timeouts, 5000)
+
+    def _reset(self):
+        """
+        Reset the typing handler's data caches.
+        """
         # map room IDs to serial numbers
         self._room_serials = {}
-        self._latest_room_serial = 0
         # map room IDs to sets of users currently typing
         self._room_typing = {}
 
-        self.clock.looping_call(
-            self._handle_timeouts,
-            5000,
-        )
-
     def _handle_timeouts(self):
-        logger.info("Checking for typing timeouts")
+        logger.debug("Checking for typing timeouts")
 
         now = self.clock.time_msec()
 
@@ -90,7 +97,7 @@ class TypingHandler(object):
             until = self._member_typing_until.get(member, None)
             if not until or until <= now:
                 logger.info("Timing out typing for: %s", member.user_id)
-                preserve_fn(self._stopped_typing)(member)
+                self._stopped_typing(member)
                 continue
 
             # Check if we need to resend a keep alive over federation for this
@@ -98,18 +105,11 @@ class TypingHandler(object):
             if self.hs.is_mine_id(member.user_id):
                 last_fed_poke = self._member_last_federation_poke.get(member, None)
                 if not last_fed_poke or last_fed_poke + FEDERATION_PING_INTERVAL <= now:
-                    preserve_fn(self._push_remote)(
-                        member=member,
-                        typing=True
-                    )
+                    run_in_background(self._push_remote, member=member, typing=True)
 
             # Add a paranoia timer to ensure that we always have a timer for
             # each person typing.
-            self.wheel_timer.insert(
-                now=now,
-                obj=member,
-                then=now + 60 * 1000,
-            )
+            self.wheel_timer.insert(now=now, obj=member, then=now + 60 * 1000)
 
     def is_typing(self, member):
         return member.user_id in self._room_typing.get(member.room_id, [])
@@ -127,9 +127,7 @@ class TypingHandler(object):
 
         yield self.auth.check_joined_room(room_id, target_user_id)
 
-        logger.debug(
-            "%s has started typing in %s", target_user_id, room_id
-        )
+        logger.debug("%s has started typing in %s", target_user_id, room_id)
 
         member = RoomMember(room_id=room_id, user_id=target_user_id)
 
@@ -138,20 +136,13 @@ class TypingHandler(object):
         now = self.clock.time_msec()
         self._member_typing_until[member] = now + timeout
 
-        self.wheel_timer.insert(
-            now=now,
-            obj=member,
-            then=now + timeout,
-        )
+        self.wheel_timer.insert(now=now, obj=member, then=now + timeout)
 
         if was_present:
             # No point sending another notification
-            defer.returnValue(None)
+            return None
 
-        yield self._push_update(
-            member=member,
-            typing=True,
-        )
+        self._push_update(member=member, typing=True)
 
     @defer.inlineCallbacks
     def stopped_typing(self, target_user, auth_user, room_id):
@@ -166,13 +157,11 @@ class TypingHandler(object):
 
         yield self.auth.check_joined_room(room_id, target_user_id)
 
-        logger.debug(
-            "%s has stopped typing in %s", target_user_id, room_id
-        )
+        logger.debug("%s has stopped typing in %s", target_user_id, room_id)
 
         member = RoomMember(room_id=room_id, user_id=target_user_id)
 
-        yield self._stopped_typing(member)
+        self._stopped_typing(member)
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
@@ -181,55 +170,49 @@ class TypingHandler(object):
             member = RoomMember(room_id=room_id, user_id=user_id)
             yield self._stopped_typing(member)
 
-    @defer.inlineCallbacks
     def _stopped_typing(self, member):
         if member.user_id not in self._room_typing.get(member.room_id, set()):
             # No point
-            defer.returnValue(None)
+            return None
 
         self._member_typing_until.pop(member, None)
         self._member_last_federation_poke.pop(member, None)
 
-        yield self._push_update(
-            member=member,
-            typing=False,
-        )
+        self._push_update(member=member, typing=False)
 
-    @defer.inlineCallbacks
     def _push_update(self, member, typing):
         if self.hs.is_mine_id(member.user_id):
             # Only send updates for changes to our own users.
-            yield self._push_remote(member, typing)
+            run_in_background(self._push_remote, member, typing)
 
-        self._push_update_local(
-            member=member,
-            typing=typing
-        )
+        self._push_update_local(member=member, typing=typing)
 
     @defer.inlineCallbacks
     def _push_remote(self, member, typing):
-        users = yield self.state.get_current_user_in_room(member.room_id)
-        self._member_last_federation_poke[member] = self.clock.time_msec()
+        try:
+            users = yield self.state.get_current_users_in_room(member.room_id)
+            self._member_last_federation_poke[member] = self.clock.time_msec()
 
-        now = self.clock.time_msec()
-        self.wheel_timer.insert(
-            now=now,
-            obj=member,
-            then=now + FEDERATION_PING_INTERVAL,
-        )
+            now = self.clock.time_msec()
+            self.wheel_timer.insert(
+                now=now, obj=member, then=now + FEDERATION_PING_INTERVAL
+            )
 
-        for domain in set(get_domain_from_id(u) for u in users):
-            if domain != self.server_name:
-                self.federation.send_edu(
-                    destination=domain,
-                    edu_type="m.typing",
-                    content={
-                        "room_id": member.room_id,
-                        "user_id": member.user_id,
-                        "typing": typing,
-                    },
-                    key=member,
-                )
+            for domain in set(get_domain_from_id(u) for u in users):
+                if domain != self.server_name:
+                    logger.debug("sending typing update to %s", domain)
+                    self.federation.build_and_send_edu(
+                        destination=domain,
+                        edu_type="m.typing",
+                        content={
+                            "room_id": member.room_id,
+                            "user_id": member.user_id,
+                            "typing": typing,
+                        },
+                        key=member,
+                    )
+        except Exception:
+            logger.exception("Error pushing typing notif to remotes")
 
     @defer.inlineCallbacks
     def _recv_edu(self, origin, content):
@@ -243,27 +226,19 @@ class TypingHandler(object):
 
         if user.domain != origin:
             logger.info(
-                "Got typing update from %r with bad 'user_id': %r",
-                origin, user_id,
+                "Got typing update from %r with bad 'user_id': %r", origin, user_id
             )
             return
 
-        users = yield self.state.get_current_user_in_room(room_id)
+        users = yield self.state.get_current_users_in_room(room_id)
         domains = set(get_domain_from_id(u) for u in users)
 
         if self.server_name in domains:
             logger.info("Got typing update from %s: %r", user_id, content)
             now = self.clock.time_msec()
             self._member_typing_until[member] = now + FEDERATION_TIMEOUT
-            self.wheel_timer.insert(
-                now=now,
-                obj=member,
-                then=now + FEDERATION_TIMEOUT,
-            )
-            self._push_update_local(
-                member=member,
-                typing=content["typing"]
-            )
+            self.wheel_timer.insert(now=now, obj=member, then=now + FEDERATION_TIMEOUT)
+            self._push_update_local(member=member, typing=content["typing"])
 
     def _push_update_local(self, member, typing):
         room_set = self._room_typing.setdefault(member.room_id, set())
@@ -274,24 +249,36 @@ class TypingHandler(object):
 
         self._latest_room_serial += 1
         self._room_serials[member.room_id] = self._latest_room_serial
+        self._typing_stream_change_cache.entity_has_changed(
+            member.room_id, self._latest_room_serial
+        )
 
         self.notifier.on_new_event(
             "typing_key", self._latest_room_serial, rooms=[member.room_id]
         )
 
     def get_all_typing_updates(self, last_id, current_id):
-        # TODO: Work out a way to do this without scanning the entire state.
         if last_id == current_id:
             return []
 
+        changed_rooms = self._typing_stream_change_cache.get_all_entities_changed(
+            last_id
+        )
+
+        if changed_rooms is None:
+            changed_rooms = self._room_serials
+
         rows = []
-        for room_id, serial in self._room_serials.items():
-            if last_id < serial and serial <= current_id:
+        for room_id in changed_rooms:
+            serial = self._room_serials[room_id]
+            if last_id < serial <= current_id:
                 typing = self._room_typing[room_id]
-                typing_bytes = json.dumps(list(typing), ensure_ascii=False)
-                rows.append((serial, room_id, typing_bytes))
+                rows.append((serial, room_id, list(typing)))
         rows.sort()
         return rows
+
+    def get_current_token(self):
+        return self._latest_room_serial
 
 
 class TypingNotificationEventSource(object):
@@ -309,9 +296,7 @@ class TypingNotificationEventSource(object):
         return {
             "type": "m.typing",
             "room_id": room_id,
-            "content": {
-                "user_ids": list(typing),
-            },
+            "content": {"user_ids": list(typing)},
         }
 
     def get_new_events(self, from_key, room_ids, **kwargs):
@@ -334,4 +319,4 @@ class TypingNotificationEventSource(object):
         return self.get_typing_handler()._latest_room_serial
 
     def get_pagination_rows(self, user, pagination_config, key):
-        return ([], pagination_config.from_key)
+        return [], pagination_config.from_key

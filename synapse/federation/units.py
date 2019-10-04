@@ -17,10 +17,9 @@
 server protocol.
 """
 
-from synapse.util.jsonobject import JsonEncodedObject
-
 import logging
 
+from synapse.util.jsonobject import JsonEncodedObject
 
 logger = logging.getLogger(__name__)
 
@@ -33,21 +32,17 @@ class Edu(JsonEncodedObject):
     internal ID or previous references graph.
     """
 
-    valid_keys = [
-        "origin",
-        "destination",
-        "edu_type",
-        "content",
-    ]
+    valid_keys = ["origin", "destination", "edu_type", "content"]
 
-    required_keys = [
-        "edu_type",
-    ]
+    required_keys = ["edu_type"]
 
-    internal_keys = [
-        "origin",
-        "destination",
-    ]
+    internal_keys = ["origin", "destination"]
+
+    def get_context(self):
+        return getattr(self, "content", {}).get("org.matrix.opentracing_context", "{}")
+
+    def strip_context(self):
+        getattr(self, "content", {})["org.matrix.opentracing_context"] = "{}"
 
 
 class Transaction(JsonEncodedObject):
@@ -74,15 +69,9 @@ class Transaction(JsonEncodedObject):
         "previous_ids",
         "pdus",
         "edus",
-        "transaction_id",
-        "destination",
-        "pdu_failures",
     ]
 
-    internal_keys = [
-        "transaction_id",
-        "destination",
-    ]
+    internal_keys = ["transaction_id", "destination"]
 
     required_keys = [
         "transaction_id",
@@ -102,9 +91,7 @@ class Transaction(JsonEncodedObject):
             del kwargs["edus"]
 
         super(Transaction, self).__init__(
-            transaction_id=transaction_id,
-            pdus=pdus,
-            **kwargs
+            transaction_id=transaction_id, pdus=pdus, **kwargs
         )
 
     @staticmethod
@@ -113,16 +100,9 @@ class Transaction(JsonEncodedObject):
         transaction_id and origin_server_ts keys.
         """
         if "origin_server_ts" not in kwargs:
-            raise KeyError(
-                "Require 'origin_server_ts' to construct a Transaction"
-            )
+            raise KeyError("Require 'origin_server_ts' to construct a Transaction")
         if "transaction_id" not in kwargs:
-            raise KeyError(
-                "Require 'transaction_id' to construct a Transaction"
-            )
-
-        for p in pdus:
-            p.transaction_id = kwargs["transaction_id"]
+            raise KeyError("Require 'transaction_id' to construct a Transaction")
 
         kwargs["pdus"] = [p.get_pdu_json() for p in pdus]
 

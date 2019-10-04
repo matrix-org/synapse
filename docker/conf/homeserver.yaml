@@ -1,0 +1,209 @@
+# vim:ft=yaml
+
+## TLS ##
+
+{% if not SYNAPSE_NO_TLS %}
+
+tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
+tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
+
+{% if SYNAPSE_ACME %}
+acme:
+    enabled: true
+    port: 8009
+{% endif %}
+
+{% endif %}
+
+## Server ##
+
+server_name: "{{ SYNAPSE_SERVER_NAME }}"
+pid_file: /homeserver.pid
+web_client: False
+soft_file_limit: 0
+log_config: "{{ SYNAPSE_LOG_CONFIG }}"
+
+## Ports ##
+
+listeners:
+  {% if not SYNAPSE_NO_TLS %}
+  -
+    port: 8448
+    bind_addresses: ['::']
+    type: http
+    tls: true
+    x_forwarded: false
+    resources:
+      - names: [client]
+        compress: true
+      - names: [federation]  # Federation APIs
+        compress: false
+  {% endif %}
+
+  - port: 8008
+    tls: false
+    bind_addresses: ['::']
+    type: http
+    x_forwarded: false
+
+    resources:
+      - names: [client]
+        compress: true
+      - names: [federation]
+        compress: false
+
+## Database ##
+
+{% if POSTGRES_PASSWORD %}
+database:
+  name: "psycopg2"
+  args:
+    user: "{{ POSTGRES_USER or "synapse" }}"
+    password: "{{ POSTGRES_PASSWORD }}"
+    database: "{{ POSTGRES_DB or "synapse" }}"
+    host: "{{ POSTGRES_HOST or "db" }}"
+    port: "{{ POSTGRES_PORT or "5432" }}"
+    cp_min: 5
+    cp_max: 10
+{% else %}
+database:
+  name: "sqlite3"
+  args:
+    database: "/data/homeserver.db"
+{% endif %}
+
+## Performance ##
+
+event_cache_size: "{{ SYNAPSE_EVENT_CACHE_SIZE or "10K" }}"
+
+## Ratelimiting ##
+
+rc_messages_per_second: 0.2
+rc_message_burst_count: 10.0
+federation_rc_window_size: 1000
+federation_rc_sleep_limit: 10
+federation_rc_sleep_delay: 500
+federation_rc_reject_limit: 50
+federation_rc_concurrent: 3
+
+## Files ##
+
+media_store_path: "/data/media"
+uploads_path: "/data/uploads"
+max_upload_size: "{{ SYNAPSE_MAX_UPLOAD_SIZE or "10M" }}"
+max_image_pixels: "32M"
+dynamic_thumbnails: false
+
+# List of thumbnail to precalculate when an image is uploaded.
+thumbnail_sizes:
+- width: 32
+  height: 32
+  method: crop
+- width: 96
+  height: 96
+  method: crop
+- width: 320
+  height: 240
+  method: scale
+- width: 640
+  height: 480
+  method: scale
+- width: 800
+  height: 600
+  method: scale
+
+url_preview_enabled: False
+max_spider_size: "10M"
+
+## Captcha ##
+
+{% if SYNAPSE_RECAPTCHA_PUBLIC_KEY %}
+recaptcha_public_key: "{{ SYNAPSE_RECAPTCHA_PUBLIC_KEY }}"
+recaptcha_private_key: "{{ SYNAPSE_RECAPTCHA_PRIVATE_KEY }}"
+enable_registration_captcha: True
+recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
+{% else %}
+recaptcha_public_key: "YOUR_PUBLIC_KEY"
+recaptcha_private_key: "YOUR_PRIVATE_KEY"
+enable_registration_captcha: False
+recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
+{% endif %}
+
+## Turn ##
+
+{% if SYNAPSE_TURN_URIS %}
+turn_uris:
+{% for uri in SYNAPSE_TURN_URIS.split(',') %}    - "{{ uri }}"
+{% endfor %}
+turn_shared_secret: "{{ SYNAPSE_TURN_SECRET }}"
+turn_user_lifetime: "1h"
+turn_allow_guests: True
+{% else %}
+turn_uris: []
+turn_shared_secret: "YOUR_SHARED_SECRET"
+turn_user_lifetime: "1h"
+turn_allow_guests: True
+{% endif %}
+
+## Registration ##
+
+enable_registration: {{ "True" if SYNAPSE_ENABLE_REGISTRATION else "False" }}
+registration_shared_secret: "{{ SYNAPSE_REGISTRATION_SHARED_SECRET }}"
+bcrypt_rounds: 12
+allow_guest_access: {{ "True" if SYNAPSE_ALLOW_GUEST else "False" }}
+enable_group_creation: true
+
+# The list of identity servers trusted to verify third party
+# identifiers by this server.
+#
+# Also defines the ID server which will be called when an account is
+# deactivated (one will be picked arbitrarily).
+trusted_third_party_id_servers:
+    - matrix.org
+    - vector.im
+
+## Metrics ###
+
+{% if SYNAPSE_REPORT_STATS.lower() == "yes" %}
+enable_metrics: True
+report_stats: True
+{% else %}
+enable_metrics: False
+report_stats: False
+{% endif %}
+
+## API Configuration ##
+
+room_invite_state_types:
+    - "m.room.join_rules"
+    - "m.room.canonical_alias"
+    - "m.room.avatar"
+    - "m.room.name"
+
+{% if SYNAPSE_APPSERVICES %}
+app_service_config_files:
+{% for appservice in SYNAPSE_APPSERVICES %}    - "{{ appservice }}"
+{% endfor %}
+{% else %}
+app_service_config_files: []
+{% endif %}
+
+macaroon_secret_key: "{{ SYNAPSE_MACAROON_SECRET_KEY }}"
+expire_access_token: False
+
+## Signing Keys ##
+
+signing_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.signing.key"
+old_signing_keys: {}
+key_refresh_interval: "1d" # 1 Day.
+
+# The trusted servers to download signing keys from.
+perspectives:
+  servers:
+    "matrix.org":
+      verify_keys:
+        "ed25519:auto":
+          key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
+
+password_config:
+   enabled: true

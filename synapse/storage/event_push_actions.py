@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,22 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from twisted.internet import defer
-from synapse.util.async import sleep
-from synapse.util.caches.descriptors import cachedInlineCallbacks
-from synapse.types import RoomStreamToken
-from .stream import lower_bound
-
 import logging
-import ujson as json
+
+from six import iteritems
+
+from canonicaljson import json
+
+from twisted.internet import defer
+
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage._base import LoggingTransaction, SQLBaseStore
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
 
 
 DEFAULT_NOTIF_ACTION = ["notify", {"set_tweak": "highlight", "value": False}]
 DEFAULT_HIGHLIGHT_ACTION = [
-    "notify", {"set_tweak": "sound", "value": "default"}, {"set_tweak": "highlight"}
+    "notify",
+    {"set_tweak": "sound", "value": "default"},
+    {"set_tweak": "highlight"},
 ]
 
 
@@ -62,97 +67,61 @@ def _deserialize_action(actions, is_highlight):
         return DEFAULT_NOTIF_ACTION
 
 
-class EventPushActionsStore(SQLBaseStore):
-    EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
+class EventPushActionsWorkerStore(SQLBaseStore):
+    def __init__(self, db_conn, hs):
+        super(EventPushActionsWorkerStore, self).__init__(db_conn, hs)
 
-    def __init__(self, hs):
-        super(EventPushActionsStore, self).__init__(hs)
+        # These get correctly set by _find_stream_orderings_for_times_txn
+        self.stream_ordering_month_ago = None
+        self.stream_ordering_day_ago = None
 
-        self.register_background_index_update(
-            self.EPA_HIGHLIGHT_INDEX,
-            index_name="event_push_actions_u_highlight",
-            table="event_push_actions",
-            columns=["user_id", "stream_ordering"],
+        cur = LoggingTransaction(
+            db_conn.cursor(),
+            name="_find_stream_orderings_for_times_txn",
+            database_engine=self.database_engine,
         )
+        self._find_stream_orderings_for_times_txn(cur)
+        cur.close()
 
-        self.register_background_index_update(
-            "event_push_actions_highlights_index",
-            index_name="event_push_actions_highlights_index",
-            table="event_push_actions",
-            columns=["user_id", "room_id", "topological_ordering", "stream_ordering"],
-            where_clause="highlight=1"
+        self.find_stream_orderings_looping_call = self._clock.looping_call(
+            self._find_stream_orderings_for_times, 10 * 60 * 1000
         )
-
-        self._doing_notif_rotation = False
-        self._rotate_notif_loop = self._clock.looping_call(
-            self._rotate_notifs, 30 * 60 * 1000
-        )
-
-    def _set_push_actions_for_event_and_users_txn(self, txn, event, tuples):
-        """
-        Args:
-            event: the event set actions for
-            tuples: list of tuples of (user_id, actions)
-        """
-        values = []
-        for uid, actions in tuples:
-            is_highlight = 1 if _action_has_highlight(actions) else 0
-
-            values.append({
-                'room_id': event.room_id,
-                'event_id': event.event_id,
-                'user_id': uid,
-                'actions': _serialize_action(actions, is_highlight),
-                'stream_ordering': event.internal_metadata.stream_ordering,
-                'topological_ordering': event.depth,
-                'notif': 1,
-                'highlight': is_highlight,
-            })
-
-        for uid, __ in tuples:
-            txn.call_after(
-                self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                (event.room_id, uid)
-            )
-        self._simple_insert_many_txn(txn, "event_push_actions", values)
+        self._rotate_delay = 3
+        self._rotate_count = 10000
 
     @cachedInlineCallbacks(num_args=3, tree=True, max_entries=5000)
     def get_unread_event_push_actions_by_room_for_user(
-            self, room_id, user_id, last_read_event_id
+        self, room_id, user_id, last_read_event_id
     ):
         ret = yield self.runInteraction(
             "get_unread_event_push_actions_by_room",
             self._get_unread_counts_by_receipt_txn,
-            room_id, user_id, last_read_event_id
+            room_id,
+            user_id,
+            last_read_event_id,
         )
-        defer.returnValue(ret)
+        return ret
 
-    def _get_unread_counts_by_receipt_txn(self, txn, room_id, user_id,
-                                          last_read_event_id):
+    def _get_unread_counts_by_receipt_txn(
+        self, txn, room_id, user_id, last_read_event_id
+    ):
         sql = (
-            "SELECT stream_ordering, topological_ordering"
+            "SELECT stream_ordering"
             " FROM events"
             " WHERE room_id = ? AND event_id = ?"
         )
-        txn.execute(
-            sql, (room_id, last_read_event_id)
-        )
+        txn.execute(sql, (room_id, last_read_event_id))
         results = txn.fetchall()
         if len(results) == 0:
             return {"notify_count": 0, "highlight_count": 0}
 
         stream_ordering = results[0][0]
-        topological_ordering = results[0][1]
 
         return self._get_unread_counts_by_pos_txn(
-            txn, room_id, user_id, topological_ordering, stream_ordering
+            txn, room_id, user_id, stream_ordering
         )
 
-    def _get_unread_counts_by_pos_txn(self, txn, room_id, user_id, topological_ordering,
-                                      stream_ordering):
-        token = RoomStreamToken(
-            topological_ordering, stream_ordering
-        )
+    def _get_unread_counts_by_pos_txn(self, txn, room_id, user_id, stream_ordering):
 
         # First get number of notifications.
         # We don't need to put a notif=1 clause as all rows always have
@@ -163,17 +132,20 @@ class EventPushActionsStore(SQLBaseStore):
             " WHERE"
             " user_id = ?"
             " AND room_id = ?"
-            " AND %s"
-        ) % (lower_bound(token, self.database_engine, inclusive=False),)
+            " AND stream_ordering > ?"
+        )
 
-        txn.execute(sql, (user_id, room_id))
+        txn.execute(sql, (user_id, room_id, stream_ordering))
         row = txn.fetchone()
         notify_count = row[0] if row else 0
 
-        txn.execute("""
+        txn.execute(
+            """
             SELECT notif_count FROM event_push_summary
             WHERE room_id = ? AND user_id = ? AND stream_ordering > ?
-        """, (room_id, user_id, stream_ordering,))
+        """,
+            (room_id, user_id, stream_ordering),
+        )
         rows = txn.fetchall()
         if rows:
             notify_count += rows[0][0]
@@ -186,17 +158,14 @@ class EventPushActionsStore(SQLBaseStore):
             " highlight = 1"
             " AND user_id = ?"
             " AND room_id = ?"
-            " AND %s"
-        ) % (lower_bound(token, self.database_engine, inclusive=False),)
+            " AND stream_ordering > ?"
+        )
 
-        txn.execute(sql, (user_id, room_id))
+        txn.execute(sql, (user_id, room_id, stream_ordering))
         row = txn.fetchone()
         highlight_count = row[0] if row else 0
 
-        return {
-            "notify_count": notify_count,
-            "highlight_count": highlight_count,
-        }
+        return {"notify_count": notify_count, "highlight_count": highlight_count}
 
     @defer.inlineCallbacks
     def get_push_action_users_in_range(self, min_stream_ordering, max_stream_ordering):
@@ -206,9 +175,10 @@ class EventPushActionsStore(SQLBaseStore):
                 " stream_ordering >= ? AND stream_ordering <= ?"
             )
             txn.execute(sql, (min_stream_ordering, max_stream_ordering))
-            return [r[0] for r in txn.fetchall()]
+            return [r[0] for r in txn]
+
         ret = yield self.runInteraction("get_push_action_users_in_range", f)
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def get_unread_push_actions_for_user_in_range_for_http(
@@ -240,7 +210,6 @@ class EventPushActionsStore(SQLBaseStore):
                 "   ep.highlight "
                 " FROM ("
                 "   SELECT room_id,"
-                "       MAX(topological_ordering) as topological_ordering,"
                 "       MAX(stream_ordering) as stream_ordering"
                 "   FROM events"
                 "   INNER JOIN receipts_linearized USING (room_id, event_id)"
@@ -250,24 +219,16 @@ class EventPushActionsStore(SQLBaseStore):
                 " event_push_actions AS ep"
                 " WHERE"
                 "   ep.room_id = rl.room_id"
-                "   AND ("
-                "       ep.topological_ordering > rl.topological_ordering"
-                "       OR ("
-                "           ep.topological_ordering = rl.topological_ordering"
-                "           AND ep.stream_ordering > rl.stream_ordering"
-                "       )"
-                "   )"
+                "   AND ep.stream_ordering > rl.stream_ordering"
                 "   AND ep.user_id = ?"
                 "   AND ep.stream_ordering > ?"
                 "   AND ep.stream_ordering <= ?"
                 " ORDER BY ep.stream_ordering ASC LIMIT ?"
             )
-            args = [
-                user_id, user_id,
-                min_stream_ordering, max_stream_ordering, limit,
-            ]
+            args = [user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
             txn.execute(sql, args)
             return txn.fetchall()
+
         after_read_receipt = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range_http_arr", get_after_receipt
         )
@@ -292,12 +253,10 @@ class EventPushActionsStore(SQLBaseStore):
                 "   AND ep.stream_ordering <= ?"
                 " ORDER BY ep.stream_ordering ASC LIMIT ?"
             )
-            args = [
-                user_id, user_id,
-                min_stream_ordering, max_stream_ordering, limit,
-            ]
+            args = [user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
             txn.execute(sql, args)
             return txn.fetchall()
+
         no_read_receipt = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range_http_nrr", get_no_receipt
         )
@@ -308,18 +267,19 @@ class EventPushActionsStore(SQLBaseStore):
                 "room_id": row[1],
                 "stream_ordering": row[2],
                 "actions": _deserialize_action(row[3], row[4]),
-            } for row in after_read_receipt + no_read_receipt
+            }
+            for row in after_read_receipt + no_read_receipt
         ]
 
         # Now sort it so it's ordered correctly, since currently it will
         # contain results from the first query, correctly ordered, followed
         # by results from the second query, but we want them all ordered
         # by stream_ordering, oldest first.
-        notifs.sort(key=lambda r: r['stream_ordering'])
+        notifs.sort(key=lambda r: r["stream_ordering"])
 
         # Take only up to the limit. We have to stop at the limit because
         # one of the subqueries may have hit the limit.
-        defer.returnValue(notifs[:limit])
+        return notifs[:limit]
 
     @defer.inlineCallbacks
     def get_unread_push_actions_for_user_in_range_for_email(
@@ -349,7 +309,6 @@ class EventPushActionsStore(SQLBaseStore):
                 "  ep.highlight, e.received_ts"
                 " FROM ("
                 "   SELECT room_id,"
-                "       MAX(topological_ordering) as topological_ordering,"
                 "       MAX(stream_ordering) as stream_ordering"
                 "   FROM events"
                 "   INNER JOIN receipts_linearized USING (room_id, event_id)"
@@ -360,24 +319,16 @@ class EventPushActionsStore(SQLBaseStore):
                 " INNER JOIN events AS e USING (room_id, event_id)"
                 " WHERE"
                 "   ep.room_id = rl.room_id"
-                "   AND ("
-                "       ep.topological_ordering > rl.topological_ordering"
-                "       OR ("
-                "           ep.topological_ordering = rl.topological_ordering"
-                "           AND ep.stream_ordering > rl.stream_ordering"
-                "       )"
-                "   )"
+                "   AND ep.stream_ordering > rl.stream_ordering"
                 "   AND ep.user_id = ?"
                 "   AND ep.stream_ordering > ?"
                 "   AND ep.stream_ordering <= ?"
                 " ORDER BY ep.stream_ordering DESC LIMIT ?"
             )
-            args = [
-                user_id, user_id,
-                min_stream_ordering, max_stream_ordering, limit,
-            ]
+            args = [user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
             txn.execute(sql, args)
             return txn.fetchall()
+
         after_read_receipt = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_arr", get_after_receipt
         )
@@ -402,12 +353,10 @@ class EventPushActionsStore(SQLBaseStore):
                 "   AND ep.stream_ordering <= ?"
                 " ORDER BY ep.stream_ordering DESC LIMIT ?"
             )
-            args = [
-                user_id, user_id,
-                min_stream_ordering, max_stream_ordering, limit,
-            ]
+            args = [user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
             txn.execute(sql, args)
             return txn.fetchall()
+
         no_read_receipt = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_nrr", get_no_receipt
         )
@@ -420,21 +369,338 @@ class EventPushActionsStore(SQLBaseStore):
                 "stream_ordering": row[2],
                 "actions": _deserialize_action(row[3], row[4]),
                 "received_ts": row[5],
-            } for row in after_read_receipt + no_read_receipt
+            }
+            for row in after_read_receipt + no_read_receipt
         ]
 
         # Now sort it so it's ordered correctly, since currently it will
         # contain results from the first query, correctly ordered, followed
         # by results from the second query, but we want them all ordered
         # by received_ts (most recent first)
-        notifs.sort(key=lambda r: -(r['received_ts'] or 0))
+        notifs.sort(key=lambda r: -(r["received_ts"] or 0))
 
         # Now return the first `limit`
-        defer.returnValue(notifs[:limit])
+        return notifs[:limit]
+
+    def get_if_maybe_push_in_range_for_user(self, user_id, min_stream_ordering):
+        """A fast check to see if there might be something to push for the
+        user since the given stream ordering. May return false positives.
+
+        Useful to know whether to bother starting a pusher on start up or not.
+
+        Args:
+            user_id (str)
+            min_stream_ordering (int)
+
+        Returns:
+            Deferred[bool]: True if there may be push to process, False if
+            there definitely isn't.
+        """
+
+        def _get_if_maybe_push_in_range_for_user_txn(txn):
+            sql = """
+                SELECT 1 FROM event_push_actions
+                WHERE user_id = ? AND stream_ordering > ?
+                LIMIT 1
+            """
+
+            txn.execute(sql, (user_id, min_stream_ordering))
+            return bool(txn.fetchone())
+
+        return self.runInteraction(
+            "get_if_maybe_push_in_range_for_user",
+            _get_if_maybe_push_in_range_for_user_txn,
+        )
+
+    def add_push_actions_to_staging(self, event_id, user_id_actions):
+        """Add the push actions for the event to the push action staging area.
+
+        Args:
+            event_id (str)
+            user_id_actions (dict[str, list[dict|str])]): A dictionary mapping
+                user_id to list of push actions, where an action can either be
+                a string or dict.
+
+        Returns:
+            Deferred
+        """
+
+        if not user_id_actions:
+            return
+
+        # This is a helper function for generating the necessary tuple that
+        # can be used to inert into the `event_push_actions_staging` table.
+        def _gen_entry(user_id, actions):
+            is_highlight = 1 if _action_has_highlight(actions) else 0
+            return (
+                event_id,  # event_id column
+                user_id,  # user_id column
+                _serialize_action(actions, is_highlight),  # actions column
+                1,  # notif column
+                is_highlight,  # highlight column
+            )
+
+        def _add_push_actions_to_staging_txn(txn):
+            # We don't use _simple_insert_many here to avoid the overhead
+            # of generating lists of dicts.
+
+            sql = """
+                INSERT INTO event_push_actions_staging
+                    (event_id, user_id, actions, notif, highlight)
+                VALUES (?, ?, ?, ?, ?)
+            """
+
+            txn.executemany(
+                sql,
+                (
+                    _gen_entry(user_id, actions)
+                    for user_id, actions in iteritems(user_id_actions)
+                ),
+            )
+
+        return self.runInteraction(
+            "add_push_actions_to_staging", _add_push_actions_to_staging_txn
+        )
 
     @defer.inlineCallbacks
-    def get_push_actions_for_user(self, user_id, before=None, limit=50,
-                                  only_highlight=False):
+    def remove_push_actions_from_staging(self, event_id):
+        """Called if we failed to persist the event to ensure that stale push
+        actions don't build up in the DB
+
+        Args:
+            event_id (str)
+        """
+
+        try:
+            res = yield self._simple_delete(
+                table="event_push_actions_staging",
+                keyvalues={"event_id": event_id},
+                desc="remove_push_actions_from_staging",
+            )
+            return res
+        except Exception:
+            # this method is called from an exception handler, so propagating
+            # another exception here really isn't helpful - there's nothing
+            # the caller can do about it. Just log the exception and move on.
+            logger.exception(
+                "Error removing push actions after event persistence failure"
+            )
+
+    def _find_stream_orderings_for_times(self):
+        return run_as_background_process(
+            "event_push_action_stream_orderings",
+            self.runInteraction,
+            "_find_stream_orderings_for_times",
+            self._find_stream_orderings_for_times_txn,
+        )
+
+    def _find_stream_orderings_for_times_txn(self, txn):
+        logger.info("Searching for stream ordering 1 month ago")
+        self.stream_ordering_month_ago = self._find_first_stream_ordering_after_ts_txn(
+            txn, self._clock.time_msec() - 30 * 24 * 60 * 60 * 1000
+        )
+        logger.info(
+            "Found stream ordering 1 month ago: it's %d", self.stream_ordering_month_ago
+        )
+        logger.info("Searching for stream ordering 1 day ago")
+        self.stream_ordering_day_ago = self._find_first_stream_ordering_after_ts_txn(
+            txn, self._clock.time_msec() - 24 * 60 * 60 * 1000
+        )
+        logger.info(
+            "Found stream ordering 1 day ago: it's %d", self.stream_ordering_day_ago
+        )
+
+    def find_first_stream_ordering_after_ts(self, ts):
+        """Gets the stream ordering corresponding to a given timestamp.
+
+        Specifically, finds the stream_ordering of the first event that was
+        received on or after the timestamp. This is done by a binary search on
+        the events table, since there is no index on received_ts, so is
+        relatively slow.
+
+        Args:
+            ts (int): timestamp in millis
+
+        Returns:
+            Deferred[int]: stream ordering of the first event received on/after
+                the timestamp
+        """
+        return self.runInteraction(
+            "_find_first_stream_ordering_after_ts_txn",
+            self._find_first_stream_ordering_after_ts_txn,
+            ts,
+        )
+
+    @staticmethod
+    def _find_first_stream_ordering_after_ts_txn(txn, ts):
+        """
+        Find the stream_ordering of the first event that was received on or
+        after a given timestamp. This is relatively slow as there is no index
+        on received_ts but we can then use this to delete push actions before
+        this.
+
+        received_ts must necessarily be in the same order as stream_ordering
+        and stream_ordering is indexed, so we manually binary search using
+        stream_ordering
+
+        Args:
+            txn (twisted.enterprise.adbapi.Transaction):
+            ts (int): timestamp to search for
+
+        Returns:
+            int: stream ordering
+        """
+        txn.execute("SELECT MAX(stream_ordering) FROM events")
+        max_stream_ordering = txn.fetchone()[0]
+
+        if max_stream_ordering is None:
+            return 0
+
+        # We want the first stream_ordering in which received_ts is greater
+        # than or equal to ts. Call this point X.
+        #
+        # We maintain the invariants:
+        #
+        #   range_start <= X <= range_end
+        #
+        range_start = 0
+        range_end = max_stream_ordering + 1
+
+        # Given a stream_ordering, look up the timestamp at that
+        # stream_ordering.
+        #
+        # The array may be sparse (we may be missing some stream_orderings).
+        # We treat the gaps as the same as having the same value as the
+        # preceding entry, because we will pick the lowest stream_ordering
+        # which satisfies our requirement of received_ts >= ts.
+        #
+        # For example, if our array of events indexed by stream_ordering is
+        # [10, <none>, 20], we should treat this as being equivalent to
+        # [10, 10, 20].
+        #
+        sql = (
+            "SELECT received_ts FROM events"
+            " WHERE stream_ordering <= ?"
+            " ORDER BY stream_ordering DESC"
+            " LIMIT 1"
+        )
+
+        while range_end - range_start > 0:
+            middle = (range_end + range_start) // 2
+            txn.execute(sql, (middle,))
+            row = txn.fetchone()
+            if row is None:
+                # no rows with stream_ordering<=middle
+                range_start = middle + 1
+                continue
+
+            middle_ts = row[0]
+            if ts > middle_ts:
+                # we got a timestamp lower than the one we were looking for.
+                # definitely need to look higher: X > middle.
+                range_start = middle + 1
+            else:
+                # we got a timestamp higher than (or the same as) the one we
+                # were looking for. We aren't yet sure about the point we
+                # looked up, but we can be sure that X <= middle.
+                range_end = middle
+
+        return range_end
+
+
+class EventPushActionsStore(EventPushActionsWorkerStore):
+    EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
+
+    def __init__(self, db_conn, hs):
+        super(EventPushActionsStore, self).__init__(db_conn, hs)
+
+        self.register_background_index_update(
+            self.EPA_HIGHLIGHT_INDEX,
+            index_name="event_push_actions_u_highlight",
+            table="event_push_actions",
+            columns=["user_id", "stream_ordering"],
+        )
+
+        self.register_background_index_update(
+            "event_push_actions_highlights_index",
+            index_name="event_push_actions_highlights_index",
+            table="event_push_actions",
+            columns=["user_id", "room_id", "topological_ordering", "stream_ordering"],
+            where_clause="highlight=1",
+        )
+
+        self._doing_notif_rotation = False
+        self._rotate_notif_loop = self._clock.looping_call(
+            self._start_rotate_notifs, 30 * 60 * 1000
+        )
+
+    def _set_push_actions_for_event_and_users_txn(
+        self, txn, events_and_contexts, all_events_and_contexts
+    ):
+        """Handles moving push actions from staging table to main
+        event_push_actions table for all events in `events_and_contexts`.
+
+        Also ensures that all events in `all_events_and_contexts` are removed
+        from the push action staging area.
+
+        Args:
+            events_and_contexts (list[(EventBase, EventContext)]): events
+                we are persisting
+            all_events_and_contexts (list[(EventBase, EventContext)]): all
+                events that we were going to persist. This includes events
+                we've already persisted, etc, that wouldn't appear in
+                events_and_context.
+        """
+
+        sql = """
+            INSERT INTO event_push_actions (
+                room_id, event_id, user_id, actions, stream_ordering,
+                topological_ordering, notif, highlight
+            )
+            SELECT ?, event_id, user_id, actions, ?, ?, notif, highlight
+            FROM event_push_actions_staging
+            WHERE event_id = ?
+        """
+
+        if events_and_contexts:
+            txn.executemany(
+                sql,
+                (
+                    (
+                        event.room_id,
+                        event.internal_metadata.stream_ordering,
+                        event.depth,
+                        event.event_id,
+                    )
+                    for event, _ in events_and_contexts
+                ),
+            )
+
+        for event, _ in events_and_contexts:
+            user_ids = self._simple_select_onecol_txn(
+                txn,
+                table="event_push_actions_staging",
+                keyvalues={"event_id": event.event_id},
+                retcol="user_id",
+            )
+
+            for uid in user_ids:
+                txn.call_after(
+                    self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+                    (event.room_id, uid),
+                )
+
+        # Now we delete the staging area for *all* events that were being
+        # persisted.
+        txn.executemany(
+            "DELETE FROM event_push_actions_staging WHERE event_id = ?",
+            ((event.event_id,) for event, _ in all_events_and_contexts),
+        )
+
+    @defer.inlineCallbacks
+    def get_push_actions_for_user(
+        self, user_id, before=None, limit=50, only_highlight=False
+    ):
         def f(txn):
             before_clause = ""
             if before:
@@ -458,18 +724,15 @@ class EventPushActionsStore(SQLBaseStore):
                 " WHERE epa.event_id = e.event_id"
                 " AND epa.user_id = ? %s"
                 " ORDER BY epa.stream_ordering DESC"
-                " LIMIT ?"
-                % (before_clause,)
+                " LIMIT ?" % (before_clause,)
             )
             txn.execute(sql, args)
             return self.cursor_to_dict(txn)
 
-        push_actions = yield self.runInteraction(
-            "get_push_actions_for_user", f
-        )
+        push_actions = yield self.runInteraction("get_push_actions_for_user", f)
         for pa in push_actions:
             pa["actions"] = _deserialize_action(pa["actions"], pa["highlight"])
-        defer.returnValue(push_actions)
+        return push_actions
 
     @defer.inlineCallbacks
     def get_time_of_last_push_action_before(self, stream_ordering):
@@ -484,35 +747,36 @@ class EventPushActionsStore(SQLBaseStore):
             )
             txn.execute(sql, (stream_ordering,))
             return txn.fetchone()
+
         result = yield self.runInteraction("get_time_of_last_push_action_before", f)
-        defer.returnValue(result[0] if result else None)
+        return result[0] if result else None
 
     @defer.inlineCallbacks
     def get_latest_push_action_stream_ordering(self):
         def f(txn):
             txn.execute("SELECT MAX(stream_ordering) FROM event_push_actions")
             return txn.fetchone()
-        result = yield self.runInteraction(
-            "get_latest_push_action_stream_ordering", f
-        )
-        defer.returnValue(result[0] or 0)
+
+        result = yield self.runInteraction("get_latest_push_action_stream_ordering", f)
+        return result[0] or 0
 
     def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
         # Sad that we have to blow away the cache for the whole room here
         txn.call_after(
             self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-            (room_id,)
+            (room_id,),
         )
         txn.execute(
             "DELETE FROM event_push_actions WHERE room_id = ? AND event_id = ?",
-            (room_id, event_id)
+            (room_id, event_id),
         )
 
-    def _remove_old_push_actions_before_txn(self, txn, room_id, user_id,
-                                            topological_ordering, stream_ordering):
+    def _remove_old_push_actions_before_txn(
+        self, txn, room_id, user_id, stream_ordering
+    ):
         """
         Purges old push actions for a user and room before a given
-        topological_ordering.
+        stream_ordering.
 
         We however keep a months worth of highlighted notifications, so that
         users can still get a list of recent highlights.
@@ -521,12 +785,12 @@ class EventPushActionsStore(SQLBaseStore):
             txn: The transcation
             room_id: Room ID to delete from
             user_id: user ID to delete for
-            topological_ordering: The lowest topological ordering which will
+            stream_ordering: The lowest stream ordering which will
                                   not be deleted.
         """
         txn.call_after(
             self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-            (room_id, user_id, )
+            (room_id, user_id),
         )
 
         # We need to join on the events table to get the received_ts for
@@ -540,78 +804,21 @@ class EventPushActionsStore(SQLBaseStore):
         txn.execute(
             "DELETE FROM event_push_actions "
             " WHERE user_id = ? AND room_id = ? AND "
-            " topological_ordering <= ?"
+            " stream_ordering <= ?"
             " AND ((stream_ordering < ? AND highlight = 1) or highlight = 0)",
-            (user_id, room_id, topological_ordering, self.stream_ordering_month_ago)
+            (user_id, room_id, stream_ordering, self.stream_ordering_month_ago),
         )
 
-        txn.execute("""
+        txn.execute(
+            """
             DELETE FROM event_push_summary
             WHERE room_id = ? AND user_id = ? AND stream_ordering <= ?
-        """, (room_id, user_id, stream_ordering))
-
-    @defer.inlineCallbacks
-    def _find_stream_orderings_for_times(self):
-        yield self.runInteraction(
-            "_find_stream_orderings_for_times",
-            self._find_stream_orderings_for_times_txn
+        """,
+            (room_id, user_id, stream_ordering),
         )
 
-    def _find_stream_orderings_for_times_txn(self, txn):
-        logger.info("Searching for stream ordering 1 month ago")
-        self.stream_ordering_month_ago = self._find_first_stream_ordering_after_ts_txn(
-            txn, self._clock.time_msec() - 30 * 24 * 60 * 60 * 1000
-        )
-        logger.info(
-            "Found stream ordering 1 month ago: it's %d",
-            self.stream_ordering_month_ago
-        )
-        logger.info("Searching for stream ordering 1 day ago")
-        self.stream_ordering_day_ago = self._find_first_stream_ordering_after_ts_txn(
-            txn, self._clock.time_msec() - 24 * 60 * 60 * 1000
-        )
-        logger.info(
-            "Found stream ordering 1 day ago: it's %d",
-            self.stream_ordering_day_ago
-        )
-
-    def _find_first_stream_ordering_after_ts_txn(self, txn, ts):
-        """
-        Find the stream_ordering of the first event that was received after
-        a given timestamp. This is relatively slow as there is no index on
-        received_ts but we can then use this to delete push actions before
-        this.
-
-        received_ts must necessarily be in the same order as stream_ordering
-        and stream_ordering is indexed, so we manually binary search using
-        stream_ordering
-        """
-        txn.execute("SELECT MAX(stream_ordering) FROM events")
-        max_stream_ordering = txn.fetchone()[0]
-
-        if max_stream_ordering is None:
-            return 0
-
-        range_start = 0
-        range_end = max_stream_ordering
-
-        sql = (
-            "SELECT received_ts FROM events"
-            " WHERE stream_ordering > ?"
-            " ORDER BY stream_ordering"
-            " LIMIT 1"
-        )
-
-        while range_end - range_start > 1:
-            middle = int((range_end + range_start) / 2)
-            txn.execute(sql, (middle,))
-            middle_ts = txn.fetchone()[0]
-            if ts > middle_ts:
-                range_start = middle
-            else:
-                range_end = middle
-
-        return range_end
+    def _start_rotate_notifs(self):
+        return run_as_background_process("rotate_notifs", self._rotate_notifs)
 
     @defer.inlineCallbacks
     def _rotate_notifs(self):
@@ -624,12 +831,11 @@ class EventPushActionsStore(SQLBaseStore):
                 logger.info("Rotating notifications")
 
                 caught_up = yield self.runInteraction(
-                    "_rotate_notifs",
-                    self._rotate_notifs_txn
+                    "_rotate_notifs", self._rotate_notifs_txn
                 )
                 if caught_up:
                     break
-                yield sleep(5)
+                yield self.hs.get_clock().sleep(self._rotate_delay)
         finally:
             self._doing_notif_rotation = False
 
@@ -647,11 +853,14 @@ class EventPushActionsStore(SQLBaseStore):
 
         # We don't to try and rotate millions of rows at once, so we cap the
         # maximum stream ordering we'll rotate before.
-        txn.execute("""
+        txn.execute(
+            """
             SELECT stream_ordering FROM event_push_actions
             WHERE stream_ordering > ?
-            ORDER BY stream_ordering ASC LIMIT 1 OFFSET 50000
-        """, (old_rotate_stream_ordering,))
+            ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
+        """,
+            (old_rotate_stream_ordering, self._rotate_count),
+        )
         stream_row = txn.fetchone()
         if stream_row:
             offset_stream_ordering, = stream_row
@@ -695,7 +904,7 @@ class EventPushActionsStore(SQLBaseStore):
             LEFT JOIN event_push_summary AS old USING (user_id, room_id)
         """
 
-        txn.execute(sql, (old_rotate_stream_ordering, rotate_to_stream_ordering,))
+        txn.execute(sql, (old_rotate_stream_ordering, rotate_to_stream_ordering))
         rows = txn.fetchall()
 
         logger.info("Rotating notifications, handling %d rows", len(rows))
@@ -713,8 +922,9 @@ class EventPushActionsStore(SQLBaseStore):
                     "notif_count": row[2],
                     "stream_ordering": row[3],
                 }
-                for row in rows if row[4] is None
-            ]
+                for row in rows
+                if row[4] is None
+            ],
         )
 
         txn.executemany(
@@ -722,20 +932,20 @@ class EventPushActionsStore(SQLBaseStore):
                 UPDATE event_push_summary SET notif_count = ?, stream_ordering = ?
                 WHERE user_id = ? AND room_id = ?
             """,
-            ((row[2], row[3], row[0], row[1],) for row in rows if row[4] is not None)
+            ((row[2], row[3], row[0], row[1]) for row in rows if row[4] is not None),
         )
 
         txn.execute(
             "DELETE FROM event_push_actions"
             " WHERE ? <= stream_ordering AND stream_ordering < ? AND highlight = 0",
-            (old_rotate_stream_ordering, rotate_to_stream_ordering,)
+            (old_rotate_stream_ordering, rotate_to_stream_ordering),
         )
 
         logger.info("Rotating notifications, deleted %s push actions", txn.rowcount)
 
         txn.execute(
             "UPDATE event_push_summary_stream_ordering SET stream_ordering = ?",
-            (rotate_to_stream_ordering,)
+            (rotate_to_stream_ordering,),
         )
 
 

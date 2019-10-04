@@ -14,20 +14,19 @@
 # limitations under the License.
 
 
-from tests import unittest
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.types import UserID, RoomID, RoomAlias
+from synapse.types import RoomAlias, RoomID, UserID
 
+from tests import unittest
 from tests.utils import setup_test_homeserver
 
 
 class RoomStoreTestCase(unittest.TestCase):
-
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver()
+        hs = yield setup_test_homeserver(self.addCleanup)
 
         # We can't test RoomStore on its own without the DirectoryStore, for
         # management of the 'room_aliases' table
@@ -40,7 +39,7 @@ class RoomStoreTestCase(unittest.TestCase):
         yield self.store.store_room(
             self.room.to_string(),
             room_creator_user_id=self.u_creator.to_string(),
-            is_public=True
+            is_public=True,
         )
 
     @defer.inlineCallbacks
@@ -49,17 +48,16 @@ class RoomStoreTestCase(unittest.TestCase):
             {
                 "room_id": self.room.to_string(),
                 "creator": self.u_creator.to_string(),
-                "is_public": True
+                "is_public": True,
             },
-            (yield self.store.get_room(self.room.to_string()))
+            (yield self.store.get_room(self.room.to_string())),
         )
 
 
 class RoomEventsStoreTestCase(unittest.TestCase):
-
     @defer.inlineCallbacks
     def setUp(self):
-        hs = setup_test_homeserver()
+        hs = setup_test_homeserver(self.addCleanup)
 
         # Room events need the full datastore, for persist_event() and
         # get_room_state()
@@ -69,64 +67,45 @@ class RoomEventsStoreTestCase(unittest.TestCase):
         self.room = RoomID.from_string("!abcde:test")
 
         yield self.store.store_room(
-            self.room.to_string(),
-            room_creator_user_id="@creator:text",
-            is_public=True
+            self.room.to_string(), room_creator_user_id="@creator:text", is_public=True
         )
 
     @defer.inlineCallbacks
     def inject_room_event(self, **kwargs):
         yield self.store.persist_event(
-            self.event_factory.create_event(
-                room_id=self.room.to_string(),
-                **kwargs
-            )
+            self.event_factory.create_event(room_id=self.room.to_string(), **kwargs)
         )
 
     @defer.inlineCallbacks
     def STALE_test_room_name(self):
-        name = u"A-Room-Name"
+        name = "A-Room-Name"
 
         yield self.inject_room_event(
-            etype=EventTypes.Name,
-            name=name,
-            content={"name": name},
-            depth=1,
+            etype=EventTypes.Name, name=name, content={"name": name}, depth=1
         )
 
-        state = yield self.store.get_current_state(
-            room_id=self.room.to_string()
-        )
+        state = yield self.store.get_current_state(room_id=self.room.to_string())
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(
-            {"type": "m.room.name",
-             "room_id": self.room.to_string(),
-             "name": name},
-            state[0]
+            {"type": "m.room.name", "room_id": self.room.to_string(), "name": name},
+            state[0],
         )
 
     @defer.inlineCallbacks
     def STALE_test_room_topic(self):
-        topic = u"A place for things"
+        topic = "A place for things"
 
         yield self.inject_room_event(
-            etype=EventTypes.Topic,
-            topic=topic,
-            content={"topic": topic},
-            depth=1,
+            etype=EventTypes.Topic, topic=topic, content={"topic": topic}, depth=1
         )
 
-        state = yield self.store.get_current_state(
-            room_id=self.room.to_string()
-        )
+        state = yield self.store.get_current_state(room_id=self.room.to_string())
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(
-            {"type": "m.room.topic",
-             "room_id": self.room.to_string(),
-             "topic": topic},
-            state[0]
+            {"type": "m.room.topic", "room_id": self.room.to_string(), "topic": topic},
+            state[0],
         )
 
     # Not testing the various 'level' methods for now because there's lots

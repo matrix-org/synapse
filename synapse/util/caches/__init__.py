@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,40 +14,114 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import synapse.metrics
-from lrucache import LruCache
+import logging
 import os
+from typing import Dict
 
-CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.1))
+import six
+from six.moves import intern
 
-DEBUG_CACHES = False
+from prometheus_client.core import REGISTRY, Gauge, GaugeMetricFamily
 
-metrics = synapse.metrics.get_metrics_for("synapse.util.caches")
+logger = logging.getLogger(__name__)
+
+CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
+
+
+def get_cache_factor_for(cache_name):
+    env_var = "SYNAPSE_CACHE_FACTOR_" + cache_name.upper()
+    factor = os.environ.get(env_var)
+    if factor:
+        return float(factor)
+
+    return CACHE_SIZE_FACTOR
+
 
 caches_by_name = {}
-# cache_counter = metrics.register_cache(
-#     "cache",
-#     lambda: {(name,): len(caches_by_name[name]) for name in caches_by_name.keys()},
-#     labels=["name"],
-# )
+collectors_by_name = {}  # type: Dict
+
+cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
+cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
+cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name"])
+cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
+
+response_cache_size = Gauge("synapse_util_caches_response_cache:size", "", ["name"])
+response_cache_hits = Gauge("synapse_util_caches_response_cache:hits", "", ["name"])
+response_cache_evicted = Gauge(
+    "synapse_util_caches_response_cache:evicted_size", "", ["name"]
+)
+response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
 
 
-def register_cache(name, cache):
-    caches_by_name[name] = cache
-    return metrics.register_cache(
-        "cache",
-        lambda: len(cache),
-        name,
-    )
+def register_cache(cache_type, cache_name, cache, collect_callback=None):
+    """Register a cache object for metric collection.
 
+    Args:
+        cache_type (str):
+        cache_name (str): name of the cache
+        cache (object): cache itself
+        collect_callback (callable|None): if not None, a function which is called during
+            metric collection to update additional metrics.
 
-_string_cache = LruCache(int(100000 * CACHE_SIZE_FACTOR))
-_stirng_cache_metrics = register_cache("string_cache", _string_cache)
+    Returns:
+        CacheMetric: an object which provides inc_{hits,misses,evictions} methods
+    """
+
+    # Check if the metric is already registered. Unregister it, if so.
+    # This usually happens during tests, as at runtime these caches are
+    # effectively singletons.
+    metric_name = "cache_%s_%s" % (cache_type, cache_name)
+    if metric_name in collectors_by_name.keys():
+        REGISTRY.unregister(collectors_by_name[metric_name])
+
+    class CacheMetric(object):
+
+        hits = 0
+        misses = 0
+        evicted_size = 0
+
+        def inc_hits(self):
+            self.hits += 1
+
+        def inc_misses(self):
+            self.misses += 1
+
+        def inc_evictions(self, size=1):
+            self.evicted_size += size
+
+        def describe(self):
+            return []
+
+        def collect(self):
+            try:
+                if cache_type == "response_cache":
+                    response_cache_size.labels(cache_name).set(len(cache))
+                    response_cache_hits.labels(cache_name).set(self.hits)
+                    response_cache_evicted.labels(cache_name).set(self.evicted_size)
+                    response_cache_total.labels(cache_name).set(self.hits + self.misses)
+                else:
+                    cache_size.labels(cache_name).set(len(cache))
+                    cache_hits.labels(cache_name).set(self.hits)
+                    cache_evicted.labels(cache_name).set(self.evicted_size)
+                    cache_total.labels(cache_name).set(self.hits + self.misses)
+                if collect_callback:
+                    collect_callback()
+            except Exception as e:
+                logger.warn("Error calculating metrics for %s: %s", cache_name, e)
+                raise
+
+            yield GaugeMetricFamily("__unused", "")
+
+    metric = CacheMetric()
+    REGISTRY.register(metric)
+    caches_by_name[cache_name] = cache
+    collectors_by_name[metric_name] = metric
+    return metric
 
 
 KNOWN_KEYS = {
-    key: key for key in
-    (
+    key: key
+    for key in (
         "auth_events",
         "content",
         "depth",
@@ -67,14 +142,18 @@ KNOWN_KEYS = {
 
 
 def intern_string(string):
-    """Takes a (potentially) unicode string and interns using custom cache
+    """Takes a (potentially) unicode string and interns it if it's ascii
     """
-    new_str = _string_cache.setdefault(string, string)
-    if new_str is string:
-        _stirng_cache_metrics.inc_hits()
-    else:
-        _stirng_cache_metrics.inc_misses()
-    return new_str
+    if string is None:
+        return None
+
+    try:
+        if six.PY2:
+            string = string.encode("ascii")
+
+        return intern(string)
+    except UnicodeEncodeError:
+        return string
 
 
 def intern_dict(dictionary):
@@ -87,13 +166,9 @@ def intern_dict(dictionary):
 
 
 def _intern_known_values(key, value):
-    intern_str_keys = ("event_id", "room_id")
-    intern_unicode_keys = ("sender", "user_id", "type", "state_key")
+    intern_keys = ("event_id", "room_id", "sender", "user_id", "type", "state_key")
 
-    if key in intern_str_keys:
-        return intern(value.encode('ascii'))
-
-    if key in intern_unicode_keys:
+    if key in intern_keys:
         return intern_string(value)
 
     return value

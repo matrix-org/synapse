@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,51 +13,59 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from synapse.rest.client import (
-    versions,
-)
-
+import synapse.rest.admin
+from synapse.http.server import JsonResource
+from synapse.rest.client import versions
 from synapse.rest.client.v1 import (
-    room,
-    events,
-    profile,
-    presence,
-    initial_sync,
     directory,
-    voip,
-    admin,
-    pusher,
-    push_rule,
-    register as v1_register,
+    events,
+    initial_sync,
     login as v1_login,
     logout,
+    presence,
+    profile,
+    push_rule,
+    pusher,
+    room,
+    voip,
 )
-
 from synapse.rest.client.v2_alpha import (
-    sync,
-    filter,
     account,
-    register,
-    auth,
-    receipts,
-    keys,
-    tokenrefresh,
-    tags,
     account_data,
-    report_event,
-    openid,
-    notifications,
+    account_validity,
+    auth,
+    capabilities,
     devices,
-    thirdparty,
+    filter,
+    groups,
+    keys,
+    notifications,
+    openid,
+    read_marker,
+    receipts,
+    register,
+    relations,
+    report_event,
+    room_keys,
+    room_upgrade_rest_servlet,
     sendtodevice,
+    sync,
+    tags,
+    thirdparty,
+    tokenrefresh,
+    user_directory,
 )
-
-from synapse.http.server import JsonResource
 
 
 class ClientRestResource(JsonResource):
-    """A resource for version 1 of the matrix client API."""
+    """Matrix Client API REST resource.
+
+    This gets mounted at various points under /_matrix/client, including:
+       * /_matrix/client/r0
+       * /_matrix/client/api/v1
+       * /_matrix/client/unstable
+       * etc
+    """
 
     def __init__(self, hs):
         JsonResource.__init__(self, hs, canonical_json=False)
@@ -64,19 +73,22 @@ class ClientRestResource(JsonResource):
 
     @staticmethod
     def register_servlets(client_resource, hs):
-        versions.register_servlets(client_resource)
+        versions.register_servlets(hs, client_resource)
 
-        # "v1"
-        room.register_servlets(hs, client_resource)
+        # Deprecated in r0
+        initial_sync.register_servlets(hs, client_resource)
+        room.register_deprecated_servlets(hs, client_resource)
+
+        # Partially deprecated in r0
         events.register_servlets(hs, client_resource)
-        v1_register.register_servlets(hs, client_resource)
+
+        # "v1" + "r0"
+        room.register_servlets(hs, client_resource)
         v1_login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)
-        initial_sync.register_servlets(hs, client_resource)
         directory.register_servlets(hs, client_resource)
         voip.register_servlets(hs, client_resource)
-        admin.register_servlets(hs, client_resource)
         pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
         logout.register_servlets(hs, client_resource)
@@ -88,6 +100,8 @@ class ClientRestResource(JsonResource):
         register.register_servlets(hs, client_resource)
         auth.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
+        read_marker.register_servlets(hs, client_resource)
+        room_keys.register_servlets(hs, client_resource)
         keys.register_servlets(hs, client_resource)
         tokenrefresh.register_servlets(hs, client_resource)
         tags.register_servlets(hs, client_resource)
@@ -98,3 +112,14 @@ class ClientRestResource(JsonResource):
         devices.register_servlets(hs, client_resource)
         thirdparty.register_servlets(hs, client_resource)
         sendtodevice.register_servlets(hs, client_resource)
+        user_directory.register_servlets(hs, client_resource)
+        groups.register_servlets(hs, client_resource)
+        room_upgrade_rest_servlet.register_servlets(hs, client_resource)
+        capabilities.register_servlets(hs, client_resource)
+        account_validity.register_servlets(hs, client_resource)
+        relations.register_servlets(hs, client_resource)
+
+        # moving to /_synapse/admin
+        synapse.rest.admin.register_servlets_for_client_rest_resource(
+            hs, client_resource
+        )

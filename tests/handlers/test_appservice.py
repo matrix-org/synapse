@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mock import Mock
+
 from twisted.internet import defer
-from .. import unittest
-from tests.utils import MockClock
 
 from synapse.handlers.appservice import ApplicationServicesHandler
 
-from mock import Mock
+from tests.utils import MockClock
+
+from .. import unittest
 
 
 class AppServiceHandlerTestCase(unittest.TestCase):
@@ -31,6 +33,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_scheduler = Mock()
         hs = Mock()
         hs.get_datastore = Mock(return_value=self.mock_store)
+        self.mock_store.get_received_ts.return_value = 0
         hs.get_application_service_api = Mock(return_value=self.mock_as_api)
         hs.get_application_service_scheduler = Mock(return_value=self.mock_scheduler)
         hs.get_clock.return_value = MockClock()
@@ -42,18 +45,19 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [
             self._mkservice(is_interested=False),
             interested_service,
-            self._mkservice(is_interested=False)
+            self._mkservice(is_interested=False),
         ]
 
         self.mock_store.get_app_services = Mock(return_value=services)
         self.mock_store.get_user_by_id = Mock(return_value=[])
 
         event = Mock(
-            sender="@someone:anywhere",
-            type="m.room.message",
-            room_id="!foo:bar"
+            sender="@someone:anywhere", type="m.room.message", room_id="!foo:bar"
         )
-        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        self.mock_store.get_new_events_for_appservice.side_effect = [
+            (0, [event]),
+            (0, []),
+        ]
         self.mock_as_api.push = Mock()
         yield self.handler.notify_interested_services(0)
         self.mock_scheduler.submit_event_for_as.assert_called_once_with(
@@ -68,18 +72,15 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_store.get_app_services = Mock(return_value=services)
         self.mock_store.get_user_by_id = Mock(return_value=None)
 
-        event = Mock(
-            sender=user_id,
-            type="m.room.message",
-            room_id="!foo:bar"
-        )
+        event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.push = Mock()
         self.mock_as_api.query_user = Mock()
-        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        self.mock_store.get_new_events_for_appservice.side_effect = [
+            (0, [event]),
+            (0, []),
+        ]
         yield self.handler.notify_interested_services(0)
-        self.mock_as_api.query_user.assert_called_once_with(
-            services[0], user_id
-        )
+        self.mock_as_api.query_user.assert_called_once_with(services[0], user_id)
 
     @defer.inlineCallbacks
     def test_query_user_exists_known_user(self):
@@ -87,22 +88,19 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [self._mkservice(is_interested=True)]
         services[0].is_interested_in_user = Mock(return_value=True)
         self.mock_store.get_app_services = Mock(return_value=services)
-        self.mock_store.get_user_by_id = Mock(return_value={
-            "name": user_id
-        })
+        self.mock_store.get_user_by_id = Mock(return_value={"name": user_id})
 
-        event = Mock(
-            sender=user_id,
-            type="m.room.message",
-            room_id="!foo:bar"
-        )
+        event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.push = Mock()
         self.mock_as_api.query_user = Mock()
-        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        self.mock_store.get_new_events_for_appservice.side_effect = [
+            (0, [event]),
+            (0, []),
+        ]
         yield self.handler.notify_interested_services(0)
         self.assertFalse(
             self.mock_as_api.query_user.called,
-            "query_user called when it shouldn't have been."
+            "query_user called when it shouldn't have been.",
         )
 
     @defer.inlineCallbacks
@@ -117,7 +115,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [
             self._mkservice_alias(is_interested_in_alias=False),
             interested_service,
-            self._mkservice_alias(is_interested_in_alias=False)
+            self._mkservice_alias(is_interested_in_alias=False),
         ]
 
         self.mock_store.get_app_services = Mock(return_value=services)
@@ -128,8 +126,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         result = yield self.handler.query_room_alias_exists(room_alias)
 
         self.mock_as_api.query_alias.assert_called_once_with(
-            interested_service,
-            room_alias_str
+            interested_service, room_alias_str
         )
         self.assertEquals(result.room_id, room_id)
         self.assertEquals(result.servers, servers)

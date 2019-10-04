@@ -23,6 +23,7 @@ class PostgresEngine(object):
         self.module = database_module
         self.module.extensions.register_type(self.module.extensions.UNICODE)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
+        self._version = None  # unknown as yet
 
     def check_database(self, txn):
         txn.execute("SHOW SERVER_ENCODING")
@@ -30,24 +31,53 @@ class PostgresEngine(object):
         if rows and rows[0][0] != "UTF8":
             raise IncorrectDatabaseSetup(
                 "Database has incorrect encoding: '%s' instead of 'UTF8'\n"
-                "See docs/postgres.rst for more information."
-                % (rows[0][0],)
+                "See docs/postgres.rst for more information." % (rows[0][0],)
             )
 
     def convert_param_style(self, sql):
         return sql.replace("?", "%s")
 
     def on_new_connection(self, db_conn):
+
+        # Get the version of PostgreSQL that we're using. As per the psycopg2
+        # docs: The number is formed by converting the major, minor, and
+        # revision numbers into two-decimal-digit numbers and appending them
+        # together. For example, version 8.1.5 will be returned as 80105
+        self._version = db_conn.server_version
+
+        # Are we on a supported PostgreSQL version?
+        if self._version < 90500:
+            raise RuntimeError("Synapse requires PostgreSQL 9.5+ or above.")
+
         db_conn.set_isolation_level(
             self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
         )
+
+        # Set the bytea output to escape, vs the default of hex
+        cursor = db_conn.cursor()
+        cursor.execute("SET bytea_output TO escape")
+
         # Asynchronous commit, don't wait for the server to call fsync before
         # ending the transaction.
         # https://www.postgresql.org/docs/current/static/wal-async-commit.html
         if not self.synchronous_commit:
-            cursor = db_conn.cursor()
             cursor.execute("SET synchronous_commit TO OFF")
-            cursor.close()
+
+        cursor.close()
+
+    @property
+    def can_native_upsert(self):
+        """
+        Can we use native UPSERTs?
+        """
+        return True
+
+    @property
+    def supports_tuple_comparison(self):
+        """
+        Do we support comparing tuples, i.e. `(a, b) > (c, d)`?
+        """
+        return True
 
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):
@@ -62,3 +92,27 @@ class PostgresEngine(object):
 
     def lock_table(self, txn, table):
         txn.execute("LOCK TABLE %s in EXCLUSIVE MODE" % (table,))
+
+    def get_next_state_group_id(self, txn):
+        """Returns an int that can be used as a new state_group ID
+        """
+        txn.execute("SELECT nextval('state_group_id_seq')")
+        return txn.fetchone()[0]
+
+    @property
+    def server_version(self):
+        """Returns a string giving the server version. For example: '8.1.5'
+
+        Returns:
+            string
+        """
+        # note that this is a bit of a hack because it relies on on_new_connection
+        # having been called at least once. Still, that should be a safe bet here.
+        numver = self._version
+        assert numver is not None
+
+        # https://www.postgresql.org/docs/current/libpq-status.html#LIBPQ-PQSERVERVERSION
+        if numver >= 100000:
+            return "%i.%i" % (numver / 10000, numver % 10000)
+        else:
+            return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)

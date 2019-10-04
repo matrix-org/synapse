@@ -13,43 +13,56 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
+import logging
+from collections import namedtuple
 
-from twisted.internet import defer
+import six
 
 from canonicaljson import encode_canonical_json
 
-from collections import namedtuple
+from twisted.internet import defer
 
-import logging
-import ujson as json
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.caches.expiringcache import ExpiringCache
+
+from ._base import SQLBaseStore, db_to_json
+
+# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
+# despite being deprecated and removed in favor of memoryview
+if six.PY2:
+    db_binary_type = six.moves.builtins.buffer
+else:
+    db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
 
 
 _TransactionRow = namedtuple(
-    "_TransactionRow", (
-        "id", "transaction_id", "destination", "ts", "response_code",
-        "response_json",
-    )
+    "_TransactionRow",
+    ("id", "transaction_id", "destination", "ts", "response_code", "response_json"),
 )
 
 _UpdateTransactionRow = namedtuple(
-    "_TransactionRow", (
-        "response_code", "response_json",
-    )
+    "_TransactionRow", ("response_code", "response_json")
 )
+
+SENTINEL = object()
 
 
 class TransactionStore(SQLBaseStore):
     """A collection of queries for handling PDUs.
     """
 
-    def __init__(self, hs):
-        super(TransactionStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(TransactionStore, self).__init__(db_conn, hs)
 
-        self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
+        self._clock.looping_call(self._start_cleanup_transactions, 30 * 60 * 1000)
+
+        self._destination_retry_cache = ExpiringCache(
+            cache_name="get_destination_retry_timings",
+            clock=self._clock,
+            expiry_ms=5 * 60 * 1000,
+        )
 
     def get_received_txn_response(self, transaction_id, origin):
         """For an incoming transaction from a given origin, check if we have
@@ -67,31 +80,34 @@ class TransactionStore(SQLBaseStore):
 
         return self.runInteraction(
             "get_received_txn_response",
-            self._get_received_txn_response, transaction_id, origin
+            self._get_received_txn_response,
+            transaction_id,
+            origin,
         )
 
     def _get_received_txn_response(self, txn, transaction_id, origin):
         result = self._simple_select_one_txn(
             txn,
             table="received_transactions",
-            keyvalues={
-                "transaction_id": transaction_id,
-                "origin": origin,
-            },
+            keyvalues={"transaction_id": transaction_id, "origin": origin},
             retcols=(
-                "transaction_id", "origin", "ts", "response_code", "response_json",
+                "transaction_id",
+                "origin",
+                "ts",
+                "response_code",
+                "response_json",
                 "has_been_referenced",
             ),
             allow_none=True,
         )
 
         if result and result["response_code"]:
-            return result["response_code"], json.loads(str(result["response_json"]))
+            return result["response_code"], db_to_json(result["response_json"])
+
         else:
             return None
 
-    def set_received_txn_response(self, transaction_id, origin, code,
-                                  response_dict):
+    def set_received_txn_response(self, transaction_id, origin, code, response_dict):
         """Persist the response we returened for an incoming transaction, and
         should return for subsequent transactions with the same transaction_id
         and origin.
@@ -110,43 +126,14 @@ class TransactionStore(SQLBaseStore):
                 "transaction_id": transaction_id,
                 "origin": origin,
                 "response_code": code,
-                "response_json": buffer(encode_canonical_json(response_dict)),
+                "response_json": db_binary_type(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
             },
             or_ignore=True,
             desc="set_received_txn_response",
         )
 
-    def prep_send_transaction(self, transaction_id, destination,
-                              origin_server_ts):
-        """Persists an outgoing transaction and calculates the values for the
-        previous transaction id list.
-
-        This should be called before sending the transaction so that it has the
-        correct value for the `prev_ids` key.
-
-        Args:
-            transaction_id (str)
-            destination (str)
-            origin_server_ts (int)
-
-        Returns:
-            list: A list of previous transaction ids.
-        """
-        return defer.succeed([])
-
-    def delivered_txn(self, transaction_id, destination, code, response_dict):
-        """Persists the response for an outgoing transaction.
-
-        Args:
-            transaction_id (str)
-            destination (str)
-            code (int)
-            response_json (str)
-        """
-        pass
-
-    @cached(max_entries=10000)
+    @defer.inlineCallbacks
     def get_destination_retry_timings(self, destination):
         """Gets the current retry timings (if any) for a given destination.
 
@@ -157,18 +144,28 @@ class TransactionStore(SQLBaseStore):
             None if not retrying
             Otherwise a dict for the retry scheme
         """
-        return self.runInteraction(
+
+        result = self._destination_retry_cache.get(destination, SENTINEL)
+        if result is not SENTINEL:
+            return result
+
+        result = yield self.runInteraction(
             "get_destination_retry_timings",
-            self._get_destination_retry_timings, destination)
+            self._get_destination_retry_timings,
+            destination,
+        )
+
+        # We don't hugely care about race conditions between getting and
+        # invalidating the cache, since we time out fairly quickly anyway.
+        self._destination_retry_cache[destination] = result
+        return result
 
     def _get_destination_retry_timings(self, txn, destination):
         result = self._simple_select_one_txn(
             txn,
             table="destinations",
-            keyvalues={
-                "destination": destination,
-            },
-            retcols=("destination", "retry_last_ts", "retry_interval"),
+            keyvalues={"destination": destination},
+            retcols=("destination", "failure_ts", "retry_last_ts", "retry_interval"),
             allow_none=True,
         )
 
@@ -177,34 +174,56 @@ class TransactionStore(SQLBaseStore):
         else:
             return None
 
-    def set_destination_retry_timings(self, destination,
-                                      retry_last_ts, retry_interval):
+    def set_destination_retry_timings(
+        self, destination, failure_ts, retry_last_ts, retry_interval
+    ):
         """Sets the current retry timings for a given destination.
         Both timings should be zero if retrying is no longer occuring.
 
         Args:
             destination (str)
+            failure_ts (int|None) - when the server started failing (ms since epoch)
             retry_last_ts (int) - time of last retry attempt in unix epoch ms
             retry_interval (int) - how long until next retry in ms
         """
 
-        # XXX: we could chose to not bother persisting this if our cache thinks
-        # this is a NOOP
+        self._destination_retry_cache.pop(destination, None)
         return self.runInteraction(
             "set_destination_retry_timings",
             self._set_destination_retry_timings,
             destination,
+            failure_ts,
             retry_last_ts,
             retry_interval,
         )
 
-    def _set_destination_retry_timings(self, txn, destination,
-                                       retry_last_ts, retry_interval):
-        self.database_engine.lock_table(txn, "destinations")
+    def _set_destination_retry_timings(
+        self, txn, destination, failure_ts, retry_last_ts, retry_interval
+    ):
 
-        self._invalidate_cache_and_stream(
-            txn, self.get_destination_retry_timings, (destination,)
-        )
+        if self.database_engine.can_native_upsert:
+            # Upsert retry time interval if retry_interval is zero (i.e. we're
+            # resetting it) or greater than the existing retry interval.
+
+            sql = """
+                INSERT INTO destinations (
+                    destination, failure_ts, retry_last_ts, retry_interval
+                )
+                    VALUES (?, ?, ?, ?)
+                ON CONFLICT (destination) DO UPDATE SET
+                        failure_ts = EXCLUDED.failure_ts,
+                        retry_last_ts = EXCLUDED.retry_last_ts,
+                        retry_interval = EXCLUDED.retry_interval
+                    WHERE
+                        EXCLUDED.retry_interval = 0
+                        OR destinations.retry_interval < EXCLUDED.retry_interval
+            """
+
+            txn.execute(sql, (destination, failure_ts, retry_last_ts, retry_interval))
+
+            return
+
+        self.database_engine.lock_table(txn, "destinations")
 
         # We need to be careful here as the data may have changed from under us
         # due to a worker setting the timings.
@@ -212,10 +231,8 @@ class TransactionStore(SQLBaseStore):
         prev_row = self._simple_select_one_txn(
             txn,
             table="destinations",
-            keyvalues={
-                "destination": destination,
-            },
-            retcols=("retry_last_ts", "retry_interval"),
+            keyvalues={"destination": destination},
+            retcols=("failure_ts", "retry_last_ts", "retry_interval"),
             allow_none=True,
         )
 
@@ -225,43 +242,27 @@ class TransactionStore(SQLBaseStore):
                 table="destinations",
                 values={
                     "destination": destination,
+                    "failure_ts": failure_ts,
                     "retry_last_ts": retry_last_ts,
                     "retry_interval": retry_interval,
-                }
+                },
             )
         elif retry_interval == 0 or prev_row["retry_interval"] < retry_interval:
             self._simple_update_one_txn(
                 txn,
                 "destinations",
-                keyvalues={
-                    "destination": destination,
-                },
+                keyvalues={"destination": destination},
                 updatevalues={
+                    "failure_ts": failure_ts,
                     "retry_last_ts": retry_last_ts,
                     "retry_interval": retry_interval,
                 },
             )
 
-    def get_destinations_needing_retry(self):
-        """Get all destinations which are due a retry for sending a transaction.
-
-        Returns:
-            list: A list of dicts
-        """
-
-        return self.runInteraction(
-            "get_destinations_needing_retry",
-            self._get_destinations_needing_retry
+    def _start_cleanup_transactions(self):
+        return run_as_background_process(
+            "cleanup_transactions", self._cleanup_transactions
         )
-
-    def _get_destinations_needing_retry(self, txn):
-        query = (
-            "SELECT * FROM destinations"
-            " WHERE retry_last_ts > 0 and retry_next_ts < ?"
-        )
-
-        txn.execute(query, (self._clock.time_msec(),))
-        return self.cursor_to_dict(txn)
 
     def _cleanup_transactions(self):
         now = self._clock.time_msec()

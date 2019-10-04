@@ -20,12 +20,11 @@ The overall architecture is::
              https://somewhere.org/_matrix      https://elsewhere.net/_matrix
 
 ``#matrix:matrix.org`` is the official support room for Matrix, and can be
-accessed by any client from https://matrix.org/docs/projects/try-matrix-now or
+accessed by any client from https://matrix.org/docs/projects/try-matrix-now.html or
 via IRC bridge at irc://irc.freenode.net/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
-
 
 About Matrix
 ============
@@ -68,10 +67,10 @@ or mandatory service provider in Matrix, unlike WhatsApp, Facebook, Hangouts,
 etc.
 
 We'd like to invite you to join #matrix:matrix.org (via
-https://matrix.org/docs/projects/try-matrix-now), run a homeserver, take a look
+https://matrix.org/docs/projects/try-matrix-now.html), run a homeserver, take a look
 at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
 `APIs <https://matrix.org/docs/api>`_ and `Client SDKs
-<http://matrix.org/docs/projects/try-matrix-now.html#client-sdks>`_.
+<https://matrix.org/docs/projects/try-matrix-now.html#client-sdks>`_.
 
 Thanks for using Matrix!
 
@@ -81,196 +80,33 @@ Thanks for using Matrix!
 Synapse Installation
 ====================
 
-Synapse is the reference python/twisted Matrix homeserver implementation.
+.. _federation:
 
-System requirements:
-- POSIX-compliant system (tested on Linux & OS X)
-- Python 2.7
-- At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
-
-Installing from source
-----------------------
-(Prebuilt packages are available for some platforms - see `Platform-Specific
-Instructions`_.)
-
-Synapse is written in python but some of the libraries it uses are written in
-C. So before we can install synapse itself we need a working C compiler and the
-header files for python C extensions.
-
-Installing prerequisites on Ubuntu or Debian::
-
-    sudo apt-get install build-essential python2.7-dev libffi-dev \
-                         python-pip python-setuptools sqlite3 \
-                         libssl-dev python-virtualenv libjpeg-dev libxslt1-dev
-
-Installing prerequisites on ArchLinux::
-
-    sudo pacman -S base-devel python2 python-pip \
-                   python-setuptools python-virtualenv sqlite3
-
-Installing prerequisites on CentOS 7::
-
-    sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
-                     lcms2-devel libwebp-devel tcl-devel tk-devel \
-                     python-virtualenv libffi-devel openssl-devel
-    sudo yum groupinstall "Development Tools"
-
-Installing prerequisites on Mac OS X::
-
-    xcode-select --install
-    sudo easy_install pip
-    sudo pip install virtualenv
-    brew install pkg-config libffi
-
-Installing prerequisites on Raspbian::
-
-    sudo apt-get install build-essential python2.7-dev libffi-dev \
-                         python-pip python-setuptools sqlite3 \
-                         libssl-dev python-virtualenv libjpeg-dev
-    sudo pip install --upgrade pip
-    sudo pip install --upgrade ndg-httpsclient
-    sudo pip install --upgrade virtualenv
-
-Installing prerequisites on openSUSE::
-
-    sudo zypper in -t pattern devel_basis
-    sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
-                   python-devel libffi-devel libopenssl-devel libjpeg62-devel
-
-Installing prerequisites on OpenBSD::
-
-    doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
-                 libxslt
-
-To install the synapse homeserver run::
-
-    virtualenv -p python2.7 ~/.synapse
-    source ~/.synapse/bin/activate
-    pip install --upgrade setuptools
-    pip install https://github.com/matrix-org/synapse/tarball/master
-
-This installs synapse, along with the libraries it uses, into a virtual
-environment under ``~/.synapse``.  Feel free to pick a different directory
-if you prefer.
-
-In case of problems, please see the _`Troubleshooting` section below.
-
-Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
-above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
-
-Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
-tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy
-for details.
-
-Configuring synapse
--------------------
-
-Before you can start Synapse, you will need to generate a configuration
-file. To do this, run (in your virtualenv, as before)::
-
-    cd ~/.synapse
-    python -m synapse.app.homeserver \
-        --server-name my.domain.name \
-        --config-path homeserver.yaml \
-        --generate-config \
-        --report-stats=[yes|no]
-
-... substituting an appropriate value for ``--server-name``. The server name
-determines the "domain" part of user-ids for users on your server: these will
-all be of the format ``@user:my.domain.name``. It also determines how other
-matrix servers will reach yours for `Federation`_. For a test configuration,
-set this to the hostname of your server. For a more production-ready setup, you
-will probably want to specify your domain (``example.com``) rather than a
-matrix-specific hostname here (in the same way that your email address is
-probably ``user@example.com`` rather than ``user@email.example.com``) - but
-doing so may require more advanced setup - see `Setting up
-Federation`_. Beware that the server name cannot be changed later.
-
-This command will generate you a config file that you can then customise, but it will
-also generate a set of keys for you. These keys will allow your Home Server to
-identify itself to other Home Servers, so don't lose or delete them. It would be
-wise to back them up somewhere safe. (If, for whatever reason, you do need to
-change your Home Server's keys, you may find that other Home Servers have the
-old key cached. If you update the signing key, you should change the name of the
-key in the ``<server name>.signing.key`` file (the second word) to something
-different. See `the spec`__ for more information on key management.)
-
-.. __: `key_management`_
-
-The default configuration exposes two HTTP ports: 8008 and 8448. Port 8008 is
-configured without TLS; it is not recommended this be exposed outside your
-local network. Port 8448 is configured to use TLS with a self-signed
-certificate. This is fine for testing with but, to avoid your clients
-complaining about the certificate, you will almost certainly want to use
-another certificate for production purposes. (Note that a self-signed
-certificate is fine for `Federation`_). You can do so by changing
-``tls_certificate_path``, ``tls_private_key_path`` and ``tls_dh_params_path``
-in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
-to read `Using a reverse proxy with Synapse`_ when doing so.
-
-Apart from port 8448 using TLS, both ports are the same in the default
-configuration.
-
-Registering a user
-------------------
-
-You will need at least one user on your server in order to use a Matrix
-client. Users can be registered either `via a Matrix client`__, or via a
-commandline script.
-
-.. __: `client-user-reg`_
-
-To get started, it is easiest to use the command line to register new users::
-
-    $ source ~/.synapse/bin/activate
-    $ synctl start # if not already running
-    $ register_new_matrix_user -c homeserver.yaml https://localhost:8448
-    New user localpart: erikj
-    Password:
-    Confirm password:
-    Success!
-
-This process uses a setting ``registration_shared_secret`` in
-``homeserver.yaml``, which is shared between Synapse itself and the
-``register_new_matrix_user`` script. It doesn't matter what it is (a random
-value is generated by ``--generate-config``), but it should be kept secret, as
-anyone with knowledge of it can register users on your server even if
-``enable_registration`` is ``false``.
-
-Setting up a TURN server
-------------------------
-
-For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server.  See `<docs/turn-howto.rst>`_ for details.
-
-
-Running Synapse
-===============
-
-To actually run your new homeserver, pick a working directory for Synapse to
-run (e.g. ``~/.synapse``), and::
-
-    cd ~/.synapse
-    source ./bin/activate
-    synctl start
+* For details on how to install synapse, see `<INSTALL.md>`_.
+* For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
 
 
 Connecting to Synapse from a client
 ===================================
 
 The easiest way to try out your new Synapse installation is by connecting to it
-from a web client. The easiest option is probably the one at
-http://riot.im/app. You will need to specify a "Custom server" when you log on
-or register: set this to ``https://localhost:8448`` - remember to specify the
-port (``:8448``) unless you changed the configuration. (Leave the identity
-server as the default - see `Identity servers`_.)
+from a web client.
+
+Unless you are running a test instance of Synapse on your local machine, in
+general, you will need to enable TLS support before you can successfully
+connect from a client: see `<INSTALL.md#tls-certificates>`_.
+
+An easy way to get started is to login or register via Riot at
+https://riot.im/app/#/login or https://riot.im/app/#/register respectively.
+You will need to change the server you are logging into from ``matrix.org``
+and instead specify a Homeserver URL of ``https://<server_name>:8448``
+(or just ``https://<server_name>`` if you are using a reverse proxy).
+(Leave the identity server as the default - see `Identity servers`_.)
+If you prefer to use another client, refer to our
+`client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
 
 If all goes well you should at least be able to log in, create a room, and
 start sending messages.
-
-(The homeserver runs a web client by default at https://localhost:8448/, though
-as of the time of writing it is somewhat outdated and not really recommended -
-https://github.com/matrix-org/synapse/issues/1527).
 
 .. _`client-user-reg`:
 
@@ -279,14 +115,14 @@ Registering a new user from a client
 
 By default, registration of new users via Matrix clients is disabled. To enable
 it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
-recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.rst>`_.)
+recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.md>`_.)
 
 Once ``enable_registration`` is set to ``true``, it is possible to register a
 user via `riot.im <https://riot.im/app/#/register>`_ or other Matrix clients.
 
-Your new user name will be formed partly from the ``server_name`` (see
-`Configuring synapse`_), and partly from a localpart you specify when you
-create the account. Your name will take the form of::
+Your new user name will be formed partly from the ``server_name``, and partly
+from a localpart you specify when you create the account. Your name will take
+the form of::
 
     @localpart:my.domain.name
 
@@ -295,12 +131,18 @@ create the account. Your name will take the form of::
 As when logging in, you will need to specify a "Custom server".  Specify your
 desired ``localpart`` in the 'User name' box.
 
+ACME setup
+==========
+
+For details on having Synapse manage your federation TLS certificates
+automatically, please see `<docs/ACME.md>`_.
+
 
 Security Note
 =============
 
 Matrix serves raw user generated data in some APIs - specifically the `content
-repository endpoints <http://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid>`_.
+repository endpoints <https://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid>`_.
 
 Whilst we have tried to mitigate against possible XSS attacks (e.g.
 https://github.com/matrix-org/synapse/pull/1021) we recommend running
@@ -309,209 +151,8 @@ content served to web browsers a matrix API from being able to attack webapps ho
 on the same domain.  This is particularly true of sharing a matrix webclient and
 server on the same domain.
 
-See https://github.com/vector-im/vector-web/issues/1977 and
+See https://github.com/vector-im/riot-web/issues/1977 and
 https://developer.github.com/changes/2014-04-25-user-content-security for more details.
-
-
-Platform-Specific Instructions
-==============================
-
-Debian
-------
-
-Matrix provides official Debian packages via apt from http://matrix.org/packages/debian/.
-Note that these packages do not include a client - choose one from
-https://matrix.org/docs/projects/try-matrix-now/ (or build your own with one of our SDKs :)
-
-Fedora
-------
-
-Oleg Girko provides Fedora RPMs at
-https://obs.infoserver.lv/project/monitor/matrix-synapse
-
-ArchLinux
----------
-
-The quickest way to get up and running with ArchLinux is probably with the community package
-https://www.archlinux.org/packages/community/any/matrix-synapse/, which should pull in all
-the necessary dependencies.
-
-Alternatively, to install using pip a few changes may be needed as ArchLinux
-defaults to python 3, but synapse currently assumes python 2.7 by default:
-
-pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
-
-    sudo pip2.7 install --upgrade pip
-
-You also may need to explicitly specify python 2.7 again during the install
-request::
-
-    pip2.7 install https://github.com/matrix-org/synapse/tarball/master
-
-If you encounter an error with lib bcrypt causing an Wrong ELF Class:
-ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
-compile it under the right architecture. (This should not be needed if
-installing under virtualenv)::
-
-    sudo pip2.7 uninstall py-bcrypt
-    sudo pip2.7 install py-bcrypt
-
-During setup of Synapse you need to call python2.7 directly again::
-
-    cd ~/.synapse
-    python2.7 -m synapse.app.homeserver \
-      --server-name machine.my.domain.name \
-      --config-path homeserver.yaml \
-      --generate-config
-
-...substituting your host and domain name as appropriate.
-
-FreeBSD
--------
-
-Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
-
- - Ports: ``cd /usr/ports/net/py-matrix-synapse && make install clean``
- - Packages: ``pkg install py27-matrix-synapse``
-
-
-OpenBSD
--------
-
-There is currently no port for OpenBSD. Additionally, OpenBSD's security
-settings require a slightly more difficult installation process.
-
-1) Create a new directory in ``/usr/local`` called ``_synapse``. Also, create a
-   new user called ``_synapse`` and set that directory as the new user's home.
-   This is required because, by default, OpenBSD only allows binaries which need
-   write and execute permissions on the same memory space to be run from
-   ``/usr/local``.
-2) ``su`` to the new ``_synapse`` user and change to their home directory.
-3) Create a new virtualenv: ``virtualenv -p python2.7 ~/.synapse``
-4) Source the virtualenv configuration located at
-   ``/usr/local/_synapse/.synapse/bin/activate``. This is done in ``ksh`` by
-   using the ``.`` command, rather than ``bash``'s ``source``.
-5) Optionally, use ``pip`` to install ``lxml``, which Synapse needs to parse
-   webpages for their titles.
-6) Use ``pip`` to install this repository: ``pip install
-   https://github.com/matrix-org/synapse/tarball/master``
-7) Optionally, change ``_synapse``'s shell to ``/bin/false`` to reduce the
-   chance of a compromised Synapse server being used to take over your box.
-
-After this, you may proceed with the rest of the install directions.
-
-NixOS
------
-
-Robin Lambertz has packaged Synapse for NixOS at:
-https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix
-
-Windows Install
----------------
-Synapse can be installed on Cygwin. It requires the following Cygwin packages:
-
-- gcc
-- git
-- libffi-devel
-- openssl (and openssl-devel, python-openssl)
-- python
-- python-setuptools
-
-The content repository requires additional packages and will be unable to process
-uploads without them:
-
-- libjpeg8
-- libjpeg8-devel
-- zlib
-
-If you choose to install Synapse without these packages, you will need to reinstall
-``pillow`` for changes to be applied, e.g. ``pip uninstall pillow`` ``pip install
-pillow --user``
-
-Troubleshooting:
-
-- You may need to upgrade ``setuptools`` to get this to work correctly:
-  ``pip install setuptools --upgrade``.
-- You may encounter errors indicating that ``ffi.h`` is missing, even with
-  ``libffi-devel`` installed. If you do, copy the ``.h`` files:
-  ``cp /usr/lib/libffi-3.0.13/include/*.h /usr/include``
-- You may need to install libsodium from source in order to install PyNacl. If
-  you do, you may need to create a symlink to ``libsodium.a`` so ``ld`` can find
-  it: ``ln -s /usr/local/lib/libsodium.a /usr/lib/libsodium.a``
-
-
-Troubleshooting
-===============
-
-Troubleshooting Installation
-----------------------------
-
-Synapse requires pip 1.7 or later, so if your OS provides too old a version you
-may need to manually upgrade it::
-
-    sudo pip install --upgrade pip
-
-Installing may fail with ``Could not find any downloads that satisfy the requirement pymacaroons-pynacl (from matrix-synapse==0.12.0)``.
-You can fix this by manually upgrading pip and virtualenv::
-
-    sudo pip install --upgrade virtualenv
-
-You can next rerun ``virtualenv -p python2.7 synapse`` to update the virtual env.
-
-Installing may fail during installing virtualenv with ``InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.``
-You can fix this  by manually installing ndg-httpsclient::
-
-    pip install --upgrade ndg-httpsclient
-
-Installing may fail with ``mock requires setuptools>=17.1. Aborting installation``.
-You can fix this by upgrading setuptools::
-
-    pip install --upgrade setuptools
-
-If pip crashes mid-installation for reason (e.g. lost terminal), pip may
-refuse to run until you remove the temporary installation directory it
-created. To reset the installation::
-
-    rm -rf /tmp/pip_install_matrix
-
-pip seems to leak *lots* of memory during installation.  For instance, a Linux
-host with 512MB of RAM may run out of memory whilst installing Twisted.  If this
-happens, you will have to individually install the dependencies which are
-failing, e.g.::
-
-    pip install twisted
-
-On OS X, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
-will need to export CFLAGS=-Qunused-arguments.
-
-Troubleshooting Running
------------------------
-
-If synapse fails with ``missing "sodium.h"`` crypto errors, you may need
-to manually upgrade PyNaCL, as synapse uses NaCl (http://nacl.cr.yp.to/) for
-encryption and digital signatures.
-Unfortunately PyNACL currently has a few issues
-(https://github.com/pyca/pynacl/issues/53) and
-(https://github.com/pyca/pynacl/issues/79) that mean it may not install
-correctly, causing all tests to fail with errors about missing "sodium.h". To
-fix try re-installing from PyPI or directly from
-(https://github.com/pyca/pynacl)::
-
-    # Install from PyPI
-    pip install --user --upgrade --force pynacl
-
-    # Install from github
-    pip install --user https://github.com/pyca/pynacl/tarball/master
-
-ArchLinux
-~~~~~~~~~
-
-If running `$ synctl start` fails with 'returned non-zero exit status 1',
-you will need to explicitly call Python2.7 - either running as::
-
-    python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml
-
-...or by editing synctl with the correct python executable.
 
 
 Upgrading an existing Synapse
@@ -523,91 +164,19 @@ versions of synapse.
 
 .. _UPGRADE.rst: UPGRADE.rst
 
-.. _federation:
-
-Setting up Federation
-=====================
-
-Federation is the process by which users on different servers can participate
-in the same room. For this to work, those other servers must be able to contact
-yours to send messages.
-
-As explained in `Configuring synapse`_, the ``server_name`` in your
-``homeserver.yaml`` file determines the way that other servers will reach
-yours. By default, they will treat it as a hostname and try to connect to
-port 8448. This is easy to set up and will work with the default configuration,
-provided you set the ``server_name`` to match your machine's public DNS
-hostname.
-
-For a more flexible configuration, you can set up a DNS SRV record. This allows
-you to run your server on a machine that might not have the same name as your
-domain name. For example, you might want to run your server at
-``synapse.example.com``, but have your Matrix user-ids look like
-``@user:example.com``. (A SRV record also allows you to change the port from
-the default 8448. However, if you are thinking of using a reverse-proxy, be
-sure to read `Reverse-proxying the federation port`_ first.)
-
-To use a SRV record, first create your SRV record and publish it in DNS. This
-should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
-<synapse.server.name>``. The DNS record should then look something like::
-
-    $ dig -t srv _matrix._tcp.example.com
-    _matrix._tcp.example.com. 3600    IN      SRV     10 0 8448 synapse.example.com.
-
-You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
-its user-ids, by setting ``server_name``::
-
-    python -m synapse.app.homeserver \
-        --server-name <yourdomain.com> \
-        --config-path homeserver.yaml \
-        --generate-config
-    python -m synapse.app.homeserver --config-path homeserver.yaml
-
-If you've already generated the config file, you need to edit the ``server_name``
-in your ``homeserver.yaml`` file. If you've already started Synapse and a
-database has been created, you will have to recreate the database.
-
-If all goes well, you should be able to `connect to your server with a client`__,
-and then join a room via federation. (Try ``#matrix-dev:matrix.org`` as a first
-step. "Matrix HQ"'s sheer size and activity level tends to make even the
-largest boxes pause for thought.)
-
-.. __: `Connecting to Synapse from a client`_
-
-Troubleshooting
----------------
-The typical failure mode with federation is that when you try to join a room,
-it is rejected with "401: Unauthorized". Generally this means that other
-servers in the room couldn't access yours. (Joining a room over federation is a
-complicated dance which requires connections in both directions).
-
-So, things to check are:
-
-* If you are trying to use a reverse-proxy, read `Reverse-proxying the
-  federation port`_.
-* If you are not using a SRV record, check that your ``server_name`` (the part
-  of your user-id after the ``:``) matches your hostname, and that port 8448 on
-  that hostname is reachable from outside your network.
-* If you *are* using a SRV record, check that it matches your ``server_name``
-  (it should be ``_matrix._tcp.<server_name>``), and that the port and hostname
-  it specifies are reachable from outside your network.
-
-Running a Demo Federation of Synapses
--------------------------------------
-
-If you want to get up and running quickly with a trio of homeservers in a
-private federation, there is a script in the ``demo`` directory. This is mainly
-useful just for development purposes. See `<demo/README>`_.
-
 
 Using PostgreSQL
 ================
 
-As of Synapse 0.9, `PostgreSQL <http://www.postgresql.org>`_ is supported as an
-alternative to the `SQLite <http://sqlite.org/>`_ database that Synapse has
-traditionally used for convenience and simplicity.
+Synapse offers two database engines:
+ * `SQLite <https://sqlite.org/>`_
+ * `PostgreSQL <https://www.postgresql.org>`_
 
-The advantages of Postgres include:
+By default Synapse uses SQLite in and doing so trades performance for convenience.
+SQLite is only recommended in Synapse for testing purposes or for servers with
+light workloads.
+
+Almost all installations should opt to use PostreSQL. Advantages include:
 
 * significant performance improvements due to the superior threading and
   caching model, smarter query optimiser
@@ -617,112 +186,22 @@ The advantages of Postgres include:
   synapse itself.
 
 For information on how to install and use PostgreSQL, please see
-`docs/postgres.rst <docs/postgres.rst>`_.
-
+`docs/postgres.md <docs/postgres.md>`_.
 
 .. _reverse-proxy:
 
 Using a reverse proxy with Synapse
 ==================================
 
-It is possible to put a reverse proxy such as
+It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
-`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_ or
-`HAProxy <http://www.haproxy.org/>`_ in front of Synapse. One advantage of
+`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
+`Caddy <https://caddyserver.com/docs/proxy>`_ or
+`HAProxy <https://www.haproxy.org/>`_ in front of Synapse. One advantage of
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 
-The most important thing to know here is that Matrix clients and other Matrix
-servers do not necessarily need to connect to your server via the same
-port. Indeed, clients will use port 443 by default, whereas servers default to
-port 8448. Where these are different, we refer to the 'client port' and the
-'federation port'.
-
-The next most important thing to know is that using a reverse-proxy on the
-federation port has a number of pitfalls. It is possible, but be sure to read
-`Reverse-proxying the federation port`_.
-
-The recommended setup is therefore to configure your reverse-proxy on port 443
-for client connections, but to also expose port 8448 for server-server
-connections. All the Matrix endpoints begin ``/_matrix``, so an example nginx
-configuration might look like::
-
-  server {
-      listen 443 ssl;
-      listen [::]:443 ssl;
-      server_name matrix.example.com;
-
-      location /_matrix {
-          proxy_pass http://localhost:8008;
-          proxy_set_header X-Forwarded-For $remote_addr;
-      }
-  }
-
-You will also want to set ``bind_addresses: ['127.0.0.1']`` and ``x_forwarded: true``
-for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are
-recorded correctly.
-
-Having done so, you can then use ``https://matrix.example.com`` (instead of
-``https://matrix.example.com:8448``) as the "Custom server" when `Connecting to
-Synapse from a client`_.
-
-Reverse-proxying the federation port
-------------------------------------
-
-There are two issues to consider before using a reverse-proxy on the federation
-port:
-
-* Due to the way SSL certificates are managed in the Matrix federation protocol
-  (see `spec`__), Synapse needs to be configured with the path to the SSL
-  certificate, *even if you do not terminate SSL at Synapse*.
-
-  .. __: `key_management`_
-
-* Synapse does not currently support SNI on the federation protocol
-  (`bug #1491 <https://github.com/matrix-org/synapse/issues/1491>`_), which
-  means that using name-based virtual hosting is unreliable.
-
-Furthermore, a number of the normal reasons for using a reverse-proxy do not
-apply:
-
-* Other servers will connect on port 8448 by default, so there is no need to
-  listen on port 443 (for federation, at least), which avoids the need for root
-  privileges and virtual hosting.
-
-* A self-signed SSL certificate is fine for federation, so there is no need to
-  automate renewals. (The certificate generated by ``--generate-config`` is
-  valid for 10 years.)
-
-If you want to set up a reverse-proxy on the federation port despite these
-caveats, you will need to do the following:
-
-* In ``homeserver.yaml``, set ``tls_certificate_path`` to the path to the SSL
-  certificate file used by your reverse-proxy, and set ``no_tls`` to ``True``.
-  (``tls_private_key_path`` will be ignored if ``no_tls`` is ``True``.)
-
-* In your reverse-proxy configuration:
-
-  * If there are other virtual hosts on the same port, make sure that the
-    *default* one uses the certificate configured above.
-
-  * Forward ``/_matrix`` to Synapse.
-
-* If your reverse-proxy is not listening on port 8448, publish a SRV record to
-  tell other servers how to find you. See `Setting up Federation`_.
-
-When updating the SSL certificate, just update the file pointed to by
-``tls_certificate_path``: there is no need to restart synapse. (You may like to
-use a symbolic link to help make this process atomic.)
-
-The most common mistake when setting up federation is not to tell Synapse about
-your SSL certificate. To check it, you can visit
-``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``.
-Unfortunately, there is no UI for this yet, but, you should see
-``"MatchingTLSFingerprint": true``. If not, check that
-``Certificates[0].SHA256Fingerprint`` (the fingerprint of the certificate
-presented by your reverse-proxy) matches ``Keys.tls_fingerprints[0].sha256``
-(the fingerprint of the certificate Synapse is using).
-
+For information on configuring one, see `<docs/reverse_proxy.md>`_.
 
 Identity Servers
 ================
@@ -754,34 +233,17 @@ an email address with your account, or send an invite to another user via their
 email address.
 
 
-URL Previews
-============
-
-Synapse 0.15.0 introduces a new API for previewing URLs at
-``/_matrix/media/r0/preview_url``.  This is disabled by default.  To turn it on
-you must enable the ``url_preview_enabled: True`` config parameter and
-explicitly specify the IP ranges that Synapse is not allowed to spider for
-previewing in the ``url_preview_ip_range_blacklist`` configuration parameter.
-This is critical from a security perspective to stop arbitrary Matrix users
-spidering 'internal' URLs on your network.  At the very least we recommend that
-your loopback and RFC1918 IP addresses are blacklisted.
-
-This also requires the optional lxml and netaddr python dependencies to be
-installed.
-
-
 Password reset
 ==============
 
 If a user has registered an email address to their account using an identity
-server, they can request a password-reset token via clients such as Vector.
+server, they can request a password-reset token via clients such as Riot.
 
 A manual password reset can be done via direct database access as follows.
 
 First calculate the hash of the new password::
 
-    $ source ~/.synapse/bin/activate
-    $ ./scripts/hash_password
+    $ ~/synapse/env/bin/hash_password
     Password:
     Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -797,7 +259,7 @@ Synapse Development
 
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
-`Installing from source`_.
+`Installing from source <INSTALL.md#installing-from-source>`_.
 
 To check out a synapse for development, clone the git repo into a working
 directory of your choice::
@@ -808,10 +270,9 @@ directory of your choice::
 Synapse has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
-    virtualenv env
+    virtualenv -p python3 env
     source env/bin/activate
-    python synapse/python_dependencies.py | xargs pip install
-    pip install lxml mock
+    python -m pip install --no-use-pep517 -e .[all]
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -819,7 +280,7 @@ dependencies into a virtual env.
 Once this is done, you may wish to run Synapse's unit tests, to
 check that everything is installed as it should be::
 
-    PYTHONPATH="." trial tests
+    python -m twisted.trial tests
 
 This should end with a 'PASSED' result::
 
@@ -827,6 +288,17 @@ This should end with a 'PASSED' result::
 
     PASSED (successes=143)
 
+Running the Integration Tests
+=============================
+
+Synapse is accompanied by `SyTest <https://github.com/matrix-org/sytest>`_,
+a Matrix homeserver integration testing suite, which uses HTTP requests to
+access the API as a Matrix client would. It is able to run Synapse directly from
+the source tree, so installation of the server is not required.
+
+Testing with SyTest is recommended for verifying that changes related to the
+Client-Server API are functioning correctly. See the `installation instructions
+<https://github.com/matrix-org/sytest#installing>`_ for details.
 
 Building Internal API Documentation
 ===================================
@@ -841,21 +313,84 @@ Building internal API documentation::
 
     python setup.py build_sphinx
 
+Troubleshooting
+===============
 
-Help!! Synapse eats all my RAM!
-===============================
+Running out of File Handles
+---------------------------
+
+If synapse runs out of file handles, it typically fails badly - live-locking
+at 100% CPU, and/or failing to accept new TCP connections (blocking the
+connecting client).  Matrix currently can legitimately use a lot of file handles,
+thanks to busy rooms like #matrix:matrix.org containing hundreds of participating
+servers.  The first time a server talks in a room it will try to connect
+simultaneously to all participating servers, which could exhaust the available
+file descriptors between DNS queries & HTTPS sockets, especially if DNS is slow
+to respond. (We need to improve the routing algorithm used to be better than
+full mesh, but as of March 2019 this hasn't happened yet).
+
+If you hit this failure mode, we recommend increasing the maximum number of
+open file handles to be at least 4096 (assuming a default of 1024 or 256).
+This is typically done by editing ``/etc/security/limits.conf``
+
+Separately, Synapse may leak file handles if inbound HTTP requests get stuck
+during processing - e.g. blocked behind a lock or talking to a remote server etc.
+This is best diagnosed by matching up the 'Received request' and 'Processed request'
+log lines and looking for any 'Processed request' lines which take more than
+a few seconds to execute. Please let us know at #synapse:matrix.org if
+you see this failure mode so we can help debug it, however.
+
+Help!! Synapse is slow and eats all my RAM/CPU!
+-----------------------------------------------
+
+First, ensure you are running the latest version of Synapse, using Python 3
+with a PostgreSQL database.
 
 Synapse's architecture is quite RAM hungry currently - we deliberately
 cache a lot of recent room data and metadata in RAM in order to speed up
-common requests.  We'll improve this in future, but for now the easiest
+common requests. We'll improve this in the future, but for now the easiest
 way to either reduce the RAM usage (at the risk of slowing things down)
 is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
-variable.  Roughly speaking, a SYNAPSE_CACHE_FACTOR of 1.0 will max out
-at around 3-4GB of resident memory - this is what we currently run the
-matrix.org on.  The default setting is currently 0.1, which is probably
-around a ~700MB footprint.  You can dial it down further to 0.02 if
-desired, which targets roughly ~512MB.  Conversely you can dial it up if
-you need performance for lots of users and have a box with a lot of RAM.
+variable. The default is 0.5, which can be decreased to reduce RAM usage
+in memory constrained enviroments, or increased if performance starts to
+degrade.
 
+However, degraded performance due to a low cache factor, common on
+machines with slow disks, often leads to explosions in memory use due
+backlogged requests. In this case, reducing the cache factor will make
+things worse. Instead, try increasing it drastically. 2.0 is a good
+starting value.
 
-.. _`key_management`: https://matrix.org/docs/spec/server_server/unstable.html#retrieving-server-keys
+Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
+improvement in overall memory use, and especially in terms of giving back
+RAM to the OS. To use it, the library must simply be put in the
+LD_PRELOAD environment variable when launching Synapse. On Debian, this
+can be done by installing the ``libjemalloc1`` package and adding this
+line to ``/etc/default/matrix-synapse``::
+
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
+
+This can make a significant difference on Python 2.7 - it's unclear how
+much of an improvement it provides on Python 3.x.
+
+If you're encountering high CPU use by the Synapse process itself, you
+may be affected by a bug with presence tracking that leads to a
+massive excess of outgoing federation requests (see `discussion
+<https://github.com/matrix-org/synapse/issues/3971>`_). If metrics
+indicate that your server is also issuing far more outgoing federation
+requests than can be accounted for by your users' activity, this is a
+likely cause. The misbehavior can be worked around by setting
+``use_presence: false`` in the Synapse config file.
+
+People can't accept room invitations from me
+--------------------------------------------
+
+The typical failure mode here is that you send an invitation to someone 
+to join a room or direct chat, but when they go to accept it, they get an
+error (typically along the lines of "Invalid signature"). They might see
+something like the following in their logs::
+
+    2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
+
+This is normally caused by a misconfiguration in your reverse-proxy. See
+`<docs/reverse_proxy.rst>`_ and double-check that your settings are correct.

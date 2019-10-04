@@ -12,17 +12,119 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.api.errors import SynapseError
-from synapse.storage.presence import UserPresenceState
-from synapse.types import UserID, RoomID
+from six import text_type
+
+import jsonschema
+from canonicaljson import json
+from jsonschema import FormatChecker
 
 from twisted.internet import defer
 
-import ujson as json
+from synapse.api.errors import SynapseError
+from synapse.storage.presence import UserPresenceState
+from synapse.types import RoomID, UserID
+
+FILTER_SCHEMA = {
+    "additionalProperties": False,
+    "type": "object",
+    "properties": {
+        "limit": {"type": "number"},
+        "senders": {"$ref": "#/definitions/user_id_array"},
+        "not_senders": {"$ref": "#/definitions/user_id_array"},
+        # TODO: We don't limit event type values but we probably should...
+        # check types are valid event types
+        "types": {"type": "array", "items": {"type": "string"}},
+        "not_types": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+ROOM_FILTER_SCHEMA = {
+    "additionalProperties": False,
+    "type": "object",
+    "properties": {
+        "not_rooms": {"$ref": "#/definitions/room_id_array"},
+        "rooms": {"$ref": "#/definitions/room_id_array"},
+        "ephemeral": {"$ref": "#/definitions/room_event_filter"},
+        "include_leave": {"type": "boolean"},
+        "state": {"$ref": "#/definitions/room_event_filter"},
+        "timeline": {"$ref": "#/definitions/room_event_filter"},
+        "account_data": {"$ref": "#/definitions/room_event_filter"},
+    },
+}
+
+ROOM_EVENT_FILTER_SCHEMA = {
+    "additionalProperties": False,
+    "type": "object",
+    "properties": {
+        "limit": {"type": "number"},
+        "senders": {"$ref": "#/definitions/user_id_array"},
+        "not_senders": {"$ref": "#/definitions/user_id_array"},
+        "types": {"type": "array", "items": {"type": "string"}},
+        "not_types": {"type": "array", "items": {"type": "string"}},
+        "rooms": {"$ref": "#/definitions/room_id_array"},
+        "not_rooms": {"$ref": "#/definitions/room_id_array"},
+        "contains_url": {"type": "boolean"},
+        "lazy_load_members": {"type": "boolean"},
+        "include_redundant_members": {"type": "boolean"},
+    },
+}
+
+USER_ID_ARRAY_SCHEMA = {
+    "type": "array",
+    "items": {"type": "string", "format": "matrix_user_id"},
+}
+
+ROOM_ID_ARRAY_SCHEMA = {
+    "type": "array",
+    "items": {"type": "string", "format": "matrix_room_id"},
+}
+
+USER_FILTER_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "schema for a Sync filter",
+    "type": "object",
+    "definitions": {
+        "room_id_array": ROOM_ID_ARRAY_SCHEMA,
+        "user_id_array": USER_ID_ARRAY_SCHEMA,
+        "filter": FILTER_SCHEMA,
+        "room_filter": ROOM_FILTER_SCHEMA,
+        "room_event_filter": ROOM_EVENT_FILTER_SCHEMA,
+    },
+    "properties": {
+        "presence": {"$ref": "#/definitions/filter"},
+        "account_data": {"$ref": "#/definitions/filter"},
+        "room": {"$ref": "#/definitions/room_filter"},
+        "event_format": {"type": "string", "enum": ["client", "federation"]},
+        "event_fields": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                # Don't allow '\\' in event field filters. This makes matching
+                # events a lot easier as we can then use a negative lookbehind
+                # assertion to split '\.' If we allowed \\ then it would
+                # incorrectly split '\\.' See synapse.events.utils.serialize_event
+                #
+                # Note that because this is a regular expression, we have to escape
+                # each backslash in the pattern.
+                "pattern": r"^((?!\\\\).)*$",
+            },
+        },
+    },
+    "additionalProperties": False,
+}
+
+
+@FormatChecker.cls_checks("matrix_room_id")
+def matrix_room_id_validator(room_id_str):
+    return RoomID.from_string(room_id_str)
+
+
+@FormatChecker.cls_checks("matrix_user_id")
+def matrix_user_id_validator(user_id_str):
+    return UserID.from_string(user_id_str)
 
 
 class Filtering(object):
-
     def __init__(self, hs):
         super(Filtering, self).__init__()
         self.store = hs.get_datastore()
@@ -30,7 +132,7 @@ class Filtering(object):
     @defer.inlineCallbacks
     def get_user_filter(self, user_localpart, filter_id):
         result = yield self.store.get_user_filter(user_localpart, filter_id)
-        defer.returnValue(FilterCollection(result))
+        return FilterCollection(result)
 
     def add_user_filter(self, user_localpart, user_filter):
         self.check_valid_filter(user_filter)
@@ -53,98 +155,12 @@ class Filtering(object):
         # NB: Filters are the complete json blobs. "Definitions" are an
         # individual top-level key e.g. public_user_data. Filters are made of
         # many definitions.
-
-        top_level_definitions = [
-            "presence", "account_data"
-        ]
-
-        room_level_definitions = [
-            "state", "timeline", "ephemeral", "account_data"
-        ]
-
-        for key in top_level_definitions:
-            if key in user_filter_json:
-                self._check_definition(user_filter_json[key])
-
-        if "room" in user_filter_json:
-            self._check_definition_room_lists(user_filter_json["room"])
-            for key in room_level_definitions:
-                if key in user_filter_json["room"]:
-                    self._check_definition(user_filter_json["room"][key])
-
-        if "event_fields" in user_filter_json:
-            if type(user_filter_json["event_fields"]) != list:
-                raise SynapseError(400, "event_fields must be a list of strings")
-            for field in user_filter_json["event_fields"]:
-                if not isinstance(field, basestring):
-                    raise SynapseError(400, "Event field must be a string")
-                # Don't allow '\\' in event field filters. This makes matching
-                # events a lot easier as we can then use a negative lookbehind
-                # assertion to split '\.' If we allowed \\ then it would
-                # incorrectly split '\\.' See synapse.events.utils.serialize_event
-                if r'\\' in field:
-                    raise SynapseError(
-                        400, r'The escape character \ cannot itself be escaped'
-                    )
-
-    def _check_definition_room_lists(self, definition):
-        """Check that "rooms" and "not_rooms" are lists of room ids if they
-        are present
-
-        Args:
-            definition(dict): The filter definition
-        Raises:
-            SynapseError: If there was a problem with this definition.
-        """
-        # check rooms are valid room IDs
-        room_id_keys = ["rooms", "not_rooms"]
-        for key in room_id_keys:
-            if key in definition:
-                if type(definition[key]) != list:
-                    raise SynapseError(400, "Expected %s to be a list." % key)
-                for room_id in definition[key]:
-                    RoomID.from_string(room_id)
-
-    def _check_definition(self, definition):
-        """Check if the provided definition is valid.
-
-        This inspects not only the types but also the values to make sure they
-        make sense.
-
-        Args:
-            definition(dict): The filter definition
-        Raises:
-            SynapseError: If there was a problem with this definition.
-        """
-        # NB: Filters are the complete json blobs. "Definitions" are an
-        # individual top-level key e.g. public_user_data. Filters are made of
-        # many definitions.
-        if type(definition) != dict:
-            raise SynapseError(
-                400, "Expected JSON object, not %s" % (definition,)
+        try:
+            jsonschema.validate(
+                user_filter_json, USER_FILTER_SCHEMA, format_checker=FormatChecker()
             )
-
-        self._check_definition_room_lists(definition)
-
-        # check senders are valid user IDs
-        user_id_keys = ["senders", "not_senders"]
-        for key in user_id_keys:
-            if key in definition:
-                if type(definition[key]) != list:
-                    raise SynapseError(400, "Expected %s to be a list." % key)
-                for user_id in definition[key]:
-                    UserID.from_string(user_id)
-
-        # TODO: We don't limit event type values but we probably should...
-        # check types are valid event types
-        event_keys = ["types", "not_types"]
-        for key in event_keys:
-            if key in definition:
-                if type(definition[key]) != list:
-                    raise SynapseError(400, "Expected %s to be a list." % key)
-                for event_type in definition[key]:
-                    if not isinstance(event_type, basestring):
-                        raise SynapseError(400, "Event type should be a string")
+        except jsonschema.ValidationError as e:
+            raise SynapseError(400, str(e))
 
 
 class FilterCollection(object):
@@ -153,10 +169,9 @@ class FilterCollection(object):
 
         room_filter_json = self._filter_json.get("room", {})
 
-        self._room_filter = Filter({
-            k: v for k, v in room_filter_json.items()
-            if k in ("rooms", "not_rooms")
-        })
+        self._room_filter = Filter(
+            {k: v for k, v in room_filter_json.items() if k in ("rooms", "not_rooms")}
+        )
 
         self._room_timeline_filter = Filter(room_filter_json.get("timeline", {}))
         self._room_state_filter = Filter(room_filter_json.get("state", {}))
@@ -165,10 +180,9 @@ class FilterCollection(object):
         self._presence_filter = Filter(filter_json.get("presence", {}))
         self._account_data = Filter(filter_json.get("account_data", {}))
 
-        self.include_leave = filter_json.get("room", {}).get(
-            "include_leave", False
-        )
+        self.include_leave = filter_json.get("room", {}).get("include_leave", False)
         self.event_fields = filter_json.get("event_fields", [])
+        self.event_format = filter_json.get("event_format", "client")
 
     def __repr__(self):
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
@@ -184,6 +198,12 @@ class FilterCollection(object):
 
     def ephemeral_limit(self):
         return self._room_ephemeral_filter.limit()
+
+    def lazy_load_members(self):
+        return self._room_state_filter.lazy_load_members()
+
+    def include_redundant_members(self):
+        return self._room_state_filter.include_redundant_members()
 
     def filter_presence(self, events):
         return self._presence_filter.filter(events)
@@ -205,22 +225,22 @@ class FilterCollection(object):
 
     def blocks_all_presence(self):
         return (
-            self._presence_filter.filters_all_types() or
-            self._presence_filter.filters_all_senders()
+            self._presence_filter.filters_all_types()
+            or self._presence_filter.filters_all_senders()
         )
 
     def blocks_all_room_ephemeral(self):
         return (
-            self._room_ephemeral_filter.filters_all_types() or
-            self._room_ephemeral_filter.filters_all_senders() or
-            self._room_ephemeral_filter.filters_all_rooms()
+            self._room_ephemeral_filter.filters_all_types()
+            or self._room_ephemeral_filter.filters_all_senders()
+            or self._room_ephemeral_filter.filters_all_rooms()
         )
 
     def blocks_all_room_timeline(self):
         return (
-            self._room_timeline_filter.filters_all_types() or
-            self._room_timeline_filter.filters_all_senders() or
-            self._room_timeline_filter.filters_all_rooms()
+            self._room_timeline_filter.filters_all_types()
+            or self._room_timeline_filter.filters_all_senders()
+            or self._room_timeline_filter.filters_all_rooms()
         )
 
 
@@ -261,7 +281,7 @@ class Filter(object):
             sender = event.user_id
             room_id = None
             ev_type = "m.presence"
-            is_url = False
+            contains_url = False
         else:
             sender = event.get("sender", None)
             if not sender:
@@ -276,14 +296,12 @@ class Filter(object):
 
             room_id = event.get("room_id", None)
             ev_type = event.get("type", None)
-            is_url = "url" in event.get("content", {})
 
-        return self.check_fields(
-            room_id,
-            sender,
-            ev_type,
-            is_url,
-        )
+            content = event.get("content", {})
+            # check if there is a string url field in the content for filtering purposes
+            contains_url = isinstance(content.get("url"), text_type)
+
+        return self.check_fields(room_id, sender, ev_type, contains_url)
 
     def check_fields(self, room_id, sender, event_type, contains_url):
         """Checks whether the filter matches the given event fields.
@@ -294,7 +312,7 @@ class Filter(object):
         literal_keys = {
             "rooms": lambda v: room_id == v,
             "senders": lambda v: sender == v,
-            "types": lambda v: _matches_wildcard(event_type, v)
+            "types": lambda v: _matches_wildcard(event_type, v),
         }
 
         for name, match_func in literal_keys.items():
@@ -336,10 +354,30 @@ class Filter(object):
         return room_ids
 
     def filter(self, events):
-        return filter(self.check, events)
+        return list(filter(self.check, events))
 
     def limit(self):
         return self.filter_json.get("limit", 10)
+
+    def lazy_load_members(self):
+        return self.filter_json.get("lazy_load_members", False)
+
+    def include_redundant_members(self):
+        return self.filter_json.get("include_redundant_members", False)
+
+    def with_room_ids(self, room_ids):
+        """Returns a new filter with the given room IDs appended.
+
+        Args:
+            room_ids (iterable[unicode]): The room_ids to add
+
+        Returns:
+            filter: A new filter including the given rooms and the old
+                    filter's rooms.
+        """
+        newFilter = Filter(self.filter_json)
+        newFilter.rooms += room_ids
+        return newFilter
 
 
 def _matches_wildcard(actual_value, filter_value):

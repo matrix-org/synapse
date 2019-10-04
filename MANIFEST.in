@@ -2,29 +2,52 @@ include synctl
 include LICENSE
 include VERSION
 include *.rst
+include *.md
 include demo/README
 include demo/demo.tls.dh
 include demo/*.py
 include demo/*.sh
 
 recursive-include synapse/storage/schema *.sql
+recursive-include synapse/storage/schema *.sql.postgres
+recursive-include synapse/storage/schema *.sql.sqlite
 recursive-include synapse/storage/schema *.py
+recursive-include synapse/storage/schema *.txt
 
 recursive-include docs *
-recursive-include res *
 recursive-include scripts *
 recursive-include scripts-dev *
 recursive-include synapse *.pyi
 recursive-include tests *.py
+include tests/http/ca.crt
+include tests/http/ca.key
+include tests/http/server.key
 
+recursive-include synapse/res *
 recursive-include synapse/static *.css
 recursive-include synapse/static *.gif
 recursive-include synapse/static *.html
 recursive-include synapse/static *.js
 
-exclude jenkins.sh
-exclude jenkins*.sh
+exclude Dockerfile
+exclude .dockerignore
+exclude test_postgresql.sh
+exclude .editorconfig
+exclude sytest-blacklist
+
+include pyproject.toml
+recursive-include changelog.d *
+
+prune .buildkite
+prune .circleci
+prune .codecov.yml
+prune .coveragerc
+prune .github
+prune debian
+prune demo/etc
+prune docker
+prune mypy.ini
+prune stubs
+
 exclude jenkins*
 recursive-exclude jenkins *.sh
-
-prune demo/etc

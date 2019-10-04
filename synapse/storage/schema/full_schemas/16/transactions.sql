@@ -25,25 +25,6 @@ CREATE TABLE IF NOT EXISTS received_transactions(
 
 CREATE INDEX transactions_have_ref ON received_transactions(origin, has_been_referenced);-- WHERE has_been_referenced = 0;
 
-
--- Stores what transactions we've sent, what their response was (if we got one) and whether we have
--- since referenced the transaction in another outgoing transaction
-CREATE TABLE IF NOT EXISTS sent_transactions(
-    id BIGINT PRIMARY KEY, -- This is used to apply insertion ordering
-    transaction_id TEXT,
-    destination TEXT,
-    response_code INTEGER DEFAULT 0,
-    response_json TEXT,
-    ts BIGINT
-);
-
-CREATE INDEX sent_transaction_dest ON sent_transactions(destination);
-CREATE INDEX sent_transaction_txn_id ON sent_transactions(transaction_id);
--- So that we can do an efficient look up of all transactions that have yet to be successfully
--- sent.
-CREATE INDEX sent_transaction_sent ON sent_transactions(response_code);
-
-
 -- For sent transactions only.
 CREATE TABLE IF NOT EXISTS transaction_id_to_pdu(
     transaction_id INTEGER,

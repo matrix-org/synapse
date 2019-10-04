@@ -1,0 +1,87 @@
+synapse_port_db(1) -- A script to port an existing synapse SQLite database to a new PostgreSQL database.
+=============================================
+
+## SYNOPSIS
+
+`synapse_port_db` [-v] --sqlite-database=<dbfile> --postgres-config=<yamlconfig> [--curses] [--batch-size=<batch-size>]
+
+## DESCRIPTION
+
+**synapse_port_db** ports an existing synapse SQLite database to a new
+PostgreSQL database.
+
+SQLite database is specified with `--sqlite-database` option and
+PostgreSQL configuration required to connect to PostgreSQL database is
+provided using `--postgres-config` configuration.  The configuration
+is specified in YAML format.
+
+## OPTIONS
+
+  * `-v`:
+    Print log messages in `debug` level instead of `info` level.
+
+  * `--sqlite-database`:
+    The snapshot of the SQLite database file. This must not be
+    currently used by a running synapse server.
+
+  * `--postgres-config`:
+    The database config file for the PostgreSQL database.
+
+  * `--curses`:
+    Display a curses based progress UI.
+
+## CONFIG FILE
+
+The postgres configuration file must be a valid YAML file with the
+following options.
+
+  * `database`:
+    Database configuration section.  This section header can be
+    ignored and the options below may be specified as top level
+    keys.
+
+    * `name`:
+      Connector to use when connecting to the database.  This value must
+      be `psycopg2`.
+
+    * `args`:
+      DB API 2.0 compatible arguments to send to the `psycopg2` module.
+
+      * `dbname` - the database name 
+
+      * `user` - user name used to authenticate
+
+      * `password` - password used to authenticate
+
+      * `host` - database host address (defaults to UNIX socket if not
+        provided)
+
+      * `port` - connection port number (defaults to 5432 if not
+        provided)
+      
+
+    * `synchronous_commit`:
+      Optional.  Default is True.  If the value is `False`, enable
+      asynchronous commit and don't wait for the server to call fsync
+      before ending the transaction. See:
+      https://www.postgresql.org/docs/current/static/wal-async-commit.html
+
+Following example illustrates the configuration file format.
+
+    database:
+      name: psycopg2
+      args:
+        dbname: synapsedb
+        user: synapseuser
+        password: ORohmi9Eet=ohphi
+        host: localhost
+      synchronous_commit: false
+  
+## COPYRIGHT
+
+This man page was written by Sunil Mohan Adapa <<sunil@medhas.org>> for
+Debian GNU/Linux distribution.
+
+## SEE ALSO
+
+synctl(1), hash_password(1), register_new_matrix_user(1)
