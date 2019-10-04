@@ -238,7 +238,6 @@ def setup_logging(
     logging.warn("Server %s version %s", sys.argv[0], get_version_string(synapse))
     logging.info("Server hostname: %s", config.server_name)
 
-    if (self.no_redirect_stdio):
-        logging.warn("--no-redirect-stdio is ignored. STDOUT/ERR is redirected to out_file defined in the server config")
+    logging.warn("--no-redirect-stdio is ignored. STDOUT/ERR is redirected to out_file defined in the server config")
 
     return logger
