@@ -114,7 +114,7 @@ class LoggingConfig(Config):
             "--no-redirect-stdio",
             action="store_true",
             default=None,
-            help="Do not redirect stdout/stderr to the log",
+            help="[DEFUNCT] Do not redirect stdout/stderr to the log",
         )
 
     def generate_files(self, config, config_dir_path):
@@ -170,9 +170,10 @@ def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner):
 
         return observer(event)
 
-    logBeginner.beginLoggingTo([_log], redirectStandardIO=not config.no_redirect_stdio)
-    if not config.no_redirect_stdio:
-        print("Redirected stdout/stderr to logs")
+    # logBeginner.beginLoggingTo([_log], redirectStandardIO=not config.no_redirect_stdio)
+    logBeginner.beginLoggingTo([_log], redirectStandardIO=False)
+    # if not config.no_redirect_stdio:
+    #     print("Redirected stdout/stderr to logs")
 
     return observer
 
@@ -236,5 +237,8 @@ def setup_logging(
     logging.warn("***** STARTING SERVER *****")
     logging.warn("Server %s version %s", sys.argv[0], get_version_string(synapse))
     logging.info("Server hostname: %s", config.server_name)
+
+    if (self.no_redirect_stdio):
+        logging.warn("--no-redirect-stdio is ignored. STDOUT/ERR is redirected to out_file defined in the server config")
 
     return logger

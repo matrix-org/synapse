@@ -132,7 +132,6 @@ def start_reactor(
                 app=appname,
                 pid=pid_file,
                 action=run,
-                auto_close_fds=False,
                 verbose=True,
                 logger=logger,
                 outfile=outfile

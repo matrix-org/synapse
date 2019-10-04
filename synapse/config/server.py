@@ -472,7 +472,7 @@ class ServerConfig(Config):
 
         # When running as a daemon, the file to redirect stdout and stderr to
         #
-        out_file: %(out_file)%
+        out_file: %(out_file)s
 
         # The path to the web client which will be served at /_matrix/client/
         # if 'webclient' is configured under the 'listeners' configuration.

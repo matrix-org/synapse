@@ -29,18 +29,8 @@ class Daemonize2(object):
     :param app: contains the application name which will be sent to syslog.
     :param pid: path to the pidfile.
     :param action: your custom function which will be executed after daemonization.
-    :param keep_fds: optional list of fds which should not be closed.
-    :param auto_close_fds: optional parameter to not close opened fds.
-    :param privileged_action: action that will be executed before drop privileges if user or
-                              group parameter is provided.
-                              If you want to transfer anything from privileged_action to action, such as
-                              opened privileged file descriptor, you should return it from
-                              privileged_action function and catch it inside action function.
-    :param user: drop privileges to this user if provided.
-    :param group: drop privileges to this group if provided.
     :param verbose: send debug messages to logger if provided.
     :param logger: use this logger object instead of creating new one, if provided.
-    :param foreground: stay in foreground; do not fork (for debugging)
     :param chdir: change working directory if provided or /
     """
     def __init__(self, app, pid, action,
