@@ -2705,9 +2705,7 @@ class FederationHandler(BaseHandler):
             # fetch public keys from the m.room.third_party_invite event's content, which
             # is empty.
             display_name = original_invite.content.get("display_name")
-            event_dict["content"]["third_party_invite"][
-                "display_name"
-            ] = display_name
+            event_dict["content"]["third_party_invite"]["display_name"] = display_name
         else:
             logger.info(
                 "Could not find invite event for third_party_invite: %r",
