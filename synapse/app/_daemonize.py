@@ -6,19 +6,11 @@
 
 import fcntl
 import os
-import pwd
-import grp
 import sys
 import signal
 import resource
-import logging
 import atexit
-from logging import handlers
 import traceback
-
-
-__version__ = "2.5.0"
-
 
 class Daemonize(object):
     """
@@ -34,9 +26,8 @@ class Daemonize(object):
     :param chdir: change working directory if provided or /
     """
     def __init__(self, app, pid, action,
-                 keep_fds=None, auto_close_fds=True, privileged_action=None,
-                 user=None, group=None, verbose=False, logger=None,
-                 foreground=False, chdir="/", outfile="homeserver.out"):
+                 verbose=False, logger=None,
+                 chdir="/", outfile="homeserver.out"):
         self.app = app
         self.pid = os.path.abspath(pid)
         self.outfile = os.path.abspath(outfile)
