@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*
 # Inspired by https://github.com/thesharp/daemonize/blob/master/daemonize.py
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -18,11 +18,12 @@ import fcntl
 import os
 import sys
 import signal
-import resource
 import atexit
 import traceback
 
+
 class Daemonize(object):
+
     """
     Daemonize object.
 
@@ -33,7 +34,7 @@ class Daemonize(object):
     :param action: your custom function which will be executed after daemonization.
     :param logger: use this logger object instead of creating new one, if provided.
     :param chdir: change working directory if provided or /
-    :param outfile: File to 
+    :param outfile: File to redirect stdio to
     :param void_stdio: Should stdio be sent to /dev/null or to outfile
     """
     def __init__(self, app, pid, action,
@@ -120,13 +121,11 @@ class Daemonize(object):
                 # Python has set os.devnull on this system, use it instead as it might be different
                 # than /dev/null.
                 devnull = os.devnull
-            
+
             devnull_fd = os.open(devnull, os.O_RDWR)
             os.dup2(devnull_fd, 1)
             os.dup2(devnull_fd, 2)
             os.close(devnull_fd)
-
-
 
         # Set umask to default to safe file permissions when running as a root daemon. 027 is an
         # octal number which we are typing as 0o27 for Python3 compatibility.
@@ -149,7 +148,6 @@ class Daemonize(object):
         atexit.register(self.exit)
 
         self.logger.warning("Starting daemon.")
-
 
         try:
             self.action()
