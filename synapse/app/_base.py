@@ -21,7 +21,7 @@ import socket
 import sys
 import traceback
 
-from daemonize import Daemonize
+from synapse.app import _daemonize
 
 from twisted.internet import defer, error, reactor
 from twisted.protocols.tls import TLSMemoryBIOFactory
@@ -126,13 +126,12 @@ def start_reactor(
             if print_pidfile:
                 print(pid_file)
 
-            daemon = Daemonize(
+            daemon = _daemonize.Daemonize(
                 app=appname,
                 pid=pid_file,
                 action=run,
-                auto_close_fds=False,
-                verbose=True,
                 logger=logger,
+                void_stdio=False,
             )
             daemon.start()
         else:

@@ -1,7 +1,17 @@
 # -*- coding: utf-8 -*
-# HEAVILY "inspired" by https://github.com/thesharp/daemonize/blob/master/daemonize.py
-# TODO: License header
-# app, pid, action, autoclose, verbose, logger, 
+# Inspired by https://github.com/thesharp/daemonize/blob/master/daemonize.py
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 import fcntl
@@ -21,20 +31,22 @@ class Daemonize(object):
     :param app: contains the application name which will be sent to syslog.
     :param pid: path to the pidfile.
     :param action: your custom function which will be executed after daemonization.
-    :param verbose: send debug messages to logger if provided.
     :param logger: use this logger object instead of creating new one, if provided.
     :param chdir: change working directory if provided or /
+    :param outfile: File to 
+    :param void_stdio: Should stdio be sent to /dev/null or to outfile
     """
     def __init__(self, app, pid, action,
                  verbose=False, logger=None,
-                 chdir="/", outfile="homeserver.out"):
+                 chdir="/", outfile="homeserver.out",
+                 void_stdio=False):
         self.app = app
         self.pid = os.path.abspath(pid)
         self.outfile = os.path.abspath(outfile)
         self.action = action
         self.logger = logger
-        self.verbose = verbose
         self.chdir = chdir
+        self.void_stdio = void_stdio
 
     def sigterm(self, signum, frame):
         """
@@ -97,10 +109,22 @@ class Daemonize(object):
             # Uh oh, there was a problem.
             sys.exit(1)
 
-        with open(self.outfile, 'w+') as f:
-            f.write("***STARTED STDIO REDIRECT FILE")
-            os.dup2(f.fileno(), 2)
-            os.dup2(f.fileno(), 1)
+        if self.void_stdio:
+            with open(self.outfile, 'w+') as f:
+                f.write("***STARTED STDIO REDIRECT FILE")
+                os.dup2(f.fileno(), 1)
+                os.dup2(f.fileno(), 2)
+        else:
+            devnull = "/dev/null"
+            if hasattr(os, "devnull"):
+                # Python has set os.devnull on this system, use it instead as it might be different
+                # than /dev/null.
+                devnull = os.devnull
+            
+            devnull_fd = os.open(devnull, os.O_RDWR)
+            os.dup2(devnull_fd, 1)
+            os.dup2(devnull_fd, 2)
+            os.close(devnull_fd)
 
 
 
