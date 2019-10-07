@@ -13,12 +13,30 @@ jobs:
           destination: logs
       - store_test_results:
           path: /logs
+  sytestpy2postgresworkersmerged:
+    docker:
+      - image: matrixdotorg/sytest-synapse:dinsic
+    working_directory: /src
+    steps:
+      - checkout
+      - run: bash .circleci/merge_base_branch.sh
+      - run: POSTGRES=1 WORKERS=1 /synapse_sytest.sh
+      - store_artifacts:
+          path: /logs
+          destination: logs
+      - store_test_results:
+          path: /logs
+
 
 workflows:
   version: 2
   build:
     jobs:
       - sytestpy2postgresmerged:
+          filters:
+            branches:
+              ignore: /develop|master|release-.*/
+      - sytestpy2postgresworkersmerged:
           filters:
             branches:
               ignore: /develop|master|release-.*/
