@@ -19,6 +19,8 @@ from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from tests import unittest
 from tests.server import FakeTransport
 
+from mock import Mock
+
 
 class BaseStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests of the replication streams"""
@@ -30,7 +32,9 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         server = server_factory.buildProtocol(None)
 
         # build a replication client, with a dummy handler
+        handler_factory = Mock()
         self.test_handler = TestReplicationClientHandler()
+        self.test_handler.factory = handler_factory
         self.client = ClientReplicationStreamProtocol(
             "client", "test", clock, self.test_handler
         )

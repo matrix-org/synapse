@@ -399,7 +399,6 @@ class HomeserverTestCase(TestCase):
         kwargs["config"] = config_obj
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
-        hs.hostname = config["server_name"]
         stor = hs.get_datastore()
 
         # Run the database background updates.
