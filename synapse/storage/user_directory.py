@@ -32,14 +32,14 @@ logger = logging.getLogger(__name__)
 TEMP_TABLE = "_temp_populate_user_directory"
 
 
-class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
+class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore):
 
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
     SHARE_PRIVATE_WORKING_SET = 500
 
     def __init__(self, db_conn, hs):
-        super(UserDirectoryStore, self).__init__(db_conn, hs)
+        super(UserDirectoryBackgroundUpdateStore, self).__init__(db_conn, hs)
 
         self.server_name = hs.hostname
 
@@ -452,55 +452,6 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             "update_profile_in_user_dir", _update_profile_in_user_dir_txn
         )
 
-    def remove_from_user_dir(self, user_id):
-        def _remove_from_user_dir_txn(txn):
-            self._simple_delete_txn(
-                txn, table="user_directory", keyvalues={"user_id": user_id}
-            )
-            self._simple_delete_txn(
-                txn, table="user_directory_search", keyvalues={"user_id": user_id}
-            )
-            self._simple_delete_txn(
-                txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
-            )
-            self._simple_delete_txn(
-                txn,
-                table="users_who_share_private_rooms",
-                keyvalues={"user_id": user_id},
-            )
-            self._simple_delete_txn(
-                txn,
-                table="users_who_share_private_rooms",
-                keyvalues={"other_user_id": user_id},
-            )
-            txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
-
-        return self.runInteraction("remove_from_user_dir", _remove_from_user_dir_txn)
-
-    @defer.inlineCallbacks
-    def get_users_in_dir_due_to_room(self, room_id):
-        """Get all user_ids that are in the room directory because they're
-        in the given room_id
-        """
-        user_ids_share_pub = yield self._simple_select_onecol(
-            table="users_in_public_rooms",
-            keyvalues={"room_id": room_id},
-            retcol="user_id",
-            desc="get_users_in_dir_due_to_room",
-        )
-
-        user_ids_share_priv = yield self._simple_select_onecol(
-            table="users_who_share_private_rooms",
-            keyvalues={"room_id": room_id},
-            retcol="other_user_id",
-            desc="get_users_in_dir_due_to_room",
-        )
-
-        user_ids = set(user_ids_share_pub)
-        user_ids.update(user_ids_share_priv)
-
-        return user_ids
-
     def add_users_who_share_private_room(self, room_id, user_id_tuples):
         """Insert entries into the users_who_share_private_rooms table. The first
         user should be a local user.
@@ -550,6 +501,98 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
         return self.runInteraction(
             "add_users_in_public_rooms", _add_users_in_public_rooms_txn
         )
+
+    def delete_all_from_user_dir(self):
+        """Delete the entire user directory
+        """
+
+        def _delete_all_from_user_dir_txn(txn):
+            txn.execute("DELETE FROM user_directory")
+            txn.execute("DELETE FROM user_directory_search")
+            txn.execute("DELETE FROM users_in_public_rooms")
+            txn.execute("DELETE FROM users_who_share_private_rooms")
+            txn.call_after(self.get_user_in_directory.invalidate_all)
+
+        return self.runInteraction(
+            "delete_all_from_user_dir", _delete_all_from_user_dir_txn
+        )
+
+    @cached()
+    def get_user_in_directory(self, user_id):
+        return self._simple_select_one(
+            table="user_directory",
+            keyvalues={"user_id": user_id},
+            retcols=("display_name", "avatar_url"),
+            allow_none=True,
+            desc="get_user_in_directory",
+        )
+
+    def update_user_directory_stream_pos(self, stream_id):
+        return self._simple_update_one(
+            table="user_directory_stream_pos",
+            keyvalues={},
+            updatevalues={"stream_id": stream_id},
+            desc="update_user_directory_stream_pos",
+        )
+
+
+class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
+
+    # How many records do we calculate before sending it to
+    # add_users_who_share_private_rooms?
+    SHARE_PRIVATE_WORKING_SET = 500
+
+    def __init__(self, db_conn, hs):
+        super(UserDirectoryStore, self).__init__(db_conn, hs)
+
+    def remove_from_user_dir(self, user_id):
+        def _remove_from_user_dir_txn(txn):
+            self._simple_delete_txn(
+                txn, table="user_directory", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
+                txn, table="user_directory_search", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
+                txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
+                txn,
+                table="users_who_share_private_rooms",
+                keyvalues={"user_id": user_id},
+            )
+            self._simple_delete_txn(
+                txn,
+                table="users_who_share_private_rooms",
+                keyvalues={"other_user_id": user_id},
+            )
+            txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
+
+        return self.runInteraction("remove_from_user_dir", _remove_from_user_dir_txn)
+
+    @defer.inlineCallbacks
+    def get_users_in_dir_due_to_room(self, room_id):
+        """Get all user_ids that are in the room directory because they're
+        in the given room_id
+        """
+        user_ids_share_pub = yield self._simple_select_onecol(
+            table="users_in_public_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="user_id",
+            desc="get_users_in_dir_due_to_room",
+        )
+
+        user_ids_share_priv = yield self._simple_select_onecol(
+            table="users_who_share_private_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="other_user_id",
+            desc="get_users_in_dir_due_to_room",
+        )
+
+        user_ids = set(user_ids_share_pub)
+        user_ids.update(user_ids_share_priv)
+
+        return user_ids
 
     def remove_user_who_share_room(self, user_id, room_id):
         """
@@ -637,45 +680,12 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
 
         return [room_id for room_id, in rows]
 
-    def delete_all_from_user_dir(self):
-        """Delete the entire user directory
-        """
-
-        def _delete_all_from_user_dir_txn(txn):
-            txn.execute("DELETE FROM user_directory")
-            txn.execute("DELETE FROM user_directory_search")
-            txn.execute("DELETE FROM users_in_public_rooms")
-            txn.execute("DELETE FROM users_who_share_private_rooms")
-            txn.call_after(self.get_user_in_directory.invalidate_all)
-
-        return self.runInteraction(
-            "delete_all_from_user_dir", _delete_all_from_user_dir_txn
-        )
-
-    @cached()
-    def get_user_in_directory(self, user_id):
-        return self._simple_select_one(
-            table="user_directory",
-            keyvalues={"user_id": user_id},
-            retcols=("display_name", "avatar_url"),
-            allow_none=True,
-            desc="get_user_in_directory",
-        )
-
     def get_user_directory_stream_pos(self):
         return self._simple_select_one_onecol(
             table="user_directory_stream_pos",
             keyvalues={},
             retcol="stream_id",
             desc="get_user_directory_stream_pos",
-        )
-
-    def update_user_directory_stream_pos(self, stream_id):
-        return self._simple_update_one(
-            table="user_directory_stream_pos",
-            keyvalues={},
-            updatevalues={"stream_id": stream_id},
-            desc="update_user_directory_stream_pos",
         )
 
     @defer.inlineCallbacks
