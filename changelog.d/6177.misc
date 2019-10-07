@@ -1,1 +1,1 @@
-Update `user_filters` table to have a unique index, and non-null columns. Thanks to @pik for contributing this
+Add some logging to the rooms stats updates, to try to track down a flaky test.
