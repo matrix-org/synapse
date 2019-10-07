@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 Matrix.org Federation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +37,6 @@ from synapse.api.errors import (
     UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.crypto.event_signing import compute_event_signature
 from synapse.events import room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
@@ -75,6 +75,7 @@ class FederationServer(FederationBase):
 
         self.auth = hs.get_auth()
         self.handler = hs.get_handlers().federation_handler
+        self.state = hs.get_state_handler()
 
         self._server_linearizer = Linearizer("fed_server")
         self._transaction_linearizer = Linearizer("fed_txn_handler")
@@ -301,6 +302,35 @@ class FederationServer(FederationBase):
         return 200, resp
 
     @defer.inlineCallbacks
+    @log_function
+    def on_context_state_request_v2(self, origin, room_id, event_id):
+        origin_host, _ = parse_server_name(origin)
+        yield self.check_server_matches_acl(origin_host, room_id)
+
+        in_room = yield self.auth.check_host_in_room(room_id, origin)
+        if not in_room:
+            raise AuthError(403, "Host not in room.")
+
+        # we grab the linearizer to protect ourselves from servers which hammer
+        # us. In theory we might already have the response to this query
+        # in the cache so we could return it without waiting for the linearizer
+        # - but that's non-trivial to get right, and anyway somewhat defeats
+        # the point of the linearizer.
+        with (yield self._server_linearizer.queue((origin, room_id))):
+            resp = yield self._state_resp_cache.wrap(
+                (room_id, event_id),
+                self._on_context_state_request_compute,
+                room_id,
+                event_id,
+            )
+
+        room_version = yield self.store.get_room_version(room_id)
+        resp = dict(resp)
+        resp["room_version"] = room_version
+
+        return 200, resp
+
+    @defer.inlineCallbacks
     def on_state_ids_request(self, origin, room_id, event_id):
         if not event_id:
             raise NotImplementedError("Specify an event")
@@ -319,20 +349,13 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     def _on_context_state_request_compute(self, room_id, event_id):
-        pdus = yield self.handler.get_state_for_pdu(room_id, event_id)
-        auth_chain = yield self.store.get_auth_chain([pdu.event_id for pdu in pdus])
 
-        for event in auth_chain:
-            # We sign these again because there was a bug where we
-            # incorrectly signed things the first time round
-            if self.hs.is_mine_id(event.event_id):
-                event.signatures.update(
-                    compute_event_signature(
-                        event.get_pdu_json(),
-                        self.hs.hostname,
-                        self.hs.config.signing_key[0],
-                    )
-                )
+        if event_id:
+            pdus = yield self.handler.get_state_for_pdu(room_id, event_id)
+        else:
+            pdus = (yield self.state.get_current_state(room_id)).values()
+
+        auth_chain = yield self.store.get_auth_chain([pdu.event_id for pdu in pdus])
 
         return {
             "pdus": [pdu.get_pdu_json() for pdu in pdus],
