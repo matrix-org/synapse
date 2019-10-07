@@ -74,7 +74,14 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
             self.hs.config.default_room_version.identifier,
         )
 
-        members = set(map(lambda x: x["state_key"], filter(lambda x: x["type"] == "m.room.member", channel.json_body["pdus"])))
+        members = set(
+            map(
+                lambda x: x["state_key"],
+                filter(
+                    lambda x: x["type"] == "m.room.member", channel.json_body["pdus"]
+                ),
+            )
+        )
 
         self.assertEqual(members, set(["@user:other.example.com", u1]))
         self.assertEqual(len(channel.json_body["pdus"]), 6)
