@@ -32,9 +32,10 @@ class AdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_whois(self, user):
-        connections = []
-
+        is_admin = yield self.store.is_server_admin(user)
         sessions = yield self.store.get_user_ip_and_agents(user)
+
+        connections = []
         for session in sessions:
             connections.append(
                 {
@@ -44,8 +45,10 @@ class AdminHandler(BaseHandler):
                 }
             )
 
+
         ret = {
             "user_id": user.to_string(),
+            "is_admin": is_admin,
             "devices": {"": {"sessions": [{"connections": connections}]}},
         }
 
