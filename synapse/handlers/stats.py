@@ -124,7 +124,7 @@ class StatsHandler(StateDeltasHandler):
                 stream_id=max_pos,
             )
 
-            logger.debug("Handled room stats to %s -> %s", self.pos, max_pos)
+            logger.info("Handled room stats between %s and %s", self.pos, max_pos)
 
             event_processing_positions.labels("stats").set(max_pos)
 
@@ -153,7 +153,7 @@ class StatsHandler(StateDeltasHandler):
             stream_id = delta["stream_id"]
             prev_event_id = delta["prev_event_id"]
 
-            logger.debug("Handling: %r, %r %r, %s", room_id, typ, state_key, event_id)
+            logger.info("Handling: %r, %r %r, %s", room_id, typ, state_key, event_id)
 
             token = yield self.store.get_earliest_token_for_stats("room", room_id)
 
