@@ -711,7 +711,7 @@ class RoomCreationHandler(BaseHandler):
         @defer.inlineCallbacks
         def send(etype, content, **kwargs):
             event = create(etype, content, **kwargs)
-            logger.info("Sending %s in new room %s", etype, room_id)
+            logger.info("Sending %s in new room", etype)
             yield self.event_creation_handler.create_and_send_nonmember_event(
                 creator, event, ratelimit=False
             )
