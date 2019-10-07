@@ -170,7 +170,7 @@ class RootConfig(object):
     Holder of an application's configuration.
 
     What configuration this objects hold is defined by `config_classes`, a list
-    of Config objects that will be instantiated and given the contents of a
+    of Config classes that will be instantiated and given the contents of a
     configuration file to read. They can then be accessed on this class by their
     section name, defined in the Config or dynamically set to be the name of the
     class, lower-cased and with "Config" removed.
