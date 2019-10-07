@@ -73,10 +73,10 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
             channel.json_body["room_version"],
             self.hs.config.default_room_version.identifier,
         )
-        self.assertEqual(channel.json_body["pdus"][-1]["type"], "m.room.member")
-        self.assertEqual(
-            channel.json_body["pdus"][-1]["state_key"], "@user:other.example.com"
-        )
+
+        members = set(map(lambda x: x["state_key"], filter(lambda x: x["type"] == "m.room.member", channel.json_body["pdus"])))
+
+        self.assertEqual(members, set(["@user:other.example.com", u1]))
         self.assertEqual(len(channel.json_body["pdus"]), 6)
 
     def test_needs_to_be_in_room(self):
