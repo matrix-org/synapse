@@ -1,0 +1,1 @@
+Add is_admin flag to the response of /whois. Fixes issue #6130.
