@@ -37,57 +37,7 @@ THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 logger = logging.getLogger(__name__)
 
 
-class RegistrationDeactivationStore(SQLBaseStore):
-    @cachedInlineCallbacks()
-    def get_user_deactivated_status(self, user_id):
-        """Retrieve the value for the `deactivated` property for the provided user.
-
-        Args:
-            user_id (str): The ID of the user to retrieve the status for.
-
-        Returns:
-            defer.Deferred(bool): The requested value.
-        """
-
-        res = yield self._simple_select_one_onecol(
-            table="users",
-            keyvalues={"name": user_id},
-            retcol="deactivated",
-            desc="get_user_deactivated_status",
-        )
-
-        # Convert the integer into a boolean.
-        return res == 1
-
-    @defer.inlineCallbacks
-    def set_user_deactivated_status(self, user_id, deactivated):
-        """Set the `deactivated` property for the provided user to the provided value.
-
-        Args:
-            user_id (str): The ID of the user to set the status for.
-            deactivated (bool): The value to set for `deactivated`.
-        """
-
-        yield self.runInteraction(
-            "set_user_deactivated_status",
-            self.set_user_deactivated_status_txn,
-            user_id,
-            deactivated,
-        )
-
-    def set_user_deactivated_status_txn(self, txn, user_id, deactivated):
-        self._simple_update_one_txn(
-            txn=txn,
-            table="users",
-            keyvalues={"name": user_id},
-            updatevalues={"deactivated": 1 if deactivated else 0},
-        )
-        self._invalidate_cache_and_stream(
-            txn, self.get_user_deactivated_status, (user_id,)
-        )
-
-
-class RegistrationWorkerStore(RegistrationDeactivationStore):
+class RegistrationWorkerStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
         super(RegistrationWorkerStore, self).__init__(db_conn, hs)
 
@@ -723,6 +673,27 @@ class RegistrationWorkerStore(RegistrationDeactivationStore):
             desc="get_id_servers_user_bound",
         )
 
+    @cachedInlineCallbacks()
+    def get_user_deactivated_status(self, user_id):
+        """Retrieve the value for the `deactivated` property for the provided user.
+
+        Args:
+            user_id (str): The ID of the user to retrieve the status for.
+
+        Returns:
+            defer.Deferred(bool): The requested value.
+        """
+
+        res = yield self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="deactivated",
+            desc="get_user_deactivated_status",
+        )
+
+        # Convert the integer into a boolean.
+        return res == 1
+
     def get_threepid_validation_session(
         self, medium, client_secret, address=None, sid=None, validated=True
     ):
@@ -817,7 +788,7 @@ class RegistrationWorkerStore(RegistrationDeactivationStore):
 
 
 class RegistrationBackgroundUpdateStore(
-    RegistrationDeactivationStore, background_updates.BackgroundUpdateStore
+    RegistrationWorkerStore, background_updates.BackgroundUpdateStore
 ):
     def __init__(self, db_conn, hs):
         super(RegistrationBackgroundUpdateStore, self).__init__(db_conn, hs)
@@ -1498,4 +1469,31 @@ class RegistrationStore(RegistrationWorkerStore, RegistrationBackgroundUpdateSto
             "cull_expired_threepid_validation_tokens",
             cull_expired_threepid_validation_tokens_txn,
             self.clock.time_msec(),
+        )
+
+    @defer.inlineCallbacks
+    def set_user_deactivated_status(self, user_id, deactivated):
+        """Set the `deactivated` property for the provided user to the provided value.
+
+        Args:
+            user_id (str): The ID of the user to set the status for.
+            deactivated (bool): The value to set for `deactivated`.
+        """
+
+        yield self.runInteraction(
+            "set_user_deactivated_status",
+            self.set_user_deactivated_status_txn,
+            user_id,
+            deactivated,
+        )
+
+    def set_user_deactivated_status_txn(self, txn, user_id, deactivated):
+        self._simple_update_one_txn(
+            txn=txn,
+            table="users",
+            keyvalues={"name": user_id},
+            updatevalues={"deactivated": 1 if deactivated else 0},
+        )
+        self._invalidate_cache_and_stream(
+            txn, self.get_user_deactivated_status, (user_id,)
         )
