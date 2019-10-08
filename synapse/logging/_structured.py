@@ -18,6 +18,7 @@ import os.path
 import sys
 import typing
 import warnings
+from typing import List
 
 import attr
 from constantly import NamedConstant, Names, ValueConstant, Values
@@ -33,7 +34,6 @@ from twisted.logger import (
     LogLevelFilterPredicate,
     LogPublisher,
     eventAsText,
-    globalLogBeginner,
     jsonFileLogObserver,
 )
 
@@ -265,7 +265,7 @@ def setup_structured_logging(
     hs,
     config,
     log_config: dict,
-    logBeginner: LogBeginner = globalLogBeginner,
+    logBeginner: LogBeginner,
     redirect_stdlib_logging: bool = True,
 ) -> LogPublisher:
     """
@@ -286,7 +286,7 @@ def setup_structured_logging(
     if "drains" not in log_config:
         raise ConfigError("The logging configuration requires a list of drains.")
 
-    observers = []
+    observers = []  # type: List[ILogObserver]
 
     for observer in parse_drain_configs(log_config["drains"]):
         # Pipe drains

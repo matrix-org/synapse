@@ -1,0 +1,1 @@
+Add some logging to the rooms stats updates, to try to track down a flaky test.

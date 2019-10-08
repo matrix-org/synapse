@@ -293,8 +293,10 @@ class RegistrationConfig(Config):
         # by the Matrix Identity Service API specification:
         # https://matrix.org/docs/spec/identity_service/latest
         #
+        # If a delegate is specified, the config option public_baseurl must also be filled out.
+        #
         account_threepid_delegates:
-            #email: https://example.com     # Delegate email sending to matrix.org
+            #email: https://example.com     # Delegate email sending to example.org
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
         # Users who register on this homeserver will automatically be joined
