@@ -53,6 +53,7 @@ steps:
     command:
       - "bash .buildkite/merge_base_branch.sh"
       - "pwd"
+      - "git --git-dir=/src/.git symbolic-ref HEAD"
       - "ls -a"
       - "ls /"
       - "ls jenkins"
