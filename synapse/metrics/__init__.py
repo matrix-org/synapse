@@ -20,6 +20,7 @@ import os
 import platform
 import threading
 import time
+from typing import Dict, Union
 
 import six
 
@@ -42,9 +43,7 @@ logger = logging.getLogger(__name__)
 METRICS_PREFIX = "/_synapse/metrics"
 
 running_on_pypy = platform.python_implementation() == "PyPy"
-all_metrics = []
-all_collectors = []
-all_gauges = {}
+all_gauges = {}  # type: Dict[str, Union[LaterGauge, InFlightGauge, BucketCollector]]
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
@@ -126,7 +125,7 @@ class InFlightGauge(object):
         )
 
         # Counts number of in flight blocks for a given set of label values
-        self._registrations = {}
+        self._registrations = {}  # type: Dict
 
         # Protects access to _registrations
         self._lock = threading.Lock()
@@ -227,7 +226,7 @@ class BucketCollector(object):
         # Fetch the data -- this must be synchronous!
         data = self.data_collector()
 
-        buckets = {}
+        buckets = {}  # type: Dict[float, int]
 
         res = []
         for x in data.keys():

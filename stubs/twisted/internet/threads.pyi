@@ -1,0 +1,13 @@
+from typing import List
+
+from twisted.internet.defer import Deferred
+from twisted.python.threadpool import ThreadPool
+
+from .interfaces import IReactorThreads
+
+def deferToThreadPool(
+    reactor: IReactorThreads, threadpool: ThreadPool, f, *args, **kwargs
+) -> Deferred: ...
+def deferToThread(f, *args, **kwargs): ...
+def callMultipleInThread(tupleList: List) -> None: ...
+def blockingCallFromThread(reactor: IReactorThreads, f, *a, **kw): ...

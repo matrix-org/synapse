@@ -50,6 +50,33 @@ and you should enable 'federation_verify_certificates' in your configuration.
 If you are *sure* you want to do this, set 'accept_keys_insecurely' on the
 trusted_key_server configuration."""
 
+TRUSTED_KEY_SERVER_NOT_CONFIGURED_WARN = """\
+Synapse requires that a list of trusted key servers are specified in order to
+provide signing keys for other servers in the federation.
+
+This homeserver does not have a trusted key server configured in
+homeserver.yaml and will fall back to the default of 'matrix.org'.
+
+Trusted key servers should be long-lived and stable which makes matrix.org a
+good choice for many admins, but some admins may wish to choose another. To
+suppress this warning, the admin should set 'trusted_key_servers' in
+homeserver.yaml to their desired key server and 'suppress_key_server_warning'
+to 'true'.
+
+In a future release the software-defined default will be removed entirely and
+the trusted key server will be defined exclusively by the value of
+'trusted_key_servers'.
+--------------------------------------------------------------------------------"""
+
+TRUSTED_KEY_SERVER_CONFIGURED_AS_M_ORG_WARN = """\
+This server is configured to use 'matrix.org' as its trusted key server via the
+'trusted_key_servers' config option. 'matrix.org' is a good choice for a key
+server since it is long-lived, stable and trusted. However, some admins may
+wish to use another server for this purpose.
+
+To suppress this warning and continue using 'matrix.org', admins should set
+'suppress_key_server_warning' to 'true' in homeserver.yaml.
+--------------------------------------------------------------------------------"""
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +92,8 @@ class TrustedKeyServer(object):
 
 
 class KeyConfig(Config):
+    section = "key"
+
     def read_config(self, config, config_dir_path, **kwargs):
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
@@ -85,6 +114,7 @@ class KeyConfig(Config):
             config.get("key_refresh_interval", "1d")
         )
 
+        suppress_key_server_warning = config.get("suppress_key_server_warning", False)
         key_server_signing_keys_path = config.get("key_server_signing_keys_path")
         if key_server_signing_keys_path:
             self.key_server_signing_keys = self.read_signing_keys(
@@ -95,6 +125,7 @@ class KeyConfig(Config):
 
         # if neither trusted_key_servers nor perspectives are given, use the default.
         if "perspectives" not in config and "trusted_key_servers" not in config:
+            logger.warn(TRUSTED_KEY_SERVER_NOT_CONFIGURED_WARN)
             key_servers = [{"server_name": "matrix.org"}]
         else:
             key_servers = config.get("trusted_key_servers", [])
@@ -107,6 +138,11 @@ class KeyConfig(Config):
 
             # merge the 'perspectives' config into the 'trusted_key_servers' config.
             key_servers.extend(_perspectives_to_key_servers(config))
+
+            if not suppress_key_server_warning and "matrix.org" in (
+                s["server_name"] for s in key_servers
+            ):
+                logger.warning(TRUSTED_KEY_SERVER_CONFIGURED_AS_M_ORG_WARN)
 
         # list of TrustedKeyServer objects
         self.key_servers = list(
@@ -190,6 +226,10 @@ class KeyConfig(Config):
         # This setting supercedes an older setting named `perspectives`. The old format
         # is still supported for backwards-compatibility, but it is deprecated.
         #
+        # 'trusted_key_servers' defaults to matrix.org, but using it will generate a
+        # warning on start-up. To suppress this warning, set
+        # 'suppress_key_server_warning' to true.
+        #
         # Options for each entry in the list include:
         #
         #    server_name: the name of the server. required.
@@ -214,11 +254,13 @@ class KeyConfig(Config):
         #      "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
         #  - server_name: "my_other_trusted_server.example.com"
         #
-        # The default configuration is:
+        trusted_key_servers:
+          - server_name: "matrix.org"
+
+        # Uncomment the following to disable the warning that is emitted when the
+        # trusted_key_servers include 'matrix.org'. See above.
         #
-        #trusted_key_servers:
-        #  - server_name: "matrix.org"
-        #
+        #suppress_key_server_warning: true
 
         # The signing keys to use when acting as a trusted key server. If not specified
         # defaults to the server signing key.

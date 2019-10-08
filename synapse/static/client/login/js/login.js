@@ -62,7 +62,7 @@ var show_login = function() {
         $("#sso_flow").show();
     }
 
-    if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsCas) {
+    if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsCas && !matrixLogin.serverAcceptsSso) {
         $("#no_login_types").show();
     }
 };

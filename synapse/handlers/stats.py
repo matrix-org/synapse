@@ -84,6 +84,13 @@ class StatsHandler(StateDeltasHandler):
         # Loop round handling deltas until we're up to date
 
         while True:
+            # Be sure to read the max stream_ordering *before* checking if there are any outstanding
+            # deltas, since there is otherwise a chance that we could miss updates which arrive
+            # after we check the deltas.
+            room_max_stream_ordering = yield self.store.get_room_max_stream_ordering()
+            if self.pos == room_max_stream_ordering:
+                break
+
             deltas = yield self.store.get_current_state_deltas(self.pos)
 
             if deltas:
@@ -94,7 +101,7 @@ class StatsHandler(StateDeltasHandler):
             else:
                 room_deltas = {}
                 user_deltas = {}
-                max_pos = yield self.store.get_room_max_stream_ordering()
+                max_pos = room_max_stream_ordering
 
             # Then count deltas for total_events and total_event_bytes.
             room_count, user_count = yield self.store.get_changes_room_total_events_and_bytes(
@@ -117,10 +124,9 @@ class StatsHandler(StateDeltasHandler):
                 stream_id=max_pos,
             )
 
-            event_processing_positions.labels("stats").set(max_pos)
+            logger.debug("Handled room stats to %s -> %s", self.pos, max_pos)
 
-            if self.pos == max_pos:
-                break
+            event_processing_positions.labels("stats").set(max_pos)
 
             self.pos = max_pos
 
@@ -287,6 +293,7 @@ class StatsHandler(StateDeltasHandler):
                 room_state["guest_access"] = event_content.get("guest_access")
 
         for room_id, state in room_to_state_updates.items():
+            logger.info("Updating room_stats_state for %s: %s", room_id, state)
             yield self.store.update_room_state(room_id, state)
 
         return room_to_stats_deltas, user_to_stats_deltas

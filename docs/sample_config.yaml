@@ -110,6 +110,9 @@ pid_file: DATADIR/homeserver.pid
 # blacklist IP address CIDR ranges. If this option is not specified, or
 # specified with an empty list, no ip range blacklist will be enforced.
 #
+# As of Synapse v1.4.0 this option also affects any outbound requests to identity
+# servers provided by user input.
+#
 # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
 # listed here, since they correspond to unroutable addresses.)
 #
@@ -136,8 +139,8 @@ federation_ip_range_blacklist:
 #
 #   type: the type of listener. Normally 'http', but other valid options are:
 #       'manhole' (see docs/manhole.md),
-#       'metrics' (see docs/metrics-howto.rst),
-#       'replication' (see docs/workers.rst).
+#       'metrics' (see docs/metrics-howto.md),
+#       'replication' (see docs/workers.md).
 #
 #   tls: set to true to enable TLS for this listener. Will use the TLS
 #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -172,12 +175,12 @@ federation_ip_range_blacklist:
 #
 #   media: the media API (/_matrix/media).
 #
-#   metrics: the metrics interface. See docs/metrics-howto.rst.
+#   metrics: the metrics interface. See docs/metrics-howto.md.
 #
 #   openid: OpenID authentication.
 #
 #   replication: the HTTP replication API (/_synapse/replication). See
-#       docs/workers.rst.
+#       docs/workers.md.
 #
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
@@ -201,7 +204,7 @@ listeners:
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
-  # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+  # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
   #
   - port: 8008
     tls: false
@@ -311,7 +314,13 @@ listeners:
 #
 # Defaults to `7d`. Set to `null` to disable.
 #
-redaction_retention_period: 7d
+#redaction_retention_period: 28d
+
+# How long to track users' last seen time and IPs in the database.
+#
+# Defaults to `28d`. Set to `null` to disable clearing out of old rows.
+#
+#user_ips_max_age: 14d
 
 
 ## TLS ##
@@ -937,8 +946,10 @@ uploads_path: "DATADIR/uploads"
 # by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
 #
+# If a delegate is specified, the config option public_baseurl must also be filled out.
+#
 account_threepid_delegates:
-    #email: https://example.com     # Delegate email sending to matrix.org
+    #email: https://example.com     # Delegate email sending to example.org
     #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
 # Users who register on this homeserver will automatically be joined
@@ -984,6 +995,11 @@ metrics_flags:
 
 # Whether or not to report anonymized homeserver usage statistics.
 # report_stats: true|false
+
+# The endpoint to report the anonymized homeserver usage statistics to.
+# Defaults to https://matrix.org/report-usage-stats/push
+#
+#report_stats_endpoint: https://example.com/report-usage-stats/push
 
 
 ## API Configuration ##
@@ -1056,6 +1072,10 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 # This setting supercedes an older setting named `perspectives`. The old format
 # is still supported for backwards-compatibility, but it is deprecated.
 #
+# 'trusted_key_servers' defaults to matrix.org, but using it will generate a
+# warning on start-up. To suppress this warning, set
+# 'suppress_key_server_warning' to true.
+#
 # Options for each entry in the list include:
 #
 #    server_name: the name of the server. required.
@@ -1080,11 +1100,13 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #      "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
 #  - server_name: "my_other_trusted_server.example.com"
 #
-# The default configuration is:
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+# Uncomment the following to disable the warning that is emitted when the
+# trusted_key_servers include 'matrix.org'. See above.
 #
-#trusted_key_servers:
-#  - server_name: "matrix.org"
-#
+#suppress_key_server_warning: true
 
 # The signing keys to use when acting as a trusted key server. If not specified
 # defaults to the server signing key.
@@ -1096,12 +1118,13 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 
 # Enable SAML2 for registration and login. Uses pysaml2.
 #
-# `sp_config` is the configuration for the pysaml2 Service Provider.
-# See pysaml2 docs for format of config.
+# At least one of `sp_config` or `config_path` must be set in this section to
+# enable SAML login.
 #
-# Default values will be used for the 'entityid' and 'service' settings,
-# so it is not normally necessary to specify them unless you need to
-# override them.
+# (You will probably also want to set the following options to `false` to
+# disable the regular login/registration flows:
+#   * enable_registration
+#   * password_config.enabled
 #
 # Once SAML support is enabled, a metadata file will be exposed at
 # https://<server>:<port>/_matrix/saml2/metadata.xml, which you may be able to
@@ -1109,52 +1132,85 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 # the IdP to use an ACS location of
 # https://<server>:<port>/_matrix/saml2/authn_response.
 #
-#saml2_config:
-#  sp_config:
-#    # point this to the IdP's metadata. You can use either a local file or
-#    # (preferably) a URL.
-#    metadata:
-#      #local: ["saml2/idp.xml"]
-#      remote:
-#        - url: https://our_idp/metadata.xml
-#
-#    # By default, the user has to go to our login page first. If you'd like to
-#    # allow IdP-initiated login, set 'allow_unsolicited: True' in a
-#    # 'service.sp' section:
-#    #
-#    #service:
-#    #  sp:
-#    #    allow_unsolicited: True
-#
-#    # The examples below are just used to generate our metadata xml, and you
-#    # may well not need it, depending on your setup. Alternatively you
-#    # may need a whole lot more detail - see the pysaml2 docs!
-#
-#    description: ["My awesome SP", "en"]
-#    name: ["Test SP", "en"]
-#
-#    organization:
-#      name: Example com
-#      display_name:
-#        - ["Example co", "en"]
-#      url: "http://example.com"
-#
-#    contact_person:
-#      - given_name: Bob
-#        sur_name: "the Sysadmin"
-#        email_address": ["admin@example.com"]
-#        contact_type": technical
-#
-#  # Instead of putting the config inline as above, you can specify a
-#  # separate pysaml2 configuration file:
-#  #
-#  config_path: "CONFDIR/sp_conf.py"
-#
-#  # the lifetime of a SAML session. This defines how long a user has to
-#  # complete the authentication process, if allow_unsolicited is unset.
-#  # The default is 5 minutes.
-#  #
-#  # saml_session_lifetime: 5m
+saml2_config:
+  # `sp_config` is the configuration for the pysaml2 Service Provider.
+  # See pysaml2 docs for format of config.
+  #
+  # Default values will be used for the 'entityid' and 'service' settings,
+  # so it is not normally necessary to specify them unless you need to
+  # override them.
+  #
+  #sp_config:
+  #  # point this to the IdP's metadata. You can use either a local file or
+  #  # (preferably) a URL.
+  #  metadata:
+  #    #local: ["saml2/idp.xml"]
+  #    remote:
+  #      - url: https://our_idp/metadata.xml
+  #
+  #    # By default, the user has to go to our login page first. If you'd like
+  #    # to allow IdP-initiated login, set 'allow_unsolicited: True' in a
+  #    # 'service.sp' section:
+  #    #
+  #    #service:
+  #    #  sp:
+  #    #    allow_unsolicited: true
+  #
+  #    # The examples below are just used to generate our metadata xml, and you
+  #    # may well not need them, depending on your setup. Alternatively you
+  #    # may need a whole lot more detail - see the pysaml2 docs!
+  #
+  #    description: ["My awesome SP", "en"]
+  #    name: ["Test SP", "en"]
+  #
+  #    organization:
+  #      name: Example com
+  #      display_name:
+  #        - ["Example co", "en"]
+  #      url: "http://example.com"
+  #
+  #    contact_person:
+  #      - given_name: Bob
+  #        sur_name: "the Sysadmin"
+  #        email_address": ["admin@example.com"]
+  #        contact_type": technical
+
+  # Instead of putting the config inline as above, you can specify a
+  # separate pysaml2 configuration file:
+  #
+  #config_path: "CONFDIR/sp_conf.py"
+
+  # the lifetime of a SAML session. This defines how long a user has to
+  # complete the authentication process, if allow_unsolicited is unset.
+  # The default is 5 minutes.
+  #
+  #saml_session_lifetime: 5m
+
+  # The SAML attribute (after mapping via the attribute maps) to use to derive
+  # the Matrix ID from. 'uid' by default.
+  #
+  #mxid_source_attribute: displayName
+
+  # The mapping system to use for mapping the saml attribute onto a matrix ID.
+  # Options include:
+  #  * 'hexencode' (which maps unpermitted characters to '=xx')
+  #  * 'dotreplace' (which replaces unpermitted characters with '.').
+  # The default is 'hexencode'.
+  #
+  #mxid_mapping: dotreplace
+
+  # In previous versions of synapse, the mapping from SAML attribute to MXID was
+  # always calculated dynamically rather than stored in a table. For backwards-
+  # compatibility, we will look for user_ids matching such a pattern before
+  # creating a new account.
+  #
+  # This setting controls the SAML attribute which will be used for this
+  # backwards-compatibility lookup. Typically it should be 'uid', but if the
+  # attribute maps are changed, it may be necessary to change it.
+  #
+  # The default is 'uid'.
+  #
+  #grandfathered_mxid_source_attribute: upn
 
 
 
@@ -1256,6 +1312,12 @@ password_config:
 #   #registration_template_html: registration.html
 #   #registration_template_text: registration.txt
 #
+#   # Templates for validation emails sent by the homeserver when adding an email to
+#   # your user account
+#   #
+#   #add_threepid_template_html: add_threepid.html
+#   #add_threepid_template_text: add_threepid.txt
+#
 #   # Templates for password reset success and failure pages that a user
 #   # will see after attempting to reset their password
 #   #
@@ -1267,6 +1329,12 @@ password_config:
 #   #
 #   #registration_template_success_html: registration_success.html
 #   #registration_template_failure_html: registration_failure.html
+#
+#   # Templates for success and failure pages that a user will see after attempting
+#   # to add an email or phone to their account
+#   #
+#   #add_threepid_success_html: add_threepid_success.html
+#   #add_threepid_failure_html: add_threepid_failure.html
 
 
 #password_providers:

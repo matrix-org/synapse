@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016 matrix.org
+# Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ class WorkerConfig(Config):
     """The workers are processes run separately to the main synapse process.
     They have their own pid_file and listener configuration. They use the
     replication_url to talk to the main synapse process."""
+
+    section = "worker"
 
     def read_config(self, config, **kwargs):
         self.worker_app = config.get("worker_app")

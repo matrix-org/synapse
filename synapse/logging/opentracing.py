@@ -170,6 +170,7 @@ import inspect
 import logging
 import re
 from functools import wraps
+from typing import Dict
 
 from canonicaljson import json
 
@@ -223,8 +224,8 @@ try:
     from jaeger_client import Config as JaegerConfig
     from synapse.logging.scopecontextmanager import LogContextScopeManager
 except ImportError:
-    JaegerConfig = None
-    LogContextScopeManager = None
+    JaegerConfig = None  # type: ignore
+    LogContextScopeManager = None  # type: ignore
 
 
 logger = logging.getLogger(__name__)
@@ -547,7 +548,7 @@ def inject_active_span_twisted_headers(headers, destination, check_destination=T
         return
 
     span = opentracing.tracer.active_span
-    carrier = {}
+    carrier = {}  # type: Dict[str, str]
     opentracing.tracer.inject(span, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
@@ -584,7 +585,7 @@ def inject_active_span_byte_dict(headers, destination, check_destination=True):
 
     span = opentracing.tracer.active_span
 
-    carrier = {}
+    carrier = {}  # type: Dict[str, str]
     opentracing.tracer.inject(span, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
@@ -639,7 +640,7 @@ def get_active_span_text_map(destination=None):
     if destination and not whitelisted_homeserver(destination):
         return {}
 
-    carrier = {}
+    carrier = {}  # type: Dict[str, str]
     opentracing.tracer.inject(
         opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
     )
@@ -653,7 +654,7 @@ def active_span_context_as_string():
     Returns:
         The active span context encoded as a string.
     """
-    carrier = {}
+    carrier = {}  # type: Dict[str, str]
     if opentracing:
         opentracing.tracer.inject(
             opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier

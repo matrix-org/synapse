@@ -119,7 +119,11 @@ def trace_function(f):
         logger = logging.getLogger(name)
         level = logging.DEBUG
 
-        s = inspect.currentframe().f_back
+        frame = inspect.currentframe()
+        if frame is None:
+            raise Exception("Can't get current frame!")
+
+        s = frame.f_back
 
         to_print = [
             "\t%s:%s %s. Args: args=%s, kwargs=%s"
@@ -144,7 +148,7 @@ def trace_function(f):
             pathname=pathname,
             lineno=lineno,
             msg=msg,
-            args=None,
+            args=tuple(),
             exc_info=None,
         )
 
@@ -157,7 +161,12 @@ def trace_function(f):
 
 
 def get_previous_frames():
-    s = inspect.currentframe().f_back.f_back
+
+    frame = inspect.currentframe()
+    if frame is None:
+        raise Exception("Can't get current frame!")
+
+    s = frame.f_back.f_back
     to_return = []
     while s:
         if s.f_globals["__name__"].startswith("synapse"):
@@ -174,7 +183,10 @@ def get_previous_frames():
 
 
 def get_previous_frame(ignore=[]):
-    s = inspect.currentframe().f_back.f_back
+    frame = inspect.currentframe()
+    if frame is None:
+        raise Exception("Can't get current frame!")
+    s = frame.f_back.f_back
 
     while s:
         if s.f_globals["__name__"].startswith("synapse"):

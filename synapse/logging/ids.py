@@ -19,6 +19,7 @@ Tools for generating "human readable" IDs to aid in debugging.
 
 import os
 import random as _badrandom
+from typing import List
 
 _rand = _badrandom.SystemRandom()
 
@@ -31,7 +32,7 @@ class IDGenerator(object):
     def __init__(self, files=None, digits=1):
         base = os.path.split(__file__)[0]
         self.digits = digits
-        self._sections = []
+        self._sections = []  # type: List[List[str]]
 
         if files:
             for wordlist in files:
