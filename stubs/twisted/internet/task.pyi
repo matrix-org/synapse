@@ -1,11 +1,11 @@
-from twisted.internet.defer import Deferred
+from typing import Any, Dict, List
 
 from zope.interface import implementer
 
+from twisted.internet.defer import Deferred
+
 from .base import DelayedCall
 from .interfaces import IReactorTime
-
-from typing import Any, Dict, List
 
 class LoopingCall:
     call = None

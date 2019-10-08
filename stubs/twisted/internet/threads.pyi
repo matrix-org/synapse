@@ -1,8 +1,9 @@
-from twisted.python.threadpool import ThreadPool
-from twisted.internet.defer import Deferred
-from .interfaces import IReactorThreads
-
 from typing import List
+
+from twisted.internet.defer import Deferred
+from twisted.python.threadpool import ThreadPool
+
+from .interfaces import IReactorThreads
 
 def deferToThreadPool(
     reactor: IReactorThreads, threadpool: ThreadPool, f, *args, **kwargs
