@@ -27,7 +27,13 @@ from twisted.internet.interfaces import IPushProducer, IReactorPluggableNameReso
 from twisted.python.failure import Failure
 from twisted.web.client import ResponseDone
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import UNKNOWN_LENGTH, IBodyProducer, IRequest, IResponse
+from twisted.web.iweb import (
+    UNKNOWN_LENGTH,
+    IAgent,
+    IBodyProducer,
+    IClientRequest,
+    IResponse,
+)
 
 from .connection_pool import ConnectionPool
 from .interfaces import IClient, IConnection, IRemoteAddress
@@ -60,14 +66,16 @@ class BodyProducer:
 
 
 @attr.s(slots=True)
-@implementer(IRequest)
+@implementer(IClientRequest)
 class HTTPRequest:
+
+    method = attr.ib(type=bytes)
+    headers = attr.ib(type=Headers)
+    absoluteURI = attr.ib(type=bytes)
 
     host = attr.ib(type=bytes)
     protocol = attr.ib(type=Protocols)
-    method = attr.ib(type=bytes)
     uri = attr.ib(type=bytes)
-    headers = attr.ib(type=Headers)
     body = attr.ib(type=IBodyProducer)
 
 
@@ -118,7 +126,7 @@ class BodyConsumer:
         self._sender = Deferred()
         sender.callback(h11.Data(data=content))
 
-    def next_content(self) -> Deferred[h11.Data]:
+    def next_content(self) -> Deferred:
         """
         Wait for the next content object.
         """
@@ -198,20 +206,26 @@ class HTTP11Client:
         """
         Process pending events from the h11 parser.
         """
-        event = self._parser.next_event()
+        event = None
 
         while event is not h11.NEED_DATA:
+
+            try:
+                event = self._parser.next_event()
+            except h11.RemoteProtocolError:
+                # Something went wrong. Let's bail.
+                self._done.errback(Failure())
+                return
 
             if event is h11.PAUSED:
                 self._done.errback(Failure(Exception("????")))
                 return
 
             else:
-                self._response.append(event)
                 if isinstance(event, h11.EndOfMessage):
-                    self._finish()
+                    return self._finish()
 
-            event = self._parser.next_event()
+                self._response.append(event)
 
     def _get_response(self) -> Tuple[h11.Response, List[h11.Data]]:
         """
@@ -280,6 +294,7 @@ class HTTP11Client:
         self._check()
 
 
+@implementer(IAgent)
 @attr.s(slots=True)
 class HTTP11Agent:
 
@@ -300,7 +315,13 @@ class HTTP11Agent:
 
         return response
 
-    def request(self, method, uri, headers=None, bodyProducer=None):
+    def request(
+        self,
+        method: bytes,
+        uri: bytes,
+        headers: Headers = None,
+        bodyProducer: IBodyProducer = None,
+    ):
         """
         Make a request via send_request, but like an IAgent.
         """
@@ -326,10 +347,14 @@ class HTTP11Agent:
             name=url.host, addresses=[address], port=url.port, protocol=protocol
         )
 
+        if headers is None:
+            headers = Headers()
+
         req = HTTPRequest(
             host=url.host.encode("ascii"),
             protocol=protocol,
             method=method,
+            absoluteURI=uri,
             uri=uri_path.encode("ascii"),
             headers=headers,
             body=bodyProducer,
