@@ -55,6 +55,7 @@ steps:
       - "pwd"
       - "ls"
       - "ls /"
+      - "ls jenkins"
       - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
