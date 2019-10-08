@@ -9,6 +9,7 @@ jobs:
       - run: bash .circleci/merge_base_branch.sh
       - run: pwd
       - run: ls
+      - run: ls /
       - run: ls jenkins
       - run: POSTGRES=1 /synapse_sytest.sh
       - store_artifacts:
