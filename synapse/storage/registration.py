@@ -915,7 +915,7 @@ class RegistrationBackgroundUpdateStore(
         return 1
 
 
-class RegistrationStore(RegistrationWorkerStore, RegistrationBackgroundUpdateStore):
+class RegistrationStore(RegistrationBackgroundUpdateStore):
     def __init__(self, db_conn, hs):
         super(RegistrationStore, self).__init__(db_conn, hs)
 
