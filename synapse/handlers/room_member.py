@@ -203,6 +203,10 @@ class RoomMemberHandler(object):
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
+                # Copy over user state if we're joining an upgraded room
+                yield self.copy_user_state_if_room_upgrade(
+                    room_id, requester.user.to_string()
+                )
                 yield self._user_joined_room(target, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
@@ -452,16 +456,11 @@ class RoomMemberHandler(object):
                 )
 
                 # Copy over user state if this is a join on an remote upgraded room
-                yield self.copy_user_state_on_room_upgrade(
+                yield self.copy_user_state_if_room_upgrade(
                     room_id, requester.user.to_string()
                 )
 
                 return remote_join_response
-
-            # Copy over user state if this is a join on an local upgraded room
-            yield self.copy_user_state_on_room_upgrade(
-                room_id, requester.user.to_string()
-            )
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
@@ -499,8 +498,18 @@ class RoomMemberHandler(object):
         return res
 
     @defer.inlineCallbacks
-    def copy_user_state_on_room_upgrade(self, new_room_id, user_id):
-        # Check if this is an upgraded room
+    def copy_user_state_if_room_upgrade(self, new_room_id, user_id):
+        """Copy user-specific information when they join a new room if that new room is the
+        result of a room upgrade
+
+        Args:
+            new_room_id (str): The ID of the room the user is joining
+            user_id (str): The ID of the user
+
+        Returns:
+            Deferred
+        """
+        # Check if the new room is an upgraded room
         predecessor = yield self.store.get_room_predecessor(new_room_id)
         if not predecessor:
             return
