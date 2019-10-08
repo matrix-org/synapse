@@ -24,6 +24,7 @@ from synapse.api.errors import AuthError
 from synapse.types import UserID
 
 from tests import unittest
+from tests.unittest import override_config
 from tests.utils import register_federation_servlets
 
 # Some local users to test with
@@ -171,6 +172,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    @override_config({"send_federation": True})
     def test_started_typing_remote_send(self):
         self.room_members = [U_APPLE, U_ONION]
 
@@ -234,6 +236,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    @override_config({"send_federation": True})
     def test_stopped_typing(self):
         self.room_members = [U_APPLE, U_BANANA, U_ONION]
 
