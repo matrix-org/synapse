@@ -240,6 +240,7 @@ steps:
       POSTGRES: "1"
     command:
       - "bash .buildkite/merge_base_branch.sh"
+      - "ls"
       - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
