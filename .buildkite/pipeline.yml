@@ -53,7 +53,7 @@ steps:
     command:
       - "bash .buildkite/merge_base_branch.sh"
       - "pwd"
-      - "ls"
+      - "ls -a"
       - "ls /"
       - "ls jenkins"
       - "bash /synapse_sytest.sh"
