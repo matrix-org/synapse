@@ -349,7 +349,6 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     def _on_context_state_request_compute(self, room_id, event_id):
-
         if event_id:
             pdus = yield self.handler.get_state_for_pdu(room_id, event_id)
         else:
