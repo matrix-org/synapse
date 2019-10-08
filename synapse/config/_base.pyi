@@ -47,7 +47,7 @@ class RootConfig:
     database: database.DatabaseConfig
     logging: logger.LoggingConfig
     ratelimit: ratelimiting.RatelimitConfig
-    contentrepository: repository.ContentRepositoryConfig
+    media: repository.ContentRepositoryConfig
     captcha: captcha.CaptchaConfig
     voip: voip.VoipConfig
     registration: registration.RegistrationConfig
@@ -61,7 +61,7 @@ class RootConfig:
     password: password.PasswordConfig
     email: emailconfig.EmailConfig
     worker: workers.WorkerConfig
-    passwordauthprovider: password_auth_providers.PasswordAuthProviderConfig
+    authproviders: password_auth_providers.PasswordAuthProviderConfig
     push: push.PushConfig
     spamchecker: spam_checker.SpamCheckerConfig
     groups: groups.GroupsConfig

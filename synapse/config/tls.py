@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 
 class TlsConfig(Config):
+    section = "tls"
+
     def read_config(self, config: dict, config_dir_path: str, **kwargs):
 
         acme_config = config.get("acme", None)

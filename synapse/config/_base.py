@@ -75,7 +75,15 @@ def path_exists(file_path):
 class Config(object):
     """
     A configuration section, containing configuration keys and values.
+
+    Attributes:
+        section (str): The section title of this config object, such as
+            "tls" or "logger". This is used to refer to it on the root
+            logger (for example, `config.tls.some_option`). Must be
+            defined in subclasses.
     """
+
+    section = None
 
     def __init__(self, root_config=None):
         self.root = root_config
@@ -182,17 +190,14 @@ class RootConfig(object):
         self._configs = OrderedDict()
 
         for config_class in self.config_classes:
-            if hasattr(config_class, "section"):
-                name = config_class.section
-            else:
-                name = config_class.__name__.replace("Config", "").lower()
+            if config_class.section is None:
+                raise ValueError("%r requires a section name" % (config_class,))
 
             try:
                 conf = config_class(self)
             except Exception as e:
-                raise Exception("Failed making %s: %r" % (name, e))
-            conf.section = name
-            self._configs[name] = conf
+                raise Exception("Failed making %s: %r" % (config_class.section, e))
+            self._configs[config_class.section] = conf
 
     def __getattr__(self, item: str) -> Any:
         """
