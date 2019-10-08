@@ -639,8 +639,6 @@ class RootConfig(object):
             data_dir_path=data_dir_path,
         )
 
-    read_config = parse_config_dict
-
     def generate_missing_files(self, config_dict, config_dir_path):
         self.invoke_all("generate_files", config_dict, config_dir_path)
 
