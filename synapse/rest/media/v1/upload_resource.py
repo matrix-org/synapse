@@ -17,7 +17,7 @@ import logging
 
 from twisted.web.server import NOT_DONE_YET
 
-from synapse.api.errors import SynapseError , Codes
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import (
     DirectServeResource,
     respond_with_json,
