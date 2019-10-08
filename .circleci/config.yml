@@ -19,7 +19,7 @@ jobs:
           path: /logs
   sytestpy2postgresworkersmerged:
     docker:
-      - image: matrixdotorg/sytest-synapse:dinsic-test
+      - image: matrixdotorg/sytest-synapse:dinsic
     working_directory: /src
     steps:
       - checkout
