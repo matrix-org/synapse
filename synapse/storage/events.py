@@ -1076,6 +1076,8 @@ class EventsStore(
                 ),
             )
 
+            logger.info("Persisted CSD for stream_id %s", stream_id)
+
             # Now we actually update the current_state_events table
 
             txn.executemany(
