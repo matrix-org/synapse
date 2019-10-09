@@ -28,9 +28,7 @@ def run_create(cur, database_engine, *args, **kwargs):
         select_clause = """
             SELECT * FROM user_filters GROUP BY user_id, filter_id
         """
-    sql = (
-        """
-        BEGIN;
+    sql = """
             DROP TABLE IF EXISTS user_filters_migration;
             DROP INDEX IF EXISTS user_filters_unique;
             CREATE TABLE user_filters_migration (
@@ -44,10 +42,10 @@ def run_create(cur, database_engine, *args, **kwargs):
                 (user_id, filter_id);
             DROP TABLE user_filters;
             ALTER TABLE user_filters_migration RENAME TO user_filters;
-        END;
-    """
-        % select_clause
+        """ % (
+        select_clause,
     )
+
     if isinstance(database_engine, PostgresEngine):
         cur.execute(sql)
     else:
