@@ -28,7 +28,7 @@ jobs:
           path: /logs
   sytestpy3postgresmerged:
       docker:
-        - image: matrixdotorg/sytest-synapse:dinsic
+        - image: matrixdotorg/sytest-synapse:dinsic-py3
       working_directory: /src
       steps:
         - checkout
@@ -41,7 +41,7 @@ jobs:
             path: /logs
   sytestpy3postgresworkersmerged:
       docker:
-        - image: matrixdotorg/sytest-synapse:dinsic
+        - image: matrixdotorg/sytest-synapse:dinsic-py3
       working_directory: /src
       steps:
         - checkout
