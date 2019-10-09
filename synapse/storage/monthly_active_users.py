@@ -86,12 +86,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             if len(self.reserved_users) > 0:
                 # questionmarks is a hack to overcome sqlite not supporting
                 # tuples in 'WHERE IN %s'
-                questionmarks = "?" * len(self.reserved_users)
+                question_marks = ",".join("?" * len(self.reserved_users))
 
                 query_args.extend(self.reserved_users)
-                sql = base_sql + """ AND user_id NOT IN ({})""".format(
-                    ",".join(questionmarks)
-                )
+                sql = base_sql + """ AND user_id NOT IN ({})""".format(question_marks)
             else:
                 sql = base_sql
 
@@ -120,9 +118,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 # Need if/else since 'AND user_id NOT IN ({})' fails on Postgres
                 # when len(reserved_users) == 0. Works fine on sqlite.
                 else:
-                    safe_guard = max_mau_value - len(self.reserved_users)
-                    # Must be greater than zero for postgres
-                    safe_guard = safe_guard if safe_guard > 0 else 0
+                    # Must be >= 0 for postgres
+                    num_of_non_reserved_users_to_remove = max(max_mau_value - len(self.reserved_users), 0)
+                    
                     # It is important to filter reserved users twice to guard
                     # against the case where the reserved user is present in the
                     # SELECT, meaning that a legitmate mau is deleted.
@@ -130,19 +128,13 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                         DELETE FROM monthly_active_users
                         WHERE user_id NOT IN (
                             SELECT user_id FROM monthly_active_users
-                            WHERE user_id NOT IN ({})""".format(
-                        ",".join(questionmarks)
-                    ) + """
+                            WHERE user_id NOT IN ({})
                             ORDER BY timestamp DESC
                             LIMIT ?
                         )
-                        AND user_id NOT IN ({})""".format(
-                        ",".join(questionmarks)
-                    )
-                    query_args = []
-                    query_args.extend(self.reserved_users)
-                    query_args.append(safe_guard)
-                    query_args.extend(self.reserved_users)
+                        AND user_id NOT IN ({})""".format(question_marks, question_marks)
+
+                    query_args = [*self.reserved_users, num_of_non_reserved_users_to_remove, *self.reserved_users]
 
                     txn.execute(sql, query_args)
 

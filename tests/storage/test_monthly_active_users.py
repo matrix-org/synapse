@@ -167,29 +167,29 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         for i in range(initial_users):
             user = "@user%d:server" % i
             email = "user%d@example.com" % i
-            self.store.upsert_monthly_active_user(user)
+            self.get_success(self.store.upsert_monthly_active_user(user))
             threepids.append({"medium": "email", "address": email})
             # Need to ensure that the most recent entries in the
             # monthly_active_users table are reserved
             now = int(self.hs.get_clock().time_msec())
             if i != 0:
-                self.store.register_user(user_id=user, password_hash=None)
-                self.pump()
-                self.store.user_add_threepid(user, "email", email, now, now)
+                self.get_success(self.store.register_user(user_id=user, password_hash=None))
+                #self.pump()
+                self.get_success(self.store.user_add_threepid(user, "email", email, now, now))
 
         self.hs.config.mau_limits_reserved_threepids = threepids
         self.store.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
-        self.pump()
+        #self.pump()
         count = self.store.get_monthly_active_count()
         self.assertTrue(self.get_success(count), initial_users)
 
         count = self.store.get_registered_reserved_users_count()
         self.assertEquals(self.get_success(count), reserved_user_number)
 
-        self.store.reap_monthly_active_users()
-        self.pump()
+        self.get_success(self.store.reap_monthly_active_users())
+        #self.pump()
         count = self.store.get_monthly_active_count()
         self.assertEquals(self.get_success(count), self.hs.config.max_mau_value)
 
