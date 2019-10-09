@@ -50,6 +50,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
             {"medium": "email", "address": user2_email},
             {"medium": "email", "address": user3_email},
         ]
+        self.hs.config.mau_limits_reserved_threepids = threepids
         # -1 because user3 is a support user and does not count
         user_num = len(threepids) - 1
 
@@ -84,6 +85,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.hs.config.max_mau_value = 0
 
         self.reactor.advance(FORTY_DAYS)
+        self.hs.config.max_mau_value = 5
 
         self.store.reap_monthly_active_users()
         self.pump()
@@ -173,23 +175,24 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
             # monthly_active_users table are reserved
             now = int(self.hs.get_clock().time_msec())
             if i != 0:
-                self.get_success(self.store.register_user(user_id=user, password_hash=None))
-                #self.pump()
-                self.get_success(self.store.user_add_threepid(user, "email", email, now, now))
+                self.get_success(
+                    self.store.register_user(user_id=user, password_hash=None)
+                )
+                self.get_success(
+                    self.store.user_add_threepid(user, "email", email, now, now)
+                )
 
         self.hs.config.mau_limits_reserved_threepids = threepids
         self.store.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
-        #self.pump()
         count = self.store.get_monthly_active_count()
         self.assertTrue(self.get_success(count), initial_users)
 
-        count = self.store.get_registered_reserved_users_count()
-        self.assertEquals(self.get_success(count), reserved_user_number)
+        users = self.store.get_registered_reserved_users()
+        self.assertEquals(len(self.get_success(users)), reserved_user_number)
 
         self.get_success(self.store.reap_monthly_active_users())
-        #self.pump()
         count = self.store.get_monthly_active_count()
         self.assertEquals(self.get_success(count), self.hs.config.max_mau_value)
 
@@ -227,8 +230,8 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
     def test_get_reserved_real_user_account(self):
         # Test no reserved users, or reserved threepids
-        count = self.store.get_registered_reserved_users_count()
-        self.assertEquals(self.get_success(count), 0)
+        users = self.get_success(self.store.get_registered_reserved_users())
+        self.assertEquals(len(users), 0)
         # Test reserved users but no registered users
 
         user1 = "@user1:example.com"
@@ -246,8 +249,8 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         )
 
         self.pump()
-        count = self.store.get_registered_reserved_users_count()
-        self.assertEquals(self.get_success(count), 0)
+        users = self.get_success(self.store.get_registered_reserved_users())
+        self.assertEquals(len(users), 0)
 
         # Test reserved registed users
         self.store.register_user(user_id=user1, password_hash=None)
@@ -257,8 +260,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         now = int(self.hs.get_clock().time_msec())
         self.store.user_add_threepid(user1, "email", user1_email, now, now)
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
-        count = self.store.get_registered_reserved_users_count()
-        self.assertEquals(self.get_success(count), len(threepids))
+
+        users = self.get_success(self.store.get_registered_reserved_users())
+        self.assertEquals(len(users), len(threepids))
 
     def test_support_user_not_add_to_mau_limits(self):
         support_user_id = "@support:test"
