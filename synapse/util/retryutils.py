@@ -29,7 +29,7 @@ MIN_RETRY_INTERVAL = 10 * 60 * 1000
 RETRY_MULTIPLIER = 5
 
 # a cap on the backoff. (Essentially none)
-MAX_RETRY_INTERVAL = 2 ** 63
+MAX_RETRY_INTERVAL = 2 ** 62
 
 
 class NotRetryingDestination(Exception):

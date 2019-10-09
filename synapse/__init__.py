@@ -38,7 +38,7 @@ try:
 except ImportError:
     pass
 
-__version__ = "1.4.0rc1"
+__version__ = "1.4.0"
 
 if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
     do_patch()

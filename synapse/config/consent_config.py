@@ -73,8 +73,8 @@ DEFAULT_CONFIG = """\
 
 
 class ConsentConfig(Config):
-    def __init__(self):
-        super(ConsentConfig, self).__init__()
+    def __init__(self, *args):
+        super(ConsentConfig, self).__init__(*args)
 
         self.user_consent_version = None
         self.user_consent_template_dir = None
