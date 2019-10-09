@@ -1,1 +1,1 @@
-Fix bug where we were updating censored events as bytes rather than text, occaisonally causing invalid JSON being inserted breaking APIs that attempted to fetch such events.
+Fix bug where redacted events were sometimes incorrectly censored in the database, breaking APIs that attempted to fetch such events.
