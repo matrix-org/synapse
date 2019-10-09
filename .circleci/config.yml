@@ -7,10 +7,6 @@ jobs:
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
-      - run: pwd
-      - run: ls
-      - run: ls /
-      - run: ls jenkins
       - run: POSTGRES=1 /synapse_sytest.sh
       - store_artifacts:
           path: /logs
@@ -30,6 +26,32 @@ jobs:
           destination: logs
       - store_test_results:
           path: /logs
+  sytestpy3postgresmerged:
+      docker:
+        - image: matrixdotorg/sytest-synapse:dinsic
+      working_directory: /src
+      steps:
+        - checkout
+        - run: bash .circleci/merge_base_branch.sh
+        - run: POSTGRES=1 /synapse_sytest.sh
+        - store_artifacts:
+            path: /logs
+            destination: logs
+        - store_test_results:
+            path: /logs
+  sytestpy3postgresworkersmerged:
+      docker:
+        - image: matrixdotorg/sytest-synapse:dinsic
+      working_directory: /src
+      steps:
+        - checkout
+        - run: bash .circleci/merge_base_branch.sh
+        - run: POSTGRES=1 WORKERS=1 /synapse_sytest.sh
+        - store_artifacts:
+            path: /logs
+            destination: logs
+        - store_test_results:
+            path: /logs
 
 
 workflows:
@@ -41,6 +63,14 @@ workflows:
             branches:
               ignore: /develop|master|release-.*/
       - sytestpy2postgresworkersmerged:
+          filters:
+            branches:
+              ignore: /develop|master|release-.*/
+      - sytestpy3postgresmerged:
+          filters:
+            branches:
+              ignore: /develop|master|release-.*/
+      - sytestpy3postgresworkersmerged:
           filters:
             branches:
               ignore: /develop|master|release-.*/
