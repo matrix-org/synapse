@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import abc
 import logging
 
 from synapse.storage._base import SQLBaseStore
@@ -21,9 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class StateDeltasStore(SQLBaseStore):
-    __metaclass__ = abc.ABCMeta
-
-    def get_current_state_deltas(self, prev_stream_id):
+    def get_current_state_deltas(self, prev_stream_id: int, max_stream_id: int):
         """Fetch a list of room state changes since the given stream id
 
         Each entry in the result contains the following fields:
@@ -38,31 +35,28 @@ class StateDeltasStore(SQLBaseStore):
 
         Args:
             prev_stream_id (int): point to get changes since (exclusive)
+            max_stream_id (int): the point that we know has been correctly persisted
+               - ie, an upper limit to return changes from.
 
         Returns:
             Deferred[tuple[int, list[dict]]: A tuple consisting of:
-               - the stream id which these results go up to, or the latest (persisted)
-                 room stream ordering
+               - the stream id which these results go up to
                - list of current_state_delta_stream rows. If it is empty, we are
                  up to date.
         """
 
         prev_stream_id = int(prev_stream_id)
 
-        # rows are not necessarily persisted to the CSDS table in order. make
-        # sure that we only consider stream_ids which have been fully persisted.
-        room_max_stream_ordering = self.get_room_max_stream_ordering()
-
         # check we're not going backwards
-        assert prev_stream_id <= room_max_stream_ordering
+        assert prev_stream_id <= max_stream_id
 
         if not self._curr_state_delta_stream_cache.has_any_entity_changed(
             prev_stream_id
         ):
             # if the CSDs haven't changed between prev_stream_id and now, we
             # know for certain that they haven't changed between prev_stream_id and
-            # room_max_stream_ordering.
-            return room_max_stream_ordering, []
+            # max_stream_id.
+            return max_stream_id, []
 
         def get_current_state_deltas_txn(txn):
             # First we calculate a max stream id that will give us less than
@@ -77,19 +71,24 @@ class StateDeltasStore(SQLBaseStore):
                 ORDER BY stream_id ASC
                 LIMIT 100
             """
-            txn.execute(sql, (prev_stream_id, room_max_stream_ordering))
+            txn.execute(sql, (prev_stream_id, max_stream_id))
 
             total = 0
 
-            # if there are no entries, we may as well go up to the current max stream id
-            max_stream_id = room_max_stream_ordering
-
-            for max_stream_id, count in txn:
+            for stream_id, count in txn:
                 total += count
                 if total > 100:
                     # We arbitarily limit to 100 entries to ensure we don't
                     # select toooo many.
+                    logger.debug(
+                        "Clipping current_state_delta_stream rows to stream_id %i",
+                        stream_id,
+                    )
+                    clipped_stream_id = stream_id
                     break
+            else:
+                # if there's no problem, we may as well go right up to the max_stream_id
+                clipped_stream_id = max_stream_id
 
             # Now actually get the deltas
             sql = """
@@ -98,8 +97,8 @@ class StateDeltasStore(SQLBaseStore):
                 WHERE ? < stream_id AND stream_id <= ?
                 ORDER BY stream_id ASC
             """
-            txn.execute(sql, (prev_stream_id, max_stream_id))
-            return max_stream_id, self.cursor_to_dict(txn)
+            txn.execute(sql, (prev_stream_id, clipped_stream_id))
+            return clipped_stream_id, self.cursor_to_dict(txn)
 
         return self.runInteraction(
             "get_current_state_deltas", get_current_state_deltas_txn
@@ -118,9 +117,3 @@ class StateDeltasStore(SQLBaseStore):
             "get_max_stream_id_in_current_state_deltas",
             self._get_max_stream_id_in_current_state_deltas_txn,
         )
-
-    @abc.abstractmethod
-    def get_room_max_stream_ordering(self):
-        # we expect this to be implemented one way or the other by other classes
-        # in the hierarchy
-        raise NotImplementedError()

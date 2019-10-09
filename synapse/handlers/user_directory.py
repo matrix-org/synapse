@@ -138,9 +138,16 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Loop round handling deltas until we're up to date
         while True:
             with Measure(self.clock, "user_dir_delta"):
-                max_pos, deltas = yield self.store.get_current_state_deltas(self.pos)
-                if not deltas:
+                room_max_stream_ordering = self.store.get_room_max_stream_ordering()
+                if self.pos == room_max_stream_ordering:
                     return
+
+                logger.debug(
+                    "Processing user stats %s->%s", self.pos, room_max_stream_ordering
+                )
+                max_pos, deltas = yield self.store.get_current_state_deltas(
+                    self.pos, room_max_stream_ordering
+                )
 
                 logger.info("Handling %d state deltas", len(deltas))
                 yield self._handle_deltas(deltas)

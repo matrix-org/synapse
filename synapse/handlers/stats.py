@@ -84,10 +84,19 @@ class StatsHandler(StateDeltasHandler):
         # Loop round handling deltas until we're up to date
 
         while True:
-            max_pos, deltas = yield self.store.get_current_state_deltas(self.pos)
-
-            if self.pos == max_pos:
+            # Be sure to read the max stream_ordering *before* checking if there are any outstanding
+            # deltas, since there is otherwise a chance that we could miss updates which arrive
+            # after we check the deltas.
+            room_max_stream_ordering = self.store.get_room_max_stream_ordering()
+            if self.pos == room_max_stream_ordering:
                 break
+
+            logger.debug(
+                "Processing room stats %s->%s", self.pos, room_max_stream_ordering
+            )
+            max_pos, deltas = yield self.store.get_current_state_deltas(
+                self.pos, room_max_stream_ordering
+            )
 
             if deltas:
                 logger.debug("Handling %d state deltas", len(deltas))

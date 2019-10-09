@@ -803,8 +803,17 @@ class PresenceHandler(object):
         # Loop round handling deltas until we're up to date
         while True:
             with Measure(self.clock, "presence_delta"):
+                room_max_stream_ordering = self.store.get_room_max_stream_ordering()
+                if self._event_pos == room_max_stream_ordering:
+                    return
+
+                logger.debug(
+                    "Processing presence stats %s->%s",
+                    self._event_pos,
+                    room_max_stream_ordering,
+                )
                 max_pos, deltas = yield self.store.get_current_state_deltas(
-                    self._event_pos
+                    self._event_pos, room_max_stream_ordering
                 )
                 yield self._handle_state_delta(deltas)
 
@@ -814,9 +823,6 @@ class PresenceHandler(object):
                 synapse.metrics.event_processing_positions.labels("presence").set(
                     max_pos
                 )
-
-                if not deltas:
-                    return
 
     @defer.inlineCallbacks
     def _handle_state_delta(self, deltas):
