@@ -71,6 +71,19 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             "redactions_received_ts", self._redactions_received_ts
         )
 
+        # This index gets deleted in `event_fix_redactions_bytes` update
+        self.register_background_index_update(
+            "event_fix_redactions_bytes_create_index",
+            index_name="redactions_censored_redacts",
+            table="redactions",
+            columns=["redacts"],
+            where_clause="have_censored",
+        )
+
+        self.register_background_update_handler(
+            "event_fix_redactions_bytes", self._event_fix_redactions_bytes
+        )
+
     @defer.inlineCallbacks
     def _background_reindex_fields_sender(self, progress, batch_size):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
@@ -458,3 +471,33 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             yield self._end_background_update("redactions_received_ts")
 
         return count
+
+    @defer.inlineCallbacks
+    def _event_fix_redactions_bytes(self, progress, batch_size):
+        """Undoes hex encoded censored redacted event JSON.
+        """
+
+        def _event_fix_redactions_bytes_txn(txn):
+            # This update is quite fast due to new index.
+            txn.execute(
+                """
+                UPDATE event_json
+                SET
+                    json = convert_from(json::bytea, 'utf8')
+                FROM redactions
+                WHERE
+                    redactions.have_censored
+                    AND event_json.event_id = redactions.redacts
+                    AND json NOT LIKE '{%';
+                """
+            )
+
+            txn.execute("DROP INDEX redactions_censored_redacts")
+
+        yield self.runInteraction(
+            "_event_fix_redactions_bytes", _event_fix_redactions_bytes_txn
+        )
+
+        yield self._end_background_update("event_fix_redactions_bytes")
+
+        return 1
