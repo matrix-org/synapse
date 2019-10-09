@@ -138,21 +138,21 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Loop round handling deltas until we're up to date
         while True:
             with Measure(self.clock, "user_dir_delta"):
-                deltas = yield self.store.get_current_state_deltas(self.pos)
+                max_pos, deltas = yield self.store.get_current_state_deltas(self.pos)
                 if not deltas:
                     return
 
                 logger.info("Handling %d state deltas", len(deltas))
                 yield self._handle_deltas(deltas)
 
-                self.pos = deltas[-1]["stream_id"]
+                self.pos = max_pos
 
                 # Expose current event processing position to prometheus
                 synapse.metrics.event_processing_positions.labels("user_dir").set(
-                    self.pos
+                    max_pos
                 )
 
-                yield self.store.update_user_directory_stream_pos(self.pos)
+                yield self.store.update_user_directory_stream_pos(max_pos)
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
