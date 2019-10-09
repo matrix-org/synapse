@@ -1,1 +1,1 @@
-Update `user_filters` table to have a unique index, and non-null columns. Thanks to @pik for contributing this
+Update `user_filters` table to have a unique index, and non-null columns. Thanks to @pik for contributing this.
