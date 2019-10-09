@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
 
 from synapse.storage._base import SQLBaseStore
@@ -44,7 +45,6 @@ class StateDeltasStore(SQLBaseStore):
                - list of current_state_delta_stream rows. If it is empty, we are
                  up to date.
         """
-
         prev_stream_id = int(prev_stream_id)
 
         # check we're not going backwards
@@ -59,7 +59,7 @@ class StateDeltasStore(SQLBaseStore):
             return max_stream_id, []
 
         def get_current_state_deltas_txn(txn):
-            # First we calculate a max stream id that will give us less than
+            # First we calculate the max stream id that will give us less than
             # N results.
             # We arbitarily limit to 100 stream_id entries to ensure we don't
             # select toooo many.
