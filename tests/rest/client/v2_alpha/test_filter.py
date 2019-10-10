@@ -92,7 +92,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
 
-        self.assertEqual(channel.result["code"], b"400")
+        self.assertEqual(channel.result["code"], b"404")
         self.assertEquals(channel.json_body["errcode"], Codes.NOT_FOUND)
 
     # Currently invalid params do not have an appropriate errcode
