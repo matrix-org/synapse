@@ -17,13 +17,11 @@ from __future__ import print_function
 
 import functools
 import sys
-
-from typing import List, Callable, Any
+from typing import Any, Callable, List
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
-
 
 # Tracks if we've already patched inlineCallbacks
 _already_patched = False
