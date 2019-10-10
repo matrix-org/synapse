@@ -44,7 +44,7 @@ def do_patch():
         @functools.wraps(f)
         def wrapped(*args, **kwargs):
             start_context = LoggingContext.current_context()
-            changes: List[str] = []
+            changes = []  # type: List[str]
             orig = orig_inline_callbacks(_check_yield_points(f, changes))
 
             try:
