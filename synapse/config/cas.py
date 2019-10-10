@@ -22,6 +22,8 @@ class CasConfig(Config):
     cas_server_url: URL of CAS server
     """
 
+    section = "cas"
+
     def read_config(self, config, **kwargs):
         cas_config = config.get("cas_config", None)
         if cas_config:

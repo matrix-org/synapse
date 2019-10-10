@@ -59,6 +59,8 @@ class ServerNoticesConfig(Config):
             None if server notices are not enabled.
     """
 
+    section = "servernotices"
+
     def __init__(self, *args):
         super(ServerNoticesConfig, self).__init__(*args)
         self.server_notices_mxid = None
