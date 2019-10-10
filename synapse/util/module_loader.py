@@ -54,5 +54,5 @@ def load_python_module(location: str):
     if spec is None:
         raise Exception("Unable to load module at %s" % (location,))
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    spec.loader.exec_module(mod)  # type: ignore
     return mod
