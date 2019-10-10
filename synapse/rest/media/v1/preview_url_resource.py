@@ -270,7 +270,7 @@ class PreviewUrlResource(DirectServeResource):
 
         logger.debug("Calculated OG for %s as %s" % (url, og))
 
-        jsonog = json.dumps(og).encode("utf8")
+        jsonog = json.dumps(og)
 
         # store OG in history-aware DB cache
         yield self.store.store_url_cache(
@@ -283,7 +283,7 @@ class PreviewUrlResource(DirectServeResource):
             media_info["created_ts"],
         )
 
-        return jsonog
+        return jsonog.encode("utf8")
 
     @defer.inlineCallbacks
     def _download_url(self, url, user):
