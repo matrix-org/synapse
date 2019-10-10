@@ -91,10 +91,7 @@ class ResourceLimitsServerNotices(object):
         currently_blocked, ref_events = yield self._is_room_currently_blocked(room_id)
 
         try:
-            if (
-                self._config.mau_alerting_threshold > 0
-                and self._config.mau_alerting_threshold > self._config.max_mau_value
-            ):
+            if self._config.mau_suppress_alerting:
                 # Alerting disabled, reset room if necessary and return
                 if currently_blocked:
                     content = {"pinned": ref_events}

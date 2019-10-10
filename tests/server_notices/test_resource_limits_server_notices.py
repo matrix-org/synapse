@@ -158,6 +158,41 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
 
         self._send_notice.assert_not_called()
 
+    def test_maybe_send_server_notice_when_alerting_suppressed_room_unblocked(self):
+        """
+        Test that when server is over MAU limit and alerting is suppressed, then
+        an alert message is not sent into the room
+        """
+        self.hs.config.mau_suppress_alerting = True
+        self._rlsn._auth.check_auth_blocking = Mock(
+            side_effect=ResourceLimitError(403, "foo")
+        )
+        self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
+
+        self.assertTrue(self._send_notice.call_count == 0)
+
+    def test_maybe_send_server_notice_when_alerting_suppressed_room_blocked(self):
+        """
+        When the room is already in a blocked state, test that when alerting
+        is suppressed that the room is returned to an unblocked state.
+        """
+        self.hs.config.mau_suppress_alerting = True
+        self._rlsn._auth.check_auth_blocking = Mock(
+            side_effect=ResourceLimitError(403, "foo")
+        )
+        self._rlsn._server_notices_manager.__is_room_currently_blocked = Mock(
+            return_value=defer.succeed((True, []))
+        )
+
+        mock_event = Mock(
+            type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
+        )
+        self._rlsn._store.get_events = Mock(
+            return_value=defer.succeed({"123": mock_event})
+        )
+        self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
+
+        self._send_notice.assert_called_once()
 
 class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
