@@ -30,7 +30,7 @@ from prometheus_client import Histogram
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.logging.context import LoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id
@@ -550,8 +550,9 @@ class SQLBaseStore(object):
 
                 return func(conn, *args, **kwargs)
 
-        with PreserveLoggingContext():
-            result = yield self._db_pool.runWithConnection(inner_func, *args, **kwargs)
+        result = yield make_deferred_yieldable(
+            self._db_pool.runWithConnection(inner_func, *args, **kwargs)
+        )
 
         return result
 
