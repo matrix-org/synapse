@@ -88,7 +88,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 question_marks = ",".join("?" * len(reserved_users))
 
                 query_args.extend(reserved_users)
-                sql = base_sql + """ AND user_id NOT IN ({})""".format(question_marks)
+                sql = base_sql + " AND user_id NOT IN ({})".format(question_marks)
             else:
                 sql = base_sql
 
@@ -133,7 +133,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                             ORDER BY timestamp DESC
                             LIMIT ?
                         )
-                        AND user_id NOT IN ({})""".format(
+                        AND user_id NOT IN ({})
+                    """.format(
                         question_marks, question_marks
                     )
 
@@ -182,9 +183,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         with registered users?
 
         Returns:
-            Defered[tuple]: Real reserved users
+            Defered[list]: Real reserved users
         """
-        users = ()
+        users = []
 
         for tp in self.hs.config.mau_limits_reserved_threepids[
             : self.hs.config.max_mau_value
@@ -193,7 +194,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 tp["medium"], tp["address"]
             )
             if user_id:
-                users = users + (user_id,)
+                users.append(user_id)
 
         return users
 
