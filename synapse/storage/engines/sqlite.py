@@ -47,7 +47,7 @@ class Sqlite3Engine(object):
         return self.module.sqlite_version_info >= (3, 15, 0)
 
     @property
-    def supports_any_list(self):
+    def supports_using_any_list(self):
         """Do we support using `a = ANY(?)` and passing a list
         """
         return False
