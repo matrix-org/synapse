@@ -47,7 +47,5 @@ prune debian
 prune demo/etc
 prune docker
 prune mypy.ini
+prune snap
 prune stubs
-
-exclude jenkins*
-recursive-exclude jenkins *.sh
