@@ -117,7 +117,7 @@ def _check_yield_points(f, changes, start_context):
 
         gen = f(*args, **kwargs)
 
-        last_yield_line_no = 1
+        last_yield_line_no = gen.gi_frame.f_lineno
         result = None
         while True:
             try:
@@ -136,7 +136,7 @@ def _check_yield_points(f, changes, start_context):
                         " in %s between %d and end of func"
                         % (
                             f.__qualname__,
-                            start_context,
+                            expected_context,
                             LoggingContext.current_context(),
                             f.__code__.co_filename,
                             last_yield_line_no,
@@ -148,22 +148,22 @@ def _check_yield_points(f, changes, start_context):
 
             frame = gen.gi_frame
 
-            if isinstance(d, defer.Deferred):
+            if isinstance(d, defer.Deferred) and not d.called:
                 # This happens if we yield on a deferred that doesn't follow
                 # the log context rules without wrappin in a `make_deferred_yieldable`
-                if LoggingContext.current_context() != LoggingContext.Sentinel:
+                if LoggingContext.current_context() is not LoggingContext.sentinel:
                     err = (
-                        "%s yielded with context %s rather than Sentinel,"
+                        "%s yielded with context %s rather than sentinel,"
                         " yielded on line %d in %s"
                         % (
                             frame.f_code.co_name,
-                            start_context,
                             LoggingContext.current_context(),
                             frame.f_lineno,
                             frame.f_code.co_filename,
                         )
                     )
                     changes.append(err)
+                    # raise Exception(err)
 
             try:
                 result = yield d
