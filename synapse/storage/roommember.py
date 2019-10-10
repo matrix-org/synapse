@@ -26,7 +26,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage._base import LoggingTransaction
+from synapse.storage._base import LoggingTransaction, make_in_list_sql_clause
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import Sqlite3Engine
 from synapse.storage.events_worker import EventsWorkerStore
@@ -372,6 +372,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         results = []
         if membership_list:
             if self._current_state_events_membership_up_to_date:
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "c.membership", membership_list
+                )
                 sql = """
                     SELECT room_id, e.sender, c.membership, event_id, e.stream_ordering
                     FROM current_state_events AS c
@@ -379,11 +382,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     WHERE
                         c.type = 'm.room.member'
                         AND state_key = ?
-                        AND c.membership IN (%s)
+                        AND %s
                 """ % (
-                    ",".join("?" * len(membership_list))
+                    clause,
                 )
             else:
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "m.membership", membership_list
+                )
                 sql = """
                     SELECT room_id, e.sender, m.membership, event_id, e.stream_ordering
                     FROM current_state_events AS c
@@ -392,12 +398,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     WHERE
                         c.type = 'm.room.member'
                         AND state_key = ?
-                        AND m.membership IN (%s)
+                        AND %s
                 """ % (
-                    ",".join("?" * len(membership_list))
+                    clause,
                 )
 
-            txn.execute(sql, (user_id, *membership_list))
+            txn.execute(sql, (user_id, *args))
             results = [RoomsForUser(**r) for r in self.cursor_to_dict(txn)]
 
         if do_invite:
