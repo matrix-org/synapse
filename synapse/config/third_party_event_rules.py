@@ -19,6 +19,8 @@ from ._base import Config
 
 
 class ThirdPartyRulesConfig(Config):
+    section = "thirdpartyrules"
+
     def read_config(self, config, **kwargs):
         self.third_party_event_rules = None
 
