@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, List
+
 from synapse.util.module_loader import load_module
 
 from ._base import Config
@@ -21,8 +23,10 @@ LDAP_PROVIDER = "ldap_auth_provider.LdapAuthProvider"
 
 
 class PasswordAuthProviderConfig(Config):
+    section = "authproviders"
+
     def read_config(self, config, **kwargs):
-        self.password_providers = []
+        self.password_providers = []  # type: List[Any]
         providers = []
 
         # We want to be backwards compatible with the old `ldap_config`

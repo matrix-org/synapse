@@ -21,6 +21,8 @@ class WorkerConfig(Config):
     They have their own pid_file and listener configuration. They use the
     replication_url to talk to the main synapse process."""
 
+    section = "worker"
+
     def read_config(self, config, **kwargs):
         self.worker_app = config.get("worker_app")
 
