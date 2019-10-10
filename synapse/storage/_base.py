@@ -20,7 +20,7 @@ import random
 import sys
 import threading
 import time
-from typing import Iterable, List, Tuple
+from typing import Iterable, Tuple
 
 from six import PY2, iteritems, iterkeys, itervalues
 from six.moves import builtins, intern, range
@@ -1164,10 +1164,8 @@ class SQLBaseStore(object):
         if not iterable:
             return []
 
-        clauses = []
-        values = []
-
-        add_in_list_sql_clause(txn.database_engine, column, iterable, clauses, values)
+        clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
+        clauses = [clause]
 
         for key, value in iteritems(keyvalues):
             clauses.append("%s = ?" % (key,))
@@ -1326,10 +1324,8 @@ class SQLBaseStore(object):
 
         sql = "DELETE FROM %s" % table
 
-        clauses = []
-        values = []
-
-        add_in_list_sql_clause(txn.database_engine, column, iterable, clauses, values)
+        clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
+        clauses = [clause]
 
         for key, value in iteritems(keyvalues):
             clauses.append("%s = ?" % (key,))
@@ -1698,25 +1694,6 @@ def db_to_json(db_content):
         raise
 
 
-def add_in_list_sql_clause(
-    database_engine, column: str, iterable: Iterable, clauses: List[str], args: List
-):
-    """Adds an SQL clause to the given list of clauses/args that checks the
-    given column is in the iterable. c.f. `make_in_list_sql_clause`
-
-    Args:
-        database_engine
-        column: Name of the column
-        iterable: The values to check the column against.
-        clauses: A list to add the expanded clause to
-        args: A list of arguments that we append the args to.
-    """
-
-    clause, new_args = make_in_list_sql_clause(database_engine, column, iterable)
-    clauses.append(clause)
-    args.extend(new_args)
-
-
 def make_in_list_sql_clause(
     database_engine, column: str, iterable: Iterable
 ) -> Tuple[str, Iterable]:
@@ -1736,7 +1713,7 @@ def make_in_list_sql_clause(
         A tuple of SQL query and the args
     """
 
-    if isinstance(database_engine, PostgresEngine):
+    if database_engine.supports_using_any_list:
         # This should hopefully be faster, but also makes postgres query
         # stats easier to understand.
         return "%s = ANY(?)" % (column,), [list(iterable)]
