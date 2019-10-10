@@ -20,7 +20,7 @@
 import os
 import sys
 
-from tests.patch_inline_callbacks import do_patch
+from synapse.util.patch_inline_callbacks import do_patch
 
 # Check that we're not running on an unsupported Python version.
 if sys.version_info < (3, 5):

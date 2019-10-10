@@ -105,7 +105,7 @@ def do_patch():
 
 
 def _check_yield_points(f, changes, start_context):
-    """Wraps a generator that is about to passed to defer.inlineCallbacks
+    """Wraps a generator that is about to be passed to defer.inlineCallbacks
     checking that after every yield the log contexts are correct.
     """
 
