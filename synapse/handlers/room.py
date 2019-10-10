@@ -556,7 +556,6 @@ class RoomCreationHandler(BaseHandler):
         for i in invite_list:
             try:
                 uid = UserID.from_string(i)
-                # TODO Maybe attempt idna encoding/decoding as well?
                 parse_and_validate_server_name(uid.domain)
             except Exception:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))

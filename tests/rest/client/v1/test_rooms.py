@@ -487,7 +487,7 @@ class RoomsCreateTestCase(RoomBase):
 
     def test_post_room_invitees_invalid_mxid(self):
         # POST with invalid invitee, see https://github.com/matrix-org/synapse/issues/4088
-        # Note the trailing slash in the MXID here!
+        # Note the trailing space in the MXID here!
         request, channel = self.make_request("POST", "/createRoom", b'{"invite":["@alice:example.com "]}')
         self.render(request)
         self.assertEquals(400, channel.code)
