@@ -20,8 +20,6 @@
 import os
 import sys
 
-from synapse.util.patch_inline_callbacks import do_patch
-
 # Check that we're not running on an unsupported Python version.
 if sys.version_info < (3, 5):
     print("Synapse requires Python 3.5 or above.")
@@ -41,4 +39,8 @@ except ImportError:
 __version__ = "1.4.0"
 
 if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
+    # We import here so that we don't have to install a bunch of deps when
+    # running the packaging tox test.
+    from synapse.util.patch_inline_callbacks import do_patch
+
     do_patch()
