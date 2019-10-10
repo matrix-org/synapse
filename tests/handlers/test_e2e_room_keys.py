@@ -187,7 +187,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         self.assertEqual(res, 404)
 
     @defer.inlineCallbacks
-    def test_update_missing_version(self):
+    def test_update_omitted_version(self):
         """Check that the update succeeds if the version is missing from the body
         """
         version = yield self.handler.create_version(
