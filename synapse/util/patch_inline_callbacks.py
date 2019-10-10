@@ -114,7 +114,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
     """Wraps a generator that is about to be passed to defer.inlineCallbacks
     checking that after every yield the log contexts are correct.
 
-    Its perfectly valid for log contexts to change within a function, e.g. due
+    It's perfectly valid for log contexts to change within a function, e.g. due
     to new Measure blocks, so such changes are added to the given `changes`
     list instead of triggering an exception.
 
@@ -150,7 +150,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
                     # final yield and returning. E.g. we forgot to yield on a
                     # function that returns a deferred.
                     #
-                    # We don't raise here as its perfectly valid for contexts to
+                    # We don't raise here as it's perfectly valid for contexts to
                     # change in a function, as long as it sets the correct context
                     # on resolving (which is checked separately).
                     err = (
@@ -171,7 +171,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
 
             if isinstance(d, defer.Deferred) and not d.called:
                 # This happens if we yield on a deferred that doesn't follow
-                # the log context rules without wrappin in a `make_deferred_yieldable`.
+                # the log context rules without wrapping in a `make_deferred_yieldable`.
                 # We raise here as this should never happen.
                 if LoggingContext.current_context() is not LoggingContext.sentinel:
                     err = (
