@@ -107,6 +107,19 @@ def do_patch():
 def _check_yield_points(f, changes, start_context):
     """Wraps a generator that is about to be passed to defer.inlineCallbacks
     checking that after every yield the log contexts are correct.
+
+    Its perfectly valid for log contexts to change within a function, e.g. due
+    to new Measure blocks, so such changes are added to the given `changes`
+    list instead of triggering an exception.
+
+    Args:
+        f: generator function to wrap
+        changes (list[str]): A list of strings detailing how the contexts
+            changed within a function.
+        start_context (LoggingContext): The initial context we're expecting
+
+    Returns:
+        function
     """
 
     from synapse.logging.context import LoggingContext
@@ -131,6 +144,10 @@ def _check_yield_points(f, changes, start_context):
                     # This happens when the context is lost sometime *after* the
                     # final yield and returning. E.g. we forgot to yield on a
                     # function that returns a deferred.
+                    #
+                    # We don't raise here as its perfectly valid for contexts to
+                    # change in a function, as long as it sets the correct context
+                    # on resolving (which is checked separately).
                     err = (
                         "Function %r returned and changed context from %s to %s,"
                         " in %s between %d and end of func"
@@ -143,14 +160,14 @@ def _check_yield_points(f, changes, start_context):
                         )
                     )
                     changes.append(err)
-                    # raise Exception(err)
                 return getattr(e, "value", None)
 
             frame = gen.gi_frame
 
             if isinstance(d, defer.Deferred) and not d.called:
                 # This happens if we yield on a deferred that doesn't follow
-                # the log context rules without wrappin in a `make_deferred_yieldable`
+                # the log context rules without wrappin in a `make_deferred_yieldable`.
+                # We raise here as this should never happen.
                 if LoggingContext.current_context() is not LoggingContext.sentinel:
                     err = (
                         "%s yielded with context %s rather than sentinel,"
@@ -162,8 +179,7 @@ def _check_yield_points(f, changes, start_context):
                             frame.f_code.co_filename,
                         )
                     )
-                    changes.append(err)
-                    # raise Exception(err)
+                    raise Exception(err)
 
             try:
                 result = yield d
@@ -171,10 +187,15 @@ def _check_yield_points(f, changes, start_context):
                 result = Failure(e)
 
             if LoggingContext.current_context() != expected_context:
+
                 # This happens because the context is lost sometime *after* the
                 # previous yield and *after* the current yield. E.g. the
                 # deferred we waited on didn't follow the rules, or we forgot to
                 # yield on a function between the two yield points.
+                #
+                # We don't raise here as its perfectly valid for contexts to
+                # change in a function, as long as it sets the correct context
+                # on resolving (which is checked separately).
                 err = (
                     "%s changed context from %s to %s, happened between lines %d and %d in %s"
                     % (
@@ -187,7 +208,6 @@ def _check_yield_points(f, changes, start_context):
                     )
                 )
                 changes.append(err)
-                # raise Exception(err)
 
                 expected_context = LoggingContext.current_context()
 
