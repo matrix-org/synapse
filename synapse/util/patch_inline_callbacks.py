@@ -146,12 +146,29 @@ def _check_yield_points(f, changes, start_context):
                     # raise Exception(err)
                 return getattr(e, "value", None)
 
+            frame = gen.gi_frame
+
+            if isinstance(d, defer.Deferred):
+                # This happens if we yield on a deferred that doesn't follow
+                # the log context rules without wrappin in a `make_deferred_yieldable`
+                if LoggingContext.current_context() != LoggingContext.Sentinel:
+                    err = (
+                        "%s yielded with context %s rather than Sentinel,"
+                        " yielded on line %d in %s"
+                        % (
+                            frame.f_code.co_name,
+                            start_context,
+                            LoggingContext.current_context(),
+                            frame.f_lineno,
+                            frame.f_code.co_filename,
+                        )
+                    )
+                    changes.append(err)
+
             try:
                 result = yield d
             except Exception as e:
                 result = Failure(e)
-
-            frame = gen.gi_frame
 
             if LoggingContext.current_context() != expected_context:
                 # This happens because the context is lost sometime *after* the
