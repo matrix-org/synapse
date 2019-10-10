@@ -134,7 +134,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
         gen = f(*args, **kwargs)
 
         last_yield_line_no = gen.gi_frame.f_lineno
-        result: Any = None
+        result = None  # type: Any
         while True:
             expected_context = LoggingContext.current_context()
 
