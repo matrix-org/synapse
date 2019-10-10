@@ -1718,4 +1718,4 @@ def make_in_list_sql_clause(
         # stats easier to understand.
         return "%s = ANY(?)" % (column,), [list(iterable)]
     else:
-        return "%s IN (%s)" % (column, ",".join("?" for _ in iterable)), iterable
+        return "%s IN (%s)" % (column, ",".join("?" for _ in iterable)), list(iterable)
