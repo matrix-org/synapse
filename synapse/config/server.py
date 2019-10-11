@@ -171,7 +171,7 @@ class ServerConfig(Config):
         )
 
         self.mau_trial_days = config.get("mau_trial_days", 0)
-        self.mau_suppress_alerting = config.get("mau_suppress_alerting", False)
+        self.mau_limit_alerting = config.get("mau_limit_alerting", True)
 
         # How long to keep redacted events in the database in unredacted form
         # before redacting them.
@@ -696,15 +696,16 @@ class ServerConfig(Config):
         # sign up in a short space of time never to return after their initial
         # session.
         #
-        # 'mau_suppress_alerting' is a means of limiting client side alerting
+        # 'mau_limit_alerting' is a means of limiting client side alerting
         # should the mau limit be reached. This is useful for small instances
         # where the admin has 5 mau seats (say) for 5 specific people and no
-        # interest increasing the mau limit further. Defaults to False.
+        # interest increasing the mau limit further. Defaults to True, which
+        # means that alerting is enabled
         #
         #limit_usage_by_mau: False
         #max_mau_value: 50
         #mau_trial_days: 2
-        #mau_suppress_alerting: True
+        #mau_limit_alerting: False
 
         # If enabled, the metrics for the number of monthly active users will
         # be populated, however no one will be limited. If limit_usage_by_mau

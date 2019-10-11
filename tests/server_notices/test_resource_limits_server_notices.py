@@ -163,7 +163,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test that when server is over MAU limit and alerting is suppressed, then
         an alert message is not sent into the room
         """
-        self.hs.config.mau_suppress_alerting = True
+        self.hs.config.mau_limit_alerting = False
         self._rlsn._auth.check_auth_blocking = Mock(
             side_effect=ResourceLimitError(403, "foo")
         )
@@ -176,7 +176,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         When the room is already in a blocked state, test that when alerting
         is suppressed that the room is returned to an unblocked state.
         """
-        self.hs.config.mau_suppress_alerting = True
+        self.hs.config.mau_limit_alerting = False
         self._rlsn._auth.check_auth_blocking = Mock(
             side_effect=ResourceLimitError(403, "foo")
         )

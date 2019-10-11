@@ -70,7 +70,7 @@ class ResourceLimitsServerNotices(object):
             return
 
         if not self._server_notices_manager.is_enabled():
-            # Don't try and send server notices unles they've been enabled
+            # Don't try and send server notices unless they've been enabled
             return
 
         timestamp = yield self._store.user_last_seen_monthly_active(user_id)
@@ -91,7 +91,7 @@ class ResourceLimitsServerNotices(object):
         currently_blocked, ref_events = yield self._is_room_currently_blocked(room_id)
 
         try:
-            if self._config.mau_suppress_alerting:
+            if not self._config.mau_limit_alerting:
                 # Alerting disabled, reset room if necessary and return
                 if currently_blocked:
                     content = {"pinned": ref_events}
