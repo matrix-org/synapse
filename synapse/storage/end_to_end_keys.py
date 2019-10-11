@@ -40,7 +40,8 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 This option only takes effect if include_all_devices is true.
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
-            key data.
+            key data.  The key data will be a dict in the same format as the
+            DeviceKeys type returned by POST /_matrix/client/r0/keys/query.
         """
         set_tag("query_list", query_list)
         if not query_list:
