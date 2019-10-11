@@ -194,6 +194,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
 
         self._send_notice.assert_called_once()
 
+
 class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = self.hs.get_datastore()

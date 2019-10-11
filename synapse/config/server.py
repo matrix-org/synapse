@@ -171,7 +171,7 @@ class ServerConfig(Config):
         )
 
         self.mau_trial_days = config.get("mau_trial_days", 0)
-        self.mau_suppress_alerting = config.get('mau_suppress_alerting', False)
+        self.mau_suppress_alerting = config.get("mau_suppress_alerting", False)
 
         # How long to keep redacted events in the database in unredacted form
         # before redacting them.
