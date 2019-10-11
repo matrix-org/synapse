@@ -19,7 +19,7 @@ docker-compose run --rm -e SYNAPSE_SERVER_NAME=my.matrix.host -e SYNAPSE_REPORT_
 ```
 
 Above command contains variable SYNAPSE_REPORT_STATS which is opt-in only. You are free to say 'no' here. 
-This will also generate necessary signing keys.
+(This will also generate necessary signing keys.)
 Then, customize your configuration and run the server:
 
 ```
