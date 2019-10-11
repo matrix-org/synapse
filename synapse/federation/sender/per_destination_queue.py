@@ -15,6 +15,7 @@
 # limitations under the License.
 import datetime
 import logging
+import random
 
 from prometheus_client import Counter
 
@@ -35,6 +36,8 @@ from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 
 # This is defined in the Matrix spec and enforced by the receiver.
 MAX_EDUS_PER_TRANSACTION = 100
+
+DEPRIORITISE_SLEEP_TIME = 10
 
 logger = logging.getLogger(__name__)
 
@@ -191,8 +194,13 @@ class PerDestinationQueue(object):
             while True:
                 if self._transaction_manager.deprioritise_transmission:
                     # if the event-processing loop has got behind, sleep to give it
-                    # a chance to catch up
-                    yield self._clock.sleep(2)
+                    # a chance to catch up. Add some randomness so that the transmitters
+                    # don't all wake up in sync.
+                    sleeptime = random.uniform(
+                        DEPRIORITISE_SLEEP_TIME, DEPRIORITISE_SLEEP_TIME * 2
+                    )
+                    logger.info("TX [%s]: sleeping for %f seconds", sleeptime)
+                    yield self._clock.sleep(sleeptime)
 
                 # We have to keep 2 free slots for presence and rr_edus
                 limit = MAX_EDUS_PER_TRANSACTION - 2

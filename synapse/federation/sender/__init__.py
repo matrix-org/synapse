@@ -165,8 +165,8 @@ class FederationSender(object):
                     and not self._transaction_manager.deprioritise_transmission
                 ):
                     logger.warning(
-                        "Event processing loop is getting behind: deprioritising "
-                        "transaction transmission"
+                        "Event queue is getting behind: deprioritising transaction "
+                        "transmission"
                     )
                     self._transaction_manager.deprioritise_transmission = True
 
