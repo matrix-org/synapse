@@ -36,7 +36,7 @@ services:
       - traefik.enable=true
       - traefik.frontend.rule=Host:my.matrix.Host
       - traefik.port=8008
-      # In case you use Traefik version 2.0
+      # Alternatively, for Traefik version 2.0:
       - traefik.enable=true
       - traefik.http.routers.http-synapse.entryPoints=http
       - traefik.http.routers.http-synapse.rule=Host(`my.matrix.Host`)
