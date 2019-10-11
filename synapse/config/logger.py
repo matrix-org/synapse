@@ -84,6 +84,8 @@ root:
 
 
 class LoggingConfig(Config):
+    section = "logging"
+
     def read_config(self, config, **kwargs):
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)

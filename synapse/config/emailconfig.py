@@ -28,6 +28,8 @@ from ._base import Config, ConfigError
 
 
 class EmailConfig(Config):
+    section = "email"
+
     def read_config(self, config, **kwargs):
         # TODO: We should separate better the email configuration from the notification
         # and account validity config.

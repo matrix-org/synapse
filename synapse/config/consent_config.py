@@ -73,6 +73,9 @@ DEFAULT_CONFIG = """\
 
 
 class ConsentConfig(Config):
+
+    section = "consent"
+
     def __init__(self, *args):
         super(ConsentConfig, self).__init__(*args)
 
