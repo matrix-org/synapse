@@ -346,28 +346,28 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         # The "keys" property must only have one entry, which will be the public
         # key, so we just grab the first value in there
         pubkey = next(iter(key["keys"].values()))
-        self._simple_insert(
+        self._simple_insert_txn(
+            txn,
             "devices",
             values={
                 "user_id": user_id,
                 "device_id": pubkey,
                 "display_name": key_type + " signing key",
                 "hidden": True,
-            },
-            desc="store_master_key_device",
+            }
         )
 
         # and finally, store the key itself
         with self._cross_signing_id_gen.get_next() as stream_id:
-            self._simple_insert(
+            self._simple_insert_txn(
+                txn,
                 "e2e_cross_signing_keys",
                 values={
                     "user_id": user_id,
                     "keytype": key_type,
                     "keydata": json.dumps(key),
                     "stream_id": stream_id,
-                },
-                desc="store_master_key",
+                }
             )
 
     def set_e2e_cross_signing_key(self, user_id, key_type, key):
