@@ -32,7 +32,7 @@ services:
       - 8448:8448/tcp
     # ... or use a reverse proxy, here is an example for traefik (you may disable ports):
     labels:
-      # These 3 valid for Traefik version 1.x
+      # The following lines are valid for Traefik version 1.x:
       - traefik.enable=true
       - traefik.frontend.rule=Host:my.matrix.Host
       - traefik.port=8008
