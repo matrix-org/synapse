@@ -1220,6 +1220,7 @@ saml2_config:
 #   enabled: true
 #   server_url: "https://cas-server.com"
 #   service_url: "https://homeserver.domain.com:8448"
+#   #displayname_attribute: name
 #   #required_attributes:
 #   #    name: value
 
