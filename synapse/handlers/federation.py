@@ -2098,11 +2098,6 @@ class FederationHandler(BaseHandler):
         """
         event_auth_events = set(event.auth_event_ids())
 
-        if event.is_state():
-            event_key = (event.type, event.state_key)
-        else:
-            event_key = None
-
         # if the event's auth_events refers to events which are not in our
         # calculated auth_events, we need to fetch those events from somewhere.
         #
@@ -2231,13 +2226,13 @@ class FederationHandler(BaseHandler):
             auth_events.update(new_state)
 
             context = yield self._update_context_for_auth_events(
-                event, context, auth_events, event_key
+                event, context, auth_events
             )
 
         return context
 
     @defer.inlineCallbacks
-    def _update_context_for_auth_events(self, event, context, auth_events, event_key):
+    def _update_context_for_auth_events(self, event, context, auth_events):
         """Update the state_ids in an event context after auth event resolution,
         storing the changes as a new state group.
 
@@ -2246,18 +2241,21 @@ class FederationHandler(BaseHandler):
 
             context (synapse.events.snapshot.EventContext): initial event context
 
-            auth_events (dict[(str, str)->str]): Events to update in the event
+            auth_events (dict[(str, str)->EventBase]): Events to update in the event
                 context.
-
-            event_key ((str, str)): (type, state_key) for the current event.
-                this will not be included in the current_state in the context.
 
         Returns:
             Deferred[EventContext]: new event context
         """
+        # exclude the state key of the new event from the current_state in the context.
+        if event.is_state():
+            event_key = (event.type, event.state_key)
+        else:
+            event_key = None
         state_updates = {
             k: a.event_id for k, a in iteritems(auth_events) if k != event_key
         }
+
         current_state_ids = yield context.get_current_state_ids(self.store)
         current_state_ids = dict(current_state_ids)
 
