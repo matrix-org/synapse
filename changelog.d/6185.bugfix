@@ -1,0 +1,1 @@
+Fix bug where redacted events were sometimes incorrectly censored in the database, breaking APIs that attempted to fetch such events.

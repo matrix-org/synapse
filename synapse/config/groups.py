@@ -17,6 +17,8 @@ from ._base import Config
 
 
 class GroupsConfig(Config):
+    section = "groups"
+
     def read_config(self, config, **kwargs):
         self.enable_group_creation = config.get("enable_group_creation", False)
         self.group_creation_prefix = config.get("group_creation_prefix", "")

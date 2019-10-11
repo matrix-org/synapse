@@ -89,16 +89,8 @@ class RoomListHandler(BaseHandler):
             # appservice specific lists.
             logger.info("Bypassing cache as search request.")
 
-            # XXX: Quick hack to stop room directory queries taking too long.
-            # Timeout request after 60s. Probably want a more fundamental
-            # solution at some point
-            timeout = self.clock.time() + 60
             return self._get_public_room_list(
-                limit,
-                since_token,
-                search_filter,
-                network_tuple=network_tuple,
-                timeout=timeout,
+                limit, since_token, search_filter, network_tuple=network_tuple
             )
 
         key = (limit, since_token, network_tuple)
@@ -119,7 +111,6 @@ class RoomListHandler(BaseHandler):
         search_filter=None,
         network_tuple=EMPTY_THIRD_PARTY_ID,
         from_federation=False,
-        timeout=None,
     ):
         """Generate a public room list.
         Args:
@@ -132,8 +123,6 @@ class RoomListHandler(BaseHandler):
                 Setting to None returns all public rooms across all lists.
             from_federation (bool): Whether this request originated from a
                 federating server or a client. Used for room filtering.
-            timeout (int|None): Amount of seconds to wait for a response before
-                timing out. TODO
         """
 
         # Pagination tokens work by storing the room ID sent in the last batch,
