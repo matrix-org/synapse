@@ -44,7 +44,7 @@ services:
       - traefik.http.middlewares.https_redirect.redirectscheme.permanent=true
       - traefik.http.routers.http-synapse.middlewares=https_redirect
       - traefik.http.routers.https-synapse.entryPoints=https
-      - traefik.http.routers.https-synapse.rule=Host(`my.matrix.Host`)
+      - traefik.http.routers.https-synapse.rule=Host(`my.matrix.host`)
       - traefik.http.routers.https-synapse.service=synapse
       - traefik.http.routers.https-synapse.tls=true
       - traefik.http.services.synapse.loadbalancer.server.port=8008
