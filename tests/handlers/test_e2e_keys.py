@@ -178,15 +178,15 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         }
         yield self.handler.upload_signing_keys_for_user(local_user, keys2)
 
-        devices = yield self.handler.query_devices(
-            {"device_keys": {local_user: []}}, 0, local_user
-        )
         res = yield self.hs.get_datastore()._simple_select_list(
             "e2e_cross_signing_keys", {"user_id": local_user}, ["*"]
         )
         print("\n", file=sys.stderr)
         for r in res:
             print(r, file=sys.stderr)
+        devices = yield self.handler.query_devices(
+            {"device_keys": {local_user: []}}, 0, local_user
+        )
         self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
     @defer.inlineCallbacks
