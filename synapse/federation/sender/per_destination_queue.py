@@ -199,7 +199,9 @@ class PerDestinationQueue(object):
                     sleeptime = random.uniform(
                         DEPRIORITISE_SLEEP_TIME, DEPRIORITISE_SLEEP_TIME * 2
                     )
-                    logger.info("TX [%s]: sleeping for %f seconds", sleeptime)
+                    logger.info(
+                        "TX [%s]: sleeping for %f seconds", self._destination, sleeptime
+                    )
                     yield self._clock.sleep(sleeptime)
 
                 # We have to keep 2 free slots for presence and rr_edus
