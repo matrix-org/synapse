@@ -354,7 +354,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 "device_id": pubkey,
                 "display_name": key_type + " signing key",
                 "hidden": True,
-            }
+            },
         )
 
         # and finally, store the key itself
@@ -367,7 +367,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                     "keytype": key_type,
                     "keydata": json.dumps(key),
                     "stream_id": stream_id,
-                }
+                },
             )
 
     def set_e2e_cross_signing_key(self, user_id, key_type, key):
