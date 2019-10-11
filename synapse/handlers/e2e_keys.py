@@ -248,6 +248,11 @@ class E2eKeysHandler(object):
 
         results = yield self.store.get_e2e_device_keys(local_query)
 
+        # Build the result structure
+        for user_id, device_keys in results.items():
+            for device_id, device_info in device_keys.items():
+                result_dict[user_id][device_id] = device_info
+
         log_kv(results)
         return result_dict
 

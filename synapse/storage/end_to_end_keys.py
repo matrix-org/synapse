@@ -56,16 +56,18 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         # Build the result structure, un-jsonify the results, and add the
         # "unsigned" section
+        rv = {}
         for user_id, device_keys in iteritems(results):
+            rv[user_id] = {}
             for device_id, device_info in iteritems(device_keys):
                 r = db_to_json(device_info.pop("key_json"))
                 r["unsigned"] = {}
                 display_name = device_info["device_display_name"]
                 if display_name is not None:
                     r["unsigned"]["device_display_name"] = display_name
-                results[user_id][device_id] = r
+                rv[user_id][device_id] = r
 
-        return results
+        return rv
 
     @trace
     def _get_e2e_device_keys_txn(
