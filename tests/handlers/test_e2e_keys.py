@@ -24,6 +24,8 @@ import synapse.handlers.e2e_keys
 import synapse.storage
 from synapse.api import errors
 
+import sys
+
 from tests import unittest, utils
 
 
@@ -182,9 +184,9 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         res = yield self.hs.get_datastore()._simple_select_list(
             "e2e_cross_signing_keys", {"user_id": local_user}, ["*"]
         )
-        print("\n")
+        print("\n", file=sys.stderr)
         for r in res:
-            print(r)
+            print(r, file=sys.stderr)
         self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
     @defer.inlineCallbacks
