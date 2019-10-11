@@ -44,6 +44,7 @@ from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.users import UserAdminServlet
 from synapse.types import UserID, create_requester
+from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
@@ -310,7 +311,7 @@ class PurgeHistoryRestServlet(RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        purge_id = await self.pagination_handler.start_purge_history(
+        purge_id = self.pagination_handler.start_purge_history(
             room_id, token, delete_local_events=delete_local_events
         )
 
@@ -480,7 +481,9 @@ class ShutdownRoomRestServlet(RestServlet):
             ratelimit=False,
         )
 
-        aliases_for_room = await self.store.get_aliases_for_room(room_id)
+        aliases_for_room = await maybe_awaitable(
+            self.store.get_aliases_for_room(room_id)
+        )
 
         await self.store.update_aliases_for_room(
             room_id, new_room_id, requester_user_id
