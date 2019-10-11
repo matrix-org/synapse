@@ -15,7 +15,6 @@ services:
     restart: unless-stopped
     # See the readme for a full documentation of the environment settings
     environment:
-      # Path taken from the volume stanza
       - SYNAPSE_CONFIG_PATH=/etc/homeserver.yaml
     volumes:
       # You may either store all the files in a local folder
