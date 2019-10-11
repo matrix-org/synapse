@@ -39,7 +39,7 @@ services:
       # Alternatively, for Traefik version 2.0:
       - traefik.enable=true
       - traefik.http.routers.http-synapse.entryPoints=http
-      - traefik.http.routers.http-synapse.rule=Host(`my.matrix.Host`)
+      - traefik.http.routers.http-synapse.rule=Host(`my.matrix.host`)
       - traefik.http.middlewares.https_redirect.redirectscheme.scheme=https
       - traefik.http.middlewares.https_redirect.redirectscheme.permanent=true
       - traefik.http.routers.http-synapse.middlewares=https_redirect
