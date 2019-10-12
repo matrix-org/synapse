@@ -45,7 +45,7 @@ class AppServiceConfig(Config):
         # Uncomment to enable tracking of application service IP addresses. Implicitly
         # enables MAU tracking for application service users.
         #
-        #track_appservice_user_ips: True
+        #track_appservice_user_ips: true
         """
 
 
