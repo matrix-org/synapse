@@ -21,6 +21,13 @@ from synapse.api.constants import Membership
 from synapse.types import RoomStreamToken
 from synapse.visibility import filter_events_for_client
 
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientTokenError,
+    MissingClientTokenError,
+)
+
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
@@ -29,6 +36,39 @@ logger = logging.getLogger(__name__)
 class AdminHandler(BaseHandler):
     def __init__(self, hs):
         super(AdminHandler, self).__init__(hs)
+
+    async def validate_admin_token(self, servlet, request):
+        """
+        Validate that an admin token is on the request.
+        """
+
+        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+
+        if len(auth_headers) > 1:
+            raise MissingClientTokenError("Too many Authorization headers.")
+
+        parts = auth_headers[0].split(b" ")
+        if parts[0] == b"Bearer" and len(parts) == 2:
+            token = parts[1].decode("ascii")
+        else:
+            raise MissingClientTokenError("Invalid Authorization header.")
+
+        token_rules = await self.store.get_permissions_for_token(token)
+
+        action = request.method.decode("ascii")
+
+    async def get_permissions_for_token(self, token):
+
+        token_rules = await self.store.get_permissions_for_token(token)
+
+        return token_rules
+
+    async def create_admin_token(self, valid_until, creator, description):
+
+        token = await self.store.create_admin_token(
+            valid_until=valid_until, creator=creator, description=description
+        )
+        return token
 
     @defer.inlineCallbacks
     def get_whois(self, user):

@@ -23,7 +23,7 @@ from mock import Mock
 
 from canonicaljson import json
 
-from twisted.internet.defer import Deferred, succeed
+from twisted.internet.defer import Deferred, succeed, ensureDeferred
 from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
 
@@ -409,8 +409,7 @@ class HomeserverTestCase(TestCase):
         self.reactor.pump([by] * 100)
 
     def get_success(self, d, by=0.0):
-        if not isinstance(d, Deferred):
-            return d
+        d = ensureDeferred(d)
         self.pump(by=by)
         return self.successResultOf(d)
 

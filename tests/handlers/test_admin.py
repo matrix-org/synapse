@@ -23,6 +23,9 @@ import synapse.rest.admin
 import synapse.storage
 from synapse.api.constants import EventTypes
 from synapse.rest.client.v1 import login, room
+from synapse.storage.admin import TokenState
+
+from twisted.internet.defer import ensureDeferred
 
 from tests import unittest
 
@@ -208,3 +211,25 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(args[0], room_id)
         self.assertEqual(args[1].content["membership"], "invite")
         self.assertTrue(args[2])  # Assert there is at least one bit of state
+
+
+class AdminTokenTests(unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, homeserver):
+        self.handler = homeserver.get_handlers().admin_handler
+
+    def test_create_token(self):
+        """
+        A token can be created and queried from the database.
+        """
+        token = self.get_success(
+            self.handler.create_admin_token(
+                valid_until=10000, creator="@test:server", description="A token!"
+            )
+        )
+
+        self.assertEqual(len(token), 36, token)
+
+        lookup = self.get_success(self.handler.get_permissions_for_token(token))
+
+        self.assertEqual(lookup.token_state, TokenState.VALID)
+        self.assertEqual(len(lookup.permissions), 0)
