@@ -17,7 +17,6 @@ import functools
 import inspect
 import logging
 import threading
-from collections import namedtuple
 from typing import Any, cast
 
 from six import itervalues
@@ -625,14 +624,22 @@ class CacheListDescriptor(_CacheDescriptorBase):
         return wrapped
 
 
-class _CacheContext(namedtuple("_CacheContext", ("cache", "key"))):
-    # We rely on _CacheContext implementing __eq__ and __hash__ sensibly,
-    # which namedtuple does for us (i.e. two _CacheContext are the same if
-    # their caches and keys match). This is important in particular to
-    # dedupe when we add callbacks to lru cache nodes, otherwise the number
-    # of callbacks would grow.
-    def invalidate(self):
-        self.cache.invalidate(self.key)
+class _CacheContext:
+    # We make sure identical _CacheContext objects share the same invalidate
+    # function. This is important in particular to dedupe when we add callbacks
+    # to lru cache nodes, otherwise the number of callbacks would grow.
+    _invalidate_funcs = {}
+
+    def __init__(self, cache, cache_key):
+        key = (cache, cache_key)
+
+        def invalidate():
+            cache.invalidate(cache_key)
+
+        if key not in self._invalidate_funcs:
+            self._invalidate_funcs[key] = invalidate
+
+        self.invalidate = self._invalidate_funcs[key]
 
 
 def cached(
