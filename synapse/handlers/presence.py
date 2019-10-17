@@ -24,6 +24,7 @@ The methods that define policy are:
 
 import logging
 from contextlib import contextmanager
+from typing import Dict, Set
 
 from six import iteritems, itervalues
 
@@ -179,8 +180,9 @@ class PresenceHandler(object):
         # we assume that all the sync requests on that process have stopped.
         # Stored as a dict from process_id to set of user_id, and a dict of
         # process_id to millisecond timestamp last updated.
-        self.external_process_to_current_syncs = {}
-        self.external_process_last_updated_ms = {}
+        self.external_process_to_current_syncs = {}  # type: Dict[int, Set[str]]
+        self.external_process_last_updated_ms = {}  # type: Dict[int, int]
+
         self.external_sync_linearizer = Linearizer(name="external_sync_linearizer")
 
         # Start a LoopingCall in 30s that fires every 5s.
@@ -349,10 +351,13 @@ class PresenceHandler(object):
             if now - last_update > EXTERNAL_PROCESS_EXPIRY
         ]
         for process_id in expired_process_ids:
+            # For each expired process drop tracking info and check the users
+            # that were syncing on that process to see if they need to be timed
+            # out.
             users_to_check.update(
-                self.external_process_last_updated_ms.pop(process_id, ())
+                self.external_process_to_current_syncs.pop(process_id, ())
             )
-            self.external_process_last_update.pop(process_id)
+            self.external_process_last_updated_ms.pop(process_id)
 
         states = [
             self.user_to_current_state.get(user_id, UserPresenceState.default(user_id))
