@@ -1,3 +1,11 @@
+Synapse 1.4.1rc1 (2019-10-17)
+=============================
+
+Bugfixes
+--------
+
+- Fix bug where redacted events were sometimes incorrectly censored in the database, breaking APIs that attempted to fetch such events. ([\#6185](https://github.com/matrix-org/synapse/issues/6185), [5b0e9948](https://github.com/matrix-org/synapse/commit/5b0e9948eaae801643e594b5abc8ee4b10bd194e))
+
 Synapse 1.4.0 (2019-10-03)
 ==========================
 
