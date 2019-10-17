@@ -636,10 +636,7 @@ class _CacheContext:
         def invalidate():
             cache.invalidate(cache_key)
 
-        if key not in self._invalidate_funcs:
-            self._invalidate_funcs[key] = invalidate
-
-        self.invalidate = self._invalidate_funcs[key]
+        self.invalidate = self._invalidate_funcs.setdefault(key, invalidate)
 
 
 def cached(
