@@ -30,7 +30,7 @@ services:
     # instance expose the TLS port directly:
     ports:
       - 8448:8448/tcp
-    # ... or use a reverse proxy, here is an example for traefik (you may disable ports):
+    # ... or use a reverse proxy, here is an example for traefik:
     labels:
       # The following lines are valid for Traefik version 1.x:
       - traefik.enable=true
