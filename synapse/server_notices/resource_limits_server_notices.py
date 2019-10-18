@@ -94,52 +94,73 @@ class ResourceLimitsServerNotices(object):
             if not self._config.mau_limit_alerting:
                 # Alerting disabled, reset room if necessary and return
                 if currently_blocked:
-                    content = {"pinned": ref_events}
-                    yield self._server_notices_manager.send_notice(
-                        user_id, content, EventTypes.Pinned, ""
-                    )
+                    self._remove_limit_block_notification(ref_events, user_id)
                 return
 
-            # Normally should always pass in user_id if you have it, but in
-            # this case are checking what would happen to other users if they
-            # were to arrive.
-            try:
-                yield self._auth.check_auth_blocking()
-                is_auth_blocking = False
-            except ResourceLimitError as e:
-                is_auth_blocking = True
-                event_content = e.msg
-                event_limit_type = e.limit_type
+            is_auth_blocking = False
+            if self._config.mau_limit_alerting:
+                try:
+                    # Normally should always pass in user_id to check_auth_blocking
+                    # if you have it, but in this case are checking what would happen
+                    # to other users if they were to arrive.
+                    yield self._auth.check_auth_blocking()
+                except ResourceLimitError as e:
+                    is_auth_blocking = True
+                    event_body = e.msg
+                    event_limit_type = e.limit_type
 
             if currently_blocked and not is_auth_blocking:
                 # Room is notifying of a block, when it ought not to be.
-                # Remove block notification
-                content = {"pinned": ref_events}
-                yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.Pinned, ""
-                )
-
+                yield self._remove_limit_block_notification(user_id, ref_events)
             elif not currently_blocked and is_auth_blocking:
                 # Room is not notifying of a block, when it ought to be.
-                # Add block notification
-                content = {
-                    "body": event_content,
-                    "msgtype": ServerNoticeMsgType,
-                    "server_notice_type": ServerNoticeLimitReached,
-                    "admin_contact": self._config.admin_contact,
-                    "limit_type": event_limit_type,
-                }
-                event = yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.Message
+                yield self._apply_limit_block_notification(
+                    user_id, event_body, event_limit_type
                 )
-
-                content = {"pinned": [event.event_id]}
-                yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.Pinned, ""
-                )
-
         except SynapseError as e:
             logger.error("Error sending resource limits server notice: %s", e)
+
+    @defer.inlineCallbacks
+    def _remove_limit_block_notification(self, user_id, ref_events):
+        """Utility method to remove limit block notifications from the server
+        notices room.
+
+        Args:
+            user_id (str): user to notify
+            ref_events ([]): The list of pinned events that are unrelated to
+            limit blocking and need to be preserved.
+        """
+        content = {"pinned": ref_events}
+        yield self._server_notices_manager.send_notice(
+            user_id, content, EventTypes.Pinned, ""
+        )
+
+    @defer.inlineCallbacks
+    def _apply_limit_block_notification(self, user_id, event_body, event_limit_type):
+        """Utility method to apply limit block notifications in the server
+        notices room.
+
+        Args:
+            user_id (str): user to notify
+            event_body(str): The human readable text that describes the block.
+            event_limit_type(str): Specifies the type of block e.g. monthly active user
+            limit has been exceeded.
+        """
+        content = {
+            "body": event_body,
+            "msgtype": ServerNoticeMsgType,
+            "server_notice_type": ServerNoticeLimitReached,
+            "admin_contact": self._config.admin_contact,
+            "limit_type": event_limit_type,
+        }
+        event = yield self._server_notices_manager.send_notice(
+            user_id, content, EventTypes.Message
+        )
+
+        content = {"pinned": [event.event_id]}
+        yield self._server_notices_manager.send_notice(
+            user_id, content, EventTypes.Pinned, ""
+        )
 
     @defer.inlineCallbacks
     def _check_and_set_tags(self, user_id, room_id):
