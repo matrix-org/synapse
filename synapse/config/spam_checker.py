@@ -19,6 +19,8 @@ from ._base import Config
 
 
 class SpamCheckerConfig(Config):
+    section = "spamchecker"
+
     def read_config(self, config, **kwargs):
         self.spam_checker = None
 

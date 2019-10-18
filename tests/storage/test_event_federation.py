@@ -57,7 +57,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
                     "(event_id, algorithm, hash) "
                     "VALUES (?, 'sha256', ?)"
                 ),
-                (event_id, b"ffff"),
+                (event_id, bytearray(b"ffff")),
             )
 
         for i in range(0, 11):

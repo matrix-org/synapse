@@ -203,23 +203,11 @@ class RoomMemberHandler(object):
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
+                # Copy over user state if we're joining an upgraded room
+                yield self.copy_user_state_if_room_upgrade(
+                    room_id, requester.user.to_string()
+                )
                 yield self._user_joined_room(target, room_id)
-
-            # Copy over direct message status and room tags if this is a join
-            # on an upgraded room
-
-            # Check if this is an upgraded room
-            predecessor = yield self.store.get_room_predecessor(room_id)
-
-            if predecessor:
-                # It is an upgraded room. Copy over old tags
-                self.copy_room_tags_and_direct_to_room(
-                    predecessor["room_id"], room_id, user_id
-                )
-                # Copy over push rules
-                yield self.store.copy_push_rules_from_room_to_room_for_user(
-                    predecessor["room_id"], room_id, user_id
-                )
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
@@ -463,10 +451,16 @@ class RoomMemberHandler(object):
                 if requester.is_guest:
                     content["kind"] = "guest"
 
-                ret = yield self._remote_join(
+                remote_join_response = yield self._remote_join(
                     requester, remote_room_hosts, room_id, target, content
                 )
-                return ret
+
+                # Copy over user state if this is a join on an remote upgraded room
+                yield self.copy_user_state_if_room_upgrade(
+                    room_id, requester.user.to_string()
+                )
+
+                return remote_join_response
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
@@ -502,6 +496,38 @@ class RoomMemberHandler(object):
             require_consent=require_consent,
         )
         return res
+
+    @defer.inlineCallbacks
+    def copy_user_state_if_room_upgrade(self, new_room_id, user_id):
+        """Copy user-specific information when they join a new room if that new room is the
+        result of a room upgrade
+
+        Args:
+            new_room_id (str): The ID of the room the user is joining
+            user_id (str): The ID of the user
+
+        Returns:
+            Deferred
+        """
+        # Check if the new room is an upgraded room
+        predecessor = yield self.store.get_room_predecessor(new_room_id)
+        if not predecessor:
+            return
+
+        logger.debug(
+            "Found predecessor for %s: %s. Copying over room tags and push " "rules",
+            new_room_id,
+            predecessor,
+        )
+
+        # It is an upgraded room. Copy over old tags
+        yield self.copy_room_tags_and_direct_to_room(
+            predecessor["room_id"], new_room_id, user_id
+        )
+        # Copy over push rules
+        yield self.store.copy_push_rules_from_room_to_room_for_user(
+            predecessor["room_id"], new_room_id, user_id
+        )
 
     @defer.inlineCallbacks
     def send_membership_event(self, requester, event, context, ratelimit=True):

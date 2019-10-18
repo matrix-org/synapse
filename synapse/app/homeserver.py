@@ -605,13 +605,13 @@ def run(hs):
     @defer.inlineCallbacks
     def generate_monthly_active_users():
         current_mau_count = 0
-        reserved_count = 0
+        reserved_users = ()
         store = hs.get_datastore()
         if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
             current_mau_count = yield store.get_monthly_active_count()
-            reserved_count = yield store.get_registered_reserved_users_count()
+            reserved_users = yield store.get_registered_reserved_users()
         current_mau_gauge.set(float(current_mau_count))
-        registered_reserved_users_mau_gauge.set(float(reserved_count))
+        registered_reserved_users_mau_gauge.set(float(len(reserved_users)))
         max_mau_gauge.set(float(hs.config.max_mau_value))
 
     def start_generate_monthly_active_users():

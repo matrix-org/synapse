@@ -68,9 +68,6 @@ handlers:
         filters: [context]
 
 loggers:
-    synapse:
-        level: INFO
-
     synapse.storage.SQL:
         # beware: increasing this to DEBUG will make synapse log sensitive
         # information such as access tokens.
@@ -79,11 +76,15 @@ loggers:
 root:
     level: INFO
     handlers: [file, console]
+
+disable_existing_loggers: false
 """
 )
 
 
 class LoggingConfig(Config):
+    section = "logging"
+
     def read_config(self, config, **kwargs):
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)

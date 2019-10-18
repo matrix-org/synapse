@@ -23,8 +23,6 @@ import re
 from six import text_type
 from six.moves import http_client
 
-from twisted.internet import defer
-
 import synapse
 from synapse.api.constants import Membership, UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -46,6 +44,7 @@ from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.users import UserAdminServlet
 from synapse.types import UserID, create_requester
+from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
@@ -59,15 +58,14 @@ class UsersRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
+    async def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
-        yield assert_requester_is_admin(self.auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
 
-        ret = yield self.handlers.admin_handler.get_users()
+        ret = await self.handlers.admin_handler.get_users()
 
         return 200, ret
 
@@ -122,8 +120,7 @@ class UserRegisterServlet(RestServlet):
         self.nonces[nonce] = int(self.reactor.seconds())
         return 200, {"nonce": nonce}
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         self._clear_old_nonces()
 
         if not self.hs.config.registration_shared_secret:
@@ -204,14 +201,14 @@ class UserRegisterServlet(RestServlet):
 
         register = RegisterRestServlet(self.hs)
 
-        user_id = yield register.registration_handler.register_user(
+        user_id = await register.registration_handler.register_user(
             localpart=body["username"].lower(),
             password=body["password"],
             admin=bool(admin),
             user_type=user_type,
         )
 
-        result = yield register._create_registration_details(user_id, body)
+        result = await register._create_registration_details(user_id, body)
         return 200, result
 
 
@@ -223,19 +220,18 @@ class WhoisRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
+    async def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
         auth_user = requester.user
 
         if target_user != auth_user:
-            yield assert_user_is_admin(self.auth, auth_user)
+            await assert_user_is_admin(self.auth, auth_user)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only whois a local user")
 
-        ret = yield self.handlers.admin_handler.get_whois(target_user)
+        ret = await self.handlers.admin_handler.get_whois(target_user)
 
         return 200, ret
 
@@ -255,9 +251,8 @@ class PurgeHistoryRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id, event_id):
-        yield assert_requester_is_admin(self.auth, request)
+    async def on_POST(self, request, room_id, event_id):
+        await assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request, allow_empty_body=True)
 
@@ -270,12 +265,12 @@ class PurgeHistoryRestServlet(RestServlet):
             event_id = body.get("purge_up_to_event_id")
 
         if event_id is not None:
-            event = yield self.store.get_event(event_id)
+            event = await self.store.get_event(event_id)
 
             if event.room_id != room_id:
                 raise SynapseError(400, "Event is for wrong room.")
 
-            token = yield self.store.get_topological_token_for_event(event_id)
+            token = await self.store.get_topological_token_for_event(event_id)
 
             logger.info("[purge] purging up to token %s (event_id %s)", token, event_id)
         elif "purge_up_to_ts" in body:
@@ -285,12 +280,10 @@ class PurgeHistoryRestServlet(RestServlet):
                     400, "purge_up_to_ts must be an int", errcode=Codes.BAD_JSON
                 )
 
-            stream_ordering = (yield self.store.find_first_stream_ordering_after_ts(ts))
+            stream_ordering = await self.store.find_first_stream_ordering_after_ts(ts)
 
-            r = (
-                yield self.store.get_room_event_after_stream_ordering(
-                    room_id, stream_ordering
-                )
+            r = await self.store.get_room_event_after_stream_ordering(
+                room_id, stream_ordering
             )
             if not r:
                 logger.warn(
@@ -318,7 +311,7 @@ class PurgeHistoryRestServlet(RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        purge_id = yield self.pagination_handler.start_purge_history(
+        purge_id = self.pagination_handler.start_purge_history(
             room_id, token, delete_local_events=delete_local_events
         )
 
@@ -339,9 +332,8 @@ class PurgeHistoryStatusRestServlet(RestServlet):
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, purge_id):
-        yield assert_requester_is_admin(self.auth, request)
+    async def on_GET(self, request, purge_id):
+        await assert_requester_is_admin(self.auth, request)
 
         purge_status = self.pagination_handler.get_purge_status(purge_id)
         if purge_status is None:
@@ -357,9 +349,8 @@ class DeactivateAccountRestServlet(RestServlet):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, target_user_id):
-        yield assert_requester_is_admin(self.auth, request)
+    async def on_POST(self, request, target_user_id):
+        await assert_requester_is_admin(self.auth, request)
         body = parse_json_object_from_request(request, allow_empty_body=True)
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
@@ -371,7 +362,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
         UserID.from_string(target_user_id)
 
-        result = yield self._deactivate_account_handler.deactivate_account(
+        result = await self._deactivate_account_handler.deactivate_account(
             target_user_id, erase
         )
         if result:
@@ -497,7 +488,9 @@ class ShutdownRoomRestServlet(RestServlet):
             ratelimit=False,
         )
 
-        aliases_for_room = await self.store.get_aliases_for_room(room_id)
+        aliases_for_room = await maybe_awaitable(
+            self.store.get_aliases_for_room(room_id)
+        )
 
         await self.store.update_aliases_for_room(
             room_id, new_room_id, requester_user_id
@@ -538,13 +531,12 @@ class ResetPasswordRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self._set_password_handler = hs.get_set_password_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, target_user_id):
+    async def on_POST(self, request, target_user_id):
         """Post request to allow an administrator reset password for a user.
         This needs user to have administrator access in Synapse.
         """
-        requester = yield self.auth.get_user_by_req(request)
-        yield assert_user_is_admin(self.auth, requester.user)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
 
         UserID.from_string(target_user_id)
 
@@ -552,7 +544,7 @@ class ResetPasswordRestServlet(RestServlet):
         assert_params_in_dict(params, ["new_password"])
         new_password = params["new_password"]
 
-        yield self._set_password_handler.set_password(
+        await self._set_password_handler.set_password(
             target_user_id, new_password, requester
         )
         return 200, {}
@@ -578,12 +570,11 @@ class GetUsersPaginatedRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, target_user_id):
+    async def on_GET(self, request, target_user_id):
         """Get request to get specific number of users from Synapse.
         This needs user to have administrator access in Synapse.
         """
-        yield assert_requester_is_admin(self.auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(target_user_id)
 
@@ -596,11 +587,10 @@ class GetUsersPaginatedRestServlet(RestServlet):
 
         logger.info("limit: %s, start: %s", limit, start)
 
-        ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
+        ret = await self.handlers.admin_handler.get_users_paginate(order, start, limit)
         return 200, ret
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, target_user_id):
+    async def on_POST(self, request, target_user_id):
         """Post request to get specific number of users from Synapse..
         This needs user to have administrator access in Synapse.
         Example:
@@ -614,7 +604,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
         """
-        yield assert_requester_is_admin(self.auth, request)
+        await assert_requester_is_admin(self.auth, request)
         UserID.from_string(target_user_id)
 
         order = "name"  # order by name in user table
@@ -624,7 +614,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
         start = params["start"]
         logger.info("limit: %s, start: %s", limit, start)
 
-        ret = yield self.handlers.admin_handler.get_users_paginate(order, start, limit)
+        ret = await self.handlers.admin_handler.get_users_paginate(order, start, limit)
         return 200, ret
 
 
@@ -647,13 +637,12 @@ class SearchUsersRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, target_user_id):
+    async def on_GET(self, request, target_user_id):
         """Get request to search user table for specific users according to
         search term.
         This needs user to have a administrator access in Synapse.
         """
-        yield assert_requester_is_admin(self.auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(target_user_id)
 
@@ -667,7 +656,7 @@ class SearchUsersRestServlet(RestServlet):
         term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
-        ret = yield self.handlers.admin_handler.search_users(term)
+        ret = await self.handlers.admin_handler.search_users(term)
         return 200, ret
 
 
@@ -682,15 +671,14 @@ class DeleteGroupAdminRestServlet(RestServlet):
         self.is_mine_id = hs.is_mine_id
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
-        yield assert_user_is_admin(self.auth, requester.user)
+    async def on_POST(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
 
         if not self.is_mine_id(group_id):
             raise SynapseError(400, "Can only delete local groups")
 
-        yield self.group_server.delete_group(group_id, requester.user.to_string())
+        await self.group_server.delete_group(group_id, requester.user.to_string())
         return 200, {}
 
 
@@ -706,16 +694,15 @@ class AccountValidityRenewServlet(RestServlet):
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        yield assert_requester_is_admin(self.auth, request)
+    async def on_POST(self, request):
+        await assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request)
 
         if "user_id" not in body:
             raise SynapseError(400, "Missing property 'user_id' in the request body")
 
-        expiration_ts = yield self.account_activity_handler.renew_account_for_user(
+        expiration_ts = await self.account_activity_handler.renew_account_for_user(
             body["user_id"],
             body.get("expiration_ts"),
             not body.get("enable_renewal_emails", True),

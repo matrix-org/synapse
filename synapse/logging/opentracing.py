@@ -796,13 +796,14 @@ def trace_servlet(servlet_name, extract_context=False):
                 scope = start_active_span(servlet_name, tags=request_tags)
 
             with scope:
-                result_func = func(request, *args, **kwargs)
+                result = func(request, *args, **kwargs)
 
-                if not isinstance(result_func, (defer.Deferred, types.CoroutineType)):
-                    result_func = defer.succeed(result_func)
+                if not isinstance(result, (types.CoroutineType, defer.Deferred)):
+                    # Some servlets aren't async and just return results
+                    # directly, so we handle that here.
+                    return result
 
-                result = await result_func
-                return result
+                return await result
 
         return _trace_servlet_inner
 

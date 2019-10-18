@@ -31,11 +31,10 @@ from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.types import get_domain_from_id
 from synapse.util import batch_iter
 from synapse.util.metrics import Measure
-
-from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -623,10 +622,14 @@ class EventsWorkerStore(SQLBaseStore):
                 " rej.reason "
                 " FROM event_json as e"
                 " LEFT JOIN rejections as rej USING (event_id)"
-                " WHERE e.event_id IN (%s)"
-            ) % (",".join(["?"] * len(evs)),)
+                " WHERE "
+            )
 
-            txn.execute(sql, evs)
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "e.event_id", evs
+            )
+
+            txn.execute(sql + clause, args)
 
             for row in txn:
                 event_id = row[0]
@@ -640,11 +643,11 @@ class EventsWorkerStore(SQLBaseStore):
                 }
 
             # check for redactions
-            redactions_sql = (
-                "SELECT event_id, redacts FROM redactions WHERE redacts IN (%s)"
-            ) % (",".join(["?"] * len(evs)),)
+            redactions_sql = "SELECT event_id, redacts FROM redactions WHERE "
 
-            txn.execute(redactions_sql, evs)
+            clause, args = make_in_list_sql_clause(txn.database_engine, "redacts", evs)
+
+            txn.execute(redactions_sql + clause, args)
 
             for (redacter, redacted) in txn:
                 d = event_dict.get(redacted)
@@ -753,10 +756,11 @@ class EventsWorkerStore(SQLBaseStore):
         results = set()
 
         def have_seen_events_txn(txn, chunk):
-            sql = "SELECT event_id FROM events as e WHERE e.event_id IN (%s)" % (
-                ",".join("?" * len(chunk)),
+            sql = "SELECT event_id FROM events as e WHERE "
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "e.event_id", chunk
             )
-            txn.execute(sql, chunk)
+            txn.execute(sql + clause, args)
             for (event_id,) in txn:
                 results.add(event_id)
 
