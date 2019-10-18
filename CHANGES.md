@@ -1,7 +1,7 @@
 Synapse 1.4.1 (2019-10-18)
 ==========================
 
-No changes since 1.4.1rc1
+No changes since 1.4.1rc1.
 
 
 Synapse 1.4.1rc1 (2019-10-17)
