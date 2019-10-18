@@ -21,11 +21,10 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-
-from ._base import SQLBaseStore
-from .util.id_generators import StreamIdGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -217,24 +216,26 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         def f(txn):
             if from_key:
-                sql = (
-                    "SELECT * FROM receipts_linearized WHERE"
-                    " room_id IN (%s) AND stream_id > ? AND stream_id <= ?"
-                ) % (",".join(["?"] * len(room_ids)))
-                args = list(room_ids)
-                args.extend([from_key, to_key])
+                sql = """
+                    SELECT * FROM receipts_linearized WHERE
+                    stream_id > ? AND stream_id <= ? AND
+                """
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "room_id", room_ids
+                )
 
-                txn.execute(sql, args)
+                txn.execute(sql + clause, [from_key, to_key] + list(args))
             else:
-                sql = (
-                    "SELECT * FROM receipts_linearized WHERE"
-                    " room_id IN (%s) AND stream_id <= ?"
-                ) % (",".join(["?"] * len(room_ids)))
+                sql = """
+                    SELECT * FROM receipts_linearized WHERE
+                    stream_id <= ? AND
+                """
 
-                args = list(room_ids)
-                args.append(to_key)
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "room_id", room_ids
+                )
 
-                txn.execute(sql, args)
+                txn.execute(sql + clause, [to_key] + list(args))
 
             return self.cursor_to_dict(txn)
 
@@ -433,13 +434,19 @@ class ReceiptsStore(ReceiptsWorkerStore):
             # we need to points in graph -> linearized form.
             # TODO: Make this better.
             def graph_to_linear(txn):
-                query = (
-                    "SELECT event_id WHERE room_id = ? AND stream_ordering IN ("
-                    " SELECT max(stream_ordering) WHERE event_id IN (%s)"
-                    ")"
-                ) % (",".join(["?"] * len(event_ids)))
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "event_id", event_ids
+                )
 
-                txn.execute(query, [room_id] + event_ids)
+                sql = """
+                    SELECT event_id WHERE room_id = ? AND stream_ordering IN (
+                        SELECT max(stream_ordering) WHERE %s
+                    )
+                """ % (
+                    clause,
+                )
+
+                txn.execute(sql, [room_id] + list(args))
                 rows = txn.fetchall()
                 if rows:
                     return rows[0][0]

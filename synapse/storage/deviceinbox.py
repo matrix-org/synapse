@@ -20,7 +20,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.util.caches.expiringcache import ExpiringCache
 
@@ -378,15 +378,15 @@ class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore)
             else:
                 if not devices:
                     continue
-                sql = (
-                    "SELECT device_id FROM devices"
-                    " WHERE user_id = ? AND device_id IN ("
-                    + ",".join("?" * len(devices))
-                    + ")"
+
+                clause, args = make_in_list_sql_clause(
+                    txn.database_engine, "device_id", devices
                 )
+                sql = "SELECT device_id FROM devices WHERE user_id = ? AND " + clause
+
                 # TODO: Maybe this needs to be done in batches if there are
                 # too many local devices for a given user.
-                txn.execute(sql, [user_id] + devices)
+                txn.execute(sql, [user_id] + list(args))
                 for row in txn:
                     # Only insert into the local inbox if the device exists on
                     # this server

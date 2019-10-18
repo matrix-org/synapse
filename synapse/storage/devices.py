@@ -28,7 +28,12 @@ from synapse.logging.opentracing import (
     whitelisted_homeserver,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage._base import Cache, SQLBaseStore, db_to_json
+from synapse.storage._base import (
+    Cache,
+    SQLBaseStore,
+    db_to_json,
+    make_in_list_sql_clause,
+)
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.util import batch_iter
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
@@ -448,11 +453,14 @@ class DeviceWorkerStore(SQLBaseStore):
             sql = """
                 SELECT DISTINCT user_id FROM device_lists_stream
                 WHERE stream_id > ?
-                AND user_id IN (%s)
+                AND
             """
 
             for chunk in batch_iter(to_check, 100):
-                txn.execute(sql % (",".join("?" for _ in chunk),), (from_key,) + chunk)
+                clause, args = make_in_list_sql_clause(
+                    txn.database_engine, "user_id", chunk
+                )
+                txn.execute(sql + clause, (from_key,) + tuple(args))
                 changes.update(user_id for user_id, in txn)
 
             return changes

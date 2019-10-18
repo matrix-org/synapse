@@ -388,7 +388,7 @@ class DirectServeResource(resource.Resource):
         if not callback:
             return super().render(request)
 
-        resp = callback(request)
+        resp = trace_servlet(self.__class__.__name__)(callback)(request)
 
         # If it's a coroutine, turn it into a Deferred
         if isinstance(resp, types.CoroutineType):

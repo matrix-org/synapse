@@ -21,6 +21,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.background_updates import BackgroundUpdateStore
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,19 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
         self.register_background_update_handler(
             "redactions_received_ts", self._redactions_received_ts
+        )
+
+        # This index gets deleted in `event_fix_redactions_bytes` update
+        self.register_background_index_update(
+            "event_fix_redactions_bytes_create_index",
+            index_name="redactions_censored_redacts",
+            table="redactions",
+            columns=["redacts"],
+            where_clause="have_censored",
+        )
+
+        self.register_background_update_handler(
+            "event_fix_redactions_bytes", self._event_fix_redactions_bytes
         )
 
     @defer.inlineCallbacks
@@ -312,12 +326,13 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     INNER JOIN event_json USING (event_id)
                     LEFT JOIN rejections USING (event_id)
                     WHERE
-                        prev_event_id IN (%s)
-                        AND NOT events.outlier
-                """ % (
-                    ",".join("?" for _ in to_check),
+                        NOT events.outlier
+                        AND
+                """
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "prev_event_id", to_check
                 )
-                txn.execute(sql, to_check)
+                txn.execute(sql + clause, list(args))
 
                 for prev_event_id, event_id, metadata, rejected in txn:
                     if event_id in graph:
@@ -458,3 +473,33 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             yield self._end_background_update("redactions_received_ts")
 
         return count
+
+    @defer.inlineCallbacks
+    def _event_fix_redactions_bytes(self, progress, batch_size):
+        """Undoes hex encoded censored redacted event JSON.
+        """
+
+        def _event_fix_redactions_bytes_txn(txn):
+            # This update is quite fast due to new index.
+            txn.execute(
+                """
+                UPDATE event_json
+                SET
+                    json = convert_from(json::bytea, 'utf8')
+                FROM redactions
+                WHERE
+                    redactions.have_censored
+                    AND event_json.event_id = redactions.redacts
+                    AND json NOT LIKE '{%';
+                """
+            )
+
+            txn.execute("DROP INDEX redactions_censored_redacts")
+
+        yield self.runInteraction(
+            "_event_fix_redactions_bytes", _event_fix_redactions_bytes_txn
+        )
+
+        yield self._end_background_update("event_fix_redactions_bytes")
+
+        return 1
