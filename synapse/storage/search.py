@@ -24,6 +24,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 from .background_updates import BackgroundUpdateStore
@@ -36,7 +37,7 @@ SearchEntry = namedtuple(
 )
 
 
-class SearchStore(BackgroundUpdateStore):
+class SearchBackgroundUpdateStore(BackgroundUpdateStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
@@ -44,7 +45,7 @@ class SearchStore(BackgroundUpdateStore):
     EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
 
     def __init__(self, db_conn, hs):
-        super(SearchStore, self).__init__(db_conn, hs)
+        super(SearchBackgroundUpdateStore, self).__init__(db_conn, hs)
 
         if not hs.config.enable_search:
             return
@@ -289,29 +290,6 @@ class SearchStore(BackgroundUpdateStore):
 
         return num_rows
 
-    def store_event_search_txn(self, txn, event, key, value):
-        """Add event to the search table
-
-        Args:
-            txn (cursor):
-            event (EventBase):
-            key (str):
-            value (str):
-        """
-        self.store_search_entries_txn(
-            txn,
-            (
-                SearchEntry(
-                    key=key,
-                    value=value,
-                    event_id=event.event_id,
-                    room_id=event.room_id,
-                    stream_ordering=event.internal_metadata.stream_ordering,
-                    origin_server_ts=event.origin_server_ts,
-                ),
-            ),
-        )
-
     def store_search_entries_txn(self, txn, entries):
         """Add entries to the search table
 
@@ -358,6 +336,34 @@ class SearchStore(BackgroundUpdateStore):
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
 
+
+class SearchStore(SearchBackgroundUpdateStore):
+    def __init__(self, db_conn, hs):
+        super(SearchStore, self).__init__(db_conn, hs)
+
+    def store_event_search_txn(self, txn, event, key, value):
+        """Add event to the search table
+
+        Args:
+            txn (cursor):
+            event (EventBase):
+            key (str):
+            value (str):
+        """
+        self.store_search_entries_txn(
+            txn,
+            (
+                SearchEntry(
+                    key=key,
+                    value=value,
+                    event_id=event.event_id,
+                    room_id=event.room_id,
+                    stream_ordering=event.internal_metadata.stream_ordering,
+                    origin_server_ts=event.origin_server_ts,
+                ),
+            ),
+        )
+
     @defer.inlineCallbacks
     def search_msgs(self, room_ids, search_term, keys):
         """Performs a full text search over events with given keys.
@@ -380,8 +386,10 @@ class SearchStore(BackgroundUpdateStore):
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
         if len(room_ids) < 500:
-            clauses.append("room_id IN (%s)" % (",".join(["?"] * len(room_ids)),))
-            args.extend(room_ids)
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids
+            )
+            clauses = [clause]
 
         local_clauses = []
         for key in keys:
@@ -487,8 +495,10 @@ class SearchStore(BackgroundUpdateStore):
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
         if len(room_ids) < 500:
-            clauses.append("room_id IN (%s)" % (",".join(["?"] * len(room_ids)),))
-            args.extend(room_ids)
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids
+            )
+            clauses = [clause]
 
         local_clauses = []
         for key in keys:

@@ -16,6 +16,8 @@ from ._base import Config
 
 
 class VoipConfig(Config):
+    section = "voip"
+
     def read_config(self, config, **kwargs):
         self.turn_uris = config.get("turn_uris", [])
         self.turn_shared_secret = config.get("turn_shared_secret")

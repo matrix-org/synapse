@@ -561,10 +561,12 @@ def run(hs):
 
         stats["database_engine"] = hs.get_datastore().database_engine_name
         stats["database_server_version"] = hs.get_datastore().get_server_version()
-        logger.info("Reporting stats to matrix.org: %s" % (stats,))
+        logger.info(
+            "Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats)
+        )
         try:
             yield hs.get_simple_http_client().put_json(
-                "https://matrix.org/report-usage-stats/push", stats
+                hs.config.report_stats_endpoint, stats
             )
         except Exception as e:
             logger.warn("Error reporting stats: %s", e)
@@ -603,13 +605,13 @@ def run(hs):
     @defer.inlineCallbacks
     def generate_monthly_active_users():
         current_mau_count = 0
-        reserved_count = 0
+        reserved_users = ()
         store = hs.get_datastore()
         if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
             current_mau_count = yield store.get_monthly_active_count()
-            reserved_count = yield store.get_registered_reserved_users_count()
+            reserved_users = yield store.get_registered_reserved_users()
         current_mau_gauge.set(float(current_mau_count))
-        registered_reserved_users_mau_gauge.set(float(reserved_count))
+        registered_reserved_users_mau_gauge.set(float(len(reserved_users)))
         max_mau_gauge.set(float(hs.config.max_mau_value))
 
     def start_generate_monthly_active_users():

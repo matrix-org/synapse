@@ -1,0 +1,1 @@
+Port synapse.rest.admin module to use async/await.

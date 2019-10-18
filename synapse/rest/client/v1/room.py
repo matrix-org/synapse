@@ -39,6 +39,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
@@ -81,6 +82,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
         )
 
     def on_PUT(self, request, txn_id):
+        set_tag("txn_id", txn_id)
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     @defer.inlineCallbacks
@@ -181,6 +183,9 @@ class RoomStateEventRestServlet(TransactionRestServlet):
     def on_PUT(self, request, room_id, event_type, state_key, txn_id=None):
         requester = yield self.auth.get_user_by_req(request)
 
+        if txn_id:
+            set_tag("txn_id", txn_id)
+
         content = parse_json_object_from_request(request)
 
         event_dict = {
@@ -209,6 +214,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         ret = {}
         if event:
+            set_tag("event_id", event.event_id)
             ret = {"event_id": event.event_id}
         return 200, ret
 
@@ -244,12 +250,15 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             requester, event_dict, txn_id=txn_id
         )
 
+        set_tag("event_id", event.event_id)
         return 200, {"event_id": event.event_id}
 
     def on_GET(self, request, room_id, event_type, txn_id):
         return 200, "Not implemented"
 
     def on_PUT(self, request, room_id, event_type, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, event_type, txn_id
         )
@@ -310,6 +319,8 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         return 200, {"room_id": room_id}
 
     def on_PUT(self, request, room_identifier, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_identifier, txn_id
         )
@@ -350,6 +361,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
 
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
+
         handler = self.hs.get_room_list_handler()
         if server:
             data = yield handler.get_remote_public_room_list(
@@ -386,6 +401,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             network_tuple = ThirdPartyInstanceID(None, None)
         else:
             network_tuple = ThirdPartyInstanceID.from_string(third_party_instance_id)
+
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
 
         handler = self.hs.get_room_list_handler()
         if server:
@@ -655,6 +674,8 @@ class RoomForgetRestServlet(TransactionRestServlet):
         return 200, {}
 
     def on_PUT(self, request, room_id, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, txn_id
         )
@@ -701,6 +722,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 content["id_server"],
                 requester,
                 txn_id,
+                content.get("id_access_token"),
             )
             return 200, {}
 
@@ -737,6 +759,8 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         return True
 
     def on_PUT(self, request, room_id, membership_action, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, membership_action, txn_id
         )
@@ -770,9 +794,12 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
             txn_id=txn_id,
         )
 
+        set_tag("event_id", event.event_id)
         return 200, {"event_id": event.event_id}
 
     def on_PUT(self, request, room_id, event_id, txn_id):
+        set_tag("txn_id", txn_id)
+
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, event_id, txn_id
         )

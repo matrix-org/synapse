@@ -17,6 +17,7 @@
 """Contains exceptions and error codes."""
 
 import logging
+from typing import Dict
 
 from six import iteritems
 from six.moves import http_client
@@ -112,7 +113,7 @@ class ProxiedRequestError(SynapseError):
     def __init__(self, code, msg, errcode=Codes.UNKNOWN, additional_fields=None):
         super(ProxiedRequestError, self).__init__(code, msg, errcode)
         if additional_fields is None:
-            self._additional_fields = {}
+            self._additional_fields = {}  # type: Dict
         else:
             self._additional_fields = dict(additional_fields)
 

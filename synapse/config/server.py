@@ -19,6 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
+from typing import List
 
 import attr
 import yaml
@@ -48,8 +49,17 @@ ROOM_COMPLEXITY_TOO_GREAT = (
     "to join this room."
 )
 
+METRICS_PORT_WARNING = """\
+The metrics_port configuration option is deprecated in Synapse 0.31 in favour of
+a listener. Please see
+https://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md
+on how to configure the new listener.
+--------------------------------------------------------------------------------"""
+
 
 class ServerConfig(Config):
+    section = "server"
+
     def read_config(self, config, **kwargs):
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
@@ -162,6 +172,23 @@ class ServerConfig(Config):
 
         self.mau_trial_days = config.get("mau_trial_days", 0)
 
+        # How long to keep redacted events in the database in unredacted form
+        # before redacting them.
+        redaction_retention_period = config.get("redaction_retention_period", "7d")
+        if redaction_retention_period is not None:
+            self.redaction_retention_period = self.parse_duration(
+                redaction_retention_period
+            )
+        else:
+            self.redaction_retention_period = None
+
+        # How long to keep entries in the `users_ips` table.
+        user_ips_max_age = config.get("user_ips_max_age", "28d")
+        if user_ips_max_age is not None:
+            self.user_ips_max_age = self.parse_duration(user_ips_max_age)
+        else:
+            self.user_ips_max_age = None
+
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
         self.hs_disabled_message = config.get("hs_disabled_message", "")
@@ -219,7 +246,7 @@ class ServerConfig(Config):
         # events with profile information that differ from the target's global profile.
         self.allow_per_room_profiles = config.get("allow_per_room_profiles", True)
 
-        self.listeners = []
+        self.listeners = []  # type: List[dict]
         for listener in config.get("listeners", []):
             if not isinstance(listener.get("port", None), int):
                 raise ConfigError(
@@ -263,7 +290,10 @@ class ServerConfig(Config):
                 validator=attr.validators.instance_of(bool), default=False
             )
             complexity = attr.ib(
-                validator=attr.validators.instance_of((int, float)), default=1.0
+                validator=attr.validators.instance_of(
+                    (float, int)  # type: ignore[arg-type] # noqa
+                ),
+                default=1.0,
             )
             complexity_error = attr.ib(
                 validator=attr.validators.instance_of(str),
@@ -324,14 +354,7 @@ class ServerConfig(Config):
 
         metrics_port = config.get("metrics_port")
         if metrics_port:
-            logger.warn(
-                (
-                    "The metrics_port configuration option is deprecated in Synapse 0.31 "
-                    "in favour of a listener. Please see "
-                    "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.rst"
-                    " on how to configure the new listener."
-                )
-            )
+            logger.warning(METRICS_PORT_WARNING)
 
             self.listeners.append(
                 {
@@ -345,13 +368,11 @@ class ServerConfig(Config):
 
         _check_resource_config(self.listeners)
 
-        # An experimental option to try and periodically clean up extremities
-        # by sending dummy events.
         self.cleanup_extremities_with_dummy_events = config.get(
-            "cleanup_extremities_with_dummy_events", False
+            "cleanup_extremities_with_dummy_events", True
         )
 
-    def has_tls_listener(self):
+    def has_tls_listener(self) -> bool:
         return any(l["tls"] for l in self.listeners)
 
     def generate_config_section(
@@ -535,6 +556,9 @@ class ServerConfig(Config):
         # blacklist IP address CIDR ranges. If this option is not specified, or
         # specified with an empty list, no ip range blacklist will be enforced.
         #
+        # As of Synapse v1.4.0 this option also affects any outbound requests to identity
+        # servers provided by user input.
+        #
         # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
         # listed here, since they correspond to unroutable addresses.)
         #
@@ -561,8 +585,8 @@ class ServerConfig(Config):
         #
         #   type: the type of listener. Normally 'http', but other valid options are:
         #       'manhole' (see docs/manhole.md),
-        #       'metrics' (see docs/metrics-howto.rst),
-        #       'replication' (see docs/workers.rst).
+        #       'metrics' (see docs/metrics-howto.md),
+        #       'replication' (see docs/workers.md).
         #
         #   tls: set to true to enable TLS for this listener. Will use the TLS
         #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -597,12 +621,12 @@ class ServerConfig(Config):
         #
         #   media: the media API (/_matrix/media).
         #
-        #   metrics: the metrics interface. See docs/metrics-howto.rst.
+        #   metrics: the metrics interface. See docs/metrics-howto.md.
         #
         #   openid: OpenID authentication.
         #
         #   replication: the HTTP replication API (/_synapse/replication). See
-        #       docs/workers.rst.
+        #       docs/workers.md.
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
@@ -622,7 +646,7 @@ class ServerConfig(Config):
           # that unwraps TLS.
           #
           # If you plan to use a reverse proxy, please see
-          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
           #
           %(unsecure_http_bindings)s
 
@@ -718,6 +742,19 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #allow_per_room_profiles: false
+
+        # How long to keep redacted events in unredacted form in the database. After
+        # this period redacted events get replaced with their redacted form in the DB.
+        #
+        # Defaults to `7d`. Set to `null` to disable.
+        #
+        #redaction_retention_period: 28d
+
+        # How long to track users' last seen time and IPs in the database.
+        #
+        # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
+        #
+        #user_ips_max_age: 14d
         """
             % locals()
         )

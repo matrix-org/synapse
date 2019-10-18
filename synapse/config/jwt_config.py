@@ -23,6 +23,8 @@ MISSING_JWT = """Missing jwt library. This is required for jwt login.
 
 
 class JWTConfig(Config):
+    section = "jwt"
+
     def read_config(self, config, **kwargs):
         jwt_config = config.get("jwt_config", None)
         if jwt_config:

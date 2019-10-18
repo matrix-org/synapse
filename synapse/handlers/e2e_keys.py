@@ -329,16 +329,10 @@ class E2eKeysHandler(object):
 
         results = yield self.store.get_e2e_device_keys(local_query)
 
-        # Build the result structure, un-jsonify the results, and add the
-        # "unsigned" section
+        # Build the result structure
         for user_id, device_keys in results.items():
             for device_id, device_info in device_keys.items():
-                r = dict(device_info["keys"])
-                r["unsigned"] = {}
-                display_name = device_info["device_display_name"]
-                if display_name is not None:
-                    r["unsigned"]["device_display_name"] = display_name
-                result_dict[user_id][device_id] = r
+                result_dict[user_id][device_id] = device_info
 
         log_kv(results)
         return result_dict
@@ -750,7 +744,7 @@ class E2eKeysHandler(object):
                     )
 
                 try:
-                    stored_device = devices[device_id]["keys"]
+                    stored_device = devices[device_id]
                 except KeyError:
                     raise NotFoundError("Unknown device")
                 if self_signing_key_id in stored_device.get("signatures", {}).get(
@@ -800,14 +794,14 @@ class E2eKeysHandler(object):
             _, signing_device_id = signing_key_id.split(":", 1)
             if (
                 signing_device_id not in devices
-                or signing_key_id not in devices[signing_device_id]["keys"]["keys"]
+                or signing_key_id not in devices[signing_device_id]["keys"]
             ):
                 # signed by an unknown device, or the
                 # device does not have the key
                 raise SynapseError(400, "Invalid signature", Codes.INVALID_SIGNATURE)
 
             # get the key and check the signature
-            pubkey = devices[signing_device_id]["keys"]["keys"][signing_key_id]
+            pubkey = devices[signing_device_id]["keys"][signing_key_id]
             verify_key = decode_verify_key_bytes(signing_key_id, decode_base64(pubkey))
             _check_device_signature(
                 user_id, verify_key, signed_master_key, stored_master_key

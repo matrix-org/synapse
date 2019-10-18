@@ -16,11 +16,9 @@
 
 import attr
 
-from ._base import Config, ConfigError
+from synapse.python_dependencies import DependencyException, check_requirements
 
-MISSING_SENTRY = """Missing sentry-sdk library. This is required to enable sentry
-    integration.
-    """
+from ._base import Config, ConfigError
 
 
 @attr.s
@@ -36,9 +34,14 @@ class MetricsFlags(object):
 
 
 class MetricsConfig(Config):
+    section = "metrics"
+
     def read_config(self, config, **kwargs):
         self.enable_metrics = config.get("enable_metrics", False)
         self.report_stats = config.get("report_stats", None)
+        self.report_stats_endpoint = config.get(
+            "report_stats_endpoint", "https://matrix.org/report-usage-stats/push"
+        )
         self.metrics_port = config.get("metrics_port")
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
 
@@ -51,9 +54,9 @@ class MetricsConfig(Config):
         self.sentry_enabled = "sentry" in config
         if self.sentry_enabled:
             try:
-                import sentry_sdk  # noqa F401
-            except ImportError:
-                raise ConfigError(MISSING_SENTRY)
+                check_requirements("sentry")
+            except DependencyException as e:
+                raise ConfigError(e.message)
 
             self.sentry_dsn = config["sentry"].get("dsn")
             if not self.sentry_dsn:
@@ -97,4 +100,10 @@ class MetricsConfig(Config):
         else:
             res += "report_stats: %s\n" % ("true" if report_stats else "false")
 
+        res += """
+        # The endpoint to report the anonymized homeserver usage statistics to.
+        # Defaults to https://matrix.org/report-usage-stats/push
+        #
+        #report_stats_endpoint: https://example.com/report-usage-stats/push
+        """
         return res

@@ -42,7 +42,8 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 This option only takes effect if include_all_devices is true.
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
-            dict containing "key_json", "device_display_name".
+            key data.  The key data will be a dict in the same format as the
+            DeviceKeys type returned by POST /_matrix/client/r0/keys/query.
         """
         set_tag("query_list", query_list)
         if not query_list:
@@ -56,17 +57,25 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             include_deleted_devices,
         )
 
+        # Build the result structure, un-jsonify the results, and add the
+        # "unsigned" section
+        rv = {}
         for user_id, device_keys in iteritems(results):
+            rv[user_id] = {}
             for device_id, device_info in iteritems(device_keys):
-                device_info["keys"] = db_to_json(device_info.pop("key_json"))
-                # add cross-signing signatures to the keys
+                r = db_to_json(device_info.pop("key_json"))
+                r["unsigned"] = {}
+                display_name = device_info["device_display_name"]
+                if display_name is not None:
+                    r["unsigned"]["device_display_name"] = display_name
                 if "signatures" in device_info:
                     for sig_user_id, sigs in device_info["signatures"].items():
-                        device_info["keys"].setdefault("signatures", {}).setdefault(
+                        r.setdefault("signatures", {}).setdefault(
                             sig_user_id, {}
                         ).update(sigs)
+                rv[user_id][device_id] = r
 
-        return results
+        return rv
 
     @trace
     def _get_e2e_device_keys_txn(
@@ -378,7 +387,8 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         # The "keys" property must only have one entry, which will be the public
         # key, so we just grab the first value in there
         pubkey = next(iter(key["keys"].values()))
-        self._simple_insert(
+        self._simple_insert_txn(
+            txn,
             "devices",
             values={
                 "user_id": user_id,
@@ -386,12 +396,12 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 "display_name": key_type + " signing key",
                 "hidden": True,
             },
-            desc="store_master_key_device",
         )
 
         # and finally, store the key itself
         with self._cross_signing_id_gen.get_next() as stream_id:
-            self._simple_insert(
+            self._simple_insert_txn(
+                txn,
                 "e2e_cross_signing_keys",
                 values={
                     "user_id": user_id,
@@ -399,7 +409,6 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                     "keydata": json.dumps(key),
                     "stream_id": stream_id,
                 },
-                desc="store_master_key",
             )
 
     def set_e2e_cross_signing_key(self, user_id, key_type, key):
