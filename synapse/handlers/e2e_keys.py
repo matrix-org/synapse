@@ -678,7 +678,7 @@ class E2eKeysHandler(object):
 
         Returns:
             (list[SignatureListItem], dict[string, dict[string, dict]]):
-            a list of signatures to upload, and a map of users to devices to failure
+            a list of signatures to store, and a map of users to devices to failure
             reasons
 
         Raises:
@@ -778,19 +778,20 @@ class E2eKeysHandler(object):
     def _check_master_key_signature(
         self, user_id, master_key_id, signed_master_key, stored_master_key, devices
     ):
-        """Check signatures of the user's master key made by their devices.
+        """Check signatures of a user's master key made by their devices.
 
         Args:
-            user_id (string): the user uploading the keys
-            signatures (dict[string, dict]): map of users to devices to signed keys
+            user_id (string): the user whose master key is being checked
+            master_key_id (string): the ID of the user's master key
+            signed_master_key (dict): the user's signed master key that was uploaded
+            stored_master_key (dict): our previously-stored copy of the user's master key
+            devices (iterable(dict)): the user's devices
 
         Returns:
-            (list[SignatureListItem], dict[string, dict[string, dict]]):
-            a list of signatures to upload, and a map of users to devices to failure
-            reasons
+            list[SignatureListItem]: a list of signatures to store
 
         Raises:
-            SynapseError: if the input is malformed
+            SynapseError: if a signature is invalid
         """
         # for each device that signed the master key, check the signature.
         master_key_signature_list = []
@@ -830,7 +831,7 @@ class E2eKeysHandler(object):
 
         Returns:
             (list[SignatureListItem], dict[string, dict[string, dict]]):
-            a list of signatures to upload, and a map of users to devices to failure
+            a list of signatures to store, and a map of users to devices to failure
             reasons
 
         Raises:
@@ -930,6 +931,9 @@ class E2eKeysHandler(object):
         Returns:
             dict, str, VerifyKey: the raw key data, the key ID, and the
                 signedjson verify key
+
+        Raises:
+            NotFoundError: if the key is not found
         """
         key = yield self.store.get_e2e_cross_signing_key(
             user_id, key_type, from_user_id
