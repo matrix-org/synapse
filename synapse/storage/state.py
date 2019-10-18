@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Iterable, Tuple
 
 from six import iteritems, itervalues
 from six.moves import range
@@ -25,6 +26,8 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError
+from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import PostgresEngine
@@ -1516,7 +1519,9 @@ class StateStore(StateGroupWorkerStore, StateBackgroundUpdateStore):
     def __init__(self, db_conn, hs):
         super(StateStore, self).__init__(db_conn, hs)
 
-    def _store_event_state_mappings_txn(self, txn, events_and_contexts):
+    def _store_event_state_mappings_txn(
+        self, txn, events_and_contexts: Iterable[Tuple[EventBase, EventContext]]
+    ):
         state_groups = {}
         for event, context in events_and_contexts:
             if event.internal_metadata.is_outlier():
