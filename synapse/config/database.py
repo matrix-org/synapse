@@ -21,6 +21,8 @@ from ._base import Config
 
 
 class DatabaseConfig(Config):
+    section = "database"
+
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
 

@@ -2530,11 +2530,16 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_exchange_third_party_invite_request(self, origin, room_id, event_dict):
+    def on_exchange_third_party_invite_request(self, room_id, event_dict):
         """Handle an exchange_third_party_invite request from a remote server
 
         The remote server will call this when it wants to turn a 3pid invite
         into a normal m.room.member invite.
+
+        Args:
+            room_id (str): The ID of the room.
+
+            event_dict (dict[str, Any]): Dictionary containing the event body.
 
         Returns:
             Deferred: resolves (to None)
@@ -2565,7 +2570,7 @@ class FederationHandler(BaseHandler):
         )
 
         try:
-            self.auth.check_from_context(room_version, event, context)
+            yield self.auth.check_from_context(room_version, event, context)
         except AuthError as e:
             logger.warn("Denying third party invite %r because %s", event, e)
             raise e
@@ -2594,7 +2599,12 @@ class FederationHandler(BaseHandler):
                 original_invite_id, allow_none=True
             )
         if original_invite:
-            display_name = original_invite.content["display_name"]
+            # If the m.room.third_party_invite event's content is empty, it means the
+            # invite has been revoked. In this case, we don't have to raise an error here
+            # because the auth check will fail on the invite (because it's not able to
+            # fetch public keys from the m.room.third_party_invite event's content, which
+            # is empty).
+            display_name = original_invite.content.get("display_name")
             event_dict["content"]["third_party_invite"]["display_name"] = display_name
         else:
             logger.info(

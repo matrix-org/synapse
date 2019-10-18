@@ -29,6 +29,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -376,6 +377,7 @@ class CasTicketServlet(RestServlet):
         super(CasTicketServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url
         self.cas_service_url = hs.config.cas_service_url
+        self.cas_displayname_attribute = hs.config.cas_displayname_attribute
         self.cas_required_attributes = hs.config.cas_required_attributes
         self._sso_auth_handler = SSOAuthHandler(hs)
         self._http_client = hs.get_simple_http_client()
@@ -399,6 +401,7 @@ class CasTicketServlet(RestServlet):
 
     def handle_cas_response(self, request, cas_response_body, client_redirect_url):
         user, attributes = self.parse_cas_response(cas_response_body)
+        displayname = attributes.pop(self.cas_displayname_attribute, None)
 
         for required_attribute, required_value in self.cas_required_attributes.items():
             # If required attribute was not in CAS Response - Forbidden
@@ -413,7 +416,7 @@ class CasTicketServlet(RestServlet):
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
         return self._sso_auth_handler.on_successful_auth(
-            user, request, client_redirect_url
+            user, request, client_redirect_url, displayname
         )
 
     def parse_cas_response(self, cas_response_body):
@@ -506,6 +509,19 @@ class SSOAuthHandler(object):
             registered_user_id = yield self._registration_handler.register_user(
                 localpart=localpart, default_display_name=user_display_name
             )
+
+        self.complete_sso_login(registered_user_id, request, client_redirect_url)
+
+    def complete_sso_login(
+        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+    ):
+        """Having figured out a mxid for this user, complete the HTTP request
+
+        Args:
+            registered_user_id:
+            request:
+            client_redirect_url:
+        """
 
         login_token = self._macaroon_gen.generate_short_term_login_token(
             registered_user_id

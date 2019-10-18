@@ -73,7 +73,9 @@ class DeactivateAccountHandler(BaseHandler):
         # unbinding
         identity_server_supports_unbinding = True
 
-        threepids = yield self.store.user_get_threepids(user_id)
+        # Retrieve the 3PIDs this user has bound to an identity server
+        threepids = yield self.store.user_get_bound_threepids(user_id)
+
         for threepid in threepids:
             try:
                 result = yield self._identity_handler.try_unbind_threepid(
@@ -118,6 +120,10 @@ class DeactivateAccountHandler(BaseHandler):
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
 
+        # Reject all pending invites for the user, so that the user doesn't show up in the
+        # "invited" section of rooms' members list.
+        yield self._reject_pending_invites_for_user(user_id)
+
         # Remove all information on the user from the account_validity table.
         if self._account_validity_enabled:
             yield self.store.delete_account_validity_for_user(user_id)
@@ -126,6 +132,39 @@ class DeactivateAccountHandler(BaseHandler):
         yield self.store.set_user_deactivated_status(user_id, True)
 
         return identity_server_supports_unbinding
+
+    @defer.inlineCallbacks
+    def _reject_pending_invites_for_user(self, user_id):
+        """Reject pending invites addressed to a given user ID.
+
+        Args:
+            user_id (str): The user ID to reject pending invites for.
+        """
+        user = UserID.from_string(user_id)
+        pending_invites = yield self.store.get_invited_rooms_for_user(user_id)
+
+        for room in pending_invites:
+            try:
+                yield self._room_member_handler.update_membership(
+                    create_requester(user),
+                    user,
+                    room.room_id,
+                    "leave",
+                    ratelimit=False,
+                    require_consent=False,
+                )
+                logger.info(
+                    "Rejected invite for deactivated user %r in room %r",
+                    user_id,
+                    room.room_id,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to reject invite for user %r in room %r:"
+                    " ignoring and continuing",
+                    user_id,
+                    room.room_id,
+                )
 
     def _start_user_parting(self):
         """

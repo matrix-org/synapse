@@ -42,7 +42,8 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 This option only takes effect if include_all_devices is true.
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
-            dict containing "key_json", "device_display_name".
+            key data.  The key data will be a dict in the same format as the
+            DeviceKeys type returned by POST /_matrix/client/r0/keys/query.
         """
         set_tag("query_list", query_list)
         if not query_list:
@@ -56,11 +57,20 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             include_deleted_devices,
         )
 
+        # Build the result structure, un-jsonify the results, and add the
+        # "unsigned" section
+        rv = {}
         for user_id, device_keys in iteritems(results):
+            rv[user_id] = {}
             for device_id, device_info in iteritems(device_keys):
-                device_info["keys"] = db_to_json(device_info.pop("key_json"))
+                r = db_to_json(device_info.pop("key_json"))
+                r["unsigned"] = {}
+                display_name = device_info["device_display_name"]
+                if display_name is not None:
+                    r["unsigned"]["device_display_name"] = display_name
+                rv[user_id][device_id] = r
 
-        return results
+        return rv
 
     @trace
     def _get_e2e_device_keys_txn(

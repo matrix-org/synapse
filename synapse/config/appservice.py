@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict
 
 from six import string_types
 from six.moves.urllib import parse as urlparse
@@ -29,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 
 class AppServiceConfig(Config):
+    section = "appservice"
+
     def read_config(self, config, **kwargs):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)
@@ -56,8 +59,8 @@ def load_appservices(hostname, config_files):
         return []
 
     # Dicts of value -> filename
-    seen_as_tokens = {}
-    seen_ids = {}
+    seen_as_tokens = {}  # type: Dict[str, str]
+    seen_ids = {}  # type: Dict[str, str]
 
     appservices = []
 

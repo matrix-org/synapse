@@ -22,6 +22,13 @@ class PostgresEngine(object):
     def __init__(self, database_module, database_config):
         self.module = database_module
         self.module.extensions.register_type(self.module.extensions.UNICODE)
+
+        # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
+        # actually want to use bytes than wrap it in `bytearray`.
+        def _disable_bytes_adapter(_):
+            raise Exception("Passing bytes to DB is disabled.")
+
+        self.module.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
         self._version = None  # unknown as yet
 
@@ -69,6 +76,19 @@ class PostgresEngine(object):
     def can_native_upsert(self):
         """
         Can we use native UPSERTs?
+        """
+        return True
+
+    @property
+    def supports_tuple_comparison(self):
+        """
+        Do we support comparing tuples, i.e. `(a, b) > (c, d)`?
+        """
+        return True
+
+    @property
+    def supports_using_any_list(self):
+        """Do we support using `a = ANY(?)` and passing a list
         """
         return True
 

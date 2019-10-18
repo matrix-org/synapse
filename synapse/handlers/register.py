@@ -217,10 +217,9 @@ class RegistrationHandler(BaseHandler):
 
         else:
             # autogen a sequential user ID
-            attempts = 0
             user = None
             while not user:
-                localpart = yield self._generate_user_id(attempts > 0)
+                localpart = yield self._generate_user_id()
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 yield self.check_user_id_not_appservice_exclusive(user_id)
@@ -238,7 +237,6 @@ class RegistrationHandler(BaseHandler):
                     # if user id is taken, just generate another
                     user = None
                     user_id = None
-                    attempts += 1
 
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
@@ -275,16 +273,12 @@ class RegistrationHandler(BaseHandler):
         fake_requester = create_requester(user_id)
 
         # try to create the room if we're the first real user on the server. Note
-        # that an auto-generated support user is not a real user and will never be
+        # that an auto-generated support or bot user is not a real user and will never be
         # the user to create the room
         should_auto_create_rooms = False
-        is_support = yield self.store.is_support_user(user_id)
-        # There is an edge case where the first user is the support user, then
-        # the room is never created, though this seems unlikely and
-        # recoverable from given the support user being involved in the first
-        # place.
-        if self.hs.config.autocreate_auto_join_rooms and not is_support:
-            count = yield self.store.count_all_users()
+        is_real_user = yield self.store.is_real_user(user_id)
+        if self.hs.config.autocreate_auto_join_rooms and is_real_user:
+            count = yield self.store.count_real_users()
             should_auto_create_rooms = count == 1
         for r in self.hs.config.auto_join_rooms:
             logger.info("Auto-joining %s to %s", user_id, r)
@@ -383,10 +377,10 @@ class RegistrationHandler(BaseHandler):
                 )
 
     @defer.inlineCallbacks
-    def _generate_user_id(self, reseed=False):
-        if reseed or self._next_generated_user_id is None:
+    def _generate_user_id(self):
+        if self._next_generated_user_id is None:
             with (yield self._generate_user_id_linearizer.queue(())):
-                if reseed or self._next_generated_user_id is None:
+                if self._next_generated_user_id is None:
                     self._next_generated_user_id = (
                         yield self.store.find_next_generated_user_id_localpart()
                     )
