@@ -375,7 +375,7 @@ class RoomKeysVersionServlet(RestServlet):
                     "ed25519:something": "hijklmnop"
                 }
             },
-            "version": "42"
+            "version": "12345"
         }
 
         HTTP/1.1 200 OK
