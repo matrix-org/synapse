@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -287,6 +288,8 @@ class RestServlet(object):
     into the appropriate HTTP response.
     """
 
+    PERMISSION_CODE = None
+
     def register(self, http_server):
         """ Register this servlet with the given HTTP server. """
         if hasattr(self, "PATTERNS"):
@@ -302,3 +305,10 @@ class RestServlet(object):
 
         else:
             raise NotImplementedError("RestServlet must register something.")
+
+    async def check_authorized_admin_token_in_use(self, request):
+        admin_handler = self.hs.get_handlers().admin_handler
+        is_valid = await admin_handler.validate_admin_token(
+            self, request, raise_if_missing=False
+        )
+        return is_valid

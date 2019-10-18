@@ -169,6 +169,7 @@ import contextlib
 import inspect
 import logging
 import re
+import types
 from functools import wraps
 from typing import Dict
 
@@ -778,8 +779,7 @@ def trace_servlet(servlet_name, extract_context=False):
             return func
 
         @wraps(func)
-        @defer.inlineCallbacks
-        def _trace_servlet_inner(request, *args, **kwargs):
+        async def _trace_servlet_inner(request, *args, **kwargs):
             request_tags = {
                 "request_id": request.get_request_id(),
                 tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
@@ -796,7 +796,12 @@ def trace_servlet(servlet_name, extract_context=False):
                 scope = start_active_span(servlet_name, tags=request_tags)
 
             with scope:
-                result = yield defer.maybeDeferred(func, request, *args, **kwargs)
+                result_func = func(request, *args, **kwargs)
+
+                if not isinstance(result_func, (defer.Deferred, types.CoroutineType)):
+                    result_func = defer.succeed(result_func)
+
+                result = await result_func
                 return result
 
         return _trace_servlet_inner

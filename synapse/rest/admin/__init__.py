@@ -396,6 +396,8 @@ class ShutdownRoomRestServlet(RestServlet):
         " violation will be blocked."
     )
 
+    PERMISSION_CODE = "ROOM_SHUTDOWN"
+
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
@@ -405,10 +407,16 @@ class ShutdownRoomRestServlet(RestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
-        yield assert_user_is_admin(self.auth, requester.user)
+    async def on_POST(self, request, room_id):
+
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+
+        if authorised_by_token:
+            requester_user_id = self.hs.config.admin_token_user
+        else:
+            requester = await self.auth.get_user_by_req(request)
+            await assert_user_is_admin(self.auth, requester.user)
+            requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ["new_room_user_id"])
@@ -419,7 +427,7 @@ class ShutdownRoomRestServlet(RestServlet):
         message = content.get("message", self.DEFAULT_MESSAGE)
         room_name = content.get("room_name", "Content Violation Notification")
 
-        info = yield self._room_creation_handler.create_room(
+        info = await self._room_creation_handler.create_room(
             room_creator_requester,
             config={
                 "preset": "public_chat",
@@ -430,17 +438,15 @@ class ShutdownRoomRestServlet(RestServlet):
         )
         new_room_id = info["room_id"]
 
-        requester_user_id = requester.user.to_string()
-
         logger.info(
             "Shutting down room %r, joining to new room: %r", room_id, new_room_id
         )
 
         # This will work even if the room is already blocked, but that is
         # desirable in case the first attempt at blocking the room failed below.
-        yield self.store.block_room(room_id, requester_user_id)
+        await self.store.block_room(room_id, requester_user_id)
 
-        users = yield self.state.get_current_users_in_room(room_id)
+        users = await self.state.get_current_users_in_room(room_id)
         kicked_users = []
         failed_to_kick_users = []
         for user_id in users:
@@ -451,7 +457,7 @@ class ShutdownRoomRestServlet(RestServlet):
 
             try:
                 target_requester = create_requester(user_id)
-                yield self.room_member_handler.update_membership(
+                await self.room_member_handler.update_membership(
                     requester=target_requester,
                     target=target_requester.user,
                     room_id=room_id,
@@ -461,9 +467,9 @@ class ShutdownRoomRestServlet(RestServlet):
                     require_consent=False,
                 )
 
-                yield self.room_member_handler.forget(target_requester.user, room_id)
+                await self.room_member_handler.forget(target_requester.user, room_id)
 
-                yield self.room_member_handler.update_membership(
+                await self.room_member_handler.update_membership(
                     requester=target_requester,
                     target=target_requester.user,
                     room_id=new_room_id,
@@ -480,7 +486,7 @@ class ShutdownRoomRestServlet(RestServlet):
                 )
                 failed_to_kick_users.append(user_id)
 
-        yield self.event_creation_handler.create_and_send_nonmember_event(
+        await self.event_creation_handler.create_and_send_nonmember_event(
             room_creator_requester,
             {
                 "type": "m.room.message",
@@ -491,9 +497,9 @@ class ShutdownRoomRestServlet(RestServlet):
             ratelimit=False,
         )
 
-        aliases_for_room = yield self.store.get_aliases_for_room(room_id)
+        aliases_for_room = await self.store.get_aliases_for_room(room_id)
 
-        yield self.store.update_aliases_for_room(
+        await self.store.update_aliases_for_room(
             room_id, new_room_id, requester_user_id
         )
 

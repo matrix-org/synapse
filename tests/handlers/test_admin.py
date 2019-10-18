@@ -25,8 +25,6 @@ from synapse.api.constants import EventTypes
 from synapse.rest.client.v1 import login, room
 from synapse.storage.admin import TokenState
 
-from twisted.internet.defer import ensureDeferred
-
 from tests import unittest
 
 
@@ -233,3 +231,29 @@ class AdminTokenTests(unittest.HomeserverTestCase):
 
         self.assertEqual(lookup.token_state, TokenState.VALID)
         self.assertEqual(len(lookup.permissions), 0)
+
+    def test_token_permissions(self):
+
+        token = self.get_success(
+            self.handler.create_admin_token(
+                valid_until=10000, creator="@test:server", description="A token!"
+            )
+        )
+
+        self.get_success(
+            self.handler.set_permission_for_token(
+                admin_token=token, endpoint="TEST", action="GET", allowed=True
+            )
+        )
+        self.get_success(
+            self.handler.set_permission_for_token(
+                admin_token=token, endpoint="TEST", action="POST", allowed=False
+            )
+        )
+
+        lookup = self.get_success(self.handler.get_permissions_for_token(token))
+
+        self.assertEqual(set(lookup.permissions.keys()), {"TEST"})
+        self.assertEqual(lookup.permissions["TEST"]["GET"], True)
+        self.assertEqual(lookup.permissions["TEST"]["POST"], False)
+        self.assertEqual(lookup.permissions["TEST"]["PUT"], False)

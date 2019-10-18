@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,15 +19,10 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
+from synapse.api.errors import Codes, MissingClientTokenError, SynapseError
+from synapse.storage.admin import TokenState
 from synapse.types import RoomStreamToken
 from synapse.visibility import filter_events_for_client
-
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    InvalidClientTokenError,
-    MissingClientTokenError,
-)
 
 from ._base import BaseHandler
 
@@ -37,12 +33,21 @@ class AdminHandler(BaseHandler):
     def __init__(self, hs):
         super(AdminHandler, self).__init__(hs)
 
-    async def validate_admin_token(self, servlet, request):
+    async def validate_admin_token(
+        self, servlet, request, raise_if_missing: bool = True
+    ) -> bool:
         """
-        Validate that an admin token is on the request.
+        Validate that there is an admin token on the request, and that it can
+        access this servlet.
         """
+        # This servlet can't be validated by an admin token. Error out.
+        if servlet.PERMISSION_CODE is None:
+            raise SynapseError(403, "Forbidden", errcode=Codes.FORBIDDEN)
 
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+
+        if not auth_headers:
+            raise MissingClientTokenError("Missing Authorization header.")
 
         if len(auth_headers) > 1:
             raise MissingClientTokenError("Too many Authorization headers.")
@@ -55,13 +60,32 @@ class AdminHandler(BaseHandler):
 
         token_rules = await self.store.get_permissions_for_token(token)
 
+        if not raise_if_missing and token_rules.token_state is TokenState.NON_EXISTANT:
+            return False
+
         action = request.method.decode("ascii")
+
+        if token_rules.permissions[servlet.PERMISSION_CODE][action] is True:
+            return True
+        else:
+            raise SynapseError(403, "Forbidden", errcode=Codes.FORBIDDEN)
 
     async def get_permissions_for_token(self, token):
 
         token_rules = await self.store.get_permissions_for_token(token)
 
         return token_rules
+
+    async def set_permission_for_token(
+        self, admin_token: str, endpoint: str, action: str, allowed: bool
+    ) -> bool:
+
+        if action not in ["GET", "PUT", "POST", "DELETE"]:
+            raise ValueError("%r is an invalid action" % (action,))
+
+        return await self.store.set_permission_for_token(
+            admin_token=admin_token, endpoint=endpoint, action=action, allowed=allowed
+        )
 
     async def create_admin_token(self, valid_until, creator, description):
 

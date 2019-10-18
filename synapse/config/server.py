@@ -196,6 +196,11 @@ class ServerConfig(Config):
         # due to resource constraints
         self.admin_contact = config.get("admin_contact", None)
 
+        # Admin user, a (possibly fake) MXID to use when an administrator token has been used.
+        self.admin_token_user = config.get(
+            "admin_token_user", "@admin:" + self.server_name
+        )
+
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get("federation_domain_whitelist", None)

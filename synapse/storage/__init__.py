@@ -25,8 +25,8 @@ from synapse.storage.devices import DeviceStore
 from synapse.storage.user_erasure_store import UserErasureStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
-from .admin import AdminTokenWorkerStore
 from .account_data import AccountDataStore
+from .admin import AdminTokenWorkerStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore

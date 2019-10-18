@@ -13,21 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import enum
 import uuid
-import json
-
 from collections import defaultdict
-
-from twisted.internet import defer
-
-from synapse.api.errors import StoreError
-from synapse.logging.opentracing import log_kv, trace
-
-from ._base import SQLBaseStore
 
 import attr
 
-import enum
+from ._base import SQLBaseStore
 
 
 class TokenState(enum.Enum):
@@ -41,14 +33,19 @@ class TokenState(enum.Enum):
 class TokenLookupResult(object):
     admin_token = attr.ib()
     permissions = attr.ib(
-        default=attr.Factory(lambda: defaultdict(lambda: defaultdict(False)))
+        default=attr.Factory(lambda: defaultdict(lambda: defaultdict(lambda: False)))
     )
     token_state = attr.ib(type=TokenState, default=TokenState.NON_EXISTANT)
 
 
 class AdminTokenWorkerStore(SQLBaseStore):
-    async def get_permissions_for_token(self, admin_token) -> TokenLookupResult:
+    async def get_permissions_for_token(self, admin_token: str) -> TokenLookupResult:
+        """
+        Get a token and its permissions.
 
+        Args:
+            admin_token: The admin token to look up permissions for:
+        """
         result = TokenLookupResult(admin_token=admin_token)
 
         token = await self._simple_select_one(
@@ -72,8 +69,6 @@ class AdminTokenWorkerStore(SQLBaseStore):
             result.token_state = TokenState.EXPIRED
             return result
 
-        print(token)
-
         permissions = await self._simple_select_list(
             "admin_token_permissions",
             {"admin_token": token["admin_token"]},
@@ -82,7 +77,7 @@ class AdminTokenWorkerStore(SQLBaseStore):
 
         for permission in permissions:
             if permission["allowed"]:
-                result.permissions[permission["endpoint"]]["action"] = True
+                result.permissions[permission["endpoint"]][permission["action"]] = True
 
         result.token_state = TokenState.VALID
         return result
@@ -90,7 +85,17 @@ class AdminTokenWorkerStore(SQLBaseStore):
     async def create_admin_token(
         self, valid_until: int, creator: str, description: str
     ) -> str:
+        """
+        Create a new admin token and return it.
 
+        Args:
+            valid_until: Token's end validity, in seconds since the epoch.
+            creator: mxid of the creating user, if applicable.
+            description: A description of the token's use.
+
+        Returns:
+            The admin token.
+        """
         now = int(self.hs.get_reactor().seconds())
 
         if valid_until < now:
@@ -99,7 +104,7 @@ class AdminTokenWorkerStore(SQLBaseStore):
         token_value = self.hs.get_secrets().token_bytes(16)
         token_uuid = str(uuid.UUID(bytes=token_value))
 
-        result = await self._simple_insert(
+        await self._simple_insert(
             "admin_tokens",
             {
                 "admin_token": token_uuid,
@@ -111,3 +116,27 @@ class AdminTokenWorkerStore(SQLBaseStore):
         )
 
         return token_uuid
+
+    async def set_permission_for_token(
+        self, admin_token: str, endpoint: str, action: str, allowed: bool
+    ) -> bool:
+        """
+        Set a permission on a token for a given endpoint and action.
+
+        Args:
+            admin_token
+            endpoint: The endpoint token to grant permission to.
+            action: The action to grant permission to do.
+            allowed: Whether this should be granting permission, or removing it.
+
+        Returns:
+            True
+        """
+
+        await self._simple_upsert(
+            "admin_token_permissions",
+            {"admin_token": admin_token, "endpoint": endpoint, "action": action},
+            {"allowed": allowed},
+        )
+
+        return True

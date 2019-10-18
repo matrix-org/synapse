@@ -358,6 +358,8 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
         self.event_creation_handler._consent_uri_builder = consent_uri_builder
 
+        self.admin_handler = hs.get_handlers().admin_handler
+
         self.store = hs.get_datastore()
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -462,6 +464,54 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
+
+    def test_with_admin_token_no_perm(self):
+
+        admin_token = self.get_success(
+            self.admin_handler.create_admin_token(
+                valid_until=10000, creator=self.admin_user, description=""
+            )
+        )
+
+        self.unrelated_user = self.register_user("user2", "pass")
+        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
+
+        # Admin token without permission fails
+        request, channel = self.make_request(
+            "POST",
+            "admin/shutdown_room/" + room_id,
+            json.dumps({"new_room_user_id": self.unrelated_user}),
+            access_token=admin_token,
+        )
+        self.render(request)
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+
+    def test_with_admin_token_has_perm(self):
+
+        admin_token = self.get_success(
+            self.admin_handler.create_admin_token(
+                valid_until=10000, creator=self.admin_user, description=""
+            )
+        )
+
+        self.get_success(
+            self.admin_handler.set_permission_for_token(
+                admin_token, endpoint="ROOM_SHUTDOWN", action="POST", allowed=True
+            )
+        )
+
+        self.unrelated_user = self.register_user("user2", "pass")
+        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
+
+        # Admin token without permission fails
+        request, channel = self.make_request(
+            "POST",
+            "admin/shutdown_room/" + room_id,
+            json.dumps({"new_room_user_id": self.unrelated_user}),
+            access_token=admin_token,
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
 
 class DeleteGroupTestCase(unittest.HomeserverTestCase):
