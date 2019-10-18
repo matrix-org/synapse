@@ -23,7 +23,7 @@ from functools import wraps
 from six import iteritems, text_type
 from six.moves import range
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import json
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
@@ -1632,9 +1632,7 @@ class EventsStore(
                 and original_event.internal_metadata.is_redacted()
             ):
                 # Redaction was allowed
-                pruned_json = encode_canonical_json(
-                    prune_event_dict(original_event.get_dict())
-                )
+                pruned_json = encode_json(prune_event_dict(original_event.get_dict()))
             else:
                 # Redaction wasn't allowed
                 pruned_json = None
