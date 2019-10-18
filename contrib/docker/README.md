@@ -8,22 +8,19 @@ reverse proxying and other artifacts. The docker-compose file is an example,
 please comment/uncomment sections that are not suitable for your usecase.
 
 Specify a ``SYNAPSE_CONFIG_PATH``, preferably to a persistent path,
-to use manual configuration. 
+to use manual configuration.
 
-To generate a fresh `homeserver.yaml`, you can use the `generate` command. 
-(See the [documentation](../../docker/README.md#generating-a-configuration-file) 
-for more information.) You will need to specify appropriate values for at least the 
+To generate a fresh `homeserver.yaml`, you can use the `generate` command.
+(See the [documentation](../../docker/README.md#generating-a-configuration-file)
+for more information.) You will need to specify appropriate values for at least the
 `SYNAPSE_SERVER_NAME` and `SYNAPSE_REPORT_STATS` environment variables. For example:
 
 ```
 docker-compose run --rm -e SYNAPSE_SERVER_NAME=my.matrix.host -e SYNAPSE_REPORT_STATS=yes synapse generate
 ```
 
-The above command contains variable SYNAPSE_REPORT_STATS.
-If you say 'yes' you will help project with some anonymous usage details,
-when you opt for 'no' it will disable such functionality.
-This variable is mandatory, see [/docker/README.md](../../docker/README.md) 
 (This will also generate necessary signing keys.)
+
 Then, customize your configuration and run the server:
 
 ```
