@@ -1,3 +1,4 @@
+
 # Synapse Docker
 
 ### Configuration
@@ -18,7 +19,10 @@ for more information.) You will need to specify appropriate values for at least 
 docker-compose run --rm -e SYNAPSE_SERVER_NAME=my.matrix.host -e SYNAPSE_REPORT_STATS=yes synapse generate
 ```
 
-Above command contains variable SYNAPSE_REPORT_STATS which is opt-in only. If you say 'yes' you will help project with some anonymous usage details, when you opt for 'no' it will disable such functionality. This variable is mandatory (see ../../docker/README.md).  
+The above command contains variable SYNAPSE_REPORT_STATS.
+If you say 'yes' you will help project with some anonymous usage details,
+when you opt for 'no' it will disable such functionality.
+This variable is mandatory, see [/docker/README.md](../../docker/README.md) 
 (This will also generate necessary signing keys.)
 Then, customize your configuration and run the server:
 
