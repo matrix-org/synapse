@@ -44,7 +44,7 @@ EOF
 
     for DIR in /var/lib/matrix-synapse /var/log/matrix-synapse /etc/matrix-synapse; do
       if ! dpkg-statoverride --list --quiet $DIR >/dev/null; then
-        dpkg-statoverride --force --quiet --update --add $USER nogroup 0755 $DIR
+        dpkg-statoverride --force-all --quiet --update --add $USER nogroup 0755 $DIR
       fi
     done
 
