@@ -1,0 +1,1 @@
+Add "room_stats_state" and "redactions" to the list of boolean columns in synapse_port_db
