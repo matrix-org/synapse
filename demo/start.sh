@@ -77,14 +77,13 @@ for port in 8080 8081 8082; do
 
         # Reduce the blacklist
         blacklist=$(cat <<-BLACK
-		# Set the blacklist so that it doesn't include 127.0.0.1
+		# Set the blacklist so that it doesn't include 127.0.0.1, ::1
 		federation_ip_range_blacklist:
 		  - '10.0.0.0/8'
 		  - '172.16.0.0/12'
 		  - '192.168.0.0/16'
 		  - '100.64.0.0/10'
 		  - '169.254.0.0/16'
-		  - '::1/128'
 		  - 'fe80::/64'
 		  - 'fc00::/7'
 		BLACK
