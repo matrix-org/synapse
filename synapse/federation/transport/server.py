@@ -432,7 +432,7 @@ class FederationStateV1Servlet(BaseFederationServlet):
 
 
 class FederationStateV2Servlet(BaseFederationServlet):
-    PATH = "/state/(?P<context>[^/]*)/?"
+    PATH = "/net.atleastfornow/state/(?P<context>[^/]*)/?"
 
     # See: MSC2314
     PREFIX = FEDERATION_UNSTABLE_PREFIX
