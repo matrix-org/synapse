@@ -339,7 +339,7 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     def on_query_request(self, query_type, args):
         received_queries_counter.labels(query_type).inc()
-        resp = yield self.registry.on_query(query_type, args)
+        resp = yield defer.ensureDeferred(self.registry.on_query(query_type, args))
         return 200, resp
 
     @defer.inlineCallbacks

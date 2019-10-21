@@ -75,6 +75,12 @@ class RoomMemberHandler(object):
         # it doesn't store state.
         self.base_handler = BaseHandler(hs)
 
+
+        federation_registry = hs.get_federation_registry()
+        federation_registry.register_query_handler(
+            "members", self.on_federation_query_members
+        )
+
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
         """Try and join a room that this server is not in
@@ -980,3 +986,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         if membership:
             yield self.store.forget(user_id, room_id)
+
+
+    async def on_federation_query_members(self, args):
+
+        return args
+
+        pass
