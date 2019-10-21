@@ -456,7 +456,7 @@ class DeviceHandler(DeviceWorkerHandler):
         self.notifier.on_new_event("device_list_key", position, users=[from_user_id])
 
     @defer.inlineCallbacks
-    def on_federation_query_user_devices(self, user_id):
+    def on_federation_query_user_devices(self, origin, user_id):
         stream_id, devices = yield self.store.get_devices_with_keys_by_user(user_id)
         return {"user_id": user_id, "stream_id": stream_id, "devices": devices}
 

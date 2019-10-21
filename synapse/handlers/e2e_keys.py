@@ -335,7 +335,7 @@ class E2eKeysHandler(object):
         return result_dict
 
     @defer.inlineCallbacks
-    def on_federation_query_client_keys(self, query_body):
+    def on_federation_query_client_keys(self, origin, query_body):
         """ Handle a device key query from a federated server
         """
         device_keys_query = query_body.get("device_keys", {})

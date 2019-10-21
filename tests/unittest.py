@@ -589,6 +589,8 @@ class HomeserverTestCase(TestCase):
 
         self.get_success(self.hs.get_datastore().persist_event(event, context))
 
+        return event
+
 
 class FederatingHomeserverTestCase(HomeserverTestCase):
     """

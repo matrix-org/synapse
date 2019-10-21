@@ -372,9 +372,11 @@ class FederationServer(FederationBase):
             return 404, ""
 
     @defer.inlineCallbacks
-    def on_query_request(self, query_type, args):
+    def on_query_request(self, origin, query_type, args):
         received_queries_counter.labels(query_type).inc()
-        resp = yield defer.ensureDeferred(self.registry.on_query(query_type, args))
+        resp = yield defer.ensureDeferred(
+            self.registry.on_query(origin, query_type, args)
+        )
         return 200, resp
 
     @defer.inlineCallbacks
@@ -525,10 +527,10 @@ class FederationServer(FederationBase):
 
     @log_function
     def on_query_client_keys(self, origin, content):
-        return self.on_query_request("client_keys", content)
+        return self.on_query_request(origin, "client_keys", content)
 
     def on_query_user_devices(self, origin, user_id):
-        return self.on_query_request("user_devices", user_id)
+        return self.on_query_request(origin, "user_devices", user_id)
 
     @trace
     @defer.inlineCallbacks
@@ -841,13 +843,13 @@ class FederationHandlerRegistry(object):
             except Exception:
                 logger.exception("Failed to handle edu %r", edu_type)
 
-    def on_query(self, query_type, args):
+    def on_query(self, origin, query_type, args):
         handler = self.query_handlers.get(query_type)
         if not handler:
             logger.warn("No handler registered for query type %s", query_type)
             raise NotFoundError("No handler for Query type '%s'" % (query_type,))
 
-        return handler(args)
+        return handler(origin, args)
 
 
 class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
@@ -882,11 +884,11 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
 
         return self._send_edu(edu_type=edu_type, origin=origin, content=content)
 
-    def on_query(self, query_type, args):
+    def on_query(self, origin, query_type, args):
         """Overrides FederationHandlerRegistry
         """
         handler = self.query_handlers.get(query_type)
         if handler:
             return handler(args)
 
-        return self._get_query_client(query_type=query_type, args=args)
+        return self._get_query_client(origin=origin, query_type=query_type, args=args)

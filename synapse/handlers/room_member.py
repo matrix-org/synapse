@@ -75,7 +75,6 @@ class RoomMemberHandler(object):
         # it doesn't store state.
         self.base_handler = BaseHandler(hs)
 
-
         federation_registry = hs.get_federation_registry()
         federation_registry.register_query_handler(
             "members", self.on_federation_query_members
@@ -987,9 +986,18 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if membership:
             yield self.store.forget(user_id, room_id)
 
+    async def on_federation_query_members(self, origin, args):
 
-    async def on_federation_query_members(self, args):
+        if args.get("limit_per_room"):
+            limit_per_room = int(args["limit_per_room"])
+        else:
+            limit_per_room = 0
 
-        return args
+        if args.get("pdu_ids"):
+            pdu_ids = True
+        else:
+            pdu_ids = False
 
-        pass
+        return await self.store.member_events_for_remote(
+            origin, limit_per_room, pdu_ids
+        )

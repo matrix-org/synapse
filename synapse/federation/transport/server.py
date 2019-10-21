@@ -474,6 +474,7 @@ class FederationQueryServlet(BaseFederationServlet):
     # This is when we receive a server-server Query
     async def on_GET(self, origin, content, query, query_type):
         return await self.handler.on_query_request(
+            origin,
             query_type,
             {k.decode("utf8"): v[0].decode("utf-8") for k, v in query.items()},
         )

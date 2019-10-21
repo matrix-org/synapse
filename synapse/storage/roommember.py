@@ -707,6 +707,41 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return True
 
+    async def member_events_for_remote(
+        self, remote, limit_per_room: int, pdu_ids: bool
+    ):
+
+        if "%" in remote or "_" in remote:
+            raise Exception("Invalid host name")
+
+        sql = """
+            SELECT state_key, event_id FROM current_state_events
+            WHERE type = ?
+                AND state_key LIKE ?
+        """
+
+        if limit_per_room > 0:
+            sql += "GROUP BY room_id"
+
+        like_clause = "%:" + remote
+
+        rows = await self._execute(
+            "member_events_for_remote", None, sql, "m.room.member", like_clause
+        )
+
+        done = []
+
+        for row in rows:
+            if get_domain_from_id(row[0]) == remote:
+                done.append(row[1])
+
+        if not pdu_ids:
+            done = list(
+                map(lambda x: x.get_pdu_json(), (await self.get_events(done)).values())
+            )
+
+        return done
+
     @defer.inlineCallbacks
     def get_joined_hosts(self, room_id, state_entry):
         state_group = state_entry.state_group

@@ -228,7 +228,7 @@ class BaseProfileHandler(BaseHandler):
         yield self._update_join_states(requester, target_user)
 
     @defer.inlineCallbacks
-    def on_profile_query(self, args):
+    def on_profile_query(self, origin, args):
         user = UserID.from_string(args["user_id"])
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this Home Server")
