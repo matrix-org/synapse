@@ -19,6 +19,8 @@ from ._base import Config, ConfigError
 
 
 class TracerConfig(Config):
+    section = "tracing"
+
     def read_config(self, config, **kwargs):
         opentracing_config = config.get("opentracing")
         if opentracing_config is None:

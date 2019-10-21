@@ -14,8 +14,6 @@
 # limitations under the License.
 import re
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
@@ -69,9 +67,8 @@ class SendServerNoticeServlet(RestServlet):
             self.__class__.__name__,
         )
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, txn_id=None):
-        yield assert_requester_is_admin(self.auth, request)
+    async def on_POST(self, request, txn_id=None):
+        await assert_requester_is_admin(self.auth, request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ("user_id", "content"))
         event_type = body.get("type", EventTypes.Message)
@@ -85,7 +82,7 @@ class SendServerNoticeServlet(RestServlet):
         if not self.hs.is_mine_id(user_id):
             raise SynapseError(400, "Server notices can only be sent to local users")
 
-        event = yield self.snm.send_notice(
+        event = await self.snm.send_notice(
             user_id=body["user_id"],
             type=event_type,
             state_key=state_key,

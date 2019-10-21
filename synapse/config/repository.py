@@ -78,6 +78,8 @@ def parse_thumbnail_requirements(thumbnail_sizes):
 
 
 class ContentRepositoryConfig(Config):
+    section = "media"
+
     def read_config(self, config, **kwargs):
 
         # Only enable the media repo if either the media repo is enabled or the
