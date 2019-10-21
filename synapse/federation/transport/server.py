@@ -434,7 +434,8 @@ class FederationStateV1Servlet(BaseFederationServlet):
 class FederationStateV2Servlet(BaseFederationServlet):
     PATH = "/state/(?P<context>[^/]*)/?"
 
-    PREFIX = FEDERATION_V2_PREFIX
+    # See: MSC2314
+    PREFIX = FEDERATION_UNSTABLE_PREFIX
 
     async def on_GET(self, origin, content, query, context):
         return await self.handler.on_context_state_request_v2(
@@ -840,7 +841,13 @@ class FederationVersionServlet(BaseFederationServlet):
     async def on_GET(self, origin, content, query):
         return (
             200,
-            {"server": {"name": "Synapse", "version": get_version_string(synapse)}},
+            {
+                "server": {"name": "Synapse", "version": get_version_string(synapse)},
+                "unstable_features": {
+                    "net.atleastfornow.msc2314": True,
+                    "im.vector.room_complexity_v1": True,
+                },
+            },
         )
 
 

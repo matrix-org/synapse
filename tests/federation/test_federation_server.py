@@ -54,7 +54,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
     def test_without_event_id(self):
         """
-        Querying v2/state/<room_id> without an event ID will return the current
+        Querying unstable/state/<room_id> without an event ID will return the current
         known state.
         """
         u1 = self.register_user("u1", "pass")
@@ -64,7 +64,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         self.inject_room_member(room_1, "@user:other.example.com", "join")
 
         request, channel = self.make_request(
-            "GET", "/_matrix/federation/v2/state/%s" % (room_1,)
+            "GET", "/_matrix/federation/unstable/state/%s" % (room_1,)
         )
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
@@ -88,7 +88,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
     def test_needs_to_be_in_room(self):
         """
-        Querying v2/state/<room_id> requires the server be in the room to
+        Querying unstable/state/<room_id> requires the server be in the room to
         provide data.
         """
         u1 = self.register_user("u1", "pass")
@@ -97,7 +97,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
 
         request, channel = self.make_request(
-            "GET", "/_matrix/federation/v2/state/%s" % (room_1,)
+            "GET", "/_matrix/federation/unstable/state/%s" % (room_1,)
         )
         self.render(request)
         self.assertEquals(403, channel.code, channel.result)
