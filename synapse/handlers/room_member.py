@@ -203,10 +203,25 @@ class RoomMemberHandler(object):
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
+                # Check if the new room is an upgraded room
+                predecessor = yield self.store.get_room_predecessor(room_id)
+                if not predecessor:
+                    return
+                old_room_id = predecessor["room_id"]
+                logger.debug("Found predecessor for %s: %s", room_id, old_room_id)
+
                 # Copy over user state if we're joining an upgraded room
-                yield self.copy_user_state_if_room_upgrade(
-                    room_id, requester.user.to_string()
+                yield self.copy_user_state_on_room_upgrade(
+                    old_room_id, room_id, requester.user.to_string()
                 )
+
+                # Depublish the old room from the room directory if it was published
+                room = yield self.store.get_room(old_room_id)
+                if room and room["is_public"]:
+                    yield self.directory_handler.edit_published_room_list(
+                        requester, old_room_id, "private"
+                    )
+
                 yield self._user_joined_room(target, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
@@ -455,10 +470,29 @@ class RoomMemberHandler(object):
                     requester, remote_room_hosts, room_id, target, content
                 )
 
+                # Check if the new room is an upgraded room
+                # TODO: Consolidate the work done for the duplicated update steps
+                predecessor = yield self.store.get_room_predecessor(room_id)
+                if not predecessor:
+                    return
+                old_room_id = predecessor["room_id"]
+                logger.debug("Found predecessor for %s: %s", room_id, old_room_id)
+
                 # Copy over user state if this is a join on an remote upgraded room
-                yield self.copy_user_state_if_room_upgrade(
-                    room_id, requester.user.to_string()
+                yield self.copy_user_state_on_room_upgrade(
+                    old_room_id, room_id, requester.user.to_string()
                 )
+
+                # Depublish the old room from the room directory if it was published
+                room = yield self.store.get_room(old_room_id)
+                if room and room["is_public"]:
+                    try:
+                        yield self.directory_handler.edit_published_room_list(
+                            requester, old_room_id, "private"
+                        )
+                    except AuthError:
+                        # This user wasn't allowed to depublish the room
+                        pass
 
                 return remote_join_response
 
@@ -498,35 +532,26 @@ class RoomMemberHandler(object):
         return res
 
     @defer.inlineCallbacks
-    def copy_user_state_if_room_upgrade(self, new_room_id, user_id):
-        """Copy user-specific information when they join a new room if that new room is the
+    def copy_user_state_on_room_upgrade(self, old_room_id, new_room_id, user_id):
+        """Copy user-specific information when they join a new room when that new room is the
         result of a room upgrade
 
         Args:
+            old_room_id (str): The ID of upgraded room
             new_room_id (str): The ID of the room the user is joining
             user_id (str): The ID of the user
 
         Returns:
             Deferred
         """
-        # Check if the new room is an upgraded room
-        predecessor = yield self.store.get_room_predecessor(new_room_id)
-        if not predecessor:
-            return
 
-        logger.debug(
-            "Found predecessor for %s: %s. Copying over room tags and push " "rules",
-            new_room_id,
-            predecessor,
-        )
+        logger.debug("Copying over room tags and push rules")
 
         # It is an upgraded room. Copy over old tags
-        yield self.copy_room_tags_and_direct_to_room(
-            predecessor["room_id"], new_room_id, user_id
-        )
+        yield self.copy_room_tags_and_direct_to_room(old_room_id, new_room_id, user_id)
         # Copy over push rules
         yield self.store.copy_push_rules_from_room_to_room_for_user(
-            predecessor["room_id"], new_room_id, user_id
+            old_room_id, new_room_id, user_id
         )
 
     @defer.inlineCallbacks
