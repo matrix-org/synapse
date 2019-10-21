@@ -841,13 +841,7 @@ class FederationVersionServlet(BaseFederationServlet):
     async def on_GET(self, origin, content, query):
         return (
             200,
-            {
-                "server": {"name": "Synapse", "version": get_version_string(synapse)},
-                "unstable_features": {
-                    "net.atleastfornow.msc2314": True,
-                    "im.vector.room_complexity_v1": True,
-                },
-            },
+            {"server": {"name": "Synapse", "version": get_version_string(synapse)}},
         )
 
 
