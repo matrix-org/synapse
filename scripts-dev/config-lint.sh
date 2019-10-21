@@ -6,4 +6,4 @@
 sed -i -E "s/(#.*): +True(.*)/\1: true\2/g; s/(#.*): +False(.*)/\1: false\2/g;" synapse/config/*.py
 
 # Check if anything changed
-git diff --quiet
+git diff --exit-code
