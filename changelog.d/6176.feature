@@ -1,1 +1,1 @@
-Implement the v2/state Federation API as drafted in MSC2314.
+Implement the `/_matrix/federation/unstable/state/<context>` API as drafted in MSC2314.
