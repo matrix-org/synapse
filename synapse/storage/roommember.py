@@ -16,6 +16,7 @@
 
 import logging
 from collections import namedtuple
+from typing import List, Union
 
 from six import iteritems, itervalues
 
@@ -708,8 +709,16 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return True
 
     async def member_events_for_remote(
-        self, remote, limit_per_room: int, pdu_ids: bool
-    ):
+        self, remote: str, limit_per_room: int, pdu_ids: bool
+    ) -> Union[List[dict], List[str]]:
+        """
+        Fetch the member events that belong to a given remote.
+
+        Args:
+            remote: The remote server to fetch events for.
+            limit_per_room: How many events to limit fetching to.
+            pdu_ids: If True, just returns the PDU IDs, not full events.
+        """
 
         if "%" in remote or "_" in remote:
             raise Exception("Invalid host name")

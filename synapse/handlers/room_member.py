@@ -17,6 +17,7 @@
 
 import abc
 import logging
+from typing import List, Union
 
 from six.moves import http_client
 
@@ -986,8 +987,12 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if membership:
             yield self.store.forget(user_id, room_id)
 
-    async def on_federation_query_members(self, origin, args):
-
+    async def on_federation_query_members(
+        self, origin: str, args: List[str]
+    ) -> Union[List[dict], List[str]]:
+        """
+        Return the member events that belong to users of a given origin.
+        """
         if args.get("limit_per_room"):
             limit_per_room = int(args["limit_per_room"])
         else:
