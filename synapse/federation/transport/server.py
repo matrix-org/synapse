@@ -419,7 +419,7 @@ class FederationEventServlet(BaseFederationServlet):
         return await self.handler.on_pdu_request(origin, event_id)
 
 
-class FederationStateServlet(BaseFederationServlet):
+class FederationStateV1Servlet(BaseFederationServlet):
     PATH = "/state/(?P<context>[^/]*)/?"
 
     # This is when someone asks for all data for a given context.
@@ -428,6 +428,19 @@ class FederationStateServlet(BaseFederationServlet):
             origin,
             context,
             parse_string_from_args(query, "event_id", None, required=True),
+        )
+
+
+class FederationStateV2Servlet(BaseFederationServlet):
+    PATH = "/state/(?P<context>[^/]*)/?"
+
+    PREFIX = FEDERATION_V2_PREFIX
+
+    async def on_GET(self, origin, content, query, context):
+        return await self.handler.on_context_state_request_v2(
+            origin,
+            context,
+            parse_string_from_args(query, "event_id", None, required=False),
         )
 
 
@@ -1358,7 +1371,8 @@ class RoomComplexityServlet(BaseFederationServlet):
 FEDERATION_SERVLET_CLASSES = (
     FederationSendServlet,
     FederationEventServlet,
-    FederationStateServlet,
+    FederationStateV1Servlet,
+    FederationStateV2Servlet,
     FederationStateIdsServlet,
     FederationBackfillServlet,
     FederationQueryServlet,

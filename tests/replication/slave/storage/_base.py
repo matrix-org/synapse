@@ -47,7 +47,10 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         server_factory = ReplicationStreamProtocolFactory(self.hs)
         self.streamer = server_factory.streamer
 
+        handler_factory = Mock()
         self.replication_handler = ReplicationClientHandler(self.slaved_store)
+        self.replication_handler.factory = handler_factory
+
         client_factory = ReplicationClientFactory(
             self.hs, "client_name", self.replication_handler
         )
