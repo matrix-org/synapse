@@ -37,7 +37,7 @@ class RoomMemberQueryTestCase(FederatingHomeserverTestCase):
     def test_none(self):
 
         request, channel = self.make_request(
-            "GET", "/_matrix/federation/v1/query/members"
+            "GET", "/_matrix/federation/v1/query/net.maunium.members"
         )
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
@@ -48,7 +48,7 @@ class RoomMemberQueryTestCase(FederatingHomeserverTestCase):
         injected = self.inject_room_member(room_1, "@user:other.example.com", "join")
 
         request, channel = self.make_request(
-            "GET", "/_matrix/federation/v1/query/members?pdu_ids=1"
+            "GET", "/_matrix/federation/v1/query/net.maunium.members?pdu_ids=1"
         )
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
@@ -59,7 +59,7 @@ class RoomMemberQueryTestCase(FederatingHomeserverTestCase):
         injected = self.inject_room_member(room_1, "@user:other.example.com", "join")
 
         request, channel = self.make_request(
-            "GET", "/_matrix/federation/v1/query/members"
+            "GET", "/_matrix/federation/v1/query/net.maunium.members"
         )
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
@@ -71,7 +71,7 @@ class RoomMemberQueryTestCase(FederatingHomeserverTestCase):
         injected_1 = self.inject_room_member(room_1, "@user2:other.example.com", "join")
 
         request, channel = self.make_request(
-            "GET", "/_matrix/federation/v1/query/members?limit_per_room=1"
+            "GET", "/_matrix/federation/v1/query/net.maunium.members?limit_per_room=1"
         )
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)

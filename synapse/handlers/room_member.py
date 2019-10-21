@@ -77,8 +77,10 @@ class RoomMemberHandler(object):
         self.base_handler = BaseHandler(hs)
 
         federation_registry = hs.get_federation_registry()
+
+        # UNSTABLE/PREFIXED query type
         federation_registry.register_query_handler(
-            "members", self.on_federation_query_members
+            "net.maunium.members", self.on_federation_query_members
         )
 
     @abc.abstractmethod
