@@ -71,7 +71,7 @@ steps:
 
   - label: "SyTest - :python: 2.7 / :postgres: 9.6 / Workers"
     agents:
-      queue: "medium"
+      queue: "xlarge"
     env:
       POSTGRES: "1"
       WORKERS: "1"
@@ -122,7 +122,7 @@ steps:
 
   - label: "SyTest - :python: 3 / :postgres: 9.6 / Workers"
     agents:
-      queue: "medium"
+      queue: "xlarge"
     env:
       POSTGRES: "1"
       WORKERS: "1"
