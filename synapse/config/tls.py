@@ -448,7 +448,12 @@ class TlsConfig(Config):
         #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
         """
-            % locals()
+            # Lowercase the string representation of boolean values
+            % {
+               x[0]: str(x[1]).lower()
+               if isinstance(x[1], bool) else x[1]
+               for x in locals().items()
+              }
         )
 
     def read_tls_certificate(self):
