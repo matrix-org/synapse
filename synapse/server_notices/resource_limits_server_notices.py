@@ -20,9 +20,9 @@ from twisted.internet import defer
 
 from synapse.api.constants import (
     EventTypes,
+    LimitBlockingTypes,
     ServerNoticeLimitReached,
     ServerNoticeMsgType,
-    LimitBlockingTypes,
 )
 from synapse.api.errors import AuthError, ResourceLimitError, SynapseError
 from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
