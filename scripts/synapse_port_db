@@ -480,7 +480,7 @@ class Porter(object):
         engine = create_engine(config)
 
         self.progress.set_state("Preparing %s" % config["name"])
-        conn = self.setup_db(sqlite_config, engine)
+        conn = self.setup_db(config, engine)
 
         db_pool = adbapi.ConnectionPool(
             config["name"], **config["args"]
@@ -491,8 +491,8 @@ class Porter(object):
         store = Store(conn, hs)
 
         yield store.runInteraction(
-            "%s_store.check_database" % config["name"],
-            store.check_database,
+            "%s_engine.check_database" % config["name"],
+            engine.check_database,
         )
 
         return store
@@ -516,7 +516,7 @@ class Porter(object):
     @defer.inlineCallbacks
     def run(self):
         try:
-            self.sqlite_store = self.build_db_store(self.sqlite_config)
+            self.sqlite_store = yield self.build_db_store(self.sqlite_config)
 
             # Check if all background updates are done, abort if not.
             updates_complete = yield self.sqlite_store.has_completed_background_updates()
