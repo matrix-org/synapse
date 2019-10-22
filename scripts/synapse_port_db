@@ -127,7 +127,7 @@ class Store(
     StatsStore,
 ):
     def __init__(self, db_conn, hs):
-        super(Store, self).__init__(db_conn, hs)
+        super().__init__(db_conn, hs)
         self.db_pool = hs.get_db_pool()
 
     @defer.inlineCallbacks
@@ -475,49 +475,27 @@ class Porter(object):
 
         return db_conn
 
-    def get_sqlite_store(self):
-        sqlite_db_pool = adbapi.ConnectionPool(
-            self.sqlite_config["name"], **self.sqlite_config["args"]
-        )
-        sqlite_engine = create_engine(self.sqlite_config)
-
-        self.progress.set_state("Preparing SQLite3")
-        sqlite_conn = self.setup_db(sqlite_config, sqlite_engine)
-
-        hs = MockHomeserver(
-            self.hs_config,
-            sqlite_engine,
-            sqlite_conn,
-            sqlite_db_pool,
-        )
-
-        return Store(sqlite_conn, hs)
-
     @defer.inlineCallbacks
-    def get_postgres_store(self):
-        postgres_db_pool = adbapi.ConnectionPool(
-            self.postgres_config["name"], **self.postgres_config["args"]
-        )
-        postgres_engine = create_engine(self.postgres_config)
+    def build_db_store(self, config):
+        engine = create_engine(config)
 
-        self.progress.set_state("Preparing PostgreSQL")
-        postgres_conn = self.setup_db(postgres_config, postgres_engine)
+        self.progress.set_state("Preparing %s" % config["name"])
+        conn = self.setup_db(sqlite_config, engine)
 
-        hs = MockHomeserver(
-            self.hs_config,
-            postgres_engine,
-            postgres_conn,
-            postgres_db_pool,
+        db_pool = adbapi.ConnectionPool(
+            config["name"], **config["args"]
         )
 
-        postgres_store = Store(postgres_conn, hs)
+        hs = MockHomeserver(self.hs_config, engine, conn, db_pool)
 
-        yield postgres_store.runInteraction(
-            "postgres_engine.check_database",
-            postgres_engine.check_database,
+        store = Store(conn, hs)
+
+        yield store.runInteraction(
+            "%s_store.check_database" % config["name"],
+            store.check_database,
         )
 
-        defer.returnValue(postgres_store)
+        return store
 
     @defer.inlineCallbacks
     def run_background_updates_on_postgres(self):
@@ -538,7 +516,7 @@ class Porter(object):
     @defer.inlineCallbacks
     def run(self):
         try:
-            self.sqlite_store = self.get_sqlite_store()
+            self.sqlite_store = self.build_db_store(self.sqlite_config)
 
             # Check if all background updates are done, abort if not.
             updates_complete = yield self.sqlite_store.has_completed_background_updates()
@@ -550,7 +528,9 @@ class Porter(object):
                 )
                 defer.returnValue(None)
 
-            self.postgres_store = yield self.get_postgres_store()
+            self.postgres_store = yield self.build_db_store(
+                self.hs_config.database_config
+            )
 
             yield self.run_background_updates_on_postgres()
 
@@ -1009,9 +989,6 @@ if __name__ == "__main__":
 
     hs_config = yaml.safe_load(args.postgres_config)
 
-    config = HomeServerConfig()
-    config.parse_config_dict(hs_config, "", "")
-
     if "database" in hs_config:
         postgres_config = hs_config["database"]
 
@@ -1026,6 +1003,9 @@ if __name__ == "__main__":
         sys.stderr.write("The configuration file must have a 'database' section.\n")
         sys.exit(4)
 
+    config = HomeServerConfig()
+    config.parse_config_dict(hs_config, "", "")
+
     def start(stdscr=None):
         if stdscr:
             progress = CursesProgress(stdscr)
@@ -1034,7 +1014,6 @@ if __name__ == "__main__":
 
         porter = Porter(
             sqlite_config=sqlite_config,
-            postgres_config=postgres_config,
             progress=progress,
             batch_size=args.batch_size,
             hs_config=config,
