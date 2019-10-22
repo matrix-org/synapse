@@ -64,7 +64,7 @@ makes it horribly hard to review otherwise.
 
 Before doing a commit, ensure the changes you've made don't produce
 linting errors. You can do this by running the linters as follows. Ensure to
-commit any files that were auto-corrected.
+commit any files that were corrected.
 
 ::
 
