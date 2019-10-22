@@ -505,6 +505,10 @@ class RoomMemberHandler(object):
         room upgrade. At this point, the server can transfer over information from the previous
         room.
 
+        Checks if the given room is the result of a room upgrade. If so, copies user state
+        (tags/push rules) from the old room, as well as depublishing it from the room
+        directory if it was in there.
+
         Args:
             room_id (str): The ID of the room the user is joining
 
