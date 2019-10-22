@@ -6,3 +6,8 @@ database:
   name: "sqlite3"
   args:
     database: ".buildkite/test_db.db"
+
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+suppress_key_server_warning: true

@@ -9,3 +9,8 @@ database:
     host: postgres
     password: postgres
     database: synapse
+
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+suppress_key_server_warning: true
