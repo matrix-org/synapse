@@ -546,7 +546,11 @@ class RoomMemberHandler(object):
             Deferred
         """
 
-        logger.debug("Copying over room tags and push rules")
+        logger.debug(
+            "Copying over room tags and push rules from %s to %s",
+            old_room_id,
+            new_room_id,
+        )
 
         # It is an upgraded room. Copy over old tags
         yield self.copy_room_tags_and_direct_to_room(old_room_id, new_room_id, user_id)
