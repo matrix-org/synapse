@@ -132,7 +132,7 @@ class ResourceLimitsServerNotices(object):
 
         Args:
             user_id (str): user to notify
-            ref_events ([]): The list of pinned events that are unrelated to
+            ref_events (list[str]): The event_ids of pinned events that are unrelated to
             limit blocking and need to be preserved.
         """
         content = {"pinned": ref_events}
