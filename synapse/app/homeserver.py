@@ -564,9 +564,8 @@ def run(hs):
         stats["database_server_version"] = hs.get_datastore().get_server_version()
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
         try:
-            yield hs.get_simple_http_client().put_json(
-                "https://matrix.org/report-usage-stats/push",
-                stats
+            yield hs.get_proxied_http_client().put_json(
+                "https://matrix.org/report-usage-stats/push", stats
             )
         except Exception as e:
             logger.warn("Error reporting stats: %s", e)

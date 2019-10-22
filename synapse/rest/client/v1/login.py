@@ -403,7 +403,7 @@ class CasTicketServlet(RestServlet):
         self.cas_service_url = hs.config.cas_service_url
         self.cas_required_attributes = hs.config.cas_required_attributes
         self._sso_auth_handler = SSOAuthHandler(hs)
-        self._http_client = hs.get_simple_http_client()
+        self._http_client = hs.get_proxied_http_client()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
