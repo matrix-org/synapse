@@ -624,6 +624,8 @@ class Porter(object):
         def conv(j, col):
             if j in bool_cols:
                 return bool(col)
+            if isinstance(col, bytes):
+                return bytearray(col)
             elif isinstance(col, string_types) and "\0" in col:
                 logger.warn(
                     "DROPPING ROW: NUL value in table %s col %s: %r",
