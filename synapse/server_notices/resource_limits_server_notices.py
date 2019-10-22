@@ -120,7 +120,7 @@ class ResourceLimitsServerNotices(object):
             elif not currently_blocked and is_auth_blocking:
                 # Room is not notifying of a block, when it ought to be.
                 yield self._apply_limit_block_notification(
-                    user_id, event_body, event_limit_type
+                    user_id, event_body, event_limit_type, ref_events
                 )
         except SynapseError as e:
             logger.error("Error sending resource limits server notice: %s", e)
@@ -141,7 +141,9 @@ class ResourceLimitsServerNotices(object):
         )
 
     @defer.inlineCallbacks
-    def _apply_limit_block_notification(self, user_id, event_body, event_limit_type):
+    def _apply_limit_block_notification(
+        self, user_id, event_body, event_limit_type, ref_events
+    ):
         """Utility method to apply limit block notifications in the server
         notices room.
 
@@ -162,7 +164,7 @@ class ResourceLimitsServerNotices(object):
             user_id, content, EventTypes.Message
         )
 
-        content = {"pinned": [event.event_id]}
+        content = {"pinned": ref_events.append(event.event_id)}
         yield self._server_notices_manager.send_notice(
             user_id, content, EventTypes.Pinned, ""
         )
