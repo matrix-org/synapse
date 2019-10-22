@@ -11,9 +11,7 @@ pip install -e .
 scripts-dev/update_database --database-config .buildkite/sqlite-config.yaml
 
 # Create the PostgreSQL database.
-#PGPASSWORD=postgres createdb -h postgres -u postgres synapse
-PGPASSWORD=db_port createdb -h localhost -U synapse_db_port synapse_db_port
+PGPASSWORD=postgres createdb -h postgres -u postgres synapse
 
 # Run the script
 coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
-scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
