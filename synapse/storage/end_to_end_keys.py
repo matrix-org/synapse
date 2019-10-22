@@ -68,6 +68,11 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 display_name = device_info["device_display_name"]
                 if display_name is not None:
                     r["unsigned"]["device_display_name"] = display_name
+                if "signatures" in device_info:
+                    for sig_user_id, sigs in device_info["signatures"].items():
+                        r.setdefault("signatures", {}).setdefault(
+                            sig_user_id, {}
+                        ).update(sigs)
                 rv[user_id][device_id] = r
 
         return rv
@@ -81,6 +86,8 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         query_clauses = []
         query_params = []
+        signature_query_clauses = []
+        signature_query_params = []
 
         if include_all_devices is False:
             include_deleted_devices = False
@@ -91,12 +98,20 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         for (user_id, device_id) in query_list:
             query_clause = "user_id = ?"
             query_params.append(user_id)
+            signature_query_clause = "target_user_id = ?"
+            signature_query_params.append(user_id)
 
             if device_id is not None:
                 query_clause += " AND device_id = ?"
                 query_params.append(device_id)
+                signature_query_clause += " AND target_device_id = ?"
+                signature_query_params.append(device_id)
+
+            signature_query_clause += " AND user_id = ?"
+            signature_query_params.append(user_id)
 
             query_clauses.append(query_clause)
+            signature_query_clauses.append(signature_query_clause)
 
         sql = (
             "SELECT user_id, device_id, "
@@ -122,6 +137,22 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         if include_deleted_devices:
             for user_id, device_id in deleted_devices:
                 result.setdefault(user_id, {})[device_id] = None
+
+        # get signatures on the device
+        signature_sql = (
+            "SELECT * " "  FROM e2e_cross_signing_signatures " " WHERE %s"
+        ) % (" OR ".join("(" + q + ")" for q in signature_query_clauses))
+
+        txn.execute(signature_sql, signature_query_params)
+        rows = self.cursor_to_dict(txn)
+
+        for row in rows:
+            target_user_id = row["target_user_id"]
+            target_device_id = row["target_device_id"]
+            if target_user_id in result and target_device_id in result[target_user_id]:
+                result[target_user_id][target_device_id].setdefault(
+                    "signatures", {}
+                ).setdefault(row["user_id"], {})[row["key_id"]] = row["signature"]
 
         log_kv(result)
         return result
@@ -468,24 +499,19 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
 
         Args:
             user_id (str): the user who made the signatures
-            signatures (iterable[(str, str, str, str)]): signatures to add - each
-                a tuple of (key_id, target_user_id, target_device_id, signature),
-                where key_id is the ID of the key (including the signature
-                algorithm) that made the signature, target_user_id and
-                target_device_id indicate the device being signed, and signature
-                is the signature of the device
+            signatures (iterable[SignatureListItem]): signatures to add
         """
         return self._simple_insert_many(
             "e2e_cross_signing_signatures",
             [
                 {
                     "user_id": user_id,
-                    "key_id": key_id,
-                    "target_user_id": target_user_id,
-                    "target_device_id": target_device_id,
-                    "signature": signature,
+                    "key_id": item.signing_key_id,
+                    "target_user_id": item.target_user_id,
+                    "target_device_id": item.target_device_id,
+                    "signature": item.signature,
                 }
-                for (key_id, target_user_id, target_device_id, signature) in signatures
+                for item in signatures
             ],
             "add_e2e_signing_key",
         )
