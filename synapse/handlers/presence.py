@@ -24,6 +24,7 @@ The methods that define policy are:
 
 import logging
 from contextlib import contextmanager
+from typing import Dict, Set
 
 from six import iteritems, itervalues
 
@@ -179,8 +180,9 @@ class PresenceHandler(object):
         # we assume that all the sync requests on that process have stopped.
         # Stored as a dict from process_id to set of user_id, and a dict of
         # process_id to millisecond timestamp last updated.
-        self.external_process_to_current_syncs = {}
-        self.external_process_last_updated_ms = {}
+        self.external_process_to_current_syncs = {}  # type: Dict[int, Set[str]]
+        self.external_process_last_updated_ms = {}  # type: Dict[int, int]
+
         self.external_sync_linearizer = Linearizer(name="external_sync_linearizer")
 
         # Start a LoopingCall in 30s that fires every 5s.
@@ -349,10 +351,13 @@ class PresenceHandler(object):
             if now - last_update > EXTERNAL_PROCESS_EXPIRY
         ]
         for process_id in expired_process_ids:
+            # For each expired process drop tracking info and check the users
+            # that were syncing on that process to see if they need to be timed
+            # out.
             users_to_check.update(
-                self.external_process_last_updated_ms.pop(process_id, ())
+                self.external_process_to_current_syncs.pop(process_id, ())
             )
-            self.external_process_last_update.pop(process_id)
+            self.external_process_last_updated_ms.pop(process_id)
 
         states = [
             self.user_to_current_state.get(user_id, UserPresenceState.default(user_id))
@@ -803,17 +808,25 @@ class PresenceHandler(object):
         # Loop round handling deltas until we're up to date
         while True:
             with Measure(self.clock, "presence_delta"):
-                deltas = yield self.store.get_current_state_deltas(self._event_pos)
-                if not deltas:
+                room_max_stream_ordering = self.store.get_room_max_stream_ordering()
+                if self._event_pos == room_max_stream_ordering:
                     return
 
+                logger.debug(
+                    "Processing presence stats %s->%s",
+                    self._event_pos,
+                    room_max_stream_ordering,
+                )
+                max_pos, deltas = yield self.store.get_current_state_deltas(
+                    self._event_pos, room_max_stream_ordering
+                )
                 yield self._handle_state_delta(deltas)
 
-                self._event_pos = deltas[-1]["stream_id"]
+                self._event_pos = max_pos
 
                 # Expose current event processing position to prometheus
                 synapse.metrics.event_processing_positions.labels("presence").set(
-                    self._event_pos
+                    max_pos
                 )
 
     @defer.inlineCallbacks

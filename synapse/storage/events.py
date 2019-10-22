@@ -23,7 +23,7 @@ from functools import wraps
 from six import iteritems, text_type
 from six.moves import range
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import json
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
@@ -39,6 +39,7 @@ from synapse.logging.utils import log_function
 from synapse.metrics import BucketCollector
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateResolutionStore
+from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.events_worker import EventsWorkerStore
@@ -641,14 +642,16 @@ class EventsStore(
                 LEFT JOIN rejections USING (event_id)
                 LEFT JOIN event_json USING (event_id)
             WHERE
-                prev_event_id IN (%s)
-                AND NOT events.outlier
+                NOT events.outlier
                 AND rejections.event_id IS NULL
-            """ % (
-                ",".join("?" for _ in batch),
+                AND
+            """
+
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "prev_event_id", batch
             )
 
-            txn.execute(sql, batch)
+            txn.execute(sql + clause, args)
             results.extend(r[0] for r in txn if not json.loads(r[1]).get("soft_failed"))
 
         for chunk in batch_iter(event_ids, 100):
@@ -695,13 +698,15 @@ class EventsStore(
                     LEFT JOIN rejections USING (event_id)
                     LEFT JOIN event_json USING (event_id)
                 WHERE
-                    event_id IN (%s)
-                    AND NOT events.outlier
-                """ % (
-                    ",".join("?" for _ in to_recursively_check),
+                    NOT events.outlier
+                    AND
+                """
+
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "event_id", to_recursively_check
                 )
 
-                txn.execute(sql, to_recursively_check)
+                txn.execute(sql + clause, args)
                 to_recursively_check = []
 
                 for event_id, prev_event_id, metadata, rejected in txn:
@@ -1543,10 +1548,14 @@ class EventsStore(
                 " FROM events as e"
                 " LEFT JOIN rejections as rej USING (event_id)"
                 " LEFT JOIN redactions as r ON e.event_id = r.redacts"
-                " WHERE e.event_id IN (%s)"
-            ) % (",".join(["?"] * len(ev_map)),)
+                " WHERE "
+            )
 
-            txn.execute(sql, list(ev_map))
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "e.event_id", list(ev_map)
+            )
+
+            txn.execute(sql + clause, args)
             rows = self.cursor_to_dict(txn)
             for row in rows:
                 event = ev_map[row["event_id"]]
@@ -1632,9 +1641,7 @@ class EventsStore(
                 and original_event.internal_metadata.is_redacted()
             ):
                 # Redaction was allowed
-                pruned_json = encode_canonical_json(
-                    prune_event_dict(original_event.get_dict())
-                )
+                pruned_json = encode_json(prune_event_dict(original_event.get_dict()))
             else:
                 # Redaction wasn't allowed
                 pruned_json = None
@@ -2251,11 +2258,12 @@ class EventsStore(
             sql = """
                 SELECT DISTINCT state_group FROM event_to_state_groups
                 LEFT JOIN events_to_purge AS ep USING (event_id)
-                WHERE state_group IN (%s) AND ep.event_id IS NULL
-            """ % (
-                ",".join("?" for _ in current_search),
+                WHERE ep.event_id IS NULL AND
+            """
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "state_group", current_search
             )
-            txn.execute(sql, list(current_search))
+            txn.execute(sql + clause, list(args))
 
             referenced = set(sg for sg, in txn)
             referenced_groups |= referenced

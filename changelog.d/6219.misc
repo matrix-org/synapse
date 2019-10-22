@@ -1,0 +1,1 @@
+Remove `format_tap.py` script in favour of a perl reimplementation in Sytest's repo.
