@@ -411,7 +411,7 @@ acme:
     # ACME support is disabled by default. Set this to `true` and uncomment
     # tls_certificate_path and tls_private_key_path above to enable it.
     #
-    enabled: False
+    enabled: false
 
     # Endpoint to use to request certificates. If you only want to test,
     # use Let's Encrypt's staging url:

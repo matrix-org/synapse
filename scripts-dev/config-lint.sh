@@ -5,7 +5,7 @@
 set -ex
 
 # Fix non-lowercase true/false values
-sed -i -E "s/(#.*): +True/\1: true/g; s/(#.*): +False/\1: false/g;" synapse/config/*.py
+sed -i -E "s/: +True/: true/g; s/: +False/: false/g;" docs/sample_config.yaml
 
 # Check if anything changed
 git diff --exit-code
