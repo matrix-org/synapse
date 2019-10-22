@@ -13,6 +13,7 @@ recursive-include synapse/storage *.sql.postgres
 recursive-include synapse/storage *.sql.sqlite
 recursive-include synapse/storage *.py
 recursive-include synapse/storage *.txt
+recursive-include synapse/storage *.md
 
 recursive-include docs *
 recursive-include scripts *
