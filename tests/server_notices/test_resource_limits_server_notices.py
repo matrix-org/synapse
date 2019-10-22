@@ -17,7 +17,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, ServerNoticeMsgType
+from synapse.api.constants import EventTypes, LimitBlockingTypes, ServerNoticeMsgType
 from synapse.api.errors import ResourceLimitError
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
@@ -165,11 +165,28 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         self.hs.config.mau_limit_alerting = False
         self._rlsn._auth.check_auth_blocking = Mock(
-            side_effect=ResourceLimitError(403, "foo")
+            side_effect=ResourceLimitError(
+                403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
+            )
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
         self.assertTrue(self._send_notice.call_count == 0)
+
+    def test_check_hs_disabled_unaffected_by_mau_alert_suppression(self):
+        """
+        Test that when a server is disabled, that MAU limit alerting is ignored.
+        """
+        self.hs.config.mau_limit_alerting = False
+        self._rlsn._auth.check_auth_blocking = Mock(
+            side_effect=ResourceLimitError(
+                403, "foo", limit_type=LimitBlockingTypes.HS_DISABLED
+            )
+        )
+        self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
+
+        # Would be better to check contents, but 2 calls == set blocking event
+        self.assertEqual(self._send_notice.call_count, 2)
 
     def test_maybe_send_server_notice_when_alerting_suppressed_room_blocked(self):
         """
@@ -178,7 +195,9 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         self.hs.config.mau_limit_alerting = False
         self._rlsn._auth.check_auth_blocking = Mock(
-            side_effect=ResourceLimitError(403, "foo")
+            side_effect=ResourceLimitError(
+                403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
+            )
         )
         self._rlsn._server_notices_manager.__is_room_currently_blocked = Mock(
             return_value=defer.succeed((True, []))

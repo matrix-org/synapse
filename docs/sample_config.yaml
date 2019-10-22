@@ -241,7 +241,6 @@ listeners:
 #
 #hs_disabled: False
 #hs_disabled_message: 'Human readable reason for why the HS is blocked'
-#hs_disabled_limit_type: 'error code(str), to help clients decode reason'
 
 # Monthly Active User Blocking
 #

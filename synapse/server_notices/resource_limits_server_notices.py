@@ -22,6 +22,7 @@ from synapse.api.constants import (
     EventTypes,
     ServerNoticeLimitReached,
     ServerNoticeMsgType,
+    LimitBlockingTypes,
 )
 from synapse.api.errors import AuthError, ResourceLimitError, SynapseError
 from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
@@ -91,23 +92,27 @@ class ResourceLimitsServerNotices(object):
         currently_blocked, ref_events = yield self._is_room_currently_blocked(room_id)
 
         try:
-            if not self._config.mau_limit_alerting:
-                # Alerting disabled, reset room if necessary and return
+            is_auth_blocking = False
+            event_limit_type = ""
+
+            try:
+                # Normally should always pass in user_id to check_auth_blocking
+                # if you have it, but in this case are checking what would happen
+                # to other users if they were to arrive.
+                yield self._auth.check_auth_blocking()
+            except ResourceLimitError as e:
+                is_auth_blocking = True
+                event_body = e.msg
+                event_limit_type = e.limit_type
+
+            if (
+                not self._config.mau_limit_alerting
+                and event_limit_type is LimitBlockingTypes.MONTHLY_ACTIVE_USER
+            ):
+                # MAU alerting disabled, reset room if necessary and return
                 if currently_blocked:
                     self._remove_limit_block_notification(ref_events, user_id)
                 return
-
-            is_auth_blocking = False
-            if self._config.mau_limit_alerting:
-                try:
-                    # Normally should always pass in user_id to check_auth_blocking
-                    # if you have it, but in this case are checking what would happen
-                    # to other users if they were to arrive.
-                    yield self._auth.check_auth_blocking()
-                except ResourceLimitError as e:
-                    is_auth_blocking = True
-                    event_body = e.msg
-                    event_limit_type = e.limit_type
 
             if currently_blocked and not is_auth_blocking:
                 # Room is notifying of a block, when it ought not to be.
