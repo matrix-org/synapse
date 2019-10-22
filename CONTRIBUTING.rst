@@ -67,7 +67,10 @@ linting errors. You can do this by running the linters as follows. Ensure to
 commit any files that were corrected.
 
 ::
-
+    # Install the dependencies
+    pip install -U black flake8 isort
+    
+    # Run the linter script
     ./scripts-dev/lint.sh
 
 Changelog
