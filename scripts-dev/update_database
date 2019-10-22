@@ -27,6 +27,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.storage import DataStore
+from synapse.storage.prepare_database import prepare_database
 
 logger = logging.getLogger("update_database")
 
@@ -34,7 +35,7 @@ logger = logging.getLogger("update_database")
 class MockHomeserver(HomeServer):
     DATASTORE_CLASS = DataStore
 
-    def __init__(self, config, database_engine, **kwargs):
+    def __init__(self, config, database_engine, db_conn, **kwargs):
         super(MockHomeserver, self).__init__(
             config.server_name,
             reactor=reactor,
@@ -44,6 +45,10 @@ class MockHomeserver(HomeServer):
         )
 
         self.database_engine = database_engine
+        self.db_conn = db_conn
+
+    def get_db_conn(self):
+        return self.db_conn
 
 
 if __name__ == "__main__":
@@ -73,9 +78,6 @@ if __name__ == "__main__":
     # Load, process and sanity-check the config.
     hs_config = yaml.safe_load(args.database_config)
 
-    config = HomeServerConfig()
-    config.parse_config_dict(hs_config, "", "")
-
     if "database" in hs_config:
         database_config = hs_config["database"]
 
@@ -93,13 +95,31 @@ if __name__ == "__main__":
         sys.stderr.write("The configuration file must have a 'database' section.\n")
         sys.exit(4)
 
+    config = HomeServerConfig()
+    config.parse_config_dict(hs_config, "", "")
+
+    # Create the database engine and a connection to it.
+    database_engine = create_engine(database_config)
+    db_conn = database_engine.module.connect(
+        **{
+            k: v
+            for k, v in database_config.get("args", {}).items()
+            if not k.startswith("cp_")
+        }
+    )
+
+    # Update the database to the latest schema.
+    prepare_database(db_conn, database_engine, config=config)
+    db_conn.commit()
+
     # Instantiate and initialise the homeserver object.
     hs = MockHomeserver(
         config,
-        create_engine(database_config),
+        database_engine,
+        db_conn,
         db_config=config.database_config,
     )
-    # setup() creates (if needed) and updates the database schema.
+    # setup instantiates the store within the homeserver object.
     hs.setup()
     store = hs.get_datastore()
 
