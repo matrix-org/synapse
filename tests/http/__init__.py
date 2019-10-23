@@ -21,8 +21,8 @@ from OpenSSL import SSL
 from OpenSSL.SSL import Connection
 from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
 from twisted.internet.ssl import Certificate, trustRootFromCertificates
-from twisted.web.client import BrowserLikePolicyForHTTPS
-from twisted.web.iweb import IPolicyForHTTPS
+from twisted.web.client import BrowserLikePolicyForHTTPS  # noqa: F401
+from twisted.web.iweb import IPolicyForHTTPS  # noqa: F401
 
 
 def get_test_https_policy():
