@@ -477,6 +477,15 @@ class Porter(object):
 
     @defer.inlineCallbacks
     def build_db_store(self, config):
+        """Builds and returns a database store using the provided configuration.
+
+        Args:
+            config: The database configuration, i.e. a dict following the structure of
+                the "database" section of Synapse's configuration file.
+
+        Returns:
+            The built Store object.
+        """
         engine = create_engine(config)
 
         self.progress.set_state("Preparing %s" % config["name"])
@@ -991,19 +1000,18 @@ if __name__ == "__main__":
 
     hs_config = yaml.safe_load(args.postgres_config)
 
-    if "database" in hs_config:
-        postgres_config = hs_config["database"]
-
-        if "name" not in postgres_config:
-            sys.stderr.write("Malformed database config: no 'name'\n")
-            sys.exit(2)
-        if postgres_config["name"] != "psycopg2":
-            sys.stderr.write("Database must use 'psycopg2' connector.\n")
-            sys.exit(3)
-
-    else:
+    if "database" not in hs_config:
         sys.stderr.write("The configuration file must have a 'database' section.\n")
         sys.exit(4)
+
+    postgres_config = hs_config["database"]
+
+    if "name" not in postgres_config:
+        sys.stderr.write("Malformed database config: no 'name'\n")
+        sys.exit(2)
+    if postgres_config["name"] != "psycopg2":
+        sys.stderr.write("Database must use the 'psycopg2' connector.\n")
+        sys.exit(3)
 
     config = HomeServerConfig()
     config.parse_config_dict(hs_config, "", "")
