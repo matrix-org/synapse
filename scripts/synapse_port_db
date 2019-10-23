@@ -33,19 +33,27 @@ from twisted.internet import defer, reactor
 from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.context import PreserveLoggingContext
 from synapse.storage._base import LoggingTransaction
-from synapse.storage.client_ips import ClientIpBackgroundUpdateStore
-from synapse.storage.deviceinbox import DeviceInboxBackgroundUpdateStore
-from synapse.storage.devices import DeviceBackgroundUpdateStore
+from synapse.storage.data_stores.main.client_ips import ClientIpBackgroundUpdateStore
+from synapse.storage.data_stores.main.deviceinbox import DeviceInboxBackgroundUpdateStore
+from synapse.storage.data_stores.main.devices import DeviceBackgroundUpdateStore
 from synapse.storage.engines import create_engine
-from synapse.storage.events_bg_updates import EventsBackgroundUpdatesStore
-from synapse.storage.media_repository import MediaRepositoryBackgroundUpdateStore
+from synapse.storage.data_stores.main.events_bg_updates import (
+    EventsBackgroundUpdatesStore
+)
+from synapse.storage.data_stores.main.media_repository import (
+    MediaRepositoryBackgroundUpdateStore
+)
 from synapse.storage.prepare_database import prepare_database
-from synapse.storage.registration import RegistrationBackgroundUpdateStore
-from synapse.storage.roommember import RoomMemberBackgroundUpdateStore
-from synapse.storage.search import SearchBackgroundUpdateStore
-from synapse.storage.state import StateBackgroundUpdateStore
-from synapse.storage.stats import StatsStore
-from synapse.storage.user_directory import UserDirectoryBackgroundUpdateStore
+from synapse.storage.data_stores.main.registration import (
+    RegistrationBackgroundUpdateStore
+)
+from synapse.storage.data_stores.main.roommember import RoomMemberBackgroundUpdateStore
+from synapse.storage.data_stores.main.search import SearchBackgroundUpdateStore
+from synapse.storage.data_stores.main.state import StateBackgroundUpdateStore
+from synapse.storage.data_stores.main.stats import StatsStore
+from synapse.storage.data_stores.main.user_directory import (
+    UserDirectoryBackgroundUpdateStore
+)
 from synapse.util import Clock
 
 logger = logging.getLogger("synapse_port_db")
