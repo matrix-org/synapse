@@ -42,8 +42,8 @@ from synapse.replication.tcp.streams.events import (
 )
 from synapse.rest.client.v2_alpha import user_directory
 from synapse.server import HomeServer
+from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
 from synapse.storage.engines import create_engine
-from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole

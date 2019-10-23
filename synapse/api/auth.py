@@ -90,26 +90,9 @@ class Auth(object):
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
-        self.check(
+        event_auth.check(
             room_version, event, auth_events=auth_events, do_sig_check=do_sig_check
         )
-
-    def check(self, room_version, event, auth_events, do_sig_check=True):
-        """ Checks if this event is correctly authed.
-
-        Args:
-            room_version (str): version of the room
-            event: the event being checked.
-            auth_events (dict: event-key -> event): the existing room state.
-
-
-        Returns:
-            True if the auth checks pass.
-        """
-        with Measure(self.clock, "auth.check"):
-            event_auth.check(
-                room_version, event, auth_events, do_sig_check=do_sig_check
-            )
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
