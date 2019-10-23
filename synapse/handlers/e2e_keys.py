@@ -57,7 +57,8 @@ class E2eKeysHandler(object):
 
         # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
         federation_registry.register_edu_handler(
-            "org.matrix.signing_key_update", self._edu_updater.incoming_signing_key_update
+            "org.matrix.signing_key_update",
+            self._edu_updater.incoming_signing_key_update,
         )
         # doesn't really work as part of the generic query API, because the
         # query request requires an object POST, but we abuse the
