@@ -180,7 +180,7 @@ class RegistrationConfig(Config):
         # where d is equal to 10%% of the validity period.
         #
         #account_validity:
-        #  enabled: True
+        #  enabled: true
         #  period: 6w
         #  renew_at: 1w
         #  renew_email_subject: "Renew your %%(app)s account"

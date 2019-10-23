@@ -532,7 +532,7 @@ class ServerConfig(Config):
         # Whether room invites to users on this server should be blocked
         # (except those sent by local server admins). The default is False.
         #
-        #block_non_admin_invites: True
+        #block_non_admin_invites: true
 
         # Room searching
         #
@@ -673,7 +673,7 @@ class ServerConfig(Config):
 
         # Global blocking
         #
-        #hs_disabled: False
+        #hs_disabled: false
         #hs_disabled_message: 'Human readable reason for why the HS is blocked'
         #hs_disabled_limit_type: 'error code(str), to help clients decode reason'
 
@@ -695,7 +695,7 @@ class ServerConfig(Config):
         # sign up in a short space of time never to return after their initial
         # session.
         #
-        #limit_usage_by_mau: False
+        #limit_usage_by_mau: false
         #max_mau_value: 50
         #mau_trial_days: 2
 
@@ -703,7 +703,7 @@ class ServerConfig(Config):
         # be populated, however no one will be limited. If limit_usage_by_mau
         # is true, this is implied to be true.
         #
-        #mau_stats_only: False
+        #mau_stats_only: false
 
         # Sometimes the server admin will want to ensure certain accounts are
         # never blocked by mau checking. These accounts are specified here.
@@ -728,7 +728,7 @@ class ServerConfig(Config):
         #
         # Uncomment the below lines to enable:
         #limit_remote_rooms:
-        #  enabled: True
+        #  enabled: true
         #  complexity: 1.0
         #  complexity_error: "This room is too complex."
 
