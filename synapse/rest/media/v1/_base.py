@@ -25,7 +25,7 @@ from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.http.server import finish_request, respond_with_json
-from synapse.util import logcontext
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util.stringutils import is_ascii
 
 logger = logging.getLogger(__name__)
@@ -38,8 +38,8 @@ def parse_media_id(request):
         server_name, media_id = request.postpath[:2]
 
         if isinstance(server_name, bytes):
-            server_name = server_name.decode('utf-8')
-            media_id = media_id.decode('utf8')
+            server_name = server_name.decode("utf-8")
+            media_id = media_id.decode("utf8")
 
         file_name = None
         if len(request.postpath) > 2:
@@ -75,9 +75,7 @@ def respond_with_file(request, media_type, file_path, file_size=None, upload_nam
         add_file_headers(request, media_type, file_size, upload_name)
 
         with open(file_path, "rb") as f:
-            yield logcontext.make_deferred_yieldable(
-                FileSender().beginFileTransfer(f, request)
-            )
+            yield make_deferred_yieldable(FileSender().beginFileTransfer(f, request))
 
         finish_request(request)
     else:
@@ -120,11 +118,11 @@ def add_file_headers(request, media_type, file_size, upload_name):
         # correctly interpret those as of 0.99.2 and (b) they are a bit of a pain and we
         # may as well just do the filename* version.
         if _can_encode_filename_as_token(upload_name):
-            disposition = 'inline; filename=%s' % (upload_name, )
+            disposition = "inline; filename=%s" % (upload_name,)
         else:
-            disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name), )
+            disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name),)
 
-        request.setHeader(b"Content-Disposition", disposition.encode('ascii'))
+        request.setHeader(b"Content-Disposition", disposition.encode("ascii"))
 
     # cache for at least a day.
     # XXX: we might want to turn this off for data we don't want to
@@ -137,10 +135,27 @@ def add_file_headers(request, media_type, file_size, upload_name):
 
 # separators as defined in RFC2616. SP and HT are handled separately.
 # see _can_encode_filename_as_token.
-_FILENAME_SEPARATOR_CHARS = set((
-    "(", ")", "<", ">", "@", ",", ";", ":", "\\", '"',
-    "/", "[", "]", "?", "=", "{", "}",
-))
+_FILENAME_SEPARATOR_CHARS = set(
+    (
+        "(",
+        ")",
+        "<",
+        ">",
+        "@",
+        ",",
+        ";",
+        ":",
+        "\\",
+        '"',
+        "/",
+        "[",
+        "]",
+        "?",
+        "=",
+        "{",
+        "}",
+    )
+)
 
 
 def _can_encode_filename_as_token(x):
@@ -180,7 +195,7 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
         respond_404(request)
         return
 
-    logger.debug("Responding to media request with responder %s")
+    logger.debug("Responding to media request with responder %s", responder)
     add_file_headers(request, media_type, file_size, upload_name)
     try:
         with responder:
@@ -271,7 +286,7 @@ def get_filename_from_headers(headers):
     Returns:
         A Unicode string of the filename, or None.
     """
-    content_disposition = headers.get(b"Content-Disposition", [b''])
+    content_disposition = headers.get(b"Content-Disposition", [b""])
 
     # No header, bail out.
     if not content_disposition[0]:
@@ -293,7 +308,7 @@ def get_filename_from_headers(headers):
                     # Once it is decoded, we can then unquote the %-encoded
                     # parts strictly into a unicode string.
                     upload_name = urllib.parse.unquote(
-                        upload_name_utf8.decode('ascii'), errors="strict"
+                        upload_name_utf8.decode("ascii"), errors="strict"
                     )
                 except UnicodeDecodeError:
                     # Incorrect UTF-8.
@@ -302,7 +317,7 @@ def get_filename_from_headers(headers):
                 # On Python 2, we first unquote the %-encoded parts and then
                 # decode it strictly using UTF-8.
                 try:
-                    upload_name = urllib.parse.unquote(upload_name_utf8).decode('utf8')
+                    upload_name = urllib.parse.unquote(upload_name_utf8).decode("utf8")
                 except UnicodeDecodeError:
                     pass
 
@@ -310,7 +325,7 @@ def get_filename_from_headers(headers):
     if not upload_name:
         upload_name_ascii = params.get(b"filename", None)
         if upload_name_ascii and is_ascii(upload_name_ascii):
-            upload_name = upload_name_ascii.decode('ascii')
+            upload_name = upload_name_ascii.decode("ascii")
 
     # This may be None here, indicating we did not find a matching name.
     return upload_name
@@ -328,19 +343,19 @@ def _parse_header(line):
         Tuple[bytes, dict[bytes, bytes]]:
             the main content-type, followed by the parameter dictionary
     """
-    parts = _parseparam(b';' + line)
+    parts = _parseparam(b";" + line)
     key = next(parts)
     pdict = {}
     for p in parts:
-        i = p.find(b'=')
+        i = p.find(b"=")
         if i >= 0:
             name = p[:i].strip().lower()
-            value = p[i + 1:].strip()
+            value = p[i + 1 :].strip()
 
             # strip double-quotes
             if len(value) >= 2 and value[0:1] == value[-1:] == b'"':
                 value = value[1:-1]
-                value = value.replace(b'\\\\', b'\\').replace(b'\\"', b'"')
+                value = value.replace(b"\\\\", b"\\").replace(b'\\"', b'"')
             pdict[name] = value
 
     return key, pdict
@@ -357,16 +372,16 @@ def _parseparam(s):
     Returns:
         Iterable[bytes]: the split input
     """
-    while s[:1] == b';':
+    while s[:1] == b";":
         s = s[1:]
 
         # look for the next ;
-        end = s.find(b';')
+        end = s.find(b";")
 
         # if there is an odd number of " marks between here and the next ;, skip to the
         # next ; instead
         while end > 0 and (s.count(b'"', 0, end) - s.count(b'\\"', 0, end)) % 2:
-            end = s.find(b';', end + 1)
+            end = s.find(b";", end + 1)
 
         if end < 0:
             end = len(s)

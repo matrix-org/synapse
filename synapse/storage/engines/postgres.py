@@ -22,6 +22,13 @@ class PostgresEngine(object):
     def __init__(self, database_module, database_config):
         self.module = database_module
         self.module.extensions.register_type(self.module.extensions.UNICODE)
+
+        # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
+        # actually want to use bytes than wrap it in `bytearray`.
+        def _disable_bytes_adapter(_):
+            raise Exception("Passing bytes to DB is disabled.")
+
+        self.module.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
         self._version = None  # unknown as yet
 
@@ -45,6 +52,10 @@ class PostgresEngine(object):
         # together. For example, version 8.1.5 will be returned as 80105
         self._version = db_conn.server_version
 
+        # Are we on a supported PostgreSQL version?
+        if self._version < 90500:
+            raise RuntimeError("Synapse requires PostgreSQL 9.5+ or above.")
+
         db_conn.set_isolation_level(
             self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
         )
@@ -64,9 +75,22 @@ class PostgresEngine(object):
     @property
     def can_native_upsert(self):
         """
-        Can we use native UPSERTs? This requires PostgreSQL 9.5+.
+        Can we use native UPSERTs?
         """
-        return self._version >= 90500
+        return True
+
+    @property
+    def supports_tuple_comparison(self):
+        """
+        Do we support comparing tuples, i.e. `(a, b) > (c, d)`?
+        """
+        return True
+
+    @property
+    def supports_using_any_list(self):
+        """Do we support using `a = ANY(?)` and passing a list
+        """
+        return True
 
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):

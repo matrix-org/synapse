@@ -58,7 +58,7 @@ class CapabilitiesRestServlet(RestServlet):
                 "m.change_password": {"enabled": change_password},
             }
         }
-        defer.returnValue((200, response))
+        return 200, response
 
 
 def register_servlets(hs, http_server):

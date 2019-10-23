@@ -2,52 +2,296 @@ Upgrading Synapse
 =================
 
 Before upgrading check if any special steps are required to upgrade from the
-what you currently have installed to current version of synapse. The extra
+what you currently have installed to current version of Synapse. The extra
 instructions that may be required are listed later in this document.
 
-1. If synapse was installed in a virtualenv then activate that virtualenv before
-   upgrading. If synapse is installed in a virtualenv in ``~/synapse/env`` then
-   run:
+* If Synapse was installed using `prebuilt packages
+  <INSTALL.md#prebuilt-packages>`_, you will need to follow the normal process
+  for upgrading those packages.
 
-   .. code:: bash
+* If Synapse was installed from source, then:
+
+  1. Activate the virtualenv before upgrading. For example, if Synapse is
+     installed in a virtualenv in ``~/synapse/env`` then run:
+
+     .. code:: bash
 
        source ~/synapse/env/bin/activate
 
-2. If synapse was installed using pip then upgrade to the latest version by
-   running:
+  2. If Synapse was installed using pip then upgrade to the latest version by
+     running:
 
-   .. code:: bash
+     .. code:: bash
 
-       pip install --upgrade matrix-synapse[all]
+       pip install --upgrade matrix-synapse
 
-       # restart synapse
-       synctl restart
+     If Synapse was installed using git then upgrade to the latest version by
+     running:
 
-
-   If synapse was installed using git then upgrade to the latest version by
-   running:
-
-   .. code:: bash
-
-       # Pull the latest version of the master branch.
+     .. code:: bash
+     
        git pull
+       pip install --upgrade .
 
-       # Update synapse and its python dependencies.
-       pip install --upgrade .[all]
+  3. Restart Synapse:
 
-       # restart synapse
+     .. code:: bash
+
        ./synctl restart
 
-
-To check whether your update was successful, you can check the Server header
-returned by the Client-Server API:
+To check whether your update was successful, you can check the running server
+version with:
 
 .. code:: bash
 
-    # replace <host.name> with the hostname of your synapse homeserver.
-    # You may need to specify a port (eg, :8448) if your server is not
-    # configured on port 443.
-    curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
+    # you may need to replace 'localhost:8008' if synapse is not configured
+    # to listen on port 8008.
+
+    curl http://localhost:8008/_synapse/admin/v1/server_version
+
+Rolling back to older versions
+------------------------------
+
+Rolling back to previous releases can be difficult, due to database schema
+changes between releases. Where we have been able to test the rollback process,
+this will be noted below.
+
+In general, you will need to undo any changes made during the upgrade process,
+for example:
+
+* pip:
+
+  .. code:: bash
+
+     source env/bin/activate
+     # replace `1.3.0` accordingly:
+     pip install matrix-synapse==1.3.0
+
+* Debian:
+
+  .. code:: bash
+
+     # replace `1.3.0` and `stretch` accordingly:
+     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+
+Upgrading to v1.4.0
+===================
+
+New custom templates
+--------------------
+
+If you have configured a custom template directory with the
+``email.template_dir`` option, be aware that there are new templates regarding
+registration and threepid management (see below) that must be included.
+
+* ``registration.html`` and ``registration.txt``
+* ``registration_success.html`` and ``registration_failure.html``
+* ``add_threepid.html`` and  ``add_threepid.txt``
+* ``add_threepid_failure.html`` and ``add_threepid_success.html``
+
+Synapse will expect these files to exist inside the configured template
+directory, and **will fail to start** if they are absent.
+To view the default templates, see `synapse/res/templates
+<https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
+
+3pid verification changes
+-------------------------
+
+**Note: As of this release, users will be unable to add phone numbers or email
+addresses to their accounts, without changes to the Synapse configuration. This
+includes adding an email address during registration.**
+
+It is possible for a user to associate an email address or phone number
+with their account, for a number of reasons:
+
+* for use when logging in, as an alternative to the user id.
+* in the case of email, as an alternative contact to help with account recovery.
+* in the case of email, to receive notifications of missed messages.
+
+Before an email address or phone number can be added to a user's account,
+or before such an address is used to carry out a password-reset, Synapse must
+confirm the operation with the owner of the email address or phone number.
+It does this by sending an email or text giving the user a link or token to confirm
+receipt. This process is known as '3pid verification'. ('3pid', or 'threepid',
+stands for third-party identifier, and we use it to refer to external
+identifiers such as email addresses and phone numbers.)
+
+Previous versions of Synapse delegated the task of 3pid verification to an
+identity server by default. In most cases this server is ``vector.im`` or
+``matrix.org``.
+
+In Synapse 1.4.0, for security and privacy reasons, the homeserver will no
+longer delegate this task to an identity server by default. Instead,
+the server administrator will need to explicitly decide how they would like the
+verification messages to be sent.
+
+In the medium term, the ``vector.im`` and ``matrix.org`` identity servers will
+disable support for delegated 3pid verification entirely. However, in order to
+ease the transition, they will retain the capability for a limited
+period. Delegated email verification will be disabled on Monday 2nd December
+2019 (giving roughly 2 months notice). Disabling delegated SMS verification
+will follow some time after that once SMS verification support lands in
+Synapse.
+
+Once delegated 3pid verification support has been disabled in the ``vector.im`` and
+``matrix.org`` identity servers, all Synapse versions that depend on those
+instances will be unable to verify email and phone numbers through them. There
+are no imminent plans to remove delegated 3pid verification from Sydent
+generally. (Sydent is the identity server project that backs the ``vector.im`` and
+``matrix.org`` instances).
+
+Email
+~~~~~
+Following upgrade, to continue verifying email (e.g. as part of the
+registration process), admins can either:-
+
+* Configure Synapse to use an email server.
+* Run or choose an identity server which allows delegated email verification
+  and delegate to it.
+
+Configure SMTP in Synapse
++++++++++++++++++++++++++
+
+To configure an SMTP server for Synapse, modify the configuration section
+headed ``email``, and be sure to have at least the ``smtp_host, smtp_port``
+and ``notif_from`` fields filled out.
+
+You may also need to set ``smtp_user``, ``smtp_pass``, and
+``require_transport_security``.
+
+See the `sample configuration file <docs/sample_config.yaml>`_ for more details
+on these settings.
+
+Delegate email to an identity server
+++++++++++++++++++++++++++++++++++++
+
+Some admins will wish to continue using email verification as part of the
+registration process, but will not immediately have an appropriate SMTP server
+at hand.
+
+To this end, we will continue to support email verification delegation via the
+``vector.im`` and ``matrix.org`` identity servers for two months. Support for
+delegated email verification will be disabled on Monday 2nd December.
+
+The ``account_threepid_delegates`` dictionary defines whether the homeserver
+should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending
+confirmation messages via email and SMS.
+
+So to delegate email verification, in ``homeserver.yaml``, set
+``account_threepid_delegates.email`` to the base URL of an identity server. For
+example:
+
+.. code:: yaml
+
+   account_threepid_delegates:
+       email: https://example.com     # Delegate email sending to example.com
+
+Note that ``account_threepid_delegates.email`` replaces the deprecated
+``email.trust_identity_server_for_password_resets``: if
+``email.trust_identity_server_for_password_resets`` is set to ``true``, and
+``account_threepid_delegates.email`` is not set, then the first entry in
+``trusted_third_party_id_servers`` will be used as the
+``account_threepid_delegate`` for email. This is to ensure compatibility with
+existing Synapse installs that set up external server handling for these tasks
+before v1.4.0. If ``email.trust_identity_server_for_password_resets`` is
+``true`` and no trusted identity server domains are configured, Synapse will
+report an error and refuse to start.
+
+If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent
+and no ``email`` delegate is configured in ``account_threepid_delegates``,
+then Synapse will send email verification messages itself, using the configured
+SMTP server (see above).
+that type.
+
+Phone numbers
+~~~~~~~~~~~~~
+
+Synapse does not support phone-number verification itself, so the only way to
+maintain the ability for users to add phone numbers to their accounts will be
+by continuing to delegate phone number verification to the ``matrix.org`` and
+``vector.im`` identity servers (or another identity server that supports SMS
+sending).
+
+The ``account_threepid_delegates`` dictionary defines whether the homeserver
+should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending
+confirmation messages via email and SMS.
+
+So to delegate phone number verification, in ``homeserver.yaml``, set
+``account_threepid_delegates.msisdn`` to the base URL of an identity
+server. For example:
+
+.. code:: yaml
+
+   account_threepid_delegates:
+       msisdn: https://example.com     # Delegate sms sending to example.com
+
+The ``matrix.org`` and ``vector.im`` identity servers will continue to support
+delegated phone number verification via SMS until such time as it is possible
+for admins to configure their servers to perform phone number verification
+directly. More details will follow in a future release.
+
+Rolling back to v1.3.1
+----------------------
+
+If you encounter problems with v1.4.0, it should be possible to roll back to
+v1.3.1, subject to the following:
+
+* The 'room statistics' engine was heavily reworked in this release (see
+  `#5971 <https://github.com/matrix-org/synapse/pull/5971>`_), including
+  significant changes to the database schema, which are not easily
+  reverted. This will cause the room statistics engine to stop updating when
+  you downgrade.
+
+  The room statistics are essentially unused in v1.3.1 (in future versions of
+  Synapse, they will be used to populate the room directory), so there should
+  be no loss of functionality. However, the statistics engine will write errors
+  to the logs, which can be avoided by setting the following in
+  `homeserver.yaml`:
+
+  .. code:: yaml
+
+    stats:
+      enabled: false
+
+  Don't forget to re-enable it when you upgrade again, in preparation for its
+  use in the room directory!
+
+Upgrading to v1.2.0
+===================
+
+Some counter metrics have been renamed, with the old names deprecated. See
+`the metrics documentation <docs/metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12>`_
+for details.
+
+Upgrading to v1.1.0
+===================
+
+Synapse v1.1.0 removes support for older Python and PostgreSQL versions, as
+outlined in `our deprecation notice <https://matrix.org/blog/2019/04/08/synapse-deprecating-postgres-9-4-and-python-2-x>`_.
+
+Minimum Python Version
+----------------------
+
+Synapse v1.1.0 has a minimum Python requirement of Python 3.5. Python 3.6 or
+Python 3.7 are recommended as they have improved internal string handling,
+significantly reducing memory usage.
+
+If you use current versions of the Matrix.org-distributed Debian packages or
+Docker images, action is not required.
+
+If you install Synapse in a Python virtual environment, please see "Upgrading to
+v0.34.0" for notes on setting up a new virtualenv under Python 3.
+
+Minimum PostgreSQL Version
+--------------------------
+
+If using PostgreSQL under Synapse, you will need to use PostgreSQL 9.5 or above.
+Please see the
+`PostgreSQL documentation <https://www.postgresql.org/docs/11/upgrading.html>`_
+for more details on upgrading your database.
 
 Upgrading to v1.0
 =================
@@ -71,11 +315,11 @@ server in a closed federation. This can be done in one of two ways:-
 * Configure a whitelist of server domains to trust via ``federation_certificate_verification_whitelist``.
 
 See the `sample configuration file <docs/sample_config.yaml>`_
-for more details on these settings. 
+for more details on these settings.
 
 Email
 -----
-When a user requests a password reset, Synapse will send an email to the 
+When a user requests a password reset, Synapse will send an email to the
 user to confirm the request.
 
 Previous versions of Synapse delegated the job of sending this email to an
@@ -97,6 +341,19 @@ server for password resets, set ``trust_identity_server_for_password_resets`` to
 
 See the `sample configuration file <docs/sample_config.yaml>`_
 for more details on these settings.
+
+New email templates
+---------------
+Some new templates have been added to the default template directory for the purpose of the
+homeserver sending its own password reset emails. If you have configured a custom
+``template_dir`` in your Synapse config, these files will need to be added.
+
+``password_reset.html`` and ``password_reset.txt`` are HTML and plain text templates
+respectively that contain the contents of what will be emailed to the user upon attempting to
+reset their password via email. ``password_reset_success.html`` and
+``password_reset_failure.html`` are HTML files that the content of which (assuming no redirect
+URL is set) will be shown to the user after they attempt to click the link in the email sent
+to them.
 
 Upgrading to v0.99.0
 ====================

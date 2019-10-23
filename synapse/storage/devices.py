@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,10 +22,22 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError
+from synapse.api.errors import Codes, StoreError
+from synapse.logging.opentracing import (
+    get_active_span_text_map,
+    set_tag,
+    trace,
+    whitelisted_homeserver,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage._base import Cache, SQLBaseStore, db_to_json
+from synapse.storage._base import (
+    Cache,
+    SQLBaseStore,
+    db_to_json,
+    make_in_list_sql_clause,
+)
 from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.util import batch_iter
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 
 logger = logging.getLogger(__name__)
@@ -35,7 +49,8 @@ DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES = (
 
 class DeviceWorkerStore(SQLBaseStore):
     def get_device(self, user_id, device_id):
-        """Retrieve a device.
+        """Retrieve a device. Only returns devices that are not marked as
+        hidden.
 
         Args:
             user_id (str): The ID of the user which owns the device
@@ -47,14 +62,15 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         return self._simple_select_one(
             table="devices",
-            keyvalues={"user_id": user_id, "device_id": device_id},
+            keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             retcols=("user_id", "device_id", "display_name"),
             desc="get_device",
         )
 
     @defer.inlineCallbacks
     def get_devices_by_user(self, user_id):
-        """Retrieve all of a user's registered devices.
+        """Retrieve all of a user's registered devices. Only returns devices
+        that are not marked as hidden.
 
         Args:
             user_id (str):
@@ -65,13 +81,14 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         devices = yield self._simple_select_list(
             table="devices",
-            keyvalues={"user_id": user_id},
+            keyvalues={"user_id": user_id, "hidden": False},
             retcols=("user_id", "device_id", "display_name"),
             desc="get_devices_by_user",
         )
 
-        defer.returnValue({d["device_id"]: d for d in devices})
+        return {d["device_id"]: d for d in devices}
 
+    @trace
     @defer.inlineCallbacks
     def get_devices_by_remote(self, destination, from_stream_id, limit):
         """Get stream of updates to send to remote servers
@@ -87,7 +104,7 @@ class DeviceWorkerStore(SQLBaseStore):
             destination, int(from_stream_id)
         )
         if not has_changed:
-            defer.returnValue((now_stream_id, []))
+            return now_stream_id, []
 
         # We retrieve n+1 devices from the list of outbound pokes where n is
         # our outbound device update limit. We then check if the very last
@@ -110,7 +127,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         # Return an empty list if there are no updates
         if not updates:
-            defer.returnValue((now_stream_id, []))
+            return now_stream_id, []
 
         # if we have exceeded the limit, we need to exclude any results with the
         # same stream_id as the last row.
@@ -126,8 +143,15 @@ class DeviceWorkerStore(SQLBaseStore):
         # (user_id, device_id) entries into a map, with the value being
         # the max stream_id across each set of duplicate entries
         #
-        # maps (user_id, device_id) -> stream_id
+        # maps (user_id, device_id) -> (stream_id, opentracing_context)
         # as long as their stream_id does not match that of the last row
+        #
+        # opentracing_context contains the opentracing metadata for the request
+        # that created the poke
+        #
+        # The most recent request's opentracing_context is used as the
+        # context which created the Edu.
+
         query_map = {}
         for update in updates:
             if stream_id_cutoff is not None and update[2] >= stream_id_cutoff:
@@ -135,7 +159,14 @@ class DeviceWorkerStore(SQLBaseStore):
                 break
 
             key = (update[0], update[1])
-            query_map[key] = max(query_map.get(key, 0), update[2])
+
+            update_context = update[3]
+            update_stream_id = update[2]
+
+            previous_update_stream_id, _ = query_map.get(key, (0, None))
+
+            if update_stream_id > previous_update_stream_id:
+                query_map[key] = (update_stream_id, update_context)
 
         # If we didn't find any updates with a stream_id lower than the cutoff, it
         # means that there are more than limit updates all of which have the same
@@ -146,15 +177,13 @@ class DeviceWorkerStore(SQLBaseStore):
         # skip that stream_id and return an empty list, and continue with the next
         # stream_id next time.
         if not query_map:
-            defer.returnValue((stream_id_cutoff, []))
+            return stream_id_cutoff, []
 
         results = yield self._get_device_update_edus_by_remote(
-            destination,
-            from_stream_id,
-            query_map,
+            destination, from_stream_id, query_map
         )
 
-        defer.returnValue((now_stream_id, results))
+        return now_stream_id, results
 
     def _get_devices_by_remote_txn(
         self, txn, destination, from_stream_id, now_stream_id, limit
@@ -172,7 +201,7 @@ class DeviceWorkerStore(SQLBaseStore):
             List: List of device updates
         """
         sql = """
-            SELECT user_id, device_id, stream_id FROM device_lists_outbound_pokes
+            SELECT user_id, device_id, stream_id, opentracing_context FROM device_lists_outbound_pokes
             WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
             ORDER BY stream_id
             LIMIT ?
@@ -182,16 +211,15 @@ class DeviceWorkerStore(SQLBaseStore):
         return list(txn)
 
     @defer.inlineCallbacks
-    def _get_device_update_edus_by_remote(
-        self, destination, from_stream_id, query_map,
-    ):
+    def _get_device_update_edus_by_remote(self, destination, from_stream_id, query_map):
         """Returns a list of device update EDUs as well as E2EE keys
 
         Args:
             destination (str): The host the device updates are intended for
             from_stream_id (int): The minimum stream_id to filter updates by, exclusive
-            query_map (Dict[(str, str): int]): Dictionary mapping
-                user_id/device_id to update stream_id
+            query_map (Dict[(str, str): (int, str|None)]): Dictionary mapping
+                user_id/device_id to update stream_id and the relevent json-encoded
+                opentracing context
 
         Returns:
             List[Dict]: List of objects representing an device update EDU
@@ -210,15 +238,16 @@ class DeviceWorkerStore(SQLBaseStore):
             # The prev_id for the first row is always the last row before
             # `from_stream_id`
             prev_id = yield self._get_last_device_update_for_remote_user(
-                destination, user_id, from_stream_id,
+                destination, user_id, from_stream_id
             )
             for device_id, device in iteritems(user_devices):
-                stream_id = query_map[(user_id, device_id)]
+                stream_id, opentracing_context = query_map[(user_id, device_id)]
                 result = {
                     "user_id": user_id,
                     "device_id": device_id,
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
+                    "org.matrix.opentracing_context": opentracing_context,
                 }
 
                 prev_id = stream_id
@@ -235,10 +264,10 @@ class DeviceWorkerStore(SQLBaseStore):
 
                 results.append(result)
 
-        defer.returnValue(results)
+        return results
 
     def _get_last_device_update_for_remote_user(
-        self, destination, user_id, from_stream_id,
+        self, destination, user_id, from_stream_id
     ):
         def f(txn):
             prev_sent_id_sql = """
@@ -299,9 +328,45 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         txn.execute(sql, (destination, stream_id))
 
+    @defer.inlineCallbacks
+    def add_user_signature_change_to_streams(self, from_user_id, user_ids):
+        """Persist that a user has made new signatures
+
+        Args:
+            from_user_id (str): the user who made the signatures
+            user_ids (list[str]): the users who were signed
+        """
+
+        with self._device_list_id_gen.get_next() as stream_id:
+            yield self.runInteraction(
+                "add_user_sig_change_to_streams",
+                self._add_user_signature_change_txn,
+                from_user_id,
+                user_ids,
+                stream_id,
+            )
+        return stream_id
+
+    def _add_user_signature_change_txn(self, txn, from_user_id, user_ids, stream_id):
+        txn.call_after(
+            self._user_signature_stream_cache.entity_has_changed,
+            from_user_id,
+            stream_id,
+        )
+        self._simple_insert_txn(
+            txn,
+            "user_signature_stream",
+            values={
+                "stream_id": stream_id,
+                "from_user_id": from_user_id,
+                "user_ids": json.dumps(user_ids),
+            },
+        )
+
     def get_device_stream_token(self):
         return self._device_list_id_gen.get_current_token()
 
+    @trace
     @defer.inlineCallbacks
     def get_user_devices_from_cache(self, query_list):
         """Get the devices (and keys if any) for remote users from the cache.
@@ -333,7 +398,10 @@ class DeviceWorkerStore(SQLBaseStore):
             else:
                 results[user_id] = yield self._get_cached_devices_for_user(user_id)
 
-        defer.returnValue((user_ids_not_in_cache, results))
+        set_tag("in_cache", results)
+        set_tag("not_in_cache", user_ids_not_in_cache)
+
+        return user_ids_not_in_cache, results
 
     @cachedInlineCallbacks(num_args=2, tree=True)
     def _get_cached_user_device(self, user_id, device_id):
@@ -343,7 +411,7 @@ class DeviceWorkerStore(SQLBaseStore):
             retcol="content",
             desc="_get_cached_user_device",
         )
-        defer.returnValue(db_to_json(content))
+        return db_to_json(content)
 
     @cachedInlineCallbacks()
     def _get_cached_devices_for_user(self, user_id):
@@ -353,9 +421,9 @@ class DeviceWorkerStore(SQLBaseStore):
             retcols=("device_id", "content"),
             desc="_get_cached_devices_for_user",
         )
-        defer.returnValue(
-            {device["device_id"]: db_to_json(device["content"]) for device in devices}
-        )
+        return {
+            device["device_id"]: db_to_json(device["content"]) for device in devices
+        }
 
     def get_devices_with_keys_by_user(self, user_id):
         """Get all devices (with any device keys) for a user
@@ -395,22 +463,72 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return now_stream_id, []
 
-    @defer.inlineCallbacks
-    def get_user_whose_devices_changed(self, from_key):
-        """Get set of users whose devices have changed since `from_key`.
+    def get_users_whose_devices_changed(self, from_key, user_ids):
+        """Get set of users whose devices have changed since `from_key` that
+        are in the given list of user_ids.
+
+        Args:
+            from_key (str): The device lists stream token
+            user_ids (Iterable[str])
+
+        Returns:
+            Deferred[set[str]]: The set of user_ids whose devices have changed
+            since `from_key`
         """
         from_key = int(from_key)
-        changed = self._device_list_stream_cache.get_all_entities_changed(from_key)
-        if changed is not None:
-            defer.returnValue(set(changed))
 
-        sql = """
-            SELECT DISTINCT user_id FROM device_lists_stream WHERE stream_id > ?
-        """
-        rows = yield self._execute(
-            "get_user_whose_devices_changed", None, sql, from_key
+        # Get set of users who *may* have changed. Users not in the returned
+        # list have definitely not changed.
+        to_check = list(
+            self._device_list_stream_cache.get_entities_changed(user_ids, from_key)
         )
-        defer.returnValue(set(row[0] for row in rows))
+
+        if not to_check:
+            return defer.succeed(set())
+
+        def _get_users_whose_devices_changed_txn(txn):
+            changes = set()
+
+            sql = """
+                SELECT DISTINCT user_id FROM device_lists_stream
+                WHERE stream_id > ?
+                AND
+            """
+
+            for chunk in batch_iter(to_check, 100):
+                clause, args = make_in_list_sql_clause(
+                    txn.database_engine, "user_id", chunk
+                )
+                txn.execute(sql + clause, (from_key,) + tuple(args))
+                changes.update(user_id for user_id, in txn)
+
+            return changes
+
+        return self.runInteraction(
+            "get_users_whose_devices_changed", _get_users_whose_devices_changed_txn
+        )
+
+    @defer.inlineCallbacks
+    def get_users_whose_signatures_changed(self, user_id, from_key):
+        """Get the users who have new cross-signing signatures made by `user_id` since
+        `from_key`.
+
+        Args:
+            user_id (str): the user who made the signatures
+            from_key (str): The device lists stream token
+        """
+        from_key = int(from_key)
+        if self._user_signature_stream_cache.has_entity_changed(user_id, from_key):
+            sql = """
+                SELECT DISTINCT user_ids FROM user_signature_stream
+                WHERE from_user_id = ? AND stream_id > ?
+            """
+            rows = yield self._execute(
+                "get_users_whose_signatures_changed", None, sql, user_id, from_key
+            )
+            return set(user for row in rows for user in json.loads(row[0]))
+        else:
+            return set()
 
     def get_all_device_list_changes_for_remotes(self, from_key, to_key):
         """Return a list of `(stream_id, user_id, destination)` which is the
@@ -460,20 +578,12 @@ class DeviceWorkerStore(SQLBaseStore):
         results = {user_id: None for user_id in user_ids}
         results.update({row["user_id"]: row["stream_id"] for row in rows})
 
-        defer.returnValue(results)
+        return results
 
 
-class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
+class DeviceBackgroundUpdateStore(BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
-        super(DeviceStore, self).__init__(db_conn, hs)
-
-        # Map of (user_id, device_id) -> bool. If there is an entry that implies
-        # the device exists.
-        self.device_id_exists_cache = Cache(
-            name="device_id_exists", keylen=2, max_entries=10000
-        )
-
-        self._clock.looping_call(self._prune_old_outbound_device_pokes, 60 * 60 * 1000)
+        super(DeviceBackgroundUpdateStore, self).__init__(db_conn, hs)
 
         self.register_background_index_update(
             "device_lists_stream_idx",
@@ -507,6 +617,31 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         )
 
     @defer.inlineCallbacks
+    def _drop_device_list_streams_non_unique_indexes(self, progress, batch_size):
+        def f(conn):
+            txn = conn.cursor()
+            txn.execute("DROP INDEX IF EXISTS device_lists_remote_cache_id")
+            txn.execute("DROP INDEX IF EXISTS device_lists_remote_extremeties_id")
+            txn.close()
+
+        yield self.runWithConnection(f)
+        yield self._end_background_update(DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES)
+        return 1
+
+
+class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
+    def __init__(self, db_conn, hs):
+        super(DeviceStore, self).__init__(db_conn, hs)
+
+        # Map of (user_id, device_id) -> bool. If there is an entry that implies
+        # the device exists.
+        self.device_id_exists_cache = Cache(
+            name="device_id_exists", keylen=2, max_entries=10000
+        )
+
+        self._clock.looping_call(self._prune_old_outbound_device_pokes, 60 * 60 * 1000)
+
+    @defer.inlineCallbacks
     def store_device(self, user_id, device_id, initial_device_display_name):
         """Ensure the given device is known; add it to the store if not
 
@@ -518,10 +653,12 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         Returns:
             defer.Deferred: boolean whether the device was inserted or an
                 existing device existed with that ID.
+        Raises:
+            StoreError: if the device is already in use
         """
         key = (user_id, device_id)
         if self.device_id_exists_cache.get(key, None):
-            defer.returnValue(False)
+            return False
 
         try:
             inserted = yield self._simple_insert(
@@ -530,12 +667,25 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "user_id": user_id,
                     "device_id": device_id,
                     "display_name": initial_device_display_name,
+                    "hidden": False,
                 },
                 desc="store_device",
                 or_ignore=True,
             )
+            if not inserted:
+                # if the device already exists, check if it's a real device, or
+                # if the device ID is reserved by something else
+                hidden = yield self._simple_select_one_onecol(
+                    "devices",
+                    keyvalues={"user_id": user_id, "device_id": device_id},
+                    retcol="hidden",
+                )
+                if hidden:
+                    raise StoreError(400, "The device ID is in use", Codes.FORBIDDEN)
             self.device_id_exists_cache.prefill(key, True)
-            defer.returnValue(inserted)
+            return inserted
+        except StoreError:
+            raise
         except Exception as e:
             logger.error(
                 "store_device with device_id=%s(%r) user_id=%s(%r)"
@@ -562,7 +712,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
         """
         yield self._simple_delete_one(
             table="devices",
-            keyvalues={"user_id": user_id, "device_id": device_id},
+            keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             desc="delete_device",
         )
 
@@ -582,14 +732,15 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             table="devices",
             column="device_id",
             iterable=device_ids,
-            keyvalues={"user_id": user_id},
+            keyvalues={"user_id": user_id, "hidden": False},
             desc="delete_devices",
         )
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
 
     def update_device(self, user_id, device_id, new_display_name=None):
-        """Update a device.
+        """Update a device. Only updates the device if it is not marked as
+        hidden.
 
         Args:
             user_id (str): The ID of the user which owns the device
@@ -608,7 +759,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             return defer.succeed(None)
         return self._simple_update_one(
             table="devices",
-            keyvalues={"user_id": user_id, "device_id": device_id},
+            keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             updatevalues=updates,
             desc="update_device",
         )
@@ -758,7 +909,7 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                 hosts,
                 stream_id,
             )
-        defer.returnValue(stream_id)
+        return stream_id
 
     def _add_device_change_txn(self, txn, user_id, device_ids, hosts, stream_id):
         now = self._clock.time_msec()
@@ -792,6 +943,8 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             ],
         )
 
+        context = get_active_span_text_map()
+
         self._simple_insert_many_txn(
             txn,
             table="device_lists_outbound_pokes",
@@ -803,6 +956,9 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
                     "device_id": device_id,
                     "sent": False,
                     "ts": now,
+                    "opentracing_context": json.dumps(context)
+                    if whitelisted_homeserver(destination)
+                    else "{}",
                 }
                 for destination in hosts
                 for device_id in device_ids
@@ -856,15 +1012,3 @@ class DeviceStore(DeviceWorkerStore, BackgroundUpdateStore):
             "_prune_old_outbound_device_pokes",
             _prune_txn,
         )
-
-    @defer.inlineCallbacks
-    def _drop_device_list_streams_non_unique_indexes(self, progress, batch_size):
-        def f(conn):
-            txn = conn.cursor()
-            txn.execute("DROP INDEX IF EXISTS device_lists_remote_cache_id")
-            txn.execute("DROP INDEX IF EXISTS device_lists_remote_extremeties_id")
-            txn.close()
-
-        yield self.runWithConnection(f)
-        yield self._end_background_update(DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES)
-        defer.returnValue(1)

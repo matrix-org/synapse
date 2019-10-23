@@ -18,7 +18,7 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.api.constants import UserTypes
-from synapse.api.errors import ResourceLimitError, SynapseError
+from synapse.api.errors import Codes, ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
 
@@ -44,7 +44,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs_config["max_mau_value"] = 50
         hs_config["limit_usage_by_mau"] = True
 
-        hs = self.setup_test_homeserver(config=hs_config, expire_access_token=True)
+        hs = self.setup_test_homeserver(config=hs_config)
         return hs
 
     def prepare(self, reactor, clock, hs):
@@ -52,7 +52,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
         self.macaroon_generator = Mock(
-            generate_access_token=Mock(return_value='secret')
+            generate_access_token=Mock(return_value="secret")
         )
         self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.handler = self.hs.get_registration_handler()
@@ -67,27 +67,23 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = frank.to_string()
         requester = create_requester(user_id)
         result_user_id, result_token = self.get_success(
-            self.handler.get_or_create_user(requester, frank.localpart, "Frankie")
+            self.get_or_create_user(requester, frank.localpart, "Frankie")
         )
         self.assertEquals(result_user_id, user_id)
         self.assertTrue(result_token is not None)
-        self.assertEquals(result_token, 'secret')
+        self.assertEquals(result_token, "secret")
 
     def test_if_user_exists(self):
         store = self.hs.get_datastore()
         frank = UserID.from_string("@frank:test")
         self.get_success(
-            store.register(
-                user_id=frank.to_string(),
-                token="jkv;g498752-43gj['eamb!-5",
-                password_hash=None,
-            )
+            store.register_user(user_id=frank.to_string(), password_hash=None)
         )
         local_part = frank.localpart
         user_id = frank.to_string()
         requester = create_requester(user_id)
         result_user_id, result_token = self.get_success(
-            self.handler.get_or_create_user(requester, local_part, None)
+            self.get_or_create_user(requester, local_part, None)
         )
         self.assertEquals(result_user_id, user_id)
         self.assertTrue(result_token is not None)
@@ -95,9 +91,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_mau_limits_when_disabled(self):
         self.hs.config.limit_usage_by_mau = False
         # Ensure does not throw exception
-        self.get_success(
-            self.handler.get_or_create_user(self.requester, 'a', "display_name")
-        )
+        self.get_success(self.get_or_create_user(self.requester, "a", "display_name"))
 
     def test_get_or_create_user_mau_not_blocked(self):
         self.hs.config.limit_usage_by_mau = True
@@ -105,7 +99,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             return_value=defer.succeed(self.hs.config.max_mau_value - 1)
         )
         # Ensure does not throw exception
-        self.get_success(self.handler.get_or_create_user(self.requester, 'c', "User"))
+        self.get_success(self.get_or_create_user(self.requester, "c", "User"))
 
     def test_get_or_create_user_mau_blocked(self):
         self.hs.config.limit_usage_by_mau = True
@@ -113,7 +107,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             return_value=defer.succeed(self.lots_of_users)
         )
         self.get_failure(
-            self.handler.get_or_create_user(self.requester, 'b', "display_name"),
+            self.get_or_create_user(self.requester, "b", "display_name"),
             ResourceLimitError,
         )
 
@@ -121,7 +115,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
         self.get_failure(
-            self.handler.get_or_create_user(self.requester, 'b', "display_name"),
+            self.get_or_create_user(self.requester, "b", "display_name"),
             ResourceLimitError,
         )
 
@@ -131,63 +125,88 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             return_value=defer.succeed(self.lots_of_users)
         )
         self.get_failure(
-            self.handler.register(localpart="local_part"), ResourceLimitError
+            self.handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
         self.get_failure(
-            self.handler.register(localpart="local_part"), ResourceLimitError
+            self.handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
     def test_auto_create_auto_join_rooms(self):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
-        res = self.get_success(self.handler.register(localpart='jeff'))
-        rooms = self.get_success(self.store.get_rooms_for_user(res[0]))
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         directory_handler = self.hs.get_handlers().directory_handler
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = self.get_success(directory_handler.get_association(room_alias))
 
-        self.assertTrue(room_id['room_id'] in rooms)
+        self.assertTrue(room_id["room_id"] in rooms)
         self.assertEqual(len(rooms), 1)
 
     def test_auto_create_auto_join_rooms_with_no_rooms(self):
         self.hs.config.auto_join_rooms = []
         frank = UserID.from_string("@frank:test")
-        res = self.get_success(self.handler.register(frank.localpart))
-        self.assertEqual(res[0], frank.to_string())
-        rooms = self.get_success(self.store.get_rooms_for_user(res[0]))
+        user_id = self.get_success(self.handler.register_user(frank.localpart))
+        self.assertEqual(user_id, frank.to_string())
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
     def test_auto_create_auto_join_where_room_is_another_domain(self):
         self.hs.config.auto_join_rooms = ["#room:another"]
         frank = UserID.from_string("@frank:test")
-        res = self.get_success(self.handler.register(frank.localpart))
-        self.assertEqual(res[0], frank.to_string())
-        rooms = self.get_success(self.store.get_rooms_for_user(res[0]))
+        user_id = self.get_success(self.handler.register_user(frank.localpart))
+        self.assertEqual(user_id, frank.to_string())
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
     def test_auto_create_auto_join_where_auto_create_is_false(self):
         self.hs.config.autocreate_auto_join_rooms = False
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
-        res = self.get_success(self.handler.register(localpart='jeff'))
-        rooms = self.get_success(self.store.get_rooms_for_user(res[0]))
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
-    def test_auto_create_auto_join_rooms_when_support_user_exists(self):
+    def test_auto_create_auto_join_rooms_when_user_is_not_a_real_user(self):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
 
-        self.store.is_support_user = Mock(return_value=True)
-        res = self.get_success(self.handler.register(localpart='support'))
-        rooms = self.get_success(self.store.get_rooms_for_user(res[0]))
+        self.store.is_real_user = Mock(return_value=False)
+        user_id = self.get_success(self.handler.register_user(localpart="support"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
         directory_handler = self.hs.get_handlers().directory_handler
         room_alias = RoomAlias.from_string(room_alias_str)
         self.get_failure(directory_handler.get_association(room_alias), SynapseError)
+
+    def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self):
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+
+        self.store.count_real_users = Mock(return_value=1)
+        self.store.is_real_user = Mock(return_value=True)
+        user_id = self.get_success(self.handler.register_user(localpart="real"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        self.assertTrue(room_id["room_id"] in rooms)
+        self.assertEqual(len(rooms), 1)
+
+    def test_auto_create_auto_join_rooms_when_user_is_not_the_first_real_user(self):
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+
+        self.store.count_real_users = Mock(return_value=2)
+        self.store.is_real_user = Mock(return_value=True)
+        user_id = self.get_success(self.handler.register_user(localpart="real"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertEqual(len(rooms), 0)
 
     def test_auto_create_auto_join_where_no_consent(self):
         """Test to ensure that the first user is not auto-joined to a room if
@@ -211,27 +230,82 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # When:-
         #   * the user is registered and post consent actions are called
-        res = self.get_success(self.handler.register(localpart='jeff'))
-        self.get_success(self.handler.post_consent_actions(res[0]))
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+        self.get_success(self.handler.post_consent_actions(user_id))
 
         # Then:-
         #   * Ensure that they have not been joined to the room
-        rooms = self.get_success(self.store.get_rooms_for_user(res[0]))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
     def test_register_support_user(self):
-        res = self.get_success(
-            self.handler.register(localpart='user', user_type=UserTypes.SUPPORT)
+        user_id = self.get_success(
+            self.handler.register_user(localpart="user", user_type=UserTypes.SUPPORT)
         )
-        self.assertTrue(self.store.is_support_user(res[0]))
+        d = self.store.is_support_user(user_id)
+        self.assertTrue(self.get_success(d))
 
     def test_register_not_support_user(self):
-        res = self.get_success(self.handler.register(localpart='user'))
-        self.assertFalse(self.store.is_support_user(res[0]))
+        user_id = self.get_success(self.handler.register_user(localpart="user"))
+        d = self.store.is_support_user(user_id)
+        self.assertFalse(self.get_success(d))
 
     def test_invalid_user_id_length(self):
         invalid_user_id = "x" * 256
         self.get_failure(
-            self.handler.register(localpart=invalid_user_id),
-            SynapseError
+            self.handler.register_user(localpart=invalid_user_id), SynapseError
         )
+
+    @defer.inlineCallbacks
+    def get_or_create_user(self, requester, localpart, displayname, password_hash=None):
+        """Creates a new user if the user does not exist,
+        else revokes all previous access tokens and generates a new one.
+
+        XXX: this used to be in the main codebase, but was only used by this file,
+        so got moved here. TODO: get rid of it, probably
+
+        Args:
+            localpart : The local part of the user ID to register. If None,
+              one will be randomly generated.
+        Returns:
+            A tuple of (user_id, access_token).
+        Raises:
+            RegistrationError if there was a problem registering.
+        """
+        if localpart is None:
+            raise SynapseError(400, "Request must include user id")
+        yield self.hs.get_auth().check_auth_blocking()
+        need_register = True
+
+        try:
+            yield self.handler.check_username(localpart)
+        except SynapseError as e:
+            if e.errcode == Codes.USER_IN_USE:
+                need_register = False
+            else:
+                raise
+
+        user = UserID(localpart, self.hs.hostname)
+        user_id = user.to_string()
+        token = self.macaroon_generator.generate_access_token(user_id)
+
+        if need_register:
+            yield self.handler.register_with_store(
+                user_id=user_id,
+                password_hash=password_hash,
+                create_profile_with_displayname=user.localpart,
+            )
+        else:
+            yield self.hs.get_auth_handler().delete_access_tokens_for_user(user_id)
+
+        yield self.store.add_access_token_to_user(
+            user_id=user_id, token=token, device_id=None, valid_until_ms=None
+        )
+
+        if displayname is not None:
+            # logger.info("setting user display name: %s -> %s", user_id, displayname)
+            yield self.hs.get_profile_handler().set_displayname(
+                user, requester, displayname, by_admin=True
+            )
+
+        return user_id, token

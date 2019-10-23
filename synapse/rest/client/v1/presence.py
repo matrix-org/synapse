@@ -47,7 +47,7 @@ class PresenceStatusRestServlet(RestServlet):
 
         if requester.user != user:
             allowed = yield self.presence_handler.is_visible(
-                observed_user=user, observer_user=requester.user,
+                observed_user=user, observer_user=requester.user
             )
 
             if not allowed:
@@ -56,7 +56,7 @@ class PresenceStatusRestServlet(RestServlet):
         state = yield self.presence_handler.get_state(target_user=user)
         state = format_user_presence_state(state, self.clock.time_msec())
 
-        defer.returnValue((200, state))
+        return 200, state
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -88,10 +88,10 @@ class PresenceStatusRestServlet(RestServlet):
         if self.hs.config.use_presence:
             yield self.presence_handler.set_state(user, state)
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

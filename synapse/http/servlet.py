@@ -48,7 +48,7 @@ def parse_integer(request, name, default=None, required=False):
 def parse_integer_from_args(args, name, default=None, required=False):
 
     if not isinstance(name, bytes):
-        name = name.encode('ascii')
+        name = name.encode("ascii")
 
     if name in args:
         try:
@@ -89,18 +89,14 @@ def parse_boolean(request, name, default=None, required=False):
 def parse_boolean_from_args(args, name, default=None, required=False):
 
     if not isinstance(name, bytes):
-        name = name.encode('ascii')
+        name = name.encode("ascii")
 
     if name in args:
         try:
-            return {
-                b"true": True,
-                b"false": False,
-            }[args[name][0]]
+            return {b"true": True, b"false": False}[args[name][0]]
         except Exception:
             message = (
-                "Boolean query parameter %r must be one of"
-                " ['true', 'false']"
+                "Boolean query parameter %r must be one of" " ['true', 'false']"
             ) % (name,)
             raise SynapseError(400, message)
     else:
@@ -111,8 +107,15 @@ def parse_boolean_from_args(args, name, default=None, required=False):
             return default
 
 
-def parse_string(request, name, default=None, required=False,
-                 allowed_values=None, param_type="string", encoding='ascii'):
+def parse_string(
+    request,
+    name,
+    default=None,
+    required=False,
+    allowed_values=None,
+    param_type="string",
+    encoding="ascii",
+):
     """
     Parse a string parameter from the request query string.
 
@@ -145,21 +148,34 @@ def parse_string(request, name, default=None, required=False,
     )
 
 
-def parse_string_from_args(args, name, default=None, required=False,
-                           allowed_values=None, param_type="string", encoding='ascii'):
+def parse_string_from_args(
+    args,
+    name,
+    default=None,
+    required=False,
+    allowed_values=None,
+    param_type="string",
+    encoding="ascii",
+):
 
     if not isinstance(name, bytes):
-        name = name.encode('ascii')
+        name = name.encode("ascii")
 
     if name in args:
         value = args[name][0]
 
         if encoding:
-            value = value.decode(encoding)
+            try:
+                value = value.decode(encoding)
+            except ValueError:
+                raise SynapseError(
+                    400, "Query parameter %r must be %s" % (name, encoding)
+                )
 
         if allowed_values is not None and value not in allowed_values:
             message = "Query parameter %r must be one of [%s]" % (
-                name, ", ".join(repr(v) for v in allowed_values)
+                name,
+                ", ".join(repr(v) for v in allowed_values),
             )
             raise SynapseError(400, message)
         else:
@@ -201,7 +217,7 @@ def parse_json_value_from_request(request, allow_empty_body=False):
     # Decode to Unicode so that simplejson will return Unicode strings on
     # Python 2
     try:
-        content_unicode = content_bytes.decode('utf8')
+        content_unicode = content_bytes.decode("utf8")
     except UnicodeDecodeError:
         logger.warn("Unable to decode UTF-8")
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
@@ -227,9 +243,7 @@ def parse_json_object_from_request(request, allow_empty_body=False):
         SynapseError if the request body couldn't be decoded as JSON or
             if it wasn't a JSON object.
     """
-    content = parse_json_value_from_request(
-        request, allow_empty_body=allow_empty_body,
-    )
+    content = parse_json_value_from_request(request, allow_empty_body=allow_empty_body)
 
     if allow_empty_body and content is None:
         return {}
@@ -280,8 +294,11 @@ class RestServlet(object):
 
             for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
                 if hasattr(self, "on_%s" % (method,)):
+                    servlet_classname = self.__class__.__name__
                     method_handler = getattr(self, "on_%s" % (method,))
-                    http_server.register_paths(method, patterns, method_handler)
+                    http_server.register_paths(
+                        method, patterns, method_handler, servlet_classname
+                    )
 
         else:
             raise NotImplementedError("RestServlet must register something.")

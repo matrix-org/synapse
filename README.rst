@@ -115,7 +115,7 @@ Registering a new user from a client
 
 By default, registration of new users via Matrix clients is disabled. To enable
 it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
-recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.rst>`_.)
+recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.md>`_.)
 
 Once ``enable_registration`` is set to ``true``, it is possible to register a
 user via `riot.im <https://riot.im/app/#/register>`_ or other Matrix clients.
@@ -186,7 +186,7 @@ Almost all installations should opt to use PostreSQL. Advantages include:
   synapse itself.
 
 For information on how to install and use PostgreSQL, please see
-`docs/postgres.rst <docs/postgres.rst>`_.
+`docs/postgres.md <docs/postgres.md>`_.
 
 .. _reverse-proxy:
 
@@ -201,7 +201,7 @@ It is recommended to put a reverse proxy such as
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 
-For information on configuring one, see `<docs/reverse_proxy.rst>`_.
+For information on configuring one, see `<docs/reverse_proxy.md>`_.
 
 Identity Servers
 ================
@@ -272,7 +272,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python3 env
     source env/bin/activate
-    python -m pip install --no-pep-517 -e .[all]
+    python -m pip install --no-use-pep517 -e .[all]
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -340,8 +340,11 @@ log lines and looking for any 'Processed request' lines which take more than
 a few seconds to execute. Please let us know at #synapse:matrix.org if
 you see this failure mode so we can help debug it, however.
 
-Help!! Synapse eats all my RAM!
--------------------------------
+Help!! Synapse is slow and eats all my RAM/CPU!
+-----------------------------------------------
+
+First, ensure you are running the latest version of Synapse, using Python 3
+with a PostgreSQL database.
 
 Synapse's architecture is quite RAM hungry currently - we deliberately
 cache a lot of recent room data and metadata in RAM in order to speed up
@@ -352,14 +355,42 @@ variable. The default is 0.5, which can be decreased to reduce RAM usage
 in memory constrained enviroments, or increased if performance starts to
 degrade.
 
+However, degraded performance due to a low cache factor, common on
+machines with slow disks, often leads to explosions in memory use due
+backlogged requests. In this case, reducing the cache factor will make
+things worse. Instead, try increasing it drastically. 2.0 is a good
+starting value.
+
 Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
-improvement in overall amount, and especially in terms of giving back RAM
-to the OS. To use it, the library must simply be put in the LD_PRELOAD
-environment variable when launching Synapse. On Debian, this can be done
-by installing the ``libjemalloc1`` package and adding this line to
-``/etc/default/matrix-synapse``::
+improvement in overall memory use, and especially in terms of giving back
+RAM to the OS. To use it, the library must simply be put in the
+LD_PRELOAD environment variable when launching Synapse. On Debian, this
+can be done by installing the ``libjemalloc1`` package and adding this
+line to ``/etc/default/matrix-synapse``::
 
     LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 This can make a significant difference on Python 2.7 - it's unclear how
 much of an improvement it provides on Python 3.x.
+
+If you're encountering high CPU use by the Synapse process itself, you
+may be affected by a bug with presence tracking that leads to a
+massive excess of outgoing federation requests (see `discussion
+<https://github.com/matrix-org/synapse/issues/3971>`_). If metrics
+indicate that your server is also issuing far more outgoing federation
+requests than can be accounted for by your users' activity, this is a
+likely cause. The misbehavior can be worked around by setting
+``use_presence: false`` in the Synapse config file.
+
+People can't accept room invitations from me
+--------------------------------------------
+
+The typical failure mode here is that you send an invitation to someone 
+to join a room or direct chat, but when they go to accept it, they get an
+error (typically along the lines of "Invalid signature"). They might see
+something like the following in their logs::
+
+    2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
+
+This is normally caused by a misconfiguration in your reverse-proxy. See
+`<docs/reverse_proxy.rst>`_ and double-check that your settings are correct.

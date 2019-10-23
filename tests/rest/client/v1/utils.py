@@ -44,7 +44,7 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            self.hs.get_reactor(), "POST", path, json.dumps(content).encode('utf8')
+            self.hs.get_reactor(), "POST", path, json.dumps(content).encode("utf8")
         )
         render(request, self.resource, self.hs.get_reactor())
 
@@ -93,7 +93,7 @@ class RestHelper(object):
         data = {"membership": membership}
 
         request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(data).encode('utf8')
+            self.hs.get_reactor(), "PUT", path, json.dumps(data).encode("utf8")
         )
 
         render(request, self.resource, self.hs.get_reactor())
@@ -117,7 +117,7 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(content).encode('utf8')
+            self.hs.get_reactor(), "PUT", path, json.dumps(content).encode("utf8")
         )
         render(request, self.resource, self.hs.get_reactor())
 
@@ -128,13 +128,17 @@ class RestHelper(object):
 
         return channel.json_body
 
-    def send_state(self, room_id, event_type, body, tok, expect_code=200):
-        path = "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, event_type)
+    def send_state(self, room_id, event_type, body, tok, expect_code=200, state_key=""):
+        path = "/_matrix/client/r0/rooms/%s/state/%s/%s" % (
+            room_id,
+            event_type,
+            state_key,
+        )
         if tok:
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(body).encode('utf8')
+            self.hs.get_reactor(), "PUT", path, json.dumps(body).encode("utf8")
         )
         render(request, self.resource, self.hs.get_reactor())
 

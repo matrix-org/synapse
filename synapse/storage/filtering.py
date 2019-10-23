@@ -15,8 +15,6 @@
 
 from canonicaljson import encode_canonical_json
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
@@ -41,7 +39,7 @@ class FilteringStore(SQLBaseStore):
             desc="get_user_filter",
         )
 
-        defer.returnValue(db_to_json(def_json))
+        return db_to_json(def_json)
 
     def add_user_filter(self, user_localpart, user_filter):
         def_json = encode_canonical_json(user_filter)
@@ -53,7 +51,7 @@ class FilteringStore(SQLBaseStore):
                 "SELECT filter_id FROM user_filters "
                 "WHERE user_id = ? AND filter_json = ?"
             )
-            txn.execute(sql, (user_localpart, def_json))
+            txn.execute(sql, (user_localpart, bytearray(def_json)))
             filter_id_response = txn.fetchone()
             if filter_id_response is not None:
                 return filter_id_response[0]
@@ -70,7 +68,7 @@ class FilteringStore(SQLBaseStore):
                 "INSERT INTO user_filters (user_id, filter_id, filter_json)"
                 "VALUES(?, ?, ?)"
             )
-            txn.execute(sql, (user_localpart, filter_id, def_json))
+            txn.execute(sql, (user_localpart, filter_id, bytearray(def_json)))
 
             return filter_id
 

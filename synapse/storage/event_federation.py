@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import itertools
 import logging
 import random
 
@@ -24,7 +25,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.events_worker import EventsWorkerStore
 from synapse.storage.signatures import SignatureWorkerStore
 from synapse.util.caches.descriptors import cached
@@ -67,7 +68,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         else:
             results = set()
 
-        base_sql = "SELECT auth_id FROM event_auth WHERE event_id IN (%s)"
+        base_sql = "SELECT auth_id FROM event_auth WHERE "
 
         front = set(event_ids)
         while front:
@@ -75,7 +76,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             front_list = list(front)
             chunks = [front_list[x : x + 100] for x in range(0, len(front), 100)]
             for chunk in chunks:
-                txn.execute(base_sql % (",".join(["?"] * len(chunk)),), chunk)
+                clause, args = make_in_list_sql_clause(
+                    txn.database_engine, "event_id", chunk
+                )
+                txn.execute(base_sql + clause, list(args))
                 new_front.update([r[0] for r in txn])
 
             new_front -= results
@@ -131,9 +135,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
         if not rows:
-            defer.returnValue(0)
+            return 0
         else:
-            defer.returnValue(max(row["depth"] for row in rows))
+            return max(row["depth"] for row in rows)
 
     def _get_oldest_events_in_room_txn(self, txn, room_id):
         return self._simple_select_onecol_txn(
@@ -169,7 +173,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             # make sure that we don't completely ignore the older events.
             res = res[0:5] + random.sample(res[5:], 5)
 
-        defer.returnValue(res)
+        return res
 
     def get_latest_event_ids_and_hashes_in_room(self, room_id):
         """
@@ -188,6 +192,45 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             "get_latest_event_ids_and_hashes_in_room",
             self._get_latest_event_ids_and_hashes_in_room,
             room_id,
+        )
+
+    def get_rooms_with_many_extremities(self, min_count, limit, room_id_filter):
+        """Get the top rooms with at least N extremities.
+
+        Args:
+            min_count (int): The minimum number of extremities
+            limit (int): The maximum number of rooms to return.
+            room_id_filter (iterable[str]): room_ids to exclude from the results
+
+        Returns:
+            Deferred[list]: At most `limit` room IDs that have at least
+            `min_count` extremities, sorted by extremity count.
+        """
+
+        def _get_rooms_with_many_extremities_txn(txn):
+            where_clause = "1=1"
+            if room_id_filter:
+                where_clause = "room_id NOT IN (%s)" % (
+                    ",".join("?" for _ in room_id_filter),
+                )
+
+            sql = """
+                SELECT room_id FROM event_forward_extremities
+                WHERE %s
+                GROUP BY room_id
+                HAVING count(*) > ?
+                ORDER BY count(*) DESC
+                LIMIT ?
+            """ % (
+                where_clause,
+            )
+
+            query_args = list(itertools.chain(room_id_filter, [min_count, limit]))
+            txn.execute(sql, query_args)
+            return [room_id for room_id, in txn]
+
+        return self.runInteraction(
+            "get_rooms_with_many_extremities", _get_rooms_with_many_extremities_txn
         )
 
     @cached(max_entries=5000, iterable=True)
@@ -383,7 +426,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             limit,
         )
         events = yield self.get_events_as_list(ids)
-        defer.returnValue(events)
+        return events
 
     def _get_missing_events(self, txn, room_id, earliest_events, latest_events, limit):
 
@@ -435,7 +478,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             desc="get_successor_events",
         )
 
-        defer.returnValue([row["event_id"] for row in rows])
+        return [row["event_id"] for row in rows]
 
 
 class EventFederationStore(EventFederationWorkerStore):
@@ -626,4 +669,4 @@ class EventFederationStore(EventFederationWorkerStore):
         if not result:
             yield self._end_background_update(self.EVENT_AUTH_STATE_ONLY)
 
-        defer.returnValue(batch_size)
+        return batch_size

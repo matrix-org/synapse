@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018,2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -136,6 +136,9 @@ class DataStore(
         self._device_list_id_gen = StreamIdGenerator(
             db_conn, "device_lists_stream", "stream_id"
         )
+        self._cross_signing_id_gen = StreamIdGenerator(
+            db_conn, "e2e_cross_signing_keys", "stream_id"
+        )
 
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
@@ -206,6 +209,9 @@ class DataStore(
         device_list_max = self._device_list_id_gen.get_current_token()
         self._device_list_stream_cache = StreamChangeCache(
             "DeviceListStreamChangeCache", device_list_max
+        )
+        self._user_signature_stream_cache = StreamChangeCache(
+            "UserSignatureStreamChangeCache", device_list_max
         )
         self._device_list_federation_stream_cache = StreamChangeCache(
             "DeviceListFederationStreamChangeCache", device_list_max
@@ -279,23 +285,35 @@ class DataStore(
         """
         Counts the number of users who used this homeserver in the last 24 hours.
         """
+        yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
+        return self.runInteraction("count_daily_users", self._count_users, yesterday)
 
-        def _count_users(txn):
-            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
+    def count_monthly_users(self):
+        """
+        Counts the number of users who used this homeserver in the last 30 days.
+        Note this method is intended for phonehome metrics only and is different
+        from the mau figure in synapse.storage.monthly_active_users which,
+        amongst other things, includes a 3 day grace period before a user counts.
+        """
+        thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
+        return self.runInteraction(
+            "count_monthly_users", self._count_users, thirty_days_ago
+        )
 
-            sql = """
-                SELECT COALESCE(count(*), 0) FROM (
-                    SELECT user_id FROM user_ips
-                    WHERE last_seen > ?
-                    GROUP BY user_id
-                ) u
-            """
-
-            txn.execute(sql, (yesterday,))
-            count, = txn.fetchone()
-            return count
-
-        return self.runInteraction("count_users", _count_users)
+    def _count_users(self, txn, time_from):
+        """
+        Returns number of users seen in the past time_from period
+        """
+        sql = """
+            SELECT COALESCE(count(*), 0) FROM (
+                SELECT user_id FROM user_ips
+                WHERE last_seen > ?
+                GROUP BY user_id
+            ) u
+        """
+        txn.execute(sql, (time_from,))
+        count, = txn.fetchone()
+        return count
 
     def count_r30_users(self):
         """
@@ -347,7 +365,7 @@ class DataStore(
             txn.execute(sql, (thirty_days_ago_in_secs, thirty_days_ago_in_secs))
 
             for row in txn:
-                if row[0] == 'unknown':
+                if row[0] == "unknown":
                     pass
                 results[row[0]] = row[1]
 
@@ -374,7 +392,7 @@ class DataStore(
             txn.execute(sql, (thirty_days_ago_in_secs, thirty_days_ago_in_secs))
 
             count, = txn.fetchone()
-            results['all'] = count
+            results["all"] = count
 
             return results
 
@@ -457,7 +475,7 @@ class DataStore(
         return self._simple_select_list(
             table="users",
             keyvalues={},
-            retcols=["name", "password_hash", "is_guest", "admin"],
+            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
             desc="get_users",
         )
 
@@ -482,11 +500,11 @@ class DataStore(
             orderby=order,
             start=start,
             limit=limit,
-            retcols=["name", "password_hash", "is_guest", "admin"],
+            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
         )
         count = yield self.runInteraction("get_users_paginate", self.get_user_count_txn)
         retval = {"users": users, "total": count}
-        defer.returnValue(retval)
+        return retval
 
     def search_users(self, term):
         """Function to search users list for one or more users with
@@ -502,7 +520,7 @@ class DataStore(
             table="users",
             term=term,
             col="name",
-            retcols=["name", "password_hash", "is_guest", "admin"],
+            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
             desc="search_users",
         )
 

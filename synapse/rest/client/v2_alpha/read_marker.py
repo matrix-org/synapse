@@ -48,7 +48,7 @@ class ReadMarkerRestServlet(RestServlet):
                 room_id,
                 "m.read",
                 user_id=requester.user.to_string(),
-                event_id=read_event_id
+                event_id=read_event_id,
             )
 
         read_marker_event_id = body.get("m.fully_read", None)
@@ -56,10 +56,10 @@ class ReadMarkerRestServlet(RestServlet):
             yield self.read_marker_handler.received_client_read_marker(
                 room_id,
                 user_id=requester.user.to_string(),
-                event_id=read_marker_event_id
+                event_id=read_marker_event_id,
             )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

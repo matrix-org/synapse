@@ -21,6 +21,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.background_updates import BackgroundUpdateStore
 
 logger = logging.getLogger(__name__)
@@ -64,8 +65,24 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         )
 
         self.register_background_update_handler(
-            self.DELETE_SOFT_FAILED_EXTREMITIES,
-            self._cleanup_extremities_bg_update,
+            self.DELETE_SOFT_FAILED_EXTREMITIES, self._cleanup_extremities_bg_update
+        )
+
+        self.register_background_update_handler(
+            "redactions_received_ts", self._redactions_received_ts
+        )
+
+        # This index gets deleted in `event_fix_redactions_bytes` update
+        self.register_background_index_update(
+            "event_fix_redactions_bytes_create_index",
+            index_name="redactions_censored_redacts",
+            table="redactions",
+            columns=["redacts"],
+            where_clause="have_censored",
+        )
+
+        self.register_background_update_handler(
+            "event_fix_redactions_bytes", self._event_fix_redactions_bytes
         )
 
     @defer.inlineCallbacks
@@ -136,7 +153,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _background_reindex_origin_server_ts(self, progress, batch_size):
@@ -213,7 +230,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_ORIGIN_SERVER_TS_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _cleanup_extremities_bg_update(self, progress, batch_size):
@@ -269,7 +286,8 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 LEFT JOIN events USING (event_id)
                 LEFT JOIN event_json USING (event_id)
                 LEFT JOIN rejections USING (event_id)
-                """, (batch_size,)
+                """,
+                (batch_size,),
             )
 
             for prev_event_id, event_id, metadata, rejected, outlier in txn:
@@ -308,12 +326,13 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     INNER JOIN event_json USING (event_id)
                     LEFT JOIN rejections USING (event_id)
                     WHERE
-                        prev_event_id IN (%s)
-                        AND NOT events.outlier
-                """ % (
-                    ",".join("?" for _ in to_check),
+                        NOT events.outlier
+                        AND
+                """
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "prev_event_id", to_check
                 )
-                txn.execute(sql, to_check)
+                txn.execute(sql + clause, list(args))
 
                 for prev_event_id, event_id, metadata, rejected in txn:
                     if event_id in graph:
@@ -364,13 +383,12 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     column="event_id",
                     iterable=to_delete,
                     keyvalues={},
-                    retcols=("room_id",)
+                    retcols=("room_id",),
                 )
                 room_ids = set(row["room_id"] for row in rows)
                 for room_id in room_ids:
                     txn.call_after(
-                        self.get_latest_event_ids_in_room.invalidate,
-                        (room_id,)
+                        self.get_latest_event_ids_in_room.invalidate, (room_id,)
                     )
 
             self._simple_delete_many_txn(
@@ -384,7 +402,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             return len(original_set)
 
         num_handled = yield self.runInteraction(
-            "_cleanup_extremities_bg_update", _cleanup_extremities_bg_update_txn,
+            "_cleanup_extremities_bg_update", _cleanup_extremities_bg_update_txn
         )
 
         if not num_handled:
@@ -394,8 +412,94 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 txn.execute("DROP TABLE _extremities_to_check")
 
             yield self.runInteraction(
-                "_cleanup_extremities_bg_update_drop_table",
-                _drop_table_txn,
+                "_cleanup_extremities_bg_update_drop_table", _drop_table_txn
             )
 
-        defer.returnValue(num_handled)
+        return num_handled
+
+    @defer.inlineCallbacks
+    def _redactions_received_ts(self, progress, batch_size):
+        """Handles filling out the `received_ts` column in redactions.
+        """
+        last_event_id = progress.get("last_event_id", "")
+
+        def _redactions_received_ts_txn(txn):
+            # Fetch the set of event IDs that we want to update
+            sql = """
+                SELECT event_id FROM redactions
+                WHERE event_id > ?
+                ORDER BY event_id ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (last_event_id, batch_size))
+
+            rows = txn.fetchall()
+            if not rows:
+                return 0
+
+            upper_event_id, = rows[-1]
+
+            # Update the redactions with the received_ts.
+            #
+            # Note: Not all events have an associated received_ts, so we
+            # fallback to using origin_server_ts. If we for some reason don't
+            # have an origin_server_ts, lets just use the current timestamp.
+            #
+            # We don't want to leave it null, as then we'll never try and
+            # censor those redactions.
+            sql = """
+                UPDATE redactions
+                SET received_ts = (
+                    SELECT COALESCE(received_ts, origin_server_ts, ?) FROM events
+                    WHERE events.event_id = redactions.event_id
+                )
+                WHERE ? <= event_id AND event_id <= ?
+            """
+
+            txn.execute(sql, (self._clock.time_msec(), last_event_id, upper_event_id))
+
+            self._background_update_progress_txn(
+                txn, "redactions_received_ts", {"last_event_id": upper_event_id}
+            )
+
+            return len(rows)
+
+        count = yield self.runInteraction(
+            "_redactions_received_ts", _redactions_received_ts_txn
+        )
+
+        if not count:
+            yield self._end_background_update("redactions_received_ts")
+
+        return count
+
+    @defer.inlineCallbacks
+    def _event_fix_redactions_bytes(self, progress, batch_size):
+        """Undoes hex encoded censored redacted event JSON.
+        """
+
+        def _event_fix_redactions_bytes_txn(txn):
+            # This update is quite fast due to new index.
+            txn.execute(
+                """
+                UPDATE event_json
+                SET
+                    json = convert_from(json::bytea, 'utf8')
+                FROM redactions
+                WHERE
+                    redactions.have_censored
+                    AND event_json.event_id = redactions.redacts
+                    AND json NOT LIKE '{%';
+                """
+            )
+
+            txn.execute("DROP INDEX redactions_censored_redacts")
+
+        yield self.runInteraction(
+            "_event_fix_redactions_bytes", _event_fix_redactions_bytes_txn
+        )
+
+        yield self._end_background_update("event_fix_redactions_bytes")
+
+        return 1

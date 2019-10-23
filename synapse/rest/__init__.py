@@ -66,13 +66,14 @@ class ClientRestResource(JsonResource):
        * /_matrix/client/unstable
        * etc
     """
+
     def __init__(self, hs):
         JsonResource.__init__(self, hs, canonical_json=False)
         self.register_servlets(self, hs)
 
     @staticmethod
     def register_servlets(client_resource, hs):
-        versions.register_servlets(client_resource)
+        versions.register_servlets(hs, client_resource)
 
         # Deprecated in r0
         initial_sync.register_servlets(hs, client_resource)

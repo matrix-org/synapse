@@ -26,8 +26,8 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.http.site import SynapseSite
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.logging.context import LoggingContext, run_in_background
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import __func__
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.events import SlavedEventStore
@@ -38,7 +38,6 @@ from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.logcontext import LoggingContext, run_in_background
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 
@@ -46,36 +45,27 @@ logger = logging.getLogger("synapse.app.pusher")
 
 
 class PusherSlaveStore(
-    SlavedEventStore, SlavedPusherStore, SlavedReceiptsStore,
-    SlavedAccountDataStore
+    SlavedEventStore, SlavedPusherStore, SlavedReceiptsStore, SlavedAccountDataStore
 ):
-    update_pusher_last_stream_ordering_and_success = (
-        __func__(DataStore.update_pusher_last_stream_ordering_and_success)
+    update_pusher_last_stream_ordering_and_success = __func__(
+        DataStore.update_pusher_last_stream_ordering_and_success
     )
 
-    update_pusher_failing_since = (
-        __func__(DataStore.update_pusher_failing_since)
+    update_pusher_failing_since = __func__(DataStore.update_pusher_failing_since)
+
+    update_pusher_last_stream_ordering = __func__(
+        DataStore.update_pusher_last_stream_ordering
     )
 
-    update_pusher_last_stream_ordering = (
-        __func__(DataStore.update_pusher_last_stream_ordering)
+    get_throttle_params_by_room = __func__(DataStore.get_throttle_params_by_room)
+
+    set_throttle_params = __func__(DataStore.set_throttle_params)
+
+    get_time_of_last_push_action_before = __func__(
+        DataStore.get_time_of_last_push_action_before
     )
 
-    get_throttle_params_by_room = (
-        __func__(DataStore.get_throttle_params_by_room)
-    )
-
-    set_throttle_params = (
-        __func__(DataStore.set_throttle_params)
-    )
-
-    get_time_of_last_push_action_before = (
-        __func__(DataStore.get_time_of_last_push_action_before)
-    )
-
-    get_profile_displayname = (
-        __func__(DataStore.get_profile_displayname)
-    )
+    get_profile_displayname = __func__(DataStore.get_profile_displayname)
 
 
 class PusherServer(HomeServer):
@@ -105,7 +95,7 @@ class PusherServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            )
+            ),
         )
 
         logger.info("Synapse pusher now listening on port %d", port)
@@ -119,18 +109,19 @@ class PusherServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    )
+                        username="matrix", password="rabbithole", globals={"hs": self}
+                    ),
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(("Metrics listener configured, but "
-                                 "enable_metrics is not True!"))
+                    logger.warn(
+                        (
+                            "Metrics listener configured, but "
+                            "enable_metrics is not True!"
+                        )
+                    )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"],
-                                         listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -161,9 +152,7 @@ class PusherReplicationHandler(ReplicationClientHandler):
                     else:
                         yield self.start_pusher(row.user_id, row.app_id, row.pushkey)
             elif stream_name == "events":
-                yield self.pusher_pool.on_new_notifications(
-                    token, token,
-                )
+                yield self.pusher_pool.on_new_notifications(token, token)
             elif stream_name == "receipts":
                 yield self.pusher_pool.on_new_receipts(
                     token, token, set(row.room_id for row in rows)
@@ -188,16 +177,12 @@ class PusherReplicationHandler(ReplicationClientHandler):
 
 def start(config_options):
     try:
-        config = HomeServerConfig.load_config(
-            "Synapse pusher", config_options
-        )
+        config = HomeServerConfig.load_config("Synapse pusher", config_options)
     except ConfigError as e:
         sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.pusher"
-
-    setup_logging(config, use_worker_options=True)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -223,17 +208,19 @@ def start(config_options):
         database_engine=database_engine,
     )
 
+    setup_logging(ps, config, use_worker_options=True)
+
     ps.setup()
 
     def start():
         _base.start(ps, config.worker_listeners)
         ps.get_pusherpool().start()
 
-    reactor.callWhenRunning(start)
+    reactor.addSystemEventTrigger("before", "startup", start)
 
     _base.start_worker_reactor("synapse-pusher", config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with LoggingContext("main"):
         ps = start(sys.argv[1:])

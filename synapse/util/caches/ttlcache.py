@@ -55,7 +55,7 @@ class TTLCache(object):
         if e != SENTINEL:
             self._expiry_list.remove(e)
 
-        entry = _CacheEntry(expiry_time=expiry, key=key, value=value)
+        entry = _CacheEntry(expiry_time=expiry, ttl=ttl, key=key, value=value)
         self._data[key] = entry
         self._expiry_list.add(entry)
 
@@ -87,7 +87,8 @@ class TTLCache(object):
             key: key to look up
 
         Returns:
-            Tuple[Any, float]: the value from the cache, and the expiry time
+            Tuple[Any, float, float]: the value from the cache, the expiry time
+            and the TTL
 
         Raises:
             KeyError if the entry is not found
@@ -99,7 +100,7 @@ class TTLCache(object):
             self._metrics.inc_misses()
             raise
         self._metrics.inc_hits()
-        return e.value, e.expiry_time
+        return e.value, e.expiry_time, e.ttl
 
     def pop(self, key, default=SENTINEL):
         """Remove a value from the cache
@@ -155,7 +156,9 @@ class TTLCache(object):
 @attr.s(frozen=True, slots=True)
 class _CacheEntry(object):
     """TTLCache entry"""
+
     # expiry_time is the first attribute, so that entries are sorted by expiry.
     expiry_time = attr.ib()
+    ttl = attr.ib()
     key = attr.ib()
     value = attr.ib()

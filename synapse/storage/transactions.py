@@ -133,34 +133,6 @@ class TransactionStore(SQLBaseStore):
             desc="set_received_txn_response",
         )
 
-    def prep_send_transaction(self, transaction_id, destination, origin_server_ts):
-        """Persists an outgoing transaction and calculates the values for the
-        previous transaction id list.
-
-        This should be called before sending the transaction so that it has the
-        correct value for the `prev_ids` key.
-
-        Args:
-            transaction_id (str)
-            destination (str)
-            origin_server_ts (int)
-
-        Returns:
-            list: A list of previous transaction ids.
-        """
-        return defer.succeed([])
-
-    def delivered_txn(self, transaction_id, destination, code, response_dict):
-        """Persists the response for an outgoing transaction.
-
-        Args:
-            transaction_id (str)
-            destination (str)
-            code (int)
-            response_json (str)
-        """
-        pass
-
     @defer.inlineCallbacks
     def get_destination_retry_timings(self, destination):
         """Gets the current retry timings (if any) for a given destination.
@@ -175,7 +147,7 @@ class TransactionStore(SQLBaseStore):
 
         result = self._destination_retry_cache.get(destination, SENTINEL)
         if result is not SENTINEL:
-            defer.returnValue(result)
+            return result
 
         result = yield self.runInteraction(
             "get_destination_retry_timings",
@@ -186,14 +158,14 @@ class TransactionStore(SQLBaseStore):
         # We don't hugely care about race conditions between getting and
         # invalidating the cache, since we time out fairly quickly anyway.
         self._destination_retry_cache[destination] = result
-        defer.returnValue(result)
+        return result
 
     def _get_destination_retry_timings(self, txn, destination):
         result = self._simple_select_one_txn(
             txn,
             table="destinations",
             keyvalues={"destination": destination},
-            retcols=("destination", "retry_last_ts", "retry_interval"),
+            retcols=("destination", "failure_ts", "retry_last_ts", "retry_interval"),
             allow_none=True,
         )
 
@@ -202,12 +174,15 @@ class TransactionStore(SQLBaseStore):
         else:
             return None
 
-    def set_destination_retry_timings(self, destination, retry_last_ts, retry_interval):
+    def set_destination_retry_timings(
+        self, destination, failure_ts, retry_last_ts, retry_interval
+    ):
         """Sets the current retry timings for a given destination.
         Both timings should be zero if retrying is no longer occuring.
 
         Args:
             destination (str)
+            failure_ts (int|None) - when the server started failing (ms since epoch)
             retry_last_ts (int) - time of last retry attempt in unix epoch ms
             retry_interval (int) - how long until next retry in ms
         """
@@ -217,13 +192,37 @@ class TransactionStore(SQLBaseStore):
             "set_destination_retry_timings",
             self._set_destination_retry_timings,
             destination,
+            failure_ts,
             retry_last_ts,
             retry_interval,
         )
 
     def _set_destination_retry_timings(
-        self, txn, destination, retry_last_ts, retry_interval
+        self, txn, destination, failure_ts, retry_last_ts, retry_interval
     ):
+
+        if self.database_engine.can_native_upsert:
+            # Upsert retry time interval if retry_interval is zero (i.e. we're
+            # resetting it) or greater than the existing retry interval.
+
+            sql = """
+                INSERT INTO destinations (
+                    destination, failure_ts, retry_last_ts, retry_interval
+                )
+                    VALUES (?, ?, ?, ?)
+                ON CONFLICT (destination) DO UPDATE SET
+                        failure_ts = EXCLUDED.failure_ts,
+                        retry_last_ts = EXCLUDED.retry_last_ts,
+                        retry_interval = EXCLUDED.retry_interval
+                    WHERE
+                        EXCLUDED.retry_interval = 0
+                        OR destinations.retry_interval < EXCLUDED.retry_interval
+            """
+
+            txn.execute(sql, (destination, failure_ts, retry_last_ts, retry_interval))
+
+            return
+
         self.database_engine.lock_table(txn, "destinations")
 
         # We need to be careful here as the data may have changed from under us
@@ -233,7 +232,7 @@ class TransactionStore(SQLBaseStore):
             txn,
             table="destinations",
             keyvalues={"destination": destination},
-            retcols=("retry_last_ts", "retry_interval"),
+            retcols=("failure_ts", "retry_last_ts", "retry_interval"),
             allow_none=True,
         )
 
@@ -243,6 +242,7 @@ class TransactionStore(SQLBaseStore):
                 table="destinations",
                 values={
                     "destination": destination,
+                    "failure_ts": failure_ts,
                     "retry_last_ts": retry_last_ts,
                     "retry_interval": retry_interval,
                 },
@@ -253,30 +253,11 @@ class TransactionStore(SQLBaseStore):
                 "destinations",
                 keyvalues={"destination": destination},
                 updatevalues={
+                    "failure_ts": failure_ts,
                     "retry_last_ts": retry_last_ts,
                     "retry_interval": retry_interval,
                 },
             )
-
-    def get_destinations_needing_retry(self):
-        """Get all destinations which are due a retry for sending a transaction.
-
-        Returns:
-            list: A list of dicts
-        """
-
-        return self.runInteraction(
-            "get_destinations_needing_retry", self._get_destinations_needing_retry
-        )
-
-    def _get_destinations_needing_retry(self, txn):
-        query = (
-            "SELECT * FROM destinations"
-            " WHERE retry_last_ts > 0 and retry_next_ts < ?"
-        )
-
-        txn.execute(query, (self._clock.time_msec(),))
-        return self.cursor_to_dict(txn)
 
     def _start_cleanup_transactions(self):
         return run_as_background_process(

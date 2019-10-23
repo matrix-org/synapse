@@ -48,7 +48,7 @@ class DevicesRestServlet(RestServlet):
         devices = yield self.device_handler.get_devices_by_user(
             requester.user.to_string()
         )
-        defer.returnValue((200, {"devices": devices}))
+        return 200, {"devices": devices}
 
 
 class DeleteDevicesRestServlet(RestServlet):
@@ -56,6 +56,7 @@ class DeleteDevicesRestServlet(RestServlet):
     API for bulk deletion of devices. Accepts a JSON object with a devices
     key which lists the device_ids to delete. Requires user interactive auth.
     """
+
     PATTERNS = client_patterns("/delete_devices")
 
     def __init__(self, hs):
@@ -84,14 +85,13 @@ class DeleteDevicesRestServlet(RestServlet):
         assert_params_in_dict(body, ["devices"])
 
         yield self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request),
+            requester, body, self.hs.get_ip_from_request(request)
         )
 
         yield self.device_handler.delete_devices(
-            requester.user.to_string(),
-            body['devices'],
+            requester.user.to_string(), body["devices"]
         )
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class DeviceRestServlet(RestServlet):
@@ -112,10 +112,9 @@ class DeviceRestServlet(RestServlet):
     def on_GET(self, request, device_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         device = yield self.device_handler.get_device(
-            requester.user.to_string(),
-            device_id,
+            requester.user.to_string(), device_id
         )
-        defer.returnValue((200, device))
+        return 200, device
 
     @interactive_auth_handler
     @defer.inlineCallbacks
@@ -134,13 +133,11 @@ class DeviceRestServlet(RestServlet):
                 raise
 
         yield self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request),
+            requester, body, self.hs.get_ip_from_request(request)
         )
 
-        yield self.device_handler.delete_device(
-            requester.user.to_string(), device_id,
-        )
-        defer.returnValue((200, {}))
+        yield self.device_handler.delete_device(requester.user.to_string(), device_id)
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_PUT(self, request, device_id):
@@ -148,11 +145,9 @@ class DeviceRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
         yield self.device_handler.update_device(
-            requester.user.to_string(),
-            device_id,
-            body
+            requester.user.to_string(), device_id, body
         )
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

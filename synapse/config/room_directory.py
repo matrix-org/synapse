@@ -19,10 +19,10 @@ from ._base import Config, ConfigError
 
 
 class RoomDirectoryConfig(Config):
-    def read_config(self, config):
-        self.enable_room_list_search = config.get(
-            "enable_room_list_search", True,
-        )
+    section = "roomdirectory"
+
+    def read_config(self, config, **kwargs):
+        self.enable_room_list_search = config.get("enable_room_list_search", True)
 
         alias_creation_rules = config.get("alias_creation_rules")
 
@@ -33,11 +33,7 @@ class RoomDirectoryConfig(Config):
             ]
         else:
             self._alias_creation_rules = [
-                _RoomDirectoryRule(
-                    "alias_creation_rules", {
-                        "action": "allow",
-                    }
-                )
+                _RoomDirectoryRule("alias_creation_rules", {"action": "allow"})
             ]
 
         room_list_publication_rules = config.get("room_list_publication_rules")
@@ -49,14 +45,10 @@ class RoomDirectoryConfig(Config):
             ]
         else:
             self._room_list_publication_rules = [
-                _RoomDirectoryRule(
-                    "room_list_publication_rules", {
-                        "action": "allow",
-                    }
-                )
+                _RoomDirectoryRule("room_list_publication_rules", {"action": "allow"})
             ]
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
         # Uncomment to disable searching the public room list. When disabled
         # blocks searching local and remote room lists for local and remote
@@ -178,8 +170,7 @@ class _RoomDirectoryRule(object):
             self.action = action
         else:
             raise ConfigError(
-                "%s rules can only have action of 'allow'"
-                " or 'deny'" % (option_name,)
+                "%s rules can only have action of 'allow'" " or 'deny'" % (option_name,)
             )
 
         self._alias_matches_all = alias == "*"

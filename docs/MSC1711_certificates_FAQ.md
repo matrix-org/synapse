@@ -1,5 +1,22 @@
 # MSC1711 Certificates FAQ
 
+## Historical Note
+This document was originally written to guide server admins through the upgrade
+path towards Synapse 1.0. Specifically,
+[MSC1711](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md)
+required that all servers present valid TLS certificates on their federation
+API. Admins were encouraged to achieve compliance from version 0.99.0 (released
+in February 2019) ahead of version 1.0 (released June 2019) enforcing the
+certificate checks.
+
+Much of what follows is now outdated since most admins will have already
+upgraded, however it may be of use to those with old installs returning to the
+project.
+
+If you are setting up a server from scratch you almost certainly should look at
+the [installation guide](../INSTALL.md) instead.
+
+## Introduction
 The goal of Synapse 0.99.0 is to act as a stepping stone to Synapse 1.0.0. It
 supports the r0.1 release of the server to server specification, but is
 compatible with both the legacy Matrix federation behaviour (pre-r0.1) as well
@@ -130,7 +147,7 @@ your domain, you can simply route all traffic through the reverse proxy by
 updating the SRV record appropriately (or removing it, if the proxy listens on
 8448).
 
-See [reverse_proxy.rst](reverse_proxy.rst) for information on setting up a
+See [reverse_proxy.md](reverse_proxy.md) for information on setting up a
 reverse proxy.
 
 #### Option 3: add a .well-known file to delegate your matrix traffic
@@ -302,7 +319,7 @@ We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.
 
-See [reverse_proxy.rst](reverse_proxy.rst) for information on setting up a
+See [reverse_proxy.md](reverse_proxy.md) for information on setting up a
 reverse proxy.
 
 ### Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?

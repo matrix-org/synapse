@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,6 +38,7 @@ from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
+from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
@@ -89,7 +92,9 @@ from synapse.rest.media.v1.media_repository import (
 from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
-from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
+from synapse.server_notices.worker_server_notices_sender import (
+    WorkerServerNoticesSender,
+)
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.streams.events import EventSources
 from synapse.util import Clock
@@ -125,78 +130,77 @@ class HomeServer(object):
     __metaclass__ = abc.ABCMeta
 
     DEPENDENCIES = [
-        'http_client',
-        'db_pool',
-        'federation_client',
-        'federation_server',
-        'handlers',
-        'auth',
-        'room_creation_handler',
-        'state_handler',
-        'state_resolution_handler',
-        'presence_handler',
-        'sync_handler',
-        'typing_handler',
-        'room_list_handler',
-        'acme_handler',
-        'auth_handler',
-        'device_handler',
-        'stats_handler',
-        'e2e_keys_handler',
-        'e2e_room_keys_handler',
-        'event_handler',
-        'event_stream_handler',
-        'initial_sync_handler',
-        'application_service_api',
-        'application_service_scheduler',
-        'application_service_handler',
-        'device_message_handler',
-        'profile_handler',
-        'event_creation_handler',
-        'deactivate_account_handler',
-        'set_password_handler',
-        'notifier',
-        'event_sources',
-        'keyring',
-        'pusherpool',
-        'event_builder_factory',
-        'filtering',
-        'http_client_context_factory',
-        'simple_http_client',
+        "http_client",
+        "db_pool",
+        "federation_client",
+        "federation_server",
+        "handlers",
+        "auth",
+        "room_creation_handler",
+        "state_handler",
+        "state_resolution_handler",
+        "presence_handler",
+        "sync_handler",
+        "typing_handler",
+        "room_list_handler",
+        "acme_handler",
+        "auth_handler",
+        "device_handler",
+        "stats_handler",
+        "e2e_keys_handler",
+        "e2e_room_keys_handler",
+        "event_handler",
+        "event_stream_handler",
+        "initial_sync_handler",
+        "application_service_api",
+        "application_service_scheduler",
+        "application_service_handler",
+        "device_message_handler",
+        "profile_handler",
+        "event_creation_handler",
+        "deactivate_account_handler",
+        "set_password_handler",
+        "notifier",
+        "event_sources",
+        "keyring",
+        "pusherpool",
+        "event_builder_factory",
+        "filtering",
+        "http_client_context_factory",
+        "simple_http_client",
         "proxied_http_client",
-        'media_repository',
-        'media_repository_resource',
-        'federation_transport_client',
-        'federation_sender',
-        'receipts_handler',
-        'macaroon_generator',
-        'tcp_replication',
-        'read_marker_handler',
-        'action_generator',
-        'user_directory_handler',
-        'groups_local_handler',
-        'groups_server_handler',
-        'groups_attestation_signing',
-        'groups_attestation_renewer',
-        'secrets',
-        'spam_checker',
-        'room_member_handler',
-        'federation_registry',
-        'server_notices_manager',
-        'server_notices_sender',
-        'message_handler',
-        'pagination_handler',
-        'room_context_handler',
-        'sendmail',
-        'registration_handler',
-        'account_validity_handler',
-        'event_client_serializer',
+        "media_repository",
+        "media_repository_resource",
+        "federation_transport_client",
+        "federation_sender",
+        "receipts_handler",
+        "macaroon_generator",
+        "tcp_replication",
+        "read_marker_handler",
+        "action_generator",
+        "user_directory_handler",
+        "groups_local_handler",
+        "groups_server_handler",
+        "groups_attestation_signing",
+        "groups_attestation_renewer",
+        "secrets",
+        "spam_checker",
+        "third_party_event_rules",
+        "room_member_handler",
+        "federation_registry",
+        "server_notices_manager",
+        "server_notices_sender",
+        "message_handler",
+        "pagination_handler",
+        "room_context_handler",
+        "sendmail",
+        "registration_handler",
+        "account_validity_handler",
+        "saml_handler",
+        "event_client_serializer",
     ]
 
-    REQUIRED_ON_MASTER_STARTUP = [
-        "user_directory_handler",
-        "stats_handler"
-    ]
+    REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
 
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
@@ -219,6 +223,7 @@ class HomeServer(object):
         self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
+        self.admin_redaction_ratelimiter = Ratelimiter()
         self.registration_ratelimiter = Ratelimiter()
 
         self.datastore = None
@@ -276,6 +281,9 @@ class HomeServer(object):
 
     def get_registration_ratelimiter(self):
         return self.registration_ratelimiter
+
+    def get_admin_redaction_ratelimiter(self):
+        return self.admin_redaction_ratelimiter
 
     def build_federation_client(self):
         return FederationClient(self)
@@ -415,9 +423,7 @@ class HomeServer(object):
         name = self.db_config["name"]
 
         return adbapi.ConnectionPool(
-            name,
-            cp_reactor=self.get_reactor(),
-            **self.db_config.get("args", {})
+            name, cp_reactor=self.get_reactor(), **self.db_config.get("args", {})
         )
 
     def get_db_conn(self, run_new_connection=True):
@@ -429,7 +435,8 @@ class HomeServer(object):
         # Any param beginning with cp_ is a parameter for adbapi, and should
         # not be passed to the database engine.
         db_params = {
-            k: v for k, v in self.db_config.get("args", {}).items()
+            k: v
+            for k, v in self.db_config.get("args", {}).items()
             if not k.startswith("cp_")
         }
         db_conn = self.database_engine.module.connect(**db_params)
@@ -492,6 +499,9 @@ class HomeServer(object):
     def build_spam_checker(self):
         return SpamChecker(self)
 
+    def build_third_party_event_rules(self):
+        return ThirdPartyEventRules(self)
+
     def build_room_member_handler(self):
         if self.config.worker_app:
             return RoomMemberWorkerHandler(self)
@@ -528,6 +538,11 @@ class HomeServer(object):
     def build_account_validity_handler(self):
         return AccountValidityHandler(self)
 
+    def build_saml_handler(self):
+        from synapse.handlers.saml_handler import SamlHandler
+
+        return SamlHandler(self)
+
     def build_event_client_serializer(self):
         return EventClientSerializer(self)
 
@@ -557,9 +572,7 @@ def _make_dependency_method(depname):
         if builder:
             # Prevent cyclic dependencies from deadlocking
             if depname in hs._building:
-                raise ValueError("Cyclic dependency while building %s" % (
-                    depname,
-                ))
+                raise ValueError("Cyclic dependency while building %s" % (depname,))
             hs._building[depname] = 1
 
             dep = builder()
@@ -570,9 +583,7 @@ def _make_dependency_method(depname):
             return dep
 
         raise NotImplementedError(
-            "%s has no %s nor a builder for it" % (
-                type(hs).__name__, depname,
-            )
+            "%s has no %s nor a builder for it" % (type(hs).__name__, depname)
         )
 
     setattr(HomeServer, "get_%s" % (depname), _get)

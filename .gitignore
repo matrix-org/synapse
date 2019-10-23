@@ -7,18 +7,22 @@
 *.egg-info
 *.lock
 *.pyc
+*.snap
 *.tac
 _trial_temp/
 _trial_temp*/
+/out
 
 # stuff that is likely to exist when you run a server locally
 /*.db
 /*.log
 /*.log.config
 /*.pid
+/.python-version
 /*.signing.key
 /env/
 /homeserver*.yaml
+/logs
 /media_store/
 /uploads
 
@@ -28,8 +32,9 @@ _trial_temp*/
 /.vscode/
 
 # build products
-/.coverage*
 !/.coveragerc
+/.coverage*
+/.mypy_cache/
 /.tox
 /build/
 /coverage.*
@@ -37,4 +42,3 @@ _trial_temp*/
 /docs/build/
 /htmlcov
 /pip-wheel-metadata/
-

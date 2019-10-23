@@ -21,11 +21,10 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-
-from ._base import SQLBaseStore
-from .util.id_generators import StreamIdGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +57,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cachedInlineCallbacks()
     def get_users_with_read_receipts_in_room(self, room_id):
         receipts = yield self.get_receipts_for_room(room_id, "m.read")
-        defer.returnValue(set(r['user_id'] for r in receipts))
+        return set(r["user_id"] for r in receipts)
 
     @cached(num_args=2)
     def get_receipts_for_room(self, room_id, receipt_type):
@@ -92,7 +91,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             desc="get_receipts_for_user",
         )
 
-        defer.returnValue({row["room_id"]: row["event_id"] for row in rows})
+        return {row["room_id"]: row["event_id"] for row in rows}
 
     @defer.inlineCallbacks
     def get_receipts_for_user_with_orderings(self, user_id, receipt_type):
@@ -110,16 +109,14 @@ class ReceiptsWorkerStore(SQLBaseStore):
             return txn.fetchall()
 
         rows = yield self.runInteraction("get_receipts_for_user_with_orderings", f)
-        defer.returnValue(
-            {
-                row[0]: {
-                    "event_id": row[1],
-                    "topological_ordering": row[2],
-                    "stream_ordering": row[3],
-                }
-                for row in rows
+        return {
+            row[0]: {
+                "event_id": row[1],
+                "topological_ordering": row[2],
+                "stream_ordering": row[3],
             }
-        )
+            for row in rows
+        }
 
     @defer.inlineCallbacks
     def get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
@@ -147,7 +144,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             room_ids, to_key, from_key=from_key
         )
 
-        defer.returnValue([ev for res in results.values() for ev in res])
+        return [ev for res in results.values() for ev in res]
 
     def get_linearized_receipts_for_room(self, room_id, to_key, from_key=None):
         """Get receipts for a single room for sending to clients.
@@ -197,7 +194,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         rows = yield self.runInteraction("get_linearized_receipts_for_room", f)
 
         if not rows:
-            defer.returnValue([])
+            return []
 
         content = {}
         for row in rows:
@@ -205,9 +202,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 row["user_id"]
             ] = json.loads(row["data"])
 
-        defer.returnValue(
-            [{"type": "m.receipt", "room_id": room_id, "content": content}]
-        )
+        return [{"type": "m.receipt", "room_id": room_id, "content": content}]
 
     @cachedList(
         cached_method_name="_get_linearized_receipts_for_room",
@@ -217,28 +212,30 @@ class ReceiptsWorkerStore(SQLBaseStore):
     )
     def _get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
         if not room_ids:
-            defer.returnValue({})
+            return {}
 
         def f(txn):
             if from_key:
-                sql = (
-                    "SELECT * FROM receipts_linearized WHERE"
-                    " room_id IN (%s) AND stream_id > ? AND stream_id <= ?"
-                ) % (",".join(["?"] * len(room_ids)))
-                args = list(room_ids)
-                args.extend([from_key, to_key])
+                sql = """
+                    SELECT * FROM receipts_linearized WHERE
+                    stream_id > ? AND stream_id <= ? AND
+                """
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "room_id", room_ids
+                )
 
-                txn.execute(sql, args)
+                txn.execute(sql + clause, [from_key, to_key] + list(args))
             else:
-                sql = (
-                    "SELECT * FROM receipts_linearized WHERE"
-                    " room_id IN (%s) AND stream_id <= ?"
-                ) % (",".join(["?"] * len(room_ids)))
+                sql = """
+                    SELECT * FROM receipts_linearized WHERE
+                    stream_id <= ? AND
+                """
 
-                args = list(room_ids)
-                args.append(to_key)
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "room_id", room_ids
+                )
 
-                txn.execute(sql, args)
+                txn.execute(sql + clause, [to_key] + list(args))
 
             return self.cursor_to_dict(txn)
 
@@ -264,7 +261,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             room_id: [results[room_id]] if room_id in results else []
             for room_id in room_ids
         }
-        defer.returnValue(results)
+        return results
 
     def get_all_updated_receipts(self, last_id, current_id, limit=None):
         if last_id == current_id:
@@ -437,13 +434,19 @@ class ReceiptsStore(ReceiptsWorkerStore):
             # we need to points in graph -> linearized form.
             # TODO: Make this better.
             def graph_to_linear(txn):
-                query = (
-                    "SELECT event_id WHERE room_id = ? AND stream_ordering IN ("
-                    " SELECT max(stream_ordering) WHERE event_id IN (%s)"
-                    ")"
-                ) % (",".join(["?"] * len(event_ids)))
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "event_id", event_ids
+                )
 
-                txn.execute(query, [room_id] + event_ids)
+                sql = """
+                    SELECT event_id WHERE room_id = ? AND stream_ordering IN (
+                        SELECT max(stream_ordering) WHERE %s
+                    )
+                """ % (
+                    clause,
+                )
+
+                txn.execute(sql, [room_id] + list(args))
                 rows = txn.fetchall()
                 if rows:
                     return rows[0][0]
@@ -468,7 +471,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             )
 
         if event_ts is None:
-            defer.returnValue(None)
+            return None
 
         now = self._clock.time_msec()
         logger.debug(
@@ -482,7 +485,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
 
         max_persisted_id = self._receipts_id_gen.get_current_token()
 
-        defer.returnValue((stream_id, max_persisted_id))
+        return stream_id, max_persisted_id
 
     def insert_graph_receipt(self, room_id, receipt_type, user_id, event_ids, data):
         return self.runInteraction(

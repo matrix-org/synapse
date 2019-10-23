@@ -24,6 +24,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 from .background_updates import BackgroundUpdateStore
@@ -31,12 +32,12 @@ from .background_updates import BackgroundUpdateStore
 logger = logging.getLogger(__name__)
 
 SearchEntry = namedtuple(
-    'SearchEntry',
-    ['key', 'value', 'event_id', 'room_id', 'stream_ordering', 'origin_server_ts'],
+    "SearchEntry",
+    ["key", "value", "event_id", "room_id", "stream_ordering", "origin_server_ts"],
 )
 
 
-class SearchStore(BackgroundUpdateStore):
+class SearchBackgroundUpdateStore(BackgroundUpdateStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
@@ -44,7 +45,7 @@ class SearchStore(BackgroundUpdateStore):
     EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
 
     def __init__(self, db_conn, hs):
-        super(SearchStore, self).__init__(db_conn, hs)
+        super(SearchBackgroundUpdateStore, self).__init__(db_conn, hs)
 
         if not hs.config.enable_search:
             return
@@ -166,7 +167,7 @@ class SearchStore(BackgroundUpdateStore):
         if not result:
             yield self._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def _background_reindex_gin_search(self, progress, batch_size):
@@ -209,14 +210,14 @@ class SearchStore(BackgroundUpdateStore):
             yield self.runWithConnection(create_index)
 
         yield self._end_background_update(self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME)
-        defer.returnValue(1)
+        return 1
 
     @defer.inlineCallbacks
     def _background_reindex_search_order(self, progress, batch_size):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
         rows_inserted = progress.get("rows_inserted", 0)
-        have_added_index = progress['have_added_indexes']
+        have_added_index = progress["have_added_indexes"]
 
         if not have_added_index:
 
@@ -287,30 +288,7 @@ class SearchStore(BackgroundUpdateStore):
         if not finished:
             yield self._end_background_update(self.EVENT_SEARCH_ORDER_UPDATE_NAME)
 
-        defer.returnValue(num_rows)
-
-    def store_event_search_txn(self, txn, event, key, value):
-        """Add event to the search table
-
-        Args:
-            txn (cursor):
-            event (EventBase):
-            key (str):
-            value (str):
-        """
-        self.store_search_entries_txn(
-            txn,
-            (
-                SearchEntry(
-                    key=key,
-                    value=value,
-                    event_id=event.event_id,
-                    room_id=event.room_id,
-                    stream_ordering=event.internal_metadata.stream_ordering,
-                    origin_server_ts=event.origin_server_ts,
-                ),
-            ),
-        )
+        return num_rows
 
     def store_search_entries_txn(self, txn, entries):
         """Add entries to the search table
@@ -341,29 +319,7 @@ class SearchStore(BackgroundUpdateStore):
                 for entry in entries
             )
 
-            # inserts to a GIN index are normally batched up into a pending
-            # list, and then all committed together once the list gets to a
-            # certain size. The trouble with that is that postgres (pre-9.5)
-            # uses work_mem to determine the length of the list, and work_mem
-            # is typically very large.
-            #
-            # We therefore reduce work_mem while we do the insert.
-            #
-            # (postgres 9.5 uses the separate gin_pending_list_limit setting,
-            # so doesn't suffer the same problem, but changing work_mem will
-            # be harmless)
-            #
-            # Note that we don't need to worry about restoring it on
-            # exception, because exceptions will cause the transaction to be
-            # rolled back, including the effects of the SET command.
-            #
-            # Also: we use SET rather than SET LOCAL because there's lots of
-            # other stuff going on in this transaction, which want to have the
-            # normal work_mem setting.
-
-            txn.execute("SET work_mem='256kB'")
             txn.executemany(sql, args)
-            txn.execute("RESET work_mem")
 
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
@@ -379,6 +335,34 @@ class SearchStore(BackgroundUpdateStore):
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
+
+
+class SearchStore(SearchBackgroundUpdateStore):
+    def __init__(self, db_conn, hs):
+        super(SearchStore, self).__init__(db_conn, hs)
+
+    def store_event_search_txn(self, txn, event, key, value):
+        """Add event to the search table
+
+        Args:
+            txn (cursor):
+            event (EventBase):
+            key (str):
+            value (str):
+        """
+        self.store_search_entries_txn(
+            txn,
+            (
+                SearchEntry(
+                    key=key,
+                    value=value,
+                    event_id=event.event_id,
+                    room_id=event.room_id,
+                    stream_ordering=event.internal_metadata.stream_ordering,
+                    origin_server_ts=event.origin_server_ts,
+                ),
+            ),
+        )
 
     @defer.inlineCallbacks
     def search_msgs(self, room_ids, search_term, keys):
@@ -402,8 +386,10 @@ class SearchStore(BackgroundUpdateStore):
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
         if len(room_ids) < 500:
-            clauses.append("room_id IN (%s)" % (",".join(["?"] * len(room_ids)),))
-            args.extend(room_ids)
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids
+            )
+            clauses = [clause]
 
         local_clauses = []
         for key in keys:
@@ -476,17 +462,15 @@ class SearchStore(BackgroundUpdateStore):
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 
-        defer.returnValue(
-            {
-                "results": [
-                    {"event": event_map[r["event_id"]], "rank": r["rank"]}
-                    for r in results
-                    if r["event_id"] in event_map
-                ],
-                "highlights": highlights,
-                "count": count,
-            }
-        )
+        return {
+            "results": [
+                {"event": event_map[r["event_id"]], "rank": r["rank"]}
+                for r in results
+                if r["event_id"] in event_map
+            ],
+            "highlights": highlights,
+            "count": count,
+        }
 
     @defer.inlineCallbacks
     def search_rooms(self, room_ids, search_term, keys, limit, pagination_token=None):
@@ -511,8 +495,10 @@ class SearchStore(BackgroundUpdateStore):
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
         if len(room_ids) < 500:
-            clauses.append("room_id IN (%s)" % (",".join(["?"] * len(room_ids)),))
-            args.extend(room_ids)
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids
+            )
+            clauses = [clause]
 
         local_clauses = []
         for key in keys:
@@ -621,22 +607,20 @@ class SearchStore(BackgroundUpdateStore):
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 
-        defer.returnValue(
-            {
-                "results": [
-                    {
-                        "event": event_map[r["event_id"]],
-                        "rank": r["rank"],
-                        "pagination_token": "%s,%s"
-                        % (r["origin_server_ts"], r["stream_ordering"]),
-                    }
-                    for r in results
-                    if r["event_id"] in event_map
-                ],
-                "highlights": highlights,
-                "count": count,
-            }
-        )
+        return {
+            "results": [
+                {
+                    "event": event_map[r["event_id"]],
+                    "rank": r["rank"],
+                    "pagination_token": "%s,%s"
+                    % (r["origin_server_ts"], r["stream_ordering"]),
+                }
+                for r in results
+                if r["event_id"] in event_map
+            ],
+            "highlights": highlights,
+            "count": count,
+        }
 
     def _find_highlights_in_postgres(self, search_query, events):
         """Given a list of events and a search term, return a list of words

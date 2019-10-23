@@ -35,28 +35,31 @@ except Exception:
 class PusherFactory(object):
     def __init__(self, hs):
         self.hs = hs
+        self.config = hs.config
 
-        self.pusher_types = {
-            "http": HttpPusher,
-        }
+        self.pusher_types = {"http": HttpPusher}
 
         logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
         if hs.config.email_enable_notifs:
             self.mailers = {}  # app_name -> Mailer
 
-            templates = load_jinja2_templates(
-                config=hs.config,
-                template_html_name=hs.config.email_notif_template_html,
-                template_text_name=hs.config.email_notif_template_text,
+            self.notif_template_html, self.notif_template_text = load_jinja2_templates(
+                self.config.email_template_dir,
+                [
+                    self.config.email_notif_template_html,
+                    self.config.email_notif_template_text,
+                ],
+                apply_format_ts_filter=True,
+                apply_mxc_to_http_filter=True,
+                public_baseurl=self.config.public_baseurl,
             )
-            self.notif_template_html, self.notif_template_text = templates
 
             self.pusher_types["email"] = self._create_email_pusher
 
             logger.info("defined email pusher type")
 
     def create_pusher(self, pusherdict):
-        kind = pusherdict['kind']
+        kind = pusherdict["kind"]
         f = self.pusher_types.get(kind, None)
         if not f:
             return None
@@ -77,9 +80,9 @@ class PusherFactory(object):
         return EmailPusher(self.hs, pusherdict, mailer)
 
     def _app_name_from_pusherdict(self, pusherdict):
-        if 'data' in pusherdict and 'brand' in pusherdict['data']:
-            app_name = pusherdict['data']['brand']
+        if "data" in pusherdict and "brand" in pusherdict["data"]:
+            app_name = pusherdict["data"]["brand"]
         else:
-            app_name = self.hs.config.email_app_name
+            app_name = self.config.email_app_name
 
         return app_name

@@ -28,7 +28,9 @@ logger = logging.getLogger(__name__)
 
 class AccountValidityRenewServlet(RestServlet):
     PATTERNS = client_patterns("/account_validity/renew$")
-    SUCCESS_HTML = b"<html><body>Your account has been successfully renewed.</body><html>"
+    SUCCESS_HTML = (
+        b"<html><body>Your account has been successfully renewed.</body><html>"
+    )
 
     def __init__(self, hs):
         """
@@ -40,6 +42,8 @@ class AccountValidityRenewServlet(RestServlet):
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
+        self.success_html = hs.config.account_validity.account_renewed_html_content
+        self.failure_html = hs.config.account_validity.invalid_token_html_content
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -47,14 +51,21 @@ class AccountValidityRenewServlet(RestServlet):
             raise SynapseError(400, "Missing renewal token")
         renewal_token = request.args[b"token"][0]
 
-        yield self.account_activity_handler.renew_account(renewal_token.decode('utf8'))
+        token_valid = yield self.account_activity_handler.renew_account(
+            renewal_token.decode("utf8")
+        )
 
-        request.setResponseCode(200)
+        if token_valid:
+            status_code = 200
+            response = self.success_html
+        else:
+            status_code = 404
+            response = self.failure_html
+
+        request.setResponseCode(status_code)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (
-            len(AccountValidityRenewServlet.SUCCESS_HTML),
-        ))
-        request.write(AccountValidityRenewServlet.SUCCESS_HTML)
+        request.setHeader(b"Content-Length", b"%d" % (len(response),))
+        request.write(response.encode("utf8"))
         finish_request(request)
         defer.returnValue(None)
 
@@ -77,9 +88,11 @@ class AccountValiditySendMailServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         if not self.account_validity.renew_by_email_enabled:
-            raise AuthError(403, "Account renewal via email is disabled on this server.")
+            raise AuthError(
+                403, "Account renewal via email is disabled on this server."
+            )
 
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_expired=True)
         user_id = requester.user.to_string()
         yield self.account_activity_handler.send_renewal_email_to_user(user_id)
 

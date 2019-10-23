@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@
 import collections
 import logging
 import re
+from typing import Optional, Tuple
 
 from canonicaljson import json
 
@@ -24,6 +26,7 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.search import SearchStore
+from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
@@ -63,103 +66,196 @@ class RoomWorkerStore(SQLBaseStore):
             desc="get_public_room_ids",
         )
 
-    @cached(num_args=2, max_entries=100)
-    def get_public_room_ids_at_stream_id(self, stream_id, network_tuple):
-        """Get pulbic rooms for a particular list, or across all lists.
+    def count_public_rooms(self, network_tuple, ignore_non_federatable):
+        """Counts the number of public rooms as tracked in the room_stats_current
+        and room_stats_state table.
 
         Args:
-            stream_id (int)
-            network_tuple (ThirdPartyInstanceID): The list to use (None, None)
-                means the main list, None means all lsits.
+            network_tuple (ThirdPartyInstanceID|None)
+            ignore_non_federatable (bool): If true filters out non-federatable rooms
         """
-        return self.runInteraction(
-            "get_public_room_ids_at_stream_id",
-            self.get_public_room_ids_at_stream_id_txn,
-            stream_id,
-            network_tuple=network_tuple,
-        )
 
-    def get_public_room_ids_at_stream_id_txn(self, txn, stream_id, network_tuple):
-        return {
-            rm
-            for rm, vis in self.get_published_at_stream_id_txn(
-                txn, stream_id, network_tuple=network_tuple
-            ).items()
-            if vis
-        }
+        def _count_public_rooms_txn(txn):
+            query_args = []
 
-    def get_published_at_stream_id_txn(self, txn, stream_id, network_tuple):
-        if network_tuple:
-            # We want to get from a particular list. No aggregation required.
-
-            sql = """
-                SELECT room_id, visibility FROM public_room_list_stream
-                INNER JOIN (
-                    SELECT room_id, max(stream_id) AS stream_id
-                    FROM public_room_list_stream
-                    WHERE stream_id <= ? %s
-                    GROUP BY room_id
-                ) grouped USING (room_id, stream_id)
+            if network_tuple:
+                if network_tuple.appservice_id:
+                    published_sql = """
+                        SELECT room_id from appservice_room_list
+                        WHERE appservice_id = ? AND network_id = ?
+                    """
+                    query_args.append(network_tuple.appservice_id)
+                    query_args.append(network_tuple.network_id)
+                else:
+                    published_sql = """
+                        SELECT room_id FROM rooms WHERE is_public
+                    """
+            else:
+                published_sql = """
+                    SELECT room_id FROM rooms WHERE is_public
+                    UNION SELECT room_id from appservice_room_list
             """
 
-            if network_tuple.appservice_id is not None:
-                txn.execute(
-                    sql % ("AND appservice_id = ? AND network_id = ?",),
-                    (stream_id, network_tuple.appservice_id, network_tuple.network_id),
+            sql = """
+                SELECT
+                    COALESCE(COUNT(*), 0)
+                FROM (
+                    %(published_sql)s
+                ) published
+                INNER JOIN room_stats_state USING (room_id)
+                INNER JOIN room_stats_current USING (room_id)
+                WHERE
+                    (
+                        join_rules = 'public' OR history_visibility = 'world_readable'
+                    )
+                    AND joined_members > 0
+            """ % {
+                "published_sql": published_sql
+            }
+
+            txn.execute(sql, query_args)
+            return txn.fetchone()[0]
+
+        return self.runInteraction("count_public_rooms", _count_public_rooms_txn)
+
+    @defer.inlineCallbacks
+    def get_largest_public_rooms(
+        self,
+        network_tuple: Optional[ThirdPartyInstanceID],
+        search_filter: Optional[dict],
+        limit: Optional[int],
+        bounds: Optional[Tuple[int, str]],
+        forwards: bool,
+        ignore_non_federatable: bool = False,
+    ):
+        """Gets the largest public rooms (where largest is in terms of joined
+        members, as tracked in the statistics table).
+
+        Args:
+            network_tuple
+            search_filter
+            limit: Maxmimum number of rows to return, unlimited otherwise.
+            bounds: An uppoer or lower bound to apply to result set if given,
+                consists of a joined member count and room_id (these are
+                excluded from result set).
+            forwards: true iff going forwards, going backwards otherwise
+            ignore_non_federatable: If true filters out non-federatable rooms.
+
+        Returns:
+            Rooms in order: biggest number of joined users first.
+            We then arbitrarily use the room_id as a tie breaker.
+
+        """
+
+        where_clauses = []
+        query_args = []
+
+        if network_tuple:
+            if network_tuple.appservice_id:
+                published_sql = """
+                    SELECT room_id from appservice_room_list
+                    WHERE appservice_id = ? AND network_id = ?
+                """
+                query_args.append(network_tuple.appservice_id)
+                query_args.append(network_tuple.network_id)
+            else:
+                published_sql = """
+                    SELECT room_id FROM rooms WHERE is_public
+                """
+        else:
+            published_sql = """
+                SELECT room_id FROM rooms WHERE is_public
+                UNION SELECT room_id from appservice_room_list
+            """
+
+        # Work out the bounds if we're given them, these bounds look slightly
+        # odd, but are designed to help query planner use indices by pulling
+        # out a common bound.
+        if bounds:
+            last_joined_members, last_room_id = bounds
+            if forwards:
+                where_clauses.append(
+                    """
+                        joined_members <= ? AND (
+                            joined_members < ? OR room_id < ?
+                        )
+                    """
                 )
             else:
-                txn.execute(sql % ("AND appservice_id IS NULL",), (stream_id,))
-            return dict(txn)
-        else:
-            # We want to get from all lists, so we need to aggregate the results
+                where_clauses.append(
+                    """
+                        joined_members >= ? AND (
+                            joined_members > ? OR room_id > ?
+                        )
+                    """
+                )
 
-            logger.info("Executing full list")
+            query_args += [last_joined_members, last_joined_members, last_room_id]
 
-            sql = """
-                SELECT room_id, visibility
-                FROM public_room_list_stream
-                INNER JOIN (
-                    SELECT
-                        room_id, max(stream_id) AS stream_id, appservice_id,
-                        network_id
-                    FROM public_room_list_stream
-                    WHERE stream_id <= ?
-                    GROUP BY room_id, appservice_id, network_id
-                ) grouped USING (room_id, stream_id)
+        if ignore_non_federatable:
+            where_clauses.append("is_federatable")
+
+        if search_filter and search_filter.get("generic_search_term", None):
+            search_term = "%" + search_filter["generic_search_term"] + "%"
+
+            where_clauses.append(
+                """
+                    (
+                        name LIKE ?
+                        OR topic LIKE ?
+                        OR canonical_alias LIKE ?
+                    )
+                """
+            )
+            query_args += [search_term, search_term, search_term]
+
+        where_clause = ""
+        if where_clauses:
+            where_clause = " AND " + " AND ".join(where_clauses)
+
+        sql = """
+            SELECT
+                room_id, name, topic, canonical_alias, joined_members,
+                avatar, history_visibility, joined_members, guest_access
+            FROM (
+                %(published_sql)s
+            ) published
+            INNER JOIN room_stats_state USING (room_id)
+            INNER JOIN room_stats_current USING (room_id)
+            WHERE
+                (
+                    join_rules = 'public' OR history_visibility = 'world_readable'
+                )
+                AND joined_members > 0
+                %(where_clause)s
+            ORDER BY joined_members %(dir)s, room_id %(dir)s
+        """ % {
+            "published_sql": published_sql,
+            "where_clause": where_clause,
+            "dir": "DESC" if forwards else "ASC",
+        }
+
+        if limit is not None:
+            query_args.append(limit)
+
+            sql += """
+                LIMIT ?
             """
 
-            txn.execute(sql, (stream_id,))
+        def _get_largest_public_rooms_txn(txn):
+            txn.execute(sql, query_args)
 
-            results = {}
-            # A room is visible if its visible on any list.
-            for room_id, visibility in txn:
-                results[room_id] = bool(visibility) or results.get(room_id, False)
+            results = self.cursor_to_dict(txn)
+
+            if not forwards:
+                results.reverse()
 
             return results
 
-    def get_public_room_changes(self, prev_stream_id, new_stream_id, network_tuple):
-        def get_public_room_changes_txn(txn):
-            then_rooms = self.get_public_room_ids_at_stream_id_txn(
-                txn, prev_stream_id, network_tuple
-            )
-
-            now_rooms_dict = self.get_published_at_stream_id_txn(
-                txn, new_stream_id, network_tuple
-            )
-
-            now_rooms_visible = set(rm for rm, vis in now_rooms_dict.items() if vis)
-            now_rooms_not_visible = set(
-                rm for rm, vis in now_rooms_dict.items() if not vis
-            )
-
-            newly_visible = now_rooms_visible - then_rooms
-            newly_unpublished = now_rooms_not_visible & then_rooms
-
-            return newly_visible, newly_unpublished
-
-        return self.runInteraction(
-            "get_public_room_changes", get_public_room_changes_txn
+        ret_val = yield self.runInteraction(
+            "get_largest_public_rooms", _get_largest_public_rooms_txn
         )
+        defer.returnValue(ret_val)
 
     @cached(max_entries=10000)
     def is_room_blocked(self, room_id):
@@ -193,14 +289,12 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
         if row:
-            defer.returnValue(
-                RatelimitOverride(
-                    messages_per_second=row["messages_per_second"],
-                    burst_count=row["burst_count"],
-                )
+            return RatelimitOverride(
+                messages_per_second=row["messages_per_second"],
+                burst_count=row["burst_count"],
             )
         else:
-            defer.returnValue(None)
+            return None
 
 
 class RoomStore(RoomWorkerStore, SearchStore):
@@ -388,32 +482,12 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
     def _store_room_topic_txn(self, txn, event):
         if hasattr(event, "content") and "topic" in event.content:
-            self._simple_insert_txn(
-                txn,
-                "topics",
-                {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "topic": event.content["topic"],
-                },
-            )
-
             self.store_event_search_txn(
                 txn, event, "content.topic", event.content["topic"]
             )
 
     def _store_room_name_txn(self, txn, event):
         if hasattr(event, "content") and "name" in event.content:
-            self._simple_insert_txn(
-                txn,
-                "room_names",
-                {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "name": event.content["name"],
-                },
-            )
-
             self.store_event_search_txn(
                 txn, event, "content.name", event.content["name"]
             )
@@ -423,21 +497,6 @@ class RoomStore(RoomWorkerStore, SearchStore):
             self.store_event_search_txn(
                 txn, event, "content.body", event.content["body"]
             )
-
-    def _store_history_visibility_txn(self, txn, event):
-        self._store_content_index_txn(txn, event, "history_visibility")
-
-    def _store_guest_access_txn(self, txn, event):
-        self._store_content_index_txn(txn, event, "guest_access")
-
-    def _store_content_index_txn(self, txn, event, key):
-        if hasattr(event, "content") and key in event.content:
-            sql = (
-                "INSERT INTO %(key)s"
-                " (event_id, room_id, %(key)s)"
-                " VALUES (?, ?, ?)" % {"key": key}
-            )
-            txn.execute(sql, (event.event_id, event.room_id, event.content[key]))
 
     def add_event_report(
         self, room_id, event_id, user_id, reason, content, received_ts

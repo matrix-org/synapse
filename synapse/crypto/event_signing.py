@@ -46,9 +46,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     if name not in hashes:
         raise SynapseError(
             400,
-            "Algorithm %s not in hashes %s" % (
-                name, list(hashes),
-            ),
+            "Algorithm %s not in hashes %s" % (name, list(hashes)),
             Codes.UNAUTHORIZED,
         )
     message_hash_base64 = hashes[name]
@@ -56,9 +54,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
         message_hash_bytes = decode_base64(message_hash_base64)
     except Exception:
         raise SynapseError(
-            400,
-            "Invalid base64: %s" % (message_hash_base64,),
-            Codes.UNAUTHORIZED,
+            400, "Invalid base64: %s" % (message_hash_base64,), Codes.UNAUTHORIZED
         )
     return message_hash_bytes == expected_hash
 
@@ -87,7 +83,7 @@ def compute_content_hash(event_dict, hash_algorithm):
     event_json_bytes = encode_canonical_json(event_dict)
 
     hashed = hash_algorithm(event_json_bytes)
-    return (hashed.name, hashed.digest())
+    return hashed.name, hashed.digest()
 
 
 def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
@@ -110,7 +106,7 @@ def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
     event_dict.pop("unsigned", None)
     event_json_bytes = encode_canonical_json(event_dict)
     hashed = hash_algorithm(event_json_bytes)
-    return (hashed.name, hashed.digest())
+    return hashed.name, hashed.digest()
 
 
 def compute_event_signature(event_dict, signature_name, signing_key):
@@ -135,8 +131,9 @@ def compute_event_signature(event_dict, signature_name, signing_key):
     return redact_json["signatures"]
 
 
-def add_hashes_and_signatures(event_dict, signature_name, signing_key,
-                              hash_algorithm=hashlib.sha256):
+def add_hashes_and_signatures(
+    event_dict, signature_name, signing_key, hash_algorithm=hashlib.sha256
+):
     """Add content hash and sign the event
 
     Args:
@@ -153,7 +150,5 @@ def add_hashes_and_signatures(event_dict, signature_name, signing_key,
     event_dict.setdefault("hashes", {})[name] = encode_base64(digest)
 
     event_dict["signatures"] = compute_event_signature(
-        event_dict,
-        signature_name=signature_name,
-        signing_key=signing_key,
+        event_dict, signature_name=signature_name, signing_key=signing_key
     )

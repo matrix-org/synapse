@@ -11,9 +11,13 @@ from twisted.internet import address, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.error import DNSLookupError
-from twisted.internet.interfaces import IReactorPluggableNameResolver, IResolverSimple
+from twisted.internet.interfaces import (
+    IReactorPluggableNameResolver,
+    IReactorTCP,
+    IResolverSimple,
+)
 from twisted.python.failure import Failure
-from twisted.test.proto_helpers import MemoryReactorClock
+from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
 from twisted.web.http import unquote
 from twisted.web.http_headers import Headers
 
@@ -46,7 +50,7 @@ class FakeChannel(object):
     def json_body(self):
         if not self.result:
             raise Exception("No result yet.")
-        return json.loads(self.result["body"].decode('utf8'))
+        return json.loads(self.result["body"].decode("utf8"))
 
     @property
     def code(self):
@@ -151,10 +155,10 @@ def make_request(
         Tuple[synapse.http.site.SynapseRequest, channel]
     """
     if not isinstance(method, bytes):
-        method = method.encode('ascii')
+        method = method.encode("ascii")
 
     if not isinstance(path, bytes):
-        path = path.encode('ascii')
+        path = path.encode("ascii")
 
     # Decorate it to be the full path, if we're using shorthand
     if shorthand and not path.startswith(b"/_matrix"):
@@ -165,7 +169,7 @@ def make_request(
         path = b"/" + path
 
     if isinstance(content, text_type):
-        content = content.encode('utf8')
+        content = content.encode("utf8")
 
     site = FakeSite()
     channel = FakeChannel(reactor)
@@ -173,11 +177,11 @@ def make_request(
     req = request(site, channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
-    req.postpath = list(map(unquote, path[1:].split(b'/')))
+    req.postpath = list(map(unquote, path[1:].split(b"/")))
 
     if access_token:
         req.requestHeaders.addRawHeader(
-            b"Authorization", b"Bearer " + access_token.encode('ascii')
+            b"Authorization", b"Bearer " + access_token.encode("ascii")
         )
 
     if federation_auth_origin is not None:
@@ -242,7 +246,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super(ThreadedMemoryReactorClock, self).__init__()
 
-    def listenUDP(self, port, protocol, interface='', maxPacketSize=8196):
+    def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
         p.startListening()
         self._udp.append(p)
@@ -334,7 +338,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
 def get_clock():
     clock = ThreadedMemoryReactorClock()
     hs_clock = Clock(clock)
-    return (clock, hs_clock)
+    return clock, hs_clock
 
 
 @attr.s(cmp=False)
@@ -371,7 +375,7 @@ class FakeTransport(object):
 
     disconnecting = False
     disconnected = False
-    buffer = attr.ib(default=b'')
+    buffer = attr.ib(default=b"")
     producer = attr.ib(default=None)
     autoflush = attr.ib(default=True)
 
@@ -390,7 +394,9 @@ class FakeTransport(object):
 
             # if we still have data to write, delay until that is done
             if self.buffer:
-                logger.info("FakeTransport: Delaying disconnect until buffer is flushed")
+                logger.info(
+                    "FakeTransport: Delaying disconnect until buffer is flushed"
+                )
             else:
                 self.disconnected = True
 
@@ -483,3 +489,22 @@ class FakeTransport(object):
         if not self.buffer and self.disconnecting:
             logger.info("FakeTransport: Buffer now empty, completing disconnect")
             self.disconnected = True
+
+
+def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol:
+    """
+    Connect a client to a fake TCP transport.
+
+    Args:
+        reactor
+        factory: The connecting factory to build.
+    """
+    factory = reactor.tcpClients[client_id][2]
+    client = factory.buildProtocol(None)
+    server = AccumulatingProtocol()
+    server.makeConnection(FakeTransport(client, reactor))
+    client.makeConnection(FakeTransport(server, reactor))
+
+    reactor.tcpClients.pop(client_id)
+
+    return client, server

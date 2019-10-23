@@ -18,12 +18,13 @@ import os
 import warnings
 from datetime import datetime
 from hashlib import sha256
+from typing import List
 
 import six
 
 from unpaddedbase64 import encode_base64
 
-from OpenSSL import crypto
+from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
 
 from synapse.config._base import Config, ConfigError
@@ -33,7 +34,9 @@ logger = logging.getLogger(__name__)
 
 
 class TlsConfig(Config):
-    def read_config(self, config):
+    section = "tls"
+
+    def read_config(self, config: dict, config_dir_path: str, **kwargs):
 
         acme_config = config.get("acme", None)
         if acme_config is None:
@@ -42,18 +45,22 @@ class TlsConfig(Config):
         self.acme_enabled = acme_config.get("enabled", False)
 
         # hyperlink complains on py2 if this is not a Unicode
-        self.acme_url = six.text_type(acme_config.get(
-            "url", u"https://acme-v01.api.letsencrypt.org/directory"
-        ))
+        self.acme_url = six.text_type(
+            acme_config.get("url", "https://acme-v01.api.letsencrypt.org/directory")
+        )
         self.acme_port = acme_config.get("port", 80)
-        self.acme_bind_addresses = acme_config.get("bind_addresses", ['::', '0.0.0.0'])
+        self.acme_bind_addresses = acme_config.get("bind_addresses", ["::", "0.0.0.0"])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
         self.acme_domain = acme_config.get("domain", config.get("server_name"))
+
+        self.acme_account_key_file = self.abspath(
+            acme_config.get("account_key_file", config_dir_path + "/client.key")
+        )
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
 
-        if self.has_tls_listener():
+        if self.root.server.has_tls_listener():
             if not self.tls_certificate_file:
                 raise ConfigError(
                     "tls_certificate_path must be specified if TLS-enabled listeners are "
@@ -74,25 +81,51 @@ class TlsConfig(Config):
 
         # Whether to verify certificates on outbound federation traffic
         self.federation_verify_certificates = config.get(
-            "federation_verify_certificates", True,
+            "federation_verify_certificates", True
         )
+
+        # Minimum TLS version to use for outbound federation traffic
+        self.federation_client_minimum_tls_version = str(
+            config.get("federation_client_minimum_tls_version", 1)
+        )
+
+        if self.federation_client_minimum_tls_version not in ["1", "1.1", "1.2", "1.3"]:
+            raise ConfigError(
+                "federation_client_minimum_tls_version must be one of: 1, 1.1, 1.2, 1.3"
+            )
+
+        # Prevent people shooting themselves in the foot here by setting it to
+        # the biggest number blindly
+        if self.federation_client_minimum_tls_version == "1.3":
+            if getattr(SSL, "OP_NO_TLSv1_3", None) is None:
+                raise ConfigError(
+                    (
+                        "federation_client_minimum_tls_version cannot be 1.3, "
+                        "your OpenSSL does not support it"
+                    )
+                )
 
         # Whitelist of domains to not verify certificates for
         fed_whitelist_entries = config.get(
-            "federation_certificate_verification_whitelist", [],
+            "federation_certificate_verification_whitelist", []
         )
 
         # Support globs (*) in whitelist values
-        self.federation_certificate_verification_whitelist = []
+        self.federation_certificate_verification_whitelist = []  # type: List[str]
         for entry in fed_whitelist_entries:
+            try:
+                entry_regex = glob_to_regex(entry.encode("ascii").decode("ascii"))
+            except UnicodeEncodeError:
+                raise ConfigError(
+                    "IDNA domain names are not allowed in the "
+                    "federation_certificate_verification_whitelist: %s" % (entry,)
+                )
+
             # Convert globs to regex
-            entry_regex = glob_to_regex(entry)
             self.federation_certificate_verification_whitelist.append(entry_regex)
 
         # List of custom certificate authorities for federation traffic validation
-        custom_ca_list = config.get(
-            "federation_custom_ca_list", None,
-        )
+        custom_ca_list = config.get("federation_custom_ca_list", None)
 
         # Read in and parse custom CA certificates
         self.federation_ca_trust_root = None
@@ -101,8 +134,10 @@ class TlsConfig(Config):
                 # A trustroot cannot be generated without any CA certificates.
                 # Raise an error if this option has been specified without any
                 # corresponding certificates.
-                raise ConfigError("federation_custom_ca_list specified without "
-                                  "any certificate files")
+                raise ConfigError(
+                    "federation_custom_ca_list specified without "
+                    "any certificate files"
+                )
 
             certs = []
             for ca_file in custom_ca_list:
@@ -114,8 +149,9 @@ class TlsConfig(Config):
                     cert_base = Certificate.loadPEM(content)
                     certs.append(cert_base)
                 except Exception as e:
-                    raise ConfigError("Error parsing custom CA certificate file %s: %s"
-                                      % (ca_file, e))
+                    raise ConfigError(
+                        "Error parsing custom CA certificate file %s: %s" % (ca_file, e)
+                    )
 
             self.federation_ca_trust_root = trustRootFromCertificates(certs)
 
@@ -146,17 +182,21 @@ class TlsConfig(Config):
             return None
 
         try:
-            with open(self.tls_certificate_file, 'rb') as f:
+            with open(self.tls_certificate_file, "rb") as f:
                 cert_pem = f.read()
         except Exception as e:
-            raise ConfigError("Failed to read existing certificate file %s: %s"
-                              % (self.tls_certificate_file, e))
+            raise ConfigError(
+                "Failed to read existing certificate file %s: %s"
+                % (self.tls_certificate_file, e)
+            )
 
         try:
             tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
         except Exception as e:
-            raise ConfigError("Failed to parse existing certificate file %s: %s"
-                              % (self.tls_certificate_file, e))
+            raise ConfigError(
+                "Failed to parse existing certificate file %s: %s"
+                % (self.tls_certificate_file, e)
+            )
 
         if not allow_self_signed:
             if tls_certificate.get_subject() == tls_certificate.get_issuer():
@@ -166,7 +206,7 @@ class TlsConfig(Config):
 
         # YYYYMMDDhhmmssZ -- in UTC
         expires_on = datetime.strptime(
-            tls_certificate.get_notAfter().decode('ascii'), "%Y%m%d%H%M%SZ"
+            tls_certificate.get_notAfter().decode("ascii"), "%Y%m%d%H%M%SZ"
         )
         now = datetime.utcnow()
         days_remaining = (expires_on - now).days
@@ -191,7 +231,8 @@ class TlsConfig(Config):
             except Exception as e:
                 logger.info(
                     "Unable to read TLS certificate (%s). Ignoring as no "
-                    "tls listeners enabled.", e,
+                    "tls listeners enabled.",
+                    e,
                 )
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
@@ -205,18 +246,47 @@ class TlsConfig(Config):
             sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
             sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
             if sha256_fingerprint not in sha256_fingerprints:
-                self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
+                self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(
+        self,
+        config_dir_path,
+        server_name,
+        data_dir_path,
+        tls_certificate_path,
+        tls_private_key_path,
+        acme_domain,
+        **kwargs
+    ):
+        """If the acme_domain is specified acme will be enabled.
+        If the TLS paths are not specified the default will be certs in the
+        config directory"""
+
         base_key_name = os.path.join(config_dir_path, server_name)
 
-        tls_certificate_path = base_key_name + ".tls.crt"
-        tls_private_key_path = base_key_name + ".tls.key"
+        if bool(tls_certificate_path) != bool(tls_private_key_path):
+            raise ConfigError(
+                "Please specify both a cert path and a key path or neither."
+            )
+
+        tls_enabled = (
+            "" if tls_certificate_path and tls_private_key_path or acme_domain else "#"
+        )
+
+        if not tls_certificate_path:
+            tls_certificate_path = base_key_name + ".tls.crt"
+        if not tls_private_key_path:
+            tls_private_key_path = base_key_name + ".tls.key"
+
+        acme_enabled = bool(acme_domain)
+        acme_domain = "matrix.example.com"
+
+        default_acme_account_file = os.path.join(data_dir_path, "acme_account.key")
 
         # this is to avoid the max line length. Sorrynotsorry
         proxypassline = (
-            'ProxyPass /.well-known/acme-challenge '
-            'http://localhost:8009/.well-known/acme-challenge'
+            "ProxyPass /.well-known/acme-challenge "
+            "http://localhost:8009/.well-known/acme-challenge"
         )
 
         return (
@@ -235,11 +305,11 @@ class TlsConfig(Config):
         # instance, if using certbot, use `fullchain.pem` as your certificate,
         # not `cert.pem`).
         #
-        #tls_certificate_path: "%(tls_certificate_path)s"
+        %(tls_enabled)stls_certificate_path: "%(tls_certificate_path)s"
 
         # PEM-encoded private key for TLS
         #
-        #tls_private_key_path: "%(tls_private_key_path)s"
+        %(tls_enabled)stls_private_key_path: "%(tls_private_key_path)s"
 
         # Whether to verify TLS server certificates for outbound federation requests.
         #
@@ -247,6 +317,15 @@ class TlsConfig(Config):
         # following line.
         #
         #federation_verify_certificates: false
+
+        # The minimum TLS version that will be used for outbound federation requests.
+        #
+        # Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
+        # that setting this value higher than `1.2` will prevent federation to most
+        # of the public Matrix network: only configure it to `1.3` if you have an
+        # entirely private federation setup and you can ensure TLS 1.3 support.
+        #
+        #federation_client_minimum_tls_version: 1.2
 
         # Skip federation certificate verification on the following whitelist
         # of domains.
@@ -297,10 +376,10 @@ class TlsConfig(Config):
         #    permission to listen on port 80.
         #
         acme:
-            # ACME support is disabled by default. Uncomment the following line
-            # (and tls_certificate_path and tls_private_key_path above) to enable it.
+            # ACME support is disabled by default. Set this to `true` and uncomment
+            # tls_certificate_path and tls_private_key_path above to enable it.
             #
-            #enabled: true
+            enabled: %(acme_enabled)s
 
             # Endpoint to use to request certificates. If you only want to test,
             # use Let's Encrypt's staging url:
@@ -311,17 +390,17 @@ class TlsConfig(Config):
             # Port number to listen on for the HTTP-01 challenge. Change this if
             # you are forwarding connections through Apache/Nginx/etc.
             #
-            #port: 80
+            port: 80
 
             # Local addresses to listen on for incoming connections.
             # Again, you may want to change this if you are forwarding connections
             # through Apache/Nginx/etc.
             #
-            #bind_addresses: ['::', '0.0.0.0']
+            bind_addresses: ['::', '0.0.0.0']
 
             # How many days remaining on a certificate before it is renewed.
             #
-            #reprovision_threshold: 30
+            reprovision_threshold: 30
 
             # The domain that the certificate should be for. Normally this
             # should be the same as your Matrix domain (i.e., 'server_name'), but,
@@ -335,7 +414,14 @@ class TlsConfig(Config):
             #
             # If not set, defaults to your 'server_name'.
             #
-            #domain: matrix.example.com
+            domain: %(acme_domain)s
+
+            # file to use for the account key. This will be generated if it doesn't
+            # exist.
+            #
+            # If unspecified, we will use CONFDIR/client.key.
+            #
+            account_key_file: %(default_acme_account_file)s
 
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that

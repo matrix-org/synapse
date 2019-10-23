@@ -187,9 +187,8 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         self.assertEqual(res, 404)
 
     @defer.inlineCallbacks
-    def test_update_bad_version(self):
-        """Check that we get a 400 if the version in the body is missing or
-        doesn't match
+    def test_update_omitted_version(self):
+        """Check that the update succeeds if the version is missing from the body
         """
         version = yield self.handler.create_version(
             self.local_user,
@@ -197,19 +196,35 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         )
         self.assertEqual(version, "1")
 
-        res = None
-        try:
-            yield self.handler.update_version(
-                self.local_user,
-                version,
-                {
-                    "algorithm": "m.megolm_backup.v1",
-                    "auth_data": "revised_first_version_auth_data",
-                },
-            )
-        except errors.SynapseError as e:
-            res = e.code
-        self.assertEqual(res, 400)
+        yield self.handler.update_version(
+            self.local_user,
+            version,
+            {
+                "algorithm": "m.megolm_backup.v1",
+                "auth_data": "revised_first_version_auth_data",
+            },
+        )
+
+        # check we can retrieve it as the current version
+        res = yield self.handler.get_version_info(self.local_user)
+        self.assertDictEqual(
+            res,
+            {
+                "algorithm": "m.megolm_backup.v1",
+                "auth_data": "revised_first_version_auth_data",
+                "version": version,
+            },
+        )
+
+    @defer.inlineCallbacks
+    def test_update_bad_version(self):
+        """Check that we get a 400 if the version in the body doesn't match
+        """
+        version = yield self.handler.create_version(
+            self.local_user,
+            {"algorithm": "m.megolm_backup.v1", "auth_data": "first_version_auth_data"},
+        )
+        self.assertEqual(version, "1")
 
         res = None
         try:
@@ -395,37 +410,37 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         yield self.handler.upload_room_keys(self.local_user, version, room_keys)
 
         new_room_keys = copy.deepcopy(room_keys)
-        new_room_key = new_room_keys['rooms']['!abc:matrix.org']['sessions']['c0ff33']
+        new_room_key = new_room_keys["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]
 
         # test that increasing the message_index doesn't replace the existing session
-        new_room_key['first_message_index'] = 2
-        new_room_key['session_data'] = 'new'
+        new_room_key["first_message_index"] = 2
+        new_room_key["session_data"] = "new"
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
 
         res = yield self.handler.get_room_keys(self.local_user, version)
         self.assertEqual(
-            res['rooms']['!abc:matrix.org']['sessions']['c0ff33']['session_data'],
+            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"],
             "SSBBTSBBIEZJU0gK",
         )
 
         # test that marking the session as verified however /does/ replace it
-        new_room_key['is_verified'] = True
+        new_room_key["is_verified"] = True
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
 
         res = yield self.handler.get_room_keys(self.local_user, version)
         self.assertEqual(
-            res['rooms']['!abc:matrix.org']['sessions']['c0ff33']['session_data'], "new"
+            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
         )
 
         # test that a session with a higher forwarded_count doesn't replace one
         # with a lower forwarding count
-        new_room_key['forwarded_count'] = 2
-        new_room_key['session_data'] = 'other'
+        new_room_key["forwarded_count"] = 2
+        new_room_key["session_data"] = "other"
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
 
         res = yield self.handler.get_room_keys(self.local_user, version)
         self.assertEqual(
-            res['rooms']['!abc:matrix.org']['sessions']['c0ff33']['session_data'], "new"
+            res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
         )
 
         # TODO: check edge cases as well as the common variations here

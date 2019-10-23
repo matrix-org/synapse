@@ -46,12 +46,12 @@ def _load_rules(rawrules, enabled_map):
     rules = list(list_with_base_rules(ruleslist))
 
     for i, rule in enumerate(rules):
-        rule_id = rule['rule_id']
+        rule_id = rule["rule_id"]
         if rule_id in enabled_map:
-            if rule.get('enabled', True) != bool(enabled_map[rule_id]):
+            if rule.get("enabled", True) != bool(enabled_map[rule_id]):
                 # Rules are cached across users.
                 rule = dict(rule)
-                rule['enabled'] = bool(enabled_map[rule_id])
+                rule["enabled"] = bool(enabled_map[rule_id])
                 rules[i] = rule
 
     return rules
@@ -120,19 +120,17 @@ class PushRulesWorkerStore(
 
         rules = _load_rules(rows, enabled_map)
 
-        defer.returnValue(rules)
+        return rules
 
     @cachedInlineCallbacks(max_entries=5000)
     def get_push_rules_enabled_for_user(self, user_id):
         results = yield self._simple_select_list(
             table="push_rules_enable",
-            keyvalues={'user_name': user_id},
+            keyvalues={"user_name": user_id},
             retcols=("user_name", "rule_id", "enabled"),
             desc="get_push_rules_enabled_for_user",
         )
-        defer.returnValue(
-            {r['rule_id']: False if r['enabled'] == 0 else True for r in results}
-        )
+        return {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
 
     def have_push_rules_changed_for_user(self, user_id, last_id):
         if not self.push_rules_stream_cache.has_entity_changed(user_id, last_id):
@@ -160,7 +158,7 @@ class PushRulesWorkerStore(
     )
     def bulk_get_push_rules(self, user_ids):
         if not user_ids:
-            defer.returnValue({})
+            return {}
 
         results = {user_id: [] for user_id in user_ids}
 
@@ -175,18 +173,18 @@ class PushRulesWorkerStore(
         rows.sort(key=lambda row: (-int(row["priority_class"]), -int(row["priority"])))
 
         for row in rows:
-            results.setdefault(row['user_name'], []).append(row)
+            results.setdefault(row["user_name"], []).append(row)
 
         enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
 
         for user_id, rules in results.items():
             results[user_id] = _load_rules(rules, enabled_map_by_user.get(user_id, {}))
 
-        defer.returnValue(results)
+        return results
 
     @defer.inlineCallbacks
-    def move_push_rule_from_room_to_room(self, new_room_id, user_id, rule):
-        """Move a single push rule from one room to another for a specific user.
+    def copy_push_rule_from_room_to_room(self, new_room_id, user_id, rule):
+        """Copy a single push rule from one room to another for a specific user.
 
         Args:
             new_room_id (str): ID of the new room.
@@ -194,7 +192,7 @@ class PushRulesWorkerStore(
             rule (Dict): A push rule.
         """
         # Create new rule id
-        rule_id_scope = '/'.join(rule["rule_id"].split('/')[:-1])
+        rule_id_scope = "/".join(rule["rule_id"].split("/")[:-1])
         new_rule_id = rule_id_scope + "/" + new_room_id
 
         # Change room id in each condition
@@ -211,14 +209,11 @@ class PushRulesWorkerStore(
             actions=rule["actions"],
         )
 
-        # Delete push rule for the old room
-        yield self.delete_push_rule(user_id, rule["rule_id"])
-
     @defer.inlineCallbacks
-    def move_push_rules_from_room_to_room_for_user(
+    def copy_push_rules_from_room_to_room_for_user(
         self, old_room_id, new_room_id, user_id
     ):
-        """Move all of the push rules from one room to another for a specific
+        """Copy all of the push rules from one room to another for a specific
         user.
 
         Args:
@@ -229,15 +224,14 @@ class PushRulesWorkerStore(
         # Retrieve push rules for this user
         user_push_rules = yield self.get_push_rules_for_user(user_id)
 
-        # Get rules relating to the old room, move them to the new room, then
-        # delete them from the old room
+        # Get rules relating to the old room and copy them to the new room
         for rule in user_push_rules:
             conditions = rule.get("conditions", [])
             if any(
                 (c.get("key") == "room_id" and c.get("pattern") == old_room_id)
                 for c in conditions
             ):
-                self.move_push_rule_from_room_to_room(new_room_id, user_id, rule)
+                yield self.copy_push_rule_from_room_to_room(new_room_id, user_id, rule)
 
     @defer.inlineCallbacks
     def bulk_get_push_rules_for_room(self, event, context):
@@ -253,7 +247,7 @@ class PushRulesWorkerStore(
         result = yield self._bulk_get_push_rules_for_room(
             event.room_id, state_group, current_state_ids, event=event
         )
-        defer.returnValue(result)
+        return result
 
     @cachedInlineCallbacks(num_args=2, cache_context=True)
     def _bulk_get_push_rules_for_room(
@@ -312,7 +306,7 @@ class PushRulesWorkerStore(
 
         rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
 
-        defer.returnValue(rules_by_user)
+        return rules_by_user
 
     @cachedList(
         cached_method_name="get_push_rules_enabled_for_user",
@@ -322,7 +316,7 @@ class PushRulesWorkerStore(
     )
     def bulk_get_push_rules_enabled(self, user_ids):
         if not user_ids:
-            defer.returnValue({})
+            return {}
 
         results = {user_id: {} for user_id in user_ids}
 
@@ -334,9 +328,9 @@ class PushRulesWorkerStore(
             desc="bulk_get_push_rules_enabled",
         )
         for row in rows:
-            enabled = bool(row['enabled'])
-            results.setdefault(row['user_name'], {})[row['rule_id']] = enabled
-        defer.returnValue(results)
+            enabled = bool(row["enabled"])
+            results.setdefault(row["user_name"], {})[row["rule_id"]] = enabled
+        return results
 
 
 class PushRuleStore(PushRulesWorkerStore):
@@ -568,7 +562,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
         def delete_push_rule_txn(txn, stream_id, event_stream_ordering):
             self._simple_delete_one_txn(
-                txn, "push_rules", {'user_name': user_id, 'rule_id': rule_id}
+                txn, "push_rules", {"user_name": user_id, "rule_id": rule_id}
             )
 
             self._insert_push_rules_update_txn(
@@ -605,9 +599,9 @@ class PushRuleStore(PushRulesWorkerStore):
         self._simple_upsert_txn(
             txn,
             "push_rules_enable",
-            {'user_name': user_id, 'rule_id': rule_id},
-            {'enabled': 1 if enabled else 0},
-            {'id': new_id},
+            {"user_name": user_id, "rule_id": rule_id},
+            {"enabled": 1 if enabled else 0},
+            {"id": new_id},
         )
 
         self._insert_push_rules_update_txn(
@@ -645,8 +639,8 @@ class PushRuleStore(PushRulesWorkerStore):
                 self._simple_update_one_txn(
                     txn,
                     "push_rules",
-                    {'user_name': user_id, 'rule_id': rule_id},
-                    {'actions': actions_json},
+                    {"user_name": user_id, "rule_id": rule_id},
+                    {"actions": actions_json},
                 )
 
             self._insert_push_rules_update_txn(

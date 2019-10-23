@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import operator
 
-from twisted.internet import defer
+import operator
 
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
@@ -57,17 +56,17 @@ class UserErasureWorkerStore(SQLBaseStore):
         # iterate it multiple times, and (b) avoiding duplicates.
         user_ids = tuple(set(user_ids))
 
-        def _get_erased_users(txn):
-            txn.execute(
-                "SELECT user_id FROM erased_users WHERE user_id IN (%s)"
-                % (",".join("?" * len(user_ids))),
-                user_ids,
-            )
-            return set(r[0] for r in txn)
+        rows = yield self._simple_select_many_batch(
+            table="erased_users",
+            column="user_id",
+            iterable=user_ids,
+            retcols=("user_id",),
+            desc="are_users_erased",
+        )
+        erased_users = set(row["user_id"] for row in rows)
 
-        erased_users = yield self.runInteraction("are_users_erased", _get_erased_users)
         res = dict((u, u in erased_users) for u in user_ids)
-        defer.returnValue(res)
+        return res
 
 
 class UserErasureStore(UserErasureWorkerStore):

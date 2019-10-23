@@ -27,14 +27,17 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
         self.hs = hs
 
         self._device_list_id_gen = SlavedIdTracker(
-            db_conn, "device_lists_stream", "stream_id",
+            db_conn, "device_lists_stream", "stream_id"
         )
         device_list_max = self._device_list_id_gen.get_current_token()
         self._device_list_stream_cache = StreamChangeCache(
-            "DeviceListStreamChangeCache", device_list_max,
+            "DeviceListStreamChangeCache", device_list_max
+        )
+        self._user_signature_stream_cache = StreamChangeCache(
+            "UserSignatureStreamChangeCache", device_list_max
         )
         self._device_list_federation_stream_cache = StreamChangeCache(
-            "DeviceListFederationStreamChangeCache", device_list_max,
+            "DeviceListFederationStreamChangeCache", device_list_max
         )
 
     def stream_positions(self):
@@ -46,17 +49,13 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
         if stream_name == "device_lists":
             self._device_list_id_gen.advance(token)
             for row in rows:
-                self._invalidate_caches_for_devices(
-                    token, row.user_id, row.destination,
-                )
+                self._invalidate_caches_for_devices(token, row.user_id, row.destination)
         return super(SlavedDeviceStore, self).process_replication_rows(
             stream_name, token, rows
         )
 
     def _invalidate_caches_for_devices(self, token, user_id, destination):
-        self._device_list_stream_cache.entity_has_changed(
-            user_id, token
-        )
+        self._device_list_stream_cache.entity_has_changed(user_id, token)
 
         if destination:
             self._device_list_federation_stream_cache.entity_has_changed(

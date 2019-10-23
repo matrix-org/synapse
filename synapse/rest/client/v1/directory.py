@@ -18,7 +18,13 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientCredentialsError,
+    NotFoundError,
+    SynapseError,
+)
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import RoomAlias
@@ -48,7 +54,7 @@ class ClientDirectoryServer(RestServlet):
         dir_handler = self.handlers.directory_handler
         res = yield dir_handler.get_association(room_alias)
 
-        defer.returnValue((200, res))
+        return 200, res
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
@@ -56,8 +62,9 @@ class ClientDirectoryServer(RestServlet):
 
         content = parse_json_object_from_request(request)
         if "room_id" not in content:
-            raise SynapseError(400, 'Missing params: ["room_id"]',
-                               errcode=Codes.BAD_JSON)
+            raise SynapseError(
+                400, 'Missing params: ["room_id"]', errcode=Codes.BAD_JSON
+            )
 
         logger.debug("Got content: %s", content)
         logger.debug("Got room name: %s", room_alias.to_string())
@@ -80,7 +87,7 @@ class ClientDirectoryServer(RestServlet):
             requester, room_alias, room_id, servers
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, room_alias):
@@ -89,16 +96,14 @@ class ClientDirectoryServer(RestServlet):
         try:
             service = yield self.auth.get_appservice_by_req(request)
             room_alias = RoomAlias.from_string(room_alias)
-            yield dir_handler.delete_appservice_association(
-                service, room_alias
-            )
+            yield dir_handler.delete_appservice_association(service, room_alias)
             logger.info(
                 "Application service at %s deleted alias %s",
                 service.url,
-                room_alias.to_string()
+                room_alias.to_string(),
             )
-            defer.returnValue((200, {}))
-        except AuthError:
+            return 200, {}
+        except InvalidClientCredentialsError:
             # fallback to default user behaviour if they aren't an AS
             pass
 
@@ -107,17 +112,13 @@ class ClientDirectoryServer(RestServlet):
 
         room_alias = RoomAlias.from_string(room_alias)
 
-        yield dir_handler.delete_association(
-            requester, room_alias
-        )
+        yield dir_handler.delete_association(requester, room_alias)
 
         logger.info(
-            "User %s deleted alias %s",
-            user.to_string(),
-            room_alias.to_string()
+            "User %s deleted alias %s", user.to_string(), room_alias.to_string()
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class ClientDirectoryListServer(RestServlet):
@@ -135,9 +136,7 @@ class ClientDirectoryListServer(RestServlet):
         if room is None:
             raise NotFoundError("Unknown room")
 
-        defer.returnValue((200, {
-            "visibility": "public" if room["is_public"] else "private"
-        }))
+        return 200, {"visibility": "public" if room["is_public"] else "private"}
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id):
@@ -147,20 +146,20 @@ class ClientDirectoryListServer(RestServlet):
         visibility = content.get("visibility", "public")
 
         yield self.handlers.directory_handler.edit_published_room_list(
-            requester, room_id, visibility,
+            requester, room_id, visibility
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_DELETE(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request)
 
         yield self.handlers.directory_handler.edit_published_room_list(
-            requester, room_id, "private",
+            requester, room_id, "private"
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class ClientAppserviceDirectoryListServer(RestServlet):
@@ -191,7 +190,7 @@ class ClientAppserviceDirectoryListServer(RestServlet):
             )
 
         yield self.handlers.directory_handler.edit_published_appservice_room_list(
-            requester.app_service.id, network_id, room_id, visibility,
+            requester.app_service.id, network_id, room_id, visibility
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}

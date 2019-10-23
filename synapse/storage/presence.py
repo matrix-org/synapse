@@ -18,10 +18,9 @@ from collections import namedtuple
 from twisted.internet import defer
 
 from synapse.api.constants import PresenceState
+from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.util import batch_iter
 from synapse.util.caches.descriptors import cached, cachedList
-
-from ._base import SQLBaseStore
 
 
 class UserPresenceState(
@@ -90,9 +89,7 @@ class PresenceStore(SQLBaseStore):
                 presence_states,
             )
 
-        defer.returnValue(
-            (stream_orderings[-1], self._presence_id_gen.get_current_token())
-        )
+        return stream_orderings[-1], self._presence_id_gen.get_current_token()
 
     def _update_presence_txn(self, txn, stream_orderings, presence_states):
         for stream_id, state in zip(stream_orderings, presence_states):
@@ -121,14 +118,13 @@ class PresenceStore(SQLBaseStore):
         )
 
         # Delete old rows to stop database from getting really big
-        sql = (
-            "DELETE FROM presence_stream WHERE" " stream_id < ?" " AND user_id IN (%s)"
-        )
+        sql = "DELETE FROM presence_stream WHERE stream_id < ? AND "
 
         for states in batch_iter(presence_states, 50):
-            args = [stream_id]
-            args.extend(s.user_id for s in states)
-            txn.execute(sql % (",".join("?" for _ in states),), args)
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "user_id", [s.user_id for s in states]
+            )
+            txn.execute(sql + clause, [stream_id] + list(args))
 
     def get_all_presence_updates(self, last_id, current_id):
         if last_id == current_id:
@@ -180,7 +176,7 @@ class PresenceStore(SQLBaseStore):
         for row in rows:
             row["currently_active"] = bool(row["currently_active"])
 
-        defer.returnValue({row["user_id"]: UserPresenceState(**row) for row in rows})
+        return {row["user_id"]: UserPresenceState(**row) for row in rows}
 
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()

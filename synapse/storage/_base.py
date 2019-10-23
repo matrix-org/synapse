@@ -20,6 +20,7 @@ import random
 import sys
 import threading
 import time
+from typing import Iterable, Tuple
 
 from six import PY2, iteritems, iterkeys, itervalues
 from six.moves import builtins, intern, range
@@ -30,13 +31,21 @@ from prometheus_client import Histogram
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.logging.context import LoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id
 from synapse.util import batch_iter
 from synapse.util.caches.descriptors import Cache
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
+
+# import a function which will return a monotonic time, in seconds
+try:
+    # on python 3, use time.monotonic, since time.clock can go backwards
+    from time import monotonic as monotonic_time
+except ImportError:
+    # ... but python 2 doesn't have it
+    from time import clock as monotonic_time
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +87,21 @@ _CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 class LoggingTransaction(object):
     """An object that almost-transparently proxies for the 'txn' object
     passed to the constructor. Adds logging and metrics to the .execute()
-    method."""
+    method.
+
+    Args:
+        txn: The database transcation object to wrap.
+        name (str): The name of this transactions for logging.
+        database_engine (Sqlite3Engine|PostgresEngine)
+        after_callbacks(list|None): A list that callbacks will be appended to
+            that have been added by `call_after` which should be run on
+            successful completion of the transaction. None indicates that no
+            callbacks should be allowed to be scheduled to run.
+        exception_callbacks(list|None): A list that callbacks will be appended
+            to that have been added by `call_on_exception` which should be run
+            if transaction ends with an error. None indicates that no callbacks
+            should be allowed to be scheduled to run.
+    """
 
     __slots__ = [
         "txn",
@@ -89,7 +112,7 @@ class LoggingTransaction(object):
     ]
 
     def __init__(
-        self, txn, name, database_engine, after_callbacks, exception_callbacks
+        self, txn, name, database_engine, after_callbacks=None, exception_callbacks=None
     ):
         object.__setattr__(self, "txn", txn)
         object.__setattr__(self, "name", name)
@@ -167,22 +190,22 @@ class PerformanceCounters(object):
         self.current_counters = {}
         self.previous_counters = {}
 
-    def update(self, key, start_time, end_time=None):
-        if end_time is None:
-            end_time = time.time()
-        duration = end_time - start_time
+    def update(self, key, duration_secs):
         count, cum_time = self.current_counters.get(key, (0, 0))
         count += 1
-        cum_time += duration
+        cum_time += duration_secs
         self.current_counters[key] = (count, cum_time)
-        return end_time
 
-    def interval(self, interval_duration, limit=3):
+    def interval(self, interval_duration_secs, limit=3):
         counters = []
         for name, (count, cum_time) in iteritems(self.current_counters):
             prev_count, prev_time = self.previous_counters.get(name, (0, 0))
             counters.append(
-                ((cum_time - prev_time) / interval_duration, count - prev_count, name)
+                (
+                    (cum_time - prev_time) / interval_duration_secs,
+                    count - prev_count,
+                    name,
+                )
             )
 
         self.previous_counters = dict(self.current_counters)
@@ -213,7 +236,6 @@ class SQLBaseStore(object):
         #   is running in mainline, and we have some nice monitoring frontends
         #   to watch it
         self._txn_perf_counters = PerformanceCounters()
-        self._get_event_counters = PerformanceCounters()
 
         self._get_event_cache = Cache(
             "*getEvent*", keylen=3, max_entries=hs.config.event_cache_size
@@ -299,12 +321,12 @@ class SQLBaseStore(object):
 
         def select_users_with_no_expiration_date_txn(txn):
             """Retrieves the list of registered users with no expiration date from the
-            database.
+            database, filtering out deactivated users.
             """
             sql = (
                 "SELECT users.name FROM users"
                 " LEFT JOIN account_validity ON (users.name = account_validity.user_id)"
-                " WHERE account_validity.user_id is NULL;"
+                " WHERE account_validity.user_id is NULL AND users.deactivated = 0;"
             )
             txn.execute(sql, [])
 
@@ -312,9 +334,7 @@ class SQLBaseStore(object):
             if res:
                 for user in res:
                     self.set_expiration_date_for_user_txn(
-                        txn,
-                        user["name"],
-                        use_delta=True,
+                        txn, user["name"], use_delta=True
                     )
 
         yield self.runInteraction(
@@ -352,32 +372,24 @@ class SQLBaseStore(object):
         )
 
     def start_profiling(self):
-        self._previous_loop_ts = self._clock.time_msec()
+        self._previous_loop_ts = monotonic_time()
 
         def loop():
             curr = self._current_txn_total_time
             prev = self._previous_txn_total_time
             self._previous_txn_total_time = curr
 
-            time_now = self._clock.time_msec()
+            time_now = monotonic_time()
             time_then = self._previous_loop_ts
             self._previous_loop_ts = time_now
 
-            ratio = (curr - prev) / (time_now - time_then)
+            duration = time_now - time_then
+            ratio = (curr - prev) / duration
 
-            top_three_counters = self._txn_perf_counters.interval(
-                time_now - time_then, limit=3
-            )
-
-            top_3_event_counters = self._get_event_counters.interval(
-                time_now - time_then, limit=3
-            )
+            top_three_counters = self._txn_perf_counters.interval(duration, limit=3)
 
             perf_logger.info(
-                "Total database time: %.3f%% {%s} {%s}",
-                ratio * 100,
-                top_three_counters,
-                top_3_event_counters,
+                "Total database time: %.3f%% {%s}", ratio * 100, top_three_counters
             )
 
         self._clock.looping_call(loop, 10000)
@@ -385,7 +397,7 @@ class SQLBaseStore(object):
     def _new_transaction(
         self, conn, desc, after_callbacks, exception_callbacks, func, *args, **kwargs
     ):
-        start = time.time()
+        start = monotonic_time()
         txn_id = self._TXN_ID
 
         # We don't really need these to be unique, so lets stop it from
@@ -451,7 +463,7 @@ class SQLBaseStore(object):
             logger.debug("[TXN FAIL] {%s} %s", name, e)
             raise
         finally:
-            end = time.time()
+            end = monotonic_time()
             duration = end - start
 
             LoggingContext.current_context().add_database_transaction(duration)
@@ -459,7 +471,7 @@ class SQLBaseStore(object):
             transaction_logger.debug("[TXN END] {%s} %f sec", name, duration)
 
             self._current_txn_total_time += duration
-            self._txn_perf_counters.update(desc, start, end)
+            self._txn_perf_counters.update(desc, duration)
             sql_txn_timer.labels(desc).observe(duration)
 
     @defer.inlineCallbacks
@@ -502,7 +514,7 @@ class SQLBaseStore(object):
                 after_callback(*after_args, **after_kwargs)
             raise
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def runWithConnection(self, func, *args, **kwargs):
@@ -525,11 +537,11 @@ class SQLBaseStore(object):
             )
             parent_context = None
 
-        start_time = time.time()
+        start_time = monotonic_time()
 
         def inner_func(conn, *args, **kwargs):
             with LoggingContext("runWithConnection", parent_context) as context:
-                sched_duration_sec = time.time() - start_time
+                sched_duration_sec = monotonic_time() - start_time
                 sql_scheduling_timer.observe(sched_duration_sec)
                 context.add_database_scheduled(sched_duration_sec)
 
@@ -539,10 +551,11 @@ class SQLBaseStore(object):
 
                 return func(conn, *args, **kwargs)
 
-        with PreserveLoggingContext():
-            result = yield self._db_pool.runWithConnection(inner_func, *args, **kwargs)
+        result = yield make_deferred_yieldable(
+            self._db_pool.runWithConnection(inner_func, *args, **kwargs)
+        )
 
-        defer.returnValue(result)
+        return result
 
     @staticmethod
     def cursor_to_dict(cursor):
@@ -604,8 +617,8 @@ class SQLBaseStore(object):
             # a cursor after we receive an error from the db.
             if not or_ignore:
                 raise
-            defer.returnValue(False)
-        defer.returnValue(True)
+            return False
+        return True
 
     @staticmethod
     def _simple_insert_txn(txn, table, values):
@@ -697,7 +710,7 @@ class SQLBaseStore(object):
                     insertion_values,
                     lock=lock,
                 )
-                defer.returnValue(result)
+                return result
             except self.database_engine.module.IntegrityError as e:
                 attempts += 1
                 if attempts >= 5:
@@ -1110,7 +1123,7 @@ class SQLBaseStore(object):
         results = []
 
         if not iterable:
-            defer.returnValue(results)
+            return results
 
         # iterables can not be sliced, so convert it to a list first
         it_list = list(iterable)
@@ -1131,7 +1144,7 @@ class SQLBaseStore(object):
 
             results.extend(rows)
 
-        defer.returnValue(results)
+        return results
 
     @classmethod
     def _simple_select_many_txn(cls, txn, table, column, iterable, keyvalues, retcols):
@@ -1151,19 +1164,18 @@ class SQLBaseStore(object):
         if not iterable:
             return []
 
-        sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
-
-        clauses = []
-        values = []
-        clauses.append("%s IN (%s)" % (column, ",".join("?" for _ in iterable)))
-        values.extend(iterable)
+        clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
+        clauses = [clause]
 
         for key, value in iteritems(keyvalues):
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
-        if clauses:
-            sql = "%s WHERE %s" % (sql, " AND ".join(clauses))
+        sql = "SELECT %s FROM %s WHERE %s" % (
+            ", ".join(retcols),
+            table,
+            " AND ".join(clauses),
+        )
 
         txn.execute(sql, values)
         return cls.cursor_to_dict(txn)
@@ -1312,10 +1324,8 @@ class SQLBaseStore(object):
 
         sql = "DELETE FROM %s" % table
 
-        clauses = []
-        values = []
-        clauses.append("%s IN (%s)" % (column, ",".join("?" for _ in iterable)))
-        values.extend(iterable)
+        clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
+        clauses = [clause]
 
         for key, value in iteritems(keyvalues):
             clauses.append("%s = ?" % (key,))
@@ -1384,14 +1394,22 @@ class SQLBaseStore(object):
         """
         txn.call_after(self._invalidate_state_caches, room_id, members_changed)
 
-        # We need to be careful that the size of the `members_changed` list
-        # isn't so large that it causes problems sending over replication, so we
-        # send them in chunks.
-        # Max line length is 16K, and max user ID length is 255, so 50 should
-        # be safe.
-        for chunk in batch_iter(members_changed, 50):
-            keys = itertools.chain([room_id], chunk)
-            self._send_invalidation_to_replication(txn, _CURRENT_STATE_CACHE_NAME, keys)
+        if members_changed:
+            # We need to be careful that the size of the `members_changed` list
+            # isn't so large that it causes problems sending over replication, so we
+            # send them in chunks.
+            # Max line length is 16K, and max user ID length is 255, so 50 should
+            # be safe.
+            for chunk in batch_iter(members_changed, 50):
+                keys = itertools.chain([room_id], chunk)
+                self._send_invalidation_to_replication(
+                    txn, _CURRENT_STATE_CACHE_NAME, keys
+                )
+        else:
+            # if no members changed, we still need to invalidate the other caches.
+            self._send_invalidation_to_replication(
+                txn, _CURRENT_STATE_CACHE_NAME, [room_id]
+            )
 
     def _invalidate_state_caches(self, room_id, members_changed):
         """Invalidates caches that are based on the current state, but does
@@ -1667,10 +1685,37 @@ def db_to_json(db_content):
     # Decode it to a Unicode string before feeding it to json.loads, so we
     # consistenty get a Unicode-containing object out.
     if isinstance(db_content, (bytes, bytearray)):
-        db_content = db_content.decode('utf8')
+        db_content = db_content.decode("utf8")
 
     try:
         return json.loads(db_content)
     except Exception:
         logging.warning("Tried to decode '%r' as JSON and failed", db_content)
         raise
+
+
+def make_in_list_sql_clause(
+    database_engine, column: str, iterable: Iterable
+) -> Tuple[str, Iterable]:
+    """Returns an SQL clause that checks the given column is in the iterable.
+
+    On SQLite this expands to `column IN (?, ?, ...)`, whereas on Postgres
+    it expands to `column = ANY(?)`. While both DBs support the `IN` form,
+    using the `ANY` form on postgres means that it views queries with
+    different length iterables as the same, helping the query stats.
+
+    Args:
+        database_engine
+        column: Name of the column
+        iterable: The values to check the column against.
+
+    Returns:
+        A tuple of SQL query and the args
+    """
+
+    if database_engine.supports_using_any_list:
+        # This should hopefully be faster, but also makes postgres query
+        # stats easier to understand.
+        return "%s = ANY(?)" % (column,), [list(iterable)]
+    else:
+        return "%s IN (%s)" % (column, ",".join("?" for _ in iterable)), list(iterable)
