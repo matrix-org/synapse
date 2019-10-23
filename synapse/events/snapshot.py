@@ -71,7 +71,7 @@ class EventContext:
     rejected = attr.ib(default=False)
     prev_group = attr.ib(default=None)
     delta_ids = attr.ib(default=None)
-    prev_state_events = attr.ib(factory=list)
+    prev_state_events = attr.ib(default=attr.Factory(list))
     app_service = attr.ib(default=None)
 
     _current_state_ids = attr.ib(default=None)
