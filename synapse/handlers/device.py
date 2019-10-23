@@ -468,7 +468,7 @@ class DeviceHandler(DeviceWorkerHandler):
             "stream_id": stream_id,
             "devices": devices,
             "master_key": master_key,
-            "self_signing_key": self_signing_key
+            "self_signing_key": self_signing_key,
         }
 
     @defer.inlineCallbacks

@@ -260,7 +260,7 @@ class E2eKeysHandler(object):
 
         Returns:
             defer.Deferred[dict[str, dict[str, dict]]]: map from
-                (master|self_signing|user_signing) -> user_id -> key
+                (master_keys|self_signing_keys|user_signing_keys) -> user_id -> key
         """
         master_keys = {}
         self_signing_keys = {}
@@ -355,10 +355,11 @@ class E2eKeysHandler(object):
         ret = {"device_keys": res}
 
         # add in the cross-signing keys
-        cross_signing_keys = yield self.query_cross_signing_keys(device_keys_query, None)
+        cross_signing_keys = yield self.get_cross_signing_keys_from_cache(
+            device_keys_query, None
+        )
 
-        for key, value in iteritems(cross_signing_keys):
-            ret[key + "_keys"] = value
+        ret.update(cross_signing_keys)
 
         return ret
 

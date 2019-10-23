@@ -214,7 +214,7 @@ class DeviceWorkerStore(SQLBaseStore):
         # figure out which cross-signing keys were changed by intersecting the
         # update list with the master/self-signing key by user maps
         cross_signing_keys_by_user = {}
-        for user_id, device_id, stream in updates:
+        for user_id, device_id, stream, _opentracing_context in updates:
             if device_id == master_key_by_user.get(user_id, {}).get("pubkey", None):
                 result = cross_signing_keys_by_user.setdefault(user_id, {})
                 result["master_key"] = master_key_by_user[user_id]["key_info"]
