@@ -137,7 +137,9 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         """Check that an specific device ids exist in a list of device update EDUs"""
         self.assertEqual(len(device_updates), len(expected_device_ids))
 
-        received_device_ids = {update["device_id"] for update in device_updates}
+        received_device_ids = {
+            update["device_id"] for edu_type, update in device_updates
+        }
         self.assertEqual(received_device_ids, set(expected_device_ids))
 
     @defer.inlineCallbacks
