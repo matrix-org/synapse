@@ -30,6 +30,9 @@ class AdminHandler(BaseHandler):
     def __init__(self, hs):
         super(AdminHandler, self).__init__(hs)
 
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
+
     @defer.inlineCallbacks
     def get_whois(self, user):
         connections = []
@@ -205,7 +208,7 @@ class AdminHandler(BaseHandler):
 
                 from_key = events[-1].internal_metadata.after
 
-                events = yield filter_events_for_client(self.store, user_id, events)
+                events = yield filter_events_for_client(self.storage, user_id, events)
 
                 writer.write_events(room_id, events)
 
@@ -241,7 +244,7 @@ class AdminHandler(BaseHandler):
             for event_id in extremities:
                 if not event_to_unseen_prevs[event_id]:
                     continue
-                state = yield self.store.get_state_for_event(event_id)
+                state = yield self.state_store.get_state_for_event(event_id)
                 writer.write_state(room_id, event_id, state)
 
         return writer.finished()
