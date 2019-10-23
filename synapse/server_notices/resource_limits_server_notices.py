@@ -141,9 +141,7 @@ class ResourceLimitsServerNotices(object):
         )
 
     @defer.inlineCallbacks
-    def _apply_limit_block_notification(
-        self, user_id, event_body, event_limit_type, ref_events
-    ):
+    def _apply_limit_block_notification(self, user_id, event_body, event_limit_type):
         """Utility method to apply limit block notifications in the server
         notices room.
 
@@ -164,7 +162,7 @@ class ResourceLimitsServerNotices(object):
             user_id, content, EventTypes.Message
         )
 
-        content = {"pinned": ref_events.append(event.event_id)}
+        content = {"pinned": [event.event_id]}
         yield self._server_notices_manager.send_notice(
             user_id, content, EventTypes.Pinned, ""
         )
