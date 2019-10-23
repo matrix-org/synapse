@@ -39,17 +39,14 @@ class HomeServer(object):
         pass
     def get_state_resolution_handler(self) -> synapse.state.StateResolutionHandler:
         pass
-
     def get_simple_http_client(self) -> synapse.http.client.SimpleHttpClient:
         """Fetch an HTTP client implementation which doesn't do any blacklisting
         or support any HTTP_PROXY settings"""
         pass
-
-    def get_proxied_http_client(self) synapse.http.client.SimpleHttpClient:
+    def get_proxied_http_client(self) -> synapse.http.client.SimpleHttpClient:
         """Fetch an HTTP client implementation which doesn't do any blacklisting
         but does support HTTP_PROXY settings"""
         pass
-
     def get_deactivate_account_handler(
         self
     ) -> synapse.handlers.deactivate_account.DeactivateAccountHandler:
