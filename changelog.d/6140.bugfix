@@ -1,1 +1,1 @@
-Make the  script create the right indexes on a new PostgreSQL database.
+Make the `synapse_port_db` script create the right indexes on a new PostgreSQL database.
