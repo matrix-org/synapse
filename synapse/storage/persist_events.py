@@ -183,7 +183,7 @@ class EventsPersistenceStorage(object):
         # so we use separate variables here even though they point to the same
         # store for now.
         self.main_store = stores.main
-        self.state_store = stores.main
+        self.state_store = stores.state
 
         self._clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
@@ -550,7 +550,7 @@ class EventsPersistenceStorage(object):
 
         if missing_event_ids:
             # Now pull out the state groups for any missing events from DB
-            event_to_groups = yield self.state_store._get_state_group_for_events(
+            event_to_groups = yield self.main_store._get_state_group_for_events(
                 missing_event_ids
             )
             event_id_to_state_group.update(event_to_groups)
