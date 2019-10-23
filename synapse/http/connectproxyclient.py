@@ -74,8 +74,8 @@ class HTTPProxiedClientFactory(protocol.ClientFactory):
     HTTP Protocol object and run the rest of the connection.
 
     Args:
-        dst_host (bytes): The original HTTP(s) hostname or IPv4 or IPv6 address literal.
-        dst_port (int): The original HTTP(s) port
+        dst_host (bytes): hostname that we want to CONNECT to
+        dst_port (int): port that we want to connect to
         wrapped_factory (protocol.ClientFactory): The original Factory
     """
 
@@ -109,12 +109,19 @@ class HTTPProxiedClientFactory(protocol.ClientFactory):
 
 
 class HTTPConnectProtocol(protocol.Protocol):
-    """Protocol that wraps http factory with CONNECT proxy handshake on connect
+    """Protocol that wraps an existing Protocol to do a CONNECT handshake at connect
 
     Args:
-        host (bytes): The original HTTP(s) hostname or IPv4 or IPv6 address literal.
+        host (bytes): The original HTTP(s) hostname or IPv4 or IPv6 address literal
+            to put in the CONNECT request
 
-        port (int): The original HTTP(s) port
+        port (int): The original HTTP(s) port to put in the CONNECT request
+
+        wrapped_protocol (interfaces.IProtocol): the original protocol (probably
+            HTTPChannel or TLSMemoryBIOProtocol, but could be anything really)
+
+        connected_deferred (Deferred): a Deferred which will be callbacked with
+            wrapped_protocol when the CONNECT completes
     """
 
     def __init__(self, host, port, wrapped_protocol, connected_deferred):
@@ -142,7 +149,7 @@ class HTTPConnectProtocol(protocol.Protocol):
 
         self.connected_deferred.callback(self.wrapped_protocol)
 
-        # Get any pending data from the http buf and forward it to the http protocol
+        # Get any pending data from the http buf and forward it to the original protocol
         buf = self.http_setup_client.clearLineBuffer()
         if buf:
             self.wrapped_protocol.dataReceived(buf)
@@ -161,9 +168,8 @@ class HTTPConnectSetupClient(http.HTTPClient):
     """HTTPClient protocol to send a CONNECT message for proxies and read the response.
 
     Args:
-        host (bytes): The original HTTP(s) hostname or IPv4 or IPv6 address literal.
-
-        port (int): The original HTTP(s) port
+        host (bytes): The hostname to send in the CONNECT message
+        port (int): The port to send in the CONNECT message
     """
 
     def __init__(self, host, port):
