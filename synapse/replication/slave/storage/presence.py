@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.storage import DataStore
-from synapse.storage.presence import PresenceStore
+from synapse.storage.data_stores.main.presence import PresenceStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from ._base import BaseSlavedStore, __func__
