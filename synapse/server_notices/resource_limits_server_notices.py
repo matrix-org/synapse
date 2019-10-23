@@ -120,7 +120,7 @@ class ResourceLimitsServerNotices(object):
             elif not currently_blocked and is_auth_blocking:
                 # Room is not notifying of a block, when it ought to be.
                 yield self._apply_limit_block_notification(
-                    user_id, event_body, event_limit_type, ref_events
+                    user_id, event_body, event_limit_type
                 )
         except SynapseError as e:
             logger.error("Error sending resource limits server notice: %s", e)
