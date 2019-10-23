@@ -29,6 +29,7 @@ from synapse.api.constants import EventTypes
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateResolutionStore
+from synapse.storage.data_stores import DataStores
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.metrics import Measure
 
@@ -171,12 +172,12 @@ class _EventPeristenceQueue(object):
 
 
 class EventsPersistenceStore(object):
-    def __init__(self, hs):
+    def __init__(self, hs, stores: DataStores):
         # We ultimately want to split out the state store from the main store,
         # so we use separate variables here even though they point to the same
         # store for now.
-        self.main_store = hs.get_datastore()
-        self.state_store = hs.get_datastore()
+        self.main_store = stores.main
+        self.state_store = stores.main
 
         self._clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
