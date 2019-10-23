@@ -84,14 +84,30 @@ class ProxyAgent(_AgentBase):
 
     def request(self, method, uri, headers=None, bodyProducer=None):
         """
-        Issue a request to the server indicated by the given C{uri}.
+        Issue a request to the server indicated by the given uri.
 
-        An existing connection from the connection pool may be used or a new
-        one may be created.
+        Supports `http` and `https` schemes.
 
-        I{HTTP} and I{HTTPS} schemes are supported in C{uri}.
+        An existing connection from the connection pool may be used or a new one may be
+        created.
 
-        @see: L{twisted.web.iweb.IAgent.request}
+        See also: twisted.web.iweb.IAgent.request
+
+        Args:
+            method (bytes): The request method to use, such as `GET`, `POST`, etc
+
+            uri (bytes): The location of the resource to request.
+
+            headers (Headers|None): Extra headers to send with the request
+
+            bodyProducer (IBodyProducer|None): An object which can generate bytes to
+                make up the body of this request (for example, the properly encoded
+                contents of a file for a file upload). Or, None if the request is to
+                have no body.
+
+        Returns:
+            Deferred[IResponse]: completes when the header of the response has
+                 been received (regardless of the response status code).
         """
         uri = uri.strip()
         if not _VALID_URI.match(uri):

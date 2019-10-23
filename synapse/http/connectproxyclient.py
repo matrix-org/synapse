@@ -173,12 +173,12 @@ class HTTPConnectSetupClient(http.HTTPClient):
 
     def connectionMade(self):
         logger.debug("Connected to proxy, sending CONNECT")
-        self.sendCommand("CONNECT", b"%s:%d" % (self.host, self.port))
+        self.sendCommand(b"CONNECT", b"%s:%d" % (self.host, self.port))
         self.endHeaders()
 
     def handleStatus(self, version, status, message):
         logger.debug("Got Status: %s %s %s", status, message, version)
-        if str(status) != "200":
+        if status != b"200":
             raise ProxyConnectError("Unexpected status on CONNECT: %s" % status)
 
     def handleEndHeaders(self):
