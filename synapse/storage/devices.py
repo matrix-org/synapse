@@ -231,7 +231,8 @@ class DeviceWorkerStore(SQLBaseStore):
         # add the updated cross-signing keys to the results list
         for user_id, result in iteritems(cross_signing_keys_by_user):
             result["user_id"] = user_id
-            cross_signing_results.append(("m.signing_key_update", result))
+            # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
+            cross_signing_results.append(("org.matrix.signing_key_update", result))
 
         # That should only happen if a client is spamming the server with new
         # devices, in which case E2E isn't going to work well anyway. We'll just
