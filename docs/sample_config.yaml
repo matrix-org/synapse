@@ -86,7 +86,7 @@ pid_file: DATADIR/homeserver.pid
 # Whether room invites to users on this server should be blocked
 # (except those sent by local server admins). The default is False.
 #
-#block_non_admin_invites: True
+#block_non_admin_invites: true
 
 # Room searching
 #
@@ -239,7 +239,7 @@ listeners:
 
 # Global blocking
 #
-#hs_disabled: False
+#hs_disabled: false
 #hs_disabled_message: 'Human readable reason for why the HS is blocked'
 #hs_disabled_limit_type: 'error code(str), to help clients decode reason'
 
@@ -261,7 +261,7 @@ listeners:
 # sign up in a short space of time never to return after their initial
 # session.
 #
-#limit_usage_by_mau: False
+#limit_usage_by_mau: false
 #max_mau_value: 50
 #mau_trial_days: 2
 
@@ -269,7 +269,7 @@ listeners:
 # be populated, however no one will be limited. If limit_usage_by_mau
 # is true, this is implied to be true.
 #
-#mau_stats_only: False
+#mau_stats_only: false
 
 # Sometimes the server admin will want to ensure certain accounts are
 # never blocked by mau checking. These accounts are specified here.
@@ -294,7 +294,7 @@ listeners:
 #
 # Uncomment the below lines to enable:
 #limit_remote_rooms:
-#  enabled: True
+#  enabled: true
 #  complexity: 1.0
 #  complexity_error: "This room is too complex."
 
@@ -411,7 +411,7 @@ acme:
     # ACME support is disabled by default. Set this to `true` and uncomment
     # tls_certificate_path and tls_private_key_path above to enable it.
     #
-    enabled: False
+    enabled: false
 
     # Endpoint to use to request certificates. If you only want to test,
     # use Let's Encrypt's staging url:
@@ -786,7 +786,7 @@ uploads_path: "DATADIR/uploads"
 # connect to arbitrary endpoints without having first signed up for a
 # valid account (e.g. by passing a CAPTCHA).
 #
-#turn_allow_guests: True
+#turn_allow_guests: true
 
 
 ## Registration ##
@@ -829,7 +829,7 @@ uploads_path: "DATADIR/uploads"
 # where d is equal to 10% of the validity period.
 #
 #account_validity:
-#  enabled: True
+#  enabled: true
 #  period: 6w
 #  renew_at: 1w
 #  renew_email_subject: "Renew your %(app)s account"
@@ -971,7 +971,7 @@ account_threepid_delegates:
 
 # Enable collection and rendering of performance metrics
 #
-#enable_metrics: False
+#enable_metrics: false
 
 # Enable sentry integration
 # NOTE: While attempts are made to ensure that the logs don't contain
@@ -1023,7 +1023,7 @@ metrics_flags:
 # Uncomment to enable tracking of application service IP addresses. Implicitly
 # enables MAU tracking for application service users.
 #
-#track_appservice_user_ips: True
+#track_appservice_user_ips: true
 
 
 # a secret which is used to sign access tokens. If none is specified,
@@ -1149,7 +1149,7 @@ saml2_config:
   #      - url: https://our_idp/metadata.xml
   #
   #    # By default, the user has to go to our login page first. If you'd like
-  #    # to allow IdP-initiated login, set 'allow_unsolicited: True' in a
+  #    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
   #    # 'service.sp' section:
   #    #
   #    #service:
@@ -1263,13 +1263,13 @@ password_config:
 #   smtp_port: 25 # SSL: 465, STARTTLS: 587
 #   smtp_user: "exampleusername"
 #   smtp_pass: "examplepassword"
-#   require_transport_security: False
+#   require_transport_security: false
 #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
 #   app_name: Matrix
 #
 #   # Enable email notifications by default
 #   #
-#   notif_for_new_users: True
+#   notif_for_new_users: true
 #
 #   # Defining a custom URL for Riot is only needed if email notifications
 #   # should contain links to a self-hosted installation of Riot; when set
@@ -1447,11 +1447,11 @@ password_config:
 #    body: >-
 #      To continue using this homeserver you must review and agree to the
 #      terms and conditions at %(consent_uri)s
-#  send_server_notice_to_guests: True
+#  send_server_notice_to_guests: true
 #  block_events_error: >-
 #    To continue using this homeserver you must review and agree to the
 #    terms and conditions at %(consent_uri)s
-#  require_at_registration: False
+#  require_at_registration: false
 #  policy_name: Privacy Policy
 #
 
