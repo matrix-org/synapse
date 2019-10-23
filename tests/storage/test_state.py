@@ -35,6 +35,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
+        self.state_datastore = self.storage.stores.state
         self.event_builder_factory = hs.get_event_builder_factory()
         self.event_creation_handler = hs.get_event_creation_handler()
 
@@ -83,7 +84,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.room, self.u_alice, EventTypes.Name, "", {"name": "test room"}
         )
 
-        state_group_map = yield self.store.get_state_groups_ids(
+        state_group_map = yield self.storage.state.get_state_groups_ids(
             self.room, [e2.event_id]
         )
         self.assertEqual(len(state_group_map), 1)
@@ -102,7 +103,9 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.room, self.u_alice, EventTypes.Name, "", {"name": "test room"}
         )
 
-        state_group_map = yield self.store.get_state_groups(self.room, [e2.event_id])
+        state_group_map = yield self.storage.state.get_state_groups(
+            self.room, [e2.event_id]
+        )
         self.assertEqual(len(state_group_map), 1)
         state_list = list(state_group_map.values())[0]
 
@@ -142,7 +145,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
         )
 
         # check we get the full state as of the final event
-        state = yield self.store.get_state_for_event(e5.event_id)
+        state = yield self.storage.state.get_state_for_event(e5.event_id)
 
         self.assertIsNotNone(e4)
 
@@ -158,21 +161,21 @@ class StateStoreTestCase(tests.unittest.TestCase):
         )
 
         # check we can filter to the m.room.name event (with a '' state key)
-        state = yield self.store.get_state_for_event(
+        state = yield self.storage.state.get_state_for_event(
             e5.event_id, StateFilter.from_types([(EventTypes.Name, "")])
         )
 
         self.assertStateMapEqual({(e2.type, e2.state_key): e2}, state)
 
         # check we can filter to the m.room.name event (with a wildcard None state key)
-        state = yield self.store.get_state_for_event(
+        state = yield self.storage.state.get_state_for_event(
             e5.event_id, StateFilter.from_types([(EventTypes.Name, None)])
         )
 
         self.assertStateMapEqual({(e2.type, e2.state_key): e2}, state)
 
         # check we can grab the m.room.member events (with a wildcard None state key)
-        state = yield self.store.get_state_for_event(
+        state = yield self.storage.state.get_state_for_event(
             e5.event_id, StateFilter.from_types([(EventTypes.Member, None)])
         )
 
@@ -182,7 +185,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # check we can grab a specific room member without filtering out the
         # other event types
-        state = yield self.store.get_state_for_event(
+        state = yield self.storage.state.get_state_for_event(
             e5.event_id,
             state_filter=StateFilter(
                 types={EventTypes.Member: {self.u_alice.to_string()}},
@@ -200,7 +203,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
         )
 
         # check that we can grab everything except members
-        state = yield self.store.get_state_for_event(
+        state = yield self.storage.state.get_state_for_event(
             e5.event_id,
             state_filter=StateFilter(
                 types={EventTypes.Member: set()}, include_others=True
@@ -216,13 +219,18 @@ class StateStoreTestCase(tests.unittest.TestCase):
         #######################################################
 
         room_id = self.room.to_string()
-        group_ids = yield self.store.get_state_groups_ids(room_id, [e5.event_id])
+        group_ids = yield self.storage.state.get_state_groups_ids(
+            room_id, [e5.event_id]
+        )
         group = list(group_ids.keys())[0]
 
         # test _get_state_for_group_using_cache correctly filters out members
         # with types=[]
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: set()}, include_others=True
@@ -238,8 +246,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
             state_dict,
         )
 
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_members_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: set()}, include_others=True
@@ -251,8 +262,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with wildcard types
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: None}, include_others=True
@@ -268,8 +282,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
             state_dict,
         )
 
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_members_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: None}, include_others=True
@@ -288,8 +305,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with specific types
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: {e5.state_key}}, include_others=True
@@ -305,8 +325,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
             state_dict,
         )
 
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_members_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: {e5.state_key}}, include_others=True
@@ -318,8 +341,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with specific types
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_members_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: {e5.state_key}}, include_others=False
@@ -332,9 +358,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
         #######################################################
         # deliberately remove e2 (room name) from the _state_group_cache
 
-        (is_all, known_absent, state_dict_ids) = self.store._state_group_cache.get(
-            group
-        )
+        (
+            is_all,
+            known_absent,
+            state_dict_ids,
+        ) = self.state_datastore._state_group_cache.get(group)
 
         self.assertEqual(is_all, True)
         self.assertEqual(known_absent, set())
@@ -347,18 +375,20 @@ class StateStoreTestCase(tests.unittest.TestCase):
         )
 
         state_dict_ids.pop((e2.type, e2.state_key))
-        self.store._state_group_cache.invalidate(group)
-        self.store._state_group_cache.update(
-            sequence=self.store._state_group_cache.sequence,
+        self.state_datastore._state_group_cache.invalidate(group)
+        self.state_datastore._state_group_cache.update(
+            sequence=self.state_datastore._state_group_cache.sequence,
             key=group,
             value=state_dict_ids,
             # list fetched keys so it knows it's partial
             fetched_keys=((e1.type, e1.state_key),),
         )
 
-        (is_all, known_absent, state_dict_ids) = self.store._state_group_cache.get(
-            group
-        )
+        (
+            is_all,
+            known_absent,
+            state_dict_ids,
+        ) = self.state_datastore._state_group_cache.get(group)
 
         self.assertEqual(is_all, False)
         self.assertEqual(known_absent, set([(e1.type, e1.state_key)]))
@@ -370,8 +400,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
         # test _get_state_for_group_using_cache correctly filters out members
         # with types=[]
         room_id = self.room.to_string()
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: set()}, include_others=True
@@ -382,8 +415,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
         self.assertDictEqual({(e1.type, e1.state_key): e1.event_id}, state_dict)
 
         room_id = self.room.to_string()
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_members_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: set()}, include_others=True
@@ -395,8 +431,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # wildcard types
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: None}, include_others=True
@@ -406,8 +445,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
         self.assertEqual(is_all, False)
         self.assertDictEqual({(e1.type, e1.state_key): e1.event_id}, state_dict)
 
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_members_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: None}, include_others=True
@@ -425,8 +467,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with specific types
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: {e5.state_key}}, include_others=True
@@ -436,8 +481,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
         self.assertEqual(is_all, False)
         self.assertDictEqual({(e1.type, e1.state_key): e1.event_id}, state_dict)
 
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_members_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: {e5.state_key}}, include_others=True
@@ -449,8 +497,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with specific types
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: {e5.state_key}}, include_others=False
@@ -460,8 +511,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
         self.assertEqual(is_all, False)
         self.assertDictEqual({}, state_dict)
 
-        (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_members_cache,
+        (
+            state_dict,
+            is_all,
+        ) = yield self.state_datastore._get_state_for_group_using_cache(
+            self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
                 types={EventTypes.Member: {e5.state_key}}, include_others=False

@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
+from synapse.storage import Storage
 
 
 @defer.inlineCallbacks
@@ -43,22 +44,22 @@ def get_badge_count(store, user_id):
 
 
 @defer.inlineCallbacks
-def get_context_for_event(store, state_handler, ev, user_id):
+def get_context_for_event(storage: Storage, state_handler, ev, user_id):
     ctx = {}
 
-    room_state_ids = yield store.get_state_ids_for_event(ev.event_id)
+    room_state_ids = yield storage.state.get_state_ids_for_event(ev.event_id)
 
     # we no longer bother setting room_alias, and make room_name the
     # human-readable name instead, be that m.room.name, an alias or
     # a list of people in the room
     name = yield calculate_room_name(
-        store, room_state_ids, user_id, fallback_to_single_member=False
+        storage.main, room_state_ids, user_id, fallback_to_single_member=False
     )
     if name:
         ctx["name"] = name
 
     sender_state_event_id = room_state_ids[("m.room.member", ev.sender)]
-    sender_state_event = yield store.get_event(sender_state_event_id)
+    sender_state_event = yield storage.main.get_event(sender_state_event_id)
     ctx["sender_display_name"] = name_from_member_event(sender_state_event)
 
     return ctx
