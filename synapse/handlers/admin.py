@@ -51,6 +51,15 @@ class AdminHandler(BaseHandler):
 
         return ret
 
+    async def get_user(self, user):
+        """Function to get user details"""
+        ret = await self.store.get_user_by_id(user.to_string())
+        if ret:
+            profile = await self.store.get_profileinfo(user.localpart)
+            ret["displayname"] = profile.display_name
+            ret["avatar_url"] = profile.avatar_url
+        return ret
+
     async def get_users(self):
         """Function to retrieve a list of users in users table.
 
