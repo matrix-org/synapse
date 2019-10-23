@@ -249,6 +249,73 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         return self.runInteraction("count_e2e_one_time_keys", _count_e2e_one_time_keys)
 
+    def _get_e2e_cross_signing_key_txn(self, txn, user_id, key_type, from_user_id=None):
+        """Returns a user's cross-signing key.
+
+        Args:
+            txn (twisted.enterprise.adbapi.Connection): db connection
+            user_id (str): the user whose key is being requested
+            key_type (str): the type of key that is being set: either 'master'
+                for a master key, 'self_signing' for a self-signing key, or
+                'user_signing' for a user-signing key
+            from_user_id (str): if specified, signatures made by this user on
+                the key will be included in the result
+
+        Returns:
+            dict of the key data or None if not found
+        """
+        sql = (
+            "SELECT keydata "
+            "  FROM e2e_cross_signing_keys "
+            " WHERE user_id = ? AND keytype = ? ORDER BY stream_id DESC LIMIT 1"
+        )
+        txn.execute(sql, (user_id, key_type))
+        row = txn.fetchone()
+        if not row:
+            return None
+        key = json.loads(row[0])
+
+        device_id = None
+        for k in key["keys"].values():
+            device_id = k
+
+        if from_user_id is not None:
+            sql = (
+                "SELECT key_id, signature "
+                "  FROM e2e_cross_signing_signatures "
+                " WHERE user_id = ? "
+                "   AND target_user_id = ? "
+                "   AND target_device_id = ? "
+            )
+            txn.execute(sql, (from_user_id, user_id, device_id))
+            row = txn.fetchone()
+            if row:
+                key.setdefault("signatures", {}).setdefault(from_user_id, {})[
+                    row[0]
+                ] = row[1]
+
+        return key
+
+    def get_e2e_cross_signing_key(self, user_id, key_type, from_user_id=None):
+        """Returns a user's cross-signing key.
+
+        Args:
+            user_id (str): the user whose self-signing key is being requested
+            key_type (str): the type of cross-signing key to get
+            from_user_id (str): if specified, signatures made by this user on
+                the self-signing key will be included in the result
+
+        Returns:
+            dict of the key data or None if not found
+        """
+        return self.runInteraction(
+            "get_e2e_cross_signing_key",
+            self._get_e2e_cross_signing_key_txn,
+            user_id,
+            key_type,
+            from_user_id,
+        )
+
 
 class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
     def set_e2e_device_keys(self, user_id, device_id, time_now, device_keys):
@@ -425,73 +492,6 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             user_id,
             key_type,
             key,
-        )
-
-    def _get_e2e_cross_signing_key_txn(self, txn, user_id, key_type, from_user_id=None):
-        """Returns a user's cross-signing key.
-
-        Args:
-            txn (twisted.enterprise.adbapi.Connection): db connection
-            user_id (str): the user whose key is being requested
-            key_type (str): the type of key that is being set: either 'master'
-                for a master key, 'self_signing' for a self-signing key, or
-                'user_signing' for a user-signing key
-            from_user_id (str): if specified, signatures made by this user on
-                the key will be included in the result
-
-        Returns:
-            dict of the key data or None if not found
-        """
-        sql = (
-            "SELECT keydata "
-            "  FROM e2e_cross_signing_keys "
-            " WHERE user_id = ? AND keytype = ? ORDER BY stream_id DESC LIMIT 1"
-        )
-        txn.execute(sql, (user_id, key_type))
-        row = txn.fetchone()
-        if not row:
-            return None
-        key = json.loads(row[0])
-
-        device_id = None
-        for k in key["keys"].values():
-            device_id = k
-
-        if from_user_id is not None:
-            sql = (
-                "SELECT key_id, signature "
-                "  FROM e2e_cross_signing_signatures "
-                " WHERE user_id = ? "
-                "   AND target_user_id = ? "
-                "   AND target_device_id = ? "
-            )
-            txn.execute(sql, (from_user_id, user_id, device_id))
-            row = txn.fetchone()
-            if row:
-                key.setdefault("signatures", {}).setdefault(from_user_id, {})[
-                    row[0]
-                ] = row[1]
-
-        return key
-
-    def get_e2e_cross_signing_key(self, user_id, key_type, from_user_id=None):
-        """Returns a user's cross-signing key.
-
-        Args:
-            user_id (str): the user whose self-signing key is being requested
-            key_type (str): the type of cross-signing key to get
-            from_user_id (str): if specified, signatures made by this user on
-                the self-signing key will be included in the result
-
-        Returns:
-            dict of the key data or None if not found
-        """
-        return self.runInteraction(
-            "get_e2e_cross_signing_key",
-            self._get_e2e_cross_signing_key_txn,
-            user_id,
-            key_type,
-            from_user_id,
         )
 
     def store_e2e_cross_signing_signatures(self, user_id, signatures):
