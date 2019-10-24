@@ -114,7 +114,12 @@ class SyncRestServlet(RestServlet):
         logger.debug(
             "/sync: user=%r, timeout=%r, since=%r, "
             "set_presence=%r, filter_id=%r, device_id=%r",
-            user, timeout, since, set_presence, filter_id, device_id
+            user,
+            timeout,
+            since,
+            set_presence,
+            filter_id,
+            device_id,
         )
 
         request_key = (user, timeout, since, filter_id, full_state, device_id)

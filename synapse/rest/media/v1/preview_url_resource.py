@@ -118,7 +118,9 @@ class PreviewUrlResource(DirectServeResource):
                 value = getattr(url_tuple, attrib)
                 logger.debug(
                     "Matching attrib '%s' with value '%s' against" " pattern '%s'",
-                    attrib, value, pattern
+                    attrib,
+                    value,
+                    pattern,
                 )
 
                 if value is None:
