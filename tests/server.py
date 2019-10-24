@@ -375,6 +375,7 @@ class FakeTransport(object):
 
     disconnecting = False
     disconnected = False
+    connected = True
     buffer = attr.ib(default=b"")
     producer = attr.ib(default=None)
     autoflush = attr.ib(default=True)
@@ -392,6 +393,7 @@ class FakeTransport(object):
             if self._protocol:
                 self._protocol.connectionLost(reason)
             self.disconnected = True
+            self.connected = False
 
     def abortConnection(self):
         logger.info("FakeTransport: abortConnection()")

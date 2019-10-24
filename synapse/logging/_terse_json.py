@@ -24,7 +24,7 @@ from math import floor
 from typing import IO
 
 import attr
-from simplejson import dumps
+from rapidjson import dumps
 from zope.interface import implementer
 
 from twisted.application.internet import ClientService
@@ -33,9 +33,9 @@ from twisted.internet.endpoints import (
     TCP4ClientEndpoint,
     TCP6ClientEndpoint,
 )
+from twisted.internet.interfaces import IPushProducer
 from twisted.internet.protocol import Factory, Protocol
 from twisted.logger import FileLogObserver, ILogObserver, Logger
-from twisted.python.failure import Failure
 
 
 def flatten_event(event: dict, metadata: dict, include_time: bool = False):
@@ -141,9 +141,38 @@ def TerseJSONToConsoleLogObserver(outFile: IO[str], metadata: dict) -> FileLogOb
 
     def formatEvent(_event: dict) -> str:
         flattened = flatten_event(_event, metadata)
-        return dumps(flattened, ensure_ascii=False, separators=(",", ":")) + "\n"
+        return dumps(flattened, ensure_ascii=False) + "\n"
 
     return FileLogObserver(outFile, formatEvent)
+
+
+@attr.s
+@implementer(IPushProducer)
+class LogProducer(object):
+
+    _buffer = attr.ib()
+    _transport = attr.ib()
+    paused = attr.ib(default=False)
+
+    def pauseProducing(self):
+        self.paused = True
+
+    def stopProducing(self):
+        self.paused = True
+        self._buffer = None
+
+    def resumeProducing(self):
+        self.paused = False
+
+        while self.paused is False and (self._buffer and self._transport.connected):
+            try:
+                event = self._buffer.popleft()
+                self._transport.write(dumps(event, ensure_ascii=False).encode("utf8"))
+                self._transport.write(b"\n")
+            except Exception:
+                import traceback
+
+                traceback.print_exc(file=sys.__stderr__)
 
 
 @attr.s
@@ -167,6 +196,7 @@ class TerseJSONToTCPLogObserver(object):
     _buffer = attr.ib(default=attr.Factory(deque), type=deque)
     _writer = attr.ib(default=None)
     _logger = attr.ib(default=attr.Factory(Logger))
+    _producer = attr.ib(default=None)
 
     def start(self) -> None:
 
@@ -188,6 +218,9 @@ class TerseJSONToTCPLogObserver(object):
         self._service = ClientService(endpoint, factory, clock=self.hs.get_reactor())
         self._service.startService()
 
+    def stop(self):
+        self._service.stopService()
+
     def _write_loop(self) -> None:
         """
         Implement the write loop.
@@ -195,27 +228,29 @@ class TerseJSONToTCPLogObserver(object):
         if self._writer:
             return
 
+        if self._producer and self._producer._transport.connected:
+            self._producer.resumeProducing()
+            return
+
         self._writer = self._service.whenConnected()
 
-        @self._writer.addBoth
-        def writer(r):
-            if isinstance(r, Failure):
-                r.printTraceback(file=sys.__stderr__)
-                self._writer = None
-                self.hs.get_reactor().callLater(1, self._write_loop)
-                return
+        @self._writer.addErrback
+        def fail(r):
+            r.printTraceback(file=sys.__stderr__)
+            self._writer = None
+            self.hs.get_reactor().callLater(1, self._write_loop)
+            return
 
-            try:
-                for event in self._buffer:
-                    r.transport.write(
-                        dumps(event, ensure_ascii=False, separators=(",", ":")).encode(
-                            "utf8"
-                        )
-                    )
-                    r.transport.write(b"\n")
-                self._buffer.clear()
-            except Exception as e:
-                sys.__stderr__.write("Failed writing out logs with %s\n" % (str(e),))
+        @self._writer.addCallback
+        def writer(r):
+            def connectionLost(_self, reason):
+                self._producer.pauseProducing()
+                self._producer = None
+                self.hs.get_reactor().callLater(1, self._write_loop)
+
+            self._producer = LogProducer(self._buffer, r.transport)
+            r.transport.registerProducer(self._producer, True)
+            self._producer.resumeProducing()
 
             self._writer = False
             self.hs.get_reactor().callLater(1, self._write_loop)
