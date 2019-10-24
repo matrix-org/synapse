@@ -133,7 +133,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
         # Would be better to check contents, but 2 calls == set blocking event
-        self.assertTrue(self._send_notice.call_count == 2)
+        self.assertEqual(self._send_notice.call_count, 2)
 
     def test_maybe_send_server_notice_to_user_add_blocked_notice_noop(self):
         """

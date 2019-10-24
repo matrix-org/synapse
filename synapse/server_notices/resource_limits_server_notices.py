@@ -113,10 +113,10 @@ class ResourceLimitsServerNotices(object):
                     self._remove_limit_block_notification(user_id, ref_events)
                 return
 
-            if currently_blocked and not limit_type:
+            if currently_blocked and not limit_msg:
                 # Room is notifying of a block, when it ought not to be.
                 yield self._remove_limit_block_notification(user_id, ref_events)
-            elif not currently_blocked and limit_type:
+            elif not currently_blocked and limit_msg:
                 # Room is not notifying of a block, when it ought to be.
                 yield self._apply_limit_block_notification(
                     user_id, limit_msg, limit_type
