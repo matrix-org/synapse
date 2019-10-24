@@ -54,7 +54,7 @@ class MockHomeserver(HomeServer):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=(
-            "A script to update the schema of a given database and run background updates"
+            "Updates a synapse database to the latest schema and runs background updates"
             " on it."
         )
     )
@@ -78,20 +78,7 @@ if __name__ == "__main__":
     # Load, process and sanity-check the config.
     hs_config = yaml.safe_load(args.database_config)
 
-    if "database" in hs_config:
-        database_config = hs_config["database"]
-
-        if "name" not in database_config:
-            sys.stderr.write("Malformed database config: no 'name'\n")
-            sys.exit(2)
-        if database_config["name"] not in ["psycopg2", "sqlite3"]:
-            sys.stderr.write(
-                "Database must use either the 'psycopg2' connector or the 'sqlite3'"
-                " one.\n"
-            )
-            sys.exit(3)
-
-    else:
+    if "database" not in hs_config:
         sys.stderr.write("The configuration file must have a 'database' section.\n")
         sys.exit(4)
 
@@ -99,11 +86,11 @@ if __name__ == "__main__":
     config.parse_config_dict(hs_config, "", "")
 
     # Create the database engine and a connection to it.
-    database_engine = create_engine(database_config)
+    database_engine = create_engine(config.database_config)
     db_conn = database_engine.module.connect(
         **{
             k: v
-            for k, v in database_config.get("args", {}).items()
+            for k, v in config.database_config.get("args", {}).items()
             if not k.startswith("cp_")
         }
     )

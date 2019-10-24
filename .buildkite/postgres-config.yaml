@@ -1,3 +1,6 @@
+# Configuration file used for testing the 'synapse_port_db' script.
+# Tells the script to connect to the postgresql database that will be available in the
+# CI's Docker setup at the point where this file is considered.
 server_name: "test"
 
 report_stats: false
@@ -5,12 +8,12 @@ report_stats: false
 database:
   name: "psycopg2"
   args:
-    user: postgres
-    host: postgres
-    password: postgres
-    database: synapse
+      user: postgres
+      host: postgres
+      password: postgres
+      database: synapse
 
+# Suppress the key server warning.
 trusted_key_servers:
   - server_name: "matrix.org"
-
 suppress_key_server_warning: true
