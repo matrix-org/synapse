@@ -80,8 +80,6 @@ class ResourceLimitsServerNotices(object):
             # In practice, not sure we can ever get here
             return
 
-        # Determine current state of room
-
         room_id = yield self._server_notices_manager.get_notice_room_for_user(user_id)
 
         if not room_id:
@@ -89,38 +87,39 @@ class ResourceLimitsServerNotices(object):
             return
 
         yield self._check_and_set_tags(user_id, room_id)
+
+        # Determine current state of room
         currently_blocked, ref_events = yield self._is_room_currently_blocked(room_id)
 
+        limit_msg = None
+        limit_type = None
         try:
-            is_auth_blocking = False
-            event_limit_type = ""
+            # Normally should always pass in user_id to check_auth_blocking
+            # if you have it, but in this case are checking what would happen
+            # to other users if they were to arrive.
+            yield self._auth.check_auth_blocking()
+        except ResourceLimitError as e:
+            limit_msg = e.msg
+            limit_type = e.limit_type
 
-            try:
-                # Normally should always pass in user_id to check_auth_blocking
-                # if you have it, but in this case are checking what would happen
-                # to other users if they were to arrive.
-                yield self._auth.check_auth_blocking()
-            except ResourceLimitError as e:
-                is_auth_blocking = True
-                event_body = e.msg
-                event_limit_type = e.limit_type
-
+        try:
             if (
-                not self._config.mau_limit_alerting
-                and event_limit_type is LimitBlockingTypes.MONTHLY_ACTIVE_USER
+                limit_type == LimitBlockingTypes.MONTHLY_ACTIVE_USER
+                and not self._config.mau_limit_alerting
             ):
-                # MAU alerting disabled, reset room if necessary and return
+                # We have hit the MAU limit, but MAU alerting is disabled:
+                # reset room if necessary and return
                 if currently_blocked:
-                    self._remove_limit_block_notification(ref_events, user_id)
+                    self._remove_limit_block_notification(user_id, ref_events)
                 return
 
-            if currently_blocked and not is_auth_blocking:
+            if currently_blocked and not limit_type:
                 # Room is notifying of a block, when it ought not to be.
                 yield self._remove_limit_block_notification(user_id, ref_events)
-            elif not currently_blocked and is_auth_blocking:
+            elif not currently_blocked and limit_type:
                 # Room is not notifying of a block, when it ought to be.
                 yield self._apply_limit_block_notification(
-                    user_id, event_body, event_limit_type
+                    user_id, limit_msg, limit_type
                 )
         except SynapseError as e:
             logger.error("Error sending resource limits server notice: %s", e)
