@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Iterable, Tuple
 
 from six import iteritems, itervalues
 from six.moves import range
