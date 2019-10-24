@@ -18,6 +18,7 @@ import inspect
 import logging
 import threading
 from typing import Any, cast
+from weakref import WeakValueDictionary
 
 from six import itervalues
 
@@ -628,7 +629,7 @@ class _CacheContext:
     # We make sure identical _CacheContext objects share the same invalidate
     # function. This is important in particular to dedupe when we add callbacks
     # to lru cache nodes, otherwise the number of callbacks would grow.
-    _invalidate_funcs = {}
+    _invalidate_funcs = WeakValueDictionary()
 
     def __init__(self, cache, cache_key):
         key = (cache, cache_key)
