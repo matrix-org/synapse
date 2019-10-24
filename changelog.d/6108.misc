@@ -1,1 +1,0 @@
-Remove `get_user_by_req` opentracing span and add some tags.

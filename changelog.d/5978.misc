@@ -1,1 +1,0 @@
-Move lookup-related functions from RoomMemberHandler to IdentityHandler.
