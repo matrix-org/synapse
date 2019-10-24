@@ -112,9 +112,9 @@ class SyncRestServlet(RestServlet):
         full_state = parse_boolean(request, "full_state", default=False)
 
         logger.debug(
-            "/sync: user=%r, timeout=%r, since=%r,"
-            " set_presence=%r, filter_id=%r, device_id=%r"
-            % (user, timeout, since, set_presence, filter_id, device_id)
+            "/sync: user=%r, timeout=%r, since=%r, "
+            "set_presence=%r, filter_id=%r, device_id=%r",
+            user, timeout, since, set_presence, filter_id, device_id
         )
 
         request_key = (user, timeout, since, filter_id, full_state, device_id)
