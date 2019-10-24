@@ -17,6 +17,7 @@
 Log formatters that output terse JSON.
 """
 
+import json
 import sys
 from collections import deque
 from ipaddress import IPv4Address, IPv6Address, ip_address
@@ -24,7 +25,6 @@ from math import floor
 from typing import IO
 
 import attr
-from rapidjson import dumps
 from zope.interface import implementer
 
 from twisted.application.internet import ClientService
@@ -36,6 +36,8 @@ from twisted.internet.endpoints import (
 from twisted.internet.interfaces import IPushProducer
 from twisted.internet.protocol import Factory, Protocol
 from twisted.logger import FileLogObserver, ILogObserver, Logger
+
+_encoder = json.JSONEncoder(ensure_ascii=False, separators=(",", ":"))
 
 
 def flatten_event(event: dict, metadata: dict, include_time: bool = False):
@@ -141,7 +143,7 @@ def TerseJSONToConsoleLogObserver(outFile: IO[str], metadata: dict) -> FileLogOb
 
     def formatEvent(_event: dict) -> str:
         flattened = flatten_event(_event, metadata)
-        return dumps(flattened, ensure_ascii=False) + "\n"
+        return _encoder.encode(flattened) + "\n"
 
     return FileLogObserver(outFile, formatEvent)
 
@@ -167,7 +169,7 @@ class LogProducer(object):
         while self.paused is False and (self._buffer and self._transport.connected):
             try:
                 event = self._buffer.popleft()
-                self._transport.write(dumps(event, ensure_ascii=False).encode("utf8"))
+                self._transport.write(_encoder.encode(event).encode("utf8"))
                 self._transport.write(b"\n")
             except Exception:
                 import traceback
