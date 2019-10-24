@@ -476,3 +476,134 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
             return state_group
 
         return self.runInteraction("store_state_group", _store_state_group_txn)
+
+    def purge_unreferenced_state_groups(
+        self, room_id, state_groups_to_delete, remaining_state_groups
+    ):
+        return self.runInteraction(
+            "purge_unreferenced_state_groups",
+            self._purge_unreferenced_state_groups,
+            room_id,
+            state_groups_to_delete,
+            remaining_state_groups,
+        )
+
+    def _purge_unreferenced_state_groups(
+        self, txn, room_id, state_groups_to_delete, remaining_state_groups
+    ):
+        logger.info(
+            "[purge] found %i state groups to delete", len(state_groups_to_delete)
+        )
+
+        logger.info(
+            "[purge] de-delta-ing %i remaining state groups",
+            len(remaining_state_groups),
+        )
+
+        # Now we turn the state groups that reference to-be-deleted state
+        # groups to non delta versions.
+        for sg in remaining_state_groups:
+            logger.info("[purge] de-delta-ing remaining state group %s", sg)
+            curr_state = self._get_state_groups_from_groups_txn(txn, [sg])
+            curr_state = curr_state[sg]
+
+            self._simple_delete_txn(
+                txn, table="state_groups_state", keyvalues={"state_group": sg}
+            )
+
+            self._simple_delete_txn(
+                txn, table="state_group_edges", keyvalues={"state_group": sg}
+            )
+
+            self._simple_insert_many_txn(
+                txn,
+                table="state_groups_state",
+                values=[
+                    {
+                        "state_group": sg,
+                        "room_id": room_id,
+                        "type": key[0],
+                        "state_key": key[1],
+                        "event_id": state_id,
+                    }
+                    for key, state_id in iteritems(curr_state)
+                ],
+            )
+
+        logger.info("[purge] removing redundant state groups")
+        txn.executemany(
+            "DELETE FROM state_groups_state WHERE state_group = ?",
+            ((sg,) for sg in state_groups_to_delete),
+        )
+        txn.executemany(
+            "DELETE FROM state_groups WHERE id = ?",
+            ((sg,) for sg in state_groups_to_delete),
+        )
+
+    @defer.inlineCallbacks
+    def get_previous_state_groups(self, state_groups):
+        """Fetch the previous groups of the given state groups.
+
+        Args:
+            state_groups (Iterable[int])
+
+        Returns:
+            Deferred[dict[int, int]]: mapping from state group to previous
+            state group.
+        """
+
+        rows = yield self._simple_select_many_batch(
+            table="state_group_edges",
+            column="prev_state_group",
+            iterable=state_groups,
+            keyvalues={},
+            retcols=("prev_state_group", "state_group"),
+            desc="get_previous_state_groups",
+        )
+
+        return {row["state_group"]: row["prev_state_group"] for row in rows}
+
+    def purge_room(self, room_id):
+        """Deletes all record of a room
+
+        Args:
+            room_id (str):
+        """
+
+        return self.runInteraction("state.purge_room", self._purge_room_txn, room_id)
+
+    def _purge_room_txn(self, txn, room_id):
+        # first we have to delete the state groups states
+        logger.info("[purge] removing %s from state_groups_state", room_id)
+
+        txn.execute(
+            """
+            DELETE FROM state_groups_state
+            INNER JOIN state_groups USING (event_id)
+            WHEREE state_groups.room_id = ?
+            """,
+            (room_id,),
+        )
+
+        # ... and the state group edges
+        logger.info("[purge] removing %s from state_group_edges", room_id)
+
+        txn.execute(
+            """
+            DELETE FROM state_group_edges
+            INNER JOIN state_groups USING (event_id)
+            WHEREE state_groups.room_id = ?
+            )
+            """,
+            (room_id,),
+        )
+
+        # ... and the state groups
+        logger.info("[purge] removing %s from state_groups", room_id)
+
+        txn.execute(
+            """
+            DELETE FROM state_groups WHEREE room_id = ?
+            """,
+            (room_id,),
+        )

@@ -1368,6 +1368,10 @@ class EventsStore(
                 if True, we will delete local events as well as remote ones
                 (instead of just marking them as outliers and deleting their
                 state groups).
+
+        Returns:
+            Deferred[set[int]]: The set of state groups that reference deleted
+            events.
         """
 
         return self.runInteraction(
@@ -1521,60 +1525,6 @@ class EventsStore(
             "[purge] found %i referenced state groups", len(referenced_state_groups)
         )
 
-        logger.info("[purge] finding state groups that can be deleted")
-
-        _ = self._find_unreferenced_groups_during_purge(txn, referenced_state_groups)
-        state_groups_to_delete, remaining_state_groups = _
-
-        logger.info(
-            "[purge] found %i state groups to delete", len(state_groups_to_delete)
-        )
-
-        logger.info(
-            "[purge] de-delta-ing %i remaining state groups",
-            len(remaining_state_groups),
-        )
-
-        # Now we turn the state groups that reference to-be-deleted state
-        # groups to non delta versions.
-        for sg in remaining_state_groups:
-            logger.info("[purge] de-delta-ing remaining state group %s", sg)
-            curr_state = self._get_state_groups_from_groups_txn(txn, [sg])
-            curr_state = curr_state[sg]
-
-            self._simple_delete_txn(
-                txn, table="state_groups_state", keyvalues={"state_group": sg}
-            )
-
-            self._simple_delete_txn(
-                txn, table="state_group_edges", keyvalues={"state_group": sg}
-            )
-
-            self._simple_insert_many_txn(
-                txn,
-                table="state_groups_state",
-                values=[
-                    {
-                        "state_group": sg,
-                        "room_id": room_id,
-                        "type": key[0],
-                        "state_key": key[1],
-                        "event_id": state_id,
-                    }
-                    for key, state_id in iteritems(curr_state)
-                ],
-            )
-
-        logger.info("[purge] removing redundant state groups")
-        txn.executemany(
-            "DELETE FROM state_groups_state WHERE state_group = ?",
-            ((sg,) for sg in state_groups_to_delete),
-        )
-        txn.executemany(
-            "DELETE FROM state_groups WHERE id = ?",
-            ((sg,) for sg in state_groups_to_delete),
-        )
-
         logger.info("[purge] removing events from event_to_state_groups")
         txn.execute(
             "DELETE FROM event_to_state_groups "
@@ -1661,87 +1611,7 @@ class EventsStore(
 
         logger.info("[purge] done")
 
-    def _find_unreferenced_groups_during_purge(self, txn, state_groups):
-        """Used when purging history to figure out which state groups can be
-        deleted and which need to be de-delta'ed (due to one of its prev groups
-        being scheduled for deletion).
-
-        Args:
-            txn
-            state_groups (set[int]): Set of state groups referenced by events
-                that are going to be deleted.
-
-        Returns:
-            tuple[set[int], set[int]]: The set of state groups that can be
-            deleted and the set of state groups that need to be de-delta'ed
-        """
-        # Graph of state group -> previous group
-        graph = {}
-
-        # Set of events that we have found to be referenced by events
-        referenced_groups = set()
-
-        # Set of state groups we've already seen
-        state_groups_seen = set(state_groups)
-
-        # Set of state groups to handle next.
-        next_to_search = set(state_groups)
-        while next_to_search:
-            # We bound size of groups we're looking up at once, to stop the
-            # SQL query getting too big
-            if len(next_to_search) < 100:
-                current_search = next_to_search
-                next_to_search = set()
-            else:
-                current_search = set(itertools.islice(next_to_search, 100))
-                next_to_search -= current_search
-
-            # Check if state groups are referenced
-            sql = """
-                SELECT DISTINCT state_group FROM event_to_state_groups
-                LEFT JOIN events_to_purge AS ep USING (event_id)
-                WHERE ep.event_id IS NULL AND
-            """
-            clause, args = make_in_list_sql_clause(
-                txn.database_engine, "state_group", current_search
-            )
-            txn.execute(sql + clause, list(args))
-
-            referenced = set(sg for sg, in txn)
-            referenced_groups |= referenced
-
-            # We don't continue iterating up the state group graphs for state
-            # groups that are referenced.
-            current_search -= referenced
-
-            rows = self._simple_select_many_txn(
-                txn,
-                table="state_group_edges",
-                column="prev_state_group",
-                iterable=current_search,
-                keyvalues={},
-                retcols=("prev_state_group", "state_group"),
-            )
-
-            prevs = set(row["state_group"] for row in rows)
-            # We don't bother re-handling groups we've already seen
-            prevs -= state_groups_seen
-            next_to_search |= prevs
-            state_groups_seen |= prevs
-
-            for row in rows:
-                # Note: Each state group can have at most one prev group
-                graph[row["state_group"]] = row["prev_state_group"]
-
-        to_delete = state_groups_seen - referenced_groups
-
-        to_dedelta = set()
-        for sg in referenced_groups:
-            prev_sg = graph.get(sg)
-            if prev_sg and prev_sg in to_delete:
-                to_dedelta.add(sg)
-
-        return to_delete, to_dedelta
+        return referenced_state_groups
 
     def purge_room(self, room_id):
         """Deletes all record of a room
@@ -1753,46 +1623,7 @@ class EventsStore(
         return self.runInteraction("purge_room", self._purge_room_txn, room_id)
 
     def _purge_room_txn(self, txn, room_id):
-        # first we have to delete the state groups states
-        logger.info("[purge] removing %s from state_groups_state", room_id)
-
-        txn.execute(
-            """
-            DELETE FROM state_groups_state WHERE state_group IN (
-              SELECT state_group FROM events JOIN event_to_state_groups USING(event_id)
-              WHERE events.room_id=?
-            )
-            """,
-            (room_id,),
-        )
-
-        # ... and the state group edges
-        logger.info("[purge] removing %s from state_group_edges", room_id)
-
-        txn.execute(
-            """
-            DELETE FROM state_group_edges WHERE state_group IN (
-              SELECT state_group FROM events JOIN event_to_state_groups USING(event_id)
-              WHERE events.room_id=?
-            )
-            """,
-            (room_id,),
-        )
-
-        # ... and the state groups
-        logger.info("[purge] removing %s from state_groups", room_id)
-
-        txn.execute(
-            """
-            DELETE FROM state_groups WHERE id IN (
-              SELECT state_group FROM events JOIN event_to_state_groups USING(event_id)
-              WHERE events.room_id=?
-            )
-            """,
-            (room_id,),
-        )
-
-        # and then tables which lack an index on room_id but have one on event_id
+        # First delete tables which lack an index on room_id but have one on event_id
         for table in (
             "event_auth",
             "event_edges",
