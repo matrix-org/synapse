@@ -543,9 +543,20 @@ class DeviceWorkerStore(SQLBaseStore):
             LEFT JOIN device_lists_outbound_pokes USING (stream_id, user_id, device_id)
             WHERE ? < stream_id AND stream_id <= ?
             GROUP BY user_id, destination
+            UNION
+            SELECT MAX(stream_id) AS stream_id, from_user_id AS user_id, NULL AS destination
+            FROM user_signature_stream
+            WHERE ? < stream_id AND stream_id <= ?
+            GROUP BY user_id
         """
         return self._execute(
-            "get_all_device_list_changes_for_remotes", None, sql, from_key, to_key
+            "get_all_device_list_changes_for_remotes",
+            None,
+            sql,
+            from_key,
+            to_key,
+            from_key,
+            to_key,
         )
 
     @cached(max_entries=10000)

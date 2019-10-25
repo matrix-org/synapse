@@ -56,6 +56,7 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
 
     def _invalidate_caches_for_devices(self, token, user_id, destination):
         self._device_list_stream_cache.entity_has_changed(user_id, token)
+        self._user_signature_stream_cache.entity_has_changed(user_id, token)
 
         if destination:
             self._device_list_federation_stream_cache.entity_has_changed(
