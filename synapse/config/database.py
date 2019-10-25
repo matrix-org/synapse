@@ -32,26 +32,37 @@ class DatabaseConfig(Config):
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
 
-        database_config = config.get("database")
+        # The `databases` section is an *experimental* option that replaces the
+        # database config, allowing synapse to run against multiple databases.
 
-        if database_config is None:
-            database_config = {"name": "sqlite3", "args": {}}
-
-        name = database_config.get("name", None)
-        if name == "psycopg2":
-            pass
-        elif name == "sqlite3":
-            database_config.setdefault("args", {}).update(
-                {"cp_min": 1, "cp_max": 1, "check_same_thread": False}
+        if "database" in config and "databases" in config:
+            raise ConfigError(
+                "Cannot specify both 'database' and 'databases' config options"
             )
+
+        self.databases = {}
+        if "databases" in config:
+            # New, experimental, databases section.
+
+            for db_name, database_config in config["databases"].items():
+                self.databases[db_name] = DatabaseConnectionConfig(database_config)
+
+            self.data_stores = config["data_stores"]
         else:
-            raise RuntimeError("Unsupported database type '%s'" % (name,))
+            # Standard database section. This just creates a single database
+            # with a generic name.
 
-        # A map from database name to database config.
-        self.databases = {"master": DatabaseConnectionConfig(database_config)}
+            if "database" in config:
+                self.databases["main_db"] = DatabaseConnectionConfig(config["database"])
+            else:
+                self.databases["main_db"] = DatabaseConnectionConfig(
+                    {
+                        "name": "sqlite3",
+                        "args": {"database": config.get("database_path", ":memory:")},
+                    }
+                )
 
-        # A map from data store name to database the data store should use.
-        self.data_stores = {"main": "master", "state": "master"}
+            self.data_stores = {"main": "main_db", "state": "main_db"}
 
         self.set_databasepath(config.get("database_path"))
 
