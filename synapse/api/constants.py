@@ -97,8 +97,6 @@ class EventTypes(object):
 
 class RejectedReason(object):
     AUTH_ERROR = "auth_error"
-    REPLACED = "replaced"
-    NOT_ANCESTOR = "not_ancestor"
 
 
 class RoomCreationPreset(object):
@@ -133,3 +131,10 @@ class RelationTypes(object):
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"
     REFERENCE = "m.reference"
+
+
+class LimitBlockingTypes(object):
+    """Reasons that a server may be blocked"""
+
+    MONTHLY_ACTIVE_USER = "monthly_active_user"
+    HS_DISABLED = "hs_disabled"

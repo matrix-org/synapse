@@ -68,9 +68,6 @@ handlers:
         filters: [context]
 
 loggers:
-    synapse:
-        level: INFO
-
     synapse.storage.SQL:
         # beware: increasing this to DEBUG will make synapse log sensitive
         # information such as access tokens.
@@ -79,6 +76,8 @@ loggers:
 root:
     level: INFO
     handlers: [file, console]
+
+disable_existing_loggers: false
 """
 )
 

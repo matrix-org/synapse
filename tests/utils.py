@@ -38,11 +38,7 @@ from synapse.logging.context import LoggingContext
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import PostgresEngine, create_engine
-from synapse.storage.prepare_database import (
-    _get_or_create_schema_state,
-    _setup_new_database,
-    prepare_database,
-)
+from synapse.storage.prepare_database import prepare_database
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 # set this to True to run the tests against postgres instead of sqlite.
@@ -88,11 +84,7 @@ def setupdb():
             host=POSTGRES_HOST,
             password=POSTGRES_PASSWORD,
         )
-        cur = db_conn.cursor()
-        _get_or_create_schema_state(cur, db_engine)
-        _setup_new_database(cur, db_engine)
-        db_conn.commit()
-        cur.close()
+        prepare_database(db_conn, db_engine, None)
         db_conn.close()
 
         def _cleanup():
@@ -145,7 +137,6 @@ def default_config(name, parse=False):
         "limit_usage_by_mau": False,
         "hs_disabled": False,
         "hs_disabled_message": "",
-        "hs_disabled_limit_type": "",
         "max_mau_value": 50,
         "mau_trial_days": 0,
         "mau_stats_only": False,

@@ -25,7 +25,13 @@ from twisted.internet import defer
 import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, JoinRules, Membership, UserTypes
+from synapse.api.constants import (
+    EventTypes,
+    JoinRules,
+    LimitBlockingTypes,
+    Membership,
+    UserTypes,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -84,26 +90,9 @@ class Auth(object):
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
-        self.check(
+        event_auth.check(
             room_version, event, auth_events=auth_events, do_sig_check=do_sig_check
         )
-
-    def check(self, room_version, event, auth_events, do_sig_check=True):
-        """ Checks if this event is correctly authed.
-
-        Args:
-            room_version (str): version of the room
-            event: the event being checked.
-            auth_events (dict: event-key -> event): the existing room state.
-
-
-        Returns:
-            True if the auth checks pass.
-        """
-        with Measure(self.clock, "auth.check"):
-            event_auth.check(
-                room_version, event, auth_events, do_sig_check=do_sig_check
-            )
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
@@ -743,7 +732,7 @@ class Auth(object):
                 self.hs.config.hs_disabled_message,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 admin_contact=self.hs.config.admin_contact,
-                limit_type=self.hs.config.hs_disabled_limit_type,
+                limit_type=LimitBlockingTypes.HS_DISABLED,
             )
         if self.hs.config.limit_usage_by_mau is True:
             assert not (user_id and threepid)
@@ -776,5 +765,5 @@ class Auth(object):
                     "Monthly Active User Limit Exceeded",
                     admin_contact=self.hs.config.admin_contact,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                    limit_type="monthly_active_user",
+                    limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER,
                 )

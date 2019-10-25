@@ -196,7 +196,7 @@ class FederationClient(FederationBase):
             dest, room_id, extremities, limit
         )
 
-        logger.debug("backfill transaction_data=%s", repr(transaction_data))
+        logger.debug("backfill transaction_data=%r", transaction_data)
 
         room_version = yield self.store.get_room_version(room_id)
         format_ver = room_version_to_event_format(room_version)
@@ -877,44 +877,6 @@ class FederationClient(FederationBase):
             include_all_networks=include_all_networks,
             third_party_instance_id=third_party_instance_id,
         )
-
-    @defer.inlineCallbacks
-    def query_auth(self, destination, room_id, event_id, local_auth):
-        """
-        Params:
-            destination (str)
-            event_it (str)
-            local_auth (list)
-        """
-        time_now = self._clock.time_msec()
-
-        send_content = {"auth_chain": [e.get_pdu_json(time_now) for e in local_auth]}
-
-        code, content = yield self.transport_layer.send_query_auth(
-            destination=destination,
-            room_id=room_id,
-            event_id=event_id,
-            content=send_content,
-        )
-
-        room_version = yield self.store.get_room_version(room_id)
-        format_ver = room_version_to_event_format(room_version)
-
-        auth_chain = [event_from_pdu_json(e, format_ver) for e in content["auth_chain"]]
-
-        signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True, room_version=room_version
-        )
-
-        signed_auth.sort(key=lambda e: e.depth)
-
-        ret = {
-            "auth_chain": signed_auth,
-            "rejects": content.get("rejects", []),
-            "missing": content.get("missing", []),
-        }
-
-        return ret
 
     @defer.inlineCallbacks
     def get_missing_events(
