@@ -13,14 +13,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
+from synapse.storage.data_stores.state import StateGroupDataStore
+from synapse.storage.prepare_database import prepare_database
+
+logger = logging.getLogger(__name__)
+
 
 class DataStores(object):
     """The various data stores.
 
     These are low level interfaces to physical databases.
+
+    Attributes:
+        main (DataStore)
+        state (StateGroupDataStore)
     """
 
-    def __init__(self, main_store, db_conn, hs):
+    def __init__(self, main_store_class, hs):
         # Note we pass in the main store here as workers use a different main
         # store.
-        self.main = main_store
+
+        # This is a bit convoluted as we need to figure out which stores are in
+        # which databases.
+
+        db_to_store = {}
+        for store_name in ("main", "state"):
+            db_to_store.setdefault(hs.config.data_stores[store_name], []).append(
+                store_name
+            )
+
+        for db_name, store_names in db_to_store.items():
+            database = hs.config.databases[db_name]
+            with database.make_conn() as db_conn:
+                logger.info("Preparing database %r...", db_name)
+                database.engine.check_database(db_conn.cursor())
+                prepare_database(
+                    db_conn, database.engine, hs.config, data_stores=store_names
+                )
+
+                if "main" in store_names:
+                    logger.info("Starting 'main' data store")
+                    self.main = main_store_class(database, db_conn, hs)
+
+                if "state" in store_names:
+                    logger.info("Starting 'state' data store")
+                    self.state = StateGroupDataStore(database, db_conn, hs)
+
+                db_conn.commit()
+
+                logger.info("Database %r prepared", db_name)

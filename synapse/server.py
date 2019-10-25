@@ -25,7 +25,6 @@ import abc
 import logging
 import os
 
-from twisted.enterprise import adbapi
 from twisted.mail.smtp import sendmail
 from twisted.web.client import BrowserLikePolicyForHTTPS
 
@@ -237,11 +236,8 @@ class HomeServer(object):
 
     def setup(self):
         logger.info("Setting up.")
-        with self.get_db_conn() as conn:
-            datastore = self.DATASTORE_CLASS(conn, self)
-            self.datastores = DataStores(datastore, conn, self)
-            conn.commit()
         self.start_time = int(self.get_clock().time())
+        self.datastores = DataStores(self.DATASTORE_CLASS, self)
         logger.info("Finished setting up.")
 
     def setup_master(self):
@@ -423,31 +419,6 @@ class HomeServer(object):
             self.config
         )
         return MatrixFederationHttpClient(self, tls_client_options_factory)
-
-    def build_db_pool(self):
-        name = self.db_config["name"]
-
-        return adbapi.ConnectionPool(
-            name, cp_reactor=self.get_reactor(), **self.db_config.get("args", {})
-        )
-
-    def get_db_conn(self, run_new_connection=True):
-        """Makes a new connection to the database, skipping the db pool
-
-        Returns:
-            Connection: a connection object implementing the PEP-249 spec
-        """
-        # Any param beginning with cp_ is a parameter for adbapi, and should
-        # not be passed to the database engine.
-        db_params = {
-            k: v
-            for k, v in self.db_config.get("args", {}).items()
-            if not k.startswith("cp_")
-        }
-        db_conn = self.database_engine.module.connect(**db_params)
-        if run_new_connection:
-            self.database_engine.on_new_connection(db_conn)
-        return db_conn
 
     def build_media_repository_resource(self):
         # build the media repo resource. This indirects through the HomeServer
