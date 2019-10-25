@@ -278,9 +278,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
             pdu_to_check.sender_domain,
             e.getErrorMessage(),
         )
-        # XX not really sure if these are the right codes, but they are what
-        # we've done for ages
-        raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
+        raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
     for p, d in zip(pdus_to_check_sender, more_deferreds):
         d.addErrback(sender_err, p)
@@ -314,8 +312,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
                 "event id %s: unable to verify signature for event id domain: %s"
                 % (pdu_to_check.pdu.event_id, e.getErrorMessage())
             )
-            # XX as above: not really sure if these are the right codes
-            raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
         for p, d in zip(pdus_to_check_event_id, more_deferreds):
             d.addErrback(event_err, p)
