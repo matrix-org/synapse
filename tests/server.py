@@ -302,14 +302,13 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
     Set up a synchronous test server, driven by the reactor used by
     the homeserver.
     """
-    d = _sth(cleanup_func, *args, **kwargs).result
+    server = _sth(cleanup_func, *args, **kwargs)
 
-    if isinstance(d, Failure):
-        d.raiseException()
+    database = server.config.database.get_single_database()
 
     # Make the thread pool synchronous.
-    clock = d.get_clock()
-    pool = d.get_db_pool()
+    clock = server.get_clock()
+    pool = database.get_pool(clock._reactor)
 
     def runWithConnection(func, *args, **kwargs):
         return threads.deferToThreadPool(
@@ -336,7 +335,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
         pool.runInteraction = runInteraction
         pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
-    return d
+    return server
 
 
 def get_clock():

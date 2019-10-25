@@ -40,9 +40,12 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
 
+        database = hs.config.database.get_single_database()
         self.master_store = self.hs.get_datastore()
         self.storage = hs.get_storage()
-        self.slaved_store = self.STORE_TYPE(self.hs.get_db_conn(), self.hs)
+        self.slaved_store = self.STORE_TYPE(
+            database, database.get_pool(reactor).connect(), self.hs
+        )
         self.event_id = 0
 
         server_factory = ReplicationStreamProtocolFactory(self.hs)

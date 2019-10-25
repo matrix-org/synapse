@@ -55,11 +55,13 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         engine = create_engine(config.database_config)
         fake_engine = Mock(wraps=engine)
         fake_engine.can_native_upsert = False
-        hs = TestHomeServer(
-            "test", db_pool=self.db_pool, config=config, database_engine=fake_engine
-        )
+        hs = TestHomeServer("test", config=config)
 
-        self.datastore = SQLBaseStore(None, hs)
+        mock_db = Mock()
+        mock_db.engine = fake_engine
+        mock_db.get_pool.return_value = self.db_pool
+
+        self.datastore = SQLBaseStore(mock_db, None, hs)
 
     @defer.inlineCallbacks
     def test_insert_1col(self):
