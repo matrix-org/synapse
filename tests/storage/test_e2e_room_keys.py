@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from tests import unittest, utils
+from tests import unittest
 
 # sample room_key data for use in the tests
 room_key = {
