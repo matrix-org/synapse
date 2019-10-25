@@ -607,6 +607,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         """
 
         self.hs.config.stats_enabled = False
+        self.handler.stats_enabled = False
 
         u1 = self.register_user("u1", "pass")
         u1token = self.login("u1", "pass")
@@ -618,6 +619,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertIsNone(self._get_current_stats("user", u1))
 
         self.hs.config.stats_enabled = True
+        self.handler.stats_enabled = True
 
         self._perform_background_initial_update()
 
