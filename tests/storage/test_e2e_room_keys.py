@@ -26,46 +26,52 @@ room_key = {
 }
 
 
-class E2eRoomKeysHandlerTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield utils.setup_test_homeserver(self.addCleanup)
-
+class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+        hs = self.setup_test_homeserver("server", http_client=None)
         self.store = hs.get_datastore()
+        return hs
 
-    @defer.inlineCallbacks
     def test_room_keys_version_delete(self):
         # test that deleting a room key backup deletes the keys
-        version1 = yield self.store.create_e2e_room_keys_version(
-            "user_id", {"algorithm": "rot13", "auth_data": {}}
+        version1 = self.get_success(
+            self.store.create_e2e_room_keys_version(
+                "user_id", {"algorithm": "rot13", "auth_data": {}}
+            )
         )
 
-        yield self.store.set_e2e_room_key(
-            "user_id", version1, "room", "session", room_key
+        self.get_success(
+            self.store.set_e2e_room_key(
+                "user_id", version1, "room", "session", room_key
+            )
         )
 
-        version2 = yield self.store.create_e2e_room_keys_version(
-            "user_id", {"algorithm": "rot13", "auth_data": {}}
+        version2 = self.get_success(
+            self.store.create_e2e_room_keys_version(
+                "user_id", {"algorithm": "rot13", "auth_data": {}}
+            )
         )
 
-        yield self.store.set_e2e_room_key(
-            "user_id", version2, "room", "session", room_key
+        self.get_success(
+            self.store.set_e2e_room_key(
+                "user_id", version2, "room", "session", room_key
+            )
         )
 
         # make sure the keys were stored properly
-        keys = yield self.store.get_e2e_room_keys("user_id", version1)
+        keys = self.get_success(self.store.get_e2e_room_keys("user_id", version1))
         self.assertEqual(len(keys["rooms"]), 1)
 
-        keys = yield self.store.get_e2e_room_keys("user_id", version2)
+        keys = self.get_success(self.store.get_e2e_room_keys("user_id", version2))
         self.assertEqual(len(keys["rooms"]), 1)
 
         # delete version1
-        yield self.store.delete_e2e_room_keys_version("user_id", version1)
+        self.get_success(self.store.delete_e2e_room_keys_version("user_id", version1))
 
         # make sure the key from version1 is gone, and the key from version2 is
         # still there
-        keys = yield self.store.get_e2e_room_keys("user_id", version1)
+        keys = self.get_success(self.store.get_e2e_room_keys("user_id", version1))
         self.assertEqual(len(keys["rooms"]), 0)
 
-        keys = yield self.store.get_e2e_room_keys("user_id", version2)
+        keys = self.get_success(self.store.get_e2e_room_keys("user_id", version2))
         self.assertEqual(len(keys["rooms"]), 1)
