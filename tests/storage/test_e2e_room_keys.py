@@ -27,11 +27,6 @@ room_key = {
 
 
 class E2eRoomKeysHandlerTestCase(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(E2eRoomKeysHandlerTestCase, self).__init__(*args, **kwargs)
-        self.hs = None  # type: synapse.server.HomeServer
-        self.store = None  # type: synapse.storage.DataStore
-
     @defer.inlineCallbacks
     def setUp(self):
         hs = yield utils.setup_test_homeserver(self.addCleanup)
