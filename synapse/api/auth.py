@@ -25,7 +25,13 @@ from twisted.internet import defer
 import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, JoinRules, Membership, UserTypes
+from synapse.api.constants import (
+    EventTypes,
+    JoinRules,
+    LimitBlockingTypes,
+    Membership,
+    UserTypes,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -726,7 +732,7 @@ class Auth(object):
                 self.hs.config.hs_disabled_message,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 admin_contact=self.hs.config.admin_contact,
-                limit_type=self.hs.config.hs_disabled_limit_type,
+                limit_type=LimitBlockingTypes.HS_DISABLED,
             )
         if self.hs.config.limit_usage_by_mau is True:
             assert not (user_id and threepid)
@@ -759,5 +765,5 @@ class Auth(object):
                     "Monthly Active User Limit Exceeded",
                     admin_contact=self.hs.config.admin_contact,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                    limit_type="monthly_active_user",
+                    limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER,
                 )

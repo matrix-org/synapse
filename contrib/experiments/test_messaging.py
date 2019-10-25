@@ -339,7 +339,7 @@ def main(stdscr):
     root_logger = logging.getLogger()
 
     formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(lineno)d - " "%(levelname)s - %(message)s"
+        "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s"
     )
     if not os.path.exists("logs"):
         os.makedirs("logs")
