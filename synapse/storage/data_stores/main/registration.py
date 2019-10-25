@@ -37,8 +37,8 @@ logger = logging.getLogger(__name__)
 
 
 class RegistrationWorkerStore(SQLBaseStore):
-    def __init__(self, db_conn, hs):
-        super(RegistrationWorkerStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(RegistrationWorkerStore, self).__init__(database, db_conn, hs)
 
         self.config = hs.config
         self.clock = hs.get_clock()
@@ -795,8 +795,8 @@ class RegistrationWorkerStore(SQLBaseStore):
 class RegistrationBackgroundUpdateStore(
     RegistrationWorkerStore, background_updates.BackgroundUpdateStore
 ):
-    def __init__(self, db_conn, hs):
-        super(RegistrationBackgroundUpdateStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(RegistrationBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
         self.clock = hs.get_clock()
         self.config = hs.config
@@ -921,8 +921,8 @@ class RegistrationBackgroundUpdateStore(
 
 
 class RegistrationStore(RegistrationBackgroundUpdateStore):
-    def __init__(self, db_conn, hs):
-        super(RegistrationStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(RegistrationStore, self).__init__(database, db_conn, hs)
 
         self._account_validity = hs.config.account_validity
 

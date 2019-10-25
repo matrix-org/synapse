@@ -72,8 +72,8 @@ class PushRulesWorkerStore(
     # the abstract methods being implemented.
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, db_conn, hs):
-        super(PushRulesWorkerStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(PushRulesWorkerStore, self).__init__(database, db_conn, hs)
 
         push_rules_prefill, push_rules_id = self.get_cache_dict(
             db_conn,

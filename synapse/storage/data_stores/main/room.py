@@ -362,8 +362,8 @@ class RoomWorkerStore(SQLBaseStore):
 
 
 class RoomBackgroundUpdateStore(BackgroundUpdateStore):
-    def __init__(self, db_conn, hs):
-        super(RoomBackgroundUpdateStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(RoomBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
         self.config = hs.config
 
@@ -441,8 +441,8 @@ class RoomBackgroundUpdateStore(BackgroundUpdateStore):
 
 
 class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
-    def __init__(self, db_conn, hs):
-        super(RoomStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(RoomStore, self).__init__(database, db_conn, hs)
 
         self.config = hs.config
 

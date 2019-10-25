@@ -99,8 +99,8 @@ class EventsStore(
     EventsWorkerStore,
     BackgroundUpdateStore,
 ):
-    def __init__(self, db_conn, hs):
-        super(EventsStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(EventsStore, self).__init__(database, db_conn, hs)
 
         # Collect metrics on the number of forward extremities that exist.
         # Counter of number of extremities to count

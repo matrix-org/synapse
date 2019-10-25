@@ -113,13 +113,13 @@ class DataStore(
     RelationsStore,
     CacheInvalidationStore,
 ):
-    def __init__(self, db_conn, hs):
+    def __init__(self, database, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
-        self.database_engine = hs.database_engine
+        self.database_engine = database.engine
 
         all_users_native = are_all_users_on_domain(
-            db_conn.cursor(), hs.database_engine, hs.hostname
+            db_conn.cursor(), database.engine, hs.hostname
         )
         if not all_users_native:
             raise Exception(
@@ -272,7 +272,7 @@ class DataStore(
         # Used in _generate_user_daily_visits to keep track of progress
         self._last_user_visit_update = self._get_start_of_day()
 
-        super(DataStore, self).__init__(db_conn, hs)
+        super(DataStore, self).__init__(database, db_conn, hs)
 
     def take_presence_startup_info(self):
         active_on_startup = self._presence_on_startup

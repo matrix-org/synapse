@@ -86,8 +86,8 @@ class BackgroundUpdateStore(SQLBaseStore):
     BACKGROUND_UPDATE_INTERVAL_MS = 1000
     BACKGROUND_UPDATE_DURATION_MS = 100
 
-    def __init__(self, db_conn, hs):
-        super(BackgroundUpdateStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(BackgroundUpdateStore, self).__init__(database, db_conn, hs)
         self._background_update_performance = {}
         self._background_update_queue = []
         self._background_update_handlers = {}

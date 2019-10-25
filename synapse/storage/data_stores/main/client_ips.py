@@ -33,8 +33,8 @@ LAST_SEEN_GRANULARITY = 120 * 1000
 
 
 class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
-    def __init__(self, db_conn, hs):
-        super(ClientIpBackgroundUpdateStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(ClientIpBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
         self.register_background_index_update(
             "user_ips_device_index",
@@ -363,13 +363,13 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
 
 
 class ClientIpStore(ClientIpBackgroundUpdateStore):
-    def __init__(self, db_conn, hs):
+    def __init__(self, database, db_conn, hs):
 
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen", keylen=4, max_entries=50000 * CACHE_SIZE_FACTOR
         )
 
-        super(ClientIpStore, self).__init__(db_conn, hs)
+        super(ClientIpStore, self).__init__(database, db_conn, hs)
 
         self.user_ips_max_age = hs.config.user_ips_max_age
 

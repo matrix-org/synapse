@@ -27,13 +27,13 @@ LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 
 class MonthlyActiveUsersStore(SQLBaseStore):
-    def __init__(self, dbconn, hs):
-        super(MonthlyActiveUsersStore, self).__init__(None, hs)
+    def __init__(self, database, db_conn, hs):
+        super(MonthlyActiveUsersStore, self).__init__(database, db_conn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
         # Do not add more reserved users than the total allowable number
         self.new_transaction(
-            dbconn,
+            db_conn,
             "initialise_mau_threepids",
             [],
             [],

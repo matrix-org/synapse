@@ -43,8 +43,8 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
     EVENT_SEARCH_USE_GIST_POSTGRES_NAME = "event_search_postgres_gist"
     EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
 
-    def __init__(self, db_conn, hs):
-        super(SearchBackgroundUpdateStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(SearchBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
         if not hs.config.enable_search:
             return
@@ -337,8 +337,8 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
 
 
 class SearchStore(SearchBackgroundUpdateStore):
-    def __init__(self, db_conn, hs):
-        super(SearchStore, self).__init__(db_conn, hs)
+    def __init__(self, database, db_conn, hs):
+        super(SearchStore, self).__init__(database, db_conn, hs)
 
     def store_event_search_txn(self, txn, event, key, value):
         """Add event to the search table

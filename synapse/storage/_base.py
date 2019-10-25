@@ -215,10 +215,10 @@ class PerformanceCounters(object):
 class SQLBaseStore(object):
     _TXN_ID = 0
 
-    def __init__(self, db_conn, hs):
+    def __init__(self, database, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
-        self._db_pool = hs.get_db_pool()
+        self._db_pool = database.get_pool(hs.get_reactor())
 
         self._previous_txn_total_time = 0
         self._current_txn_total_time = 0
@@ -229,7 +229,7 @@ class SQLBaseStore(object):
         #   to watch it
         self._txn_perf_counters = PerformanceCounters()
 
-        self.database_engine = hs.database_engine
+        self.database_engine = database.engine
 
         # A set of tables that are not safe to use native upserts in.
         self._unsafe_to_upsert_tables = set(UNIQUE_INDEX_BACKGROUND_UPDATES.keys())
