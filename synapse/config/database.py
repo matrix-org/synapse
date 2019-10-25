@@ -170,3 +170,8 @@ class DatabaseConnectionConfig(object):
         }
         db_conn = self.engine.module.connect(**db_params)
         return db_conn
+
+    def is_running(self):
+        """Is the database pool currently running
+        """
+        return self._pool is not None and self._pool.running

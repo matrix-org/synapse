@@ -217,6 +217,7 @@ class SQLBaseStore(object):
 
     def __init__(self, database, db_conn, hs):
         self.hs = hs
+        self.database = database
         self._clock = hs.get_clock()
         self._db_pool = database.get_pool(hs.get_reactor())
 
