@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +15,7 @@
 # limitations under the License.
 
 import inspect
+
 
 class SpamChecker(object):
     def __init__(self, hs):
@@ -30,7 +32,7 @@ class SpamChecker(object):
             # Older spam checkers don't accept the `hs` argument, so we
             # try and detect support.
             spam_args = inspect.getargspec(module)
-            if 'hs' in spam_args.args:
+            if "hs" in spam_args.args:
                 self.spam_checker = module(config=config, hs=hs)
             else:
                 self.spam_checker = module(config=config)
