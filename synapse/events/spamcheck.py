@@ -31,7 +31,7 @@ class SpamChecker(object):
             pass
 
         if module is not None:
-            # Older spam checkers don't accept the `hs` argument, so we
+            # Older spam checkers don't accept the `api` argument, so we
             # try and detect support.
             spam_args = inspect.getfullargspec(module)
             if "api" in spam_args.args:
