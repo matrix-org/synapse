@@ -438,7 +438,7 @@ class CacheDescriptor(_CacheDescriptorBase):
                 if isinstance(cached_result_d, ObservableDeferred):
                     observer = cached_result_d.observe()
                 else:
-                    observer = cached_result_d
+                    observer = defer.succeed(cached_result_d)
 
             except KeyError:
                 ret = defer.maybeDeferred(
@@ -618,7 +618,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
                 )
                 return make_deferred_yieldable(d)
             else:
-                return results
+                return defer.succeed(results)
 
         obj.__dict__[self.orig.__name__] = wrapped
 
