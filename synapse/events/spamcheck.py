@@ -16,6 +16,8 @@
 
 import inspect
 
+from synapse.spam_checker_api import SpamCheckerApi
+
 
 class SpamChecker(object):
     def __init__(self, hs):
@@ -31,9 +33,10 @@ class SpamChecker(object):
         if module is not None:
             # Older spam checkers don't accept the `hs` argument, so we
             # try and detect support.
-            spam_args = inspect.getargspec(module)
-            if "hs" in spam_args.args:
-                self.spam_checker = module(config=config, hs=hs)
+            spam_args = inspect.getfullargspec(module)
+            if "api" in spam_args.args:
+                api = SpamCheckerApi(hs)
+                self.spam_checker = module(config=config, api=api)
             else:
                 self.spam_checker = module(config=config)
 
