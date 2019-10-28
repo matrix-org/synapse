@@ -112,19 +112,7 @@ if __name__ == "__main__":
 
     @defer.inlineCallbacks
     def run_background_updates():
-        # Check if there are background updates to be run.
-        ready = yield store.has_completed_background_updates()
-
-        if not ready:
-            logger.info("Running pending background updates.")
-
-        while not ready:
-            # Run the pending background updates.
-            yield store.do_next_background_update(100)
-            ready = yield store.has_completed_background_updates()
-
-        logger.info("Finished update, exiting.")
-
+        yield store.run_background_updates(sleep=False)
         # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 

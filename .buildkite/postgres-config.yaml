@@ -8,10 +8,10 @@ report_stats: false
 database:
   name: "psycopg2"
   args:
-      user: postgres
-      host: postgres
-      password: postgres
-      database: synapse
+    user: postgres
+    host: postgres
+    password: postgres
+    database: synapse
 
 # Suppress the key server warning.
 trusted_key_servers:

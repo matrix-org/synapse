@@ -94,10 +94,10 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._all_done = False
 
     def start_doing_background_updates(self):
-        run_as_background_process("background_updates", self._run_background_updates)
+        run_as_background_process("background_updates", self.run_background_updates)
 
     @defer.inlineCallbacks
-    def _run_background_updates(self, sleep=True):
+    def run_background_updates(self, sleep=True):
         logger.info("Starting background schema updates")
         while True:
             if sleep:

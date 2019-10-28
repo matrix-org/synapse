@@ -1,4 +1,5 @@
 #!/bin/bash
+#
 # Test script for 'synapse_port_db', which creates a virtualenv, installs Synapse along
 # with additional dependencies needed for the test (such as coverage or the PostgreSQL
 # driver), update the schema of the test SQLite database and run background updates on it,
@@ -6,6 +7,7 @@
 # test porting the SQLite database to the PostgreSQL database (with coverage).
 
 set -xe
+cd `dirname $0`/../..
 
 # Create a virtualenv and use it.
 virtualenv env
