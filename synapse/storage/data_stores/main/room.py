@@ -201,13 +201,17 @@ class RoomWorkerStore(SQLBaseStore):
             where_clauses.append(
                 """
                     (
-                        name LIKE ?
-                        OR topic LIKE ?
-                        OR canonical_alias LIKE ?
+                        LOWER(name) LIKE ?
+                        OR LOWER(topic) LIKE ?
+                        OR LOWER(canonical_alias) LIKE ?
                     )
                 """
             )
-            query_args += [search_term, search_term, search_term]
+            query_args += [
+                search_term.lower(),
+                search_term.lower(),
+                search_term.lower(),
+            ]
 
         where_clause = ""
         if where_clauses:
