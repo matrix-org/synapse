@@ -1,1 +1,1 @@
-Port `federation_server.py` to async/await.
+Add a CI job to test the `synapse_port_db` script.
