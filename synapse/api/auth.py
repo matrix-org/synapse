@@ -497,7 +497,7 @@ class Auth(object):
         token = self.get_access_token_from_request(request)
         service = self.store.get_app_service_by_token(token)
         if not service:
-            logger.warn("Unrecognised appservice access token.")
+            logger.warning("Unrecognised appservice access token.")
             raise InvalidClientTokenError()
         request.authenticated_entity = service.sender
         return defer.succeed(service)

@@ -148,7 +148,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
             # The 'except' clause is very broad, but we need to
             # capture everything from DNS failures upwards
             #
-            logger.warn("Failed to reject invite: %s", e)
+            logger.warning("Failed to reject invite: %s", e)
 
             yield self.store.locally_reject_invite(user_id, room_id)
             ret = {}

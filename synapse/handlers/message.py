@@ -687,7 +687,7 @@ class EventCreationHandler(object):
         try:
             yield self.auth.check_from_context(room_version, event, context)
         except AuthError as err:
-            logger.warn("Denying new event %r because %s", event, err)
+            logger.warning("Denying new event %r because %s", event, err)
             raise err
 
         # Ensure that we can round trip before trying to persist in db

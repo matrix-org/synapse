@@ -227,7 +227,7 @@ class FederationServer(FederationBase):
             try:
                 yield self.check_server_matches_acl(origin_host, room_id)
             except AuthError as e:
-                logger.warn("Ignoring PDUs for room %s from banned server", room_id)
+                logger.warning("Ignoring PDUs for room %s from banned server", room_id)
                 for pdu in pdus_by_room[room_id]:
                     event_id = pdu.event_id
                     pdu_results[event_id] = e.error_dict()
@@ -240,7 +240,7 @@ class FederationServer(FederationBase):
                         yield self._handle_received_pdu(origin, pdu)
                         pdu_results[event_id] = {}
                     except FederationError as e:
-                        logger.warn("Error handling PDU %s: %s", event_id, e)
+                        logger.warning("Error handling PDU %s: %s", event_id, e)
                         pdu_results[event_id] = {"error": str(e)}
                     except Exception as e:
                         f = failure.Failure()
@@ -349,7 +349,9 @@ class FederationServer(FederationBase):
 
         room_version = yield self.store.get_room_version(room_id)
         if room_version not in supported_versions:
-            logger.warn("Room version %s not in %s", room_version, supported_versions)
+            logger.warning(
+                "Room version %s not in %s", room_version, supported_versions
+            )
             raise IncompatibleRoomVersionError(room_version=room_version)
 
         pdu = yield self.handler.on_make_join_request(origin, room_id, user_id)
@@ -709,7 +711,7 @@ def server_matches_acl_event(server_name, acl_event):
     # server name is a literal IP
     allow_ip_literals = acl_event.content.get("allow_ip_literals", True)
     if not isinstance(allow_ip_literals, bool):
-        logger.warn("Ignorning non-bool allow_ip_literals flag")
+        logger.warning("Ignorning non-bool allow_ip_literals flag")
         allow_ip_literals = True
     if not allow_ip_literals:
         # check for ipv6 literals. These start with '['.
@@ -723,7 +725,7 @@ def server_matches_acl_event(server_name, acl_event):
     # next,  check the deny list
     deny = acl_event.content.get("deny", [])
     if not isinstance(deny, (list, tuple)):
-        logger.warn("Ignorning non-list deny ACL %s", deny)
+        logger.warning("Ignorning non-list deny ACL %s", deny)
         deny = []
     for e in deny:
         if _acl_entry_matches(server_name, e):
@@ -733,7 +735,7 @@ def server_matches_acl_event(server_name, acl_event):
     # then the allow list.
     allow = acl_event.content.get("allow", [])
     if not isinstance(allow, (list, tuple)):
-        logger.warn("Ignorning non-list allow ACL %s", allow)
+        logger.warning("Ignorning non-list allow ACL %s", allow)
         allow = []
     for e in allow:
         if _acl_entry_matches(server_name, e):
@@ -747,7 +749,7 @@ def server_matches_acl_event(server_name, acl_event):
 
 def _acl_entry_matches(server_name, acl_entry):
     if not isinstance(acl_entry, six.string_types):
-        logger.warn(
+        logger.warning(
             "Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry)
         )
         return False
@@ -803,7 +805,7 @@ class FederationHandlerRegistry(object):
     def on_edu(self, edu_type, origin, content):
         handler = self.edu_handlers.get(edu_type)
         if not handler:
-            logger.warn("No handler registered for EDU type %s", edu_type)
+            logger.warning("No handler registered for EDU type %s", edu_type)
 
         with start_active_span_from_edu(content, "handle_edu"):
             try:
@@ -816,7 +818,7 @@ class FederationHandlerRegistry(object):
     def on_query(self, query_type, args):
         handler = self.query_handlers.get(query_type)
         if not handler:
-            logger.warn("No handler registered for query type %s", query_type)
+            logger.warning("No handler registered for query type %s", query_type)
             raise NotFoundError("No handler for Query type '%s'" % (query_type,))
 
         return handler(args)
