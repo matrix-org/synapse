@@ -21,7 +21,7 @@ python -m synapse.app.homeserver --generate-keys -c .buildkite/sqlite-config.yam
 scripts-dev/update_database --database-config .buildkite/sqlite-config.yaml
 
 # Create the PostgreSQL database.
-PGPASSWORD=postgres createdb -h postgres -U postgres synapse
+./.buildkite/scripts/create_postgres_db.py
 
 # Run the script
 coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
