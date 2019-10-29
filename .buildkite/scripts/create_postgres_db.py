@@ -20,12 +20,14 @@ from synapse.storage.engines import create_engine
 logger = logging.getLogger("create_postgres_db")
 
 if __name__ == "__main__":
-    # create a PostgresEngine
+    # Create a PostgresEngine.
     db_engine = create_engine({"name": "psycopg2", "args": {}})
 
-    # connect to postgres to create the base database.
+    # Connect to postgres to create the base database.
+    # We use "postgres" as a database because it's bound to exist and the "synapse" one
+    # doesn't exist yet.
     db_conn = db_engine.module.connect(
-        user="postgres", host="postgres", password="postgres", dbname="synapse"
+        user="postgres", host="postgres", password="postgres", dbname="postgres"
     )
     db_conn.autocommit = True
     cur = db_conn.cursor()
