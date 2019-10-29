@@ -1180,9 +1180,19 @@ class FederationHandler(BaseHandler):
 
             # Check whether this room is the result of an upgrade of a room we already know
             # about. If so, migrate over user information
+            predecessor = yield self.store.get_room_predecessor(room_id)
+            if not predecessor:
+                return
+            old_room_id = predecessor["room_id"]
+            logger.debug(
+                "Found predecessor for %s during remote join: %s", room_id, old_room_id
+            )
+
             # We retrieve the room member handler here as to not cause a cyclic dependency
             member_handler = self.hs.get_room_member_handler()
-            yield member_handler.transfer_room_state_if_room_upgrade(room_id)
+            yield member_handler.transfer_room_state_on_room_upgrade(
+                old_room_id, room_id
+            )
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
         finally:

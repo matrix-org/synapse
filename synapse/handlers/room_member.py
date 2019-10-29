@@ -489,36 +489,31 @@ class RoomMemberHandler(object):
         return res
 
     @defer.inlineCallbacks
-    def transfer_room_state_if_room_upgrade(self, room_id):
-        """Upon our server joining a room, we can check if that room is the result of a
-        room upgrade. At this point, we can transfer over information from the previous
-        room.
+    def transfer_room_state_on_room_upgrade(self, old_room_id, room_id):
+        """Upon our server becoming aware of an upgraded room, either by upgrading a room
+        ourselves or joining one, we can transfer over information from the previous room.
 
-        Checks if the given room is the result of a room upgrade. If so, copies user state
-        (tags/push rules) for every local user that was in the old room, as well as
-        depublishing the room from the room directory if it was there.
+        Copies user state (tags/push rules) for every local user that was in the old room, as
+        well as migrating the room directory state.
 
         Args:
+            old_room_id (str): The ID of the old room
+
             room_id (str): The ID of the new room
 
         Returns:
             Deferred
         """
-        # Check if the new room is an upgraded room
-        predecessor = yield self.store.get_room_predecessor(room_id)
-        if not predecessor:
-            return
-        old_room_id = predecessor["room_id"]
-        logger.debug("Found predecessor for %s: %s", room_id, old_room_id)
-
         # Find all local users that were in the old room and copy over each user's state
         users = yield self.store.get_users_in_room(old_room_id)
         yield self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
 
-        # Depublish the old room from the room directory if it was published
-        room = yield self.store.get_room(old_room_id)
-        if room and room["is_public"]:
+        # Add new room to the room directory if the old room was there
+        # Remove old room from the room directory
+        old_room = yield self.store.get_room(old_room_id)
+        if old_room and old_room["is_public"]:
             yield self.store.set_room_is_public(old_room_id, False)
+            yield self.store.set_room_is_public(room_id, True)
 
     @defer.inlineCallbacks
     def copy_user_state_on_room_upgrade(self, old_room_id, new_room_id, user_ids):

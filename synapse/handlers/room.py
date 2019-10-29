@@ -189,9 +189,10 @@ class RoomCreationHandler(BaseHandler):
             requester, old_room_id, new_room_id, old_room_state
         )
 
-        # Copy over user push rules, tags and depublish the old room from the room directory
-        # if necessary
-        yield self.room_member_handler.transfer_room_state_if_room_upgrade(new_room_id)
+        # Copy over user push rules, tags and migrate room directory state
+        yield self.room_member_handler.transfer_room_state_on_room_upgrade(
+            old_room_id, new_room_id
+        )
 
         # finally, shut down the PLs in the old room, and update them in the new
         # room.
