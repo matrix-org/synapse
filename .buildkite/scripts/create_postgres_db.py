@@ -25,10 +25,7 @@ if __name__ == "__main__":
 
     # connect to postgres to create the base database.
     db_conn = db_engine.module.connect(
-        user="postgres",
-        host="postgres",
-        password="postgres",
-        dbname="synapse",
+        user="postgres", host="postgres", password="postgres", dbname="synapse"
     )
     db_conn.autocommit = True
     cur = db_conn.cursor()
