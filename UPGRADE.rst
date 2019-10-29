@@ -2,7 +2,7 @@ Upgrading Synapse
 =================
 
 Before upgrading check if any special steps are required to upgrade from the
-what you currently have installed to current version of Synapse. The extra
+version you currently have installed to current version of Synapse. The extra
 instructions that may be required are listed later in this document.
 
 * If Synapse was installed using `prebuilt packages
