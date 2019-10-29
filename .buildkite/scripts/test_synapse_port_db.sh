@@ -10,6 +10,7 @@ set -xe
 cd `dirname $0`/../..
 
 # Create a virtualenv and use it.
+apt install python-virtualenv
 virtualenv env
 source env/bin/activate
 
