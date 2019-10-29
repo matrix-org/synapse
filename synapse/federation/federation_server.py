@@ -151,7 +151,7 @@ class FederationServer(FederationBase):
 
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
-        # Reject if PDU count > 50 and EDU count > 100
+        # Reject if PDU count > 50 or EDU count > 100
         if len(transaction.pdus) > 50 or (
             hasattr(transaction, "edus") and len(transaction.edus) > 100
         ):
