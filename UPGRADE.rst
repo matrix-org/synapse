@@ -29,7 +29,7 @@ instructions that may be required are listed later in this document.
      running:
 
      .. code:: bash
-     
+
        git pull
        pip install --upgrade .
 
@@ -74,6 +74,16 @@ for example:
      # replace `1.3.0` and `stretch` accordingly:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+
+
+Upgrading to v1.5.0
+===================
+
+This release includes a database migration which may take several minutes to
+complete if there are a large number (more than a million or so) of entries in
+the ``devices`` table. This is only likely to a be a problem on very large
+installations.
+
 
 Upgrading to v1.4.0
 ===================
