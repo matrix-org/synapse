@@ -809,7 +809,7 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
 
         super(ReplicationFederationHandlerRegistry, self).__init__()
 
-    def on_edu(self, edu_type, origin, content):
+    async def on_edu(self, edu_type, origin, content):
         """Overrides FederationHandlerRegistry
         """
         if not self.config.use_presence and edu_type == "m.presence":
@@ -817,17 +817,17 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
 
         handler = self.edu_handlers.get(edu_type)
         if handler:
-            return super(ReplicationFederationHandlerRegistry, self).on_edu(
+            return await super(ReplicationFederationHandlerRegistry, self).on_edu(
                 edu_type, origin, content
             )
 
-        return self._send_edu(edu_type=edu_type, origin=origin, content=content)
+        return await self._send_edu(edu_type=edu_type, origin=origin, content=content)
 
-    def on_query(self, query_type, args):
+    async def on_query(self, query_type, args):
         """Overrides FederationHandlerRegistry
         """
         handler = self.query_handlers.get(query_type)
         if handler:
-            return handler(args)
+            return await handler(args)
 
-        return self._get_query_client(query_type=query_type, args=args)
+        return await self._get_query_client(query_type=query_type, args=args)
