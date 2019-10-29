@@ -1,3 +1,21 @@
+Synapse 1.5.0rc2 (2019-10-28)
+=============================
+
+Bugfixes
+--------
+
+- Update list of boolean columns in `synapse_port_db`. ([\#6247](https://github.com/matrix-org/synapse/issues/6247))
+- Fix /keys/query API on workers. ([\#6256](https://github.com/matrix-org/synapse/issues/6256))
+- Improve signature checking on some federation APIs. ([\#6262](https://github.com/matrix-org/synapse/issues/6262))
+
+
+Internal Changes
+----------------
+
+- Move schema delta files to the correct data store. ([\#6248](https://github.com/matrix-org/synapse/issues/6248))
+- Small performance improvement by removing repeated config lookups in room stats calculation. ([\#6255](https://github.com/matrix-org/synapse/issues/6255))
+
+
 Synapse 1.5.0rc1 (2019-10-24)
 ==========================
 
