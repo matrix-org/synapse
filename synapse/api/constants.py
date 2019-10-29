@@ -138,3 +138,6 @@ class LimitBlockingTypes(object):
 
     MONTHLY_ACTIVE_USER = "monthly_active_user"
     HS_DISABLED = "hs_disabled"
+
+
+LabelsField = "org.matrix.labels"
