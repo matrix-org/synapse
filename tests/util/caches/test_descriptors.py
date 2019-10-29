@@ -325,9 +325,9 @@ class DescriptorTestCase(unittest.TestCase):
         self.assertEqual(len(obj.fn.cache.cache), 3)
 
         r = obj.fn(1, 2)
-        self.assertEqual(r, ["spam", "eggs"])
+        self.assertEqual(r.result, ["spam", "eggs"])
         r = obj.fn(1, 3)
-        self.assertEqual(r, ["chips"])
+        self.assertEqual(r.result, ["chips"])
         obj.mock.assert_not_called()
 
     def test_cache_iterable_with_sync_exception(self):
