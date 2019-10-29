@@ -129,6 +129,7 @@ class RoomCreationHandler(BaseHandler):
             old_room_id,
             new_version,  # args for _upgrade_room
         )
+
         return ret
 
     @defer.inlineCallbacks
@@ -188,7 +189,11 @@ class RoomCreationHandler(BaseHandler):
             requester, old_room_id, new_room_id, old_room_state
         )
 
-        # and finally, shut down the PLs in the old room, and update them in the new
+        # Copy over user push rules, tags and depublish the old room from the room directory
+        # if necessary
+        yield self.room_member_handler.transfer_room_state_if_room_upgrade(new_room_id)
+
+        # finally, shut down the PLs in the old room, and update them in the new
         # room.
         yield self._update_upgraded_room_pls(
             requester, old_room_id, new_room_id, old_room_state

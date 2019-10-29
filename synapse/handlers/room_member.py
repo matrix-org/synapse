@@ -512,7 +512,7 @@ class RoomMemberHandler(object):
         logger.debug("Found predecessor for %s: %s", room_id, old_room_id)
 
         # Find all local users that were in the old room and copy over each user's state
-        users = self.store.get_users_in_room(old_room_id)
+        users = yield self.store.get_users_in_room(old_room_id)
         yield self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
 
         # Depublish the old room from the room directory if it was published
@@ -535,9 +535,10 @@ class RoomMemberHandler(object):
         """
 
         logger.debug(
-            "Copying over room tags and push rules from %s to %s",
+            "Copying over room tags and push rules from %s to %s for users %s",
             old_room_id,
             new_room_id,
+            user_ids,
         )
 
         for user_id in user_ids:

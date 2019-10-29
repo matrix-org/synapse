@@ -111,7 +111,6 @@ class FederationHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
-        self.room_member_handler = hs.get_room_member_handler()
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.action_generator = hs.get_action_generator()
@@ -1181,9 +1180,9 @@ class FederationHandler(BaseHandler):
 
             # Check whether this room is the result of an upgrade of a room we already know
             # about. If so, migrate over user information
-            yield self.room_member_handler.transfer_room_state_if_room_upgrade(
-                room_id, joinee
-            )
+            # We retrieve the room member handler here as to not cause a cyclic dependency
+            member_handler = self.hs.get_room_member_handler()
+            yield member_handler.transfer_room_state_if_room_upgrade(room_id)
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
         finally:
@@ -2451,7 +2450,10 @@ class FederationHandler(BaseHandler):
                 raise e
 
             yield self._check_signature(event, context)
-            yield self.room_member_handler.send_membership_event(None, event, context)
+
+            # We retrieve the room member handler here as to not cause a cyclic dependency
+            member_handler = self.hs.get_room_member_handler()
+            yield member_handler.send_membership_event(None, event, context)
         else:
             destinations = set(x.split(":", 1)[-1] for x in (sender_user_id, room_id))
             yield self.federation_client.forward_third_party_invite(
@@ -2510,7 +2512,9 @@ class FederationHandler(BaseHandler):
         # though the sender isn't a local user.
         event.internal_metadata.send_on_behalf_of = get_domain_from_id(event.sender)
 
-        yield self.room_member_handler.send_membership_event(None, event, context)
+        # We retrieve the room member handler here as to not cause a cyclic dependency
+        member_handler = self.hs.get_room_member_handler()
+        yield member_handler.send_membership_event(None, event, context)
 
     @defer.inlineCallbacks
     def add_display_name_to_third_party_invite(
