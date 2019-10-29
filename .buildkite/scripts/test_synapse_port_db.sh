@@ -15,6 +15,8 @@ pip install psycopg2 coverage coverage-enable-subprocess
 # Install Synapse itself. This won't update any libraries.
 pip install -e .
 
+python -m synapse.app.homeserver --generate-keys -c .buildkite/sqlite-config.yaml
+
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
 scripts-dev/update_database --database-config .buildkite/sqlite-config.yaml
 
