@@ -1,1 +1,1 @@
-Install python-virtualenv when testing synapse_port_db.
+Add a CI job to test the `synapse_port_db` script.
