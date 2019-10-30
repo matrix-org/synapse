@@ -18,3 +18,5 @@ CREATE TABLE IF NOT EXISTS event_labels (
     label TEXT,
     PRIMARY KEY(event_id, label)
 );
+
+CREATE INDEX event_labels_label_idx ON event_labels(label);
