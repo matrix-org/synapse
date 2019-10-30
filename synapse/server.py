@@ -95,6 +95,7 @@ from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
+from synapse.storage import DataStores, Storage
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -196,6 +197,7 @@ class HomeServer(object):
         "account_validity_handler",
         "saml_handler",
         "event_client_serializer",
+        "storage",
     ]
 
     REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
@@ -224,7 +226,7 @@ class HomeServer(object):
         self.admin_redaction_ratelimiter = Ratelimiter()
         self.registration_ratelimiter = Ratelimiter()
 
-        self.datastore = None
+        self.datastores = None
 
         # Other kwargs are explicit dependencies
         for depname in kwargs:
@@ -233,7 +235,8 @@ class HomeServer(object):
     def setup(self):
         logger.info("Setting up.")
         with self.get_db_conn() as conn:
-            self.datastore = self.DATASTORE_CLASS(conn, self)
+            datastore = self.DATASTORE_CLASS(conn, self)
+            self.datastores = DataStores(datastore, conn, self)
             conn.commit()
         logger.info("Finished setting up.")
 
@@ -266,7 +269,7 @@ class HomeServer(object):
         return self.clock
 
     def get_datastore(self):
-        return self.datastore
+        return self.datastores.main
 
     def get_config(self):
         return self.config
@@ -536,6 +539,9 @@ class HomeServer(object):
 
     def build_event_client_serializer(self):
         return EventClientSerializer(self)
+
+    def build_storage(self) -> Storage:
+        return Storage(self, self.datastores)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
