@@ -29,7 +29,7 @@ stored in `synapse.storage.schema`.
 
 from synapse.storage.data_stores import DataStores
 from synapse.storage.data_stores.main import DataStore
-from synapse.storage.persist_events import EventsPersistenceStore
+from synapse.storage.persist_events import EventsPersistenceStorage
 
 __all__ = ["DataStores", "DataStore"]
 
@@ -44,7 +44,7 @@ class Storage(object):
         # interfaces.
         self.main = stores.main
 
-        self.persistence = EventsPersistenceStore(hs, stores)
+        self.persistence = EventsPersistenceStorage(hs, stores)
 
 
 def are_all_users_on_domain(txn, database_engine, domain):

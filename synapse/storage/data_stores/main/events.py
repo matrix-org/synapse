@@ -146,7 +146,7 @@ class EventsStore(
 
     @_retry_on_integrity_error
     @defer.inlineCallbacks
-    def _persist_events(
+    def _persist_events_and_state_updates(
         self,
         events_and_contexts,
         current_state_for_room,
@@ -155,18 +155,27 @@ class EventsStore(
         backfilled=False,
         delete_existing=False,
     ):
-        """Persist events to db
+        """Persist a set of events alongside updates to the current state and
+        forward extremities tables.
 
         Args:
             events_and_contexts (list[(EventBase, EventContext)]):
-            backfilled (bool):
+            current_state_for_room (dict[str, dict]): Map from room_id to the
+                current state of the room based on forward extremities
+            state_delta_for_room (dict[str, tuple]): Map from room_id to tuple
+                of `(to_delete, to_insert)` where to_delete is a list
+                of type/state keys to remove from current state, and to_insert
+                is a map (type,key)->event_id giving the state delta in each
+                room.
+            new_forward_extremities (dict[str, list[str]]): Map from room_id
+                to list of event IDs that are the new forward extremities of
+                the room.
+            backfilled (bool)
             delete_existing (bool):
 
         Returns:
             Deferred: resolves when the events have been persisted
         """
-        if not events_and_contexts:
-            return
 
         # We want to calculate the stream orderings as late as possible, as
         # we only notify after all events with a lesser stream ordering have

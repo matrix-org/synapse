@@ -171,7 +171,13 @@ class _EventPeristenceQueue(object):
             pass
 
 
-class EventsPersistenceStore(object):
+class EventsPersistenceStorage(object):
+    """High level interface for handling persisting newly received events.
+
+    Takes care of batching up events by room, and calculating the necessary
+    current state and forward extremity changes.
+    """
+
     def __init__(self, hs, stores: DataStores):
         # We ultimately want to split out the state store from the main store,
         # so we use separate variables here even though they point to the same
@@ -257,7 +263,8 @@ class EventsPersistenceStore(object):
     def _persist_events(
         self, events_and_contexts, backfilled=False, delete_existing=False
     ):
-        """Persist events to db
+        """Calculates the change to current state and forward extremities, and
+        persists the given events and with those updates.
 
         Args:
             events_and_contexts (list[(EventBase, EventContext)]):
@@ -399,7 +406,7 @@ class EventsPersistenceStore(object):
                         if current_state is not None:
                             current_state_for_room[room_id] = current_state
 
-            yield self.main_store._persist_events(
+            yield self.main_store._persist_events_and_state_updates(
                 chunk,
                 current_state_for_room=current_state_for_room,
                 state_delta_for_room=state_delta_for_room,

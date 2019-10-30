@@ -226,7 +226,6 @@ class HomeServer(object):
         self.admin_redaction_ratelimiter = Ratelimiter()
         self.registration_ratelimiter = Ratelimiter()
 
-        self.datastore = None
         self.datastores = None
 
         # Other kwargs are explicit dependencies
@@ -236,8 +235,8 @@ class HomeServer(object):
     def setup(self):
         logger.info("Setting up.")
         with self.get_db_conn() as conn:
-            self.datastore = self.DATASTORE_CLASS(conn, self)
-            self.datastores = DataStores(self.datastore, conn, self)
+            datastore = self.DATASTORE_CLASS(conn, self)
+            self.datastores = DataStores(datastore, conn, self)
             conn.commit()
         logger.info("Finished setting up.")
 
