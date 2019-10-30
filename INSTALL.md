@@ -423,7 +423,7 @@ headed `email`, and be sure to have at least the `smtp_host`, `smtp_port`
 and `notif_from` fields filled out.  You may also need to set `smtp_user`,
 `smtp_pass`, and `require_transport_security`.
 
-If email is not configured password reset, registration and notifications via
+If email is not configured, password reset, registration and notifications via
 email will be disabled.
 
 ## Registering a user
