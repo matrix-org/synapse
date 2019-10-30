@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+
 from mock import Mock
 
-from synapse.api.constants import EventTypes, LabelsField
 import synapse.rest.admin
+from synapse.api.constants import EventTypes, LabelsField
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import sync
 
@@ -121,7 +122,9 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(events), 3, [event["content"] for event in events])
         self.assertEqual(events[0]["content"]["body"], "without label", events[0])
         self.assertEqual(events[1]["content"]["body"], "with wrong label", events[1])
-        self.assertEqual(events[2]["content"]["body"], "with two wrong labels", events[2])
+        self.assertEqual(
+            events[2]["content"]["body"], "with two wrong labels", events[2]
+        )
 
     def test_sync_filter_labels_not_labels(self):
         """Test that we can filter by both a label and the absence of another label."""
@@ -162,10 +165,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
         self.helper.send_event(
             room_id=room_id,
             type=EventTypes.Message,
-            content={
-                "msgtype": "m.text",
-                "body": "without label",
-            },
+            content={"msgtype": "m.text", "body": "without label"},
             tok=tok,
         )
 

@@ -2486,13 +2486,7 @@ class EventsStore(
         return self._simple_insert_many_txn(
             txn=txn,
             table="event_labels",
-            values=[
-                {
-                    "event_id": event_id,
-                    "label": label,
-                }
-                for label in labels
-            ],
+            values=[{"event_id": event_id, "label": label} for label in labels],
         )
 
 
