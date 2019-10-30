@@ -13,17 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.data_stores.state import StateGroupDataStore
-
-
-class DataStores(object):
-    """The various data stores.
-
-    These are low level interfaces to physical databases.
-    """
-
-    def __init__(self, main_store, db_conn, hs):
-        # Note we pass in the main store here as workers use a different main
-        # store.
-        self.main = main_store
-        self.state = StateGroupDataStore(db_conn, hs)
+from synapse.storage.data_stores.state.store import StateGroupDataStore  # noqa: F401
