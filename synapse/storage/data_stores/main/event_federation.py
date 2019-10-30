@@ -364,9 +364,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     def _get_backfill_events(self, txn, room_id, event_list, limit):
-        logger.debug(
-            "_get_backfill_events: %s, %s, %s", room_id, repr(event_list), limit
-        )
+        logger.debug("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
 
         event_results = set()
 

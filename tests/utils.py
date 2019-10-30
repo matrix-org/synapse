@@ -325,10 +325,16 @@ def setup_test_homeserver(
         if homeserverToUse.__name__ == "TestHomeServer":
             hs.setup_master()
     else:
+        # If we have been given an explicit datastore we probably want to mock
+        # out the DataStores somehow too. This all feels a bit wrong, but then
+        # mocking the stores feels wrong too.
+        datastores = Mock(datastore=datastore)
+
         hs = homeserverToUse(
             name,
             db_pool=None,
             datastore=datastore,
+            datastores=datastores,
             config=config,
             version_string="Synapse/tests",
             database_engine=db_engine,
@@ -646,7 +652,7 @@ def create_room(hs, room_id, creator_id):
         creator_id (str)
     """
 
-    store = hs.get_datastore()
+    persistence_store = hs.get_storage().persistence
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
 
@@ -663,4 +669,4 @@ def create_room(hs, room_id, creator_id):
 
     event, context = yield event_creation_handler.create_new_client_event(builder)
 
-    yield store.persist_event(event, context)
+    yield persistence_store.persist_event(event, context)
