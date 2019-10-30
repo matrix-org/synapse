@@ -1223,7 +1223,6 @@ class FederationHandler(BaseHandler):
         Returns:
             Deferred[FrozenEvent]
         """
-
         if get_domain_from_id(user_id) != origin:
             logger.info(
                 "Got /make_join request for user %r from different origin %s, ignoring",
@@ -1252,7 +1251,7 @@ class FederationHandler(BaseHandler):
                 builder=builder
             )
         except AuthError as e:
-            logger.warn("Failed to create join %r because %s", event, e)
+            logger.warn("Failed to create join to %s because %s", room_id, e)
             raise e
 
         event_allowed = yield self.third_party_event_rules.check_event_allowed(
@@ -1281,10 +1280,19 @@ class FederationHandler(BaseHandler):
         event = pdu
 
         logger.debug(
-            "on_send_join_request: Got event: %s, signatures: %s",
+            "on_send_join_request from %s: Got event: %s, signatures: %s",
+            origin,
             event.event_id,
             event.signatures,
         )
+
+        if get_domain_from_id(event.sender) != origin:
+            logger.info(
+                "Got /send_join request for user %r from different origin %s",
+                event.sender,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
         event.internal_metadata.outlier = False
         # Send this event on behalf of the origin server.
@@ -1503,6 +1511,14 @@ class FederationHandler(BaseHandler):
             event.event_id,
             event.signatures,
         )
+
+        if get_domain_from_id(event.sender) != origin:
+            logger.info(
+                "Got /send_leave request for user %r from different origin %s",
+                event.sender,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
         event.internal_metadata.outlier = False
 

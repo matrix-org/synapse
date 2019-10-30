@@ -1,1 +1,0 @@
-Fix bug where guest account registration can wedge after restart.
