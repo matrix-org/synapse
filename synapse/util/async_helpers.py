@@ -88,6 +88,10 @@ class ObservableDeferred(object):
 
     def observe(self) -> defer.Deferred:
         """Observe the underlying deferred.
+
+        This returns a brand new deferred that is resolved when the underlying
+        deferred is resolved. Interacting with the returned deferred does not
+        effect the underdlying deferred.
         """
         if not self._result:
             d = defer.Deferred()
