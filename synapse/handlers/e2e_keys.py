@@ -1072,7 +1072,7 @@ class SignatureListItem:
 
 
 class SigningKeyEduUpdater(object):
-    "Handles incoming signing key updates from federation and updates the DB"
+    """Handles incoming signing key updates from federation and updates the DB"""
 
     def __init__(self, hs, e2e_keys_handler):
         self.store = hs.get_datastore()
@@ -1111,7 +1111,6 @@ class SigningKeyEduUpdater(object):
         self_signing_key = edu_content.pop("self_signing_key", None)
 
         if get_domain_from_id(user_id) != origin:
-            # TODO: Raise?
             logger.warning("Got signing key update edu for %r from %r", user_id, origin)
             return
 
@@ -1122,7 +1121,7 @@ class SigningKeyEduUpdater(object):
             return
 
         self._pending_updates.setdefault(user_id, []).append(
-            (master_key, self_signing_key, edu_content)
+            (master_key, self_signing_key)
         )
 
         yield self._handle_signing_key_updates(user_id)
@@ -1147,22 +1146,21 @@ class SigningKeyEduUpdater(object):
 
             logger.info("pending updates: %r", pending_updates)
 
-            for master_key, self_signing_key, edu_content in pending_updates:
+            for master_key, self_signing_key in pending_updates:
                 if master_key:
                     yield self.store.set_e2e_cross_signing_key(
                         user_id, "master", master_key
                     )
-                    device_id = get_verify_key_from_cross_signing_key(master_key)[
-                        1
-                    ].version
-                    device_ids.append(device_id)
+                    _, verify_key = get_verify_key_from_cross_signing_key(master_key)
+                    # verify_key is a VerifyKey from signedjson, which uses
+                    # .version to denote the portion of the key ID after the
+                    # algorithm and colon, which is the device ID
+                    device_ids.append(verify_key.version)
                 if self_signing_key:
                     yield self.store.set_e2e_cross_signing_key(
                         user_id, "self_signing", self_signing_key
                     )
-                    device_id = get_verify_key_from_cross_signing_key(self_signing_key)[
-                        1
-                    ].version
-                    device_ids.append(device_id)
+                    _, verify_key = get_verify_key_from_cross_signing_key(self_signing_key)
+                    device_ids.append(verify_key.version)
 
             yield device_handler.notify_device_update(user_id, device_ids)
