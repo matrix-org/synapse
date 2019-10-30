@@ -37,9 +37,6 @@ class EventContext:
         delta_ids (dict[(str, str), str]): Delta from ``prev_group``.
             (type, state_key) -> event_id. ``None`` for an outlier.
 
-        prev_state_events (?): XXX: is this ever set to anything other than
-            the empty list?
-
         app_service: FIXME
 
         _current_state_ids (dict[(str, str), str]|None):
@@ -71,7 +68,6 @@ class EventContext:
     rejected = attr.ib(default=False)
     prev_group = attr.ib(default=None)
     delta_ids = attr.ib(default=None)
-    prev_state_events = attr.ib(default=attr.Factory(list))
     app_service = attr.ib(default=None)
 
     _current_state_ids = attr.ib(default=None)
@@ -125,7 +121,6 @@ class EventContext:
             "rejected": self.rejected,
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
-            "prev_state_events": self.prev_state_events,
             "app_service_id": self.app_service.id if self.app_service else None,
         }
 
@@ -151,7 +146,6 @@ class EventContext:
             prev_group=input["prev_group"],
             delta_ids=_decode_state_dict(input["delta_ids"]),
             rejected=input["rejected"],
-            prev_state_events=input["prev_state_events"],
         )
 
         app_service_id = input["app_service_id"]
