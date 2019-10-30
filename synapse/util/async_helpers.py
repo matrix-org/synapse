@@ -138,7 +138,7 @@ def concurrently_execute(func, args, limit):
     the number of concurrent executions.
 
     Args:
-        func (func): Function to execute, should return a deferred.
+        func (func): Function to execute, should return a deferred or coroutine.
         args (list): List of arguments to pass to func, each invocation of func
             gets a signle argument.
         limit (int): Maximum number of conccurent executions.
@@ -148,11 +148,10 @@ def concurrently_execute(func, args, limit):
     """
     it = iter(args)
 
-    @defer.inlineCallbacks
-    def _concurrently_execute_inner():
+    async def _concurrently_execute_inner():
         try:
             while True:
-                yield func(next(it))
+                await maybe_awaitable(func(next(it)))
         except StopIteration:
             pass
 
