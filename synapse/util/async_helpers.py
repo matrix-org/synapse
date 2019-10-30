@@ -86,11 +86,12 @@ class ObservableDeferred(object):
 
         deferred.addCallbacks(callback, errback)
 
-    def observe(self):
+    def observe(self) -> defer.Deferred:
         """Observe the underlying deferred.
 
-        Can return either a deferred if the underlying deferred is still pending
-        (or has failed), or the actual value. Callers may need to use maybeDeferred.
+        This returns a brand new deferred that is resolved when the underlying
+        deferred is resolved. Interacting with the returned deferred does not
+        effect the underdlying deferred.
         """
         if not self._result:
             d = defer.Deferred()
@@ -105,7 +106,7 @@ class ObservableDeferred(object):
             return d
         else:
             success, res = self._result
-            return res if success else defer.fail(res)
+            return defer.succeed(res) if success else defer.fail(res)
 
     def observers(self):
         return self._observers
