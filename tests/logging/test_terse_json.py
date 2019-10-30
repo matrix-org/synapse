@@ -168,7 +168,7 @@ class TerseJSONTCPTestCase(StructuredLoggingTestBase, HomeserverTestCase):
 
         # Send a bunch of useful messages
         for i in range(0, 10):
-            logger.warning("test warn %s" % (i,))
+            logger.warn("test warn %s" % (i,))
 
         # Send a bunch of info messages
         for i in range(0, 3):
@@ -220,7 +220,7 @@ class TerseJSONTCPTestCase(StructuredLoggingTestBase, HomeserverTestCase):
 
         # Send a bunch of useful messages
         for i in range(0, 20):
-            logger.warning("test warn", num=i)
+            logger.warn("test warn", num=i)
 
         # Allow the reconnection
         client, server = connect_client(self.reactor, 0)
