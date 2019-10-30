@@ -34,7 +34,7 @@ class PurgeEventsStorage(object):
         """
 
         yield self.stores.main.purge_room(room_id)
-        yield self.stores.main.purge_room_state(room_id)
+        yield self.stores.state.purge_room_state(room_id)
 
     @defer.inlineCallbacks
     def purge_history(self, room_id, token, delete_local_events):
@@ -58,7 +58,7 @@ class PurgeEventsStorage(object):
 
         sg_to_delete = yield self._find_unreferenced_groups(state_groups)
 
-        yield self.stores.main.purge_unreferenced_state_groups(room_id, sg_to_delete)
+        yield self.stores.state.purge_unreferenced_state_groups(room_id, sg_to_delete)
 
     @defer.inlineCallbacks
     def _find_unreferenced_groups(self, state_groups):
@@ -102,7 +102,7 @@ class PurgeEventsStorage(object):
             # groups that are referenced.
             current_search -= referenced
 
-            edges = yield self.stores.main.get_previous_state_groups(current_search)
+            edges = yield self.stores.state.get_previous_state_groups(current_search)
 
             prevs = set(edges.values())
             # We don't bother re-handling groups we've already seen

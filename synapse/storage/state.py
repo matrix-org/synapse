@@ -341,7 +341,7 @@ class StateGroupStorage(object):
             (prev_group, delta_ids), where both may be None.
         """
 
-        return self.stores.main.get_state_group_delta(state_group)
+        return self.stores.state.get_state_group_delta(state_group)
 
     @defer.inlineCallbacks
     def get_state_groups_ids(self, _room_id, event_ids):
@@ -361,7 +361,7 @@ class StateGroupStorage(object):
         event_to_groups = yield self.stores.main._get_state_group_for_events(event_ids)
 
         groups = set(itervalues(event_to_groups))
-        group_to_state = yield self.stores.main._get_state_for_groups(groups)
+        group_to_state = yield self.stores.state._get_state_for_groups(groups)
 
         return group_to_state
 
@@ -422,7 +422,7 @@ class StateGroupStorage(object):
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
 
-        return self.stores.main._get_state_groups_from_groups(groups, state_filter)
+        return self.stores.state._get_state_groups_from_groups(groups, state_filter)
 
     @defer.inlineCallbacks
     def get_state_for_events(self, event_ids, state_filter=StateFilter.all()):
@@ -438,7 +438,7 @@ class StateGroupStorage(object):
         event_to_groups = yield self.stores.main._get_state_group_for_events(event_ids)
 
         groups = set(itervalues(event_to_groups))
-        group_to_state = yield self.stores.main._get_state_for_groups(
+        group_to_state = yield self.stores.state._get_state_for_groups(
             groups, state_filter
         )
 
@@ -475,7 +475,7 @@ class StateGroupStorage(object):
         event_to_groups = yield self.stores.main._get_state_group_for_events(event_ids)
 
         groups = set(itervalues(event_to_groups))
-        group_to_state = yield self.stores.main._get_state_for_groups(
+        group_to_state = yield self.stores.state._get_state_for_groups(
             groups, state_filter
         )
 
@@ -531,7 +531,7 @@ class StateGroupStorage(object):
             Deferred[dict[int, dict[tuple[str, str], str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
-        return self.stores.main._get_state_for_groups(groups, state_filter)
+        return self.stores.state._get_state_for_groups(groups, state_filter)
 
     def store_state_group(
         self, event_id, room_id, prev_group, delta_ids, current_state_ids
@@ -551,6 +551,6 @@ class StateGroupStorage(object):
         Returns:
             Deferred[int]: The state group ID
         """
-        return self.stores.main.store_state_group(
+        return self.stores.state.store_state_group(
             event_id, room_id, prev_group, delta_ids, current_state_ids
         )

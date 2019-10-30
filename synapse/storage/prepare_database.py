@@ -57,7 +57,7 @@ def prepare_database(db_conn, database_engine, config):
     """
 
     # For now we only have the one datastore.
-    data_stores = ["main"]
+    data_stores = ["main", "state"]
 
     try:
         cur = db_conn.cursor()
