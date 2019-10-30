@@ -85,6 +85,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
     ]
 
     def test_sync_filter_labels(self):
+        """Test that we can filter by a label."""
         sync_filter = json.dumps(
             {
                 "room": {
@@ -98,11 +99,12 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
 
         events = self._test_sync_filter_labels(sync_filter)
 
-        self.assertEqual(len(events), 2, events)
-        self.assertEqual(events[0]["content"]["body"], "with label", events[0])
-        self.assertEqual(events[1]["content"]["body"], "with label", events[1])
+        self.assertEqual(len(events), 2, [event["content"] for event in events])
+        self.assertEqual(events[0]["content"]["body"], "with right label", events[0])
+        self.assertEqual(events[1]["content"]["body"], "with right label", events[1])
 
     def test_sync_filter_not_labels(self):
+        """Test that we can filter by the absence of a label."""
         sync_filter = json.dumps(
             {
                 "room": {
@@ -116,9 +118,29 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
 
         events = self._test_sync_filter_labels(sync_filter)
 
-        self.assertEqual(len(events), 2, events)
+        self.assertEqual(len(events), 3, [event["content"] for event in events])
         self.assertEqual(events[0]["content"]["body"], "without label", events[0])
         self.assertEqual(events[1]["content"]["body"], "with wrong label", events[1])
+        self.assertEqual(events[2]["content"]["body"], "with two wrong labels", events[2])
+
+    def test_sync_filter_labels_not_labels(self):
+        """Test that we can filter by both a label and the absence of another label."""
+        sync_filter = json.dumps(
+            {
+                "room": {
+                    "timeline": {
+                        "types": [EventTypes.Message],
+                        "org.matrix.labels": ["#work"],
+                        "org.matrix.not_labels": ["#notfun"],
+                    }
+                }
+            }
+        )
+
+        events = self._test_sync_filter_labels(sync_filter)
+
+        self.assertEqual(len(events), 1, [event["content"] for event in events])
+        self.assertEqual(events[0]["content"]["body"], "with wrong label", events[0])
 
     def _test_sync_filter_labels(self, sync_filter):
         user_id = self.register_user("kermit", "test")
@@ -131,7 +153,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             type=EventTypes.Message,
             content={
                 "msgtype": "m.text",
-                "body": "with label",
+                "body": "with right label",
                 LabelsField: ["#fun"],
             },
             tok=tok,
@@ -163,7 +185,18 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             type=EventTypes.Message,
             content={
                 "msgtype": "m.text",
-                "body": "with label",
+                "body": "with two wrong labels",
+                LabelsField: ["#work", "#notfun"],
+            },
+            tok=tok,
+        )
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
                 LabelsField: ["#fun"],
             },
             tok=tok,

@@ -872,7 +872,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         args.append(int(limit))
 
         sql = (
-            "SELECT event_id, topological_ordering, stream_ordering"
+            "SELECT DISTINCT event_id, topological_ordering, stream_ordering"
             " FROM events"
             " LEFT JOIN event_labels USING (event_id)"
             " WHERE outlier = ? AND room_id = ? AND %(bounds)s"
