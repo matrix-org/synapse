@@ -222,27 +222,6 @@ class EventContext:
         else:
             self._prev_state_ids = self._current_state_ids
 
-    @defer.inlineCallbacks
-    def update_state(
-        self, state_group, prev_state_ids, current_state_ids, prev_group, delta_ids
-    ):
-        """Replace the state in the context
-        """
-
-        # We need to make sure we wait for any ongoing fetching of state
-        # to complete so that the updated state doesn't get clobbered
-        if self._fetching_state_deferred:
-            yield make_deferred_yieldable(self._fetching_state_deferred)
-
-        self.state_group = state_group
-        self._prev_state_ids = prev_state_ids
-        self.prev_group = prev_group
-        self._current_state_ids = current_state_ids
-        self.delta_ids = delta_ids
-
-        # We need to ensure that that we've marked as having fetched the state
-        self._fetching_state_deferred = defer.succeed(None)
-
 
 def _encode_state_dict(state_dict):
     """Since dicts of (type, state_key) -> event_id cannot be serialized in
