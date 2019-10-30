@@ -1160,7 +1160,9 @@ class SigningKeyEduUpdater(object):
                     yield self.store.set_e2e_cross_signing_key(
                         user_id, "self_signing", self_signing_key
                     )
-                    _, verify_key = get_verify_key_from_cross_signing_key(self_signing_key)
+                    _, verify_key = get_verify_key_from_cross_signing_key(
+                        self_signing_key
+                    )
                     device_ids.append(verify_key.version)
 
             yield device_handler.notify_device_update(user_id, device_ids)
