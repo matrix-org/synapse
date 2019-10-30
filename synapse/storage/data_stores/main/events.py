@@ -82,7 +82,7 @@ def _retry_on_integrity_error(func):
     @defer.inlineCallbacks
     def f(self, *args, **kwargs):
         try:
-            res = yield func(self, *args, **kwargs)
+            res = yield func(self, *args, delete_existing=False, **kwargs)
         except self.database_engine.module.IntegrityError:
             logger.exception("IntegrityError, retrying.")
             res = yield func(self, *args, delete_existing=True, **kwargs)
