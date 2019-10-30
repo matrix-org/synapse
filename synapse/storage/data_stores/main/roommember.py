@@ -720,7 +720,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # See bulk_get_push_rules_for_room for how we work around this.
         assert state_group is not None
 
-        cache = self._get_joined_hosts_cache(room_id)
+        cache = yield self._get_joined_hosts_cache(room_id)
         joined_hosts = yield cache.get_destinations(state_entry)
 
         return joined_hosts

@@ -125,9 +125,11 @@ def compute_event_signature(event_dict, signature_name, signing_key):
     redact_json = prune_event_dict(event_dict)
     redact_json.pop("age_ts", None)
     redact_json.pop("unsigned", None)
-    logger.debug("Signing event: %s", encode_canonical_json(redact_json))
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Signing event: %s", encode_canonical_json(redact_json))
     redact_json = sign_json(redact_json, signature_name, signing_key)
-    logger.debug("Signed event: %s", encode_canonical_json(redact_json))
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Signed event: %s", encode_canonical_json(redact_json))
     return redact_json["signatures"]
 
 

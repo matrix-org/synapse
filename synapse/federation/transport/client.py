@@ -122,10 +122,10 @@ class TransportLayerClient(object):
             Deferred: Results in a dict received from the remote homeserver.
         """
         logger.debug(
-            "backfill dest=%s, room_id=%s, event_tuples=%s, limit=%s",
+            "backfill dest=%s, room_id=%s, event_tuples=%r, limit=%s",
             destination,
             room_id,
-            repr(event_tuples),
+            event_tuples,
             str(limit),
         )
 

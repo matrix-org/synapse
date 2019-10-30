@@ -1,12 +1,37 @@
-Synapse 1.5.0rc1 (2019-10-24)
+Synapse 1.5.0 (2019-10-29)
 ==========================
 
-This release includes a database migration step **which may take a long time to complete**:
+Security updates
+----------------
 
-- Allow devices to be marked as hidden, for use by features such as cross-signing.
-  This adds a new field with a default value to the devices field in the database,
-  and so the database upgrade may take a long time depending on how many devices
-  are in the database. ([\#5759](https://github.com/matrix-org/synapse/issues/5759))
+This release includes a security fix ([\#6262](https://github.com/matrix-org/synapse/issues/6262), below). Administrators are encouraged to upgrade as soon as possible.
+
+Bugfixes
+--------
+
+- Fix bug where room directory search was case sensitive. ([\#6268](https://github.com/matrix-org/synapse/issues/6268))
+
+
+Synapse 1.5.0rc2 (2019-10-28)
+=============================
+
+Bugfixes
+--------
+
+- Update list of boolean columns in `synapse_port_db`. ([\#6247](https://github.com/matrix-org/synapse/issues/6247))
+- Fix /keys/query API on workers. ([\#6256](https://github.com/matrix-org/synapse/issues/6256))
+- Improve signature checking on some federation APIs. ([\#6262](https://github.com/matrix-org/synapse/issues/6262))
+
+
+Internal Changes
+----------------
+
+- Move schema delta files to the correct data store. ([\#6248](https://github.com/matrix-org/synapse/issues/6248))
+- Small performance improvement by removing repeated config lookups in room stats calculation. ([\#6255](https://github.com/matrix-org/synapse/issues/6255))
+
+
+Synapse 1.5.0rc1 (2019-10-24)
+==========================
 
 Features
 --------
@@ -51,6 +76,10 @@ Internal Changes
 ----------------
 
 - Update `user_filters` table to have a unique index, and non-null columns. Thanks to @pik for contributing this. ([\#1172](https://github.com/matrix-org/synapse/issues/1172), [\#6175](https://github.com/matrix-org/synapse/issues/6175), [\#6184](https://github.com/matrix-org/synapse/issues/6184))
+- Allow devices to be marked as hidden, for use by features such as cross-signing.
+  This adds a new field with a default value to the devices field in the database,
+  and so the database upgrade may take a long time depending on how many devices
+  are in the database. ([\#5759](https://github.com/matrix-org/synapse/issues/5759))
 - Move lookup-related functions from RoomMemberHandler to IdentityHandler. ([\#5978](https://github.com/matrix-org/synapse/issues/5978))
 - Improve performance of the public room list directory. ([\#6019](https://github.com/matrix-org/synapse/issues/6019), [\#6152](https://github.com/matrix-org/synapse/issues/6152), [\#6153](https://github.com/matrix-org/synapse/issues/6153), [\#6154](https://github.com/matrix-org/synapse/issues/6154))
 - Edit header dicts docstrings in `SimpleHttpClient` to note that `str` or `bytes` can be passed as header keys. ([\#6077](https://github.com/matrix-org/synapse/issues/6077))
