@@ -12,9 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 from mock import Mock
 
+from synapse.api.constants import EventTypes, LabelsField
 import synapse.rest.admin
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import sync
@@ -26,7 +27,12 @@ from tests.server import TimedOutException
 class FilterTestCase(unittest.HomeserverTestCase):
 
     user_id = "@apple:test"
-    servlets = [sync.register_servlets]
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+    ]
 
     def make_homeserver(self, reactor, clock):
 
@@ -68,6 +74,108 @@ class FilterTestCase(unittest.HomeserverTestCase):
                 ["next_batch", "rooms", "account_data", "to_device", "device_lists"]
             ).issubset(set(channel.json_body.keys()))
         )
+
+
+class SyncFilterTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def test_sync_filter_labels(self):
+        sync_filter = json.dumps(
+            {
+                "room": {
+                    "timeline": {
+                        "types": [EventTypes.Message],
+                        "org.matrix.labels": ["#fun"],
+                    }
+                }
+            }
+        )
+
+        events = self._test_sync_filter_labels(sync_filter)
+
+        self.assertEqual(len(events), 2, events)
+        self.assertEqual(events[0]["content"]["body"], "with label", events[0])
+        self.assertEqual(events[1]["content"]["body"], "with label", events[1])
+
+    def test_sync_filter_not_labels(self):
+        sync_filter = json.dumps(
+            {
+                "room": {
+                    "timeline": {
+                        "types": [EventTypes.Message],
+                        "org.matrix.not_labels": ["#fun"],
+                    }
+                }
+            }
+        )
+
+        events = self._test_sync_filter_labels(sync_filter)
+
+        self.assertEqual(len(events), 2, events)
+        self.assertEqual(events[0]["content"]["body"], "without label", events[0])
+        self.assertEqual(events[1]["content"]["body"], "with wrong label", events[1])
+
+    def _test_sync_filter_labels(self, sync_filter):
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+
+        room_id = self.helper.create_room_as(user_id, tok=tok)
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with label",
+                LabelsField: ["#fun"],
+            },
+            tok=tok,
+        )
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "without label",
+            },
+            tok=tok,
+        )
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with wrong label",
+                LabelsField: ["#work"],
+            },
+            tok=tok,
+        )
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with label",
+                LabelsField: ["#fun"],
+            },
+            tok=tok,
+        )
+
+        request, channel = self.make_request(
+            "GET", "/sync?filter=%s" % sync_filter, access_token=tok
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        return channel.json_body["rooms"]["join"][room_id]["timeline"]["events"]
 
 
 class SyncTypingTests(unittest.HomeserverTestCase):
