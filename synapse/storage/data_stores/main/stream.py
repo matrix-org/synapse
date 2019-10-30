@@ -229,6 +229,14 @@ def filter_to_clause(event_filter):
         clauses.append("contains_url = ?")
         args.append(event_filter.contains_url)
 
+    # We're only applying the "labels" filter on the database query, because applying the
+    # "not_labels" filter via a SQL query is non-trivial. Instead, we let
+    # event_filter.check_fields apply it, which is not as efficient but makes the
+    # implementation simpler.
+    if event_filter.labels:
+        clauses.append("(%s)" % " OR ".join("label = ?" for _ in event_filter.labels))
+        args.extend(event_filter.labels)
+
     return " AND ".join(clauses), args
 
 
@@ -866,6 +874,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         sql = (
             "SELECT event_id, topological_ordering, stream_ordering"
             " FROM events"
+            " LEFT JOIN event_labels USING (event_id)"
             " WHERE outlier = ? AND room_id = ? AND %(bounds)s"
             " ORDER BY topological_ordering %(order)s,"
             " stream_ordering %(order)s LIMIT ?"
