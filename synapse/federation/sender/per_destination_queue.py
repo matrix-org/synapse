@@ -359,7 +359,7 @@ class PerDestinationQueue(object):
         last_device_list = self._last_device_list_stream_id
 
         # Retrieve list of new device updates to send to the destination
-        now_stream_id, results = yield self._store.get_devices_by_remote(
+        now_stream_id, results = yield self._store.get_device_updates_by_remote(
             self._destination, last_device_list, limit=limit
         )
         edus = [
@@ -372,7 +372,7 @@ class PerDestinationQueue(object):
             for (edu_type, content) in results
         ]
 
-        assert len(edus) <= limit, "get_devices_by_remote returned too many EDUs"
+        assert len(edus) <= limit, "get_device_updates_by_remote returned too many EDUs"
 
         return (edus, now_stream_id)
 

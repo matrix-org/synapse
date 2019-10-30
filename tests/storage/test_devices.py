@@ -72,7 +72,7 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_get_devices_by_remote(self):
+    def test_get_device_updates_by_remote(self):
         device_ids = ["device_id1", "device_id2"]
 
         # Add two device updates with a single stream_id
@@ -81,7 +81,7 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         )
 
         # Get all device updates ever meant for this remote
-        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+        now_stream_id, device_updates = yield self.store.get_device_updates_by_remote(
             "somehost", -1, limit=100
         )
 
@@ -89,7 +89,7 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         self._check_devices_in_updates(device_ids, device_updates)
 
     @defer.inlineCallbacks
-    def test_get_devices_by_remote_limited(self):
+    def test_get_device_updates_by_remote_limited(self):
         # Test breaking the update limit in 1, 101, and 1 device_id segments
 
         # first add one device
@@ -115,20 +115,20 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         #
 
         # first we should get a single update
-        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+        now_stream_id, device_updates = yield self.store.get_device_updates_by_remote(
             "someotherhost", -1, limit=100
         )
         self._check_devices_in_updates(device_ids1, device_updates)
 
         # Then we should get an empty list back as the 101 devices broke the limit
-        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+        now_stream_id, device_updates = yield self.store.get_device_updates_by_remote(
             "someotherhost", now_stream_id, limit=100
         )
         self.assertEqual(len(device_updates), 0)
 
         # The 101 devices should've been cleared, so we should now just get one device
         # update
-        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+        now_stream_id, device_updates = yield self.store.get_device_updates_by_remote(
             "someotherhost", now_stream_id, limit=100
         )
         self._check_devices_in_updates(device_ids3, device_updates)
