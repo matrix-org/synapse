@@ -42,7 +42,9 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
 
     def stream_positions(self):
         result = super(SlavedDeviceStore, self).stream_positions()
-        result["device_lists"] = self._device_list_id_gen.get_current_token()
+        result["user_signature"] = result[
+            "device_lists"
+        ] = self._device_list_id_gen.get_current_token()
         return result
 
     def process_replication_rows(self, stream_name, token, rows):
@@ -50,13 +52,15 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
             self._device_list_id_gen.advance(token)
             for row in rows:
                 self._invalidate_caches_for_devices(token, row.user_id, row.destination)
+        elif stream_name == "user_signature":
+            for row in rows:
+                self._user_signature_stream_cache.entity_has_changed(row.user_id, token)
         return super(SlavedDeviceStore, self).process_replication_rows(
             stream_name, token, rows
         )
 
     def _invalidate_caches_for_devices(self, token, user_id, destination):
         self._device_list_stream_cache.entity_has_changed(user_id, token)
-        self._user_signature_stream_cache.entity_has_changed(user_id, token)
 
         if destination:
             self._device_list_federation_stream_cache.entity_has_changed(
