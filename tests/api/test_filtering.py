@@ -19,6 +19,7 @@ import jsonschema
 
 from twisted.internet import defer
 
+from synapse.api.constants import LabelsField
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import FrozenEvent
@@ -95,6 +96,8 @@ class FilteringTestCase(unittest.TestCase):
                         "types": ["m.room.message"],
                         "not_rooms": ["!726s6s6q:example.com"],
                         "not_senders": ["@spam:example.com"],
+                        "org.matrix.labels": ["#fun"],
+                        "org.matrix.not_labels": ["#work"],
                     },
                     "ephemeral": {
                         "types": ["m.receipt", "m.typing"],
@@ -319,6 +322,54 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!stage:unknown",  # yup
         )
         self.assertFalse(Filter(definition).check(event))
+
+    def test_filter_labels(self):
+        definition = {"org.matrix.labels": ["#fun"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={
+                LabelsField: ["#fun"]
+            },
+        )
+
+        self.assertTrue(Filter(definition).check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={
+                LabelsField: ["#notfun"]
+            },
+        )
+
+        self.assertFalse(Filter(definition).check(event))
+
+    def test_filter_not_labels(self):
+        definition = {"org.matrix.not_labels": ["#fun"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={
+                LabelsField: ["#fun"]
+            },
+        )
+
+        self.assertFalse(Filter(definition).check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={
+                LabelsField: ["#notfun"]
+            },
+        )
+
+        self.assertTrue(Filter(definition).check(event))
 
     @defer.inlineCallbacks
     def test_filter_presence_match(self):
