@@ -1509,7 +1509,7 @@ class EventsStore(
             [(room_id, event_id) for event_id, in new_backwards_extrems],
         )
 
-        logger.info("[purge] finding redundant state groups")
+        logger.info("[purge] finding state groups referenced by deleted events")
 
         # Get all state groups that are referenced by events that are to be
         # deleted. We then go and check if they are referenced by other events
