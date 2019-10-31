@@ -79,7 +79,7 @@ class BulkPushRuleEvaluator(object):
             dict of user_id -> push_rules
         """
         room_id = event.room_id
-        rules_for_room = self._get_rules_for_room(room_id)
+        rules_for_room = yield self._get_rules_for_room(room_id)
 
         rules_by_user = yield rules_for_room.get_rules(event, context)
 

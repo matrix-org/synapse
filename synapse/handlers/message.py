@@ -234,6 +234,7 @@ class EventCreationHandler(object):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
@@ -687,7 +688,7 @@ class EventCreationHandler(object):
         try:
             yield self.auth.check_from_context(room_version, event, context)
         except AuthError as err:
-            logger.warn("Denying new event %r because %s", event, err)
+            logger.warning("Denying new event %r because %s", event, err)
             raise err
 
         # Ensure that we can round trip before trying to persist in db
@@ -868,7 +869,7 @@ class EventCreationHandler(object):
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
-        (event_stream_id, max_stream_id) = yield self.store.persist_event(
+        event_stream_id, max_stream_id = yield self.storage.persistence.persist_event(
             event, context=context
         )
 

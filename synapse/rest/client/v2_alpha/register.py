@@ -106,7 +106,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "Email registration has been disabled due to lack of email config"
                 )
             raise SynapseError(
@@ -207,7 +207,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             )
 
         if not self.hs.config.account_threepid_delegate_msisdn:
-            logger.warn(
+            logger.warning(
                 "No upstream msisdn account_threepid_delegate configured on the server to "
                 "handle this request"
             )
@@ -266,7 +266,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
             )
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "User registration via email has been disabled due to lack of email config"
                 )
             raise SynapseError(
@@ -287,7 +287,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
             # Perform a 302 redirect if next_link is set
             if next_link:
                 if next_link.startswith("file:///"):
-                    logger.warn(
+                    logger.warning(
                         "Not redirecting to next_link as it is a local file: address"
                     )
                 else:
@@ -480,7 +480,7 @@ class RegisterRestServlet(RestServlet):
             # a password to work around a client bug where it sent
             # the 'initial_device_display_name' param alone, wiping out
             # the original registration params
-            logger.warn("Ignoring initial_device_display_name without password")
+            logger.warning("Ignoring initial_device_display_name without password")
             del body["initial_device_display_name"]
 
         session_id = self.auth_handler.get_session_id(body)

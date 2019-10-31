@@ -36,6 +36,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.store = self.hs.get_datastore()
+        self.storage = self.hs.get_storage()
 
         yield create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM")
 
@@ -137,7 +138,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder
         )
-        yield self.hs.get_datastore().persist_event(event, context)
+        yield self.storage.persistence.persist_event(event, context)
         return event
 
     @defer.inlineCallbacks
@@ -159,7 +160,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             builder
         )
 
-        yield self.hs.get_datastore().persist_event(event, context)
+        yield self.storage.persistence.persist_event(event, context)
         return event
 
     @defer.inlineCallbacks
@@ -180,7 +181,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             builder
         )
 
-        yield self.hs.get_datastore().persist_event(event, context)
+        yield self.storage.persistence.persist_event(event, context)
         return event
 
     @defer.inlineCallbacks

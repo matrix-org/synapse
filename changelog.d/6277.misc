@@ -1,0 +1,1 @@
+Remove redundant CLI parameters on CI's `flake8` step.
