@@ -32,6 +32,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
+from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
@@ -297,28 +298,6 @@ class ShutdownRoomRestServlet(RestServlet):
                 "new_room_id": new_room_id,
             },
         )
-
-
-class DeleteGroupAdminRestServlet(RestServlet):
-    """Allows deleting of local groups
-    """
-
-    PATTERNS = historical_admin_path_patterns("/delete_group/(?P<group_id>[^/]*)")
-
-    def __init__(self, hs):
-        self.group_server = hs.get_groups_server_handler()
-        self.is_mine_id = hs.is_mine_id
-        self.auth = hs.get_auth()
-
-    async def on_POST(self, request, group_id):
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
-
-        if not self.is_mine_id(group_id):
-            raise SynapseError(400, "Can only delete local groups")
-
-        await self.group_server.delete_group(group_id, requester.user.to_string())
-        return 200, {}
 
 
 ########################################################################################
