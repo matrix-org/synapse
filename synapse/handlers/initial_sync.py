@@ -126,8 +126,8 @@ class InitialSyncHandler(BaseHandler):
 
         tags_by_room = yield self.store.get_tags_for_user(user_id)
 
-        account_data, account_data_by_room = (
-            yield self.store.get_account_data_for_user(user_id)
+        account_data, account_data_by_room = yield self.store.get_account_data_for_user(
+            user_id
         )
 
         public_room_ids = yield self.store.get_public_room_ids()

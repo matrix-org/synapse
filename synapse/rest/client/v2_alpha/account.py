@@ -148,7 +148,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self.failure_email_template, = load_jinja2_templates(
+            (self.failure_email_template,) = load_jinja2_templates(
                 self.config.email_template_dir,
                 [self.config.email_password_reset_template_failure_html],
             )
@@ -479,7 +479,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self.failure_email_template, = load_jinja2_templates(
+            (self.failure_email_template,) = load_jinja2_templates(
                 self.config.email_template_dir,
                 [self.config.email_add_threepid_template_failure_html],
             )

@@ -1204,10 +1204,11 @@ class SyncHandler(object):
         since_token = sync_result_builder.since_token
 
         if since_token and not sync_result_builder.full_state:
-            account_data, account_data_by_room = (
-                yield self.store.get_updated_account_data_for_user(
-                    user_id, since_token.account_data_key
-                )
+            (
+                account_data,
+                account_data_by_room,
+            ) = yield self.store.get_updated_account_data_for_user(
+                user_id, since_token.account_data_key
             )
 
             push_rules_changed = yield self.store.have_push_rules_changed_for_user(
@@ -1219,9 +1220,10 @@ class SyncHandler(object):
                     sync_config.user
                 )
         else:
-            account_data, account_data_by_room = (
-                yield self.store.get_account_data_for_user(sync_config.user.to_string())
-            )
+            (
+                account_data,
+                account_data_by_room,
+            ) = yield self.store.get_account_data_for_user(sync_config.user.to_string())
 
             account_data["m.push_rules"] = yield self.push_rules_for_user(
                 sync_config.user

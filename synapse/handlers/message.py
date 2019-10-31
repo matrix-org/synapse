@@ -74,9 +74,10 @@ class MessageHandler(object):
         Raises:
             SynapseError if something went wrong.
         """
-        membership, membership_event_id = yield self.auth.check_in_room_or_world_readable(
-            room_id, user_id
-        )
+        (
+            membership,
+            membership_event_id,
+        ) = yield self.auth.check_in_room_or_world_readable(room_id, user_id)
 
         if membership == Membership.JOIN:
             data = yield self.state.get_current_state(room_id, event_type, state_key)
@@ -151,9 +152,10 @@ class MessageHandler(object):
                     % (user_id, room_id, at_token),
                 )
         else:
-            membership, membership_event_id = (
-                yield self.auth.check_in_room_or_world_readable(room_id, user_id)
-            )
+            (
+                membership,
+                membership_event_id,
+            ) = yield self.auth.check_in_room_or_world_readable(room_id, user_id)
 
             if membership == Membership.JOIN:
                 state_ids = yield self.store.get_filtered_current_state_ids(
