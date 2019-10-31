@@ -522,7 +522,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 WHERE event_id > ? AND label IS NULL
                 LIMIT ?
                 """,
-                (last_event_id, batch_size)
+                (last_event_id, batch_size),
             )
 
             rows = self.cursor_to_dict(txn)
@@ -537,12 +537,9 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     txn=txn,
                     table="event_labels",
                     values=[
-                        {
-                            "event_id": event_id,
-                            "label": label,
-                        }
+                        {"event_id": event_id, "label": label}
                         for label in event_json["content"].get(LabelsField, [])
-                    ]
+                    ],
                 )
 
             self._background_update_progress_txn(
