@@ -46,7 +46,7 @@ def _load_current_id(db_conn, table, column, step=1):
         cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
     else:
         cur.execute("SELECT MIN(%s) FROM %s" % (column, table))
-    val, = cur.fetchone()
+    (val,) = cur.fetchone()
     cur.close()
     current_id = int(val) if val else step
     return (max if step > 0 else min)(current_id, step)

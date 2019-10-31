@@ -77,7 +77,7 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
     if auth_events is None:
         # Oh, we don't know what the state of the room was, so we
         # are trusting that this is allowed (at least for now)
-        logger.warn("Trusting event: %s", event.event_id)
+        logger.warning("Trusting event: %s", event.event_id)
         return
 
     if event.type == EventTypes.Create:

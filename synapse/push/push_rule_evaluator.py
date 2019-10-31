@@ -117,7 +117,7 @@ class PushRuleEvaluatorForEvent(object):
                 pattern = UserID.from_string(user_id).localpart
 
         if not pattern:
-            logger.warn("event_match condition with no pattern")
+            logger.warning("event_match condition with no pattern")
             return False
 
         # XXX: optimisation: cache our pattern regexps
@@ -173,7 +173,7 @@ def _glob_matches(glob, value, word_boundary=False):
             regex_cache[(glob, word_boundary)] = r
         return r.search(value)
     except re.error:
-        logger.warn("Failed to parse glob to regex: %r", glob)
+        logger.warning("Failed to parse glob to regex: %r", glob)
         return False
 
 

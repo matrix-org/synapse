@@ -320,7 +320,7 @@ class DataStore(
             ) u
         """
         txn.execute(sql, (time_from,))
-        count, = txn.fetchone()
+        (count,) = txn.fetchone()
         return count
 
     def count_r30_users(self):
@@ -399,7 +399,7 @@ class DataStore(
 
             txn.execute(sql, (thirty_days_ago_in_secs, thirty_days_ago_in_secs))
 
-            count, = txn.fetchone()
+            (count,) = txn.fetchone()
             results["all"] = count
 
             return results
