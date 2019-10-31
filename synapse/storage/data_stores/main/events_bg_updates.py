@@ -518,7 +518,8 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             txn.execute(
                 """
                 SELECT event_id, json FROM event_json
-                WHERE event_id > ?
+                LEFT JOIN event_labels USING (event_id)
+                WHERE event_id > ? AND label IS NULL
                 LIMIT ?
                 """,
                 (last_event_id, batch_size)
