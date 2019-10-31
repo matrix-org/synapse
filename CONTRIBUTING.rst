@@ -58,6 +58,12 @@ All Matrix projects have a well-defined code-style - and sometimes we've even
 got as far as documenting it... For instance, synapse's code style doc lives
 at https://github.com/matrix-org/synapse/tree/master/docs/code_style.md.
 
+To facilitate meeting these criteria you can run ``scripts-dev/lint.sh``
+locally. Since this runs the tools listed in the above document, you'll need
+python 3.6 and to install each tool. **Note that the script does not just
+test/check, but also reformats code, so you may wish to ensure any new code is
+committed first**.
+
 Please ensure your changes match the cosmetic style of the existing project,
 and **never** mix cosmetic and functional changes in the same commit, as it
 makes it horribly hard to review otherwise.
