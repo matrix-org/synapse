@@ -1829,8 +1829,10 @@ class EventsStore(
         txn.execute(
             """
             DELETE FROM state_groups_state
-            INNER JOIN state_groups USING (event_id)
-            WHEREE state_groups.room_id = ?
+            WHERE state_group IN (
+                SELECT state_group FROM state_groups
+                WHERE room_id = ?
+            )
             """,
             (room_id,),
         )
@@ -1841,8 +1843,9 @@ class EventsStore(
         txn.execute(
             """
             DELETE FROM state_group_edges
-            INNER JOIN state_groups USING (event_id)
-            WHEREE state_groups.room_id = ?
+            WHERE state_group IN (
+                SELECT state_group FROM state_groups
+                WHERE room_id = ?
             )
             """,
             (room_id,),
@@ -1853,7 +1856,7 @@ class EventsStore(
 
         txn.execute(
             """
-            DELETE FROM state_groups WHEREE room_id = ?
+            DELETE FROM state_groups WHERE room_id = ?
             """,
             (room_id,),
         )
