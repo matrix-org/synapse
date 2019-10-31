@@ -547,7 +547,7 @@ class RoomMemberHandler(object):
                     old_room_id, new_room_id, user_id
                 )
             except Exception:
-                logger.warning(
+                logger.exception(
                     "Error copying tags and/or push rules from rooms %s to %s for user %s. "
                     "Skipping...",
                     old_room_id,
