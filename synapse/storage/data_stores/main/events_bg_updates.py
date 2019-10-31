@@ -548,6 +548,8 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             # We want to return true (to end the background update) only when
             # the query returned with less rows than we asked for.
+            # TODO: this currently doesn't work, i.e. it only runs once whereas
+            #       its opposite does the whole thing, investigate.
             return len(rows) != batch_size
 
         end = yield self.runInteraction(
