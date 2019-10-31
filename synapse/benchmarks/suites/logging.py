@@ -23,12 +23,7 @@ from pyperf import perf_counter
 
 from twisted.internet.defer import ensureDeferred
 from twisted.internet.protocol import ServerFactory
-from twisted.logger import (
-    LogBeginner,
-    Logger,
-    LogPublisher,
-    globalLogBeginner,
-)
+from twisted.logger import LogBeginner, Logger, LogPublisher, globalLogBeginner
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
