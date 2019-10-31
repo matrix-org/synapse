@@ -524,7 +524,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 (last_event_id, batch_size)
             )
 
-            rows = txn.fetchall()
+            rows = self.cursor_to_dict(txn)
             if not rows:
                 return True
 
