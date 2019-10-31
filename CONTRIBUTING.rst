@@ -62,7 +62,9 @@ To facilitate meeting these criteria you can run ``scripts-dev/lint.sh``
 locally. Since this runs the tools listed in the above document, you'll need
 python 3.6 and to install each tool. **Note that the script does not just
 test/check, but also reformats code, so you may wish to ensure any new code is
-committed first**.
+committed first**. By default this script checks all files and can take some
+time; if you alter only certain files, you might wish to specify paths as
+arguments to reduce the run-time.
 
 Please ensure your changes match the cosmetic style of the existing project,
 and **never** mix cosmetic and functional changes in the same commit, as it
