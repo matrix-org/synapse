@@ -546,7 +546,9 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 txn, "event_store_labels", {"last_event_id": event_id}
             )
 
-            return len(rows) == batch_size
+            # We want to return true (to end the background update) only when
+            # the query returned with less rows than we asked for.
+            return len(rows) != batch_size
 
         end = yield self.runInteraction(
             desc="event_store_labels", func=_event_store_labels_txn
