@@ -69,6 +69,8 @@ class PaginationHandler(object):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
 
@@ -255,7 +257,7 @@ class PaginationHandler(object):
                 events = event_filter.filter(events)
 
             events = yield filter_events_for_client(
-                self.store, user_id, events, is_peeking=(member_event_id is None)
+                self.storage, user_id, events, is_peeking=(member_event_id is None)
             )
 
         if not events:
@@ -274,7 +276,7 @@ class PaginationHandler(object):
                 (EventTypes.Member, event.sender) for event in events
             )
 
-            state_ids = yield self.store.get_state_ids_for_event(
+            state_ids = yield self.state_store.get_state_ids_for_event(
                 events[0].event_id, state_filter=state_filter
             )
 

@@ -110,6 +110,7 @@ class FederationHandler(BaseHandler):
 
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
+        self.state_store = self.storage.state
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -325,7 +326,7 @@ class FederationHandler(BaseHandler):
                 event_map = {event_id: pdu}
                 try:
                     # Get the state of the events we know about
-                    ours = yield self.store.get_state_groups_ids(room_id, seen)
+                    ours = yield self.state_store.get_state_groups_ids(room_id, seen)
 
                     # state_maps is a list of mappings from (type, state_key) to event_id
                     state_maps = list(
@@ -891,7 +892,7 @@ class FederationHandler(BaseHandler):
         # We set `check_history_visibility_only` as we might otherwise get false
         # positives from users having been erased.
         filtered_extremities = yield filter_events_for_server(
-            self.store,
+            self.storage,
             self.server_name,
             list(extremities_events.values()),
             redact=False,
@@ -1552,7 +1553,7 @@ class FederationHandler(BaseHandler):
             event_id, allow_none=False, check_room_id=room_id
         )
 
-        state_groups = yield self.store.get_state_groups(room_id, [event_id])
+        state_groups = yield self.state_store.get_state_groups(room_id, [event_id])
 
         if state_groups:
             _, state = list(iteritems(state_groups)).pop()
@@ -1581,7 +1582,7 @@ class FederationHandler(BaseHandler):
             event_id, allow_none=False, check_room_id=room_id
         )
 
-        state_groups = yield self.store.get_state_groups_ids(room_id, [event_id])
+        state_groups = yield self.state_store.get_state_groups_ids(room_id, [event_id])
 
         if state_groups:
             _, state = list(state_groups.items()).pop()
@@ -1609,7 +1610,7 @@ class FederationHandler(BaseHandler):
 
         events = yield self.store.get_backfill_events(room_id, pdu_list, limit)
 
-        events = yield filter_events_for_server(self.store, origin, events)
+        events = yield filter_events_for_server(self.storage, origin, events)
 
         return events
 
@@ -1639,7 +1640,7 @@ class FederationHandler(BaseHandler):
             if not in_room:
                 raise AuthError(403, "Host not in room.")
 
-            events = yield filter_events_for_server(self.store, origin, [event])
+            events = yield filter_events_for_server(self.storage, origin, [event])
             event = events[0]
             return event
         else:
@@ -1907,7 +1908,7 @@ class FederationHandler(BaseHandler):
                 # given state at the event. This should correctly handle cases
                 # like bans, especially with state res v2.
 
-                state_sets = yield self.store.get_state_groups(
+                state_sets = yield self.state_store.get_state_groups(
                     event.room_id, extrem_ids
                 )
                 state_sets = list(state_sets.values())
@@ -1998,7 +1999,7 @@ class FederationHandler(BaseHandler):
         )
 
         missing_events = yield filter_events_for_server(
-            self.store, origin, missing_events
+            self.storage, origin, missing_events
         )
 
         return missing_events
@@ -2239,7 +2240,7 @@ class FederationHandler(BaseHandler):
 
         # create a new state group as a delta from the existing one.
         prev_group = context.state_group
-        state_group = yield self.store.store_state_group(
+        state_group = yield self.state_store.store_state_group(
             event.event_id,
             event.room_id,
             prev_group=prev_group,
