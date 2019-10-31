@@ -147,21 +147,22 @@ class RoomCreationHandler(BaseHandler):
 
         # we create and auth the tombstone event before properly creating the new
         # room, to check our user has perms in the old room.
-        tombstone_event, tombstone_context = (
-            yield self.event_creation_handler.create_event(
-                requester,
-                {
-                    "type": EventTypes.Tombstone,
-                    "state_key": "",
-                    "room_id": old_room_id,
-                    "sender": user_id,
-                    "content": {
-                        "body": "This room has been replaced",
-                        "replacement_room": new_room_id,
-                    },
+        (
+            tombstone_event,
+            tombstone_context,
+        ) = yield self.event_creation_handler.create_event(
+            requester,
+            {
+                "type": EventTypes.Tombstone,
+                "state_key": "",
+                "room_id": old_room_id,
+                "sender": user_id,
+                "content": {
+                    "body": "This room has been replaced",
+                    "replacement_room": new_room_id,
                 },
-                token_id=requester.access_token_id,
-            )
+            },
+            token_id=requester.access_token_id,
         )
         old_room_version = yield self.store.get_room_version(old_room_id)
         yield self.auth.check_from_context(

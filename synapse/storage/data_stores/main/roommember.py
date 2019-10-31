@@ -927,7 +927,7 @@ class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
                 if not row or not row[0]:
                     return processed, True
 
-                next_room, = row
+                (next_room,) = row
 
                 sql = """
                     UPDATE current_state_events

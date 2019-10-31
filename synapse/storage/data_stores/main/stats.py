@@ -773,7 +773,7 @@ class StatsStore(StateDeltasStore):
                 (room_id,),
             )
 
-            current_state_events_count, = txn.fetchone()
+            (current_state_events_count,) = txn.fetchone()
 
             users_in_room = self.get_users_in_room_txn(txn, room_id)
 
@@ -863,7 +863,7 @@ class StatsStore(StateDeltasStore):
                 """,
                 (user_id,),
             )
-            count, = txn.fetchone()
+            (count,) = txn.fetchone()
             return count, pos
 
         joined_rooms, pos = yield self.runInteraction(

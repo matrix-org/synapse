@@ -78,7 +78,7 @@ class InputOutput(object):
             m = re.match("^join (\S+)$", line)
             if m:
                 # The `sender` wants to join a room.
-                room_name, = m.groups()
+                (room_name,) = m.groups()
                 self.print_line("%s joining %s" % (self.user, room_name))
                 self.server.join_room(room_name, self.user, self.user)
                 # self.print_line("OK.")
@@ -105,7 +105,7 @@ class InputOutput(object):
             m = re.match("^backfill (\S+)$", line)
             if m:
                 # we want to backfill a room
-                room_name, = m.groups()
+                (room_name,) = m.groups()
                 self.print_line("backfill %s" % room_name)
                 self.server.backfill(room_name)
                 return
