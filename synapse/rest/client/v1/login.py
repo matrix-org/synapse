@@ -221,7 +221,7 @@ class LoginRestServlet(RestServlet):
                 medium, address
             )
             if not user_id:
-                logger.warn(
+                logger.warning(
                     "unknown 3pid identifier medium %s, address %r", medium, address
                 )
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
