@@ -182,7 +182,7 @@ class FederationHandler(BaseHandler):
         try:
             self._sanity_check_event(pdu)
         except SynapseError as err:
-            logger.warn(
+            logger.warning(
                 "[%s %s] Received event failed sanity checks", room_id, event_id
             )
             raise FederationError("ERROR", err.code, err.msg, affected=pdu.event_id)
@@ -303,7 +303,7 @@ class FederationHandler(BaseHandler):
                 # following.
 
                 if sent_to_us_directly:
-                    logger.warn(
+                    logger.warning(
                         "[%s %s] Rejecting: failed to fetch %d prev events: %s",
                         room_id,
                         event_id,
@@ -407,7 +407,7 @@ class FederationHandler(BaseHandler):
                     state = [event_map[e] for e in six.itervalues(state_map)]
                     auth_chain = list(auth_chains)
                 except Exception:
-                    logger.warn(
+                    logger.warning(
                         "[%s %s] Error attempting to resolve state at missing "
                         "prev_events",
                         room_id,
@@ -520,7 +520,9 @@ class FederationHandler(BaseHandler):
             # We failed to get the missing events, but since we need to handle
             # the case of `get_missing_events` not returning the necessary
             # events anyway, it is safe to simply log the error and continue.
-            logger.warn("[%s %s]: Failed to get prev_events: %s", room_id, event_id, e)
+            logger.warning(
+                "[%s %s]: Failed to get prev_events: %s", room_id, event_id, e
+            )
             return
 
         logger.info(
@@ -547,7 +549,7 @@ class FederationHandler(BaseHandler):
                     yield self.on_receive_pdu(origin, ev, sent_to_us_directly=False)
                 except FederationError as e:
                     if e.code == 403:
-                        logger.warn(
+                        logger.warning(
                             "[%s %s] Received prev_event %s failed history check.",
                             room_id,
                             event_id,
@@ -1061,7 +1063,7 @@ class FederationHandler(BaseHandler):
             SynapseError if the event does not pass muster
         """
         if len(ev.prev_event_ids()) > 20:
-            logger.warn(
+            logger.warning(
                 "Rejecting event %s which has %i prev_events",
                 ev.event_id,
                 len(ev.prev_event_ids()),
@@ -1069,7 +1071,7 @@ class FederationHandler(BaseHandler):
             raise SynapseError(http_client.BAD_REQUEST, "Too many prev_events")
 
         if len(ev.auth_event_ids()) > 10:
-            logger.warn(
+            logger.warning(
                 "Rejecting event %s which has %i auth_events",
                 ev.event_id,
                 len(ev.auth_event_ids()),
@@ -1205,7 +1207,7 @@ class FederationHandler(BaseHandler):
                 with nested_logging_context(p.event_id):
                     yield self.on_receive_pdu(origin, p, sent_to_us_directly=True)
             except Exception as e:
-                logger.warn(
+                logger.warning(
                     "Error handling queued PDU %s from %s: %s", p.event_id, origin, e
                 )
 
@@ -1252,7 +1254,7 @@ class FederationHandler(BaseHandler):
                 builder=builder
             )
         except AuthError as e:
-            logger.warn("Failed to create join to %s because %s", room_id, e)
+            logger.warning("Failed to create join to %s because %s", room_id, e)
             raise e
 
         event_allowed = yield self.third_party_event_rules.check_event_allowed(
@@ -1496,7 +1498,7 @@ class FederationHandler(BaseHandler):
                 room_version, event, context, do_sig_check=False
             )
         except AuthError as e:
-            logger.warn("Failed to create new leave %r because %s", event, e)
+            logger.warning("Failed to create new leave %r because %s", event, e)
             raise e
 
         return event
@@ -1790,7 +1792,7 @@ class FederationHandler(BaseHandler):
                 # cause SynapseErrors in auth.check. We don't want to give up
                 # the attempt to federate altogether in such cases.
 
-                logger.warn("Rejecting %s because %s", e.event_id, err.msg)
+                logger.warning("Rejecting %s because %s", e.event_id, err.msg)
 
                 if e == event:
                     raise
@@ -1846,7 +1848,9 @@ class FederationHandler(BaseHandler):
         try:
             yield self.do_auth(origin, event, context, auth_events=auth_events)
         except AuthError as e:
-            logger.warn("[%s %s] Rejecting: %s", event.room_id, event.event_id, e.msg)
+            logger.warning(
+                "[%s %s] Rejecting: %s", event.room_id, event.event_id, e.msg
+            )
 
             context.rejected = RejectedReason.AUTH_ERROR
 
@@ -1940,7 +1944,7 @@ class FederationHandler(BaseHandler):
             try:
                 event_auth.check(room_version, event, auth_events=current_auth_events)
             except AuthError as e:
-                logger.warn("Soft-failing %r because %s", event, e)
+                logger.warning("Soft-failing %r because %s", event, e)
                 event.internal_metadata.soft_failed = True
 
     @defer.inlineCallbacks
@@ -2039,7 +2043,7 @@ class FederationHandler(BaseHandler):
         try:
             event_auth.check(room_version, event, auth_events=auth_events)
         except AuthError as e:
-            logger.warn("Failed auth resolution for %r because %s", event, e)
+            logger.warning("Failed auth resolution for %r because %s", event, e)
             raise e
 
     @defer.inlineCallbacks
@@ -2433,7 +2437,7 @@ class FederationHandler(BaseHandler):
             try:
                 yield self.auth.check_from_context(room_version, event, context)
             except AuthError as e:
-                logger.warn("Denying new third party invite %r because %s", event, e)
+                logger.warning("Denying new third party invite %r because %s", event, e)
                 raise e
 
             yield self._check_signature(event, context)
@@ -2489,7 +2493,7 @@ class FederationHandler(BaseHandler):
         try:
             yield self.auth.check_from_context(room_version, event, context)
         except AuthError as e:
-            logger.warn("Denying third party invite %r because %s", event, e)
+            logger.warning("Denying third party invite %r because %s", event, e)
             raise e
         yield self._check_signature(event, context)
 

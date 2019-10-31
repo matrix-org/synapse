@@ -260,9 +260,7 @@ class EventsPersistenceStorage(object):
         self._event_persist_queue.handle_queue(room_id, persisting_queue)
 
     @defer.inlineCallbacks
-    def _persist_events(
-        self, events_and_contexts, backfilled=False, delete_existing=False
-    ):
+    def _persist_events(self, events_and_contexts, backfilled=False):
         """Calculates the change to current state and forward extremities, and
         persists the given events and with those updates.
 
@@ -412,7 +410,6 @@ class EventsPersistenceStorage(object):
                 state_delta_for_room=state_delta_for_room,
                 new_forward_extremeties=new_forward_extremeties,
                 backfilled=backfilled,
-                delete_existing=delete_existing,
             )
 
     @defer.inlineCallbacks

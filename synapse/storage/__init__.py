@@ -47,8 +47,8 @@ class Storage(object):
         self.main = stores.main
 
         self.persistence = EventsPersistenceStorage(hs, stores)
-        self.state = StateGroupStorage(hs, stores)
         self.purge_events = PurgeEventsStorage(hs, stores)
+        self.state = StateGroupStorage(hs, stores)
 
 
 def are_all_users_on_domain(txn, database_engine, domain):

@@ -184,6 +184,7 @@ class StateBackgroundUpdateStore(
 
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
+    STATE_GROUPS_ROOM_INDEX_UPDATE_NAME = "state_groups_room_id_idx"
 
     def __init__(self, db_conn, hs):
         super(StateBackgroundUpdateStore, self).__init__(db_conn, hs)
@@ -193,6 +194,12 @@ class StateBackgroundUpdateStore(
         )
         self.register_background_update_handler(
             self.STATE_GROUP_INDEX_UPDATE_NAME, self._background_index_state
+        )
+        self.register_background_index_update(
+            self.STATE_GROUPS_ROOM_INDEX_UPDATE_NAME,
+            index_name="state_groups_room_id_idx",
+            table="state_groups",
+            columns=["room_id"],
         )
 
     @defer.inlineCallbacks

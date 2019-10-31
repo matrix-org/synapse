@@ -82,7 +82,7 @@ def _retry_on_integrity_error(func):
     @defer.inlineCallbacks
     def f(self, *args, **kwargs):
         try:
-            res = yield func(self, *args, **kwargs)
+            res = yield func(self, *args, delete_existing=False, **kwargs)
         except self.database_engine.module.IntegrityError:
             logger.exception("IntegrityError, retrying.")
             res = yield func(self, *args, delete_existing=True, **kwargs)
@@ -1370,8 +1370,8 @@ class EventsStore(
                 state groups).
 
         Returns:
-            Deferred[set[int]]: The set of state groups that reference deleted
-            events.
+            Deferred[set[int]]: The set of state groups that are referenced by
+            deleted events.
         """
 
         return self.runInteraction(
@@ -1508,7 +1508,7 @@ class EventsStore(
             [(room_id, event_id) for event_id, in new_backwards_extrems],
         )
 
-        logger.info("[purge] finding redundant state groups")
+        logger.info("[purge] finding state groups referenced by deleted events")
 
         # Get all state groups that are referenced by events that are to be
         # deleted. We then go and check if they are referenced by other events
@@ -1669,7 +1669,6 @@ class EventsStore(
             "room_stats_earliest_token",
             "rooms",
             "stream_ordering_to_exterm",
-            "topics",
             "users_in_public_rooms",
             "users_who_share_private_rooms",
             # no useful index, but let's clear them anyway

@@ -247,7 +247,7 @@ class HttpPusher(object):
                     # we really only give up so that if the URL gets
                     # fixed, we don't suddenly deliver a load
                     # of old notifications.
-                    logger.warn(
+                    logger.warning(
                         "Giving up on a notification to user %s, " "pushkey %s",
                         self.user_id,
                         self.pushkey,
@@ -300,7 +300,7 @@ class HttpPusher(object):
                 if pk != self.pushkey:
                     # for sanity, we only remove the pushkey if it
                     # was the one we actually sent...
-                    logger.warn(
+                    logger.warning(
                         ("Ignoring rejected pushkey %s because we" " didn't send it"),
                         pk,
                     )

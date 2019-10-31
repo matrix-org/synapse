@@ -338,7 +338,8 @@ class StateGroupStorage(object):
         the old and the new.
 
         Returns:
-            (prev_group, delta_ids), where both may be None.
+            Deferred[Tuple[Optional[int], Optional[list[dict[tuple[str, str], str]]]]]):
+                (prev_group, delta_ids)
         """
 
         return self.stores.state.get_state_group_delta(state_group)

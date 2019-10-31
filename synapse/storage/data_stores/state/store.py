@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Set
 
 from six import iteritems
 from six.moves import range
@@ -477,9 +478,16 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
 
         return self.runInteraction("store_state_group", _store_state_group_txn)
 
-    def purge_unreferenced_state_groups(self, room_id, state_groups_to_delete):
+    def purge_unreferenced_state_groups(
+        self, room_id: str, state_groups_to_delete: Set[int]
+    ) -> defer.Deferred:
         """Deletes no longer referenced state groups and de-deltas any state
         groups that reference them.
+
+        Args:
+            room_id: The room the state groups belong to (must all be in the
+                same room).
+            state_groups_to_delete: Set of all state groups to delete.
         """
 
         return self.runInteraction(
@@ -595,8 +603,10 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
         txn.execute(
             """
             DELETE FROM state_groups_state
-            INNER JOIN state_groups USING (event_id)
-            WHEREE state_groups.room_id = ?
+            WHERE state_group IN (
+                SELECT state_group FROM state_groups
+                WHERE room_id = ?
+            )
             """,
             (room_id,),
         )
@@ -607,8 +617,9 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
         txn.execute(
             """
             DELETE FROM state_group_edges
-            INNER JOIN state_groups USING (event_id)
-            WHEREE state_groups.room_id = ?
+            WHERE state_group IN (
+                SELECT state_group FROM state_groups
+                WHERE room_id = ?
             )
             """,
             (room_id,),
@@ -619,7 +630,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
 
         txn.execute(
             """
-            DELETE FROM state_groups WHEREE room_id = ?
+            DELETE FROM state_groups WHERE room_id = ?
             """,
             (room_id,),
         )
