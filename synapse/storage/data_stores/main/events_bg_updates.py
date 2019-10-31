@@ -540,7 +540,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                             "event_id": event_id,
                             "label": label,
                         }
-                        for label in event_json["content"].get(LabelsField)
+                        for label in event_json["content"].get(LabelsField, [])
                     ]
                 )
 
