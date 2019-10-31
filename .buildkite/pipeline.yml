@@ -243,7 +243,7 @@ steps:
       - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:dinsic-test"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -269,7 +269,7 @@ steps:
       - "bash /synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:dinsic-test"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
