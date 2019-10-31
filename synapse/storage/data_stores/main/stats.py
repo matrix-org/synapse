@@ -260,6 +260,7 @@ class StatsStore(StateDeltasStore):
         slice_list = self._simple_select_list_paginate_txn(
             txn,
             table + "_historical",
+            None,
             {id_col: stats_id},
             "end_ts",
             start,

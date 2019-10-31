@@ -1534,6 +1534,7 @@ class SQLBaseStore(object):
     def _simple_select_list_paginate(
         self,
         table,
+        filters,
         keyvalues,
         orderby,
         start,
@@ -1549,6 +1550,9 @@ class SQLBaseStore(object):
 
         Args:
             table (str): the table name
+            filters (dict[str, T] | None):
+                column names and values to filter the rows with, or None to not
+                apply a WHERE ? LIKE ? clause.
             keyvalues (dict[str, T] | None):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
@@ -1564,6 +1568,7 @@ class SQLBaseStore(object):
             desc,
             self._simple_select_list_paginate_txn,
             table,
+            filters,
             keyvalues,
             orderby,
             start,
@@ -1577,6 +1582,7 @@ class SQLBaseStore(object):
         cls,
         txn,
         table,
+        filters,
         keyvalues,
         orderby,
         start,
@@ -1592,6 +1598,9 @@ class SQLBaseStore(object):
         Args:
             txn : Transaction object
             table (str): the table name
+            filters (dict[str, T] | None):
+                column names and values to filter the rows with, or None to not
+                apply a WHERE ? LIKE ? clause.
             keyvalues (dict[str, T] | None):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
@@ -1606,10 +1615,12 @@ class SQLBaseStore(object):
         if order_direction not in ["ASC", "DESC"]:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
 
+        where_clause = "WHERE " if filters or keyvalues else ""
+        if filters:
+            where_clause += " AND ".join("%s LIKE ?" % (k,) for k in filters)
+        where_clause += " AND " if filters and keyvalues else ""
         if keyvalues:
-            where_clause = "WHERE " + " AND ".join("%s = ?" % (k,) for k in keyvalues)
-        else:
-            where_clause = ""
+            where_clause += " AND ".join("%s = ?" % (k,) for k in keyvalues)
 
         sql = "SELECT %s FROM %s %s ORDER BY %s %s LIMIT ? OFFSET ?" % (
             ", ".join(retcols),
@@ -1621,18 +1632,6 @@ class SQLBaseStore(object):
         txn.execute(sql, list(keyvalues.values()) + [limit, start])
 
         return cls.cursor_to_dict(txn)
-
-    def get_user_count_txn(self, txn):
-        """Get a total number of registered users in the users list.
-
-        Args:
-            txn : Transaction object
-        Returns:
-            int : number of users
-        """
-        sql_count = "SELECT COUNT(*) FROM users WHERE is_guest = 0;"
-        txn.execute(sql_count)
-        return txn.fetchone()[0]
 
     def _simple_search_list(
         self, table, term, col, retcols, desc="_simple_search_list"
