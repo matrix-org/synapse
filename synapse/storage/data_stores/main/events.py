@@ -1838,7 +1838,6 @@ class EventsStore(
             "room_stats_earliest_token",
             "rooms",
             "stream_ordering_to_exterm",
-            "topics",
             "users_in_public_rooms",
             "users_who_share_private_rooms",
             # no useful index, but let's clear them anyway
