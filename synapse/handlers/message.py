@@ -59,6 +59,8 @@ class MessageHandler(object):
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
@@ -82,7 +84,7 @@ class MessageHandler(object):
             data = yield self.state.get_current_state(room_id, event_type, state_key)
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
-            room_state = yield self.store.get_state_for_events(
+            room_state = yield self.state_store.get_state_for_events(
                 [membership_event_id], StateFilter.from_types([key])
             )
             data = room_state[membership_event_id].get(key)
@@ -135,12 +137,12 @@ class MessageHandler(object):
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
             visible_events = yield filter_events_for_client(
-                self.store, user_id, last_events
+                self.storage, user_id, last_events
             )
 
             event = last_events[0]
             if visible_events:
-                room_state = yield self.store.get_state_for_events(
+                room_state = yield self.state_store.get_state_for_events(
                     [event.event_id], state_filter=state_filter
                 )
                 room_state = room_state[event.event_id]
@@ -161,7 +163,7 @@ class MessageHandler(object):
                 )
                 room_state = yield self.store.get_events(state_ids.values())
             elif membership == Membership.LEAVE:
-                room_state = yield self.store.get_state_for_events(
+                room_state = yield self.state_store.get_state_for_events(
                     [membership_event_id], state_filter=state_filter
                 )
                 room_state = room_state[membership_event_id]
@@ -688,7 +690,7 @@ class EventCreationHandler(object):
         try:
             yield self.auth.check_from_context(room_version, event, context)
         except AuthError as err:
-            logger.warn("Denying new event %r because %s", event, err)
+            logger.warning("Denying new event %r because %s", event, err)
             raise err
 
         # Ensure that we can round trip before trying to persist in db

@@ -64,6 +64,7 @@ class HttpPusher(object):
     def __init__(self, hs, pusherdict):
         self.hs = hs
         self.store = self.hs.get_datastore()
+        self.storage = self.hs.get_storage()
         self.clock = self.hs.get_clock()
         self.state_handler = self.hs.get_state_handler()
         self.user_id = pusherdict["user_name"]
@@ -246,7 +247,7 @@ class HttpPusher(object):
                     # we really only give up so that if the URL gets
                     # fixed, we don't suddenly deliver a load
                     # of old notifications.
-                    logger.warn(
+                    logger.warning(
                         "Giving up on a notification to user %s, " "pushkey %s",
                         self.user_id,
                         self.pushkey,
@@ -299,7 +300,7 @@ class HttpPusher(object):
                 if pk != self.pushkey:
                     # for sanity, we only remove the pushkey if it
                     # was the one we actually sent...
-                    logger.warn(
+                    logger.warning(
                         ("Ignoring rejected pushkey %s because we" " didn't send it"),
                         pk,
                     )
@@ -329,7 +330,7 @@ class HttpPusher(object):
             return d
 
         ctx = yield push_tools.get_context_for_event(
-            self.store, self.state_handler, event, self.user_id
+            self.storage, self.state_handler, event, self.user_id
         )
 
         d = {

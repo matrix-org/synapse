@@ -181,7 +181,7 @@ class GroupAttestionRenewer(object):
                 elif not self.is_mine_id(user_id):
                     destination = get_domain_from_id(user_id)
                 else:
-                    logger.warn(
+                    logger.warning(
                         "Incorrectly trying to do attestations for user: %r in %r",
                         user_id,
                         group_id,

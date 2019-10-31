@@ -82,7 +82,7 @@ def _retry_on_integrity_error(func):
     @defer.inlineCallbacks
     def f(self, *args, **kwargs):
         try:
-            res = yield func(self, *args, **kwargs)
+            res = yield func(self, *args, delete_existing=False, **kwargs)
         except self.database_engine.module.IntegrityError:
             logger.exception("IntegrityError, retrying.")
             res = yield func(self, *args, delete_existing=True, **kwargs)
@@ -1669,7 +1669,6 @@ class EventsStore(
             "room_stats_earliest_token",
             "rooms",
             "stream_ordering_to_exterm",
-            "topics",
             "users_in_public_rooms",
             "users_who_share_private_rooms",
             # no useful index, but let's clear them anyway
