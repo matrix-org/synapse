@@ -427,20 +427,6 @@ class FederationStateV1Servlet(BaseFederationServlet):
         return await self.handler.on_context_state_request(
             origin,
             context,
-            parse_string_from_args(query, "event_id", None, required=True),
-        )
-
-
-class FederationStateV2Servlet(BaseFederationServlet):
-    PATH = "/net.atleastfornow/state/(?P<context>[^/]*)/?"
-
-    # See: MSC2314
-    PREFIX = FEDERATION_UNSTABLE_PREFIX
-
-    async def on_GET(self, origin, content, query, context):
-        return await self.handler.on_context_state_request_v2(
-            origin,
-            context,
             parse_string_from_args(query, "event_id", None, required=False),
         )
 
@@ -1373,7 +1359,6 @@ FEDERATION_SERVLET_CLASSES = (
     FederationSendServlet,
     FederationEventServlet,
     FederationStateV1Servlet,
-    FederationStateV2Servlet,
     FederationStateIdsServlet,
     FederationBackfillServlet,
     FederationQueryServlet,

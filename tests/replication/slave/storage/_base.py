@@ -41,6 +41,7 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
 
         self.master_store = self.hs.get_datastore()
+        self.storage = hs.get_storage()
         self.slaved_store = self.STORE_TYPE(self.hs.get_db_conn(), self.hs)
         self.event_id = 0
 

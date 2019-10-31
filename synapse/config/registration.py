@@ -180,7 +180,7 @@ class RegistrationConfig(Config):
         # where d is equal to 10%% of the validity period.
         #
         #account_validity:
-        #  enabled: True
+        #  enabled: true
         #  period: 6w
         #  renew_at: 1w
         #  renew_email_subject: "Renew your %%(app)s account"
@@ -300,7 +300,7 @@ class RegistrationConfig(Config):
         # If a delegate is specified, the config option public_baseurl must also be filled out.
         #
         account_threepid_delegates:
-            #email: https://example.com     # Delegate email sending to example.org
+            #email: https://example.com     # Delegate email sending to example.com
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
         # Users who register on this homeserver will automatically be joined

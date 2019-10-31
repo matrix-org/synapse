@@ -145,6 +145,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.datastore.get_to_device_stream_token = lambda: 0
         self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: ([], 0)
         self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: None
+        self.datastore.set_received_txn_response = lambda *args, **kwargs: defer.succeed(
+            None
+        )
 
     def test_started_typing_local(self):
         self.room_members = [U_APPLE, U_BANANA]
