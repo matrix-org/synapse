@@ -212,9 +212,10 @@ class PaginationHandler(object):
         source_config = pagin_config.get_source_config("room")
 
         with (yield self.pagination_lock.read(room_id)):
-            membership, member_event_id = yield self.auth.check_in_room_or_world_readable(
-                room_id, user_id
-            )
+            (
+                membership,
+                member_event_id,
+            ) = yield self.auth.check_in_room_or_world_readable(room_id, user_id)
 
             if source_config.direction == "b":
                 # if we're going backwards, we might need to backfill. This
@@ -297,10 +298,8 @@ class PaginationHandler(object):
         }
 
         if state:
-            chunk["state"] = (
-                yield self._event_serializer.serialize_events(
-                    state, time_now, as_client_event=as_client_event
-                )
+            chunk["state"] = yield self._event_serializer.serialize_events(
+                state, time_now, as_client_event=as_client_event
             )
 
         return chunk
