@@ -438,7 +438,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             if not rows:
                 return 0
 
-            upper_event_id, = rows[-1]
+            (upper_event_id,) = rows[-1]
 
             # Update the redactions with the received_ts.
             #

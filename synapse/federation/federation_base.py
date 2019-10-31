@@ -102,7 +102,7 @@ class FederationBase(object):
                     pass
 
             if not res:
-                logger.warn(
+                logger.warning(
                     "Failed to find copy of %s with valid signature", pdu.event_id
                 )
 
@@ -173,7 +173,7 @@ class FederationBase(object):
                     return redacted_event
 
                 if self.spam_checker.check_event_for_spam(pdu):
-                    logger.warn(
+                    logger.warning(
                         "Event contains spam, redacting %s: %s",
                         pdu.event_id,
                         pdu.get_pdu_json(),
@@ -185,7 +185,7 @@ class FederationBase(object):
         def errback(failure, pdu):
             failure.trap(SynapseError)
             with PreserveLoggingContext(ctx):
-                logger.warn(
+                logger.warning(
                     "Signature check failed for %s: %s",
                     pdu.event_id,
                     failure.getErrorMessage(),

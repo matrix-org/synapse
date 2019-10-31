@@ -110,14 +110,14 @@ class ReplicationEndpoint(object):
         return {}
 
     @abc.abstractmethod
-    def _handle_request(self, request, **kwargs):
+    async def _handle_request(self, request, **kwargs):
         """Handle incoming request.
 
         This is called with the request object and PATH_ARGS.
 
         Returns:
-            Deferred[dict]: A JSON serialisable dict to be used as response
-            body of request.
+            tuple[int, dict]: HTTP status code and a JSON serialisable dict
+            to be used as response body of request.
         """
         pass
 
@@ -180,7 +180,7 @@ class ReplicationEndpoint(object):
                         if e.code != 504 or not cls.RETRY_ON_TIMEOUT:
                             raise
 
-                    logger.warn("%s request timed out", cls.NAME)
+                    logger.warning("%s request timed out", cls.NAME)
 
                     # If we timed out we probably don't need to worry about backing
                     # off too much, but lets just wait a little anyway.
