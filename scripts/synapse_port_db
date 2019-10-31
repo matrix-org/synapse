@@ -34,26 +34,28 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.context import PreserveLoggingContext
 from synapse.storage._base import LoggingTransaction
 from synapse.storage.data_stores.main.client_ips import ClientIpBackgroundUpdateStore
-from synapse.storage.data_stores.main.deviceinbox import DeviceInboxBackgroundUpdateStore
+from synapse.storage.data_stores.main.deviceinbox import (
+    DeviceInboxBackgroundUpdateStore,
+)
 from synapse.storage.data_stores.main.devices import DeviceBackgroundUpdateStore
-from synapse.storage.engines import create_engine
 from synapse.storage.data_stores.main.events_bg_updates import (
-    EventsBackgroundUpdatesStore
+    EventsBackgroundUpdatesStore,
 )
 from synapse.storage.data_stores.main.media_repository import (
-    MediaRepositoryBackgroundUpdateStore
+    MediaRepositoryBackgroundUpdateStore,
 )
-from synapse.storage.prepare_database import prepare_database
 from synapse.storage.data_stores.main.registration import (
-    RegistrationBackgroundUpdateStore
+    RegistrationBackgroundUpdateStore,
 )
 from synapse.storage.data_stores.main.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.data_stores.main.search import SearchBackgroundUpdateStore
 from synapse.storage.data_stores.main.state import StateBackgroundUpdateStore
 from synapse.storage.data_stores.main.stats import StatsStore
 from synapse.storage.data_stores.main.user_directory import (
-    UserDirectoryBackgroundUpdateStore
+    UserDirectoryBackgroundUpdateStore,
 )
+from synapse.storage.engines import create_engine
+from synapse.storage.prepare_database import prepare_database
 from synapse.util import Clock
 
 logger = logging.getLogger("synapse_port_db")
@@ -66,6 +68,7 @@ BOOLEAN_COLUMNS = {
     "presence_list": ["accepted"],
     "presence_stream": ["currently_active"],
     "public_room_list_stream": ["visibility"],
+    "devices": ["hidden"],
     "device_lists_outbound_pokes": ["sent"],
     "users_who_share_rooms": ["share_private"],
     "groups": ["is_public"],
