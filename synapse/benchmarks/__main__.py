@@ -17,7 +17,6 @@ import pyperf
 
 from twisted.python import reflect
 
-from synapse.benchmarks import setupdb
 from synapse.benchmarks.suites import SUITES
 
 if __name__ == "__main__":
