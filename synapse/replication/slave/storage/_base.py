@@ -44,7 +44,14 @@ class BaseSlavedStore(SQLBaseStore):
 
         self.hs = hs
 
-    def stream_positions(self):
+    def stream_positions(self) -> dict[str, int]:
+        """
+        Get the current positions of all the streams this store wants to subscribe to
+
+        Returns:
+            map from stream name to the most recent update we have for
+            that stream (ie, the point we want to start replicating from)
+        """
         pos = {}
         if self._cache_id_gen:
             pos["caches"] = self._cache_id_gen.get_current_token()

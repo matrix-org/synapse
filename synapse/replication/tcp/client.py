@@ -20,6 +20,8 @@ import logging
 from twisted.internet import defer
 from twisted.internet.protocol import ReconnectingClientFactory
 
+from synapse.replication.slave.storage._base import BaseSlavedStore
+
 from .commands import (
     FederationAckCommand,
     InvalidateCacheCommand,
@@ -42,7 +44,7 @@ class ReplicationClientFactory(ReconnectingClientFactory):
 
     maxDelay = 30  # Try at least once every N seconds
 
-    def __init__(self, hs, client_name, handler):
+    def __init__(self, hs, client_name, handler: "ReplicationClientHandler"):
         self.client_name = client_name
         self.handler = handler
         self.server_name = hs.config.server_name
@@ -75,7 +77,7 @@ class ReplicationClientHandler(object):
     """
 
     def __init__(self, store):
-        self.store = store
+        self.store = store  # type: BaseSlavedStore
 
         # The current connection. None if we are currently (re)connecting
         self.connection = None
@@ -142,7 +144,9 @@ class ReplicationClientHandler(object):
         """Called when a new connection has been established and we need to
         subscribe to streams.
 
-        Returns a dictionary of stream name to token.
+        Returns:
+            map from stream name to the most recent update we have for
+            that stream (ie, the point we want to start replicating from)
         """
         args = self.store.stream_positions()
         user_account_data = args.pop("user_account_data", None)

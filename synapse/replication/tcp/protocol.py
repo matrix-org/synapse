@@ -65,6 +65,8 @@ from twisted.python.failure import Failure
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from .commands import (
@@ -562,7 +564,13 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
     VALID_INBOUND_COMMANDS = VALID_SERVER_COMMANDS
     VALID_OUTBOUND_COMMANDS = VALID_CLIENT_COMMANDS
 
-    def __init__(self, client_name, server_name, clock, handler):
+    def __init__(
+        self,
+        client_name: str,
+        server_name: str,
+        clock: Clock,
+        handler: ReplicationClientHandler,
+    ):
         BaseReplicationStreamProtocol.__init__(self, clock)
 
         self.client_name = client_name
