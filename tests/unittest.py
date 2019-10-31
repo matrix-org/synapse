@@ -587,7 +587,9 @@ class HomeserverTestCase(TestCase):
             event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(self.hs.get_datastore().persist_event(event, context))
+        self.get_success(
+            self.hs.get_storage().persistence.persist_event(event, context)
+        )
 
 
 class FederatingHomeserverTestCase(HomeserverTestCase):
