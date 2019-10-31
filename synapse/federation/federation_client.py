@@ -553,7 +553,7 @@ class FederationClient(FederationBase):
         Note that this does not append any events to any graphs.
 
         Args:
-            destinations (Iterable[unicode]): Candidate homeservers which are probably
+            destinations (Iterable[str]): Candidate homeservers which are probably
                 participating in the room.
             room_id (str): The room in which the event will happen.
             user_id (str): The user whose membership is being evented.

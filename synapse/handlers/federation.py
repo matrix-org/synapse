@@ -1112,7 +1112,7 @@ class FederationHandler(BaseHandler):
         have finished processing the join.
 
         Args:
-            target_hosts (Iterable[unicode]): List of servers to attempt to join the room with.
+            target_hosts (Iterable[str]): List of servers to attempt to join the room with.
 
             room_id (str): The ID of the room to join.
 
