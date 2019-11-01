@@ -21,6 +21,10 @@ from twisted.internet import defer
 from twisted.internet.protocol import ReconnectingClientFactory
 
 from synapse.replication.slave.storage._base import BaseSlavedStore
+from synapse.replication.tcp.protocol import (
+    AbstractReplicationClientHandler,
+    ClientReplicationStreamProtocol,
+)
 
 from .commands import (
     FederationAckCommand,
@@ -29,7 +33,6 @@ from .commands import (
     UserIpCommand,
     UserSyncCommand,
 )
-from .protocol import ClientReplicationStreamProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +47,7 @@ class ReplicationClientFactory(ReconnectingClientFactory):
 
     maxDelay = 30  # Try at least once every N seconds
 
-    def __init__(self, hs, client_name, handler: "ReplicationClientHandler"):
+    def __init__(self, hs, client_name, handler: AbstractReplicationClientHandler):
         self.client_name = client_name
         self.handler = handler
         self.server_name = hs.config.server_name
@@ -70,14 +73,14 @@ class ReplicationClientFactory(ReconnectingClientFactory):
         ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
 
 
-class ReplicationClientHandler(object):
+class ReplicationClientHandler(AbstractReplicationClientHandler):
     """A base handler that can be passed to the ReplicationClientFactory.
 
     By default proxies incoming replication data to the SlaveStore.
     """
 
-    def __init__(self, store):
-        self.store = store  # type: BaseSlavedStore
+    def __init__(self, store: BaseSlavedStore):
+        self.store = store
 
         # The current connection. None if we are currently (re)connecting
         self.connection = None

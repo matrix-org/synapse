@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict
 
 import six
 
@@ -44,7 +45,7 @@ class BaseSlavedStore(SQLBaseStore):
 
         self.hs = hs
 
-    def stream_positions(self) -> dict[str, int]:
+    def stream_positions(self) -> Dict[str, int]:
         """
         Get the current positions of all the streams this store wants to subscribe to
 

@@ -65,7 +65,6 @@ from twisted.python.failure import Failure
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -560,6 +559,62 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.streamer.lost_connection(self)
 
 
+class AbstractReplicationClientHandler:
+    """
+    The interface for the handler that should be passed to
+    ClientReplicationStreamProtocol
+    """
+
+    def on_rdata(self, stream_name, token, rows):
+        """Called to handle a batch of replication data with a given stream token.
+
+        Args:
+            stream_name (str): name of the replication stream for this batch of rows
+            token (int): stream token for this batch of rows
+            rows (list): a list of Stream.ROW_TYPE objects as returned by
+                Stream.parse_row.
+
+        Returns:
+            Deferred|None
+        """
+        raise NotImplementedError()
+
+    def on_position(self, stream_name, token):
+        """Called when we get new position data."""
+        raise NotImplementedError()
+
+    def on_sync(self, data):
+        """Called when get a new SYNC command."""
+        raise NotImplementedError()
+
+    def get_streams_to_replicate(self):
+        """Called when a new connection has been established and we need to
+        subscribe to streams.
+
+        Returns:
+            map from stream name to the most recent update we have for
+            that stream (ie, the point we want to start replicating from)
+        """
+        raise NotImplementedError()
+
+    def get_currently_syncing_users(self):
+        """Get the list of currently syncing users (if any). This is called
+        when a connection has been established and we need to send the
+        currently syncing users."""
+        raise NotImplementedError()
+
+    def update_connection(self, connection):
+        """Called when a connection has been established (or lost with None).
+        """
+        raise NotImplementedError()
+
+    def finished_connecting(self):
+        """Called when we have successfully subscribed and caught up to all
+        streams we're interested in.
+        """
+        raise NotImplementedError()
+
+
 class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
     VALID_INBOUND_COMMANDS = VALID_SERVER_COMMANDS
     VALID_OUTBOUND_COMMANDS = VALID_CLIENT_COMMANDS
@@ -569,7 +624,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         client_name: str,
         server_name: str,
         clock: Clock,
-        handler: ReplicationClientHandler,
+        handler: AbstractReplicationClientHandler,
     ):
         BaseReplicationStreamProtocol.__init__(self, clock)
 
