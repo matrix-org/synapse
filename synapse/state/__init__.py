@@ -232,6 +232,9 @@ class StateHandler(object):
             # If this is an outlier, then we know it shouldn't have any current
             # state. Certainly store.get_current_state won't return any, and
             # persisting the event won't store the state group.
+
+            # FIXME: why do we populate current_state_ids? I thought the point was
+            # that we weren't supposed to have any state for outliers?
             if old_state:
                 prev_state_ids = {(s.type, s.state_key): s.event_id for s in old_state}
                 if event.is_state():

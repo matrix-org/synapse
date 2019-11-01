@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Dict, Optional, Tuple, Union
+
 from six import iteritems
 
 import attr
@@ -19,45 +21,79 @@ from frozendict import frozendict
 
 from twisted.internet import defer
 
+from synapse.appservice import ApplicationService
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 
 
 @attr.s(slots=True)
 class EventContext:
     """
+    Holds information relevant to persisting an event
+
     Attributes:
-        state_group (int|None): state group id, if the state has been stored
-            as a state group. This is usually only None if e.g. the event is
-            an outlier.
-        rejected (bool|str): A rejection reason if the event was rejected, else
-            False
+        rejected: A rejection reason if the event was rejected, else False
 
-        prev_group (int): Previously persisted state group. ``None`` for an
-            outlier.
-        delta_ids (dict[(str, str), str]): Delta from ``prev_group``.
-            (type, state_key) -> event_id. ``None`` for an outlier.
+        state_group: The ID of the state group for this event. Note that state events
+            are persisted with a state group which includes the new event, so this is
+            effectively the state *after* the event in question.
 
-        app_service: FIXME
+            For a *rejected* state event, where the state of the rejected event is
+            ignored, this state_group should never make it into the
+            event_to_state_groups table. Indeed, inspecting this value for a rejected
+            state event is almost certainly incorrect.
 
-        _current_state_ids (dict[(str, str), str]|None):
-            The current state map including the current event. None if outlier
-            or we haven't fetched the state from DB yet.
+            For an outlier, where we don't have the state at the event, this will be
+            None.
+
+        prev_group: If it is known, ``state_group``'s prev_group. Note that this being
+            None does not necessarily mean that ``state_group`` does not have
+            a prev_group!
+
+            If ``state_group`` is None (ie, the event is an outlier), ``prev_group``
+            will always also be ``None``.
+
+        delta_ids: If ``prev_group`` is not None, the state delta between ``prev_group``
+            and ``state_group``.
+
+        app_service: If this event is being sent by a (local) application service, that
+            app service.
+
+        _current_state_ids: The room state map, including this event - ie, the state
+            in ``state_group``.
+
             (type, state_key) -> event_id
 
-        _prev_state_ids (dict[(str, str), str]|None):
-            The current state map excluding the current event. None if outlier
-            or we haven't fetched the state from DB yet.
+            FIXME: what is this for an outlier? it seems ill-defined. It seems like
+            it could be either {}, or the state we were given by the remote
+            server, depending on $THINGS
+
+            Note that this is a private attribute: it should be accessed via
+            ``get_current_state_ids``. _AsyncEventContext impl calculates this
+            on-demand: it will be None until that happens.
+
+        _prev_state_ids: The room state map, excluding this event. For a non-state
+            event, this will be the same as _current_state_events.
+
+            Note that it is a completely different thing to prev_group!
+
             (type, state_key) -> event_id
+
+            FIXME: again, what is this for an outlier?
+
+            As with _current_state_ids, this is a private attribute. It should be
+            accessed via get_prev_state_ids.
     """
 
-    state_group = attr.ib(default=None)
-    rejected = attr.ib(default=False)
-    prev_group = attr.ib(default=None)
-    delta_ids = attr.ib(default=None)
-    app_service = attr.ib(default=None)
+    rejected = attr.ib(default=False, type=Union[bool, str])
+    state_group = attr.ib(default=None, type=Optional[int])
+    prev_group = attr.ib(default=None, type=Optional[int])
+    delta_ids = attr.ib(default=None, type=Optional[Dict[Tuple[str, str], str]])
+    app_service = attr.ib(default=None, type=Optional[ApplicationService])
 
-    _prev_state_ids = attr.ib(default=None)
-    _current_state_ids = attr.ib(default=None)
+    _current_state_ids = attr.ib(
+        default=None, type=Optional[Dict[Tuple[str, str], str]]
+    )
+    _prev_state_ids = attr.ib(default=None, type=Optional[Dict[Tuple[str, str], str]])
 
     @staticmethod
     def with_state(
