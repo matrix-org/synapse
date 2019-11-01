@@ -103,6 +103,7 @@ class StateHandler(object):
     def __init__(self, hs):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
+        self.state_store = hs.get_storage().state
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
@@ -271,7 +272,7 @@ class StateHandler(object):
             else:
                 current_state_ids = prev_state_ids
 
-            state_group = yield self.store.store_state_group(
+            state_group = yield self.state_store.store_state_group(
                 event.event_id,
                 event.room_id,
                 prev_group=None,
@@ -321,7 +322,7 @@ class StateHandler(object):
                 delta_ids = dict(entry.delta_ids)
                 delta_ids[key] = event.event_id
 
-            state_group = yield self.store.store_state_group(
+            state_group = yield self.state_store.store_state_group(
                 event.event_id,
                 event.room_id,
                 prev_group=prev_group,
@@ -334,7 +335,7 @@ class StateHandler(object):
             delta_ids = entry.delta_ids
 
             if entry.state_group is None:
-                entry.state_group = yield self.store.store_state_group(
+                entry.state_group = yield self.state_store.store_state_group(
                     event.event_id,
                     event.room_id,
                     prev_group=entry.prev_group,
@@ -376,14 +377,16 @@ class StateHandler(object):
         # map from state group id to the state in that state group (where
         # 'state' is a map from state key to event id)
         # dict[int, dict[(str, str), str]]
-        state_groups_ids = yield self.store.get_state_groups_ids(room_id, event_ids)
+        state_groups_ids = yield self.state_store.get_state_groups_ids(
+            room_id, event_ids
+        )
 
         if len(state_groups_ids) == 0:
             return _StateCacheEntry(state={}, state_group=None)
         elif len(state_groups_ids) == 1:
             name, state_list = list(state_groups_ids.items()).pop()
 
-            prev_group, delta_ids = yield self.store.get_state_group_delta(name)
+            prev_group, delta_ids = yield self.state_store.get_state_group_delta(name)
 
             return _StateCacheEntry(
                 state=state_list,

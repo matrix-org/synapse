@@ -12,9 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from six import iteritems
 
+import attr
 from frozendict import frozendict
 
 from twisted.internet import defer
@@ -22,7 +22,8 @@ from twisted.internet import defer
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 
 
-class EventContext(object):
+@attr.s(slots=True)
+class EventContext:
     """
     Attributes:
         state_group (int|None): state group id, if the state has been stored
@@ -31,9 +32,6 @@ class EventContext(object):
         rejected (bool|str): A rejection reason if the event was rejected, else
             False
 
-        push_actions (list[(str, list[object])]): list of (user_id, actions)
-            tuples
-
         prev_group (int): Previously persisted state group. ``None`` for an
             outlier.
         delta_ids (dict[(str, str), str]): Delta from ``prev_group``.
@@ -41,6 +39,8 @@ class EventContext(object):
 
         prev_state_events (?): XXX: is this ever set to anything other than
             the empty list?
+
+        app_service: FIXME
 
         _current_state_ids (dict[(str, str), str]|None):
             The current state map including the current event. None if outlier
@@ -67,49 +67,33 @@ class EventContext(object):
             Only set when state has not been fetched yet.
     """
 
-    __slots__ = [
-        "state_group",
-        "rejected",
-        "prev_group",
-        "delta_ids",
-        "prev_state_events",
-        "app_service",
-        "_current_state_ids",
-        "_prev_state_ids",
-        "_prev_state_id",
-        "_event_type",
-        "_event_state_key",
-        "_fetching_state_deferred",
-    ]
+    state_group = attr.ib(default=None)
+    rejected = attr.ib(default=False)
+    prev_group = attr.ib(default=None)
+    delta_ids = attr.ib(default=None)
+    prev_state_events = attr.ib(default=attr.Factory(list))
+    app_service = attr.ib(default=None)
 
-    def __init__(self):
-        self.prev_state_events = []
-        self.rejected = False
-        self.app_service = None
+    _current_state_ids = attr.ib(default=None)
+    _prev_state_ids = attr.ib(default=None)
+    _prev_state_id = attr.ib(default=None)
+
+    _event_type = attr.ib(default=None)
+    _event_state_key = attr.ib(default=None)
+    _fetching_state_deferred = attr.ib(default=None)
 
     @staticmethod
     def with_state(
         state_group, current_state_ids, prev_state_ids, prev_group=None, delta_ids=None
     ):
-        context = EventContext()
-
-        # The current state including the current event
-        context._current_state_ids = current_state_ids
-        # The current state excluding the current event
-        context._prev_state_ids = prev_state_ids
-        context.state_group = state_group
-
-        context._prev_state_id = None
-        context._event_type = None
-        context._event_state_key = None
-        context._fetching_state_deferred = defer.succeed(None)
-
-        # A previously persisted state group and a delta between that
-        # and this state.
-        context.prev_group = prev_group
-        context.delta_ids = delta_ids
-
-        return context
+        return EventContext(
+            current_state_ids=current_state_ids,
+            prev_state_ids=prev_state_ids,
+            state_group=state_group,
+            fetching_state_deferred=defer.succeed(None),
+            prev_group=prev_group,
+            delta_ids=delta_ids,
+        )
 
     @defer.inlineCallbacks
     def serialize(self, event, store):
@@ -157,24 +141,18 @@ class EventContext(object):
         Returns:
             EventContext
         """
-        context = EventContext()
-
-        # We use the state_group and prev_state_id stuff to pull the
-        # current_state_ids out of the DB and construct prev_state_ids.
-        context._prev_state_id = input["prev_state_id"]
-        context._event_type = input["event_type"]
-        context._event_state_key = input["event_state_key"]
-
-        context._current_state_ids = None
-        context._prev_state_ids = None
-        context._fetching_state_deferred = None
-
-        context.state_group = input["state_group"]
-        context.prev_group = input["prev_group"]
-        context.delta_ids = _decode_state_dict(input["delta_ids"])
-
-        context.rejected = input["rejected"]
-        context.prev_state_events = input["prev_state_events"]
+        context = EventContext(
+            # We use the state_group and prev_state_id stuff to pull the
+            # current_state_ids out of the DB and construct prev_state_ids.
+            prev_state_id=input["prev_state_id"],
+            event_type=input["event_type"],
+            event_state_key=input["event_state_key"],
+            state_group=input["state_group"],
+            prev_group=input["prev_group"],
+            delta_ids=_decode_state_dict(input["delta_ids"]),
+            rejected=input["rejected"],
+            prev_state_events=input["prev_state_events"],
+        )
 
         app_service_id = input["app_service_id"]
         if app_service_id:

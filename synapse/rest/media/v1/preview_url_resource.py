@@ -117,8 +117,10 @@ class PreviewUrlResource(DirectServeResource):
                 pattern = entry[attrib]
                 value = getattr(url_tuple, attrib)
                 logger.debug(
-                    ("Matching attrib '%s' with value '%s' against" " pattern '%s'")
-                    % (attrib, value, pattern)
+                    "Matching attrib '%s' with value '%s' against" " pattern '%s'",
+                    attrib,
+                    value,
+                    pattern,
                 )
 
                 if value is None:
@@ -134,7 +136,7 @@ class PreviewUrlResource(DirectServeResource):
                         match = False
                         continue
             if match:
-                logger.warn("URL %s blocked by url_blacklist entry %s", url, entry)
+                logger.warning("URL %s blocked by url_blacklist entry %s", url, entry)
                 raise SynapseError(
                     403, "URL blocked by url pattern blacklist entry", Codes.UNKNOWN
                 )
@@ -186,7 +188,7 @@ class PreviewUrlResource(DirectServeResource):
 
         media_info = yield self._download_url(url, user)
 
-        logger.debug("got media_info of '%s'" % media_info)
+        logger.debug("got media_info of '%s'", media_info)
 
         if _is_media(media_info["media_type"]):
             file_id = media_info["filesystem_id"]
@@ -206,7 +208,7 @@ class PreviewUrlResource(DirectServeResource):
                 og["og:image:width"] = dims["width"]
                 og["og:image:height"] = dims["height"]
             else:
-                logger.warn("Couldn't get dims for %s" % url)
+                logger.warning("Couldn't get dims for %s" % url)
 
             # define our OG response for this media
         elif _is_html(media_info["media_type"]):
@@ -254,7 +256,7 @@ class PreviewUrlResource(DirectServeResource):
                         og["og:image:width"] = dims["width"]
                         og["og:image:height"] = dims["height"]
                     else:
-                        logger.warn("Couldn't get dims for %s" % og["og:image"])
+                        logger.warning("Couldn't get dims for %s", og["og:image"])
 
                     og["og:image"] = "mxc://%s/%s" % (
                         self.server_name,
@@ -265,10 +267,10 @@ class PreviewUrlResource(DirectServeResource):
                 else:
                     del og["og:image"]
         else:
-            logger.warn("Failed to find any OG data in %s", url)
+            logger.warning("Failed to find any OG data in %s", url)
             og = {}
 
-        logger.debug("Calculated OG for %s as %s" % (url, og))
+        logger.debug("Calculated OG for %s as %s", url, og)
 
         jsonog = json.dumps(og)
 
@@ -297,7 +299,7 @@ class PreviewUrlResource(DirectServeResource):
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             try:
-                logger.debug("Trying to get url '%s'" % url)
+                logger.debug("Trying to get url '%s'", url)
                 length, headers, uri, code = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size
                 )
@@ -317,7 +319,7 @@ class PreviewUrlResource(DirectServeResource):
                 )
             except Exception as e:
                 # FIXME: pass through 404s and other error messages nicely
-                logger.warn("Error downloading %s: %r", url, e)
+                logger.warning("Error downloading %s: %r", url, e)
 
                 raise SynapseError(
                     500,
@@ -398,7 +400,7 @@ class PreviewUrlResource(DirectServeResource):
             except OSError as e:
                 # If the path doesn't exist, meh
                 if e.errno != errno.ENOENT:
-                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    logger.warning("Failed to remove media: %r: %s", media_id, e)
                     continue
 
             removed_media.append(media_id)
@@ -430,7 +432,7 @@ class PreviewUrlResource(DirectServeResource):
             except OSError as e:
                 # If the path doesn't exist, meh
                 if e.errno != errno.ENOENT:
-                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    logger.warning("Failed to remove media: %r: %s", media_id, e)
                     continue
 
             try:
@@ -446,7 +448,7 @@ class PreviewUrlResource(DirectServeResource):
             except OSError as e:
                 # If the path doesn't exist, meh
                 if e.errno != errno.ENOENT:
-                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    logger.warning("Failed to remove media: %r: %s", media_id, e)
                     continue
 
             removed_media.append(media_id)
