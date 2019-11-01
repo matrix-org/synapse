@@ -142,5 +142,6 @@ class LimitBlockingTypes(object):
 
 class EventContentFields(object):
     """Fields found in events' content, regardless of type."""
+
     # Labels for the event, cf https://github.com/matrix-org/matrix-doc/pull/2326
     Labels = "org.matrix.labels"

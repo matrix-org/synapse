@@ -29,7 +29,7 @@ from prometheus_client import Counter, Histogram
 from twisted.internet import defer
 
 import synapse.metrics
-from synapse.api.constants import EventTypes, EventContentFields
+from synapse.api.constants import EventContentFields, EventTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
