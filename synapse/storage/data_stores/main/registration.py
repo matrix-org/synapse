@@ -459,7 +459,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 WHERE appservice_id IS NULL
             """
             )
-            count, = txn.fetchone()
+            (count,) = txn.fetchone()
             return count
 
         ret = yield self.runInteraction("count_users", _count_users)

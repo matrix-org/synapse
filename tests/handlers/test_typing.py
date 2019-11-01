@@ -74,7 +74,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                         "get_received_txn_response",
                         "set_received_txn_response",
                         "get_destination_retry_timings",
-                        "get_devices_by_remote",
+                        "get_device_updates_by_remote",
                         # Bits that user_directory needs
                         "get_user_directory_stream_pos",
                         "get_current_state_deltas",
@@ -110,7 +110,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             retry_timings_res
         )
 
-        self.datastore.get_devices_by_remote.return_value = (0, [])
+        self.datastore.get_device_updates_by_remote.return_value = (0, [])
 
         def get_received_txn_response(*args):
             return defer.succeed(None)

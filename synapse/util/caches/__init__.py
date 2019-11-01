@@ -107,7 +107,7 @@ def register_cache(cache_type, cache_name, cache, collect_callback=None):
                 if collect_callback:
                     collect_callback()
             except Exception as e:
-                logger.warn("Error calculating metrics for %s: %s", cache_name, e)
+                logger.warning("Error calculating metrics for %s: %s", cache_name, e)
                 raise
 
             yield GaugeMetricFamily("__unused", "")
