@@ -16,7 +16,9 @@
 CREATE TABLE IF NOT EXISTS event_labels (
     event_id TEXT,
     label TEXT,
+    room_id TEXT NOT NULL,
+    topological_ordering bigint NOT NULL,
     PRIMARY KEY(event_id, label)
 );
 
-CREATE INDEX event_labels_label_idx ON event_labels(label);
+CREATE INDEX event_labels_room_id_label_idx ON event_labels(room_id, label, topological_ordering);

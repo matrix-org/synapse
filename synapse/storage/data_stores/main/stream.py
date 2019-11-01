@@ -874,7 +874,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         sql = (
             "SELECT DISTINCT event_id, topological_ordering, stream_ordering"
             " FROM events"
-            " LEFT JOIN event_labels USING (event_id)"
+            " LEFT JOIN event_labels USING (event_id, room_id, topological_ordering)"
             " WHERE outlier = ? AND room_id = ? AND %(bounds)s"
             " ORDER BY topological_ordering %(order)s,"
             " stream_ordering %(order)s LIMIT ?"

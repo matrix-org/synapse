@@ -1493,7 +1493,9 @@ class EventsStore(
             # Store the labels for this event.
             labels = event.content.get(EventContentFields.Labels)
             if labels:
-                self.insert_labels_for_event_txn(txn, event.event_id, labels)
+                self.insert_labels_for_event_txn(
+                    txn, event.event_id, labels, event.room_id, event.depth
+                )
 
         # Insert into the room_memberships table.
         self._store_room_members_txn(
@@ -2482,7 +2484,9 @@ class EventsStore(
             get_all_updated_current_state_deltas_txn,
         )
 
-    def insert_labels_for_event_txn(self, txn, event_id, labels):
+    def insert_labels_for_event_txn(
+        self, txn, event_id, labels, room_id, topological_ordering
+    ):
         """Store the mapping between an event's ID and its labels, with one row per
         (event_id, label) tuple.
 
@@ -2490,11 +2494,21 @@ class EventsStore(
             txn (LoggingTransaction): The transaction to execute.
             event_id (str): The event's ID.
             labels (list[str]): A list of text labels.
+            room_id (str): The ID of the room the event was sent to.
+            topological_ordering (int): The position of the event in the room's topology.
         """
         return self._simple_insert_many_txn(
             txn=txn,
             table="event_labels",
-            values=[{"event_id": event_id, "label": label} for label in labels],
+            values=[
+                {
+                    "event_id": event_id,
+                    "label": label,
+                    "room_id": room_id,
+                    "topological_ordering": topological_ordering,
+                }
+                for label in labels
+            ],
         )
 
 
