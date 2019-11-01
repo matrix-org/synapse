@@ -52,7 +52,7 @@ class DeviceMessageHandler(object):
         local_messages = {}
         sender_user_id = content["sender"]
         if origin != get_domain_from_id(sender_user_id):
-            logger.warn(
+            logger.warning(
                 "Dropping device message from %r with spoofed sender %r",
                 origin,
                 sender_user_id,

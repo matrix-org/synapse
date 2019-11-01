@@ -294,7 +294,7 @@ class LoggingContext(object):
         """Enters this logging context into thread local storage"""
         old_context = self.set_current_context(self)
         if self.previous_context != old_context:
-            logger.warn(
+            logger.warning(
                 "Expected previous context %r, found %r",
                 self.previous_context,
                 old_context,
