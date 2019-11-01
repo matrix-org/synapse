@@ -12,6 +12,7 @@ import synapse.handlers.message
 import synapse.handlers.room
 import synapse.handlers.room_member
 import synapse.handlers.set_password
+import synapse.http.client
 import synapse.rest.media.v1.media_repository
 import synapse.server_notices.server_notices_manager
 import synapse.server_notices.server_notices_sender
@@ -37,6 +38,14 @@ class HomeServer(object):
     def get_state_handler(self) -> synapse.state.StateHandler:
         pass
     def get_state_resolution_handler(self) -> synapse.state.StateResolutionHandler:
+        pass
+    def get_simple_http_client(self) -> synapse.http.client.SimpleHttpClient:
+        """Fetch an HTTP client implementation which doesn't do any blacklisting
+        or support any HTTP_PROXY settings"""
+        pass
+    def get_proxied_http_client(self) -> synapse.http.client.SimpleHttpClient:
+        """Fetch an HTTP client implementation which doesn't do any blacklisting
+        but does support HTTP_PROXY settings"""
         pass
     def get_deactivate_account_handler(
         self,
