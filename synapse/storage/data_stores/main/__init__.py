@@ -139,7 +139,10 @@ class DataStore(
             db_conn, "public_room_list_stream", "stream_id"
         )
         self._device_list_id_gen = StreamIdGenerator(
-            db_conn, "device_lists_stream", "stream_id"
+            db_conn,
+            "device_lists_stream",
+            "stream_id",
+            extra_tables=[("user_signature_stream", "stream_id")],
         )
         self._cross_signing_id_gen = StreamIdGenerator(
             db_conn, "e2e_cross_signing_keys", "stream_id"
@@ -317,7 +320,7 @@ class DataStore(
             ) u
         """
         txn.execute(sql, (time_from,))
-        count, = txn.fetchone()
+        (count,) = txn.fetchone()
         return count
 
     def count_r30_users(self):
@@ -396,7 +399,7 @@ class DataStore(
 
             txn.execute(sql, (thirty_days_ago_in_secs, thirty_days_ago_in_secs))
 
-            count, = txn.fetchone()
+            (count,) = txn.fetchone()
             results["all"] = count
 
             return results

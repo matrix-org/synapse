@@ -272,7 +272,7 @@ class IdentityHandler(BaseHandler):
             changed = False
             if e.code in (400, 404, 501):
                 # The remote server probably doesn't support unbinding (yet)
-                logger.warn("Received %d response while unbinding threepid", e.code)
+                logger.warning("Received %d response while unbinding threepid", e.code)
             else:
                 logger.error("Failed to unbind threepid on identity server: %s", e)
                 raise SynapseError(500, "Failed to contact identity server")
@@ -403,7 +403,7 @@ class IdentityHandler(BaseHandler):
 
         if self.hs.config.using_identity_server_from_trusted_list:
             # Warn that a deprecated config option is in use
-            logger.warn(
+            logger.warning(
                 'The config option "trust_identity_server_for_password_resets" '
                 'has been replaced by "account_threepid_delegate". '
                 "Please consult the sample config at docs/sample_config.yaml for "
@@ -457,7 +457,7 @@ class IdentityHandler(BaseHandler):
 
         if self.hs.config.using_identity_server_from_trusted_list:
             # Warn that a deprecated config option is in use
-            logger.warn(
+            logger.warning(
                 'The config option "trust_identity_server_for_password_resets" '
                 'has been replaced by "account_threepid_delegate". '
                 "Please consult the sample config at docs/sample_config.yaml for "

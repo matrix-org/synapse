@@ -759,22 +759,25 @@ class RoomMemberHandler(object):
         if room_avatar_event:
             room_avatar_url = room_avatar_event.content.get("url", "")
 
-        token, public_keys, fallback_public_key, display_name = (
-            yield self.identity_handler.ask_id_server_for_third_party_invite(
-                requester=requester,
-                id_server=id_server,
-                medium=medium,
-                address=address,
-                room_id=room_id,
-                inviter_user_id=user.to_string(),
-                room_alias=canonical_room_alias,
-                room_avatar_url=room_avatar_url,
-                room_join_rules=room_join_rules,
-                room_name=room_name,
-                inviter_display_name=inviter_display_name,
-                inviter_avatar_url=inviter_avatar_url,
-                id_access_token=id_access_token,
-            )
+        (
+            token,
+            public_keys,
+            fallback_public_key,
+            display_name,
+        ) = yield self.identity_handler.ask_id_server_for_third_party_invite(
+            requester=requester,
+            id_server=id_server,
+            medium=medium,
+            address=address,
+            room_id=room_id,
+            inviter_user_id=user.to_string(),
+            room_alias=canonical_room_alias,
+            room_avatar_url=room_avatar_url,
+            room_join_rules=room_join_rules,
+            room_name=room_name,
+            inviter_display_name=inviter_display_name,
+            inviter_avatar_url=inviter_avatar_url,
+            id_access_token=id_access_token,
         )
 
         yield self.event_creation_handler.create_and_send_nonmember_event(

@@ -863,7 +863,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         )
         stream_row = txn.fetchone()
         if stream_row:
-            offset_stream_ordering, = stream_row
+            (offset_stream_ordering,) = stream_row
             rotate_to_stream_ordering = min(
                 self.stream_ordering_day_ago, offset_stream_ordering
             )

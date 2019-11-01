@@ -148,7 +148,7 @@ class SrvResolver(object):
             # Try something in the cache, else rereaise
             cache_entry = self._cache.get(service_name, None)
             if cache_entry:
-                logger.warn(
+                logger.warning(
                     "Failed to resolve %r, falling back to cache. %r", service_name, e
                 )
                 return list(cache_entry)
