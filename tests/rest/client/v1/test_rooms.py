@@ -24,7 +24,7 @@ from six.moves.urllib import parse as urlparse
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.api.constants import Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.rest.client.v1 import login, profile, room
 
 from tests import unittest
@@ -810,6 +810,105 @@ class RoomMessageListTestCase(RoomBase):
         self.assertEquals(token, channel.json_body["start"])
         self.assertTrue("chunk" in channel.json_body)
         self.assertTrue("end" in channel.json_body)
+
+    def test_filter_labels(self):
+        """Test that we can filter by a label."""
+        message_filter = json.dumps(
+            {"types": [EventTypes.Message], "org.matrix.labels": ["#fun"]}
+        )
+
+        events = self._test_filter_labels(message_filter)
+
+        self.assertEqual(len(events), 2, [event["content"] for event in events])
+        self.assertEqual(events[0]["content"]["body"], "with right label", events[0])
+        self.assertEqual(events[1]["content"]["body"], "with right label", events[1])
+
+    def test_filter_not_labels(self):
+        """Test that we can filter by the absence of a label."""
+        message_filter = json.dumps(
+            {"types": [EventTypes.Message], "org.matrix.not_labels": ["#fun"]}
+        )
+
+        events = self._test_filter_labels(message_filter)
+
+        self.assertEqual(len(events), 3, [event["content"] for event in events])
+        self.assertEqual(events[0]["content"]["body"], "without label", events[0])
+        self.assertEqual(events[1]["content"]["body"], "with wrong label", events[1])
+        self.assertEqual(
+            events[2]["content"]["body"], "with two wrong labels", events[2]
+        )
+
+    def test_filter_labels_not_labels(self):
+        """Test that we can filter by both a label and the absence of another label."""
+        sync_filter = json.dumps(
+            {
+                "types": [EventTypes.Message],
+                "org.matrix.labels": ["#work"],
+                "org.matrix.not_labels": ["#notfun"],
+            }
+        )
+
+        events = self._test_filter_labels(sync_filter)
+
+        self.assertEqual(len(events), 1, [event["content"] for event in events])
+        self.assertEqual(events[0]["content"]["body"], "with wrong label", events[0])
+
+    def _test_filter_labels(self, message_filter):
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#fun"],
+            },
+        )
+
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "without label"},
+        )
+
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with wrong label",
+                EventContentFields.LABELS: ["#work"],
+            },
+        )
+
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with two wrong labels",
+                EventContentFields.LABELS: ["#work", "#notfun"],
+            },
+        )
+
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#fun"],
+            },
+        )
+
+        token = "s0_0_0_0_0_0_0_0_0"
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=x&from=%s&filter=%s"
+            % (self.room_id, token, message_filter),
+        )
+        self.render(request)
+
+        return channel.json_body["chunk"]
 
 
 class RoomSearchTestCase(unittest.HomeserverTestCase):
