@@ -44,6 +44,8 @@ def check_bind_error(e, address, bind_addresses):
         bind_addresses (list): Addresses on which the service listens.
     """
     if address == "0.0.0.0" and "::" in bind_addresses:
-        logger.warn("Failed to listen on 0.0.0.0, continuing because listening on [::]")
+        logger.warning(
+            "Failed to listen on 0.0.0.0, continuing because listening on [::]"
+        )
     else:
         raise e

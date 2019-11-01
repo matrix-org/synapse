@@ -282,7 +282,7 @@ class SynapseHomeServer(HomeServer):
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(
+                    logger.warning(
                         (
                             "Metrics listener configured, but "
                             "enable_metrics is not True!"
@@ -291,7 +291,7 @@ class SynapseHomeServer(HomeServer):
                 else:
                     _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
-                logger.warn("Unrecognized listener type: %s", listener["type"])
+                logger.warning("Unrecognized listener type: %s", listener["type"])
 
     def run_startup_checks(self, db_conn, database_engine):
         all_users_native = are_all_users_on_domain(
@@ -565,11 +565,11 @@ def run(hs):
             "Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats)
         )
         try:
-            yield hs.get_simple_http_client().put_json(
+            yield hs.get_proxied_http_client().put_json(
                 hs.config.report_stats_endpoint, stats
             )
         except Exception as e:
-            logger.warn("Error reporting stats: %s", e)
+            logger.warning("Error reporting stats: %s", e)
 
     def performance_stats_init():
         try:

@@ -143,7 +143,7 @@ class PushRulesWorkerStore(
                     " WHERE user_id = ? AND ? < stream_id"
                 )
                 txn.execute(sql, (user_id, last_id))
-                count, = txn.fetchone()
+                (count,) = txn.fetchone()
                 return bool(count)
 
             return self.runInteraction(

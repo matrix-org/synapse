@@ -83,7 +83,7 @@ class ResourceLimitsServerNotices(object):
         room_id = yield self._server_notices_manager.get_notice_room_for_user(user_id)
 
         if not room_id:
-            logger.warn("Failed to get server notices room")
+            logger.warning("Failed to get server notices room")
             return
 
         yield self._check_and_set_tags(user_id, room_id)

@@ -522,12 +522,12 @@ class FederationClient(FederationBase):
                 res = yield callback(destination)
                 return res
             except InvalidResponseError as e:
-                logger.warn("Failed to %s via %s: %s", description, destination, e)
+                logger.warning("Failed to %s via %s: %s", description, destination, e)
             except HttpResponseException as e:
                 if not 500 <= e.code < 600:
                     raise e.to_synapse_error()
                 else:
-                    logger.warn(
+                    logger.warning(
                         "Failed to %s via %s: %i %s",
                         description,
                         destination,
@@ -535,7 +535,9 @@ class FederationClient(FederationBase):
                         e.args[0],
                     )
             except Exception:
-                logger.warn("Failed to %s via %s", description, destination, exc_info=1)
+                logger.warning(
+                    "Failed to %s via %s", description, destination, exc_info=1
+                )
 
         raise SynapseError(502, "Failed to %s via any server" % (description,))
 
@@ -553,7 +555,7 @@ class FederationClient(FederationBase):
         Note that this does not append any events to any graphs.
 
         Args:
-            destinations (str): Candidate homeservers which are probably
+            destinations (Iterable[str]): Candidate homeservers which are probably
                 participating in the room.
             room_id (str): The room in which the event will happen.
             user_id (str): The user whose membership is being evented.
