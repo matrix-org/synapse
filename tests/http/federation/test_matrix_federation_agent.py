@@ -113,19 +113,24 @@ class MatrixFederationAgentTests(TestCase):
             FakeTransport(client_protocol, self.reactor, server_tls_protocol)
         )
 
+        # grab a hold of the TLS connection, in case it gets torn down
+        server_tls_connection = server_tls_protocol._tlsConnection
+
+        # fish the test server back out of the server-side TLS protocol.
+        http_protocol = server_tls_protocol.wrappedProtocol
+
         # give the reactor a pump to get the TLS juices flowing.
         self.reactor.pump((0.1,))
 
         # check the SNI
-        server_name = server_tls_protocol._tlsConnection.get_servername()
+        server_name = server_tls_connection.get_servername()
         self.assertEqual(
             server_name,
             expected_sni,
             "Expected SNI %s but got %s" % (expected_sni, server_name),
         )
 
-        # fish the test server back out of the server-side TLS protocol.
-        return server_tls_protocol.wrappedProtocol
+        return http_protocol
 
     @defer.inlineCallbacks
     def _make_get_request(self, uri):
