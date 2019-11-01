@@ -116,7 +116,7 @@ class EventContext:
         Returns:
             EventContext
         """
-        context = AsyncEventContext(
+        context = _AsyncEventContextImpl(
             # We use the state_group and prev_state_id stuff to pull the
             # current_state_ids out of the DB and construct prev_state_ids.
             prev_state_id=input["prev_state_id"],
@@ -176,10 +176,10 @@ class EventContext:
 
 
 @attr.s(slots=True)
-class AsyncEventContext(EventContext):
+class _AsyncEventContextImpl(EventContext):
     """
-    A version of EventContext which fetches _current_state_ids and _prev_state_ids
-    from the database on demand.
+    An implementation of EventContext which fetches _current_state_ids and
+    _prev_state_ids from the database on demand.
 
     Attributes:
 
