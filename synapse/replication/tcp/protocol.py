@@ -48,7 +48,7 @@ indicate which side is sending, these are *not* included on the wire::
     > ERROR server stopping
     * connection closed by server *
 """
-
+import abc
 import fcntl
 import logging
 import struct
@@ -559,12 +559,13 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.streamer.lost_connection(self)
 
 
-class AbstractReplicationClientHandler:
+class AbstractReplicationClientHandler(metaclass=abc.ABCMeta):
     """
     The interface for the handler that should be passed to
     ClientReplicationStreamProtocol
     """
 
+    @abc.abstractmethod
     def on_rdata(self, stream_name, token, rows):
         """Called to handle a batch of replication data with a given stream token.
 
@@ -579,14 +580,17 @@ class AbstractReplicationClientHandler:
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
     def on_position(self, stream_name, token):
         """Called when we get new position data."""
         raise NotImplementedError()
 
+    @abc.abstractmethod
     def on_sync(self, data):
         """Called when get a new SYNC command."""
         raise NotImplementedError()
 
+    @abc.abstractmethod
     def get_streams_to_replicate(self):
         """Called when a new connection has been established and we need to
         subscribe to streams.
@@ -597,17 +601,20 @@ class AbstractReplicationClientHandler:
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
     def get_currently_syncing_users(self):
         """Get the list of currently syncing users (if any). This is called
         when a connection has been established and we need to send the
         currently syncing users."""
         raise NotImplementedError()
 
+    @abc.abstractmethod
     def update_connection(self, connection):
         """Called when a connection has been established (or lost with None).
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
     def finished_connecting(self):
         """Called when we have successfully subscribed and caught up to all
         streams we're interested in.

@@ -16,6 +16,7 @@
 """
 
 import logging
+from typing import Dict
 
 from twisted.internet import defer
 from twisted.internet.protocol import ReconnectingClientFactory
@@ -143,7 +144,7 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         if d:
             d.callback(data)
 
-    def get_streams_to_replicate(self):
+    def get_streams_to_replicate(self) -> Dict[str, int]:
         """Called when a new connection has been established and we need to
         subscribe to streams.
 
