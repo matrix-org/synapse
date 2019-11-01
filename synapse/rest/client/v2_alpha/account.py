@@ -71,7 +71,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "User password resets have been disabled due to lack of email config"
                 )
             raise SynapseError(
@@ -148,7 +148,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self.failure_email_template, = load_jinja2_templates(
+            (self.failure_email_template,) = load_jinja2_templates(
                 self.config.email_template_dir,
                 [self.config.email_password_reset_template_failure_html],
             )
@@ -162,7 +162,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             )
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "Password reset emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
@@ -183,7 +183,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             # Perform a 302 redirect if next_link is set
             if next_link:
                 if next_link.startswith("file:///"):
-                    logger.warn(
+                    logger.warning(
                         "Not redirecting to next_link as it is a local file: address"
                     )
                 else:
@@ -350,7 +350,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "Adding emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
@@ -441,7 +441,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         if not self.hs.config.account_threepid_delegate_msisdn:
-            logger.warn(
+            logger.warning(
                 "No upstream msisdn account_threepid_delegate configured on the server to "
                 "handle this request"
             )
@@ -479,7 +479,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self.failure_email_template, = load_jinja2_templates(
+            (self.failure_email_template,) = load_jinja2_templates(
                 self.config.email_template_dir,
                 [self.config.email_add_threepid_template_failure_html],
             )
@@ -488,7 +488,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
     def on_GET(self, request):
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "Adding emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
@@ -515,7 +515,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
             # Perform a 302 redirect if next_link is set
             if next_link:
                 if next_link.startswith("file:///"):
-                    logger.warn(
+                    logger.warning(
                         "Not redirecting to next_link as it is a local file: address"
                     )
                 else:

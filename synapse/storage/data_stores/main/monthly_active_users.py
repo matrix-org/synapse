@@ -171,7 +171,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
 
             txn.execute(sql)
-            count, = txn.fetchone()
+            (count,) = txn.fetchone()
             return count
 
         return self.runInteraction("count_users", _count_users)

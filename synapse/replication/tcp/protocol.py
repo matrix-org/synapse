@@ -250,7 +250,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         return handler(cmd)
 
     def close(self):
-        logger.warn("[%s] Closing connection", self.id())
+        logger.warning("[%s] Closing connection", self.id())
         self.time_we_closed = self.clock.time_msec()
         self.transport.loseConnection()
         self.on_connection_closed()

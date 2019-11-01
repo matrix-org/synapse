@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Iterable, Tuple
 
 from six import iteritems, itervalues
 from six.moves import range
@@ -23,6 +24,8 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError
+from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
@@ -722,16 +725,18 @@ class StateGroupWorkerStore(
         member_filter, non_member_filter = state_filter.get_member_split()
 
         # Now we look them up in the member and non-member caches
-        non_member_state, incomplete_groups_nm, = (
-            yield self._get_state_for_groups_using_cache(
-                groups, self._state_group_cache, state_filter=non_member_filter
-            )
+        (
+            non_member_state,
+            incomplete_groups_nm,
+        ) = yield self._get_state_for_groups_using_cache(
+            groups, self._state_group_cache, state_filter=non_member_filter
         )
 
-        member_state, incomplete_groups_m, = (
-            yield self._get_state_for_groups_using_cache(
-                groups, self._state_group_members_cache, state_filter=member_filter
-            )
+        (
+            member_state,
+            incomplete_groups_m,
+        ) = yield self._get_state_for_groups_using_cache(
+            groups, self._state_group_members_cache, state_filter=member_filter
         )
 
         state = dict(non_member_state)
@@ -1073,7 +1078,7 @@ class StateBackgroundUpdateStore(
                     " WHERE id < ? AND room_id = ?",
                     (state_group, room_id),
                 )
-                prev_group, = txn.fetchone()
+                (prev_group,) = txn.fetchone()
                 new_last_state_group = state_group
 
                 if prev_group:
@@ -1215,7 +1220,9 @@ class StateStore(StateGroupWorkerStore, StateBackgroundUpdateStore):
     def __init__(self, db_conn, hs):
         super(StateStore, self).__init__(db_conn, hs)
 
-    def _store_event_state_mappings_txn(self, txn, events_and_contexts):
+    def _store_event_state_mappings_txn(
+        self, txn, events_and_contexts: Iterable[Tuple[EventBase, EventContext]]
+    ):
         state_groups = {}
         for event, context in events_and_contexts:
             if event.internal_metadata.is_outlier():

@@ -175,7 +175,7 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         if self.connection:
             self.connection.send_command(cmd)
         else:
-            logger.warn("Queuing command as not connected: %r", cmd.NAME)
+            logger.warning("Queuing command as not connected: %r", cmd.NAME)
             self.pending_commands.append(cmd)
 
     def send_federation_ack(self, token):

@@ -396,8 +396,8 @@ class RegistrationHandler(BaseHandler):
             room_id = room_identifier
         elif RoomAlias.is_valid(room_identifier):
             room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = (
-                yield room_member_handler.lookup_room_alias(room_alias)
+            room_id, remote_room_hosts = yield room_member_handler.lookup_room_alias(
+                room_alias
             )
             room_id = room_id.to_string()
         else:

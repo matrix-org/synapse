@@ -27,7 +27,26 @@ data stores associated with them (e.g. the schema version tables), which are
 stored in `synapse.storage.schema`.
 """
 
-from synapse.storage.data_stores.main import DataStore  # noqa: F401
+from synapse.storage.data_stores import DataStores
+from synapse.storage.data_stores.main import DataStore
+from synapse.storage.persist_events import EventsPersistenceStorage
+from synapse.storage.state import StateGroupStorage
+
+__all__ = ["DataStores", "DataStore"]
+
+
+class Storage(object):
+    """The high level interfaces for talking to various storage layers.
+    """
+
+    def __init__(self, hs, stores: DataStores):
+        # We include the main data store here mainly so that we don't have to
+        # rewrite all the existing code to split it into high vs low level
+        # interfaces.
+        self.main = stores.main
+
+        self.persistence = EventsPersistenceStorage(hs, stores)
+        self.state = StateGroupStorage(hs, stores)
 
 
 def are_all_users_on_domain(txn, database_engine, domain):
