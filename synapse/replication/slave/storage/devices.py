@@ -15,6 +15,7 @@
 
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
+from synapse.replication.tcp.streams._base import DeviceListsStream, UserSignatureStream
 from synapse.storage.data_stores.main.devices import DeviceWorkerStore
 from synapse.storage.data_stores.main.end_to_end_keys import EndToEndKeyWorkerStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -42,14 +43,22 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
 
     def stream_positions(self):
         result = super(SlavedDeviceStore, self).stream_positions()
-        result["device_lists"] = self._device_list_id_gen.get_current_token()
+        # The user signature stream uses the same stream ID generator as the
+        # device list stream, so set them both to the device list ID
+        # generator's current token.
+        current_token = self._device_list_id_gen.get_current_token()
+        result[DeviceListsStream.NAME] = current_token
+        result[UserSignatureStream.NAME] = current_token
         return result
 
     def process_replication_rows(self, stream_name, token, rows):
-        if stream_name == "device_lists":
+        if stream_name == DeviceListsStream.NAME:
             self._device_list_id_gen.advance(token)
             for row in rows:
                 self._invalidate_caches_for_devices(token, row.user_id, row.destination)
+        elif stream_name == UserSignatureStream.NAME:
+            for row in rows:
+                self._user_signature_stream_cache.entity_has_changed(row.user_id, token)
         return super(SlavedDeviceStore, self).process_replication_rows(
             stream_name, token, rows
         )
