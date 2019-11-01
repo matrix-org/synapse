@@ -21,7 +21,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.constants import LabelsField
+from synapse.api.constants import EventContentFields
 from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.background_updates import BackgroundUpdateStore
 
@@ -520,7 +520,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 SELECT event_id, json FROM event_json
                 LEFT JOIN event_labels USING (event_id)
                 WHERE event_id > ? AND label IS NULL
-                LIMIT ?
+                ORDER BY event_id LIMIT ?
                 """,
                 (last_event_id, batch_size),
             )
@@ -538,7 +538,9 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     table="event_labels",
                     values=[
                         {"event_id": event_id, "label": label}
-                        for label in event_json["content"].get(LabelsField, [])
+                        for label in event_json["content"].get(
+                            EventContentFields.Labels, []
+                        )
                     ],
                 )
 
@@ -548,8 +550,6 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             # We want to return true (to end the background update) only when
             # the query returned with less rows than we asked for.
-            # TODO: this currently doesn't work, i.e. it only runs once whereas
-            #       its opposite does the whole thing, investigate.
             return len(rows) != batch_size
 
         end = yield self.runInteraction(
