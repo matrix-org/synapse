@@ -157,7 +157,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             content={
                 "msgtype": "m.text",
                 "body": "with right label",
-                EventContentFields.Labels: ["#fun"],
+                EventContentFields.LABELS: ["#fun"],
             },
             tok=tok,
         )
@@ -175,7 +175,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             content={
                 "msgtype": "m.text",
                 "body": "with wrong label",
-                EventContentFields.Labels: ["#work"],
+                EventContentFields.LABELS: ["#work"],
             },
             tok=tok,
         )
@@ -186,7 +186,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             content={
                 "msgtype": "m.text",
                 "body": "with two wrong labels",
-                EventContentFields.Labels: ["#work", "#notfun"],
+                EventContentFields.LABELS: ["#work", "#notfun"],
             },
             tok=tok,
         )
@@ -197,7 +197,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             content={
                 "msgtype": "m.text",
                 "body": "with right label",
-                EventContentFields.Labels: ["#fun"],
+                EventContentFields.LABELS: ["#fun"],
             },
             tok=tok,
         )

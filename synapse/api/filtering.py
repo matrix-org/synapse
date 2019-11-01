@@ -309,7 +309,7 @@ class Filter(object):
             content = event.get("content", {})
             # check if there is a string url field in the content for filtering purposes
             contains_url = isinstance(content.get("url"), text_type)
-            labels = content.get(EventContentFields.Labels, [])
+            labels = content.get(EventContentFields.LABELS, [])
 
         return self.check_fields(room_id, sender, ev_type, labels, contains_url)
 

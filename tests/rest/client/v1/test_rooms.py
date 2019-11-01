@@ -860,7 +860,7 @@ class RoomMessageListTestCase(RoomBase):
             content={
                 "msgtype": "m.text",
                 "body": "with right label",
-                EventContentFields.Labels: ["#fun"],
+                EventContentFields.LABELS: ["#fun"],
             },
         )
 
@@ -876,7 +876,7 @@ class RoomMessageListTestCase(RoomBase):
             content={
                 "msgtype": "m.text",
                 "body": "with wrong label",
-                EventContentFields.Labels: ["#work"],
+                EventContentFields.LABELS: ["#work"],
             },
         )
 
@@ -886,7 +886,7 @@ class RoomMessageListTestCase(RoomBase):
             content={
                 "msgtype": "m.text",
                 "body": "with two wrong labels",
-                EventContentFields.Labels: ["#work", "#notfun"],
+                EventContentFields.LABELS: ["#work", "#notfun"],
             },
         )
 
@@ -896,7 +896,7 @@ class RoomMessageListTestCase(RoomBase):
             content={
                 "msgtype": "m.text",
                 "body": "with right label",
-                EventContentFields.Labels: ["#fun"],
+                EventContentFields.LABELS: ["#fun"],
             },
         )
 

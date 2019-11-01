@@ -329,7 +329,7 @@ class FilteringTestCase(unittest.TestCase):
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content={EventContentFields.Labels: ["#fun"]},
+            content={EventContentFields.LABELS: ["#fun"]},
         )
 
         self.assertTrue(Filter(definition).check(event))
@@ -338,7 +338,7 @@ class FilteringTestCase(unittest.TestCase):
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content={EventContentFields.Labels: ["#notfun"]},
+            content={EventContentFields.LABELS: ["#notfun"]},
         )
 
         self.assertFalse(Filter(definition).check(event))
@@ -349,7 +349,7 @@ class FilteringTestCase(unittest.TestCase):
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content={EventContentFields.Labels: ["#fun"]},
+            content={EventContentFields.LABELS: ["#fun"]},
         )
 
         self.assertFalse(Filter(definition).check(event))
@@ -358,7 +358,7 @@ class FilteringTestCase(unittest.TestCase):
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content={EventContentFields.Labels: ["#notfun"]},
+            content={EventContentFields.LABELS: ["#notfun"]},
         )
 
         self.assertTrue(Filter(definition).check(event))

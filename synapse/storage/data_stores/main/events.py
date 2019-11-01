@@ -1491,7 +1491,7 @@ class EventsStore(
             self._handle_event_relations(txn, event)
 
             # Store the labels for this event.
-            labels = event.content.get(EventContentFields.Labels)
+            labels = event.content.get(EventContentFields.LABELS)
             if labels:
                 self.insert_labels_for_event_txn(
                     txn, event.event_id, labels, event.room_id, event.depth
