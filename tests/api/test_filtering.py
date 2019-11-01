@@ -19,7 +19,7 @@ import jsonschema
 
 from twisted.internet import defer
 
-from synapse.api.constants import LabelsField
+from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import FrozenEvent
@@ -329,7 +329,7 @@ class FilteringTestCase(unittest.TestCase):
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content={LabelsField: ["#fun"]},
+            content={EventContentFields.Labels: ["#fun"]},
         )
 
         self.assertTrue(Filter(definition).check(event))
@@ -338,7 +338,7 @@ class FilteringTestCase(unittest.TestCase):
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content={LabelsField: ["#notfun"]},
+            content={EventContentFields.Labels: ["#notfun"]},
         )
 
         self.assertFalse(Filter(definition).check(event))
@@ -349,7 +349,7 @@ class FilteringTestCase(unittest.TestCase):
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content={LabelsField: ["#fun"]},
+            content={EventContentFields.Labels: ["#fun"]},
         )
 
         self.assertFalse(Filter(definition).check(event))
@@ -358,7 +358,7 @@ class FilteringTestCase(unittest.TestCase):
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content={LabelsField: ["#notfun"]},
+            content={EventContentFields.Labels: ["#notfun"]},
         )
 
         self.assertTrue(Filter(definition).check(event))

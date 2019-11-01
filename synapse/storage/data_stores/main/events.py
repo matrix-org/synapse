@@ -29,7 +29,7 @@ from prometheus_client import Counter, Histogram
 from twisted.internet import defer
 
 import synapse.metrics
-from synapse.api.constants import EventTypes, LabelsField
+from synapse.api.constants import EventTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
@@ -1491,7 +1491,7 @@ class EventsStore(
             self._handle_event_relations(txn, event)
 
             # Store the labels for this event.
-            labels = event.content.get(LabelsField)
+            labels = event.content.get(EventContentFields.Labels)
             if labels:
                 self.insert_labels_for_event_txn(txn, event.event_id, labels)
 
@@ -2483,6 +2483,14 @@ class EventsStore(
         )
 
     def insert_labels_for_event_txn(self, txn, event_id, labels):
+        """Store the mapping between an event's ID and its labels, with one row per
+        (event_id, label) tuple.
+
+        Args:
+            txn (LoggingTransaction): The transaction to execute.
+            event_id (str): The event's ID.
+            labels (list[str]): A list of text labels.
+        """
         return self._simple_insert_many_txn(
             txn=txn,
             table="event_labels",

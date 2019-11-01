@@ -24,7 +24,7 @@ from six.moves.urllib import parse as urlparse
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.api.constants import EventTypes, LabelsField, Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.rest.client.v1 import login, profile, room
 
 from tests import unittest
@@ -860,7 +860,7 @@ class RoomMessageListTestCase(RoomBase):
             content={
                 "msgtype": "m.text",
                 "body": "with right label",
-                LabelsField: ["#fun"],
+                EventContentFields.Labels: ["#fun"],
             },
         )
 
@@ -876,7 +876,7 @@ class RoomMessageListTestCase(RoomBase):
             content={
                 "msgtype": "m.text",
                 "body": "with wrong label",
-                LabelsField: ["#work"],
+                EventContentFields.Labels: ["#work"],
             },
         )
 
@@ -886,7 +886,7 @@ class RoomMessageListTestCase(RoomBase):
             content={
                 "msgtype": "m.text",
                 "body": "with two wrong labels",
-                LabelsField: ["#work", "#notfun"],
+                EventContentFields.Labels: ["#work", "#notfun"],
             },
         )
 
@@ -896,7 +896,7 @@ class RoomMessageListTestCase(RoomBase):
             content={
                 "msgtype": "m.text",
                 "body": "with right label",
-                LabelsField: ["#fun"],
+                EventContentFields.Labels: ["#fun"],
             },
         )
 

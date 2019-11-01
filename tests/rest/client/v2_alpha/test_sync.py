@@ -17,7 +17,7 @@ import json
 from mock import Mock
 
 import synapse.rest.admin
-from synapse.api.constants import EventTypes, LabelsField
+from synapse.api.constants import EventContentFields, EventTypes
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import sync
 
@@ -157,7 +157,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             content={
                 "msgtype": "m.text",
                 "body": "with right label",
-                LabelsField: ["#fun"],
+                EventContentFields.Labels: ["#fun"],
             },
             tok=tok,
         )
@@ -175,7 +175,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             content={
                 "msgtype": "m.text",
                 "body": "with wrong label",
-                LabelsField: ["#work"],
+                EventContentFields.Labels: ["#work"],
             },
             tok=tok,
         )
@@ -186,7 +186,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             content={
                 "msgtype": "m.text",
                 "body": "with two wrong labels",
-                LabelsField: ["#work", "#notfun"],
+                EventContentFields.Labels: ["#work", "#notfun"],
             },
             tok=tok,
         )
@@ -197,7 +197,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             content={
                 "msgtype": "m.text",
                 "body": "with right label",
-                LabelsField: ["#fun"],
+                EventContentFields.Labels: ["#fun"],
             },
             tok=tok,
         )
