@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS event_labels (
     event_id TEXT,
     label TEXT,
     room_id TEXT NOT NULL,
-    topological_ordering bigint NOT NULL,
+    topological_ordering BIGINT NOT NULL,
     PRIMARY KEY(event_id, label)
 );
 
