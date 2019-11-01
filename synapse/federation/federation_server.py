@@ -279,12 +279,17 @@ class FederationServer(FederationBase):
         # - but that's non-trivial to get right, and anyway somewhat defeats
         # the point of the linearizer.
         with (await self._server_linearizer.queue((origin, room_id))):
-            resp = await self._state_resp_cache.wrap(
-                (room_id, event_id),
-                self._on_context_state_request_compute,
-                room_id,
-                event_id,
+            resp = dict(
+                await self._state_resp_cache.wrap(
+                    (room_id, event_id),
+                    self._on_context_state_request_compute,
+                    room_id,
+                    event_id,
+                )
             )
+
+        room_version = await self.store.get_room_version(room_id)
+        resp["room_version"] = room_version
 
         return 200, resp
 
