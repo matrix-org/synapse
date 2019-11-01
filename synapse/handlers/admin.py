@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.errors import Codes, MissingClientTokenError, SynapseError
-from synapse.storage.admin import TokenState
+from synapse.storage.data_stores.main.admin import TokenState
 from synapse.types import RoomStreamToken
 from synapse.visibility import filter_events_for_client
 
