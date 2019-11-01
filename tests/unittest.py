@@ -13,11 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import gc
 import hashlib
 import hmac
 import logging
 import time
+import types
 
 from mock import Mock
 
@@ -409,7 +411,10 @@ class HomeserverTestCase(TestCase):
         self.reactor.pump([by] * 100)
 
     def get_success(self, d, by=0.0):
-        d = ensureDeferred(d)
+        if isinstance(d, types.CoroutineType):
+            d = ensureDeferred(d)
+        elif not isinstance(d, Deferred):
+            return d
         self.pump(by=by)
         return self.successResultOf(d)
 

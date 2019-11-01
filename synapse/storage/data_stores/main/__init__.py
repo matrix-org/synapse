@@ -31,6 +31,7 @@ from synapse.storage.util.id_generators import (
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
+from .admin import AdminTokenWorkerStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
@@ -64,7 +65,6 @@ from .state import StateStore
 from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
-from .admin import AdminTokenWorkerStore
 from .transactions import TransactionStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
