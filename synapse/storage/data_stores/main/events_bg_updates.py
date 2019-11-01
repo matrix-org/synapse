@@ -527,7 +527,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             rows = self.cursor_to_dict(txn)
             if not rows:
-                return True
+                return True, 0
 
             for row in rows:
                 event_id = row["event_id"]
@@ -550,13 +550,13 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             # We want to return true (to end the background update) only when
             # the query returned with less rows than we asked for.
-            return len(rows) != batch_size
+            return len(rows) != batch_size, len(rows)
 
-        end = yield self.runInteraction(
+        end, num_rows = yield self.runInteraction(
             desc="event_store_labels", func=_event_store_labels_txn
         )
 
         if end:
             yield self._end_background_update("event_store_labels")
 
-        return batch_size
+        return num_rows
