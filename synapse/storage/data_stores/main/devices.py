@@ -203,7 +203,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 result = cross_signing_keys_by_user.setdefault(user_id, {})
                 result["master_key"] = master_key_by_user[user_id]["key_info"]
             elif (
-                user_id in master_key_by_user
+                user_id in self_signing_key_by_user
                 and device_id == self_signing_key_by_user[user_id]["device_id"]
             ):
                 result = cross_signing_keys_by_user.setdefault(user_id, {})
