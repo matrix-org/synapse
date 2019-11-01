@@ -13,20 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import enum
 import uuid
 from collections import defaultdict
 
 import attr
+from constantly import NamedConstant, Names
 
 from synapse.storage._base import SQLBaseStore
 
 
-class TokenState(enum.Enum):
-    VALID = enum.auto()
-    EXPIRED = enum.auto()
-    NOT_YET_ACTIVE = enum.auto()
-    NON_EXISTANT = enum.auto()
+class TokenState(Names):
+    VALID = NamedConstant()
+    EXPIRED = NamedConstant()
+    NOT_YET_ACTIVE = NamedConstant()
+    NON_EXISTANT = NamedConstant()
 
 
 @attr.s
