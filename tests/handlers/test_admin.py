@@ -23,7 +23,7 @@ import synapse.rest.admin
 import synapse.storage
 from synapse.api.constants import EventTypes
 from synapse.rest.client.v1 import login, room
-from synapse.storage.admin import TokenState
+from synapse.storage.data_stores.main.admin import TokenState
 
 from tests import unittest
 
