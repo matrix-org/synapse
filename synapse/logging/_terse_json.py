@@ -19,21 +19,23 @@ Log formatters that output terse JSON.
 
 import json
 import sys
+import traceback
 from collections import deque
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from math import floor
-from typing import IO
+from typing import IO, Optional
 
 import attr
 from zope.interface import implementer
 
 from twisted.application.internet import ClientService
+from twisted.internet import Deferred
 from twisted.internet.endpoints import (
     HostnameEndpoint,
     TCP4ClientEndpoint,
     TCP6ClientEndpoint,
 )
-from twisted.internet.interfaces import IPushProducer
+from twisted.internet.interfaces import IPushProducer, ITransport
 from twisted.internet.protocol import Factory, Protocol
 from twisted.logger import FileLogObserver, ILogObserver, Logger
 
@@ -151,30 +153,39 @@ def TerseJSONToConsoleLogObserver(outFile: IO[str], metadata: dict) -> FileLogOb
 @attr.s
 @implementer(IPushProducer)
 class LogProducer(object):
+    """
+    An IPushProducer that writes logs from its buffer to its transport when it
+    is resumed.
 
-    _buffer = attr.ib()
-    _transport = attr.ib()
-    paused = attr.ib(default=False)
+    Args:
+        buffer: Log buffer to read logs from.
+        transport: Transport to write to.
+    """
+
+    _buffer = attr.ib(type=deque)
+    _transport = attr.ib(type=ITransport)
+    _paused = attr.ib(default=False, type=bool, init=False)
 
     def pauseProducing(self):
-        self.paused = True
+        self._paused = True
 
     def stopProducing(self):
-        self.paused = True
+        self._paused = True
         self._buffer = None
 
     def resumeProducing(self):
-        self.paused = False
+        self._paused = False
 
-        while self.paused is False and (self._buffer and self._transport.connected):
+        while self._paused is False and (self._buffer and self._transport.connected):
             try:
                 event = self._buffer.popleft()
                 self._transport.write(_encoder.encode(event).encode("utf8"))
                 self._transport.write(b"\n")
             except Exception:
-                import traceback
-
+                # Something has gone wrong writing to the transport -- log it
+                # and break out of the while.
                 traceback.print_exc(file=sys.__stderr__)
+                break
 
 
 @attr.s
@@ -196,9 +207,9 @@ class TerseJSONToTCPLogObserver(object):
     metadata = attr.ib(type=dict)
     maximum_buffer = attr.ib(type=int)
     _buffer = attr.ib(default=attr.Factory(deque), type=deque)
-    _writer = attr.ib(default=None)
+    _writer = attr.ib(default=None, type=Optional[Deferred])
     _logger = attr.ib(default=attr.Factory(Logger))
-    _producer = attr.ib(default=None)
+    _producer = attr.ib(default=None, type=Optional[LogProducer])
 
     def start(self) -> None:
 
@@ -245,16 +256,11 @@ class TerseJSONToTCPLogObserver(object):
 
         @self._writer.addCallback
         def writer(r):
-            def connectionLost(_self, reason):
-                self._producer.pauseProducing()
-                self._producer = None
-                self.hs.get_reactor().callLater(1, self._write_loop)
-
             self._producer = LogProducer(self._buffer, r.transport)
             r.transport.registerProducer(self._producer, True)
             self._producer.resumeProducing()
 
-            self._writer = False
+            self._writer = None
             self.hs.get_reactor().callLater(1, self._write_loop)
 
     def _handle_pressure(self) -> None:

@@ -262,6 +262,11 @@ def parse_drain_configs(
 
 
 class StoppableLogPublisher(LogPublisher):
+    """
+    A log publisher that can tell its observers to shut down any external
+    communications.
+    """
+
     def stop(self):
         for obs in self._observers:
             if hasattr(obs, "stop"):
