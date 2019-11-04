@@ -16,6 +16,7 @@
 import logging
 import random
 import uuid
+import sys
 
 import click
 import nio
@@ -147,7 +148,12 @@ def main(config, endpoint, users, messages, time_between, jitter, room, sync, sm
 
         d = []
 
-        prog = click.progressbar(length=len(made_users), label="Logging in...")
+        print("Done!")
+
+        prog = click.progressbar(
+            length=len(made_users), label="Logging in and joining room..."
+        )
+        prog.update(0)
 
         def on_login():
             prog.update(1)
@@ -155,7 +161,16 @@ def main(config, endpoint, users, messages, time_between, jitter, room, sync, sm
         for u in made_users:
             d.append(ensureDeferred(login_user(reactor, *u, on_login)))
 
-        await DeferredList(d)
+        r = await DeferredList(d)
+        failed = False
+
+        for result in r:
+            if result[0] is False:
+                result[1].printTraceback()
+                failed = True
+
+        if failed:
+            sys.exit(1)
 
         prog = click.progressbar(
             length=len(made_users) * messages,
