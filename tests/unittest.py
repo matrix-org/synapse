@@ -178,14 +178,11 @@ class HomeserverTestCase(TestCase):
     needs_threadpool = False
 
     def __init__(self, methodName, *args, **kwargs):
-        if methodName:
-            super().__init__(methodName, *args, **kwargs)
+        super().__init__(methodName, *args, **kwargs)
 
-            # see if we have any additional config for this test
-            method = getattr(self, methodName)
-            self._extra_config = getattr(method, "_extra_config", None)
-        else:
-            self._extra_config = None
+        # see if we have any additional config for this test
+        method = getattr(self, methodName)
+        self._extra_config = getattr(method, "_extra_config", None)
 
     def setUp(self):
         """
@@ -193,7 +190,7 @@ class HomeserverTestCase(TestCase):
         hijacking the authentication system to return a fixed user, and then
         calling the prepare function.
         """
-        self.reactor, self.clock = self.get_clock()
+        self.reactor, self.clock = get_clock()
         self._hs_args = {"clock": self.clock, "reactor": self.reactor}
         self.hs = self.make_homeserver(self.reactor, self.clock)
 
@@ -242,9 +239,6 @@ class HomeserverTestCase(TestCase):
 
         if hasattr(self, "prepare"):
             self.prepare(self.reactor, self.clock, self.hs)
-
-    def get_clock(self):
-        return get_clock()
 
     def wait_on_thread(self, deferred, timeout=10):
         """
