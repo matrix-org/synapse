@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import resource
-import time
 
 import mock
 
