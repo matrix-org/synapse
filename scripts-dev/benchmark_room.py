@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import random
 import uuid
 
@@ -28,6 +29,7 @@ from twisted.internet.task import react
 from synapse._scripts.register_new_matrix_user import request_registration
 
 api = nio.Api()
+logging.captureWarnings(True)
 
 
 def sleep(time):
@@ -55,24 +57,30 @@ def main(config, endpoint, users, messages, time_between, jitter, room, sync, sm
 
     made_users = []
 
-    with click.progressbar(
-        range(users), length=users, label="Creating users..."
-    ) as bar:
-        for u in bar:
-            user = uuid.uuid4().hex
-            password = uuid.uuid4().hex
+    try:
+        with click.progressbar(
+            range(users), length=users, label="Creating users..."
+        ) as bar:
+            for u in bar:
+                user = uuid.uuid4().hex
+                password = uuid.uuid4().hex
 
-            u = request_registration(
-                user,
-                password,
-                endpoint,
-                config["registration_shared_secret"],
-                admin=False,
-                user_type=None,
-                _print=output.append,
-            )
-
-            made_users.append((user, password))
+                u = request_registration(
+                    user,
+                    password,
+                    endpoint,
+                    config["registration_shared_secret"],
+                    admin=False,
+                    user_type=None,
+                    _print=output.append,
+                )
+                made_users.append((user, password))
+    except SystemExit:
+        print("!!!! Failed creating users! Log is as follows: !!!!")
+        print("")
+        for i in output:
+            print(i)
+        raise
 
     async def do_request(cmd, resp_type, *extra_args):
 
