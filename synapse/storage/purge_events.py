@@ -33,8 +33,8 @@ class PurgeEventsStorage(object):
         """Deletes all record of a room
         """
 
-        yield self.stores.main.purge_room(room_id)
-        yield self.stores.main.purge_room_state(room_id)
+        state_groups_to_delete = yield self.stores.main.purge_room(room_id)
+        yield self.stores.main.purge_room_state(room_id, state_groups_to_delete)
 
     @defer.inlineCallbacks
     def purge_history(self, room_id, token, delete_local_events):

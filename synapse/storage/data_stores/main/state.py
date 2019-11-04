@@ -1023,7 +1023,6 @@ class StateBackgroundUpdateStore(
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
     CURRENT_STATE_INDEX_UPDATE_NAME = "current_state_members_idx"
     EVENT_STATE_GROUP_INDEX_UPDATE_NAME = "event_to_state_groups_sg_index"
-    STATE_GROUPS_ROOM_INDEX_UPDATE_NAME = "state_groups_room_id_idx"
 
     def __init__(self, db_conn, hs):
         super(StateBackgroundUpdateStore, self).__init__(db_conn, hs)
@@ -1046,12 +1045,6 @@ class StateBackgroundUpdateStore(
             index_name="event_to_state_groups_sg_index",
             table="event_to_state_groups",
             columns=["state_group"],
-        )
-        self.register_background_index_update(
-            self.STATE_GROUPS_ROOM_INDEX_UPDATE_NAME,
-            index_name="state_groups_room_id_idx",
-            table="state_groups",
-            columns=["room_id"],
         )
 
     @defer.inlineCallbacks
