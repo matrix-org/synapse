@@ -552,7 +552,7 @@ class GroupServerStore(SQLBaseStore):
             keyvalues={"group_id": group_id, "role_id": role_id, "user_id": user_id},
             desc="remove_user_from_summary",
         )
-    
+
     def get_local_groups_for_room(self, room_id):
         """Get all of the local group that contain a given room
         Args:

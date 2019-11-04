@@ -514,7 +514,7 @@ class RoomMemberHandler(object):
         if old_room and old_room["is_public"]:
             yield self.store.set_room_is_public(old_room_id, False)
             yield self.store.set_room_is_public(room_id, True)
-            
+
         # Check if any groups we own contain the predecessor room
         local_group_ids = yield self.store.get_local_groups_for_room(old_room_id)
         for group_id in local_group_ids:
