@@ -29,7 +29,7 @@ import attr
 from zope.interface import implementer
 
 from twisted.application.internet import ClientService
-from twisted.internet import Deferred
+from twisted.internet.defer import Deferred
 from twisted.internet.endpoints import (
     HostnameEndpoint,
     TCP4ClientEndpoint,
