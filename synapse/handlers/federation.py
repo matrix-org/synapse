@@ -2276,6 +2276,7 @@ class FederationHandler(BaseHandler):
 
         return EventContext.with_state(
             state_group=state_group,
+            state_group_before_event=context.state_group_before_event,
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
             prev_group=prev_group,
