@@ -149,7 +149,7 @@ def _handle_json_response(reactor, timeout_sec, request, response):
 
         body = yield make_deferred_yieldable(d)
     except Exception as e:
-        logger.warn(
+        logger.warning(
             "{%s} [%s] Error reading response: %s",
             request.txn_id,
             request.destination,
@@ -457,7 +457,7 @@ class MatrixFederationHttpClient(object):
                         except Exception as e:
                             # Eh, we're already going to raise an exception so lets
                             # ignore if this fails.
-                            logger.warn(
+                            logger.warning(
                                 "{%s} [%s] Failed to get error response: %s %s: %s",
                                 request.txn_id,
                                 request.destination,
@@ -478,7 +478,7 @@ class MatrixFederationHttpClient(object):
 
                     break
                 except RequestSendFailed as e:
-                    logger.warn(
+                    logger.warning(
                         "{%s} [%s] Request failed: %s %s: %s",
                         request.txn_id,
                         request.destination,
@@ -513,7 +513,7 @@ class MatrixFederationHttpClient(object):
                         raise
 
                 except Exception as e:
-                    logger.warn(
+                    logger.warning(
                         "{%s} [%s] Request failed: %s %s: %s",
                         request.txn_id,
                         request.destination,
@@ -889,7 +889,7 @@ class MatrixFederationHttpClient(object):
             d.addTimeout(self.default_timeout, self.reactor)
             length = yield make_deferred_yieldable(d)
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "{%s} [%s] Error reading response: %s",
                 request.txn_id,
                 request.destination,

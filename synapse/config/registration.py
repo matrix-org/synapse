@@ -300,7 +300,7 @@ class RegistrationConfig(Config):
         # If a delegate is specified, the config option public_baseurl must also be filled out.
         #
         account_threepid_delegates:
-            #email: https://example.com     # Delegate email sending to example.org
+            #email: https://example.com     # Delegate email sending to example.com
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
         # Users who register on this homeserver will automatically be joined

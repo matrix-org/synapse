@@ -82,8 +82,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 
         return payload
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request):
+    async def _handle_request(self, request):
         with Measure(self.clock, "repl_fed_send_events_parse"):
             content = parse_json_object_from_request(request)
 
@@ -101,15 +100,13 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                 EventType = event_type_from_format_version(format_ver)
                 event = EventType(event_dict, internal_metadata, rejected_reason)
 
-                context = yield EventContext.deserialize(
-                    self.store, event_payload["context"]
-                )
+                context = EventContext.deserialize(self.store, event_payload["context"])
 
                 event_and_contexts.append((event, context))
 
         logger.info("Got %d events from federation", len(event_and_contexts))
 
-        yield self.federation_handler.persist_events_and_notify(
+        await self.federation_handler.persist_events_and_notify(
             event_and_contexts, backfilled
         )
 
@@ -144,8 +141,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
     def _serialize_payload(edu_type, origin, content):
         return {"origin": origin, "content": content}
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, edu_type):
+    async def _handle_request(self, request, edu_type):
         with Measure(self.clock, "repl_fed_send_edu_parse"):
             content = parse_json_object_from_request(request)
 
@@ -154,7 +150,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
 
         logger.info("Got %r edu from %s", edu_type, origin)
 
-        result = yield self.registry.on_edu(edu_type, origin, edu_content)
+        result = await self.registry.on_edu(edu_type, origin, edu_content)
 
         return 200, result
 
@@ -193,8 +189,7 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
         """
         return {"args": args}
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, query_type):
+    async def _handle_request(self, request, query_type):
         with Measure(self.clock, "repl_fed_query_parse"):
             content = parse_json_object_from_request(request)
 
@@ -202,7 +197,7 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
 
         logger.info("Got %r query", query_type)
 
-        result = yield self.registry.on_query(query_type, args)
+        result = await self.registry.on_query(query_type, args)
 
         return 200, result
 
@@ -234,9 +229,8 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
         """
         return {}
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, room_id):
-        yield self.store.clean_room_for_join(room_id)
+    async def _handle_request(self, request, room_id):
+        await self.store.clean_room_for_join(room_id)
 
         return 200, {}
 
