@@ -565,7 +565,7 @@ def run(hs):
             "Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats)
         )
         try:
-            yield hs.get_simple_http_client().put_json(
+            yield hs.get_proxied_http_client().put_json(
                 hs.config.report_stats_endpoint, stats
             )
         except Exception as e:

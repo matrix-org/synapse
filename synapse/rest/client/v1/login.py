@@ -203,10 +203,11 @@ class LoginRestServlet(RestServlet):
                 address = address.lower()
 
             # Check for login providers that support 3pid login types
-            canonical_user_id, callback_3pid = (
-                yield self.auth_handler.check_password_provider_3pid(
-                    medium, address, login_submission["password"]
-                )
+            (
+                canonical_user_id,
+                callback_3pid,
+            ) = yield self.auth_handler.check_password_provider_3pid(
+                medium, address, login_submission["password"]
             )
             if canonical_user_id:
                 # Authentication through password provider and 3pid succeeded
@@ -280,8 +281,8 @@ class LoginRestServlet(RestServlet):
     def do_token_login(self, login_submission):
         token = login_submission["token"]
         auth_handler = self.auth_handler
-        user_id = (
-            yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
+        user_id = yield auth_handler.validate_short_term_login_token_and_get_user_id(
+            token
         )
 
         result = yield self._register_device_with_callback(user_id, login_submission)
@@ -380,7 +381,7 @@ class CasTicketServlet(RestServlet):
         self.cas_displayname_attribute = hs.config.cas_displayname_attribute
         self.cas_required_attributes = hs.config.cas_required_attributes
         self._sso_auth_handler = SSOAuthHandler(hs)
-        self._http_client = hs.get_simple_http_client()
+        self._http_client = hs.get_proxied_http_client()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
