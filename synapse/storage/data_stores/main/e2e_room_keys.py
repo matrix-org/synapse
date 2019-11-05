@@ -321,8 +321,16 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         def _delete_e2e_room_keys_version_txn(txn):
             if version is None:
                 this_version = self._get_current_version(txn, user_id)
+                if this_version is None:
+                    raise StoreError(404, "No current backup version")
             else:
                 this_version = version
+
+            self._simple_delete_txn(
+                txn,
+                table="e2e_room_keys",
+                keyvalues={"user_id": user_id, "version": this_version},
+            )
 
             return self._simple_update_one_txn(
                 txn,

@@ -332,7 +332,7 @@ class StatsStore(StateDeltasStore):
         def _bulk_update_stats_delta_txn(txn):
             for stats_type, stats_updates in updates.items():
                 for stats_id, fields in stats_updates.items():
-                    logger.info(
+                    logger.debug(
                         "Updating %s stats for %s: %s", stats_type, stats_id, fields
                     )
                     self._update_stats_delta_txn(
@@ -773,7 +773,7 @@ class StatsStore(StateDeltasStore):
                 (room_id,),
             )
 
-            current_state_events_count, = txn.fetchone()
+            (current_state_events_count,) = txn.fetchone()
 
             users_in_room = self.get_users_in_room_txn(txn, room_id)
 
@@ -863,7 +863,7 @@ class StatsStore(StateDeltasStore):
                 """,
                 (user_id,),
             )
-            count, = txn.fetchone()
+            (count,) = txn.fetchone()
             return count, pos
 
         joined_rooms, pos = yield self.runInteraction(
