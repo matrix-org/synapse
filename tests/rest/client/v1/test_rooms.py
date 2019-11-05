@@ -1106,3 +1106,185 @@ class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
 
         res_displayname = channel.json_body["content"]["displayname"]
         self.assertEqual(res_displayname, self.displayname, channel.result)
+
+
+class ContextTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+        profile.register_servlets,
+    ]
+
+    def test_context_filter_labels(self):
+        """Test that we can filter by a label."""
+        context_filter = json.dumps(
+            {
+                "types": [EventTypes.Message],
+                "org.matrix.labels": ["#fun"],
+            }
+        )
+
+        res = self._test_context_filter_labels(context_filter)
+
+        self.assertEqual(
+            res["event"]["content"]["body"], "with right label", res["event"]
+        )
+
+        events_before = res["events_before"]
+
+        self.assertEqual(
+            len(events_before), 1, [event["content"] for event in events_before]
+        )
+        self.assertEqual(
+            events_before[0]["content"]["body"], "with right label", events_before[0]
+        )
+
+        events_after = res["events_before"]
+
+        self.assertEqual(
+            len(events_after), 1, [event["content"] for event in events_after]
+        )
+        self.assertEqual(
+            events_after[0]["content"]["body"], "with right label", events_after[0]
+        )
+
+    def test_context_filter_not_labels(self):
+        """Test that we can filter by the absence of a label."""
+        context_filter = json.dumps(
+            {
+                "types": [EventTypes.Message],
+                "org.matrix.not_labels": ["#fun"],
+            }
+        )
+
+        res = self._test_context_filter_labels(context_filter)
+
+        events_before = res["events_before"]
+
+        self.assertEqual(
+            len(events_before), 1, [event["content"] for event in events_before]
+        )
+        self.assertEqual(
+            events_before[0]["content"]["body"], "without label", events_before[0]
+        )
+
+        events_after = res["events_after"]
+
+        self.assertEqual(
+            len(events_after), 2, [event["content"] for event in events_after]
+        )
+        self.assertEqual(
+            events_after[0]["content"]["body"], "with wrong label", events_after[0]
+        )
+        self.assertEqual(
+            events_after[1]["content"]["body"], "with two wrong labels", events_after[1]
+        )
+
+    def test_context_filter_labels_not_labels(self):
+        """Test that we can filter by both a label and the absence of another label."""
+        context_filter = json.dumps(
+            {
+                "types": [EventTypes.Message],
+                "org.matrix.labels": ["#work"],
+                "org.matrix.not_labels": ["#notfun"],
+            }
+        )
+
+        res = self._test_context_filter_labels(context_filter)
+
+        events_before = res["events_before"]
+
+        self.assertEqual(
+            len(events_before), 0, [event["content"] for event in events_before]
+        )
+
+        events_after = res["events_after"]
+
+        self.assertEqual(
+            len(events_after), 1, [event["content"] for event in events_after]
+        )
+        self.assertEqual(
+            events_after[0]["content"]["body"], "with wrong label", events_after[0]
+        )
+
+    def _test_context_filter_labels(self, context_filter):
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+
+        room_id = self.helper.create_room_as(user_id, tok=tok)
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#fun"],
+            },
+            tok=tok,
+        )
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "without label"},
+            tok=tok,
+        )
+
+        # The event we'll look up the context for.
+        res = self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#fun"],
+            },
+            tok=tok,
+        )
+        event_id = res["event_id"]
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with wrong label",
+                EventContentFields.LABELS: ["#work"],
+            },
+            tok=tok,
+        )
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with two wrong labels",
+                EventContentFields.LABELS: ["#work", "#notfun"],
+            },
+            tok=tok,
+        )
+
+        self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#fun"],
+            },
+            tok=tok,
+        )
+
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/context/%s?filter=%s" % (room_id, event_id, context_filter),
+            access_token=tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        return channel.json_body
+
