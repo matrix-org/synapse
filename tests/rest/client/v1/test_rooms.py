@@ -1020,9 +1020,15 @@ class LabelsTestCase(unittest.HomeserverTestCase):
     ]
 
     # Filter that should only catch messages with the label "#fun".
-    FILTER_LABELS = {"types": [EventTypes.Message], "org.matrix.labels": ["#fun"]}
+    FILTER_LABELS = {
+        "types": [EventTypes.Message],
+        "org.matrix.labels": ["#fun"],
+    }
     # Filter that should only catch messages without the label "#fun".
-    FILTER_NOT_LABELS = {"types": [EventTypes.Message], "org.matrix.not_labels": ["#fun"]}
+    FILTER_NOT_LABELS = {
+        "types": [EventTypes.Message],
+        "org.matrix.not_labels": ["#fun"],
+    }
     # Filter that should only catch messages with the label "#work" but without the label
     # "#notfun".
     FILTER_LABELS_NOT_LABELS = {
@@ -1181,7 +1187,12 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
-            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS_NOT_LABELS)),
+            % (
+                self.room_id,
+                self.tok,
+                token,
+                json.dumps(self.FILTER_LABELS_NOT_LABELS),
+            ),
         )
         self.render(request)
 
@@ -1192,14 +1203,16 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_search_filter_labels(self):
         """Test that we can filter by a label on a /search request."""
-        request_data = json.dumps({
-            "search_categories": {
-                "room_events": {
-                    "search_term": "label",
-                    "filter": self.FILTER_LABELS,
+        request_data = json.dumps(
+            {
+                "search_categories": {
+                    "room_events": {
+                        "search_term": "label",
+                        "filter": self.FILTER_LABELS,
+                    }
                 }
             }
-        })
+        )
 
         self._send_labelled_messages_in_room()
 
@@ -1211,9 +1224,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results),
-            2,
-            [result["result"]["content"] for result in results],
+            len(results), 2, [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1228,14 +1239,16 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_search_filter_not_labels(self):
         """Test that we can filter by the absence of a label on a /search request."""
-        request_data = json.dumps({
-            "search_categories": {
-                "room_events": {
-                    "search_term": "label",
-                    "filter": self.FILTER_NOT_LABELS,
+        request_data = json.dumps(
+            {
+                "search_categories": {
+                    "room_events": {
+                        "search_term": "label",
+                        "filter": self.FILTER_NOT_LABELS,
+                    }
                 }
             }
-        })
+        )
 
         self._send_labelled_messages_in_room()
 
@@ -1247,9 +1260,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results),
-            4,
-            [result["result"]["content"] for result in results],
+            len(results), 4, [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1276,14 +1287,16 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """Test that we can filter by both a label and the absence of another label on a
         /search request.
         """
-        request_data = json.dumps({
-            "search_categories": {
-                "room_events": {
-                    "search_term": "label",
-                    "filter": self.FILTER_LABELS_NOT_LABELS,
+        request_data = json.dumps(
+            {
+                "search_categories": {
+                    "room_events": {
+                        "search_term": "label",
+                        "filter": self.FILTER_LABELS_NOT_LABELS,
+                    }
                 }
             }
-        })
+        )
 
         self._send_labelled_messages_in_room()
 
@@ -1295,9 +1308,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results),
-            1,
-            [result["result"]["content"] for result in results],
+            len(results), 1, [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
