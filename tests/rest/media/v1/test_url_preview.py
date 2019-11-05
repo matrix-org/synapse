@@ -279,6 +279,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.pump()
         self.assertEqual(channel.code, 200)
         res = channel.json_body
+        # We should only see the `og:description` field, as `title` is too long and should be stripped out
         self.assertCountEqual(["og:description"], res.keys())
 
     def test_ipaddr(self):

@@ -518,7 +518,7 @@ def _calc_og(tree, media_uri):
         if "content" in tag.attrib:
             # if we've got more than 50 tags, someone is taking the piss
             if len(og) >= 50:
-                logger.warning("skipping OG for page with too many og: tags")
+                logger.warning("Skipping OG for page with too many 'og:' tags")
                 return {}
             og[tag.attrib["property"]] = tag.attrib["content"]
 
