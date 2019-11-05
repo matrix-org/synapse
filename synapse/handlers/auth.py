@@ -35,7 +35,6 @@ from synapse.api.errors import (
     SynapseError,
     UserDeactivatedError,
 )
-from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import INTERACTIVE_AUTH_CHECKERS
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.logging.context import defer_to_thread
@@ -101,9 +100,6 @@ class AuthHandler(BaseHandler):
                     if t not in login_types:
                         login_types.append(t)
         self._supported_login_types = login_types
-
-        self._account_ratelimiter = Ratelimiter()
-        self._failed_attempts_ratelimiter = Ratelimiter()
 
         self._clock = self.hs.get_clock()
 
@@ -501,11 +497,8 @@ class AuthHandler(BaseHandler):
             multiple matches
 
         Raises:
-            LimitExceededError if the ratelimiter's login requests count for this
-                user is too high too proceed.
             UserDeactivatedError if a user is found but is deactivated.
         """
-        self.ratelimit_login_per_account(user_id)
         res = yield self._find_user_id_and_pwd_hash(user_id)
         if res is not None:
             return res[0]
@@ -572,16 +565,12 @@ class AuthHandler(BaseHandler):
             StoreError if there was a problem accessing the database
             SynapseError if there was a problem with the request
             LoginError if there was an authentication problem.
-            LimitExceededError if the ratelimiter's login requests count for this
-                user is too high too proceed.
         """
 
         if username.startswith("@"):
             qualified_user_id = username
         else:
             qualified_user_id = UserID(username, self.hs.hostname).to_string()
-
-        self.ratelimit_login_per_account(qualified_user_id)
 
         login_type = login_submission.get("type")
         known_login_type = False
@@ -650,15 +639,6 @@ class AuthHandler(BaseHandler):
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
 
-        # unknown username or invalid password.
-        self._failed_attempts_ratelimiter.ratelimit(
-            qualified_user_id.lower(),
-            time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-            update=True,
-        )
-
         # We raise a 403 here, but note that if we're doing user-interactive
         # login, it turns all LoginErrors into a 401 anyway.
         raise LoginError(403, "Invalid password", errcode=Codes.FORBIDDEN)
@@ -710,10 +690,6 @@ class AuthHandler(BaseHandler):
         Returns:
             Deferred[unicode] the canonical_user_id, or Deferred[None] if
                 unknown user/bad password
-
-        Raises:
-            LimitExceededError if the ratelimiter's login requests count for this
-                user is too high too proceed.
         """
         lookupres = yield self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
@@ -742,7 +718,7 @@ class AuthHandler(BaseHandler):
             auth_api.validate_macaroon(macaroon, "login", user_id)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
-        self.ratelimit_login_per_account(user_id)
+
         yield self.auth.check_auth_blocking(user_id)
         return user_id
 
@@ -911,35 +887,6 @@ class AuthHandler(BaseHandler):
             return defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
-
-    def ratelimit_login_per_account(self, user_id):
-        """Checks whether the process must be stopped because of ratelimiting.
-
-        Checks against two ratelimiters: the generic one for login attempts per
-        account and the one specific to failed attempts.
-
-        Args:
-            user_id (unicode): complete @user:id
-
-        Raises:
-            LimitExceededError if one of the ratelimiters' login requests count
-                for this user is too high too proceed.
-        """
-        self._failed_attempts_ratelimiter.ratelimit(
-            user_id.lower(),
-            time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-            update=False,
-        )
-
-        self._account_ratelimiter.ratelimit(
-            user_id.lower(),
-            time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_account.per_second,
-            burst_count=self.hs.config.rc_login_account.burst_count,
-            update=True,
-        )
 
 
 @attr.s
