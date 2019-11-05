@@ -1,0 +1,1 @@
+Fix register_user() with bind_emails for LDAP auth module.
