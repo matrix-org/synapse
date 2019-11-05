@@ -16,6 +16,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Iterable, Optional
 
 from six import iteritems, itervalues
 
@@ -27,6 +28,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersions
+from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.utils import log_function
 from synapse.state import v1, v2
@@ -212,15 +214,17 @@ class StateHandler(object):
         return joined_hosts
 
     @defer.inlineCallbacks
-    def compute_event_context(self, event, old_state=None):
+    def compute_event_context(
+        self, event: EventBase, old_state: Optional[Iterable[EventBase]] = None
+    ):
         """Build an EventContext structure for the event.
 
         This works out what the current state should be for the event, and
         generates a new state group if necessary.
 
         Args:
-            event (synapse.events.EventBase):
-            old_state (dict|None): The state at the event if it can't be
+            event:
+            old_state: The state at the event if it can't be
                 calculated from existing events. This is normally only specified
                 when receiving an event from federation where we don't have the
                 prev events for, e.g. when backfilling.
