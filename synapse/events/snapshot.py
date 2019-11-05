@@ -55,6 +55,9 @@ class EventContext:
             If ``state_group`` is None (ie, the event is an outlier), ``prev_group``
             will always also be ``None``.
 
+            Note that this *not* (necessarily) the state group associated with
+            ``_prev_state_ids``.
+
         delta_ids: If ``prev_group`` is not None, the state delta between ``prev_group``
             and ``state_group``.
 
