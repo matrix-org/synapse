@@ -875,10 +875,12 @@ class RoomContextHandler(object):
             room_id, event_id, before_limit, after_limit, event_filter
         )
 
-        filtered_before_events = event_filter.filter(results["events_before"])
-        results["events_before"] = yield filter_evts(filtered_before_events)
-        filtered_after_events = event_filter.filter(results["events_after"])
-        results["events_after"] = yield filter_evts(filtered_after_events)
+        if event_filter:
+            results["events_before"] = event_filter.filter(results["events_before"])
+            results["events_after"] = event_filter.filter(results["events_after"])
+
+        results["events_before"] = yield filter_evts(results["events_before"])
+        results["events_after"] = yield filter_evts(results["events_after"])
         results["event"] = event
 
         if results["events_after"]:
