@@ -274,7 +274,8 @@ class PreviewUrlResource(DirectServeResource):
         # filter out any stupidly long values
         keys_to_remove = []
         for k, v in og.items():
-            if len(k) > OG_TAG_NAME_MAXLEN or len(v) > OG_TAG_VALUE_MAXLEN:
+            # values can be numeric as well as strings, hence the cast to str
+            if len(k) > OG_TAG_NAME_MAXLEN or len(str(v)) > OG_TAG_VALUE_MAXLEN:
                 logger.warning(
                     "Pruning overlong tag %s from OG data", k[:OG_TAG_NAME_MAXLEN]
                 )
