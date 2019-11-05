@@ -1017,6 +1017,18 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         profile.register_servlets,
     ]
 
+    # Filter that should only catch messages with the label "#fun".
+    FILTER_LABELS = {"types": [EventTypes.Message], "org.matrix.labels": ["#fun"]}
+    # Filter that should only catch messages without the label "#fun".
+    FILTER_NOT_LABELS = {"types": [EventTypes.Message], "org.matrix.not_labels": ["#fun"]}
+    # Filter that should only catch messages with the label "#work" but without the label
+    # "#notfun".
+    FILTER_LABELS_NOT_LABELS = {
+        "types": [EventTypes.Message],
+        "org.matrix.labels": ["#work"],
+        "org.matrix.not_labels": ["#notfun"],
+    }
+
     def prepare(self, reactor, clock, homeserver):
         self.user_id = self.register_user("test", "test")
         self.tok = self.login("test", "test")
@@ -1024,18 +1036,12 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_context_filter_labels(self):
         """Test that we can filter by a label on a /context request."""
-        context_filter = json.dumps(
-            {
-                "types": [EventTypes.Message],
-                "org.matrix.labels": ["#fun"],
-            }
-        )
-
         event_id = self._send_labelled_messages_in_room()
 
         request, channel = self.make_request(
             "GET",
-            "/rooms/%s/context/%s?filter=%s" % (self.room_id, event_id, context_filter),
+            "/rooms/%s/context/%s?filter=%s"
+            % (self.room_id, event_id, json.dumps(self.FILTER_LABELS)),
             access_token=self.tok,
         )
         self.render(request)
@@ -1061,18 +1067,12 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_context_filter_not_labels(self):
         """Test that we can filter by the absence of a label on a /context request."""
-        context_filter = json.dumps(
-            {
-                "types": [EventTypes.Message],
-                "org.matrix.not_labels": ["#fun"],
-            }
-        )
-
         event_id = self._send_labelled_messages_in_room()
 
         request, channel = self.make_request(
             "GET",
-            "/rooms/%s/context/%s?filter=%s" % (self.room_id, event_id, context_filter),
+            "/rooms/%s/context/%s?filter=%s"
+            % (self.room_id, event_id, json.dumps(self.FILTER_NOT_LABELS)),
             access_token=self.tok,
         )
         self.render(request)
@@ -1103,19 +1103,12 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """Test that we can filter by both a label and the absence of another label on a
         /context request.
         """
-        context_filter = json.dumps(
-            {
-                "types": [EventTypes.Message],
-                "org.matrix.labels": ["#work"],
-                "org.matrix.not_labels": ["#notfun"],
-            }
-        )
-
         event_id = self._send_labelled_messages_in_room()
 
         request, channel = self.make_request(
             "GET",
-            "/rooms/%s/context/%s?filter=%s" % (self.room_id, event_id, context_filter),
+            "/rooms/%s/context/%s?filter=%s"
+            % (self.room_id, event_id, json.dumps(self.FILTER_LABELS_NOT_LABELS)),
             access_token=self.tok,
         )
         self.render(request)
@@ -1138,17 +1131,13 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_messages_filter_labels(self):
         """Test that we can filter by a label on a /messages request."""
-        message_filter = json.dumps(
-            {"types": [EventTypes.Message], "org.matrix.labels": ["#fun"]}
-        )
-
         self._send_labelled_messages_in_room()
 
         token = "s0_0_0_0_0_0_0_0_0"
         request, channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
-            % (self.room_id, self.tok, token, message_filter),
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS)),
         )
         self.render(request)
 
@@ -1160,17 +1149,13 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_messages_filter_not_labels(self):
         """Test that we can filter by the absence of a label on a /messages request."""
-        message_filter = json.dumps(
-            {"types": [EventTypes.Message], "org.matrix.not_labels": ["#fun"]}
-        )
-
         self._send_labelled_messages_in_room()
 
         token = "s0_0_0_0_0_0_0_0_0"
         request, channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
-            % (self.room_id, self.tok, token, message_filter),
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_NOT_LABELS)),
         )
         self.render(request)
 
@@ -1188,21 +1173,13 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """Test that we can filter by both a label and the absence of another label on a
         /messages request.
         """
-        message_filter = json.dumps(
-            {
-                "types": [EventTypes.Message],
-                "org.matrix.labels": ["#work"],
-                "org.matrix.not_labels": ["#notfun"],
-            }
-        )
-
         self._send_labelled_messages_in_room()
 
         token = "s0_0_0_0_0_0_0_0_0"
         request, channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
-            % (self.room_id, self.tok, token, message_filter),
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS_NOT_LABELS)),
         )
         self.render(request)
 
@@ -1211,7 +1188,128 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(events), 1, [event["content"] for event in events])
         self.assertEqual(events[0]["content"]["body"], "with wrong label", events[0])
 
+    def test_search_filter_labels(self):
+        """Test that we can filter by a label on a /search request."""
+        request_data = json.dumps({
+            "search_categories": {
+                "room_events": {
+                    "search_term": "label",
+                    "filter": self.FILTER_LABELS,
+                }
+            }
+        })
+
+        self._send_labelled_messages_in_room()
+
+        request, channel = self.make_request(
+            "POST", "/search?access_token=%s" % self.tok, request_data
+        )
+        self.render(request)
+
+        results = channel.json_body["search_categories"]["room_events"]["results"]
+
+        self.assertEqual(
+            len(results),
+            2,
+            [result["result"]["content"] for result in results],
+        )
+        self.assertEqual(
+            results[0]["result"]["content"]["body"],
+            "with right label",
+            results[0]["result"]["content"]["body"],
+        )
+        self.assertEqual(
+            results[1]["result"]["content"]["body"],
+            "with right label",
+            results[1]["result"]["content"]["body"],
+        )
+
+    def test_search_filter_not_labels(self):
+        """Test that we can filter by the absence of a label on a /search request."""
+        request_data = json.dumps({
+            "search_categories": {
+                "room_events": {
+                    "search_term": "label",
+                    "filter": self.FILTER_NOT_LABELS,
+                }
+            }
+        })
+
+        self._send_labelled_messages_in_room()
+
+        request, channel = self.make_request(
+            "POST", "/search?access_token=%s" % self.tok, request_data
+        )
+        self.render(request)
+
+        results = channel.json_body["search_categories"]["room_events"]["results"]
+
+        self.assertEqual(
+            len(results),
+            4,
+            [result["result"]["content"] for result in results],
+        )
+        self.assertEqual(
+            results[0]["result"]["content"]["body"],
+            "without label",
+            results[0]["result"]["content"]["body"],
+        )
+        self.assertEqual(
+            results[1]["result"]["content"]["body"],
+            "without label",
+            results[1]["result"]["content"]["body"],
+        )
+        self.assertEqual(
+            results[2]["result"]["content"]["body"],
+            "with wrong label",
+            results[2]["result"]["content"]["body"],
+        )
+        self.assertEqual(
+            results[3]["result"]["content"]["body"],
+            "with two wrong labels",
+            results[3]["result"]["content"]["body"],
+        )
+
+    def test_search_filter_labels_not_labels(self):
+        """Test that we can filter by both a label and the absence of another label on a
+        /search request.
+        """
+        request_data = json.dumps({
+            "search_categories": {
+                "room_events": {
+                    "search_term": "label",
+                    "filter": self.FILTER_LABELS_NOT_LABELS,
+                }
+            }
+        })
+
+        self._send_labelled_messages_in_room()
+
+        request, channel = self.make_request(
+            "POST", "/search?access_token=%s" % self.tok, request_data
+        )
+        self.render(request)
+
+        results = channel.json_body["search_categories"]["room_events"]["results"]
+
+        self.assertEqual(
+            len(results),
+            1,
+            [result["result"]["content"] for result in results],
+        )
+        self.assertEqual(
+            results[0]["result"]["content"]["body"],
+            "with wrong label",
+            results[0]["result"]["content"]["body"],
+        )
+
     def _send_labelled_messages_in_room(self):
+        """Sends several messages to a room with different labels (or without any) to test
+        filtering by label.
+
+        Returns:
+            The ID of the event to use if we're testing filtering on /context.
+        """
         self.helper.send_event(
             room_id=self.room_id,
             type=EventTypes.Message,
@@ -1236,6 +1334,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
             content={"msgtype": "m.text", "body": "without label"},
             tok=self.tok,
         )
+        # Return this event's ID when we test filtering in /context requests.
         event_id = res["event_id"]
 
         self.helper.send_event(
