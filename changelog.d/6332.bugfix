@@ -1,0 +1,1 @@
+Fix caching devices for remote users when using workers.
