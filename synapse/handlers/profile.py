@@ -275,7 +275,7 @@ class BaseProfileHandler(BaseHandler):
                     ratelimit=False,  # Try to hide that these events aren't atomic.
                 )
             except Exception as e:
-                logger.warn(
+                logger.warning(
                     "Failed to update join event for room %s - %s", room_id, str(e)
                 )
 

@@ -14,8 +14,6 @@
 # limitations under the License.
 import re
 
-from twisted.internet import defer
-
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
     RestServlet,
@@ -59,24 +57,22 @@ class UserAdminServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
-        yield assert_requester_is_admin(self.auth, request)
+    async def on_GET(self, request, user_id):
+        await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Only local users can be admins of this homeserver")
 
-        is_admin = yield self.handlers.admin_handler.get_user_server_admin(target_user)
+        is_admin = await self.handlers.admin_handler.get_user_server_admin(target_user)
         is_admin = bool(is_admin)
 
         return 200, {"admin": is_admin}
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
-        yield assert_user_is_admin(self.auth, requester.user)
+    async def on_PUT(self, request, user_id):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
         auth_user = requester.user
 
         target_user = UserID.from_string(user_id)
@@ -93,7 +89,7 @@ class UserAdminServlet(RestServlet):
         if target_user == auth_user and not set_admin_to:
             raise SynapseError(400, "You may not demote yourself.")
 
-        yield self.handlers.admin_handler.set_user_server_admin(
+        await self.handlers.admin_handler.set_user_server_admin(
             target_user, set_admin_to
         )
 

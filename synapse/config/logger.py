@@ -68,9 +68,6 @@ handlers:
         filters: [context]
 
 loggers:
-    synapse:
-        level: INFO
-
     synapse.storage.SQL:
         # beware: increasing this to DEBUG will make synapse log sensitive
         # information such as access tokens.
@@ -79,6 +76,8 @@ loggers:
 root:
     level: INFO
     handlers: [file, console]
+
+disable_existing_loggers: false
 """
 )
 
@@ -183,7 +182,7 @@ def _reload_stdlib_logging(*args, log_config=None):
     logger = logging.getLogger("")
 
     if not log_config:
-        logger.warn("Reloaded a blank config?")
+        logger.warning("Reloaded a blank config?")
 
     logging.config.dictConfig(log_config)
 
@@ -235,8 +234,8 @@ def setup_logging(
 
     # make sure that the first thing we log is a thing we can grep backwards
     # for
-    logging.warn("***** STARTING SERVER *****")
-    logging.warn("Server %s version %s", sys.argv[0], get_version_string(synapse))
+    logging.warning("***** STARTING SERVER *****")
+    logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
     logging.info("Server hostname: %s", config.server_name)
 
     return logger

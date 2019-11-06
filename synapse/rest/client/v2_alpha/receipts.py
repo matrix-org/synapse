@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
 
@@ -39,16 +37,15 @@ class ReceiptRestServlet(RestServlet):
         self.receipts_handler = hs.get_receipts_handler()
         self.presence_handler = hs.get_presence_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id, receipt_type, event_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request, room_id, receipt_type, event_id):
+        requester = await self.auth.get_user_by_req(request)
 
         if receipt_type != "m.read":
             raise SynapseError(400, "Receipt type must be 'm.read'")
 
-        yield self.presence_handler.bump_presence_active_time(requester.user)
+        await self.presence_handler.bump_presence_active_time(requester.user)
 
-        yield self.receipts_handler.received_client_receipt(
+        await self.receipts_handler.received_client_receipt(
             room_id, receipt_type, user_id=requester.user.to_string(), event_id=event_id
         )
 

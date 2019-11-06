@@ -21,6 +21,8 @@ from typing import Dict, Sequence, Set, Union
 
 from six.moves import range
 
+import attr
+
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
@@ -84,11 +86,12 @@ class ObservableDeferred(object):
 
         deferred.addCallbacks(callback, errback)
 
-    def observe(self):
+    def observe(self) -> defer.Deferred:
         """Observe the underlying deferred.
 
-        Can return either a deferred if the underlying deferred is still pending
-        (or has failed), or the actual value. Callers may need to use maybeDeferred.
+        This returns a brand new deferred that is resolved when the underlying
+        deferred is resolved. Interacting with the returned deferred does not
+        effect the underdlying deferred.
         """
         if not self._result:
             d = defer.Deferred()
@@ -103,7 +106,7 @@ class ObservableDeferred(object):
             return d
         else:
             success, res = self._result
-            return res if success else defer.fail(res)
+            return defer.succeed(res) if success else defer.fail(res)
 
     def observers(self):
         return self._observers
@@ -136,7 +139,7 @@ def concurrently_execute(func, args, limit):
     the number of concurrent executions.
 
     Args:
-        func (func): Function to execute, should return a deferred.
+        func (func): Function to execute, should return a deferred or coroutine.
         args (list): List of arguments to pass to func, each invocation of func
             gets a signle argument.
         limit (int): Maximum number of conccurent executions.
@@ -146,11 +149,10 @@ def concurrently_execute(func, args, limit):
     """
     it = iter(args)
 
-    @defer.inlineCallbacks
-    def _concurrently_execute_inner():
+    async def _concurrently_execute_inner():
         try:
             while True:
-                yield func(next(it))
+                await maybe_awaitable(func(next(it)))
         except StopIteration:
             pass
 
@@ -307,7 +309,7 @@ class Linearizer(object):
                 )
 
             else:
-                logger.warn(
+                logger.warning(
                     "Unexpected exception waiting for linearizer lock %r for key %r",
                     self.name,
                     key,
@@ -483,3 +485,30 @@ def timeout_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
     deferred.addCallbacks(success_cb, failure_cb)
 
     return new_d
+
+
+@attr.s(slots=True, frozen=True)
+class DoneAwaitable(object):
+    """Simple awaitable that returns the provided value.
+    """
+
+    value = attr.ib()
+
+    def __await__(self):
+        return self
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        raise StopIteration(self.value)
+
+
+def maybe_awaitable(value):
+    """Convert a value to an awaitable if not already an awaitable.
+    """
+
+    if hasattr(value, "__await__"):
+        return value
+
+    return DoneAwaitable(value)

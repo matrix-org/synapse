@@ -525,7 +525,7 @@ class AuthHandler(BaseHandler):
 
         result = None
         if not user_infos:
-            logger.warn("Attempted to login as %s but they do not exist", user_id)
+            logger.warning("Attempted to login as %s but they do not exist", user_id)
         elif len(user_infos) == 1:
             # a single match (possibly not exact)
             result = user_infos.popitem()
@@ -534,7 +534,7 @@ class AuthHandler(BaseHandler):
             result = (user_id, user_infos[user_id])
         else:
             # multiple matches, none of them exact
-            logger.warn(
+            logger.warning(
                 "Attempted to login as %s but it matches more than one user "
                 "inexactly: %r",
                 user_id,
@@ -728,7 +728,7 @@ class AuthHandler(BaseHandler):
 
         result = yield self.validate_hash(password, password_hash)
         if not result:
-            logger.warn("Failed password login for user %s", user_id)
+            logger.warning("Failed password login for user %s", user_id)
             return None
         return user_id
 

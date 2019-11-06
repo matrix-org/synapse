@@ -289,6 +289,9 @@ class TlsConfig(Config):
             "http://localhost:8009/.well-known/acme-challenge"
         )
 
+        # flake8 doesn't recognise that variables are used in the below string
+        _ = tls_enabled, proxypassline, acme_enabled, default_acme_account_file
+
         return (
             """\
         ## TLS ##
@@ -451,7 +454,11 @@ class TlsConfig(Config):
         #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
         """
-            % locals()
+            # Lowercase the string representation of boolean values
+            % {
+                x[0]: str(x[1]).lower() if isinstance(x[1], bool) else x[1]
+                for x in locals().items()
+            }
         )
 
     def read_tls_certificate(self):

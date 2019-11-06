@@ -4,7 +4,7 @@ The captcha mechanism used is Google's ReCaptcha. This requires API keys from Go
 
 ## Getting keys
 
-Requires a public/private key pair from:
+Requires a site/secret key pair from:
 
 <https://developers.google.com/recaptcha/>
 
@@ -15,8 +15,8 @@ Must be a reCAPTCHA v2 key using the "I'm not a robot" Checkbox option
 The keys are a config option on the home server config. If they are not
 visible, you can generate them via `--generate-config`. Set the following value:
 
-    recaptcha_public_key: YOUR_PUBLIC_KEY
-    recaptcha_private_key: YOUR_PRIVATE_KEY
+    recaptcha_public_key: YOUR_SITE_KEY
+    recaptcha_private_key: YOUR_SECRET_KEY
 
 In addition, you MUST enable captchas via:
 

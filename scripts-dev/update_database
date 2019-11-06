@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright 2019 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import argparse
+import logging
+import sys
+
+import yaml
+
+from twisted.internet import defer, reactor
+
+from synapse.config.homeserver import HomeServerConfig
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.server import HomeServer
+from synapse.storage import DataStore
+from synapse.storage.engines import create_engine
+from synapse.storage.prepare_database import prepare_database
+
+logger = logging.getLogger("update_database")
+
+
+class MockHomeserver(HomeServer):
+    DATASTORE_CLASS = DataStore
+
+    def __init__(self, config, database_engine, db_conn, **kwargs):
+        super(MockHomeserver, self).__init__(
+            config.server_name,
+            reactor=reactor,
+            config=config,
+            database_engine=database_engine,
+            **kwargs
+        )
+
+        self.database_engine = database_engine
+        self.db_conn = db_conn
+
+    def get_db_conn(self):
+        return self.db_conn
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description=(
+            "Updates a synapse database to the latest schema and runs background updates"
+            " on it."
+        )
+    )
+    parser.add_argument("-v", action='store_true')
+    parser.add_argument(
+        "--database-config",
+        type=argparse.FileType('r'),
+        required=True,
+        help="A database config file for either a SQLite3 database or a PostgreSQL one.",
+    )
+
+    args = parser.parse_args()
+
+    logging_config = {
+        "level": logging.DEBUG if args.v else logging.INFO,
+        "format": "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
+    }
+
+    logging.basicConfig(**logging_config)
+
+    # Load, process and sanity-check the config.
+    hs_config = yaml.safe_load(args.database_config)
+
+    if "database" not in hs_config:
+        sys.stderr.write("The configuration file must have a 'database' section.\n")
+        sys.exit(4)
+
+    config = HomeServerConfig()
+    config.parse_config_dict(hs_config, "", "")
+
+    # Create the database engine and a connection to it.
+    database_engine = create_engine(config.database_config)
+    db_conn = database_engine.module.connect(
+        **{
+            k: v
+            for k, v in config.database_config.get("args", {}).items()
+            if not k.startswith("cp_")
+        }
+    )
+
+    # Update the database to the latest schema.
+    prepare_database(db_conn, database_engine, config=config)
+    db_conn.commit()
+
+    # Instantiate and initialise the homeserver object.
+    hs = MockHomeserver(
+        config,
+        database_engine,
+        db_conn,
+        db_config=config.database_config,
+    )
+    # setup instantiates the store within the homeserver object.
+    hs.setup()
+    store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def run_background_updates():
+        yield store.run_background_updates(sleep=False)
+        # Stop the reactor to exit the script once every background update is run.
+        reactor.stop()
+
+    # Apply all background updates on the database.
+    reactor.callWhenRunning(lambda: run_as_background_process(
+        "background_updates", run_background_updates
+    ))
+
+    reactor.run()
