@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,26 +14,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import attr
+
+from synapse.python_dependencies import DependencyException, check_requirements
+
 from ._base import Config, ConfigError
 
-MISSING_SENTRY = """Missing sentry-sdk library. This is required to enable sentry
-    integration.
-    """
+
+@attr.s
+class MetricsFlags(object):
+    known_servers = attr.ib(default=False, validator=attr.validators.instance_of(bool))
+
+    @classmethod
+    def all_off(cls):
+        """
+        Instantiate the flags with all options set to off.
+        """
+        return cls(**{x.name: False for x in attr.fields(cls)})
 
 
 class MetricsConfig(Config):
+    section = "metrics"
+
     def read_config(self, config, **kwargs):
         self.enable_metrics = config.get("enable_metrics", False)
         self.report_stats = config.get("report_stats", None)
+        self.report_stats_endpoint = config.get(
+            "report_stats_endpoint", "https://matrix.org/report-usage-stats/push"
+        )
         self.metrics_port = config.get("metrics_port")
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
+
+        if self.enable_metrics:
+            _metrics_config = config.get("metrics_flags") or {}
+            self.metrics_flags = MetricsFlags(**_metrics_config)
+        else:
+            self.metrics_flags = MetricsFlags.all_off()
 
         self.sentry_enabled = "sentry" in config
         if self.sentry_enabled:
             try:
-                import sentry_sdk  # noqa F401
-            except ImportError:
-                raise ConfigError(MISSING_SENTRY)
+                check_requirements("sentry")
+            except DependencyException as e:
+                raise ConfigError(e.message)
 
             self.sentry_dsn = config["sentry"].get("dsn")
             if not self.sentry_dsn:
@@ -46,7 +70,7 @@ class MetricsConfig(Config):
 
         # Enable collection and rendering of performance metrics
         #
-        #enable_metrics: False
+        #enable_metrics: false
 
         # Enable sentry integration
         # NOTE: While attempts are made to ensure that the logs don't contain
@@ -58,6 +82,16 @@ class MetricsConfig(Config):
         #sentry:
         #    dsn: "..."
 
+        # Flags to enable Prometheus metrics which are not suitable to be
+        # enabled by default, either for performance reasons or limited use.
+        #
+        metrics_flags:
+            # Publish synapse_federation_known_servers, a g auge of the number of
+            # servers this homeserver knows about, including itself. May cause
+            # performance problems on large homeservers.
+            #
+            #known_servers: true
+
         # Whether or not to report anonymized homeserver usage statistics.
         """
 
@@ -66,4 +100,10 @@ class MetricsConfig(Config):
         else:
             res += "report_stats: %s\n" % ("true" if report_stats else "false")
 
+        res += """
+        # The endpoint to report the anonymized homeserver usage statistics to.
+        # Defaults to https://matrix.org/report-usage-stats/push
+        #
+        #report_stats_endpoint: https://example.com/report-usage-stats/push
+        """
         return res

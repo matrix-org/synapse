@@ -36,7 +36,7 @@ that your email address is probably `user@example.com` rather than
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, 3.7, or 2.7
+- Python 3.5, 3.6, or 3.7
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
@@ -349,6 +349,13 @@ sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
 ```
 
+### Void Linux
+
+Synapse can be found in the void repositories as 'synapse':
+
+    xbps-install -Su
+    xbps-install -S synapse
+
 ### FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
@@ -373,7 +380,7 @@ is suitable for local testing, but for any practical use, you will either need
 to enable a reverse proxy, or configure Synapse to expose an HTTPS port.
 
 For information on using a reverse proxy, see
-[docs/reverse_proxy.rst](docs/reverse_proxy.rst).
+[docs/reverse_proxy.md](docs/reverse_proxy.md).
 
 To configure Synapse to expose an HTTPS port, you will need to edit
 `homeserver.yaml`, as follows:
@@ -406,22 +413,24 @@ For a more detailed guide to configuring your server for federation, see
 
 ## Email
 
-It is desirable for Synapse to have the capability to send email. For example,
-this is required to support the 'password reset' feature.
+It is desirable for Synapse to have the capability to send email. This allows
+Synapse to send password reset emails, send verifications when an email address
+is added to a user's account, and send email notifications to users when they
+receive new messages.
 
 To configure an SMTP server for Synapse, modify the configuration section
-headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
-and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
-``smtp_pass``, and ``require_transport_security``.
+headed `email`, and be sure to have at least the `smtp_host`, `smtp_port`
+and `notif_from` fields filled out.  You may also need to set `smtp_user`,
+`smtp_pass`, and `require_transport_security`.
 
-If Synapse is not configured with an SMTP server, password reset via email will
- be disabled by default.
+If email is not configured, password reset, registration and notifications via
+email will be disabled.
 
 ## Registering a user
 
 The easiest way to create a new user is to do so from a client like [Riot](https://riot.im).
 
-Alternatively you can do so from the command line if you have installed via pip. 
+Alternatively you can do so from the command line if you have installed via pip.
 
 This can be done as follows:
 
@@ -446,7 +455,7 @@ on your server even if `enable_registration` is `false`.
 ## Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server.  See [docs/turn-howto.rst](docs/turn-howto.rst) for details.
+a TURN server.  See [docs/turn-howto.md](docs/turn-howto.md) for details.
 
 ## URL previews
 

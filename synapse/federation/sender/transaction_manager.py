@@ -26,6 +26,7 @@ from synapse.logging.opentracing import (
     set_tag,
     start_active_span_follows_from,
     tags,
+    whitelisted_homeserver,
 )
 from synapse.util.metrics import measure_func
 
@@ -59,9 +60,15 @@ class TransactionManager(object):
         # The span_contexts is a generator so that it won't be evaluated if
         # opentracing is disabled. (Yay speed!)
 
-        span_contexts = (
-            extract_text_map(json.loads(edu.get_context())) for edu in pending_edus
-        )
+        span_contexts = []
+        keep_destination = whitelisted_homeserver(destination)
+
+        for edu in pending_edus:
+            context = edu.get_context()
+            if context:
+                span_contexts.append(extract_text_map(json.loads(context)))
+            if keep_destination:
+                edu.strip_context()
 
         with start_active_span_follows_from("send_transaction", span_contexts):
 
@@ -139,7 +146,7 @@ class TransactionManager(object):
             if code == 200:
                 for e_id, r in response.get("pdus", {}).items():
                     if "error" in r:
-                        logger.warn(
+                        logger.warning(
                             "TX [%s] {%s} Remote returned error for %s: %s",
                             destination,
                             txn_id,
@@ -148,7 +155,7 @@ class TransactionManager(object):
                         )
             else:
                 for p in pdus:
-                    logger.warn(
+                    logger.warning(
                         "TX [%s] {%s} Failed to send event %s",
                         destination,
                         txn_id,

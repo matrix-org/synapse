@@ -43,6 +43,8 @@ class InitialSyncHandler(BaseHandler):
         self.validator = EventValidator()
         self.snapshot_cache = SnapshotCache()
         self._event_serializer = hs.get_event_client_serializer()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
 
     def snapshot_all_rooms(
         self,
@@ -126,8 +128,8 @@ class InitialSyncHandler(BaseHandler):
 
         tags_by_room = yield self.store.get_tags_for_user(user_id)
 
-        account_data, account_data_by_room = (
-            yield self.store.get_account_data_for_user(user_id)
+        account_data, account_data_by_room = yield self.store.get_account_data_for_user(
+            user_id
         )
 
         public_room_ids = yield self.store.get_public_room_ids()
@@ -169,7 +171,7 @@ class InitialSyncHandler(BaseHandler):
                 elif event.membership == Membership.LEAVE:
                     room_end_token = "s%d" % (event.stream_ordering,)
                     deferred_room_state = run_in_background(
-                        self.store.get_state_for_events, [event.event_id]
+                        self.state_store.get_state_for_events, [event.event_id]
                     )
                     deferred_room_state.addCallback(
                         lambda states: states[event.event_id]
@@ -189,7 +191,9 @@ class InitialSyncHandler(BaseHandler):
                     )
                 ).addErrback(unwrapFirstError)
 
-                messages = yield filter_events_for_client(self.store, user_id, messages)
+                messages = yield filter_events_for_client(
+                    self.storage, user_id, messages
+                )
 
                 start_token = now_token.copy_and_replace("room_key", token)
                 end_token = now_token.copy_and_replace("room_key", room_end_token)
@@ -307,7 +311,7 @@ class InitialSyncHandler(BaseHandler):
     def _room_initial_sync_parted(
         self, user_id, room_id, pagin_config, membership, member_event_id, is_peeking
     ):
-        room_state = yield self.store.get_state_for_events([member_event_id])
+        room_state = yield self.state_store.get_state_for_events([member_event_id])
 
         room_state = room_state[member_event_id]
 
@@ -322,7 +326,7 @@ class InitialSyncHandler(BaseHandler):
         )
 
         messages = yield filter_events_for_client(
-            self.store, user_id, messages, is_peeking=is_peeking
+            self.storage, user_id, messages, is_peeking=is_peeking
         )
 
         start_token = StreamToken.START.copy_and_replace("room_key", token)
@@ -414,7 +418,7 @@ class InitialSyncHandler(BaseHandler):
         )
 
         messages = yield filter_events_for_client(
-            self.store, user_id, messages, is_peeking=is_peeking
+            self.storage, user_id, messages, is_peeking=is_peeking
         )
 
         start_token = now_token.copy_and_replace("room_key", token)
@@ -450,7 +454,6 @@ class InitialSyncHandler(BaseHandler):
             # else it will throw.
             member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
             return member_event.membership, member_event.event_id
-            return
         except AuthError:
             visibility = yield self.state_handler.get_current_state(
                 room_id, EventTypes.RoomHistoryVisibility, ""
@@ -460,7 +463,6 @@ class InitialSyncHandler(BaseHandler):
                 and visibility.content["history_visibility"] == "world_readable"
             ):
                 return Membership.JOIN, None
-                return
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )

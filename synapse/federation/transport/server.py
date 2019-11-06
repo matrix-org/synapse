@@ -165,7 +165,7 @@ class Authenticator(object):
     async def _reset_retry_timings(self, origin):
         try:
             logger.info("Marking origin %r as up", origin)
-            await self.store.set_destination_retry_timings(origin, 0, 0)
+            await self.store.set_destination_retry_timings(origin, None, 0, 0)
         except Exception:
             logger.exception("Error resetting retry timings on %s", origin)
 
@@ -202,7 +202,7 @@ def _parse_auth_header(header_bytes):
         sig = strip_quotes(param_dict["sig"])
         return origin, key, sig
     except Exception as e:
-        logger.warn(
+        logger.warning(
             "Error parsing auth header '%s': %s",
             header_bytes.decode("ascii", "replace"),
             e,
@@ -287,10 +287,12 @@ class BaseFederationServlet(object):
             except NoAuthenticationError:
                 origin = None
                 if self.REQUIRE_AUTH:
-                    logger.warn("authenticate_request failed: missing authentication")
+                    logger.warning(
+                        "authenticate_request failed: missing authentication"
+                    )
                     raise
             except Exception as e:
-                logger.warn("authenticate_request failed: %s", e)
+                logger.warning("authenticate_request failed: %s", e)
                 raise
 
             request_tags = {
@@ -342,7 +344,11 @@ class BaseFederationServlet(object):
                 continue
 
             server.register_paths(
-                method, (pattern,), self._wrap(code), self.__class__.__name__
+                method,
+                (pattern,),
+                self._wrap(code),
+                self.__class__.__name__,
+                trace=False,
             )
 
 
@@ -571,7 +577,7 @@ class FederationThirdPartyInviteExchangeServlet(BaseFederationServlet):
 
     async def on_PUT(self, origin, content, query, room_id):
         content = await self.handler.on_exchange_third_party_invite_request(
-            origin, room_id, content
+            room_id, content
         )
         return 200, content
 
@@ -761,6 +767,10 @@ class PublicRoomList(BaseFederationServlet):
         else:
             network_tuple = ThirdPartyInstanceID(None, None)
 
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
+
         data = await maybeDeferred(
             self.handler.get_local_public_room_list,
             limit,
@@ -795,6 +805,10 @@ class PublicRoomList(BaseFederationServlet):
 
         if search_filter is None:
             logger.warning("Nonefilter")
+
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
 
         data = await self.handler.get_local_public_room_list(
             limit=limit,

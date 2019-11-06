@@ -77,7 +77,7 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
     if auth_events is None:
         # Oh, we don't know what the state of the room was, so we
         # are trusting that this is allowed (at least for now)
-        logger.warn("Trusting event: %s", event.event_id)
+        logger.warning("Trusting event: %s", event.event_id)
         return
 
     if event.type == EventTypes.Create:
@@ -493,8 +493,7 @@ def _check_power_levels(event, auth_events):
         new_level_too_big = new_level is not None and new_level > user_level
         if old_level_too_big or new_level_too_big:
             raise AuthError(
-                403,
-                "You don't have permission to add ops level greater " "than your own",
+                403, "You don't have permission to add ops level greater than your own"
             )
 
 
@@ -637,11 +636,11 @@ def auth_types_for_event(event):
     if event.type == EventTypes.Create:
         return []
 
-    auth_types = []
-
-    auth_types.append((EventTypes.PowerLevels, ""))
-    auth_types.append((EventTypes.Member, event.sender))
-    auth_types.append((EventTypes.Create, ""))
+    auth_types = [
+        (EventTypes.PowerLevels, ""),
+        (EventTypes.Member, event.sender),
+        (EventTypes.Create, ""),
+    ]
 
     if event.type == EventTypes.Member:
         membership = event.content["membership"]

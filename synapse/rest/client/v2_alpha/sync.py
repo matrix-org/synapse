@@ -21,7 +21,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.constants import PresenceState
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
 from synapse.events.utils import (
     format_event_for_client_v2_without_room_id,
@@ -112,32 +112,44 @@ class SyncRestServlet(RestServlet):
         full_state = parse_boolean(request, "full_state", default=False)
 
         logger.debug(
-            "/sync: user=%r, timeout=%r, since=%r,"
-            " set_presence=%r, filter_id=%r, device_id=%r"
-            % (user, timeout, since, set_presence, filter_id, device_id)
+            "/sync: user=%r, timeout=%r, since=%r, "
+            "set_presence=%r, filter_id=%r, device_id=%r",
+            user,
+            timeout,
+            since,
+            set_presence,
+            filter_id,
+            device_id,
         )
 
         request_key = (user, timeout, since, filter_id, full_state, device_id)
 
-        if filter_id:
-            if filter_id.startswith("{"):
-                try:
-                    filter_object = json.loads(filter_id)
-                    set_timeline_upper_limit(
-                        filter_object, self.hs.config.filter_timeline_limit
-                    )
-                except Exception:
-                    raise SynapseError(400, "Invalid filter JSON")
-                self.filtering.check_valid_filter(filter_object)
-                filter = FilterCollection(filter_object)
-            else:
-                filter = yield self.filtering.get_user_filter(user.localpart, filter_id)
+        if filter_id is None:
+            filter_collection = DEFAULT_FILTER_COLLECTION
+        elif filter_id.startswith("{"):
+            try:
+                filter_object = json.loads(filter_id)
+                set_timeline_upper_limit(
+                    filter_object, self.hs.config.filter_timeline_limit
+                )
+            except Exception:
+                raise SynapseError(400, "Invalid filter JSON")
+            self.filtering.check_valid_filter(filter_object)
+            filter_collection = FilterCollection(filter_object)
         else:
-            filter = DEFAULT_FILTER_COLLECTION
+            try:
+                filter_collection = yield self.filtering.get_user_filter(
+                    user.localpart, filter_id
+                )
+            except StoreError as err:
+                if err.code != 404:
+                    raise
+                # fix up the description and errcode to be more useful
+                raise SynapseError(400, "No such filter", errcode=Codes.INVALID_PARAM)
 
         sync_config = SyncConfig(
             user=user,
-            filter_collection=filter,
+            filter_collection=filter_collection,
             is_guest=requester.is_guest,
             request_key=request_key,
             device_id=device_id,
@@ -171,7 +183,7 @@ class SyncRestServlet(RestServlet):
 
         time_now = self.clock.time_msec()
         response_content = yield self.encode_response(
-            time_now, sync_result, requester.access_token_id, filter
+            time_now, sync_result, requester.access_token_id, filter_collection
         )
 
         return 200, response_content
@@ -382,7 +394,7 @@ class SyncRestServlet(RestServlet):
             # We've had bug reports that events were coming down under the
             # wrong room.
             if event.room_id != room.room_id:
-                logger.warn(
+                logger.warning(
                     "Event %r is under room %r instead of %r",
                     event.event_id,
                     room.room_id,

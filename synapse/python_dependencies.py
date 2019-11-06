@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from typing import List, Set
 
 from pkg_resources import (
     DistributionNotFound,
@@ -60,7 +61,6 @@ REQUIREMENTS = [
     "bcrypt>=3.1.0",
     "pillow>=4.3.0",
     "sortedcontainers>=1.4.4",
-    "psutil>=2.0.0",
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
@@ -72,6 +72,7 @@ REQUIREMENTS = [
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
     "bleach>=1.4.3",
+    "typing-extensions>=3.7.4",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
@@ -97,7 +98,7 @@ CONDITIONAL_REQUIREMENTS = {
     "jwt": ["pyjwt>=1.6.4"],
 }
 
-ALL_OPTIONAL_REQUIREMENTS = set()
+ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
 
 for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
     # Exclude systemd as it's a system-based requirement.
@@ -143,16 +144,26 @@ def check_requirements(for_feature=None):
             deps_needed.append(dependency)
             errors.append(
                 "Needed %s, got %s==%s"
-                % (dependency, e.dist.project_name, e.dist.version)
+                % (
+                    dependency,
+                    e.dist.project_name,  # type: ignore[attr-defined] # noqa
+                    e.dist.version,  # type: ignore[attr-defined] # noqa
+                )
             )
         except DistributionNotFound:
             deps_needed.append(dependency)
-            errors.append("Needed %s but it was not installed" % (dependency,))
+            if for_feature:
+                errors.append(
+                    "Needed %s for the '%s' feature but it was not installed"
+                    % (dependency, for_feature)
+                )
+            else:
+                errors.append("Needed %s but it was not installed" % (dependency,))
 
     if not for_feature:
         # Check the optional dependencies are up to date. We allow them to not be
         # installed.
-        OPTS = sum(CONDITIONAL_REQUIREMENTS.values(), [])
+        OPTS = sum(CONDITIONAL_REQUIREMENTS.values(), [])  # type: List[str]
 
         for dependency in OPTS:
             try:
@@ -161,15 +172,19 @@ def check_requirements(for_feature=None):
                 deps_needed.append(dependency)
                 errors.append(
                     "Needed optional %s, got %s==%s"
-                    % (dependency, e.dist.project_name, e.dist.version)
+                    % (
+                        dependency,
+                        e.dist.project_name,  # type: ignore[attr-defined] # noqa
+                        e.dist.version,  # type: ignore[attr-defined] # noqa
+                    )
                 )
             except DistributionNotFound:
                 # If it's not found, we don't care
                 pass
 
     if deps_needed:
-        for e in errors:
-            logging.error(e)
+        for err in errors:
+            logging.error(err)
 
         raise DependencyException(deps_needed)
 

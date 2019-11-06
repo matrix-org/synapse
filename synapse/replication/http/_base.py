@@ -22,12 +22,16 @@ from six.moves import urllib
 
 from twisted.internet import defer
 
-import synapse.logging.opentracing as opentracing
 from synapse.api.errors import (
     CodeMessageException,
     HttpResponseException,
     RequestSendFailed,
     SynapseError,
+)
+from synapse.logging.opentracing import (
+    inject_active_span_byte_dict,
+    trace,
+    trace_servlet,
 )
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
@@ -106,14 +110,14 @@ class ReplicationEndpoint(object):
         return {}
 
     @abc.abstractmethod
-    def _handle_request(self, request, **kwargs):
+    async def _handle_request(self, request, **kwargs):
         """Handle incoming request.
 
         This is called with the request object and PATH_ARGS.
 
         Returns:
-            Deferred[dict]: A JSON serialisable dict to be used as response
-            body of request.
+            tuple[int, dict]: HTTP status code and a JSON serialisable dict
+            to be used as response body of request.
         """
         pass
 
@@ -129,6 +133,7 @@ class ReplicationEndpoint(object):
 
         client = hs.get_simple_http_client()
 
+        @trace(opname="outgoing_replication_request")
         @defer.inlineCallbacks
         def send_request(**kwargs):
             data = yield cls._serialize_payload(**kwargs)
@@ -167,9 +172,7 @@ class ReplicationEndpoint(object):
                 # the master, and so whether we should clean up or not.
                 while True:
                     headers = {}
-                    opentracing.inject_active_span_byte_dict(
-                        headers, None, check_destination=False
-                    )
+                    inject_active_span_byte_dict(headers, None, check_destination=False)
                     try:
                         result = yield request_func(uri, data, headers=headers)
                         break
@@ -177,7 +180,7 @@ class ReplicationEndpoint(object):
                         if e.code != 504 or not cls.RETRY_ON_TIMEOUT:
                             raise
 
-                    logger.warn("%s request timed out", cls.NAME)
+                    logger.warning("%s request timed out", cls.NAME)
 
                     # If we timed out we probably don't need to worry about backing
                     # off too much, but lets just wait a little anyway.
@@ -210,13 +213,11 @@ class ReplicationEndpoint(object):
         args = "/".join("(?P<%s>[^/]+)" % (arg,) for arg in url_args)
         pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
 
+        handler = trace_servlet(self.__class__.__name__, extract_context=True)(handler)
+        # We don't let register paths trace this servlet using the default tracing
+        # options because we wish to extract the context explicitly.
         http_server.register_paths(
-            method,
-            [pattern],
-            opentracing.trace_servlet(self.__class__.__name__, extract_context=True)(
-                handler
-            ),
-            self.__class__.__name__,
+            method, [pattern], handler, self.__class__.__name__, trace=False
         )
 
     def _cached_handler(self, request, txn_id, **kwargs):

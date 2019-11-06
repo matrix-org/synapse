@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 
@@ -74,11 +72,10 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             "address": address,
         }
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, user_id):
+    async def _handle_request(self, request, user_id):
         content = parse_json_object_from_request(request)
 
-        yield self.registration_handler.register_with_store(
+        await self.registration_handler.register_with_store(
             user_id=user_id,
             password_hash=content["password_hash"],
             was_guest=content["was_guest"],
@@ -106,7 +103,7 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    def _serialize_payload(user_id, auth_result, access_token, bind_email, bind_msisdn):
+    def _serialize_payload(user_id, auth_result, access_token):
         """
         Args:
             user_id (str): The user ID that consented
@@ -114,33 +111,17 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
                 registered user.
             access_token (str|None): The access token of the newly logged in
                 device, or None if `inhibit_login` enabled.
-            bind_email (bool): Whether to bind the email with the identity
-                server
-            bind_msisdn (bool): Whether to bind the msisdn with the identity
-                server
         """
-        return {
-            "auth_result": auth_result,
-            "access_token": access_token,
-            "bind_email": bind_email,
-            "bind_msisdn": bind_msisdn,
-        }
+        return {"auth_result": auth_result, "access_token": access_token}
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, user_id):
+    async def _handle_request(self, request, user_id):
         content = parse_json_object_from_request(request)
 
         auth_result = content["auth_result"]
         access_token = content["access_token"]
-        bind_email = content["bind_email"]
-        bind_msisdn = content["bind_msisdn"]
 
-        yield self.registration_handler.post_registration_actions(
-            user_id=user_id,
-            auth_result=auth_result,
-            access_token=access_token,
-            bind_email=bind_email,
-            bind_msisdn=bind_msisdn,
+        await self.registration_handler.post_registration_actions(
+            user_id=user_id, auth_result=auth_result, access_token=access_token
         )
 
         return 200, {}

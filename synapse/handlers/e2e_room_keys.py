@@ -377,8 +377,8 @@ class E2eRoomKeysHandler(object):
             A deferred of an empty dict.
         """
         if "version" not in version_info:
-            raise SynapseError(400, "Missing version in body", Codes.MISSING_PARAM)
-        if version_info["version"] != version:
+            version_info["version"] = version
+        elif version_info["version"] != version:
             raise SynapseError(
                 400, "Version in body does not match", Codes.INVALID_PARAM
             )

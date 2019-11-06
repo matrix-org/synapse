@@ -363,7 +363,7 @@ class MediaRepository(object):
                     },
                 )
             except RequestSendFailed as e:
-                logger.warn(
+                logger.warning(
                     "Request failed fetching remote media %s/%s: %r",
                     server_name,
                     media_id,
@@ -372,7 +372,7 @@ class MediaRepository(object):
                 raise SynapseError(502, "Failed to fetch remote media")
 
             except HttpResponseException as e:
-                logger.warn(
+                logger.warning(
                     "HTTP error fetching remote media %s/%s: %s",
                     server_name,
                     media_id,
@@ -383,10 +383,12 @@ class MediaRepository(object):
                 raise SynapseError(502, "Failed to fetch remote media")
 
             except SynapseError:
-                logger.warn("Failed to fetch remote media %s/%s", server_name, media_id)
+                logger.warning(
+                    "Failed to fetch remote media %s/%s", server_name, media_id
+                )
                 raise
             except NotRetryingDestination:
-                logger.warn("Not retrying destination %r", server_name)
+                logger.warning("Not retrying destination %r", server_name)
                 raise SynapseError(502, "Failed to fetch remote media")
             except Exception:
                 logger.exception(
@@ -526,7 +528,7 @@ class MediaRepository(object):
             try:
                 file_info = FileInfo(
                     server_name=server_name,
-                    file_id=media_id,
+                    file_id=file_id,
                     thumbnail=True,
                     thumbnail_width=t_width,
                     thumbnail_height=t_height,
@@ -691,7 +693,7 @@ class MediaRepository(object):
                 try:
                     os.remove(full_path)
                 except OSError as e:
-                    logger.warn("Failed to remove file: %r", full_path)
+                    logger.warning("Failed to remove file: %r", full_path)
                     if e.errno == errno.ENOENT:
                         pass
                     else:

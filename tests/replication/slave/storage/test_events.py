@@ -234,7 +234,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             type="m.room.member", sender=USER_ID_2, key=USER_ID_2, membership="join"
         )
         msg, msgctx = self.build_event()
-        self.get_success(self.master_store.persist_events([(j2, j2ctx), (msg, msgctx)]))
+        self.get_success(
+            self.storage.persistence.persist_events([(j2, j2ctx), (msg, msgctx)])
+        )
         self.replicate()
 
         event_source = RoomEventSource(self.hs)
@@ -290,10 +292,12 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         if backfill:
             self.get_success(
-                self.master_store.persist_events([(event, context)], backfilled=True)
+                self.storage.persistence.persist_events(
+                    [(event, context)], backfilled=True
+                )
             )
         else:
-            self.get_success(self.master_store.persist_event(event, context))
+            self.get_success(self.storage.persistence.persist_event(event, context))
 
         return event
 

@@ -147,6 +147,10 @@ class EventStreamHandler(BaseHandler):
 
 
 class EventHandler(BaseHandler):
+    def __init__(self, hs):
+        super(EventHandler, self).__init__(hs)
+        self.storage = hs.get_storage()
+
     @defer.inlineCallbacks
     def get_event(self, user, room_id, event_id):
         """Retrieve a single specified event.
@@ -167,13 +171,12 @@ class EventHandler(BaseHandler):
 
         if not event:
             return None
-            return
 
         users = yield self.store.get_users_in_room(event.room_id)
         is_peeking = user.to_string() not in users
 
         filtered = yield filter_events_for_client(
-            self.store, user.to_string(), [event], is_peeking=is_peeking
+            self.storage, user.to_string(), [event], is_peeking=is_peeking
         )
 
         if not filtered:

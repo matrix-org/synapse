@@ -25,7 +25,13 @@ from twisted.internet import defer
 import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import (
+    EventTypes,
+    JoinRules,
+    LimitBlockingTypes,
+    Membership,
+    UserTypes,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -84,26 +90,9 @@ class Auth(object):
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
-        self.check(
+        event_auth.check(
             room_version, event, auth_events=auth_events, do_sig_check=do_sig_check
         )
-
-    def check(self, room_version, event, auth_events, do_sig_check=True):
-        """ Checks if this event is correctly authed.
-
-        Args:
-            room_version (str): version of the room
-            event: the event being checked.
-            auth_events (dict: event-key -> event): the existing room state.
-
-
-        Returns:
-            True if the auth checks pass.
-        """
-        with Measure(self.clock, "auth.check"):
-            event_auth.check(
-                room_version, event, auth_events, do_sig_check=do_sig_check
-            )
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
@@ -179,7 +168,6 @@ class Auth(object):
     def get_public_keys(self, invite_event):
         return event_auth.get_public_keys(invite_event)
 
-    @opentracing.trace
     @defer.inlineCallbacks
     def get_user_by_req(
         self, request, allow_guest=False, rights="access", allow_expired=False
@@ -212,6 +200,7 @@ class Auth(object):
             if user_id:
                 request.authenticated_entity = user_id
                 opentracing.set_tag("authenticated_entity", user_id)
+                opentracing.set_tag("appservice_id", app_service.id)
 
                 if ip_addr and self.hs.config.track_appservice_user_ips:
                     yield self.store.insert_client_ip(
@@ -263,6 +252,8 @@ class Auth(object):
 
             request.authenticated_entity = user.to_string()
             opentracing.set_tag("authenticated_entity", user.to_string())
+            if device_id:
+                opentracing.set_tag("device_id", device_id)
 
             return synapse.types.create_requester(
                 user, token_id, is_guest, device_id, app_service=app_service
@@ -506,7 +497,7 @@ class Auth(object):
         token = self.get_access_token_from_request(request)
         service = self.store.get_app_service_by_token(token)
         if not service:
-            logger.warn("Unrecognised appservice access token.")
+            logger.warning("Unrecognised appservice access token.")
             raise InvalidClientTokenError()
         request.authenticated_entity = service.sender
         return defer.succeed(service)
@@ -704,13 +695,12 @@ class Auth(object):
                 and visibility.content["history_visibility"] == "world_readable"
             ):
                 return Membership.JOIN, None
-                return
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )
 
     @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None, threepid=None):
+    def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
@@ -723,6 +713,9 @@ class Auth(object):
                 with a MAU blocked server, normally they would be rejected but their
                 threepid is on the reserved list. user_id and
                 threepid should never be set at the same time.
+
+            user_type(str|None): If present, is used to decide whether to check against
+                certain blocking reasons like MAU.
         """
 
         # Never fail an auth check for the server notices users or support user
@@ -739,7 +732,7 @@ class Auth(object):
                 self.hs.config.hs_disabled_message,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 admin_contact=self.hs.config.admin_contact,
-                limit_type=self.hs.config.hs_disabled_limit_type,
+                limit_type=LimitBlockingTypes.HS_DISABLED,
             )
         if self.hs.config.limit_usage_by_mau is True:
             assert not (user_id and threepid)
@@ -760,6 +753,10 @@ class Auth(object):
                     self.hs.config.mau_limits_reserved_threepids, threepid
                 ):
                     return
+            elif user_type == UserTypes.SUPPORT:
+                # If the user does not exist yet and is of type "support",
+                # allow registration. Support users are excluded from MAU checks.
+                return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:
@@ -768,5 +765,5 @@ class Auth(object):
                     "Monthly Active User Limit Exceeded",
                     admin_contact=self.hs.config.admin_contact,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                    limit_type="monthly_active_user",
+                    limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER,
                 )

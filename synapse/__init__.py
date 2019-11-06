@@ -17,6 +17,7 @@
 """ This is a reference implementation of a Matrix home server.
 """
 
+import os
 import sys
 
 # Check that we're not running on an unsupported Python version.
@@ -35,4 +36,11 @@ try:
 except ImportError:
     pass
 
-__version__ = "1.3.1"
+__version__ = "1.5.1"
+
+if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
+    # We import here so that we don't have to install a bunch of deps when
+    # running the packaging tox test.
+    from synapse.util.patch_inline_callbacks import do_patch
+
+    do_patch()

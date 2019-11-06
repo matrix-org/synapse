@@ -21,7 +21,12 @@ from string import Template
 
 import yaml
 
-from twisted.logger import STDLibLogObserver, globalLogBeginner
+from twisted.logger import (
+    ILogObserver,
+    LogBeginner,
+    STDLibLogObserver,
+    globalLogBeginner,
+)
 
 import synapse
 from synapse.app import _base as appbase
@@ -63,9 +68,6 @@ handlers:
         filters: [context]
 
 loggers:
-    synapse:
-        level: INFO
-
     synapse.storage.SQL:
         # beware: increasing this to DEBUG will make synapse log sensitive
         # information such as access tokens.
@@ -74,11 +76,15 @@ loggers:
 root:
     level: INFO
     handlers: [file, console]
+
+disable_existing_loggers: false
 """
 )
 
 
 class LoggingConfig(Config):
+    section = "logging"
+
     def read_config(self, config, **kwargs):
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
@@ -124,7 +130,7 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(config, log_config):
+def _setup_stdlib_logging(config, log_config, logBeginner: LogBeginner):
     """
     Set up Python stdlib logging.
     """
@@ -165,23 +171,25 @@ def _setup_stdlib_logging(config, log_config):
 
         return observer(event)
 
-    globalLogBeginner.beginLoggingTo(
-        [_log], redirectStandardIO=not config.no_redirect_stdio
-    )
+    logBeginner.beginLoggingTo([_log], redirectStandardIO=not config.no_redirect_stdio)
     if not config.no_redirect_stdio:
         print("Redirected stdout/stderr to logs")
+
+    return observer
 
 
 def _reload_stdlib_logging(*args, log_config=None):
     logger = logging.getLogger("")
 
     if not log_config:
-        logger.warn("Reloaded a blank config?")
+        logger.warning("Reloaded a blank config?")
 
     logging.config.dictConfig(log_config)
 
 
-def setup_logging(hs, config, use_worker_options=False):
+def setup_logging(
+    hs, config, use_worker_options=False, logBeginner: LogBeginner = globalLogBeginner
+) -> ILogObserver:
     """
     Set up the logging subsystem.
 
@@ -191,6 +199,12 @@ def setup_logging(hs, config, use_worker_options=False):
 
         use_worker_options (bool): True to use the 'worker_log_config' option
             instead of 'log_config'.
+
+        logBeginner: The Twisted logBeginner to use.
+
+    Returns:
+        The "root" Twisted Logger observer, suitable for sending logs to from a
+        Logger instance.
     """
     log_config = config.worker_log_config if use_worker_options else config.log_config
 
@@ -210,14 +224,18 @@ def setup_logging(hs, config, use_worker_options=False):
     log_config_body = read_config()
 
     if log_config_body and log_config_body.get("structured") is True:
-        setup_structured_logging(hs, config, log_config_body)
+        logger = setup_structured_logging(
+            hs, config, log_config_body, logBeginner=logBeginner
+        )
         appbase.register_sighup(read_config, callback=reload_structured_logging)
     else:
-        _setup_stdlib_logging(config, log_config_body)
+        logger = _setup_stdlib_logging(config, log_config_body, logBeginner=logBeginner)
         appbase.register_sighup(read_config, callback=_reload_stdlib_logging)
 
     # make sure that the first thing we log is a thing we can grep backwards
     # for
-    logging.warn("***** STARTING SERVER *****")
-    logging.warn("Server %s version %s", sys.argv[0], get_version_string(synapse))
+    logging.warning("***** STARTING SERVER *****")
+    logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
     logging.info("Server hostname: %s", config.server_name)
+
+    return logger

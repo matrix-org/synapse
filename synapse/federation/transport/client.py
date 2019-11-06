@@ -122,10 +122,10 @@ class TransportLayerClient(object):
             Deferred: Results in a dict received from the remote homeserver.
         """
         logger.debug(
-            "backfill dest=%s, room_id=%s, event_tuples=%s, limit=%s",
+            "backfill dest=%s, room_id=%s, event_tuples=%r, limit=%s",
             destination,
             room_id,
-            repr(event_tuples),
+            event_tuples,
             str(limit),
         )
 
@@ -378,17 +378,6 @@ class TransportLayerClient(object):
         path = _create_v1_path("/event_auth/%s/%s", room_id, event_id)
 
         content = yield self.client.get_json(destination=destination, path=path)
-
-        return content
-
-    @defer.inlineCallbacks
-    @log_function
-    def send_query_auth(self, destination, room_id, event_id, content):
-        path = _create_v1_path("/query_auth/%s/%s", room_id, event_id)
-
-        content = yield self.client.post_json(
-            destination=destination, path=path, data=content
-        )
 
         return content
 

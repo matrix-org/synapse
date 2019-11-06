@@ -8,11 +8,12 @@ include demo/demo.tls.dh
 include demo/*.py
 include demo/*.sh
 
-recursive-include synapse/storage/schema *.sql
-recursive-include synapse/storage/schema *.sql.postgres
-recursive-include synapse/storage/schema *.sql.sqlite
-recursive-include synapse/storage/schema *.py
-recursive-include synapse/storage/schema *.txt
+recursive-include synapse/storage *.sql
+recursive-include synapse/storage *.sql.postgres
+recursive-include synapse/storage *.sql.sqlite
+recursive-include synapse/storage *.py
+recursive-include synapse/storage *.txt
+recursive-include synapse/storage *.md
 
 recursive-include docs *
 recursive-include scripts *
@@ -38,14 +39,14 @@ exclude sytest-blacklist
 include pyproject.toml
 recursive-include changelog.d *
 
+prune .buildkite
+prune .circleci
+prune .codecov.yml
+prune .coveragerc
 prune .github
+prune debian
 prune demo/etc
 prune docker
-prune .circleci
-prune .coveragerc
-prune debian
-prune .codecov.yml
-prune .buildkite
-
-exclude jenkins*
-recursive-exclude jenkins *.sh
+prune mypy.ini
+prune snap
+prune stubs

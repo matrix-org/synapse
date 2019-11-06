@@ -94,13 +94,16 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._all_done = False
 
     def start_doing_background_updates(self):
-        run_as_background_process("background_updates", self._run_background_updates)
+        run_as_background_process("background_updates", self.run_background_updates)
 
     @defer.inlineCallbacks
-    def _run_background_updates(self):
+    def run_background_updates(self, sleep=True):
         logger.info("Starting background schema updates")
         while True:
-            yield self.hs.get_clock().sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0)
+            if sleep:
+                yield self.hs.get_clock().sleep(
+                    self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0
+                )
 
             try:
                 result = yield self.do_next_background_update(
@@ -140,13 +143,33 @@ class BackgroundUpdateStore(SQLBaseStore):
             "background_updates",
             keyvalues=None,
             retcol="1",
-            desc="check_background_updates",
+            desc="has_completed_background_updates",
         )
         if not updates:
             self._all_done = True
             return True
 
         return False
+
+    async def has_completed_background_update(self, update_name) -> bool:
+        """Check if the given background update has finished running.
+        """
+
+        if self._all_done:
+            return True
+
+        if update_name in self._background_update_queue:
+            return False
+
+        update_exists = await self._simple_select_one_onecol(
+            "background_updates",
+            keyvalues={"update_name": update_name},
+            retcol="1",
+            desc="has_completed_background_update",
+            allow_none=True,
+        )
+
+        return not update_exists
 
     @defer.inlineCallbacks
     def do_next_background_update(self, desired_duration_ms):
@@ -218,7 +241,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         duration_ms = time_stop - time_start
 
         logger.info(
-            "Updating %r. Updated %r items in %rms."
+            "Running background update %r. Processed %r items in %rms."
             " (total_rate=%r/ms, current_rate=%r/ms, total_updated=%r, batch_size=%r)",
             update_name,
             items_updated,

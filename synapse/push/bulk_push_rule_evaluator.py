@@ -79,7 +79,7 @@ class BulkPushRuleEvaluator(object):
             dict of user_id -> push_rules
         """
         room_id = event.room_id
-        rules_for_room = self._get_rules_for_room(room_id)
+        rules_for_room = yield self._get_rules_for_room(room_id)
 
         rules_by_user = yield rules_for_room.get_rules(event, context)
 
@@ -149,9 +149,10 @@ class BulkPushRuleEvaluator(object):
 
         room_members = yield self.store.get_joined_users_from_context(event, context)
 
-        (power_levels, sender_power_level) = (
-            yield self._get_power_levels_and_sender_level(event, context)
-        )
+        (
+            power_levels,
+            sender_power_level,
+        ) = yield self._get_power_levels_and_sender_level(event, context)
 
         evaluator = PushRuleEvaluatorForEvent(
             event, len(room_members), sender_power_level, power_levels

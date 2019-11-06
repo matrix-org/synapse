@@ -40,6 +40,7 @@ from synapse.api.errors import (
     UnrecognizedRequestError,
 )
 from synapse.logging.context import preserve_fn
+from synapse.logging.opentracing import trace_servlet
 from synapse.util.caches import intern_dict
 
 logger = logging.getLogger(__name__)
@@ -257,7 +258,9 @@ class JsonResource(HttpServer, resource.Resource):
         self.path_regexs = {}
         self.hs = hs
 
-    def register_paths(self, method, path_patterns, callback, servlet_classname):
+    def register_paths(
+        self, method, path_patterns, callback, servlet_classname, trace=True
+    ):
         """
         Registers a request handler against a regular expression. Later request URLs are
         checked against these regular expressions in order to identify an appropriate
@@ -273,8 +276,16 @@ class JsonResource(HttpServer, resource.Resource):
 
             servlet_classname (str): The name of the handler to be used in prometheus
                 and opentracing logs.
+
+            trace (bool): Whether we should start a span to trace the servlet.
         """
         method = method.encode("utf-8")  # method is bytes on py3
+
+        if trace:
+            # We don't extract the context from the servlet because we can't
+            # trust the sender
+            callback = trace_servlet(servlet_classname)(callback)
+
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
@@ -377,7 +388,7 @@ class DirectServeResource(resource.Resource):
         if not callback:
             return super().render(request)
 
-        resp = callback(request)
+        resp = trace_servlet(self.__class__.__name__)(callback)(request)
 
         # If it's a coroutine, turn it into a Deferred
         if isinstance(resp, types.CoroutineType):
@@ -443,7 +454,7 @@ def respond_with_json(
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
     if request._disconnected:
-        logger.warn(
+        logger.warning(
             "Not sending response to request %s, already disconnected.", request
         )
         return

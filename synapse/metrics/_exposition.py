@@ -36,7 +36,9 @@ from twisted.web.resource import Resource
 try:
     from prometheus_client.samples import Sample
 except ImportError:
-    Sample = namedtuple("Sample", ["name", "labels", "value", "timestamp", "exemplar"])
+    Sample = namedtuple(  # type: ignore[no-redef] # noqa
+        "Sample", ["name", "labels", "value", "timestamp", "exemplar"]
+    )
 
 
 CONTENT_TYPE_LATEST = str("text/plain; version=0.0.4; charset=utf-8")

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from synapse.metrics import InFlightGauge
+from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
 
 from tests import unittest
 
@@ -111,3 +111,21 @@ class TestMauLimit(unittest.TestCase):
             }
 
         return results
+
+
+class BuildInfoTests(unittest.TestCase):
+    def test_get_build(self):
+        """
+        The synapse_build_info metric reports the OS version, Python version,
+        and Synapse version.
+        """
+        items = list(
+            filter(
+                lambda x: b"synapse_build_info{" in x,
+                generate_latest(REGISTRY).split(b"\n"),
+            )
+        )
+        self.assertEqual(len(items), 1)
+        self.assertTrue(b"osversion=" in items[0])
+        self.assertTrue(b"pythonversion=" in items[0])
+        self.assertTrue(b"version=" in items[0])
