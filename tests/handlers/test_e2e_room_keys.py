@@ -225,7 +225,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
                 "algorithm": "m.megolm_backup.v1",
                 "auth_data": "revised_first_version_auth_data",
                 "version": version,
-                "count": 0
+                "count": 0,
             },
         )
 
