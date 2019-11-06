@@ -1633,7 +1633,20 @@ class EventsStore(
         return self.runInteraction("purge_room", self._purge_room_txn, room_id)
 
     def _purge_room_txn(self, txn, room_id):
-        # First delete tables which lack an index on room_id but have one on event_id
+        # First we fetch all the state groups that should be deleted, before
+        # we delete that information.
+        txn.execute(
+            """
+                SELECT DISTINCT state_group FROM events
+                INNER JOIN event_to_state_groups USING(event_id)
+                WHERE events.room_id = ?
+            """,
+            (room_id,),
+        )
+
+        state_groups = [row[0] for row in txn]
+
+        # Now we delete tables which lack an index on room_id but have one on event_id
         for table in (
             "event_auth",
             "event_edges",
@@ -1716,18 +1729,6 @@ class EventsStore(
         #       The problem with these is that they are largeish and there is no room_id
         #       index on them. In any case we should be clearing out 'stream' tables
         #       periodically anyway (#5888)
-
-        # Now we fetch all the state groups that should be deleted.
-        txn.execute(
-            """
-                SELECT DISTINCT state_group FROM events
-                INNER JOIN event_to_state_groups USING(event_id)
-                WHERE events.room_id = ?
-            """,
-            (room_id,),
-        )
-
-        state_groups = [row[0] for row in txn]
 
         # TODO: we could probably usefully do a bunch of cache invalidation here
 
