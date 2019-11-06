@@ -217,8 +217,13 @@ class RegistrationHandler(BaseHandler):
 
         else:
             # autogen a sequential user ID
-            # Fail after being unable to find a suitable ID a few times
-            for x in range(10):
+            fail_count = 0
+            user = None
+            while not user:
+                # Fail after being unable to find a suitable ID a few times
+                if fail_count > 10:
+                    raise SynapseError(500, "Unable to find a suitable guest user ID")
+
                 localpart = yield self._generate_user_id()
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
@@ -238,7 +243,9 @@ class RegistrationHandler(BaseHandler):
                     break
                 except SynapseError:
                     # if user id is taken, just generate another
-                    pass
+                    user = None
+                    user_id = None
+                    fail_count += 1
 
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
