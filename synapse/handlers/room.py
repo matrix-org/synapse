@@ -907,7 +907,13 @@ class RoomContextHandler(object):
         state = yield self.state_store.get_state_for_events(
             [last_event_id], state_filter=state_filter
         )
-        results["state"] = list(state[last_event_id].values())
+
+        # Apply the filter on state events.
+        state_events = list(state[last_event_id].values())
+        if event_filter:
+            state_events = event_filter.filter(state_events)
+
+        results["state"] = list(state_events)
 
         # We use a dummy token here as we only care about the room portion of
         # the token, which we replace.
