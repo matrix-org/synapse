@@ -35,6 +35,7 @@ from synapse.api.errors import (
     SynapseError,
     UserDeactivatedError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import INTERACTIVE_AUTH_CHECKERS
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.logging.context import defer_to_thread
@@ -101,6 +102,10 @@ class AuthHandler(BaseHandler):
                         login_types.append(t)
         self._supported_login_types = login_types
 
+        # Ratelimiter for failed auth during UIA. Uses same ratelimit config
+        # as per `rc_login.failed_attempts`.
+        self._failed_uia_attempts_ratelimiter = Ratelimiter()
+
         self._clock = self.hs.get_clock()
 
     @defer.inlineCallbacks
@@ -129,12 +134,38 @@ class AuthHandler(BaseHandler):
 
             AuthError if the client has completed a login flow, and it gives
                 a different user to `requester`
+
+            LimitExceededError if the ratelimiter's failed requests count for this
+                user is too high too proceed
+
         """
+
+        user_id = requester.user.to_string()
+
+        # Check if we should be ratelimited due to too many previous failed attempts
+        self._failed_uia_attempts_ratelimiter.ratelimit(
+            user_id,
+            time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            update=False,
+        )
 
         # build a list of supported flows
         flows = [[login_type] for login_type in self._supported_login_types]
 
-        result, params, _ = yield self.check_auth(flows, request_body, clientip)
+        try:
+            result, params, _ = yield self.check_auth(flows, request_body, clientip)
+        except LoginError:
+            # Update the ratelimite to say we failed (`can_do_action` doesn't raise).
+            self._failed_uia_attempts_ratelimiter.can_do_action(
+                user_id,
+                time_now_s=self._clock.time(),
+                rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+                burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+                update=True,
+            )
+            raise
 
         # find the completed login type
         for login_type in self._supported_login_types:
