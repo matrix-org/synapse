@@ -56,6 +56,9 @@ logger = logging.getLogger(__name__)
 _charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=re.I)
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
+OG_TAG_NAME_MAXLEN = 50
+OG_TAG_VALUE_MAXLEN = 1000
+
 
 class PreviewUrlResource(DirectServeResource):
     isLeaf = True
@@ -171,7 +174,7 @@ class PreviewUrlResource(DirectServeResource):
             ts (int):
 
         Returns:
-            Deferred[str]: json-encoded og data
+            Deferred[bytes]: json-encoded og data
         """
         # check the URL cache in the DB (which will also provide us with
         # historical previews, if we have any)
@@ -271,6 +274,18 @@ class PreviewUrlResource(DirectServeResource):
         else:
             logger.warning("Failed to find any OG data in %s", url)
             og = {}
+
+        # filter out any stupidly long values
+        keys_to_remove = []
+        for k, v in og.items():
+            # values can be numeric as well as strings, hence the cast to str
+            if len(k) > OG_TAG_NAME_MAXLEN or len(str(v)) > OG_TAG_VALUE_MAXLEN:
+                logger.warning(
+                    "Pruning overlong tag %s from OG data", k[:OG_TAG_NAME_MAXLEN]
+                )
+                keys_to_remove.append(k)
+        for k in keys_to_remove:
+            del og[k]
 
         logger.debug("Calculated OG for %s as %s", url, og)
 
@@ -506,6 +521,10 @@ def _calc_og(tree, media_uri):
     og = {}
     for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
         if "content" in tag.attrib:
+            # if we've got more than 50 tags, someone is taking the piss
+            if len(og) >= 50:
+                logger.warning("Skipping OG for page with too many 'og:' tags")
+                return {}
             og[tag.attrib["property"]] = tag.attrib["content"]
 
     # TODO: grab article: meta tags too, e.g.:
