@@ -16,6 +16,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Iterable, Optional
 
 from six import iteritems, itervalues
 
@@ -27,6 +28,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersions
+from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.utils import log_function
 from synapse.state import v1, v2
@@ -212,15 +214,17 @@ class StateHandler(object):
         return joined_hosts
 
     @defer.inlineCallbacks
-    def compute_event_context(self, event, old_state=None):
+    def compute_event_context(
+        self, event: EventBase, old_state: Optional[Iterable[EventBase]] = None
+    ):
         """Build an EventContext structure for the event.
 
         This works out what the current state should be for the event, and
         generates a new state group if necessary.
 
         Args:
-            event (synapse.events.EventBase):
-            old_state (dict|None): The state at the event if it can't be
+            event:
+            old_state: The state at the event if it can't be
                 calculated from existing events. This is normally only specified
                 when receiving an event from federation where we don't have the
                 prev events for, e.g. when backfilling.
@@ -251,113 +255,103 @@ class StateHandler(object):
             # group for it.
             context = EventContext.with_state(
                 state_group=None,
+                state_group_before_event=None,
                 current_state_ids=current_state_ids,
                 prev_state_ids=prev_state_ids,
             )
 
             return context
+
+        #
+        # first of all, figure out the state before the event
+        #
 
         if old_state:
-            # We already have the state, so we don't need to calculate it.
-            # Let's just correctly fill out the context and create a
-            # new state group for it.
+            # if we're given the state before the event, then we use that
+            state_ids_before_event = {
+                (s.type, s.state_key): s.event_id for s in old_state
+            }
+            state_group_before_event = None
+            state_group_before_event_prev_group = None
+            deltas_to_state_group_before_event = None
 
-            prev_state_ids = {(s.type, s.state_key): s.event_id for s in old_state}
+        else:
+            # otherwise, we'll need to resolve the state across the prev_events.
+            logger.debug("calling resolve_state_groups from compute_event_context")
 
-            if event.is_state():
-                key = (event.type, event.state_key)
-                if key in prev_state_ids:
-                    replaces = prev_state_ids[key]
-                    if replaces != event.event_id:  # Paranoia check
-                        event.unsigned["replaces_state"] = replaces
-                current_state_ids = dict(prev_state_ids)
-                current_state_ids[key] = event.event_id
-            else:
-                current_state_ids = prev_state_ids
+            entry = yield self.resolve_state_groups_for_events(
+                event.room_id, event.prev_event_ids()
+            )
 
-            state_group = yield self.state_store.store_state_group(
+            state_ids_before_event = entry.state
+            state_group_before_event = entry.state_group
+            state_group_before_event_prev_group = entry.prev_group
+            deltas_to_state_group_before_event = entry.delta_ids
+
+        #
+        # make sure that we have a state group at that point. If it's not a state event,
+        # that will be the state group for the new event. If it *is* a state event,
+        # it might get rejected (in which case we'll need to persist it with the
+        # previous state group)
+        #
+
+        if not state_group_before_event:
+            state_group_before_event = yield self.state_store.store_state_group(
                 event.event_id,
                 event.room_id,
-                prev_group=None,
-                delta_ids=None,
-                current_state_ids=current_state_ids,
+                prev_group=state_group_before_event_prev_group,
+                delta_ids=deltas_to_state_group_before_event,
+                current_state_ids=state_ids_before_event,
             )
 
-            context = EventContext.with_state(
-                state_group=state_group,
-                current_state_ids=current_state_ids,
-                prev_state_ids=prev_state_ids,
+            # XXX: can we update the state cache entry for the new state group? or
+            # could we set a flag on resolve_state_groups_for_events to tell it to
+            # always make a state group?
+
+        #
+        # now if it's not a state event, we're done
+        #
+
+        if not event.is_state():
+            return EventContext.with_state(
+                state_group_before_event=state_group_before_event,
+                state_group=state_group_before_event,
+                current_state_ids=state_ids_before_event,
+                prev_state_ids=state_ids_before_event,
+                prev_group=state_group_before_event_prev_group,
+                delta_ids=deltas_to_state_group_before_event,
             )
 
-            return context
+        #
+        # otherwise, we'll need to create a new state group for after the event
+        #
 
-        logger.debug("calling resolve_state_groups from compute_event_context")
-
-        entry = yield self.resolve_state_groups_for_events(
-            event.room_id, event.prev_event_ids()
-        )
-
-        prev_state_ids = entry.state
-        prev_group = None
-        delta_ids = None
-
-        if event.is_state():
-            # If this is a state event then we need to create a new state
-            # group for the state after this event.
-
-            key = (event.type, event.state_key)
-            if key in prev_state_ids:
-                replaces = prev_state_ids[key]
+        key = (event.type, event.state_key)
+        if key in state_ids_before_event:
+            replaces = state_ids_before_event[key]
+            if replaces != event.event_id:
                 event.unsigned["replaces_state"] = replaces
 
-            current_state_ids = dict(prev_state_ids)
-            current_state_ids[key] = event.event_id
+        state_ids_after_event = dict(state_ids_before_event)
+        state_ids_after_event[key] = event.event_id
+        delta_ids = {key: event.event_id}
 
-            if entry.state_group:
-                # If the state at the event has a state group assigned then
-                # we can use that as the prev group
-                prev_group = entry.state_group
-                delta_ids = {key: event.event_id}
-            elif entry.prev_group:
-                # If the state at the event only has a prev group, then we can
-                # use that as a prev group too.
-                prev_group = entry.prev_group
-                delta_ids = dict(entry.delta_ids)
-                delta_ids[key] = event.event_id
-
-            state_group = yield self.state_store.store_state_group(
-                event.event_id,
-                event.room_id,
-                prev_group=prev_group,
-                delta_ids=delta_ids,
-                current_state_ids=current_state_ids,
-            )
-        else:
-            current_state_ids = prev_state_ids
-            prev_group = entry.prev_group
-            delta_ids = entry.delta_ids
-
-            if entry.state_group is None:
-                entry.state_group = yield self.state_store.store_state_group(
-                    event.event_id,
-                    event.room_id,
-                    prev_group=entry.prev_group,
-                    delta_ids=entry.delta_ids,
-                    current_state_ids=current_state_ids,
-                )
-                entry.state_id = entry.state_group
-
-            state_group = entry.state_group
-
-        context = EventContext.with_state(
-            state_group=state_group,
-            current_state_ids=current_state_ids,
-            prev_state_ids=prev_state_ids,
-            prev_group=prev_group,
+        state_group_after_event = yield self.state_store.store_state_group(
+            event.event_id,
+            event.room_id,
+            prev_group=state_group_before_event,
             delta_ids=delta_ids,
+            current_state_ids=state_ids_after_event,
         )
 
-        return context
+        return EventContext.with_state(
+            state_group=state_group_after_event,
+            state_group_before_event=state_group_before_event,
+            current_state_ids=state_ids_after_event,
+            prev_state_ids=state_ids_before_event,
+            prev_group=state_group_before_event,
+            delta_ids=delta_ids,
+        )
 
     @measure_func()
     @defer.inlineCallbacks
