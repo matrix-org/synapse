@@ -168,7 +168,7 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        yield self._check_registration_ratelimit(address)
+        yield self.check_registration_ratelimit(address)
 
         yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
@@ -415,7 +415,7 @@ class RegistrationHandler(BaseHandler):
             ratelimit=False,
         )
 
-    def _check_registration_ratelimit(self, address):
+    def check_registration_ratelimit(self, address):
         """A simple helper method to check whether the registration rate limit has been hit
         for a given IP address
 
