@@ -13,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import annotations
-
 import functools
 import inspect
 import logging
@@ -635,9 +633,8 @@ class _CacheContext:
     on a lower level.
     """
 
-    _cache_context_objects: WeakValueDictionary[
-        Tuple[Cache, CacheKey], _CacheContext
-    ] = WeakValueDictionary()
+    # WeakValueDictionary is not a generic at runtime, so we need the quotes (Py <3.7)
+    _cache_context_objects: "WeakValueDictionary[Tuple[Cache, CacheKey], _CacheContext]" = WeakValueDictionary()
 
     def __init__(self, cache: Cache, cache_key: CacheKey) -> None:
         self._cache = cache
@@ -648,7 +645,7 @@ class _CacheContext:
         self._cache.invalidate(self._cache_key)
 
     @classmethod
-    def get_instance(cls, cache: Cache, cache_key: CacheKey) -> _CacheContext:
+    def get_instance(cls, cache: Cache, cache_key: CacheKey) -> "_CacheContext":
         """Returns an instance constructed with the given arguments.
 
         A new instance is only created if none already exists.
