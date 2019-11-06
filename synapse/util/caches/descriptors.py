@@ -633,19 +633,20 @@ class _CacheContext:
     on a lower level.
     """
 
-    # WeakValueDictionary is not a generic at runtime, so we need the quotes (Py <3.7)
-    _cache_context_objects: "WeakValueDictionary[Tuple[Cache, CacheKey], _CacheContext]" = WeakValueDictionary()
+    _cache_context_objects = (
+        WeakValueDictionary()
+    )  # type: WeakValueDictionary[Tuple[Cache, CacheKey], _CacheContext]
 
-    def __init__(self, cache: Cache, cache_key: CacheKey) -> None:
+    def __init__(self, cache, cache_key):  # type: (Cache, CacheKey) -> None
         self._cache = cache
         self._cache_key = cache_key
 
-    def invalidate(self) -> None:
+    def invalidate(self):  # type: () -> None
         """Invalidates the cache entry referred to by the context."""
         self._cache.invalidate(self._cache_key)
 
     @classmethod
-    def get_instance(cls, cache: Cache, cache_key: CacheKey) -> "_CacheContext":
+    def get_instance(cls, cache, cache_key):  # type: (Cache, CacheKey) -> _CacheContext
         """Returns an instance constructed with the given arguments.
 
         A new instance is only created if none already exists.
