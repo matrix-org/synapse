@@ -19,7 +19,7 @@ import itertools
 import logging
 from collections import Counter as c_counter, OrderedDict, namedtuple
 from functools import wraps
-from typing import Set
+from typing import Collection
 
 from six import iteritems, text_type
 from six.moves import range
@@ -1736,7 +1736,7 @@ class EventsStore(
         return state_groups
 
     def purge_unreferenced_state_groups(
-        self, room_id: str, state_groups_to_delete: Set[int]
+        self, room_id: str, state_groups_to_delete: Collection[int]
     ) -> defer.Deferred:
         """Deletes no longer referenced state groups and de-deltas any state
         groups that reference them.
