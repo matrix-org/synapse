@@ -24,7 +24,6 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     ConsentNotGivenError,
-    LimitExceededError,
     RegistrationError,
     SynapseError,
 )
@@ -218,8 +217,8 @@ class RegistrationHandler(BaseHandler):
 
         else:
             # autogen a sequential user ID
-            user = None
-            while not user:
+            # Fail after being unable to find a suitable ID a few times
+            for x in range(10):
                 localpart = yield self._generate_user_id()
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
@@ -234,10 +233,12 @@ class RegistrationHandler(BaseHandler):
                         create_profile_with_displayname=default_display_name,
                         address=address,
                     )
+
+                    # Successfully registered
+                    break
                 except SynapseError:
                     # if user id is taken, just generate another
-                    user = None
-                    user_id = None
+                    pass
 
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
@@ -420,24 +421,23 @@ class RegistrationHandler(BaseHandler):
         for a given IP address
 
         Args:
-            address (str): the IP address used to perform the registration.
+            address (str|None): the IP address used to perform the registration. If this is
+                None, no ratelimiting will be performed.
 
         Raises:
             LimitExceededError: If the rate limit has been exceeded.
         """
+        if not address:
+            return
+
         time_now = self.clock.time()
 
-        allowed, time_allowed = self.ratelimiter.can_do_action(
+        self.ratelimiter.ratelimit(
             address,
             time_now_s=time_now,
             rate_hz=self.hs.config.rc_registration.per_second,
             burst_count=self.hs.config.rc_registration.burst_count,
         )
-
-        if not allowed:
-            raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now))
-            )
 
     def register_with_store(
         self,
