@@ -107,7 +107,7 @@ class E2eRoomKeysHandler(object):
         Raises:
             NotFoundError: if the backup version does not exist
         Returns:
-            A dict containing the count and hash for the backup version
+            A dict containing the count and etag for the backup version
         """
 
         # lock for consistency with uploading
@@ -125,8 +125,13 @@ class E2eRoomKeysHandler(object):
 
             yield self.store.delete_e2e_room_keys(user_id, version, room_id, session_id)
 
+            version_etag = version_info["etag"] + 1
+            yield self.store.update_e2e_room_keys_version(
+                user_id, version, None, version_etag
+            )
+
             count = yield self.store.count_e2e_room_keys(user_id, version)
-            return {"count": count, "hash": version_info["hash"]}
+            return {"etag": str(version_etag), "count": count}
 
     @trace
     @defer.inlineCallbacks
@@ -156,7 +161,7 @@ class E2eRoomKeysHandler(object):
         }
 
         Returns:
-            A dict containing the count and hash for the backup version
+            A dict containing the count and etag for the backup version
 
         Raises:
             NotFoundError: if there are no versions defined
@@ -199,7 +204,7 @@ class E2eRoomKeysHandler(object):
                 user_id, version, room_keys["rooms"]
             )
             to_insert = []  # batch the inserts together
-            changed = False  # if anything has changed, we need to update the hash
+            changed = False  # if anything has changed, we need to update the etag
             for room_id, room in iteritems(room_keys["rooms"]):
                 for session_id, room_key in iteritems(room["sessions"]):
                     log_kv(
@@ -238,15 +243,15 @@ class E2eRoomKeysHandler(object):
             if len(to_insert):
                 yield self.store.add_e2e_room_keys(user_id, version, to_insert)
 
-            version_hash = int(version_info["hash"])
+            version_etag = version_info["etag"]
             if changed:
-                version_hash = version_hash + 1
+                version_etag = version_etag + 1
                 yield self.store.update_e2e_room_keys_version(
-                    user_id, version, None, version_hash
+                    user_id, version, None, version_etag
                 )
 
             count = yield self.store.count_e2e_room_keys(user_id, version)
-            return {"hash": version_hash, "count": count}
+            return {"etag": str(version_etag), "count": count}
 
     @staticmethod
     def _should_replace_room_key(current_room_key, room_key):

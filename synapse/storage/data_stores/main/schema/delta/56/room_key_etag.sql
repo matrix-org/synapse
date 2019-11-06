@@ -13,5 +13,5 @@
  * limitations under the License.
  */
 
--- store the current hash of backup version
-ALTER TABLE e2e_room_keys_versions ADD COLUMN hash TEXT;
+-- store the current etag of backup version
+ALTER TABLE e2e_room_keys_versions ADD COLUMN etag INTEGER UNSIGNED;

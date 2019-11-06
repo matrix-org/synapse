@@ -297,7 +297,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 version(str)
                 algorithm(str)
                 auth_data(object): opaque dict supplied by the client
-                hash(int): tag of the keys in the backup
+                etag(int): tag of the keys in the backup
         """
 
         def _get_e2e_room_keys_version_info_txn(txn):
@@ -315,12 +315,12 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 txn,
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": this_version, "deleted": 0},
-                retcols=("version", "algorithm", "auth_data", "hash"),
+                retcols=("version", "algorithm", "auth_data", "etag"),
             )
             result["auth_data"] = json.loads(result["auth_data"])
             result["version"] = str(result["version"])
-            if not result["hash"]:
-                result["hash"] = 0
+            if not result["etag"]:
+                result["etag"] = 0
             return result
 
         return self.runInteraction(
@@ -370,7 +370,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
     @trace
     def update_e2e_room_keys_version(
-        self, user_id, version, info=None, version_hash=None
+        self, user_id, version, info=None, version_etag=None
     ):
         """Update a given backup version
 
@@ -378,14 +378,14 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             user_id(str): the user whose backup version we're updating
             version(str): the version ID of the backup version we're updating
             info(dict): the new backup version info to store
-            version_hash(str): tag of the keys in the backup
+            version_etag(int): tag of the keys in the backup
         """
         updatevalues = {}
 
         if info and "auth_data" in info:
             updatevalues["auth_data"] = json.dumps(info["auth_data"])
-        if version_hash:
-            updatevalues["hash"] = version_hash
+        if version_etag:
+            updatevalues["etag"] = version_etag
 
         if updatevalues:
             return self._simple_update(
