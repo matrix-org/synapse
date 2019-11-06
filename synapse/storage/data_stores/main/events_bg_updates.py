@@ -537,7 +537,12 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     txn=txn,
                     table="event_labels",
                     values=[
-                        {"event_id": event_id, "label": label}
+                        {
+                            "event_id": event_id,
+                            "label": label,
+                            "room_id": event_json["room_id"],
+                            "topological_ordering": event_json["depth"],
+                        }
                         for label in event_json["content"].get(
                             EventContentFields.Labels, []
                         )
