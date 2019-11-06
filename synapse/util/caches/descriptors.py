@@ -13,11 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import functools
 import inspect
 import logging
 import threading
-from typing import Any, cast
+from typing import Any, Tuple, Union, cast
 from weakref import WeakValueDictionary
 
 from six import itervalues
@@ -37,6 +39,8 @@ from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 from . import register_cache
 
 logger = logging.getLogger(__name__)
+
+CacheKey = Union[Tuple, Any]
 
 
 class _CachedFunction(Protocol):
@@ -631,18 +635,20 @@ class _CacheContext:
     on a lower level.
     """
 
-    _cache_context_objects = WeakValueDictionary()
+    _cache_context_objects: WeakValueDictionary[
+        Tuple[Cache, CacheKey], _CacheContext
+    ] = WeakValueDictionary()
 
-    def __init__(self, cache, cache_key):
+    def __init__(self, cache: Cache, cache_key: CacheKey) -> None:
         self._cache = cache
         self._cache_key = cache_key
 
-    def invalidate(self):
+    def invalidate(self) -> None:
         """Invalidates the cache entry referred to by the context."""
         self._cache.invalidate(self._cache_key)
 
     @classmethod
-    def get_instance(cls, cache, cache_key):
+    def get_instance(cls, cache: Cache, cache_key: CacheKey) -> _CacheContext:
         """Returns an instance constructed with the given arguments.
 
         A new instance is only created if none already exists.
