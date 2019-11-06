@@ -544,7 +544,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                             "topological_ordering": event_json["depth"],
                         }
                         for label in event_json["content"].get(
-                            EventContentFields.Labels, []
+                            EventContentFields.LABELS, []
                         )
                     ],
                 )
