@@ -545,7 +545,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                         for label in event_json["content"].get(
                             EventContentFields.LABELS, []
                         )
-                        if label is not None and isinstance(label, str)
+                        if isinstance(label, str)
                     ],
                 )
 
