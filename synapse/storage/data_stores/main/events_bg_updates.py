@@ -525,13 +525,10 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 (last_event_id, batch_size),
             )
 
-            rows = self.cursor_to_dict(txn)
-            if not len(rows):
-                return 0
-
-            for row in rows:
-                event_id = row["event_id"]
-                event_json = json.loads(row["event_json"])
+            nbrows = 0
+            last_row_event_id = ""
+            for (event_id, event_json_raw) in txn:
+                event_json = json.loads(event_json_raw)
 
                 self._simple_insert_many_txn(
                     txn=txn,
@@ -550,11 +547,14 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                     ],
                 )
 
+                nbrows += 1
+                last_row_event_id = event_id
+
             self._background_update_progress_txn(
-                txn, "event_store_labels", {"last_event_id": event_id}
+                txn, "event_store_labels", {"last_event_id": last_row_event_id}
             )
 
-            return len(rows)
+            return nbrows
 
         num_rows = yield self.runInteraction(
             desc="event_store_labels", func=_event_store_labels_txn
