@@ -876,7 +876,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         if event_filter and event_filter.labels:
             # If we're not filtering on a label, then joining on event_labels will
             # return as many row for a single event as the number of labels it has. To
-            # avoid this, only join if we're filtering on at least one label. 
+            # avoid this, only join if we're filtering on at least one label.
             join_clause = (
                 "LEFT JOIN event_labels"
                 " USING (event_id, room_id, topological_ordering)"
@@ -901,7 +901,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "select_keywords": select_keywords,
             "join_clause": join_clause,
             "bounds": bounds,
-            "order": order
+            "order": order,
         }
 
         txn.execute(sql, args)
