@@ -62,7 +62,8 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         Args:
             user_id(str): the user whose backup we're adding to
             version(str): the version ID of the backup for the set of keys we're adding to
-            room_keys(iterable[dict]): the keys to add
+            room_keys(iterable[(str, str, dict)]): the keys to add, in the form
+                (roomID, sessionID, keyData)
         """
 
         values = []
