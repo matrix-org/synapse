@@ -871,14 +871,25 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         args.append(int(limit))
 
+        # Using DISTINCT in this SELECT query is quite expensive, because it requires the
+        # engine to sort on the entire (not limited) result set, i.e. the entire events
+        # table. We only need to use it when we're filtering on more than two labels,
+        # because that's the only scenario in which we can possibly to get multiple times
+        # the same event ID in the results.
+        if event_filter.labels and len(event_filter.labels) > 1:
+            select_keywords = "SELECT DISTINCT"
+
+        else:
+            select_keywords = "SELECT"
+
         sql = (
-            "SELECT DISTINCT event_id, topological_ordering, stream_ordering"
+            "%(select_keywords)s event_id, topological_ordering, stream_ordering"
             " FROM events"
             " LEFT JOIN event_labels USING (event_id, room_id, topological_ordering)"
             " WHERE outlier = ? AND room_id = ? AND %(bounds)s"
             " ORDER BY topological_ordering %(order)s,"
             " stream_ordering %(order)s LIMIT ?"
-        ) % {"bounds": bounds, "order": order}
+        ) % {"select_keywords": select_keywords, "bounds": bounds, "order": order}
 
         txn.execute(sql, args)
 
