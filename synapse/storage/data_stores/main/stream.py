@@ -876,11 +876,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         # table. We only need to use it when we're filtering on more than two labels,
         # because that's the only scenario in which we can possibly to get multiple times
         # the same event ID in the results.
-        if event_filter.labels and len(event_filter.labels) > 1:
-            select_keywords = "SELECT DISTINCT"
-
-        else:
-            select_keywords = "SELECT"
+        select_keywords = "SELECT"
+        if event_filter and event_filter.labels and len(event_filter.labels) > 1:
+            select_keywords += "DISTINCT"
 
         sql = (
             "%(select_keywords)s event_id, topological_ordering, stream_ordering"
