@@ -511,7 +511,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def _event_store_labels(self, progress, batch_size):
-        """Stores labels for events."""
+        """Background update handler which will store labels for existing events."""
         last_event_id = progress.get("last_event_id", "")
 
         def _event_store_labels_txn(txn):
