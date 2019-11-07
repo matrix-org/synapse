@@ -525,43 +525,38 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 (last_event_id, batch_size),
             )
 
-            rows = self.cursor_to_dict(txn)
-            if not rows:
-                return True, 0
-
-            for row in rows:
-                event_id = row["event_id"]
-                event_json = json.loads(row["json"])
-
+            nbrows = 0
+            for (event_id, event_json) in txn:
                 self._simple_insert_many_txn(
                     txn=txn,
                     table="event_labels",
                     values=[
                         {
                             "event_id": event_id,
-                            "label": label,
+                            "label": str(label),
                             "room_id": event_json["room_id"],
                             "topological_ordering": event_json["depth"],
                         }
                         for label in event_json["content"].get(
                             EventContentFields.LABELS, []
                         )
+                        if label is not None
                     ],
                 )
+
+                nbrows += 1
 
             self._background_update_progress_txn(
                 txn, "event_store_labels", {"last_event_id": event_id}
             )
 
-            # We want to return true (to end the background update) only when
-            # the query returned with less rows than we asked for.
-            return len(rows) != batch_size, len(rows)
+            return nbrows
 
-        end, num_rows = yield self.runInteraction(
+        num_rows = yield self.runInteraction(
             desc="event_store_labels", func=_event_store_labels_txn
         )
 
-        if end:
+        if not num_rows:
             yield self._end_background_update("event_store_labels")
 
         return num_rows
