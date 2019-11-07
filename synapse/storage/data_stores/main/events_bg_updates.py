@@ -526,28 +526,32 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             )
 
             nbrows = 0
-            for (event_id, event_json) in txn:
+            last_row_event_id = ""
+            for (event_id, event_json_raw) in txn:
+                event_json = json.loads(event_json_raw)
+
                 self._simple_insert_many_txn(
                     txn=txn,
                     table="event_labels",
                     values=[
                         {
                             "event_id": event_id,
-                            "label": str(label),
+                            "label": label,
                             "room_id": event_json["room_id"],
                             "topological_ordering": event_json["depth"],
                         }
                         for label in event_json["content"].get(
                             EventContentFields.LABELS, []
                         )
-                        if label is not None
+                        if label is not None and isinstance(label, str)
                     ],
                 )
 
                 nbrows += 1
+                last_row_event_id = event_id
 
             self._background_update_progress_txn(
-                txn, "event_store_labels", {"last_event_id": event_id}
+                txn, "event_store_labels", {"last_event_id": last_row_event_id}
             )
 
             return nbrows
