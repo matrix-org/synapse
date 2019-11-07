@@ -525,9 +525,11 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 (last_event_id, batch_size),
             )
 
+            results = list(txn)
+
             nbrows = 0
             last_row_event_id = ""
-            for (event_id, event_json_raw) in txn:
+            for (event_id, event_json_raw) in results:
                 event_json = json.loads(event_json_raw)
 
                 self._simple_insert_many_txn(
