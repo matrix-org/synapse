@@ -88,8 +88,7 @@ TagAccountDataStreamRow = namedtuple(
     "TagAccountDataStreamRow", ("user_id", "room_id", "data")  # str  # str  # dict
 )
 AccountDataStreamRow = namedtuple(
-    "AccountDataStream",
-    ("user_id", "room_id", "data_type"),  # str  # str  # str
+    "AccountDataStream", ("user_id", "room_id", "data_type")  # str  # str  # str
 )
 GroupsStreamRow = namedtuple(
     "GroupsStreamRow",
