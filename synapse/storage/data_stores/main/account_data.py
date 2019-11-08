@@ -184,14 +184,14 @@ class AccountDataWorkerStore(SQLBaseStore):
             current_id(int): The position to fetch up to.
         Returns:
             A deferred pair of lists of tuples of stream_id int, user_id string,
-            room_id string, type string, and content string.
+            room_id string, and type string.
         """
         if last_room_id == current_id and last_global_id == current_id:
             return defer.succeed(([], []))
 
         def get_updated_account_data_txn(txn):
             sql = (
-                "SELECT stream_id, user_id, account_data_type, content"
+                "SELECT stream_id, user_id, account_data_type"
                 " FROM account_data WHERE ? < stream_id AND stream_id <= ?"
                 " ORDER BY stream_id ASC LIMIT ?"
             )
@@ -199,7 +199,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             global_results = txn.fetchall()
 
             sql = (
-                "SELECT stream_id, user_id, room_id, account_data_type, content"
+                "SELECT stream_id, user_id, room_id, account_data_type"
                 " FROM room_account_data WHERE ? < stream_id AND stream_id <= ?"
                 " ORDER BY stream_id ASC LIMIT ?"
             )
