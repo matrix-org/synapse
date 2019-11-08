@@ -877,10 +877,10 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             # If we're not filtering on a label, then joining on event_labels will
             # return as many row for a single event as the number of labels it has. To
             # avoid this, only join if we're filtering on at least one label.
-            join_clause = (
-                "LEFT JOIN event_labels"
-                " USING (event_id, room_id, topological_ordering)"
-            )
+            join_clause = """
+                LEFT JOIN event_labels
+                USING (event_id, room_id, topological_ordering)
+            """
             if len(event_filter.labels) > 1:
                 # Using DISTINCT in this SELECT query is quite expensive, because it
                 # requires the engine to sort on the entire (not limited) result set,
@@ -890,14 +890,14 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 # the results.
                 select_keywords += "DISTINCT"
 
-        sql = (
-            "%(select_keywords)s event_id, topological_ordering, stream_ordering"
-            " FROM events"
-            " %(join_clause)s"
-            " WHERE outlier = ? AND room_id = ? AND %(bounds)s"
-            " ORDER BY topological_ordering %(order)s,"
-            " stream_ordering %(order)s LIMIT ?"
-        ) % {
+        sql = """
+            %(select_keywords)s event_id, topological_ordering, stream_ordering
+            FROM events
+            %(join_clause)s
+            WHERE outlier = ? AND room_id = ? AND %(bounds)s
+            ORDER BY topological_ordering %(order)s,
+            stream_ordering %(order)s LIMIT ?
+        """ % {
             "select_keywords": select_keywords,
             "join_clause": join_clause,
             "bounds": bounds,
