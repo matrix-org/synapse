@@ -2122,14 +2122,9 @@ class FederationHandler(BaseHandler):
         #
         # we start by checking if they are in the store, and then try calling /event_auth/.
         if missing_auth:
-            # TODO: can we use store.have_seen_events here instead?
-            have_events = yield self.store.get_seen_events_with_rejections(missing_auth)
-            logger.debug("Found events %s in the store", have_events)
-            missing_auth.difference_update(have_events.keys())
-        else:
-            have_events = {}
-
-        have_events.update({e.event_id: "" for e in auth_events.values()})
+            have_events = yield self.store.have_seen_events(missing_auth)
+            logger.debug("Events %s are in the store", have_events)
+            missing_auth.difference_update(have_events)
 
         if missing_auth:
             # If we don't have all the auth events, we need to get them.
@@ -2175,9 +2170,6 @@ class FederationHandler(BaseHandler):
                     except AuthError:
                         pass
 
-                have_events = yield self.store.get_seen_events_with_rejections(
-                    event.auth_event_ids()
-                )
             except Exception:
                 logger.exception("Failed to get auth chain")
 
@@ -2207,39 +2199,33 @@ class FederationHandler(BaseHandler):
         # idea of them.
 
         room_version = yield self.store.get_room_version(event.room_id)
-        different_event_ids = [
-            d for d in different_auth if d in have_events and not have_events[d]
-        ]
 
-        if different_event_ids:
-            # XXX: currently this checks for redactions but I'm not convinced that is
-            # necessary?
-            different_events = yield self.store.get_events_as_list(different_event_ids)
+        # XXX: currently this checks for redactions but I'm not convinced that is
+        # necessary?
+        different_events = yield self.store.get_events_as_list(different_auth)
 
-            local_view = dict(auth_events)
-            remote_view = dict(auth_events)
-            remote_view.update({(d.type, d.state_key): d for d in different_events})
+        local_view = dict(auth_events)
+        remote_view = dict(auth_events)
+        remote_view.update({(d.type, d.state_key): d for d in different_events})
 
-            new_state = yield self.state_handler.resolve_events(
-                room_version,
-                [list(local_view.values()), list(remote_view.values())],
-                event,
-            )
+        new_state = yield self.state_handler.resolve_events(
+            room_version, [list(local_view.values()), list(remote_view.values())], event
+        )
 
-            logger.info(
-                "After state res: updating auth_events with new state %s",
-                {
-                    (d.type, d.state_key): d.event_id
-                    for d in new_state.values()
-                    if auth_events.get((d.type, d.state_key)) != d
-                },
-            )
+        logger.info(
+            "After state res: updating auth_events with new state %s",
+            {
+                (d.type, d.state_key): d.event_id
+                for d in new_state.values()
+                if auth_events.get((d.type, d.state_key)) != d
+            },
+        )
 
-            auth_events.update(new_state)
+        auth_events.update(new_state)
 
-            context = yield self._update_context_for_auth_events(
-                event, context, auth_events
-            )
+        context = yield self._update_context_for_auth_events(
+            event, context, auth_events
+        )
 
         return context
 
