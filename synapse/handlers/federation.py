@@ -2210,26 +2210,18 @@ class FederationHandler(BaseHandler):
         # idea of them.
 
         room_version = yield self.store.get_room_version(event.room_id)
+        different_event_ids = [
+            d for d in different_auth if d in have_events and not have_events[d]
+        ]
 
-        different_events = yield make_deferred_yieldable(
-            defer.gatherResults(
-                [
-                    run_in_background(
-                        self.store.get_event, d, allow_none=True, allow_rejected=False
-                    )
-                    for d in different_auth
-                    if d in have_events and not have_events[d]
-                ],
-                consumeErrors=True,
-            )
-        ).addErrback(unwrapFirstError)
+        if different_event_ids:
+            # XXX: currently this checks for redactions but I'm not convinced that is
+            # necessary?
+            different_events = yield self.store.get_events_as_list(different_event_ids)
 
-        if different_events:
             local_view = dict(auth_events)
             remote_view = dict(auth_events)
-            remote_view.update(
-                {(d.type, d.state_key): d for d in different_events if d}
-            )
+            remote_view.update({(d.type, d.state_key): d for d in different_events})
 
             new_state = yield self.state_handler.resolve_events(
                 room_version,
