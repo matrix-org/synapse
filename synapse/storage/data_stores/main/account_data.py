@@ -191,7 +191,7 @@ class AccountDataWorkerStore(SQLBaseStore):
 
         def get_updated_account_data_txn(txn):
             sql = (
-                "SELECT stream_id, user_id, account_data_type"
+                "SELECT stream_id, user_id, account_data_type, content"
                 " FROM account_data WHERE ? < stream_id AND stream_id <= ?"
                 " ORDER BY stream_id ASC LIMIT ?"
             )
@@ -199,7 +199,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             global_results = txn.fetchall()
 
             sql = (
-                "SELECT stream_id, user_id, room_id, account_data_type"
+                "SELECT stream_id, user_id, room_id, account_data_type, content"
                 " FROM room_account_data WHERE ? < stream_id AND stream_id <= ?"
                 " ORDER BY stream_id ASC LIMIT ?"
             )
