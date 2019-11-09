@@ -187,6 +187,15 @@ you invite them to. This can be caused by an incorrectly-configured reverse
 proxy: see [reverse_proxy.md](<reverse_proxy.md>) for instructions on how to correctly
 configure a reverse proxy.
 
+If you find yourself in a timeout situation when looking for chat room on other instances,
+keep in mind that allowing 8448 port traffic isn't enough,
+as other instances may have delegated to other port.
+You may ensure to be at least allowing ctstate RELATED and ESTABLISHED tcp connections,
+otherwise you will timeout each time your synapse will try to contact other servers.
+```
+ip[6]tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+```
+
 ## Running a Demo Federation of Synapses
 
 If you want to get up and running quickly with a trio of homeservers in a
