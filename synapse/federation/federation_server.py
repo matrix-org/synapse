@@ -378,9 +378,7 @@ class FederationServer(FederationBase):
         time_now = self._clock.time_msec()
         return {
             "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
-            "auth_chain": [
-                p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]
-            ],
+            "auth_chain": [p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]],
         }
 
     async def on_make_leave_request(self, origin, room_id, user_id):
