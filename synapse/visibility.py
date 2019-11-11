@@ -115,14 +115,17 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
         if not event.is_state() and event.sender in ignore_list:
             return None
 
-        retention_policy = retention_policies[event.room_id]
-        max_lifetime = retention_policy.get("max_lifetime")
+        # Don't try to apply the room's retention policy if the event is a state event, as
+        # MSC1763 states that retention is only considered for non-state events.
+        if not event.is_state():
+            retention_policy = retention_policies[event.room_id]
+            max_lifetime = retention_policy.get("max_lifetime")
 
-        if max_lifetime is not None:
-            oldest_allowed_ts = store.clock.time_msec() - max_lifetime
+            if max_lifetime is not None:
+                oldest_allowed_ts = store.clock.time_msec() - max_lifetime
 
-            if event.origin_server_ts < oldest_allowed_ts:
-                return None
+                if event.origin_server_ts < oldest_allowed_ts:
+                    return None
 
         if event.event_id in always_include_ids:
             return event
