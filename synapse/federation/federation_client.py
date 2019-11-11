@@ -751,7 +751,7 @@ class FederationClient(FederationBase):
                 # If we receive an error response that isn't a generic error, or an
                 # unrecognised endpoint error, we  assume that the remote understands
                 # the v2 invite API and this is a legitimate error.
-                if not err.errcode in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
+                if err.errcode not in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
                     raise err
             else:
                 raise e.to_synapse_error()
@@ -878,7 +878,6 @@ class FederationClient(FederationBase):
 
         @defer.inlineCallbacks
         def send_request(destination):
-            time_now = self._clock.time_msec()
             content = yield self._do_send_leave(destination, pdu)
 
             logger.debug("Got content: %s", content)
@@ -906,7 +905,7 @@ class FederationClient(FederationBase):
                 # If we receive an error response that isn't a generic error, or an
                 # unrecognised endpoint error, we  assume that the remote understands
                 # the v2 invite API and this is a legitimate error.
-                if not err.errcode in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
+                if err.errcode not in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
                     raise err
             else:
                 raise e.to_synapse_error()
