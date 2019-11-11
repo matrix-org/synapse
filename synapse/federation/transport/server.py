@@ -517,6 +517,8 @@ class FederationV1SendLeaveServlet(BaseFederationServlet):
 class FederationV2SendLeaveServlet(BaseFederationServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
+    PREFIX = FEDERATION_V2_PREFIX
+
     async def on_PUT(self, origin, content, query, room_id, event_id):
         content = await self.handler.on_send_leave_request(origin, content, room_id)
         return 200, content
