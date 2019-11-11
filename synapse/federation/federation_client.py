@@ -664,7 +664,7 @@ class FederationClient(FederationBase):
 
         @defer.inlineCallbacks
         def send_request(destination):
-            content = self._do_send_join(destination, pdu)
+            content = yield self._do_send_join(destination, pdu)
 
             logger.debug("Got content: %s", content)
 
