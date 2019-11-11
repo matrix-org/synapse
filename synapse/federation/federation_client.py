@@ -664,13 +664,7 @@ class FederationClient(FederationBase):
 
         @defer.inlineCallbacks
         def send_request(destination):
-            time_now = self._clock.time_msec()
-            _, content = yield self.transport_layer.send_join(
-                destination=destination,
-                room_id=pdu.room_id,
-                event_id=pdu.event_id,
-                content=pdu.get_pdu_json(time_now),
-            )
+            content = self._do_send_join(destination, pdu)
 
             logger.debug("Got content: %s", content)
 
@@ -736,6 +730,44 @@ class FederationClient(FederationBase):
             }
 
         return self._try_destination_list("send_join", destinations, send_request)
+
+    @defer.inlineCallbacks
+    def _do_send_join(self, destination, pdu):
+        time_now = self._clock.time_msec()
+
+        try:
+            content = yield self.transport_layer.send_join_v2(
+                destination=destination,
+                room_id=pdu.room_id,
+                event_id=pdu.event_id,
+                content=pdu.get_pdu_json(time_now),
+            )
+
+            return content
+        except HttpResponseException as e:
+            if e.code in [400, 404]:
+                err = e.to_synapse_error()
+
+                # If we receive an error response that isn't a generic error, or an
+                # unrecognised endpoint error, we  assume that the remote understands
+                # the v2 invite API and this is a legitimate error.
+                if not err.errcode in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
+                    raise err
+            else:
+                raise e.to_synapse_error()
+
+        logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
+
+        resp = yield self.transport_layer.send_join_v1(
+            destination=destination,
+            room_id=pdu.room_id,
+            event_id=pdu.event_id,
+            content=pdu.get_pdu_json(time_now),
+        )
+
+        # We expect the v1 API to respond with [200, content], so we only return the
+        # content.
+        return resp[1]
 
     @defer.inlineCallbacks
     def send_invite(self, destination, room_id, event_id, pdu):
