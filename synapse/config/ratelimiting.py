@@ -68,6 +68,9 @@ class RatelimitConfig(Config):
             )
 
         self.rc_registration = RateLimitConfig(config.get("rc_registration", {}))
+        self.rc_third_party_invite = RateLimitConfig(
+            config.get("rc_third_party_invite", {})
+        )
 
         rc_login_config = config.get("rc_login", {})
         self.rc_login_address = RateLimitConfig(rc_login_config.get("address", {}))
@@ -102,6 +105,8 @@ class RatelimitConfig(Config):
         #   - one for login that ratelimits login requests based on the account the
         #     client is attempting to log into, based on the amount of failed login
         #     attempts for this account.
+        #   - one that ratelimits third-party invites requests based on the account
+        #     that's making the requests.
         #
         # The defaults are as shown below.
         #
@@ -123,6 +128,10 @@ class RatelimitConfig(Config):
         #  failed_attempts:
         #    per_second: 0.17
         #    burst_count: 3
+        #
+        #rc_third_party_invite:
+        #  per_second: 0.2
+        #  burst_count: 10
 
 
         # Ratelimiting settings for incoming federation
