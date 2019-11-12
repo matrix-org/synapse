@@ -781,7 +781,7 @@ class ServerConfig(Config):
             "--daemonize",
             action="store_true",
             default=None,
-            help="Daemonize the home server",
+            help="Daemonize the homeserver",
         )
         server_group.add_argument(
             "--print-pidfile",
