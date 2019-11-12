@@ -78,19 +78,20 @@ for example:
 Upgrading to v1.5.2
 ===================
 
-In attempt to configure Synapse in a privacy preserving way, the default 
-behaviour of ``allow_public_rooms_without_auth`` and 
-``allow_public_rooms_over_federation`` has been inverted. This means that by 
-default, only authenticated users querying the Client/Server API will be able 
-to query the room directory, and relatedly that the server will not share 
+In an attempt to configure Synapse in a privacy preserving way, the default
+behaviours of ``allow_public_rooms_without_auth`` and
+``allow_public_rooms_over_federation`` have been inverted. This means that by
+default, only authenticated users querying the Client/Server API will be able
+to query the room directory, and relatedly that the server will not share
 room directory information with other servers over federation.
 
 If your installation does not explicitly set these settings one way or the other
-and you want either setting to be ``true`` they will need to be explicitly set
-in ``homeserver.yaml``
+and you want either setting to be ``true`` then it will necessary to update
+``homeserver.yaml`` accordingly.
 
 For more details on the surrounding context see our `explainer
-<https://matrix.org/blog/2019/11/09/avoiding-unwelcome-visitors-on-private-matrix-servers>`_. 
+<https://matrix.org/blog/2019/11/09/avoiding-unwelcome-visitors-on-private-matrix-servers>`_.
+
 
 Upgrading to v1.5.0
 ===================
