@@ -488,14 +488,14 @@ class RegistrationWorkerStore(SQLBaseStore):
         we can. Unfortunately, it's possible some of them are already taken by
         existing users, and there may be gaps in the already taken range. This
         function returns the start of the first allocatable gap. This is to
-        avoid the case of ID 10000000 being pre-allocated, so us wasting the
-        first (and shortest) many generated user IDs.
+        avoid the case of ID 1000 being pre-allocated and starting at 1001 while
+        0-999 are available.
         """
 
         def _find_next_generated_user_id(txn):
-            # We bound between '@1' and '@a' to avoid pulling the entire table
+            # We bound between '@0' and '@a' to avoid pulling the entire table
             # out.
-            txn.execute("SELECT name FROM users WHERE '@1' <= name AND name < '@a'")
+            txn.execute("SELECT name FROM users WHERE '@0' <= name AND name < '@a'")
 
             regex = re.compile(r"^@(\d+):")
 
