@@ -364,8 +364,8 @@ class SQLBaseStore(object):
         self._simple_upsert_txn(
             txn,
             "account_validity",
-            keyvalues={"user_id": user_id, },
-            values={"expiration_ts_ms": expiration_ts, "email_sent": False, },
+            keyvalues={"user_id": user_id},
+            values={"expiration_ts_ms": expiration_ts, "email_sent": False},
         )
 
     def start_profiling(self):
