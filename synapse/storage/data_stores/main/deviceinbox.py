@@ -361,7 +361,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore)
         # Compatible method of performing an upsert with a dummy table column
         sql = """
             INSERT INTO device_max_stream_id
-            (id, stream_id) VALUES (0, ?)
+            (id, stream_id) VALUES (false, ?)
             ON CONFLICT(id) DO UPDATE
             SET stream_id = ?
             WHERE stream_id < ?
