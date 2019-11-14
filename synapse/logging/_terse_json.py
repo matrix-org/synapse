@@ -37,7 +37,6 @@ from twisted.internet.endpoints import (
 )
 from twisted.internet.interfaces import IPushProducer, ITransport
 from twisted.internet.protocol import Factory, Protocol
-from twisted.internet.task import LoopingCall
 from twisted.logger import FileLogObserver, ILogObserver, Logger
 
 _encoder = json.JSONEncoder(ensure_ascii=False, separators=(",", ":"))
