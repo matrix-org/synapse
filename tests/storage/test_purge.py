@@ -40,23 +40,24 @@ class PurgeTests(HomeserverTestCase):
         third = self.helper.send(self.room_id, body="test3")
         last = self.helper.send(self.room_id, body="test4")
 
-        storage = self.hs.get_datastore()
+        store = self.hs.get_datastore()
+        storage = self.hs.get_storage()
 
         # Get the topological token
-        event = storage.get_topological_token_for_event(last["event_id"])
+        event = store.get_topological_token_for_event(last["event_id"])
         self.pump()
         event = self.successResultOf(event)
 
         # Purge everything before this topological token
-        purge = storage.purge_history(self.room_id, event, True)
+        purge = storage.purge_events.purge_history(self.room_id, event, True)
         self.pump()
         self.assertEqual(self.successResultOf(purge), None)
 
         # Try and get the events
-        get_first = storage.get_event(first["event_id"])
-        get_second = storage.get_event(second["event_id"])
-        get_third = storage.get_event(third["event_id"])
-        get_last = storage.get_event(last["event_id"])
+        get_first = store.get_event(first["event_id"])
+        get_second = store.get_event(second["event_id"])
+        get_third = store.get_event(third["event_id"])
+        get_last = store.get_event(last["event_id"])
         self.pump()
 
         # 1-3 should fail and last will succeed, meaning that 1-3 are deleted

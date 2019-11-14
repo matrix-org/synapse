@@ -195,7 +195,7 @@ class TerseJSONToTCPLogObserver(object):
     An IObserver that writes JSON logs to a TCP target.
 
     Args:
-        hs (HomeServer): The Homeserver that is being logged for.
+        hs (HomeServer): The homeserver that is being logged for.
         host: The host of the logging target.
         port: The logging target's port.
         metadata: Metadata to be added to each log entry.

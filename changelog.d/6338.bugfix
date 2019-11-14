@@ -1,0 +1,1 @@
+Prevent the server taking a long time to start up when guest registration is enabled.
