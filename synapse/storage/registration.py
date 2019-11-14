@@ -152,6 +152,29 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
+    def get_expired_users(self):
+        """Get IDs of all expired users
+
+        Returns:
+            Deferred[list[str]]: List of expired user IDs
+        """
+        def get_expired_users_txn(txn, now_ms):
+            sql = """
+                SELECT user_id from account_validity
+                WHERE expiration_ts_ms <= ?
+            """
+            txn.execute(sql, (now_ms,))
+            rows = txn.fetchall()
+            return [row[0] for row in rows]
+
+        res = yield self.runInteraction(
+            "get_expired_users",
+            get_expired_users_txn,
+            self.clock.time_msec(),
+        )
+        defer.returnValue(res)
+
+    @defer.inlineCallbacks
     def set_renewal_token_for_user(self, user_id, renewal_token):
         """Defines a renewal token for a given user.
 

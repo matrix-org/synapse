@@ -352,6 +352,141 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         )
 
 
+class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.client.v1.profile.register_servlets,
+        synapse.rest.client.v1.room.register_servlets,
+        synapse.rest.client.v2_alpha.user_directory.register_servlets,
+        login.register_servlets,
+        register.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        account_validity.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+
+        # Set accounts to expire after a week
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": True,
+            "period": 604800000,  # Time in ms for 1 week
+        }
+        config["replicate_user_profiles_to"] = "test.is"
+
+        # Mock homeserver requests to an identity server
+        mock_http_client = Mock(spec=[
+            "post_json_get_json",
+        ])
+        mock_http_client.post_json_get_json.return_value = defer.succeed((200, "{}"))
+
+        self.hs = self.setup_test_homeserver(
+            config=config,
+            simple_http_client=mock_http_client,
+        )
+
+        return self.hs
+
+    def test_expired_user_in_directory(self):
+        """Test that an expired user is hidden in the user directory"""
+        # Create an admin user to search the user directory
+        admin_id = self.register_user("admin", "adminpassword", admin=True)
+        admin_tok = self.login("admin", "adminpassword")
+
+        # Ensure the admin never expires
+        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        params = {
+            "user_id": admin_id,
+            "expiration_ts": 999999999999,
+            "enable_renewal_emails": False,
+        }
+        request_data = json.dumps(params)
+        request, channel = self.make_request(
+            b"POST", url, request_data, access_token=admin_tok
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # Create a user to expire
+        username = "kermit"
+        user_id = self.register_user(username, "monkey")
+        self.login(username, "monkey")
+
+        self.pump(1000)
+        self.reactor.advance(1000)
+        self.pump()
+
+        # Expire the user
+        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        params = {
+            "user_id": user_id,
+            "expiration_ts": 0,
+            "enable_renewal_emails": False,
+        }
+        request_data = json.dumps(params)
+        request, channel = self.make_request(
+            b"POST", url, request_data, access_token=admin_tok
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # Wait for the background job to run which hides expired users in the directory
+        self.pump(60 * 60 * 1000)
+
+        # Mock the homeserver's HTTP client
+        post_json = self.hs.get_simple_http_client().post_json_get_json
+
+        # Check if the homeserver has replicated the user's profile to the identity server
+        self.assertNotEquals(post_json.call_args, None, post_json.call_args)
+        payload = post_json.call_args[0][1]
+        batch = payload.get("batch")
+        self.assertNotEquals(batch, None, batch)
+        self.assertEquals(len(batch), 1, batch)
+        replicated_user_id = list(batch.keys())[0]
+        self.assertEquals(replicated_user_id, user_id, replicated_user_id)
+
+        # There was replicated information about our user
+        # Check that it's None, signifying that the user should be removed from the user
+        # directory because they were expired
+        replicated_content = batch[user_id]
+        self.assertIsNone(replicated_content)
+
+        # Now renew the user, and check they get replicated again to the identity server
+        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        params = {
+            "user_id": user_id,
+            "expiration_ts": 99999999999,
+            "enable_renewal_emails": False,
+        }
+        request_data = json.dumps(params)
+        request, channel = self.make_request(
+            b"POST", url, request_data, access_token=admin_tok
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.pump(10)
+        self.reactor.advance(10)
+        self.pump()
+
+        # Check if the homeserver has replicated the user's profile to the identity server
+        post_json = self.hs.get_simple_http_client().post_json_get_json
+        self.assertNotEquals(post_json.call_args, None, post_json.call_args)
+        payload = post_json.call_args[0][1]
+        batch = payload.get("batch")
+        self.assertNotEquals(batch, None, batch)
+        self.assertEquals(len(batch), 1, batch)
+        replicated_user_id = list(batch.keys())[0]
+        self.assertEquals(replicated_user_id, user_id, replicated_user_id)
+
+        # There was replicated information about our user
+        # Check that it's not None, signifying that the user is back in the user
+        # directory
+        replicated_content = batch[user_id]
+        self.assertIsNotNone(replicated_content)
+
+
 class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
     servlets = [
