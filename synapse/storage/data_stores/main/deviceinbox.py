@@ -359,6 +359,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore)
         self, txn, stream_id, messages_by_user_then_device
     ):
         # Compatible method of performing an upsert with a dummy table column
+        logger.info("Doing it with stream_id %s", stream_id)
         sql = """
             INSERT INTO device_max_stream_id
             (id, stream_id) VALUES (false, ?)
