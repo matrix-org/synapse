@@ -358,16 +358,21 @@ class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore)
     def _add_messages_to_local_device_inbox_txn(
         self, txn, stream_id, messages_by_user_then_device
     ):
-        # Compatible method of performing an upsert with a dummy table column
-        logger.info("Doing it with stream_id %s", stream_id)
-        sql = """
-            INSERT INTO device_max_stream_id
-            (id, stream_id) VALUES (false, ?)
-            ON CONFLICT(id) DO UPDATE
-            SET stream_id = ?
-            WHERE stream_id < ?
-        """
-        txn.execute(sql, (stream_id, stream_id, stream_id))
+        # Compatible method of performing an upsert
+        sql = "SELECT stream_id FROM device_max_stream_id"
+
+        txn.execute(sql)
+        rows = txn.fetchone()
+        if rows:
+            db_stream_id = rows[0]
+            if db_stream_id < stream_id:
+                # Insert the new stream_id
+                sql = "UPDATE device_max_stream_id SET stream_id = ?"
+        else:
+            # No rows, perform an insert
+            sql = "INSERT INTO device_max_stream_id (stream_id) VALUES (?)"
+
+        txn.execute(sql, (stream_id,))
 
         local_by_user_then_device = {}
         for user_id, messages_by_device in messages_by_user_then_device.items():
