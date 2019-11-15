@@ -487,6 +487,33 @@ class JoinedRoomMemberListRestServlet(RestServlet):
 
         return 200, {"joined": users_with_profile}
 
+class JoinedManyRoomMemberListRestServlet(RestServlet):
+    PATTERNS = client_patterns("/rooms/joined_members$", v1=True)
+
+    def __init__(self, hs):
+        super(JoinedManyRoomMemberListRestServlet, self).__init__()
+        self.message_handler = hs.get_message_handler()
+        self.auth = hs.get_auth()
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+
+        content = parse_json_object_from_request(request)
+
+        if content.get("rooms", None) is None:
+            raise SynapseError(400, "'rooms' not given in request body.", errcode=Codes.BAD_JSON)    
+
+        result = {}
+
+        for room_id in set(content["rooms"]):
+            if not isinstance(room_id, str):
+                raise SynapseError(400, "Invalid room_id given.", errcode=Codes.BAD_JSON)    
+            result[room_id] = await self.message_handler.get_joined_members(
+                requester, room_id
+            )
+
+        return 200, {"rooms": result}
+
 
 # TODO: Needs better unit testing
 class RoomMessageListRestServlet(RestServlet):
@@ -900,6 +927,7 @@ def register_servlets(hs, http_server):
     RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
+    JoinedManyRoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     RoomForgetRestServlet(hs).register(http_server)
