@@ -47,6 +47,7 @@ from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.client.v1.login import LoginRestServlet
+from synapse.rest.client.v1.login import OauthRestServlet
 from synapse.rest.client.v1.push_rule import PushRuleRestServlet
 from synapse.rest.client.v1.room import (
     JoinedRoomMemberListRestServlet,
@@ -114,6 +115,7 @@ class ClientReaderServer(HomeServer):
                     RoomMessageListRestServlet(self).register(resource)
                     RegisterRestServlet(self).register(resource)
                     LoginRestServlet(self).register(resource)
+                    OauthRestServlet(self).register(resource)
                     ThreepidRestServlet(self).register(resource)
                     KeyQueryServlet(self).register(resource)
                     KeyChangesServlet(self).register(resource)

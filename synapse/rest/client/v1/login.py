@@ -325,6 +325,18 @@ class LoginRestServlet(RestServlet):
         return result
 
 
+class OauthRestServlet(RestServlet):
+    PATTERNS = client_patterns("/oauth$", v1=True)
+
+    def __init__(self, hs):
+        super(OauthRestServlet, self).__init__()
+        self.hs = hs
+
+    def on_GET(self, request):
+        providers = [{"type": "m.oauth.mediawiki"}]
+        return 200, {"providers": providers}
+
+
 class BaseSSORedirectServlet(RestServlet):
     """Common base class for /login/sso/redirect impls"""
 
@@ -543,6 +555,7 @@ class SSOAuthHandler(object):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
+    OauthRestServlet(hs).register(http_server)
     if hs.config.cas_enabled:
         CasRedirectServlet(hs).register(http_server)
         CasTicketServlet(hs).register(http_server)
