@@ -195,39 +195,34 @@ class RoomCreationHandler(BaseHandler):
             old_room_id, new_room_id
         )
 
-        # finally, shut down the PLs in the old room, and update them in the new
-        # room.
-        yield self._update_upgraded_room_pls(
-            requester, old_room_id, new_room_id, old_room_state
-        )
+        # finally, shut down the PLs in the old room
+        # PLs are transferred in clone_existing_room
+        yield self._update_upgraded_room_pls(requester, old_room_id, old_room_state)
 
         return new_room_id
 
     @defer.inlineCallbacks
-    def _update_upgraded_room_pls(
-        self, requester, old_room_id, new_room_id, old_room_state
-    ):
-        """Send updated power levels in both rooms after an upgrade
+    def _update_upgraded_room_pls(self, requester, room_id, room_state):
+        """Send updated power levels in a room after an upgrade
 
         Args:
             requester (synapse.types.Requester): the user requesting the upgrade
-            old_room_id (unicode): the id of the room to be replaced
-            new_room_id (unicode): the id of the replacement room
-            old_room_state (dict[tuple[str, str], str]): the state map for the old room
+            room_id (unicode): the id of the room to be replaced
+            room_state (dict[tuple[str, str], str]): the state map for the old room
 
         Returns:
             Deferred
         """
-        old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
+        room_pl_event_id = room_state.get((EventTypes.PowerLevels, ""))
 
-        if old_room_pl_event_id is None:
+        if room_pl_event_id is None:
             logger.warning(
                 "Not supported: upgrading a room with no PL event. Not setting PLs "
                 "in old room."
             )
             return
 
-        old_room_pl_state = yield self.store.get_event(old_room_pl_event_id)
+        old_room_pl_state = yield self.store.get_event(room_pl_event_id)
 
         # we try to stop regular users from speaking by setting the PL required
         # to send regular events and invites to 'Moderator' level. That's normally
@@ -245,7 +240,7 @@ class RoomCreationHandler(BaseHandler):
                 logger.info(
                     "Setting level for %s in %s to %i (was %i)",
                     v,
-                    old_room_id,
+                    room_id,
                     restricted_level,
                     current,
                 )
@@ -261,7 +256,7 @@ class RoomCreationHandler(BaseHandler):
                     {
                         "type": EventTypes.PowerLevels,
                         "state_key": "",
-                        "room_id": old_room_id,
+                        "room_id": room_id,
                         "sender": requester.user.to_string(),
                         "content": pl_content,
                     },
@@ -269,19 +264,6 @@ class RoomCreationHandler(BaseHandler):
                 )
             except AuthError as e:
                 logger.warning("Unable to update PLs in old room: %s", e)
-
-        logger.info("Setting correct PLs in new room")
-        yield self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            {
-                "type": EventTypes.PowerLevels,
-                "state_key": "",
-                "room_id": new_room_id,
-                "sender": requester.user.to_string(),
-                "content": old_room_pl_state.content,
-            },
-            ratelimit=False,
-        )
 
     @defer.inlineCallbacks
     def clone_existing_room(
