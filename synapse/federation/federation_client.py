@@ -177,7 +177,7 @@ class FederationClient(FederationBase):
         given destination server.
 
         Args:
-            dest (str): The remote home server to ask.
+            dest (str): The remote homeserver to ask.
             room_id (str): The room_id to backfill.
             limit (int): The maximum number of PDUs to return.
             extremities (list): List of PDU id and origins of the first pdus
@@ -227,7 +227,7 @@ class FederationClient(FederationBase):
         one succeeds.
 
         Args:
-            destinations (list): Which home servers to query
+            destinations (list): Which homeservers to query
             event_id (str): event to fetch
             room_version (str): version of the room
             outlier (bool): Indicates whether the PDU is an `outlier`, i.e. if
@@ -312,7 +312,7 @@ class FederationClient(FederationBase):
     @defer.inlineCallbacks
     @log_function
     def get_state_for_room(self, destination, room_id, event_id):
-        """Requests all of the room state at a given event from a remote home server.
+        """Requests all of the room state at a given event from a remote homeserver.
 
         Args:
             destination (str): The remote homeserver to query for the state.
@@ -555,7 +555,7 @@ class FederationClient(FederationBase):
         Note that this does not append any events to any graphs.
 
         Args:
-            destinations (str): Candidate homeservers which are probably
+            destinations (Iterable[str]): Candidate homeservers which are probably
                 participating in the room.
             room_id (str): The room in which the event will happen.
             user_id (str): The user whose membership is being evented.

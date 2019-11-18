@@ -15,7 +15,6 @@
 
 import logging
 from collections import namedtuple
-from typing import Set
 
 from six import iteritems
 from six.moves import range
@@ -481,7 +480,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
         return self.runInteraction("store_state_group", _store_state_group_txn)
 
     def purge_unreferenced_state_groups(
-        self, room_id: str, state_groups_to_delete: Set[int]
+        self, room_id: str, state_groups_to_delete
     ) -> defer.Deferred:
         """Deletes no longer referenced state groups and de-deltas any state
         groups that reference them.
@@ -489,7 +488,8 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
         Args:
             room_id: The room the state groups belong to (must all be in the
                 same room).
-            state_groups_to_delete: Set of all state groups to delete.
+            state_groups_to_delete (Collection[int]): Set of all state groups
+                to delete.
         """
 
         return self.runInteraction(
@@ -587,52 +587,51 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
 
         return {row["state_group"]: row["prev_state_group"] for row in rows}
 
-    def purge_room_state(self, room_id):
+    def purge_room_state(self, room_id, state_groups_to_delete):
         """Deletes all record of a room from state tables
 
         Args:
             room_id (str):
+            state_groups_to_delete (list[int]): State groups to delete
         """
 
         return self.runInteraction(
-            "purge_room_state", self._purge_room_state_txn, room_id
+            "purge_room_state",
+            self._purge_room_state_txn,
+            room_id,
+            state_groups_to_delete,
         )
 
-    def _purge_room_state_txn(self, txn, room_id):
+    def _purge_room_state_txn(self, txn, room_id, state_groups_to_delete):
         # first we have to delete the state groups states
         logger.info("[purge] removing %s from state_groups_state", room_id)
 
-        txn.execute(
-            """
-            DELETE FROM state_groups_state
-            WHERE state_group IN (
-                SELECT state_group FROM state_groups
-                WHERE room_id = ?
-            )
-            """,
-            (room_id,),
+        self._simple_delete_many_txn(
+            txn,
+            table="state_groups_state",
+            column="state_group",
+            iterable=state_groups_to_delete,
+            keyvalues={},
         )
 
         # ... and the state group edges
         logger.info("[purge] removing %s from state_group_edges", room_id)
 
-        txn.execute(
-            """
-            DELETE FROM state_group_edges
-            WHERE state_group IN (
-                SELECT state_group FROM state_groups
-                WHERE room_id = ?
-            )
-            """,
-            (room_id,),
+        self._simple_delete_many_txn(
+            txn,
+            table="state_group_edges",
+            column="state_group",
+            iterable=state_groups_to_delete,
+            keyvalues={},
         )
 
         # ... and the state groups
         logger.info("[purge] removing %s from state_groups", room_id)
 
-        txn.execute(
-            """
-            DELETE FROM state_groups WHERE room_id = ?
-            """,
-            (room_id,),
+        self._simple_delete_many_txn(
+            txn,
+            table="state_groups",
+            column="id",
+            iterable=state_groups_to_delete,
+            keyvalues={},
         )

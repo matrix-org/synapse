@@ -29,7 +29,7 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse.metrics
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventContentFields, EventTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
@@ -932,6 +932,13 @@ class EventsStore(
 
             self._handle_event_relations(txn, event)
 
+            # Store the labels for this event.
+            labels = event.content.get(EventContentFields.LABELS)
+            if labels:
+                self.insert_labels_for_event_txn(
+                    txn, event.event_id, labels, event.room_id, event.depth
+                )
+
         # Insert into the room_memberships table.
         self._store_room_members_txn(
             txn,
@@ -1511,8 +1518,7 @@ class EventsStore(
         logger.info("[purge] finding state groups referenced by deleted events")
 
         # Get all state groups that are referenced by events that are to be
-        # deleted. We then go and check if they are referenced by other events
-        # or state groups, and if not we delete them.
+        # deleted.
         txn.execute(
             """
             SELECT DISTINCT state_group FROM events_to_purge
@@ -1617,13 +1623,29 @@ class EventsStore(
         """Deletes all record of a room
 
         Args:
-            room_id (str):
+            room_id (str)
+
+        Returns:
+            Deferred[List[int]]: The list of state groups to delete.
         """
 
         return self.runInteraction("purge_room", self._purge_room_txn, room_id)
 
     def _purge_room_txn(self, txn, room_id):
-        # First delete tables which lack an index on room_id but have one on event_id
+        # First we fetch all the state groups that should be deleted, before
+        # we delete that information.
+        txn.execute(
+            """
+                SELECT DISTINCT state_group FROM events
+                INNER JOIN event_to_state_groups USING(event_id)
+                WHERE events.room_id = ?
+            """,
+            (room_id,),
+        )
+
+        state_groups = [row[0] for row in txn]
+
+        # Now we delete tables which lack an index on room_id but have one on event_id
         for table in (
             "event_auth",
             "event_edges",
@@ -1711,6 +1733,8 @@ class EventsStore(
 
         logger.info("[purge] done")
 
+        return state_groups
+
     async def is_event_after(self, event_id1, event_id2):
         """Returns True if event_id1 is after event_id2 in the stream
         """
@@ -1746,6 +1770,33 @@ class EventsStore(
         return self.runInteraction(
             "get_all_updated_current_state_deltas",
             get_all_updated_current_state_deltas_txn,
+        )
+
+    def insert_labels_for_event_txn(
+        self, txn, event_id, labels, room_id, topological_ordering
+    ):
+        """Store the mapping between an event's ID and its labels, with one row per
+        (event_id, label) tuple.
+
+        Args:
+            txn (LoggingTransaction): The transaction to execute.
+            event_id (str): The event's ID.
+            labels (list[str]): A list of text labels.
+            room_id (str): The ID of the room the event was sent to.
+            topological_ordering (int): The position of the event in the room's topology.
+        """
+        return self._simple_insert_many_txn(
+            txn=txn,
+            table="event_labels",
+            values=[
+                {
+                    "event_id": event_id,
+                    "label": label,
+                    "room_id": room_id,
+                    "topological_ordering": topological_ordering,
+                }
+                for label in labels
+            ],
         )
 
 

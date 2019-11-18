@@ -89,7 +89,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id (str)
 
         Returns:
-            Deferred[unicode|None]: predecessor room id
+            Deferred[dict|None]: A dictionary containing the structure of the predecessor
+                field from the room's create event. The structure is subject to other servers,
+                but it is expected to be:
+                    * room_id (str): The room ID of the predecessor room
+                    * event_id (str): The ID of the tombstone event in the predecessor room
 
         Raises:
             NotFoundError if the room is unknown
@@ -331,7 +335,7 @@ class StateStore(StateGroupWorkerStore, StateBackgroundUpdateStore):
             # if the event was rejected, just give it the same state as its
             # predecessor.
             if context.rejected:
-                state_groups[event.event_id] = context.prev_group
+                state_groups[event.event_id] = context.state_group_before_event
                 continue
 
             state_groups[event.event_id] = context.state_group

@@ -203,10 +203,6 @@ class RoomMemberHandler(object):
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
-                # Copy over user state if we're joining an upgraded room
-                yield self.copy_user_state_if_room_upgrade(
-                    room_id, requester.user.to_string()
-                )
                 yield self._user_joined_room(target, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
@@ -455,11 +451,6 @@ class RoomMemberHandler(object):
                     requester, remote_room_hosts, room_id, target, content
                 )
 
-                # Copy over user state if this is a join on an remote upgraded room
-                yield self.copy_user_state_if_room_upgrade(
-                    room_id, requester.user.to_string()
-                )
-
                 return remote_join_response
 
         elif effective_membership_state == Membership.LEAVE:
@@ -498,36 +489,81 @@ class RoomMemberHandler(object):
         return res
 
     @defer.inlineCallbacks
-    def copy_user_state_if_room_upgrade(self, new_room_id, user_id):
-        """Copy user-specific information when they join a new room if that new room is the
-        result of a room upgrade
+    def transfer_room_state_on_room_upgrade(self, old_room_id, room_id):
+        """Upon our server becoming aware of an upgraded room, either by upgrading a room
+        ourselves or joining one, we can transfer over information from the previous room.
+
+        Copies user state (tags/push rules) for every local user that was in the old room, as
+        well as migrating the room directory state.
 
         Args:
-            new_room_id (str): The ID of the room the user is joining
-            user_id (str): The ID of the user
+            old_room_id (str): The ID of the old room
+
+            room_id (str): The ID of the new room
 
         Returns:
             Deferred
         """
-        # Check if the new room is an upgraded room
-        predecessor = yield self.store.get_room_predecessor(new_room_id)
-        if not predecessor:
-            return
+        # Find all local users that were in the old room and copy over each user's state
+        users = yield self.store.get_users_in_room(old_room_id)
+        yield self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
+
+        # Add new room to the room directory if the old room was there
+        # Remove old room from the room directory
+        old_room = yield self.store.get_room(old_room_id)
+        if old_room and old_room["is_public"]:
+            yield self.store.set_room_is_public(old_room_id, False)
+            yield self.store.set_room_is_public(room_id, True)
+
+        # Check if any groups we own contain the predecessor room
+        local_group_ids = yield self.store.get_local_groups_for_room(old_room_id)
+        for group_id in local_group_ids:
+            # Add new the new room to those groups
+            yield self.store.add_room_to_group(group_id, room_id, old_room["is_public"])
+
+            # Remove the old room from those groups
+            yield self.store.remove_room_from_group(group_id, old_room_id)
+
+    @defer.inlineCallbacks
+    def copy_user_state_on_room_upgrade(self, old_room_id, new_room_id, user_ids):
+        """Copy user-specific information when they join a new room when that new room is the
+        result of a room upgrade
+
+        Args:
+            old_room_id (str): The ID of upgraded room
+            new_room_id (str): The ID of the new room
+            user_ids (Iterable[str]): User IDs to copy state for
+
+        Returns:
+            Deferred
+        """
 
         logger.debug(
-            "Found predecessor for %s: %s. Copying over room tags and push " "rules",
+            "Copying over room tags and push rules from %s to %s for users %s",
+            old_room_id,
             new_room_id,
-            predecessor,
+            user_ids,
         )
 
-        # It is an upgraded room. Copy over old tags
-        yield self.copy_room_tags_and_direct_to_room(
-            predecessor["room_id"], new_room_id, user_id
-        )
-        # Copy over push rules
-        yield self.store.copy_push_rules_from_room_to_room_for_user(
-            predecessor["room_id"], new_room_id, user_id
-        )
+        for user_id in user_ids:
+            try:
+                # It is an upgraded room. Copy over old tags
+                yield self.copy_room_tags_and_direct_to_room(
+                    old_room_id, new_room_id, user_id
+                )
+                # Copy over push rules
+                yield self.store.copy_push_rules_from_room_to_room_for_user(
+                    old_room_id, new_room_id, user_id
+                )
+            except Exception:
+                logger.exception(
+                    "Error copying tags and/or push rules from rooms %s to %s for user %s. "
+                    "Skipping...",
+                    old_room_id,
+                    new_room_id,
+                    user_id,
+                )
+                continue
 
     @defer.inlineCallbacks
     def send_membership_event(self, requester, event, context, ratelimit=True):
