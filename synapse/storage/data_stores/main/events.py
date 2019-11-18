@@ -1936,51 +1936,13 @@ class EventsStore(
         if relation.get("rel_type") == RelationTypes.REPLACE:
             replaces = relation.get("event_id")
 
-        # Check if we already know about labels for this event, or for the original event
-        # if this one has a m.replace relation.
-        old_labels = self.get_labels_for_event_txn(
-            event_id=replaces if replaces is not None else event.event_id,
-            txn=txn,
-        )
-
-        # Check if this event has any labels attached to it.
+        # Retrieve the labels on this event.
         labels = event.content.get(EventContentFields.LABELS)
 
-        # If there isn't any label related to this event and the new event doesn't add any
-        # label, then do nothing.
-        if not old_labels and not labels:
-            return
-
-        # Otherwise, insert the labels. If we got previous labels for the event this one
-        # replaces but this event specifically doesn't have any, the insert function will
-        # delete all labels previously associated with the event it replaces and insert
-        # nothing.
+        # Insert the labels, if any.
         self.insert_labels_for_event_txn(
             txn, event.event_id, replaces, labels, event.room_id, event.depth
         )
-
-    @cached(num_args=1)
-    def get_labels_for_event_txn(self, event_id, txn):
-        """Retrieve the list of labels for a given event.
-
-        Args:
-            event_id (str): The event's ID.
-            txn (LoggingTransaction): The transaction to execute.
-        """
-        labels = []
-
-        txn.execute(
-            """
-                SELECT label FROM event_labels
-                WHERE event_id = ? OR replaces = ?
-            """,
-            (event_id, event_id),
-        )
-
-        for label in txn:
-            labels.append(label)
-
-        return labels
 
     def insert_labels_for_event_txn(
         self, txn, event_id, replaces, labels, room_id, topological_ordering
@@ -2010,6 +1972,7 @@ class EventsStore(
 
             txn.execute(sql, (replaces, replaces))
 
+        # If the event doesn't have any label, don't insert anything.
         if labels:
             self._simple_insert_many_txn(
                 txn=txn,
@@ -2025,8 +1988,6 @@ class EventsStore(
                     for label in labels
                 ],
             )
-
-        self._invalidate_cache_and_stream(txn, self.get_labels_for_event_txn, event_id)
 
 
 AllNewEventsResult = namedtuple(
