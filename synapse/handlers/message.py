@@ -533,8 +533,6 @@ class EventCreationHandler(object):
                 )
                 return prev_state
 
-        logger.info("Really sending new event: %s", event)
-
         yield self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
         )
@@ -581,8 +579,6 @@ class EventCreationHandler(object):
             event, context = yield self.create_event(
                 requester, event_dict, token_id=requester.access_token_id, txn_id=txn_id
             )
-
-            logger.info("Created new event: %s", event)
 
             spam_error = self.spam_checker.check_event_for_spam(event)
             if spam_error:
