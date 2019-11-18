@@ -29,7 +29,7 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse.metrics
-from synapse.api.constants import EventContentFields, EventTypes
+from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
@@ -931,13 +931,7 @@ class EventsStore(
                 self._store_redaction(txn, event)
 
             self._handle_event_relations(txn, event)
-
-            # Store the labels for this event.
-            labels = event.content.get(EventContentFields.LABELS)
-            if labels:
-                self.insert_labels_for_event_txn(
-                    txn, event.event_id, labels, event.room_id, event.depth
-                )
+            self._store_labels_txn(txn, event)
 
         # Insert into the room_memberships table.
         self._store_room_members_txn(
@@ -1928,6 +1922,59 @@ class EventsStore(
             "get_all_updated_current_state_deltas",
             get_all_updated_current_state_deltas_txn,
         )
+
+    def _store_labels_txn(self, txn, event):
+        """Extract labels from an event and store them.
+
+        Args:
+            txn (LoggingTransaction): The transaction to execute.
+            event (EventBase): The event to process.
+        """
+        # Check if the event replaces another one (e.g. it's an edit)
+        relation = event.content.get("m.relates_to", {})
+        replaces = None
+        if relation.get("rel_type") == RelationTypes.REPLACE:
+            replaces = relation.get("event_id")
+
+        # Check if we already know about labels for this event, or for the original event
+        # if this one has a m.replace relation.
+        old_labels = self.get_labels_for_event_txn(
+            txn=txn,
+            event_id=replaces if replaces is not None else event.event_id,
+        )
+
+        # Check if this event has any labels attached to it.
+        labels = event.content.get(EventContentFields.LABELS)
+
+        # If there isn't any label related to this event and the new event doesn't add any
+        # label, then do nothing.
+        if not old_labels and not labels:
+            return
+
+        # Otherwise, insert the labels. If we got previous labels for the event this one
+        # replaces but this event specifically doesn't have any, the insert function will
+        # delete all labels previously associated with the event it replaces and insert
+        # nothing.
+        self.insert_labels_for_event_txn(
+            txn, event.event_id, replaces, labels, event.room_id, event.depth
+        )
+
+    @cached()
+    def get_labels_for_event_txn(self, txn, event_id):
+        labels = []
+
+        txn.execute(
+            """
+                SELECT label FROM event_labels
+                WHERE event_id = ? OR replaces = ?
+            """,
+            (event_id, event_id),
+        )
+
+        for label in txn:
+            labels.append(label)
+
+        return labels
 
     def insert_labels_for_event_txn(
         self, txn, event_id, replaces, labels, room_id, topological_ordering
