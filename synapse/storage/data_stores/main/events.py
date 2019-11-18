@@ -1930,31 +1930,48 @@ class EventsStore(
         )
 
     def insert_labels_for_event_txn(
-        self, txn, event_id, labels, room_id, topological_ordering
+        self, txn, event_id, replaces, labels, room_id, topological_ordering
     ):
         """Store the mapping between an event's ID and its labels, with one row per
-        (event_id, label) tuple.
+        (event_id, label) tuple, after deleting labels associated with the event it
+        replaces (or a prior replacement of it), if applicable.
+
+        Can be called with labels being None, in which case it will only delete labels
+        associated with the replaced event.
 
         Args:
             txn (LoggingTransaction): The transaction to execute.
             event_id (str): The event's ID.
-            labels (list[str]): A list of text labels.
+            replaces (str|None): The ID of the event this event replaces, if any.
+            labels (list[str]|None): A list of text labels, if any.
             room_id (str): The ID of the room the event was sent to.
             topological_ordering (int): The position of the event in the room's topology.
         """
-        return self._simple_insert_many_txn(
-            txn=txn,
-            table="event_labels",
-            values=[
-                {
-                    "event_id": event_id,
-                    "label": label,
-                    "room_id": room_id,
-                    "topological_ordering": topological_ordering,
-                }
-                for label in labels
-            ],
-        )
+        if replaces:
+            # If the event is replacing another one (e.g. it's an edit), delete all
+            # labels associated with the event it replaces or past replacements of it.
+            sql = """
+                DELETE FROM event_labels
+                WHERE event_id = ? OR replaces = ?
+            """
+
+            txn.execute(sql, (replaces, replaces))
+
+        if labels:
+            self._simple_insert_many_txn(
+                txn=txn,
+                table="event_labels",
+                values=[
+                    {
+                        "event_id": event_id,
+                        "label": label,
+                        "room_id": room_id,
+                        "topological_ordering": topological_ordering,
+                        "replaces": replaces,
+                    }
+                    for label in labels
+                ],
+            )
 
 
 AllNewEventsResult = namedtuple(
