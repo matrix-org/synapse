@@ -135,8 +135,8 @@ class AuthHandler(BaseHandler):
             AuthError if the client has completed a login flow, and it gives
                 a different user to `requester`
 
-            LimitExceededError if the ratelimiter's failed requests count for this
-                user is too high too proceed
+            LimitExceededError if the ratelimiter's failed request count for this
+                user is too high to proceed
 
         """
 
