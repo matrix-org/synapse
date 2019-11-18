@@ -1,0 +1,1 @@
+Fix `to_device` stream ID getting reset every time Synapse restarts, which had the potential to cause unable to decrypt errors.
