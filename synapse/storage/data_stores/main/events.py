@@ -1939,8 +1939,8 @@ class EventsStore(
         # Check if we already know about labels for this event, or for the original event
         # if this one has a m.replace relation.
         old_labels = self.get_labels_for_event_txn(
-            txn=txn,
             event_id=replaces if replaces is not None else event.event_id,
+            txn=txn,
         )
 
         # Check if this event has any labels attached to it.
@@ -1959,8 +1959,8 @@ class EventsStore(
             txn, event.event_id, replaces, labels, event.room_id, event.depth
         )
 
-    @cached()
-    def get_labels_for_event_txn(self, txn, event_id):
+    @cached(num_args=1)
+    def get_labels_for_event_txn(self, event_id, txn):
         labels = []
 
         txn.execute(
@@ -2019,6 +2019,8 @@ class EventsStore(
                     for label in labels
                 ],
             )
+
+        self._invalidate_cache_and_stream(txn, self.get_labels_for_event_txn, event_id)
 
 
 AllNewEventsResult = namedtuple(
