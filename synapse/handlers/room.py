@@ -197,32 +197,37 @@ class RoomCreationHandler(BaseHandler):
 
         # finally, shut down the PLs in the old room
         # PLs are transferred in clone_existing_room
-        yield self._update_upgraded_room_pls(requester, old_room_id, old_room_state)
+        yield self._update_upgraded_room_pls(
+            requester, old_room_id, new_room_id, old_room_state
+        )
 
         return new_room_id
 
     @defer.inlineCallbacks
-    def _update_upgraded_room_pls(self, requester, room_id, room_state):
+    def _update_upgraded_room_pls(
+        self, requester, old_room_id, new_room_id, old_room_state
+    ):
         """Send updated power levels in a room after an upgrade
 
         Args:
             requester (synapse.types.Requester): the user requesting the upgrade
-            room_id (unicode): the id of the room to be replaced
-            room_state (dict[tuple[str, str], str]): the state map for the old room
+            old_room_id (str): the id of the room to be replaced
+            new_room_id (str): the id of the replacement room
+            old_room_state (dict[tuple[str, str], str]): the state map for the old room
 
         Returns:
             Deferred
         """
-        room_pl_event_id = room_state.get((EventTypes.PowerLevels, ""))
+        old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
 
-        if room_pl_event_id is None:
+        if old_room_pl_event_id is None:
             logger.warning(
                 "Not supported: upgrading a room with no PL event. Not setting PLs "
                 "in old room."
             )
             return
 
-        old_room_pl_state = yield self.store.get_event(room_pl_event_id)
+        old_room_pl_state = yield self.store.get_event(old_room_pl_event_id)
 
         # we try to stop regular users from speaking by setting the PL required
         # to send regular events and invites to 'Moderator' level. That's normally
@@ -240,7 +245,7 @@ class RoomCreationHandler(BaseHandler):
                 logger.info(
                     "Setting level for %s in %s to %i (was %i)",
                     v,
-                    room_id,
+                    old_room_id,
                     restricted_level,
                     current,
                 )
@@ -256,7 +261,7 @@ class RoomCreationHandler(BaseHandler):
                     {
                         "type": EventTypes.PowerLevels,
                         "state_key": "",
-                        "room_id": room_id,
+                        "room_id": old_room_id,
                         "sender": requester.user.to_string(),
                         "content": pl_content,
                     },
@@ -264,6 +269,19 @@ class RoomCreationHandler(BaseHandler):
                 )
             except AuthError as e:
                 logger.warning("Unable to update PLs in old room: %s", e)
+
+        logger.info("Setting correct PLs in new room")
+        yield self.event_creation_handler.create_and_send_nonmember_event(
+            requester,
+            {
+                "type": EventTypes.PowerLevels,
+                "state_key": "",
+                "room_id": new_room_id,
+                "sender": requester.user.to_string(),
+                "content": old_room_pl_state.content,
+            },
+            ratelimit=False,
+        )
 
     @defer.inlineCallbacks
     def clone_existing_room(
@@ -315,7 +333,7 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.Encryption, ""),
             (EventTypes.ServerACL, ""),
             (EventTypes.RelatedGroups, ""),
-            (EventTypes.PowerLevels, ""),
+            (EventTypes.PowerLevels, ""),  # Removed before sending in the new room
         )
 
         old_room_state_ids = yield self.store.get_filtered_current_state_ids(
@@ -329,6 +347,31 @@ class RoomCreationHandler(BaseHandler):
             if old_event:
                 initial_state[k] = old_event.content
 
+        # Copy over user power levels now as this will not be possible with >100PL users once
+        # the room has been created
+        old_user_power_levels = initial_state[(EventTypes.PowerLevels, "")].get("users")
+        new_user_power_levels = None
+        if old_user_power_levels:
+            user_level_dict = {}
+
+            # Track the maximum power level in the old room, and temporarily make the
+            # upgrading user this power level so that they can replicate all state events over
+            # They will be returned to their original power level later
+            max_power_level = 100
+            for user, power_level in old_user_power_levels.items():
+                power_level = int(power_level)
+                user_level_dict[user] = power_level
+                max_power_level = max(max_power_level, power_level)
+
+            # Upgrade the requester to the max known room power level so that
+            # they're allowed to send any state event in the new room
+            user_level_dict[requester.user.to_string()] = max_power_level
+            new_user_power_levels = {"users": user_level_dict}
+
+        # Prevent the rest of the power level events from being transferred now. They will
+        # be transferred later after the room state has been established
+        del initial_state[(EventTypes.PowerLevels, "")]
+
         yield self._send_events_for_new_room(
             requester,
             new_room_id,
@@ -338,6 +381,7 @@ class RoomCreationHandler(BaseHandler):
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
+            power_level_content_override=new_user_power_levels,
         )
 
         # Transfer membership events
