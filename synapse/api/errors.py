@@ -457,7 +457,7 @@ def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
 
 
 class FederationError(RuntimeError):
-    """  This class is used to inform remote home servers about erroneous
+    """  This class is used to inform remote homeservers about erroneous
     PDUs they sent us.
 
     FATAL: The remote server could not interpret the source event.
