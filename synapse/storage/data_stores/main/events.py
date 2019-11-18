@@ -1961,6 +1961,12 @@ class EventsStore(
 
     @cached(num_args=1)
     def get_labels_for_event_txn(self, event_id, txn):
+        """Retrieve the list of labels for a given event.
+
+        Args:
+            event_id (str): The event's ID.
+            txn (LoggingTransaction): The transaction to execute.
+        """
         labels = []
 
         txn.execute(
