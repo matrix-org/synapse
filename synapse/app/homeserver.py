@@ -329,6 +329,10 @@ def setup(config_options):
     Returns:
         HomeServer
     """
+    if "--version" in config_options:
+        print("Synapse/" + get_version_string(synapse))
+        sys.exit(0)
+
     try:
         config = HomeServerConfig.load_or_generate_config(
             "Synapse Homeserver", config_options
