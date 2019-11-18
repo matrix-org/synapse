@@ -195,8 +195,8 @@ class RoomCreationHandler(BaseHandler):
             old_room_id, new_room_id
         )
 
-        # finally, shut down the PLs in the old room
-        # PLs are transferred in clone_existing_room
+        # finally, shut down the PLs in the old room, and update them in the new
+        # room.
         yield self._update_upgraded_room_pls(
             requester, old_room_id, new_room_id, old_room_state
         )
@@ -207,7 +207,7 @@ class RoomCreationHandler(BaseHandler):
     def _update_upgraded_room_pls(
         self, requester, old_room_id, new_room_id, old_room_state
     ):
-        """Send updated power levels in a room after an upgrade
+        """Send updated power levels in both rooms after an upgrade
 
         Args:
             requester (synapse.types.Requester): the user requesting the upgrade
