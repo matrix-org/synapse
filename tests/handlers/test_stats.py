@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse import storage
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
+from synapse.storage.data_stores.main import stats
 
 from tests import unittest
 
@@ -87,10 +87,10 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         )
 
     def _get_current_stats(self, stats_type, stat_id):
-        table, id_col = storage.stats.TYPE_TO_TABLE[stats_type]
+        table, id_col = stats.TYPE_TO_TABLE[stats_type]
 
-        cols = list(storage.stats.ABSOLUTE_STATS_FIELDS[stats_type]) + list(
-            storage.stats.PER_SLICE_FIELDS[stats_type]
+        cols = list(stats.ABSOLUTE_STATS_FIELDS[stats_type]) + list(
+            stats.PER_SLICE_FIELDS[stats_type]
         )
 
         end_ts = self.store.quantise_stats_time(self.reactor.seconds() * 1000)
@@ -607,6 +607,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         """
 
         self.hs.config.stats_enabled = False
+        self.handler.stats_enabled = False
 
         u1 = self.register_user("u1", "pass")
         u1token = self.login("u1", "pass")
@@ -618,6 +619,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertIsNone(self._get_current_stats("user", u1))
 
         self.hs.config.stats_enabled = True
+        self.handler.stats_enabled = True
 
         self._perform_background_initial_update()
 

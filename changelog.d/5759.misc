@@ -1,4 +1,0 @@
-Allow devices to be marked as hidden, for use by features such as cross-signing.
-This adds a new field with a default value to the devices field in the database,
-and so the database upgrade may take a long time depending on how many devices
-are in the database.

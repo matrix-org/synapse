@@ -72,7 +72,7 @@ pid_file: DATADIR/homeserver.pid
 # For example, for room version 1, default_room_version should be set
 # to "1".
 #
-#default_room_version: "4"
+#default_room_version: "5"
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -86,7 +86,7 @@ pid_file: DATADIR/homeserver.pid
 # Whether room invites to users on this server should be blocked
 # (except those sent by local server admins). The default is False.
 #
-#block_non_admin_invites: True
+#block_non_admin_invites: true
 
 # Room searching
 #
@@ -239,9 +239,8 @@ listeners:
 
 # Global blocking
 #
-#hs_disabled: False
+#hs_disabled: false
 #hs_disabled_message: 'Human readable reason for why the HS is blocked'
-#hs_disabled_limit_type: 'error code(str), to help clients decode reason'
 
 # Monthly Active User Blocking
 #
@@ -261,15 +260,22 @@ listeners:
 # sign up in a short space of time never to return after their initial
 # session.
 #
-#limit_usage_by_mau: False
+# 'mau_limit_alerting' is a means of limiting client side alerting
+# should the mau limit be reached. This is useful for small instances
+# where the admin has 5 mau seats (say) for 5 specific people and no
+# interest increasing the mau limit further. Defaults to True, which
+# means that alerting is enabled
+#
+#limit_usage_by_mau: false
 #max_mau_value: 50
 #mau_trial_days: 2
+#mau_limit_alerting: false
 
 # If enabled, the metrics for the number of monthly active users will
 # be populated, however no one will be limited. If limit_usage_by_mau
 # is true, this is implied to be true.
 #
-#mau_stats_only: False
+#mau_stats_only: false
 
 # Sometimes the server admin will want to ensure certain accounts are
 # never blocked by mau checking. These accounts are specified here.
@@ -281,7 +287,7 @@ listeners:
 # Used by phonehome stats to group together related servers.
 #server_context: context
 
-# Resource-constrained Homeserver Settings
+# Resource-constrained homeserver Settings
 #
 # If limit_remote_rooms.enabled is True, the room complexity will be
 # checked before a user joins a new remote room. If it is above
@@ -294,7 +300,7 @@ listeners:
 #
 # Uncomment the below lines to enable:
 #limit_remote_rooms:
-#  enabled: True
+#  enabled: true
 #  complexity: 1.0
 #  complexity_error: "This room is too complex."
 
@@ -411,7 +417,7 @@ acme:
     # ACME support is disabled by default. Set this to `true` and uncomment
     # tls_certificate_path and tls_private_key_path above to enable it.
     #
-    enabled: False
+    enabled: false
 
     # Endpoint to use to request certificates. If you only want to test,
     # use Let's Encrypt's staging url:
@@ -737,11 +743,11 @@ uploads_path: "DATADIR/uploads"
 ## Captcha ##
 # See docs/CAPTCHA_SETUP for full details of configuring this.
 
-# This Home Server's ReCAPTCHA public key.
+# This homeserver's ReCAPTCHA public key.
 #
 #recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
-# This Home Server's ReCAPTCHA private key.
+# This homeserver's ReCAPTCHA private key.
 #
 #recaptcha_private_key: "YOUR_PRIVATE_KEY"
 
@@ -786,7 +792,7 @@ uploads_path: "DATADIR/uploads"
 # connect to arbitrary endpoints without having first signed up for a
 # valid account (e.g. by passing a CAPTCHA).
 #
-#turn_allow_guests: True
+#turn_allow_guests: true
 
 
 ## Registration ##
@@ -829,7 +835,7 @@ uploads_path: "DATADIR/uploads"
 # where d is equal to 10% of the validity period.
 #
 #account_validity:
-#  enabled: True
+#  enabled: true
 #  period: 6w
 #  renew_at: 1w
 #  renew_email_subject: "Renew your %(app)s account"
@@ -949,7 +955,7 @@ uploads_path: "DATADIR/uploads"
 # If a delegate is specified, the config option public_baseurl must also be filled out.
 #
 account_threepid_delegates:
-    #email: https://example.com     # Delegate email sending to example.org
+    #email: https://example.com     # Delegate email sending to example.com
     #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
 # Users who register on this homeserver will automatically be joined
@@ -971,7 +977,7 @@ account_threepid_delegates:
 
 # Enable collection and rendering of performance metrics
 #
-#enable_metrics: False
+#enable_metrics: false
 
 # Enable sentry integration
 # NOTE: While attempts are made to ensure that the logs don't contain
@@ -1023,7 +1029,7 @@ metrics_flags:
 # Uncomment to enable tracking of application service IP addresses. Implicitly
 # enables MAU tracking for application service users.
 #
-#track_appservice_user_ips: True
+#track_appservice_user_ips: true
 
 
 # a secret which is used to sign access tokens. If none is specified,
@@ -1149,7 +1155,7 @@ saml2_config:
   #      - url: https://our_idp/metadata.xml
   #
   #    # By default, the user has to go to our login page first. If you'd like
-  #    # to allow IdP-initiated login, set 'allow_unsolicited: True' in a
+  #    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
   #    # 'service.sp' section:
   #    #
   #    #service:
@@ -1263,13 +1269,13 @@ password_config:
 #   smtp_port: 25 # SSL: 465, STARTTLS: 587
 #   smtp_user: "exampleusername"
 #   smtp_pass: "examplepassword"
-#   require_transport_security: False
-#   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
+#   require_transport_security: false
+#   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
 #   app_name: Matrix
 #
 #   # Enable email notifications by default
 #   #
-#   notif_for_new_users: True
+#   notif_for_new_users: true
 #
 #   # Defining a custom URL for Riot is only needed if email notifications
 #   # should contain links to a self-hosted installation of Riot; when set
@@ -1447,11 +1453,11 @@ password_config:
 #    body: >-
 #      To continue using this homeserver you must review and agree to the
 #      terms and conditions at %(consent_uri)s
-#  send_server_notice_to_guests: True
+#  send_server_notice_to_guests: true
 #  block_events_error: >-
 #    To continue using this homeserver you must review and agree to the
 #    terms and conditions at %(consent_uri)s
-#  require_at_registration: False
+#  require_at_registration: false
 #  policy_name: Privacy Policy
 #
 

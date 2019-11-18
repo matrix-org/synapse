@@ -199,7 +199,20 @@ client (C):
 
 #### REPLICATE (C)
 
-   Asks the server to replicate a given stream
+Asks the server to replicate a given stream. The syntax is:
+
+```
+    REPLICATE <stream_name> <token>
+```
+
+Where `<token>` may be either:
+ * a numeric stream_id to stream updates since (exclusive)
+ * `NOW` to stream all subsequent updates.
+
+The `<stream_name>` is the name of a replication stream to subscribe 
+to (see [here](../synapse/replication/tcp/streams/_base.py) for a list
+of streams). It can also be `ALL` to subscribe to all known streams,
+in which case the `<token>` must be set to `NOW`.
 
 #### USER_SYNC (C)
 

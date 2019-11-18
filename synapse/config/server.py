@@ -41,7 +41,7 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
-DEFAULT_ROOM_VERSION = "4"
+DEFAULT_ROOM_VERSION = "5"
 
 ROOM_COMPLEXITY_TOO_GREAT = (
     "Your homeserver is unable to join rooms this large or complex. "
@@ -171,6 +171,7 @@ class ServerConfig(Config):
         )
 
         self.mau_trial_days = config.get("mau_trial_days", 0)
+        self.mau_limit_alerting = config.get("mau_limit_alerting", True)
 
         # How long to keep redacted events in the database in unredacted form
         # before redacting them.
@@ -192,7 +193,6 @@ class ServerConfig(Config):
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
         self.hs_disabled_message = config.get("hs_disabled_message", "")
-        self.hs_disabled_limit_type = config.get("hs_disabled_limit_type", "")
 
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints
@@ -532,7 +532,7 @@ class ServerConfig(Config):
         # Whether room invites to users on this server should be blocked
         # (except those sent by local server admins). The default is False.
         #
-        #block_non_admin_invites: True
+        #block_non_admin_invites: true
 
         # Room searching
         #
@@ -673,9 +673,8 @@ class ServerConfig(Config):
 
         # Global blocking
         #
-        #hs_disabled: False
+        #hs_disabled: false
         #hs_disabled_message: 'Human readable reason for why the HS is blocked'
-        #hs_disabled_limit_type: 'error code(str), to help clients decode reason'
 
         # Monthly Active User Blocking
         #
@@ -695,15 +694,22 @@ class ServerConfig(Config):
         # sign up in a short space of time never to return after their initial
         # session.
         #
-        #limit_usage_by_mau: False
+        # 'mau_limit_alerting' is a means of limiting client side alerting
+        # should the mau limit be reached. This is useful for small instances
+        # where the admin has 5 mau seats (say) for 5 specific people and no
+        # interest increasing the mau limit further. Defaults to True, which
+        # means that alerting is enabled
+        #
+        #limit_usage_by_mau: false
         #max_mau_value: 50
         #mau_trial_days: 2
+        #mau_limit_alerting: false
 
         # If enabled, the metrics for the number of monthly active users will
         # be populated, however no one will be limited. If limit_usage_by_mau
         # is true, this is implied to be true.
         #
-        #mau_stats_only: False
+        #mau_stats_only: false
 
         # Sometimes the server admin will want to ensure certain accounts are
         # never blocked by mau checking. These accounts are specified here.
@@ -715,7 +721,7 @@ class ServerConfig(Config):
         # Used by phonehome stats to group together related servers.
         #server_context: context
 
-        # Resource-constrained Homeserver Settings
+        # Resource-constrained homeserver Settings
         #
         # If limit_remote_rooms.enabled is True, the room complexity will be
         # checked before a user joins a new remote room. If it is above
@@ -728,7 +734,7 @@ class ServerConfig(Config):
         #
         # Uncomment the below lines to enable:
         #limit_remote_rooms:
-        #  enabled: True
+        #  enabled: true
         #  complexity: 1.0
         #  complexity_error: "This room is too complex."
 
@@ -775,7 +781,7 @@ class ServerConfig(Config):
             "--daemonize",
             action="store_true",
             default=None,
-            help="Daemonize the home server",
+            help="Daemonize the homeserver",
         )
         server_group.add_argument(
             "--print-pidfile",

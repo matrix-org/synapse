@@ -131,3 +131,17 @@ class RelationTypes(object):
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"
     REFERENCE = "m.reference"
+
+
+class LimitBlockingTypes(object):
+    """Reasons that a server may be blocked"""
+
+    MONTHLY_ACTIVE_USER = "monthly_active_user"
+    HS_DISABLED = "hs_disabled"
+
+
+class EventContentFields(object):
+    """Fields found in events' content, regardless of type."""
+
+    # Labels for the event, cf https://github.com/matrix-org/matrix-doc/pull/2326
+    LABELS = "org.matrix.labels"

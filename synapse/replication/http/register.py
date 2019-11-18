@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 
@@ -74,11 +72,12 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             "address": address,
         }
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, user_id):
+    async def _handle_request(self, request, user_id):
         content = parse_json_object_from_request(request)
 
-        yield self.registration_handler.register_with_store(
+        self.registration_handler.check_registration_ratelimit(content["address"])
+
+        await self.registration_handler.register_with_store(
             user_id=user_id,
             password_hash=content["password_hash"],
             was_guest=content["was_guest"],
@@ -117,14 +116,13 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
         """
         return {"auth_result": auth_result, "access_token": access_token}
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, user_id):
+    async def _handle_request(self, request, user_id):
         content = parse_json_object_from_request(request)
 
         auth_result = content["auth_result"]
         access_token = content["access_token"]
 
-        yield self.registration_handler.post_registration_actions(
+        await self.registration_handler.post_registration_actions(
             user_id=user_id, auth_result=auth_result, access_token=access_token
         )
 

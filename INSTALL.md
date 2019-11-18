@@ -36,7 +36,7 @@ that your email address is probably `user@example.com` rather than
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, or 3.7
+- Python 3.5, 3.6, 3.7 or 3.8.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
@@ -413,16 +413,18 @@ For a more detailed guide to configuring your server for federation, see
 
 ## Email
 
-It is desirable for Synapse to have the capability to send email. For example,
-this is required to support the 'password reset' feature.
+It is desirable for Synapse to have the capability to send email. This allows
+Synapse to send password reset emails, send verifications when an email address
+is added to a user's account, and send email notifications to users when they
+receive new messages.
 
 To configure an SMTP server for Synapse, modify the configuration section
-headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
-and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
-``smtp_pass``, and ``require_transport_security``.
+headed `email`, and be sure to have at least the `smtp_host`, `smtp_port`
+and `notif_from` fields filled out.  You may also need to set `smtp_user`,
+`smtp_pass`, and `require_transport_security`.
 
-If Synapse is not configured with an SMTP server, password reset via email will
- be disabled by default.
+If email is not configured, password reset, registration and notifications via
+email will be disabled.
 
 ## Registering a user
 

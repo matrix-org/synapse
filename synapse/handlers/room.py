@@ -129,6 +129,7 @@ class RoomCreationHandler(BaseHandler):
             old_room_id,
             new_version,  # args for _upgrade_room
         )
+
         return ret
 
     @defer.inlineCallbacks
@@ -147,21 +148,22 @@ class RoomCreationHandler(BaseHandler):
 
         # we create and auth the tombstone event before properly creating the new
         # room, to check our user has perms in the old room.
-        tombstone_event, tombstone_context = (
-            yield self.event_creation_handler.create_event(
-                requester,
-                {
-                    "type": EventTypes.Tombstone,
-                    "state_key": "",
-                    "room_id": old_room_id,
-                    "sender": user_id,
-                    "content": {
-                        "body": "This room has been replaced",
-                        "replacement_room": new_room_id,
-                    },
+        (
+            tombstone_event,
+            tombstone_context,
+        ) = yield self.event_creation_handler.create_event(
+            requester,
+            {
+                "type": EventTypes.Tombstone,
+                "state_key": "",
+                "room_id": old_room_id,
+                "sender": user_id,
+                "content": {
+                    "body": "This room has been replaced",
+                    "replacement_room": new_room_id,
                 },
-                token_id=requester.access_token_id,
-            )
+            },
+            token_id=requester.access_token_id,
         )
         old_room_version = yield self.store.get_room_version(old_room_id)
         yield self.auth.check_from_context(
@@ -188,7 +190,12 @@ class RoomCreationHandler(BaseHandler):
             requester, old_room_id, new_room_id, old_room_state
         )
 
-        # and finally, shut down the PLs in the old room, and update them in the new
+        # Copy over user push rules, tags and migrate room directory state
+        yield self.room_member_handler.transfer_room_state_on_room_upgrade(
+            old_room_id, new_room_id
+        )
+
+        # finally, shut down the PLs in the old room, and update them in the new
         # room.
         yield self._update_upgraded_room_pls(
             requester, old_room_id, new_room_id, old_room_state
@@ -823,6 +830,8 @@ class RoomContextHandler(object):
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
 
     @defer.inlineCallbacks
     def get_event_context(self, user, room_id, event_id, limit, event_filter):
@@ -849,7 +858,7 @@ class RoomContextHandler(object):
 
         def filter_evts(events):
             return filter_events_for_client(
-                self.store, user.to_string(), events, is_peeking=is_peeking
+                self.storage, user.to_string(), events, is_peeking=is_peeking
             )
 
         event = yield self.store.get_event(
@@ -891,7 +900,7 @@ class RoomContextHandler(object):
         # first? Shouldn't we be consistent with /sync?
         # https://github.com/matrix-org/matrix-doc/issues/687
 
-        state = yield self.store.get_state_for_events(
+        state = yield self.state_store.get_state_for_events(
             [last_event_id], state_filter=state_filter
         )
         results["state"] = list(state[last_event_id].values())
@@ -923,7 +932,7 @@ class RoomEventSource(object):
 
         from_token = RoomStreamToken.parse(from_key)
         if from_token.topological:
-            logger.warn("Stream has topological part!!!! %r", from_key)
+            logger.warning("Stream has topological part!!!! %r", from_key)
             from_key = "s%s" % (from_token.stream,)
 
         app_service = self.store.get_app_service_by_user_id(user.to_string())
