@@ -121,11 +121,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(one_day_ms * 2 / 1000)
 
         # Send another event, which shouldn't get filtered out.
-        resp = self.helper.send(
-            room_id=room_id,
-            body="2",
-            tok=self.token,
-        )
+        resp = self.helper.send(room_id=room_id, body="2", tok=self.token)
 
         valid_event_id = resp.get("event_id")
 
@@ -252,11 +248,7 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
     def _test_retention(self, room_id, expected_code_for_first_event=200):
         # Send a first event to the room. This is the event we'll want to be purged at the
         # end of the test.
-        resp = self.helper.send(
-            room_id=room_id,
-            body="1",
-            tok=self.token,
-        )
+        resp = self.helper.send(room_id=room_id, body="1", tok=self.token)
 
         first_event_id = resp.get("event_id")
 

@@ -19,7 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 import attr
 import yaml
