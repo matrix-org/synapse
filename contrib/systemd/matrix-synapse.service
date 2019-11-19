@@ -8,7 +8,7 @@
 # synapse.
 #
 # This assumes that Synapse has been installed in a virtualenv in
-# the user's home directory
+# the user's home directory: `/home/synapse/synapse/env`.
 #
 # **NOTE:** This is an example service file that may change in the future. If you
 # wish to use this please copy rather than symlink it.
