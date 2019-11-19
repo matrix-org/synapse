@@ -1,5 +1,5 @@
 window.matrixRegistration = {
-    endpoint: location.origin + "/_matrix/client/api/v1/register"
+    endpoint: location.origin + "/_matrix/client/r0/register"
 };
 
 var setupCaptcha = function() {
