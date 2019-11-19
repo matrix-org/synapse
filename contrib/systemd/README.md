@@ -14,4 +14,4 @@ appropriate locations of your installation.
 4. Copy the `matrix-synapse.service` to `/etc/systemd/system/`
 5. Start Synapse: `sudo systemctl start matrix-synapse`
 6. Verify Synapse is running: `sudo systemctl status matrix-synapse`
-7. *optional* Enable the service at boot: `sudo systemctl enable matrix-synapse`
+7. *optional* Enable Synapse to start at system boot: `sudo systemctl enable matrix-synapse`
