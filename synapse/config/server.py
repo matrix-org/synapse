@@ -879,7 +879,7 @@ class ServerConfig(Config):
         # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
         #
         #user_ips_max_age: 14d
-        
+
         # Message retention policy at the server level.
         #
         # Room admins and mods can define a retention period for their rooms using the
