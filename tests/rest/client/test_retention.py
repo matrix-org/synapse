@@ -61,9 +61,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         self.helper.send_state(
             room_id=room_id,
             event_type=EventTypes.Retention,
-            body={
-                "max_lifetime": one_day_ms * 4,
-            },
+            body={"max_lifetime": one_day_ms * 4},
             tok=self.token,
             expect_code=400,
         )
@@ -71,9 +69,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         self.helper.send_state(
             room_id=room_id,
             event_type=EventTypes.Retention,
-            body={
-                "max_lifetime": one_hour_ms,
-            },
+            body={"max_lifetime": one_hour_ms},
             tok=self.token,
             expect_code=400,
         )
@@ -89,9 +85,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         self.helper.send_state(
             room_id=room_id,
             event_type=EventTypes.Retention,
-            body={
-                "max_lifetime": lifetime,
-            },
+            body={"max_lifetime": lifetime},
             tok=self.token,
         )
 
@@ -115,20 +109,12 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         events = []
 
         # Send a first event, which should be filtered out at the end of the test.
-        resp = self.helper.send(
-            room_id=room_id,
-            body="1",
-            tok=self.token,
-        )
+        resp = self.helper.send(room_id=room_id, body="1", tok=self.token)
 
         # Get the event from the store so that we end up with a FrozenEvent that we can
         # give to filter_events_for_client. We need to do this now because the event won't
         # be in the database anymore after it has expired.
-        events.append(self.get_success(
-            store.get_event(
-                resp.get("event_id")
-            )
-        ))
+        events.append(self.get_success(store.get_event(resp.get("event_id"))))
 
         # Advance the time by 2 days. We're using the default retention policy, therefore
         # after this the first event will still be valid.
@@ -143,20 +129,16 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         valid_event_id = resp.get("event_id")
 
-        events.append(self.get_success(
-            store.get_event(
-                valid_event_id
-            )
-        ))
+        events.append(self.get_success(store.get_event(valid_event_id)))
 
         # Advance the time by anothe 2 days. After this, the first event should be
         # outdated but not the second one.
         self.reactor.advance(one_day_ms * 2 / 1000)
 
         # Run filter_events_for_client with our list of FrozenEvents.
-        filtered_events = self.get_success(filter_events_for_client(
-            storage, self.user_id, events
-        ))
+        filtered_events = self.get_success(
+            filter_events_for_client(storage, self.user_id, events)
+        )
 
         # We should only get one event back.
         self.assertEqual(len(filtered_events), 1, filtered_events)
@@ -172,28 +154,22 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         # Send a first event to the room. This is the event we'll want to be purged at the
         # end of the test.
-        resp = self.helper.send(
-            room_id=room_id,
-            body="1",
-            tok=self.token,
-        )
+        resp = self.helper.send(room_id=room_id, body="1", tok=self.token)
 
         expired_event_id = resp.get("event_id")
 
         # Check that we can retrieve the event.
         expired_event = self.get_event(room_id, expired_event_id)
-        self.assertEqual(expired_event.get("content", {}).get("body"), "1", expired_event)
+        self.assertEqual(
+            expired_event.get("content", {}).get("body"), "1", expired_event
+        )
 
         # Advance the time.
         self.reactor.advance(increment / 1000)
 
         # Send another event. We need this because the purge job won't purge the most
         # recent event in the room.
-        resp = self.helper.send(
-            room_id=room_id,
-            body="2",
-            tok=self.token,
-        )
+        resp = self.helper.send(room_id=room_id, body="2", tok=self.token)
 
         valid_event_id = resp.get("event_id")
 
@@ -240,8 +216,7 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         mock_federation_client = Mock(spec=["backfill"])
 
         self.hs = self.setup_test_homeserver(
-            config=config,
-            federation_client=mock_federation_client,
+            config=config, federation_client=mock_federation_client,
         )
         return self.hs
 
@@ -268,9 +243,7 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         self.helper.send_state(
             room_id=room_id,
             event_type=EventTypes.Retention,
-            body={
-                "max_lifetime": one_day_ms * 35,
-            },
+            body={"max_lifetime": one_day_ms * 35},
             tok=self.token,
         )
 
@@ -289,18 +262,16 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
 
         # Check that we can retrieve the event.
         expired_event = self.get_event(room_id, first_event_id)
-        self.assertEqual(expired_event.get("content", {}).get("body"), "1", expired_event)
+        self.assertEqual(
+            expired_event.get("content", {}).get("body"), "1", expired_event
+        )
 
         # Advance the time by a month.
         self.reactor.advance(one_day_ms * 30 / 1000)
 
         # Send another event. We need this because the purge job won't purge the most
         # recent event in the room.
-        resp = self.helper.send(
-            room_id=room_id,
-            body="2",
-            tok=self.token,
-        )
+        resp = self.helper.send(room_id=room_id, body="2", tok=self.token)
 
         second_event_id = resp.get("event_id")
 
@@ -313,7 +284,9 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         )
 
         if expected_code_for_first_event == 200:
-            self.assertEqual(first_event.get("content", {}).get("body"), "1", first_event)
+            self.assertEqual(
+                first_event.get("content", {}).get("body"), "1", first_event
+            )
 
         # Check that the event that hasn't been purged can still be retrieved.
         second_event = self.get_event(room_id, second_event_id)

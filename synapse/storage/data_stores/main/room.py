@@ -334,8 +334,9 @@ class RoomStore(RoomWorkerStore, SearchStore):
                 WHERE state.room_id > ? AND state.type = '%s'
                 ORDER BY state.room_id ASC
                 LIMIT ?;
-                """ % EventTypes.Retention,
-                (last_room, batch_size)
+                """
+                % EventTypes.Retention,
+                (last_room, batch_size),
             )
 
             rows = self.cursor_to_dict(txn)
@@ -358,15 +359,13 @@ class RoomStore(RoomWorkerStore, SearchStore):
                         "event_id": row["event_id"],
                         "min_lifetime": retention_policy.get("min_lifetime"),
                         "max_lifetime": retention_policy.get("max_lifetime"),
-                    }
+                    },
                 )
 
             logger.info("Inserted %d rows into room_retention", len(rows))
 
             self._background_update_progress_txn(
-                txn, "insert_room_retention", {
-                    "room_id": rows[-1]["room_id"],
-                }
+                txn, "insert_room_retention", {"room_id": rows[-1]["room_id"]}
             )
 
             if batch_size > len(rows):
@@ -375,8 +374,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
                 return False
 
         end = yield self.runInteraction(
-            "insert_room_retention",
-            _background_insert_retention_txn,
+            "insert_room_retention", _background_insert_retention_txn,
         )
 
         if end:
@@ -585,17 +583,15 @@ class RoomStore(RoomWorkerStore, SearchStore):
             )
 
     def _store_retention_policy_for_room_txn(self, txn, event):
-        if (
-            hasattr(event, "content")
-            and ("min_lifetime" in event.content or "max_lifetime" in event.content)
+        if hasattr(event, "content") and (
+            "min_lifetime" in event.content or "max_lifetime" in event.content
         ):
             if (
-                ("min_lifetime" in event.content and not isinstance(
-                    event.content.get("min_lifetime"), integer_types
-                ))
-                or ("max_lifetime" in event.content and not isinstance(
-                    event.content.get("max_lifetime"), integer_types
-                ))
+                "min_lifetime" in event.content
+                and not isinstance(event.content.get("min_lifetime"), integer_types)
+            ) or (
+                "max_lifetime" in event.content
+                and not isinstance(event.content.get("max_lifetime"), integer_types)
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return
@@ -798,7 +794,9 @@ class RoomStore(RoomWorkerStore, SearchStore):
         return local_media_mxcs, remote_media_mxcs
 
     @defer.inlineCallbacks
-    def get_rooms_for_retention_period_in_range(self, min_ms, max_ms, include_null=False):
+    def get_rooms_for_retention_period_in_range(
+        self, min_ms, max_ms, include_null=False
+    ):
         """Retrieves all of the rooms within the given retention range.
 
         Optionally includes the rooms which don't have a retention policy.
@@ -904,23 +902,24 @@ class RoomStore(RoomWorkerStore, SearchStore):
                 INNER JOIN current_state_events USING (event_id, room_id)
                 WHERE room_id = ?;
                 """,
-                (room_id,)
+                (room_id,),
             )
 
             return self.cursor_to_dict(txn)
 
         ret = yield self.runInteraction(
-            "get_retention_policy_for_room",
-            get_retention_policy_for_room_txn,
+            "get_retention_policy_for_room", get_retention_policy_for_room_txn,
         )
 
         # If we don't know this room ID, ret will be None, in this case return the default
         # policy.
         if not ret:
-            defer.returnValue({
-                "min_lifetime": self.config.retention_default_min_lifetime,
-                "max_lifetime": self.config.retention_default_max_lifetime,
-            })
+            defer.returnValue(
+                {
+                    "min_lifetime": self.config.retention_default_min_lifetime,
+                    "max_lifetime": self.config.retention_default_max_lifetime,
+                }
+            )
 
         row = ret[0]
 

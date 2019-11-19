@@ -19,7 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import List
+from typing import List, Dict, Optional
 
 import attr
 import yaml
@@ -287,13 +287,17 @@ class ServerConfig(Config):
             self.retention_default_min_lifetime = None
             self.retention_default_max_lifetime = None
 
-        self.retention_allowed_lifetime_min = retention_config.get("allowed_lifetime_min")
+        self.retention_allowed_lifetime_min = retention_config.get(
+            "allowed_lifetime_min"
+        )
         if self.retention_allowed_lifetime_min is not None:
             self.retention_allowed_lifetime_min = self.parse_duration(
                 self.retention_allowed_lifetime_min
             )
 
-        self.retention_allowed_lifetime_max = retention_config.get("allowed_lifetime_max")
+        self.retention_allowed_lifetime_max = retention_config.get(
+            "allowed_lifetime_max"
+        )
         if self.retention_allowed_lifetime_max is not None:
             self.retention_allowed_lifetime_max = self.parse_duration(
                 self.retention_allowed_lifetime_max
@@ -302,14 +306,15 @@ class ServerConfig(Config):
         if (
             self.retention_allowed_lifetime_min is not None
             and self.retention_allowed_lifetime_max is not None
-            and self.retention_allowed_lifetime_min > self.retention_allowed_lifetime_max
+            and self.retention_allowed_lifetime_min
+            > self.retention_allowed_lifetime_max
         ):
             raise ConfigError(
                 "Invalid retention policy limits: 'allowed_lifetime_min' can not be"
                 " greater than 'allowed_lifetime_max'"
             )
 
-        self.retention_purge_jobs = []
+        self.retention_purge_jobs = []  # type: List[Dict[str, Optional[int]]]
         for purge_job_config in retention_config.get("purge_jobs", []):
             interval_config = purge_job_config.get("interval")
 
@@ -342,18 +347,22 @@ class ServerConfig(Config):
                     " 'longest_max_lifetime' value."
                 )
 
-            self.retention_purge_jobs.append({
-                "interval": interval,
-                "shortest_max_lifetime": shortest_max_lifetime,
-                "longest_max_lifetime": longest_max_lifetime,
-            })
+            self.retention_purge_jobs.append(
+                {
+                    "interval": interval,
+                    "shortest_max_lifetime": shortest_max_lifetime,
+                    "longest_max_lifetime": longest_max_lifetime,
+                }
+            )
 
         if not self.retention_purge_jobs:
-            self.retention_purge_jobs = [{
-                "interval": self.parse_duration("1d"),
-                "shortest_max_lifetime": None,
-                "longest_max_lifetime": None,
-            }]
+            self.retention_purge_jobs = [
+                {
+                    "interval": self.parse_duration("1d"),
+                    "shortest_max_lifetime": None,
+                    "longest_max_lifetime": None,
+                }
+            ]
 
         self.listeners = []  # type: List[dict]
         for listener in config.get("listeners", []):
