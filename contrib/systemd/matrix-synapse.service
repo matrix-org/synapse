@@ -5,7 +5,7 @@
 #    systemctl start matrix-synapse
 #
 # This assumes that Synapse has been installed by a user named
-# synapse
+# synapse.
 #
 # This assumes that Synapse has been installed in a virtualenv in
 # the user's home directory
