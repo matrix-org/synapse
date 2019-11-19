@@ -1,0 +1,1 @@
+Fix the registration fallback page to use the r0 registration endpoint instead of the deprecated v1 one.
