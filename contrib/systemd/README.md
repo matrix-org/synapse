@@ -1,7 +1,7 @@
 # Setup Synapse with Systemd
 This is a setup for managing synapse with the user contributed systemd unit 
 file. It provides a `matrix-synapse` systemd unit file that should be tailored 
-to accomidate your installation in accordinance with the installation 
+to accommodate your installation in accordance with the installation 
 instructions provided in [installation instructions](https://github.com/matrix-org/synapse/blob/master/INSTALL.md).
 
 ## Setup
