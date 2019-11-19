@@ -3,65 +3,91 @@ window.matrixRegistration = {
 };
 
 var setupCaptcha = function() {
-    if (!window.matrixRegistrationConfig) {
-        return;
-    }
-    $.get(matrixRegistration.endpoint, function(response) {
-        var serverExpectsCaptcha = false;
-        for (var i=0; i<response.flows.length; i++) {
-            var flow = response.flows[i];
-            if ("m.login.recaptcha" === flow.type) {
-                serverExpectsCaptcha = true;
-                break;
+    $.ajax({
+        url: matrixRegistration.endpoint,
+        method: "POST",
+        data: '{}',
+        complete: function(response) {
+            if (response.status != 401) {
+                errorFunc(response);
+                return;
             }
+            response = response.responseJSON;
+            window.matrixRegistration.session = response.session;
+            var serverExpectsCaptcha = false;
+            for (var i=0; i<response.flows.length; i++) {
+                var flow = response.flows[i];
+                for (j=0; j<flow.stages.length; j++) {
+                    var stage = flow.stages[j];
+                    if ("m.login.recaptcha" === stage) {
+                        serverExpectsCaptcha = true;
+                        break;
+                    }
+                }
+            }
+            if (!serverExpectsCaptcha) {
+                console.log("This server does not require a captcha.");
+                return;
+            }
+            console.log("Setting up ReCaptcha for "+matrixRegistration.endpoint);
+            var public_key = response.params["m.login.recaptcha"].public_key;
+            if (public_key === undefined) {
+                console.error("No public key defined for captcha!");
+                setFeedbackString("Misconfigured captcha for server. Contact server admin.");
+                return;
+            }
+            Recaptcha.create(public_key,
+            "regcaptcha",
+            {
+                theme: "red",
+                callback: Recaptcha.focus_response_field
+            });
+            window.matrixRegistration.isUsingRecaptcha = true;
         }
-        if (!serverExpectsCaptcha) {
-            console.log("This server does not require a captcha.");
-            return;
-        }
-        console.log("Setting up ReCaptcha for "+matrixRegistration.endpoint);
-        var public_key = window.matrixRegistrationConfig.recaptcha_public_key;
-        if (public_key === undefined) {
-            console.error("No public key defined for captcha!");
-            setFeedbackString("Misconfigured captcha for server. Contact server admin.");
-            return;
-        }
-        Recaptcha.create(public_key,
-        "regcaptcha",
-        {
-            theme: "red",
-            callback: Recaptcha.focus_response_field
-        });
-        window.matrixRegistration.isUsingRecaptcha = true;
-    }).error(errorFunc);
-    
+    })
 };
 
 var submitCaptcha = function(user, pwd) {
     var challengeToken = Recaptcha.get_challenge();
     var captchaEntry = Recaptcha.get_response();
     var data = {
-        type: "m.login.recaptcha",
-        challenge: challengeToken,
-        response: captchaEntry
+        auth: {
+            type: "m.login.recaptcha",
+            challenge: challengeToken,
+            response: captchaEntry,
+            session: window.matrixRegistration.session,
+        },
+        username: user,
+        password: pwd,
     };
     console.log("Submitting captcha");
-    $.post(matrixRegistration.endpoint, JSON.stringify(data), function(response) {
-        console.log("Success -> "+JSON.stringify(response));
-        submitPassword(user, pwd, response.session);
-    }).error(function(err) {
-        Recaptcha.reload();
-        errorFunc(err);
-    });
+    $.ajax({
+        url: matrixRegistration.endpoint,
+        method: "POST",
+        data: JSON.stringify(data),
+        complete: function(response) {
+            if (response.responseJSON.errcode) {
+                if (response.status != 401) {
+                    Recaptcha.reload();
+                }
+                errorFunc(response);
+                return
+            }
+            console.log("Success -> "+JSON.stringify(response));
+            submitPassword(user, pwd);
+        }
+    })
 };
 
-var submitPassword = function(user, pwd, session) {
+var submitPassword = function(user, pwd) {
     console.log("Registering...");
     var data = {
-        type: "m.login.password",
-        user: user,
+        auth: {
+            type: "m.login.dummy",
+            session: window.matrixRegistration.session,
+        },
+        username: user,
         password: pwd,
-        session: session
     };
     $.post(matrixRegistration.endpoint, JSON.stringify(data), function(response) {
         matrixRegistration.onRegistered(
