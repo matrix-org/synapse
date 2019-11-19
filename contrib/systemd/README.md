@@ -7,7 +7,7 @@ instructions provided in [installation instructions](https://github.com/matrix-o
 ## Setup
 1. Under the service section, ensure the `User` variable matches which user
 you installed synapse under and wish to run it as. 
-2. Under the service section, ensure the `WorkingDirectory` variablei matches
+2. Under the service section, ensure the `WorkingDirectory` variable matches
 where you have installed synapse.
 3. Under the service section, ensure the `ExecStart` variable matches the
 appropriate locations of your installation.
