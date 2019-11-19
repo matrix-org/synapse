@@ -35,8 +35,10 @@ class SearchHandler(BaseHandler):
     def __init__(self, hs):
         super(SearchHandler, self).__init__(hs)
         self._event_serializer = hs.get_event_client_serializer()
+        self.hs = hs
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def get_old_rooms_from_upgraded_room(self, room_id):
@@ -65,8 +67,17 @@ class SearchHandler(BaseHandler):
             if not predecessor:
                 break
 
+            predecessor_room_id = predecessor["room_id"]
+
+            # Don't bother trying to search in rooms we're not in
+            in_room = yield self.auth.check_host_in_room(
+                predecessor_room_id, self.hs.hostname
+            )
+            if not in_room:
+                break
+
             # Add predecessor's room ID
-            historical_room_ids.append(predecessor["room_id"])
+            historical_room_ids.append(predecessor_room_id)
 
             # Scan through the old room for further predecessors
             room_id = predecessor["room_id"]
