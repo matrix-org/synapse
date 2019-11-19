@@ -1,0 +1,1 @@
+Fix exception when remote servers attempt to join a room that they're not allowed to join.

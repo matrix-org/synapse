@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Iterable, Tuple
 
 from six import iteritems, itervalues
 from six.moves import range
@@ -23,6 +24,8 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError
+from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
@@ -282,7 +285,11 @@ class StateGroupWorkerStore(
             room_id (str)
 
         Returns:
-            Deferred[unicode|None]: predecessor room id
+            Deferred[dict|None]: A dictionary containing the structure of the predecessor
+                field from the room's create event. The structure is subject to other servers,
+                but it is expected to be:
+                    * room_id (str): The room ID of the predecessor room
+                    * event_id (str): The ID of the tombstone event in the predecessor room
 
         Raises:
             NotFoundError if the room is unknown
@@ -722,16 +729,18 @@ class StateGroupWorkerStore(
         member_filter, non_member_filter = state_filter.get_member_split()
 
         # Now we look them up in the member and non-member caches
-        non_member_state, incomplete_groups_nm, = (
-            yield self._get_state_for_groups_using_cache(
-                groups, self._state_group_cache, state_filter=non_member_filter
-            )
+        (
+            non_member_state,
+            incomplete_groups_nm,
+        ) = yield self._get_state_for_groups_using_cache(
+            groups, self._state_group_cache, state_filter=non_member_filter
         )
 
-        member_state, incomplete_groups_m, = (
-            yield self._get_state_for_groups_using_cache(
-                groups, self._state_group_members_cache, state_filter=member_filter
-            )
+        (
+            member_state,
+            incomplete_groups_m,
+        ) = yield self._get_state_for_groups_using_cache(
+            groups, self._state_group_members_cache, state_filter=member_filter
         )
 
         state = dict(non_member_state)
@@ -986,6 +995,29 @@ class StateGroupWorkerStore(
 
         return self.runInteraction("store_state_group", _store_state_group_txn)
 
+    @defer.inlineCallbacks
+    def get_referenced_state_groups(self, state_groups):
+        """Check if the state groups are referenced by events.
+
+        Args:
+            state_groups (Iterable[int])
+
+        Returns:
+            Deferred[set[int]]: The subset of state groups that are
+            referenced.
+        """
+
+        rows = yield self._simple_select_many_batch(
+            table="event_to_state_groups",
+            column="state_group",
+            iterable=state_groups,
+            keyvalues={},
+            retcols=("DISTINCT state_group",),
+            desc="get_referenced_state_groups",
+        )
+
+        return set(row["state_group"] for row in rows)
+
 
 class StateBackgroundUpdateStore(
     StateGroupBackgroundUpdateStore, BackgroundUpdateStore
@@ -1073,7 +1105,7 @@ class StateBackgroundUpdateStore(
                     " WHERE id < ? AND room_id = ?",
                     (state_group, room_id),
                 )
-                prev_group, = txn.fetchone()
+                (prev_group,) = txn.fetchone()
                 new_last_state_group = state_group
 
                 if prev_group:
@@ -1215,7 +1247,9 @@ class StateStore(StateGroupWorkerStore, StateBackgroundUpdateStore):
     def __init__(self, db_conn, hs):
         super(StateStore, self).__init__(db_conn, hs)
 
-    def _store_event_state_mappings_txn(self, txn, events_and_contexts):
+    def _store_event_state_mappings_txn(
+        self, txn, events_and_contexts: Iterable[Tuple[EventBase, EventContext]]
+    ):
         state_groups = {}
         for event, context in events_and_contexts:
             if event.internal_metadata.is_outlier():
@@ -1224,7 +1258,7 @@ class StateStore(StateGroupWorkerStore, StateBackgroundUpdateStore):
             # if the event was rejected, just give it the same state as its
             # predecessor.
             if context.rejected:
-                state_groups[event.event_id] = context.prev_group
+                state_groups[event.event_id] = context.state_group_before_event
                 continue
 
             state_groups[event.event_id] = context.state_group

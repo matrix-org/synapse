@@ -1,3 +1,12 @@
+Synapse 1.5.1 (2019-11-06)
+==========================
+
+Features
+--------
+
+- Limit the length of data returned by url previews, to prevent DoS attacks. ([\#6331](https://github.com/matrix-org/synapse/issues/6331), [\#6334](https://github.com/matrix-org/synapse/issues/6334))
+
+
 Synapse 1.5.0 (2019-10-29)
 ==========================
 

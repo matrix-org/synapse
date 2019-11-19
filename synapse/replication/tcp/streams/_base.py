@@ -95,6 +95,7 @@ GroupsStreamRow = namedtuple(
     "GroupsStreamRow",
     ("group_id", "user_id", "type", "content"),  # str  # str  # str  # dict
 )
+UserSignatureStreamRow = namedtuple("UserSignatureStreamRow", ("user_id"))  # str
 
 
 class Stream(object):
@@ -438,3 +439,20 @@ class GroupServerStream(Stream):
         self.update_function = store.get_all_groups_changes
 
         super(GroupServerStream, self).__init__(hs)
+
+
+class UserSignatureStream(Stream):
+    """A user has signed their own device with their user-signing key
+    """
+
+    NAME = "user_signature"
+    _LIMITED = False
+    ROW_TYPE = UserSignatureStreamRow
+
+    def __init__(self, hs):
+        store = hs.get_datastore()
+
+        self.current_token = store.get_device_stream_token
+        self.update_function = store.get_all_user_signature_changes_for_remotes
+
+        super(UserSignatureStream, self).__init__(hs)

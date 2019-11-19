@@ -73,7 +73,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                         "get_received_txn_response",
                         "set_received_txn_response",
                         "get_destination_retry_timings",
-                        "get_devices_by_remote",
+                        "get_device_updates_by_remote",
                         # Bits that user_directory needs
                         "get_user_directory_stream_pos",
                         "get_current_state_deltas",
@@ -109,7 +109,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             retry_timings_res
         )
 
-        self.datastore.get_devices_by_remote.return_value = (0, [])
+        self.datastore.get_device_updates_by_remote.return_value = (0, [])
 
         def get_received_txn_response(*args):
             return defer.succeed(None)
@@ -144,6 +144,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.datastore.get_to_device_stream_token = lambda: 0
         self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: ([], 0)
         self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: None
+        self.datastore.set_received_txn_response = lambda *args, **kwargs: defer.succeed(
+            None
+        )
 
     def test_started_typing_local(self):
         self.room_members = [U_APPLE, U_BANANA]

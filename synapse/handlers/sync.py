@@ -233,6 +233,8 @@ class SyncHandler(object):
         )
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
 
         # ExpiringCache((User, Device)) -> LruCache(state_key => event_id)
         self.lazy_loaded_members_cache = ExpiringCache(
@@ -420,7 +422,7 @@ class SyncHandler(object):
                     current_state_ids = frozenset(itervalues(current_state_ids))
 
                 recents = yield filter_events_for_client(
-                    self.store,
+                    self.storage,
                     sync_config.user.to_string(),
                     recents,
                     always_include_ids=current_state_ids,
@@ -473,7 +475,7 @@ class SyncHandler(object):
                     current_state_ids = frozenset(itervalues(current_state_ids))
 
                 loaded_recents = yield filter_events_for_client(
-                    self.store,
+                    self.storage,
                     sync_config.user.to_string(),
                     loaded_recents,
                     always_include_ids=current_state_ids,
@@ -512,7 +514,7 @@ class SyncHandler(object):
         Returns:
             A Deferred map from ((type, state_key)->Event)
         """
-        state_ids = yield self.store.get_state_ids_for_event(
+        state_ids = yield self.state_store.get_state_ids_for_event(
             event.event_id, state_filter=state_filter
         )
         if event.is_state():
@@ -583,7 +585,7 @@ class SyncHandler(object):
             return None
 
         last_event = last_events[-1]
-        state_ids = yield self.store.get_state_ids_for_event(
+        state_ids = yield self.state_store.get_state_ids_for_event(
             last_event.event_id,
             state_filter=StateFilter.from_types(
                 [(EventTypes.Name, ""), (EventTypes.CanonicalAlias, "")]
@@ -760,11 +762,11 @@ class SyncHandler(object):
 
             if full_state:
                 if batch:
-                    current_state_ids = yield self.store.get_state_ids_for_event(
+                    current_state_ids = yield self.state_store.get_state_ids_for_event(
                         batch.events[-1].event_id, state_filter=state_filter
                     )
 
-                    state_ids = yield self.store.get_state_ids_for_event(
+                    state_ids = yield self.state_store.get_state_ids_for_event(
                         batch.events[0].event_id, state_filter=state_filter
                     )
 
@@ -784,7 +786,7 @@ class SyncHandler(object):
                 )
             elif batch.limited:
                 if batch:
-                    state_at_timeline_start = yield self.store.get_state_ids_for_event(
+                    state_at_timeline_start = yield self.state_store.get_state_ids_for_event(
                         batch.events[0].event_id, state_filter=state_filter
                     )
                 else:
@@ -813,7 +815,7 @@ class SyncHandler(object):
                 )
 
                 if batch:
-                    current_state_ids = yield self.store.get_state_ids_for_event(
+                    current_state_ids = yield self.state_store.get_state_ids_for_event(
                         batch.events[-1].event_id, state_filter=state_filter
                     )
                 else:
@@ -844,7 +846,7 @@ class SyncHandler(object):
                         # So we fish out all the member events corresponding to the
                         # timeline here, and then dedupe any redundant ones below.
 
-                        state_ids = yield self.store.get_state_ids_for_event(
+                        state_ids = yield self.state_store.get_state_ids_for_event(
                             batch.events[0].event_id,
                             # we only want members!
                             state_filter=StateFilter.from_types(
@@ -1207,10 +1209,11 @@ class SyncHandler(object):
         since_token = sync_result_builder.since_token
 
         if since_token and not sync_result_builder.full_state:
-            account_data, account_data_by_room = (
-                yield self.store.get_updated_account_data_for_user(
-                    user_id, since_token.account_data_key
-                )
+            (
+                account_data,
+                account_data_by_room,
+            ) = yield self.store.get_updated_account_data_for_user(
+                user_id, since_token.account_data_key
             )
 
             push_rules_changed = yield self.store.have_push_rules_changed_for_user(
@@ -1222,9 +1225,10 @@ class SyncHandler(object):
                     sync_config.user
                 )
         else:
-            account_data, account_data_by_room = (
-                yield self.store.get_account_data_for_user(sync_config.user.to_string())
-            )
+            (
+                account_data,
+                account_data_by_room,
+            ) = yield self.store.get_account_data_for_user(sync_config.user.to_string())
 
             account_data["m.push_rules"] = yield self.push_rules_for_user(
                 sync_config.user

@@ -69,6 +69,8 @@ class PaginationHandler(object):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
 
@@ -125,7 +127,9 @@ class PaginationHandler(object):
         self._purges_in_progress_by_room.add(room_id)
         try:
             with (yield self.pagination_lock.write(room_id)):
-                yield self.store.purge_history(room_id, token, delete_local_events)
+                yield self.storage.purge_events.purge_history(
+                    room_id, token, delete_local_events
+                )
             logger.info("[purge] complete")
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_COMPLETE
         except Exception:
@@ -168,7 +172,7 @@ class PaginationHandler(object):
             if joined:
                 raise SynapseError(400, "Users are still joined to this room")
 
-            await self.store.purge_room(room_id)
+            await self.storage.purge_events.purge_room(room_id)
 
     @defer.inlineCallbacks
     def get_messages(
@@ -210,9 +214,10 @@ class PaginationHandler(object):
         source_config = pagin_config.get_source_config("room")
 
         with (yield self.pagination_lock.read(room_id)):
-            membership, member_event_id = yield self.auth.check_in_room_or_world_readable(
-                room_id, user_id
-            )
+            (
+                membership,
+                member_event_id,
+            ) = yield self.auth.check_in_room_or_world_readable(room_id, user_id)
 
             if source_config.direction == "b":
                 # if we're going backwards, we might need to backfill. This
@@ -255,7 +260,7 @@ class PaginationHandler(object):
                 events = event_filter.filter(events)
 
             events = yield filter_events_for_client(
-                self.store, user_id, events, is_peeking=(member_event_id is None)
+                self.storage, user_id, events, is_peeking=(member_event_id is None)
             )
 
         if not events:
@@ -274,7 +279,7 @@ class PaginationHandler(object):
                 (EventTypes.Member, event.sender) for event in events
             )
 
-            state_ids = yield self.store.get_state_ids_for_event(
+            state_ids = yield self.state_store.get_state_ids_for_event(
                 events[0].event_id, state_filter=state_filter
             )
 
@@ -295,10 +300,8 @@ class PaginationHandler(object):
         }
 
         if state:
-            chunk["state"] = (
-                yield self._event_serializer.serialize_events(
-                    state, time_now, as_client_event=as_client_event
-                )
+            chunk["state"] = yield self._event_serializer.serialize_events(
+                state, time_now, as_client_event=as_client_event
             )
 
         return chunk

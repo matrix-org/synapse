@@ -7,7 +7,15 @@
 
 set -e
 
-isort -y -rc synapse tests scripts-dev scripts
-flake8 synapse tests
-python3 -m black synapse tests scripts-dev scripts
+if [ $# -ge 1 ]
+then
+  files=$*
+else
+  files="synapse tests scripts-dev scripts"
+fi
+
+echo "Linting these locations: $files"
+isort -y -rc $files
+flake8 $files
+python3 -m black $files
 ./scripts-dev/config-lint.sh

@@ -77,6 +77,8 @@ class PreviewUrlResource(DirectServeResource):
             treq_args={"browser_like_redirects": True},
             ip_whitelist=hs.config.url_preview_ip_range_whitelist,
             ip_blacklist=hs.config.url_preview_ip_range_blacklist,
+            http_proxy=os.getenv("http_proxy"),
+            https_proxy=os.getenv("HTTPS_PROXY"),
         )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
@@ -139,7 +141,7 @@ class PreviewUrlResource(DirectServeResource):
                         match = False
                         continue
             if match:
-                logger.warn("URL %s blocked by url_blacklist entry %s", url, entry)
+                logger.warning("URL %s blocked by url_blacklist entry %s", url, entry)
                 raise SynapseError(
                     403, "URL blocked by url pattern blacklist entry", Codes.UNKNOWN
                 )
@@ -211,7 +213,7 @@ class PreviewUrlResource(DirectServeResource):
                 og["og:image:width"] = dims["width"]
                 og["og:image:height"] = dims["height"]
             else:
-                logger.warn("Couldn't get dims for %s" % url)
+                logger.warning("Couldn't get dims for %s" % url)
 
             # define our OG response for this media
         elif _is_html(media_info["media_type"]):
@@ -259,7 +261,7 @@ class PreviewUrlResource(DirectServeResource):
                         og["og:image:width"] = dims["width"]
                         og["og:image:height"] = dims["height"]
                     else:
-                        logger.warn("Couldn't get dims for %s", og["og:image"])
+                        logger.warning("Couldn't get dims for %s", og["og:image"])
 
                     og["og:image"] = "mxc://%s/%s" % (
                         self.server_name,
@@ -270,7 +272,7 @@ class PreviewUrlResource(DirectServeResource):
                 else:
                     del og["og:image"]
         else:
-            logger.warn("Failed to find any OG data in %s", url)
+            logger.warning("Failed to find any OG data in %s", url)
             og = {}
 
         # filter out any stupidly long values
@@ -334,7 +336,7 @@ class PreviewUrlResource(DirectServeResource):
                 )
             except Exception as e:
                 # FIXME: pass through 404s and other error messages nicely
-                logger.warn("Error downloading %s: %r", url, e)
+                logger.warning("Error downloading %s: %r", url, e)
 
                 raise SynapseError(
                     500,
@@ -415,7 +417,7 @@ class PreviewUrlResource(DirectServeResource):
             except OSError as e:
                 # If the path doesn't exist, meh
                 if e.errno != errno.ENOENT:
-                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    logger.warning("Failed to remove media: %r: %s", media_id, e)
                     continue
 
             removed_media.append(media_id)
@@ -447,7 +449,7 @@ class PreviewUrlResource(DirectServeResource):
             except OSError as e:
                 # If the path doesn't exist, meh
                 if e.errno != errno.ENOENT:
-                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    logger.warning("Failed to remove media: %r: %s", media_id, e)
                     continue
 
             try:
@@ -463,7 +465,7 @@ class PreviewUrlResource(DirectServeResource):
             except OSError as e:
                 # If the path doesn't exist, meh
                 if e.errno != errno.ENOENT:
-                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    logger.warning("Failed to remove media: %r: %s", media_id, e)
                     continue
 
             removed_media.append(media_id)

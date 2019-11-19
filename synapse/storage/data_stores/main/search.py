@@ -196,7 +196,7 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
                         " ON event_search USING GIN (vector)"
                     )
                 except psycopg2.ProgrammingError as e:
-                    logger.warn(
+                    logger.warning(
                         "Ignoring error %r when trying to switch from GIST to GIN", e
                     )
 
@@ -672,7 +672,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                     )
                 )
                 txn.execute(query, (value, search_query))
-                headline, = txn.fetchall()[0]
+                (headline,) = txn.fetchall()[0]
 
                 # Now we need to pick the possible highlights out of the haedline
                 # result.
