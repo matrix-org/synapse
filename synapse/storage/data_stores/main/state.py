@@ -31,7 +31,7 @@ from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.state import StateFilter
-from synapse.util.caches import get_cache_factor_for, intern_string
+from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.stringutils import to_ascii
@@ -249,11 +249,11 @@ class StateGroupWorkerStore(
         self._state_group_cache = DictionaryCache(
             "*stateGroupCache*",
             # TODO: this hasn't been tuned yet
-            50000 * get_cache_factor_for("stateGroupCache"),
+            50000 * hs.config.caches.get_factor_for("stateGroupCache"),
         )
         self._state_group_members_cache = DictionaryCache(
             "*stateGroupMembersCache*",
-            500000 * get_cache_factor_for("stateGroupMembersCache"),
+            500000 * hs.config.caches.get_factor_for("stateGroupMembersCache"),
         )
 
     @defer.inlineCallbacks

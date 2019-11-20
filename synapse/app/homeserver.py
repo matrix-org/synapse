@@ -71,7 +71,6 @@ from synapse.server import HomeServer
 from synapse.storage import DataStore, are_all_users_on_domain
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
 from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_database
-from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
@@ -516,7 +515,7 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
 
     daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
     stats["daily_sent_messages"] = daily_sent_messages
-    stats["cache_factor"] = CACHE_SIZE_FACTOR
+    stats["cache_factor"] = hs.config.caches.global_factor
     stats["event_cache_size"] = hs.config.event_cache_size
 
     #

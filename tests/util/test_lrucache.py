@@ -22,7 +22,7 @@ from synapse.util.caches.treecache import TreeCache
 from .. import unittest
 
 
-class LruCacheTestCase(unittest.TestCase):
+class LruCacheTestCase(unittest.HomeserverTestCase):
     def test_get_set(self):
         cache = LruCache(1)
         cache["key"] = "value"

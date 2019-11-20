@@ -49,7 +49,6 @@ from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.util.async_helpers import timeout_deferred
-from synapse.util.caches import CACHE_SIZE_FACTOR
 
 logger = logging.getLogger(__name__)
 
@@ -241,7 +240,8 @@ class SimpleHttpClient(object):
         # tends to do so in batches, so we need to allow the pool to keep
         # lots of idle connections around.
         pool = HTTPConnectionPool(self.reactor)
-        pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
+        # XXX: Why does this use the cache factor????
+        pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
         pool.cachedConnectionTimeout = 2 * 60
 
         # The default context factory in Twisted 14.0.0 (which we require) is

@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import functools
 import inspect
 import logging
@@ -30,7 +31,6 @@ from twisted.internet import defer
 from synapse.logging.context import make_deferred_yieldable, preserve_fn
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred
-from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 
@@ -81,7 +81,6 @@ class CacheEntry(object):
 class Cache(object):
     __slots__ = (
         "cache",
-        "max_entries",
         "name",
         "keylen",
         "thread",
@@ -110,6 +109,10 @@ class Cache(object):
             self.cache,
             collect_callback=self._metrics_collection_callback,
         )
+
+    @property
+    def max_entries(self):
+        return self.cache.max_size
 
     def _on_evicted(self, evicted_count):
         self.metrics.inc_evictions(evicted_count)
@@ -369,8 +372,6 @@ class CacheDescriptor(_CacheDescriptorBase):
             inlineCallbacks=inlineCallbacks,
             cache_context=cache_context,
         )
-
-        max_entries = int(max_entries * get_cache_factor_for(orig.__name__))
 
         self.max_entries = max_entries
         self.tree = tree

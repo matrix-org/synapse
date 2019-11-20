@@ -66,7 +66,7 @@ class ExpiringCache(object):
 
         self.iterable = iterable
 
-        self.metrics = register_cache("expiring", cache_name, self)
+        self.metrics = register_cache("expiring", cache_name, self, resizable=False)
 
         if not self._expiry_ms:
             # Don't bother starting the loop if things never expire

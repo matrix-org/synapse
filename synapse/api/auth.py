@@ -41,7 +41,7 @@ from synapse.api.errors import (
 )
 from synapse.config.server import is_threepid_reserved
 from synapse.types import UserID
-from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
+from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 
@@ -77,7 +77,7 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
 
-        self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
+        self.token_cache = LruCache(10000)
         register_cache("cache", "token_cache", self.token_cache)
 
         self._account_validity = hs.config.account_validity

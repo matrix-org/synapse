@@ -14,11 +14,13 @@
 # limitations under the License.
 
 import logging
+import math
 
 from six import integer_types
 
 from sortedcontainers import SortedDict
 
+from synapse.config import cache as cache_config
 from synapse.util import caches
 
 logger = logging.getLogger(__name__)
@@ -35,16 +37,36 @@ class StreamChangeCache(object):
     """
 
     def __init__(self, name, current_stream_pos, max_size=10000, prefilled_cache=None):
-        self._max_size = int(max_size * caches.CACHE_SIZE_FACTOR)
+        self._original_max_size = max_size
+        self.max_size = math.floor(max_size * cache_config.DEFAULT_CACHE_SIZE_FACTOR)
         self._entity_to_key = {}
         self._cache = SortedDict()
         self._earliest_known_stream_pos = current_stream_pos
         self.name = name
-        self.metrics = caches.register_cache("cache", self.name, self._cache)
+        self.metrics = caches.register_cache(
+            "cache", self.name, self._cache, resize_callback=self.set_cache_factor
+        )
 
         if prefilled_cache:
             for entity, stream_pos in prefilled_cache.items():
                 self.entity_has_changed(entity, stream_pos)
+
+    def set_cache_factor(self, factor: float) -> bool:
+        """
+        Set the cache factor for this individual cache.
+
+        This will trigger a resize if it changes, which may require evicting
+        items from the cache.
+
+        Returns:
+            bool: Whether the cache changed size or not.
+        """
+        new_size = math.floor(self._original_max_size * factor)
+        if new_size != self.max_size:
+            self.max_size = new_size
+            self._evict()
+            return True
+        return False
 
     def has_entity_changed(self, entity, stream_pos):
         """Returns True if the entity may have been updated since stream_pos
@@ -133,13 +155,13 @@ class StreamChangeCache(object):
                 self._cache.pop(old_pos, None)
             self._cache[stream_pos] = entity
             self._entity_to_key[entity] = stream_pos
+            self._evict()
 
-            while len(self._cache) > self._max_size:
-                k, r = self._cache.popitem(0)
-                self._earliest_known_stream_pos = max(
-                    k, self._earliest_known_stream_pos
-                )
-                self._entity_to_key.pop(r, None)
+    def _evict(self):
+        while len(self._cache) > self.max_size:
+            k, r = self._cache.popitem(0)
+            self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
+            self._entity_to_key.pop(r, None)
 
     def get_max_pos_of_last_change(self, entity):
         """Returns an upper bound of the stream id of the last change to an

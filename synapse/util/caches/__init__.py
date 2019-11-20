@@ -15,27 +15,16 @@
 # limitations under the License.
 
 import logging
-import os
 from typing import Dict
 
 import six
 from six.moves import intern
 
-from prometheus_client.core import REGISTRY, Gauge, GaugeMetricFamily
+from prometheus_client.core import Gauge
+
+from synapse.config.cache import add_resizable_cache
 
 logger = logging.getLogger(__name__)
-
-CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
-
-
-def get_cache_factor_for(cache_name):
-    env_var = "SYNAPSE_CACHE_FACTOR_" + cache_name.upper()
-    factor = os.environ.get(env_var)
-    if factor:
-        return float(factor)
-
-    return CACHE_SIZE_FACTOR
-
 
 caches_by_name = {}
 collectors_by_name = {}  # type: Dict
@@ -44,6 +33,7 @@ cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
 cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
 cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name"])
 cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
+cache_max_size = Gauge("synapse_util_caches_cache_max_size", "", ["name"])
 
 response_cache_size = Gauge("synapse_util_caches_response_cache:size", "", ["name"])
 response_cache_hits = Gauge("synapse_util_caches_response_cache:hits", "", ["name"])
@@ -53,8 +43,15 @@ response_cache_evicted = Gauge(
 response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
 
 
-def register_cache(cache_type, cache_name, cache, collect_callback=None):
-    """Register a cache object for metric collection.
+def register_cache(
+    cache_type,
+    cache_name,
+    cache,
+    collect_callback=None,
+    resizable=True,
+    resize_callback=None,
+):
+    """Register a cache object for metric collection and resizing.
 
     Args:
         cache_type (str):
@@ -66,13 +63,15 @@ def register_cache(cache_type, cache_name, cache, collect_callback=None):
     Returns:
         CacheMetric: an object which provides inc_{hits,misses,evictions} methods
     """
+    if resizable:
+        if not resize_callback:
+            resize_callback = getattr(cache, "set_cache_factor")
+        add_resizable_cache(cache_name, resize_callback)
 
     # Check if the metric is already registered. Unregister it, if so.
     # This usually happens during tests, as at runtime these caches are
     # effectively singletons.
     metric_name = "cache_%s_%s" % (cache_type, cache_name)
-    if metric_name in collectors_by_name.keys():
-        REGISTRY.unregister(collectors_by_name[metric_name])
 
     class CacheMetric(object):
 
@@ -104,16 +103,15 @@ def register_cache(cache_type, cache_name, cache, collect_callback=None):
                     cache_hits.labels(cache_name).set(self.hits)
                     cache_evicted.labels(cache_name).set(self.evicted_size)
                     cache_total.labels(cache_name).set(self.hits + self.misses)
+                    if hasattr(cache, "max_size"):
+                        cache_max_size.labels(cache_name).set(cache.max_size)
                 if collect_callback:
                     collect_callback()
             except Exception as e:
                 logger.warning("Error calculating metrics for %s: %s", cache_name, e)
                 raise
 
-            yield GaugeMetricFamily("__unused", "")
-
     metric = CacheMetric()
-    REGISTRY.register(metric)
     caches_by_name[cache_name] = cache
     collectors_by_name[metric_name] = metric
     return metric

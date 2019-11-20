@@ -22,7 +22,6 @@ from twisted.internet import defer
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage import background_updates
 from synapse.storage._base import Cache
-from synapse.util.caches import CACHE_SIZE_FACTOR
 
 logger = logging.getLogger(__name__)
 
@@ -366,7 +365,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
     def __init__(self, db_conn, hs):
 
         self.client_ip_last_seen = Cache(
-            name="client_ip_last_seen", keylen=4, max_entries=50000 * CACHE_SIZE_FACTOR
+            name="client_ip_last_seen", keylen=4, max_entries=50000
         )
 
         super(ClientIpStore, self).__init__(db_conn, hs)

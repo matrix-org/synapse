@@ -252,6 +252,7 @@ class HomeServer(object):
         """
         for i in self.REQUIRED_ON_MASTER_STARTUP:
             getattr(self, "get_" + i)()
+        self.config.caches.resize_caches()
 
     def get_reactor(self):
         """

@@ -20,7 +20,7 @@ import re
 from six import string_types
 
 from synapse.types import UserID
-from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
+from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ class PushRuleEvaluatorForEvent(object):
 
 
 # Caches (glob, word_boundary) -> regex for push. See _glob_matches
-regex_cache = LruCache(50000 * CACHE_SIZE_FACTOR)
+regex_cache = LruCache(50000)
 register_cache("cache", "regex_push_cache", regex_cache)
 
 
