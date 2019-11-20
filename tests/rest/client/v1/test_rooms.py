@@ -948,12 +948,14 @@ class RoomMessageListTestCase(RoomBase):
         # Purge every event before the second event.
         purge_id = random_string(16)
         pagination_handler._purges_by_id[purge_id] = PurgeStatus()
-        self.get_success(pagination_handler._purge_history(
-            purge_id=purge_id,
-            room_id=self.room_id,
-            token=second_token,
-            delete_local_events=True,
-        ))
+        self.get_success(
+            pagination_handler._purge_history(
+                purge_id=purge_id,
+                room_id=self.room_id,
+                token=second_token,
+                delete_local_events=True,
+            )
+        )
 
         # Check that we only get the second message through /message now that the first
         # has been purged.
