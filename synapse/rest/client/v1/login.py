@@ -397,7 +397,9 @@ class LoginRestServlet(RestServlet):
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID(user, self.hs.hostname).to_string()
-        result = yield self._complete_login(user_id, login_submission, create_non_existant_users=True)
+        result = yield self._complete_login(
+            user_id, login_submission, create_non_existant_users=True
+        )
         return result
 
 
