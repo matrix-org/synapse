@@ -1,1 +1,0 @@
-Appservice requests will no longer contain a double slash prefix when the appservice url provided ends in a slash.
