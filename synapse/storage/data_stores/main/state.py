@@ -246,14 +246,10 @@ class StateGroupWorkerStore(
         # We size the non-members cache to be smaller than the members cache as the
         # vast majority of state in Matrix (today) is member events.
 
-        self._state_group_cache = DictionaryCache(
-            "*stateGroupCache*",
-            # TODO: this hasn't been tuned yet
-            50000 * hs.config.caches.get_factor_for("stateGroupCache"),
-        )
+        # TODO: this hasn't been tuned yet
+        self._state_group_cache = DictionaryCache("*stateGroupCache*", 50000)
         self._state_group_members_cache = DictionaryCache(
-            "*stateGroupMembersCache*",
-            500000 * hs.config.caches.get_factor_for("stateGroupMembersCache"),
+            "*stateGroupMembersCache*", 500000
         )
 
     @defer.inlineCallbacks

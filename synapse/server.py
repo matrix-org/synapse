@@ -242,6 +242,7 @@ class HomeServer(object):
             self.datastores = DataStores(datastore, conn, self)
             conn.commit()
         self.start_time = int(self.get_clock().time())
+        self.get_clock().looping_call(self.config.caches.resize_caches, 10000)
         logger.info("Finished setting up.")
 
     def setup_master(self):
@@ -252,7 +253,6 @@ class HomeServer(object):
         """
         for i in self.REQUIRED_ON_MASTER_STARTUP:
             getattr(self, "get_" + i)()
-        self.config.caches.resize_caches()
 
     def get_reactor(self):
         """
