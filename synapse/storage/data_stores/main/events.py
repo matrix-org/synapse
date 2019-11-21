@@ -1963,6 +1963,27 @@ class EventsStore(
             topological_ordering (int): The position of the event in the room's topology.
         """
         if replaces:
+            # Check that processing that edit won't overwrite the processing of a more
+            # recent edit of the same event.
+            txn.execute(
+                """
+                SELECT topological_ordering FROM event_labels
+                WHERE event_id = ? OR replaces = ?
+                """,
+                (replaces, replaces),
+            )
+
+            # We don't care about which row we're using because they'll all have the same
+            # topological ordering, since they're all about the same event.
+            # If the topological ordering (depth) of the current event is lower than the
+            # one of the event which labels are already stored (which means the current
+            # event is less recent), then stop here because we already have a more recent
+            # list of labels.
+            # FIXME: This isn't true if the most recent edit removes every label from the
+            #  event, what should we do in that case?
+            if topological_ordering <= txn[0][0]:
+                return
+
             # If the event is replacing another one (e.g. it's an edit), delete all
             # labels associated with the event it replaces or past replacements of it.
             sql = """
