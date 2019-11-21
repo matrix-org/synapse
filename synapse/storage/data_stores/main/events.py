@@ -1986,6 +1986,7 @@ class EventsStore(
                         "replaces": replaces,
                     }
                     for label in labels
+                    if isinstance(label, str)
                 ],
             )
 
