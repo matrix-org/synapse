@@ -1973,6 +1973,7 @@ class EventsStore(
                 (replaces, replaces),
             )
 
+            txn.execute("SELECT 1")
             # We don't care about which row we're using because they'll all have the same
             # topological ordering, since they're all about the same event.
             # If the topological ordering (depth) of the current event is lower than the
@@ -1981,7 +1982,8 @@ class EventsStore(
             # list of labels.
             # FIXME: This isn't true if the most recent edit removes every label from the
             #  event, what should we do in that case?
-            if topological_ordering <= txn[0][0]:
+            results = tuple(txn)
+            if not results or topological_ordering <= results[0][0]:
                 return
 
             # If the event is replacing another one (e.g. it's an edit), delete all
