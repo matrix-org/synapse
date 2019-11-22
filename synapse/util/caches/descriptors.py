@@ -16,13 +16,16 @@
 import functools
 import inspect
 import logging
+import math
 import threading
+from collections import deque
 from typing import Any, Tuple, Union, cast
 from weakref import WeakValueDictionary
 
 from six import itervalues
 
-from prometheus_client import Gauge
+from bloom_filter import BloomFilter
+from prometheus_client import Gauge, Histogram
 from typing_extensions import Protocol
 
 from twisted.internet import defer
@@ -37,6 +40,13 @@ from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 from . import register_cache
 
 logger = logging.getLogger(__name__)
+
+cache_size_counts = Histogram(
+    "synapse_util_caches_miss_rate",
+    "",
+    ["name"],
+    buckets=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2, "+Inf"],
+)
 
 CacheKey = Union[Tuple, Any]
 
@@ -87,6 +97,8 @@ class Cache(object):
         "thread",
         "metrics",
         "_pending_deferred_cache",
+        "ratio_tracking",
+        "ratio_metric",
     )
 
     def __init__(self, name, max_entries=1000, keylen=1, tree=False, iterable=False):
@@ -104,12 +116,17 @@ class Cache(object):
         self.name = name
         self.keylen = keylen
         self.thread = None
+
+        self.ratio_tracking = CacheHitRatioTracking(max_entries)
+
         self.metrics = register_cache(
             "cache",
             name,
             self.cache,
             collect_callback=self._metrics_collection_callback,
         )
+
+        self.ratio_metric = cache_size_counts.labels(name)
 
     def _on_evicted(self, evicted_count):
         self.metrics.inc_evictions(evicted_count)
@@ -147,6 +164,11 @@ class Cache(object):
             if update_metrics:
                 self.metrics.inc_hits()
             return val.deferred
+
+        ratio = self.ratio_tracking.add(str(hash(key)))
+        if ratio is None:
+            ratio = 10
+        self.ratio_metric.observe(ratio)
 
         val = self.cache.get(key, _CacheSentinel, callbacks=callbacks)
         if val is not _CacheSentinel:
@@ -724,3 +746,76 @@ def cachedList(cached_method_name, list_name, num_args=None, inlineCallbacks=Fal
         num_args=num_args,
         inlineCallbacks=inlineCallbacks,
     )
+
+
+class CacheHitRatioTracking(object):
+    def __init__(self, target_size, buckets=20, error_rate=0.01):
+        self._bucket_size = 2 * target_size / buckets
+        self._error_rate = error_rate
+
+        self._target_size = target_size
+
+        self._buckets = deque(
+            (
+                [
+                    BloomFilter(
+                        max_elements=self._target_size, error_rate=self._error_rate
+                    ),
+                    0,
+                ]
+                for _ in range(buckets)
+            ),
+            maxlen=buckets,
+        )
+
+    def add(self, key):
+        found_in_bucket = None
+
+        for i, (bucket, _) in enumerate(self._buckets):
+            if key in bucket:
+                found_in_bucket = i
+                break
+            else:
+                self._buckets[i][1] += 1
+
+        self._buckets[0][0].add(key)
+
+        while self._buckets[-1][1] > 2 * self._target_size:
+            self._buckets.pop()
+
+        if self._buckets[0][1] > self._bucket_size:
+            self._buckets.appendleft(
+                [
+                    BloomFilter(
+                        max_elements=self._target_size, error_rate=self._error_rate
+                    ),
+                    0,
+                ]
+            )
+
+        if found_in_bucket is not None:
+            return self._buckets[found_in_bucket][1] / self._target_size
+
+
+def _count_set_bits(n):
+    count = 0
+    while n:
+        count += n & 1
+        n >>= 1
+    return count
+
+
+def _num_bits_set(bloom):
+    count = 0
+    for c in bloom.backend.array_:
+        if c == 0:
+            continue
+        count += _count_set_bits(c)
+    return count
+
+
+def _get_estimate_bloom_size(bloom):
+    X = _num_bits_set(bloom)
+    m = bloom.num_bits_m
+    k = bloom.num_probes_k
+    return -(m / k) * math.log(1 - X / m)
