@@ -244,6 +244,9 @@ class Cache(object):
 
     def prefill(self, key, value, callback=None):
         callbacks = [callback] if callback else []
+
+        self.ratio_tracking.add(str(hash(key)))
+
         self.cache.set(key, value, callbacks=callbacks)
 
     def invalidate(self, key):
