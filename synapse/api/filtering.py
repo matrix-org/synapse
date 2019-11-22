@@ -148,12 +148,10 @@ class Filtering(object):
     def parse_filter(self, filter_data, user_localpart=None):
         filter_collection = DEFAULT_FILTER_COLLECTION
         if filter_data:
-            if filter_data.startswith('{'):
+            if filter_data.startswith("{"):
                 try:
                     filter_object = json.loads(filter_data)
-                    set_timeline_upper_limit(
-                        filter_object, self.filter_timeline_limit
-                    )
+                    set_timeline_upper_limit(filter_object, self.filter_timeline_limit)
                 except:
                     raise SynapseError(400, "Invalid filter JSON")
                 self.check_valid_filter(filter_object)
@@ -169,7 +167,9 @@ class Filtering(object):
                     if err.code != 404:
                         raise
                     # fix up the description and errcode to be more useful
-                    raise SynapseError(400, "No such filter", errcode=Codes.INVALID_PARAM)
+                    raise SynapseError(
+                        400, "No such filter", errcode=Codes.INVALID_PARAM
+                    )
         defer.returnValue(filter_collection)
 
     # TODO(paul): surely we should probably add a delete_user_filter or
