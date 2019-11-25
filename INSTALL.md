@@ -133,15 +133,23 @@ sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
 sudo yum groupinstall "Development Tools"
 ```
 
-#### Mac OS X
+#### macOS
 
-Installing prerequisites on Mac OS X:
+Installing prerequisites on macOS:
 
 ```
 xcode-select --install
 sudo easy_install pip
 sudo pip install virtualenv
 brew install pkg-config libffi
+```
+
+On macOS Catalina (10.15) you may need to explicitly install OpenSSL
+via brew and inform `pip` about it so that `psycopg2` builds:
+
+```
+brew install openssl@1.1
+export LDFLAGS=-L/usr/local/Cellar/openssl\@1.1/1.1.1d/lib/
 ```
 
 #### OpenSUSE

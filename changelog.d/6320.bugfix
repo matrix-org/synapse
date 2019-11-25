@@ -1,1 +1,0 @@
-Fix bug which casued rejected events to be persisted with the wrong room state.
