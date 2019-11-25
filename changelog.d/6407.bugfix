@@ -1,1 +1,0 @@
-Fix a bug which could cause the background database update hander for event labels to get stuck in a loop raising exceptions.
