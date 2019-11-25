@@ -240,14 +240,6 @@ class EmailConfig(Config):
             self.email_add_threepid_template_success_html_content = self.read_file(
                 filepath, "email.add_threepid_template_success_html"
             )
-        elif self.account_threepid_delegate_msisdn:
-            if not self.public_baseurl:
-                raise ConfigError(
-                    "The configuration option `public_baseurl` is required if "
-                    "`account_threepid_delegate.msisdn` is set, such that "
-                    "clients know where to submit validation tokens to. Please "
-                    "configure `public_baseurl`."
-                )
 
         if self.email_enable_notifs:
             required = [
