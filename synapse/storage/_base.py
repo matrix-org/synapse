@@ -409,9 +409,8 @@ class SQLBaseStore(object):
             i = 0
             N = 5
             while True:
-                cursor = conn.cursor()
                 cursor = LoggingTransaction(
-                    cursor,
+                    conn.cursor(),
                     name,
                     self.database_engine,
                     after_callbacks,
@@ -466,14 +465,21 @@ class SQLBaseStore(object):
                     # statements on the connection [1], which will make our cursor
                     # invalid [2].
                     #
-                    # While the above probably doesn't apply to postgres, we still need
-                    # to make sure that we have done with the cursor before we release
-                    # the connection, for compatibility with sqlite.
-                    #
                     # In any case, continuing to read rows after commit()ing seems
                     # dubious from the PoV of ACID transactional semantics
                     # (sqlite explicitly says that once you commit, you may see rows
                     # from subsequent updates.)
+                    #
+                    # In psycopg2, cursors are essentially a client-side fabrication -
+                    # all the data is transferred to the client side when the statement
+                    # finishes executing - so in theory we could go on streaming results
+                    # from the cursor, but attempting to do so would make us
+                    # incompatible with sqlite, so let's make sure we're not doing that
+                    # by closing the cursor.
+                    #
+                    # (*named* cursors in psycopg2 are different and are proper server-
+                    # side things, but (a) we don't use them and (b) they are implicitly
+                    # closed by ending the transaction anyway.)
                     #
                     # In short, if we haven't finished with the cursor yet, that's a
                     # problem waiting to bite us.
