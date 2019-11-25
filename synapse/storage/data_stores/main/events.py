@@ -1956,6 +1956,32 @@ class EventsStore(
             ],
         )
 
+    def insert_event_expiry(self, event_id, expiry_ts):
+        return self._simple_insert(
+            table="event_expiry",
+            values={
+                "event_id": event_id,
+                "expiry_ts": expiry_ts,
+            },
+            desc="insert_event_expiry",
+        )
+
+    def delete_event_expiry(self, event_id):
+        return self._simple_delete(
+            table="event_expiry",
+            keyvalues={"event_id": event_id},
+            desc="delete_event_expiry",
+        )
+
+    def get_events_to_expire(self):
+        return self._simple_select_list(
+            table="event_expiry",
+            keyvalues=None,
+            retcols=["event_id", "expiry_ts"],
+            desc="get_events_to_expire",
+        )
+
+
 
 AllNewEventsResult = namedtuple(
     "AllNewEventsResult",
