@@ -237,7 +237,7 @@ class TerseJSONToTCPLogObserver(object):
 
     def _connect(self) -> None:
         """
-        Implement the write loop.
+        Triggers an attempt to connect then write to the remote if not already writing.
         """
         if self._connection_waiter:
             return
