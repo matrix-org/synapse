@@ -329,6 +329,8 @@ class EventCreationHandler(object):
                 5 * 60 * 1000,
             )
 
+        self._message_handler = hs.get_message_handler()
+
     @defer.inlineCallbacks
     def create_event(
         self,
@@ -769,6 +771,11 @@ class EventCreationHandler(object):
                 run_in_background(
                     self.store.remove_push_actions_from_staging, event.event_id
                 )
+
+        # If there's an expiry timestamp, schedule the redaction of the event.
+        expiry_ts = event.content.get("m.self_destruct_after")
+        if isinstance(expiry_ts, int):
+            yield self._message_handler.schedule_redaction(event.event_id, expiry_ts)
 
     @defer.inlineCallbacks
     def persist_and_notify_client_event(
