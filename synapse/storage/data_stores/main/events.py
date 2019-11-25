@@ -1959,10 +1959,7 @@ class EventsStore(
     def insert_event_expiry(self, event_id, expiry_ts):
         return self._simple_insert(
             table="event_expiry",
-            values={
-                "event_id": event_id,
-                "expiry_ts": expiry_ts,
-            },
+            values={"event_id": event_id, "expiry_ts": expiry_ts},
             desc="insert_event_expiry",
         )
 
@@ -1980,7 +1977,6 @@ class EventsStore(
             retcols=["event_id", "expiry_ts"],
             desc="get_events_to_expire",
         )
-
 
 
 AllNewEventsResult = namedtuple(
