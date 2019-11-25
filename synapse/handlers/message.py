@@ -63,6 +63,10 @@ class MessageHandler(object):
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
 
+        run_as_background_process(
+            "_schedule_redactions_from_db", self._schedule_redactions_from_db
+        )
+
     @defer.inlineCallbacks
     def get_room_data(
         self, user_id=None, room_id=None, event_type=None, state_key="", is_guest=False
@@ -224,6 +228,36 @@ class MessageHandler(object):
             }
             for user_id, profile in iteritems(users_with_profile)
         }
+
+    @defer.inlineCallbacks
+    def schedule_redaction(self, event_id, redaction_ts):
+        yield self.store.insert_event_expiry(event_id, redaction_ts)
+
+        now_ms = self.clock.time_msec()
+
+        if redaction_ts <= now_ms:
+            # If the event should have already been redacted, redact it now.
+            yield self._generate_and_send_synthetic_redaction(event_id)
+        else:
+            # Otherwise, figure out how many seconds we need to wait before redacting the
+            # event.
+            delay = (redaction_ts - now_ms) / 1000
+            self.clock.call_later(
+                delay, self._generate_and_send_synthetic_redaction, event_id
+            )
+
+    @defer.inlineCallbacks
+    def _schedule_redactions_from_db(self):
+        events_to_expire = yield self.store.get_events_to_expire()
+
+        for event in events_to_expire:
+            yield self.schedule_redaction(event["event_id"], event["expiry_ts"])
+
+    @defer.inlineCallbacks
+    def _generate_and_send_synthetic_redaction(self, event_id):
+        # TODO: actually generate and send the redaction.
+
+        yield self.store.delete_event_expiry(event_id)
 
 
 # The duration (in ms) after which rooms should be removed
