@@ -206,6 +206,31 @@ def _check_requirement(dependency_string):
     get_provider(req)
 
 
+def check_functionality():
+    """
+    Check the functionality of our optional dependencies.
+    """
+    from twisted.python.reflect import requireModule
+
+    feature_availability = {}
+    feature_availability["matrix-synapse-ldap3"] = bool(
+        requireModule("ldap_auth_provider")
+    )
+    feature_availability["postgres"] = bool(requireModule("psycopg2"))
+    feature_availability["resources.consent"] = bool(requireModule("jinja2"))
+    feature_availability["acme"] = bool(requireModule("txacme"))
+    feature_availability["saml2"] = bool(requireModule("saml2"))
+    feature_availability["systemd"] = bool(requireModule("systemd"))
+    feature_availability["url_preview"] = bool(requireModule("lxml"))
+    feature_availability["sentry"] = bool(requireModule("sentry_sdk"))
+    feature_availability["opentracing"] = bool(requireModule("jaeger_client")) and bool(
+        requireModule("opentracing")
+    )
+    feature_availability["jwt"] = bool(requireModule("jwt"))
+
+    return feature_availability
+
+
 if __name__ == "__main__":
     import sys
 

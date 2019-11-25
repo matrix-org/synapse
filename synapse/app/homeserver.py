@@ -59,7 +59,7 @@ from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
-from synapse.python_dependencies import check_requirements
+from synapse.python_dependencies import check_functionality, check_requirements
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
@@ -330,7 +330,17 @@ def setup(config_options):
         HomeServer
     """
     if "--version" in config_options:
+
         print("Synapse/" + get_version_string(synapse))
+        print("")
+
+        extras = check_functionality()
+        print("Additional functionality:")
+
+        pad_to = max([len(x) for x in extras.keys()]) + 2
+        for extra_name, available in extras.items():
+            print(extra_name.ljust(pad_to), "[  OK  ]" if available else "[NOT OK]")
+
         sys.exit(0)
 
     try:
