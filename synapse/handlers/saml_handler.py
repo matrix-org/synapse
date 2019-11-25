@@ -43,6 +43,9 @@ class SamlHandler:
         )
         self._mxid_mapper = hs.config.saml2_mxid_mapper
 
+        # plugin to do custom mapping from saml response to mxid
+        self._mapping_provider = hs.config.saml2_mapping_provider
+
         # identifier for the external_ids table
         self._auth_provider_id = "saml"
 
@@ -174,25 +177,55 @@ class SamlHandler:
                     return registered_user_id
 
             # figure out a new mxid for this user
-            base_mxid_localpart = self._mxid_mapper(mxid_source)
+            for i in range(1000):
+                # Use the provider's custom handler if available
+                if self._mapping_provider:
+                    localpart = self._mapping_provider.mxid_source_to_mixd_localpart(
+                        mxid_source, i
+                    )
+                else:
+                    localpart = self.mxid_source_to_mxid_localpart(mxid_source, i)
+                logger.info("Allocating mxid for new user with localpart %s", localpart)
 
-            suffix = 0
-            while True:
-                localpart = base_mxid_localpart + (str(suffix) if suffix else "")
+                # Check if this mxid already exists
                 if not await self._datastore.get_users_by_id_case_insensitive(
                     UserID(localpart, self._hostname).to_string()
                 ):
+                    # This mxid is free
                     break
-                suffix += 1
-            logger.info("Allocating mxid for new user with localpart %s", localpart)
+            else:
+                # Unable to generate a username in 1000 iterations
+                # Break and return error to the user
+                raise SynapseError(
+                    500, "Unable to generate a Matrix ID from the SAML response"
+                )
 
             registered_user_id = await self._registration_handler.register_user(
                 localpart=localpart, default_display_name=displayName
             )
+
             await self._datastore.record_user_external_id(
                 self._auth_provider_id, remote_user_id, registered_user_id
             )
             return registered_user_id
+
+    def mxid_source_to_mxid_localpart(self, mxid_source: str, failures: int = 0) -> str:
+        """Maps some text from a SAML response to the localpart of a new mxid
+
+        Args:
+            mxid_source (str): The input text from a SAML auth response
+
+            failures (int): How many times a call to this function with this mxid_source has
+                resulted in a failure (possibly due to the localpart already existing)
+
+        Returns:
+            str: The localpart of a new mxid
+        """
+        # Use the configured mapper for this mxid_source
+        base_mxid_localpart = self._mxid_mapper(mxid_source)
+
+        # Append suffix integer if last call to this function failed to produce a usable mxid
+        return base_mxid_localpart + (str(failures) if failures else "")
 
     def expire_sessions(self):
         expire_before = self._clock.time_msec() - self._saml2_session_lifetime
