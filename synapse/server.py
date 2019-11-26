@@ -318,8 +318,8 @@ class HomeServer(object):
     def build_proxied_http_client(self):
         return SimpleHttpClient(
             self,
-            http_proxy=os.getenv("http_proxy"),
-            https_proxy=os.getenv("HTTPS_PROXY"),
+            http_proxy=os.getenvb(b"http_proxy"),
+            https_proxy=os.getenvb(b"HTTPS_PROXY"),
         )
 
     def build_room_creation_handler(self):
