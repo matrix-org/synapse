@@ -237,13 +237,13 @@ class MessageHandler(object):
 
         if redaction_ts <= now_ms:
             # If the event should have already been redacted, redact it now.
-            yield self._generate_and_send_synthetic_redaction(event_id)
+            yield self._delete_expired_event(event_id)
         else:
             # Otherwise, figure out how many seconds we need to wait before redacting the
             # event.
             delay = (redaction_ts - now_ms) / 1000
             self.clock.call_later(
-                delay, self._generate_and_send_synthetic_redaction, event_id
+                delay, self._delete_expired_event, event_id
             )
 
     @defer.inlineCallbacks
@@ -254,10 +254,14 @@ class MessageHandler(object):
             yield self.schedule_redaction(event["event_id"], event["expiry_ts"])
 
     @defer.inlineCallbacks
-    def _generate_and_send_synthetic_redaction(self, event_id):
-        # TODO: actually generate and send the redaction.
+    def _delete_expired_event(self, event_id):
+        event = yield self.store.get_event(event_id)
 
-        yield self.store.delete_event_expiry(event_id)
+        if not event:
+            logger.warning("Can't delete event %s because we don't have it." % event_id)
+            return
+
+        yield self.store.delete_expired_event(event)
 
 
 # The duration (in ms) after which rooms should be removed

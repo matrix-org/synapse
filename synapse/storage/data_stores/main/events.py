@@ -1963,12 +1963,28 @@ class EventsStore(
             desc="insert_event_expiry",
         )
 
-    def delete_event_expiry(self, event_id):
-        return self._simple_delete(
-            table="event_expiry",
-            keyvalues={"event_id": event_id},
-            desc="delete_event_expiry",
-        )
+    def delete_expired_event(self, event):
+        """
+        Args:
+             event (events.EventBase):
+        """
+        pruned_json = encode_json(prune_event_dict(event.get_dict()))
+
+        def delete_expired_event_txn(txn):
+            self._simple_update_one_txn(
+                txn,
+                table="event_json",
+                keyvalues={"event_id": event.event_id},
+                updatevalues={"json": pruned_json},
+            )
+
+            self._simple_delete_txn(
+                txn,
+                table="event_expiry",
+                keyvalues={"event_id": event.event_id},
+            )
+
+        yield self.runInteraction("delete_expired_event", delete_expired_event_txn)
 
     def get_events_to_expire(self):
         return self._simple_select_list(
