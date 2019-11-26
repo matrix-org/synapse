@@ -334,7 +334,8 @@ class SearchStore(BackgroundUpdateStore):
             # so it chokes on code and weird formatting such as URIs.
             # This improves search indexing by only picking up the words.
             # For example: "https://github.com/matrix-org/synapse/pull/6132"
-            # Becomes "https github com matrix org synapse pull 6132"
+            # becomes "https github com matrix org synapse pull 6132".
+            #
             # Postgres seems to like that a LOT more in terms of search performance.
             # See https://github.com/matrix-org/synapse/issues/3024 for more details
 
@@ -693,17 +694,19 @@ class SearchStore(BackgroundUpdateStore):
 def _to_postgres_options(options_dict):
     return "'%s'" % (",".join("%s=%s" % (k, v) for k, v in options_dict.items()),)
 
-def _extract_search_keywords(entry):
+def _extract_search_keywords(entry: str) -> Iterable[str]:
     """
     Extract an iterator of words from the string.
 
     For instance: https://github.com/matrix-org/synapse/issues/3024
-    Becomes: ["https","github","com","matrix-org","synapse","issues","3024"]
+    becomes: ["https","github","com","matrix-org","synapse","issues","3024"].
 
-    :param entry: A string to be pre-processed for searching.
-    :return: List of words in the string.
+    Args:
+        entry: A string to be pre-processed for searching.
+
+    Returns: the words in the string.
     """
-    return re.finditer(r"([\w\-]+)", entry.value, re.UNICODE)
+    return re.finditer(r"([\w\-]+)", entry.value)
 
 def _parse_query(database_engine, search_term):
     """Takes a plain unicode string from the user and converts it into a form
