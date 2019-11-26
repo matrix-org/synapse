@@ -492,17 +492,14 @@ class RegistrationWorkerStore(SQLBaseStore):
 
             regex = re.compile(r"^@(\d+):")
 
-            found = set()
+            max_found = 0
 
             for (user_id,) in txn:
                 match = regex.search(user_id)
                 if match:
-                    found.add(int(match.group(1)))
+                    max_found = max(int(match.group(1)), max_found)
 
-            if not found:
-                return 1
-
-            return max(found) + 1
+            return max_found + 1
 
         return (
             (
