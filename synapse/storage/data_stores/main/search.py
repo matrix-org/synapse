@@ -322,7 +322,7 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
                     entry.room_id,
                     entry.key,
                     # Only store words while discarding special characters
-                    ' '.join(_extract_search_keywords(entry)),
+                    " ".join(_extract_search_keywords(entry)),
                     entry.stream_ordering,
                     entry.origin_server_ts,
                 )
@@ -703,6 +703,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 def _to_postgres_options(options_dict):
     return "'%s'" % (",".join("%s=%s" % (k, v) for k, v in options_dict.items()),)
 
+
 def _extract_search_keywords(entry: str) -> Iterable[str]:
     """
     Extract an iterator of words from the string.
@@ -716,6 +717,7 @@ def _extract_search_keywords(entry: str) -> Iterable[str]:
     Returns: the words in the string.
     """
     return re.finditer(r"([\w\-]+)", entry.value)
+
 
 def _parse_query(database_engine, search_term):
     """Takes a plain unicode string from the user and converts it into a form
