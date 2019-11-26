@@ -35,11 +35,11 @@ class CaptchaConfig(Config):
         ## Captcha ##
         # See docs/CAPTCHA_SETUP for full details of configuring this.
 
-        # This Home Server's ReCAPTCHA public key.
+        # This homeserver's ReCAPTCHA public key.
         #
         #recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
-        # This Home Server's ReCAPTCHA private key.
+        # This homeserver's ReCAPTCHA private key.
         #
         #recaptcha_private_key: "YOUR_PRIVATE_KEY"
 

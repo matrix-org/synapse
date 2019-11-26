@@ -73,7 +73,7 @@ pid_file: DATADIR/homeserver.pid
 # For example, for room version 1, default_room_version should be set
 # to "1".
 #
-#default_room_version: "4"
+#default_room_version: "5"
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -288,7 +288,7 @@ listeners:
 # Used by phonehome stats to group together related servers.
 #server_context: context
 
-# Resource-constrained Homeserver Settings
+# Resource-constrained homeserver Settings
 #
 # If limit_remote_rooms.enabled is True, the room complexity will be
 # checked before a user joins a new remote room. If it is above
@@ -744,11 +744,11 @@ uploads_path: "DATADIR/uploads"
 ## Captcha ##
 # See docs/CAPTCHA_SETUP for full details of configuring this.
 
-# This Home Server's ReCAPTCHA public key.
+# This homeserver's ReCAPTCHA public key.
 #
 #recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
-# This Home Server's ReCAPTCHA private key.
+# This homeserver's ReCAPTCHA private key.
 #
 #recaptcha_private_key: "YOUR_PRIVATE_KEY"
 
@@ -1271,7 +1271,7 @@ password_config:
 #   smtp_user: "exampleusername"
 #   smtp_pass: "examplepassword"
 #   require_transport_security: false
-#   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
+#   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
 #   app_name: Matrix
 #
 #   # Enable email notifications by default

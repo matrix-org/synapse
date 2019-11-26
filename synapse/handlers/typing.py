@@ -120,7 +120,7 @@ class TypingHandler(object):
         auth_user_id = auth_user.to_string()
 
         if not self.is_mine_id(target_user_id):
-            raise SynapseError(400, "User is not hosted on this Home Server")
+            raise SynapseError(400, "User is not hosted on this homeserver")
 
         if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
@@ -150,7 +150,7 @@ class TypingHandler(object):
         auth_user_id = auth_user.to_string()
 
         if not self.is_mine_id(target_user_id):
-            raise SynapseError(400, "User is not hosted on this Home Server")
+            raise SynapseError(400, "User is not hosted on this homeserver")
 
         if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
