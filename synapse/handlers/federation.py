@@ -31,7 +31,12 @@ from unpaddedbase64 import decode_base64
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RejectedReason
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RejectedReason,
+)
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -1710,7 +1715,7 @@ class FederationHandler(BaseHandler):
                 )
 
         # If there's an expiry timestamp, schedule the redaction of the event.
-        expiry_ts = event.content.get("m.self_destruct_after")
+        expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
         if isinstance(expiry_ts, int):
             yield self._message_handler.schedule_deletion_expired(
                 event.event_id, expiry_ts

@@ -24,7 +24,13 @@ from twisted.internet import defer
 from twisted.internet.defer import succeed
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RelationTypes, UserTypes
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RelationTypes,
+    UserTypes,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -803,7 +809,7 @@ class EventCreationHandler(object):
                 )
 
         # If there's an expiry timestamp, schedule the redaction of the event.
-        expiry_ts = event.content.get("m.self_destruct_after")
+        expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
         if isinstance(expiry_ts, int):
             yield self._message_handler.schedule_deletion_expired(
                 event.event_id, expiry_ts
