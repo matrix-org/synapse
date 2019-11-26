@@ -1,0 +1,1 @@
+Add a test scenario to make sure room history purges don't break `/messages` in the future.
