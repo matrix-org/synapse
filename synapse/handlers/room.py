@@ -170,7 +170,7 @@ class RoomCreationHandler(BaseHandler):
             old_room_version, tombstone_event, tombstone_context
         )
 
-        yield self.clone_existing_room(
+        requester_original_power_level = yield self.clone_existing_room(
             requester,
             old_room_id=old_room_id,
             new_room_id=new_room_id,
@@ -198,14 +198,23 @@ class RoomCreationHandler(BaseHandler):
         # finally, shut down the PLs in the old room, and update them in the new
         # room.
         yield self._update_upgraded_room_pls(
-            requester, old_room_id, new_room_id, old_room_state
+            requester,
+            old_room_id,
+            new_room_id,
+            old_room_state,
+            requester_original_power_level=requester_original_power_level,
         )
 
         return new_room_id
 
     @defer.inlineCallbacks
     def _update_upgraded_room_pls(
-        self, requester, old_room_id, new_room_id, old_room_state
+        self,
+        requester,
+        old_room_id,
+        new_room_id,
+        old_room_state,
+        requester_original_power_level=None,
     ):
         """Send updated power levels in both rooms after an upgrade
 
@@ -214,6 +223,8 @@ class RoomCreationHandler(BaseHandler):
             old_room_id (str): the id of the room to be replaced
             new_room_id (str): the id of the replacement room
             old_room_state (dict[tuple[str, str], str]): the state map for the old room
+            requester_original_power_level (int|None): If not None, reduce the requester's
+                power level to this value in the new room
 
         Returns:
             Deferred
@@ -271,6 +282,13 @@ class RoomCreationHandler(BaseHandler):
                 logger.warning("Unable to update PLs in old room: %s", e)
 
         logger.info("Setting correct PLs in new room")
+        if requester_original_power_level:
+            # The requester's power level was temporarily raised earlier in the upgrade
+            # process in order for them to be allowed to send the room's initial state.
+            # Return them to their original power level in the old room now
+            old_room_pl_state.content["users"][
+                requester.user.to_string()
+            ] = requester_original_power_level
         yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
@@ -298,7 +316,11 @@ class RoomCreationHandler(BaseHandler):
             tombstone_event_id (unicode|str): the ID of the tombstone event in the old
                 room.
         Returns:
-            Deferred[None]
+            Deferred[int|None]: Returns an int if the requester's power level
+                needed to be raised in the new room to send initial state events.
+                The returned int is the user's original power level. The calling function
+                should return the user's powerlevel to this value for consistency
+                once all other initial state events have been sent. None otherwise.
         """
         user_id = requester.user.to_string()
 
@@ -333,7 +355,7 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.Encryption, ""),
             (EventTypes.ServerACL, ""),
             (EventTypes.RelatedGroups, ""),
-            (EventTypes.PowerLevels, ""),  # Removed before sending in the new room
+            (EventTypes.PowerLevels, ""),
         )
 
         old_room_state_ids = yield self.store.get_filtered_current_state_ids(
@@ -347,29 +369,33 @@ class RoomCreationHandler(BaseHandler):
             if old_event:
                 initial_state[k] = old_event.content
 
+        # Resolve the minimum power level required to send any state event
+        # We will give the upgrading user this power level temporarily (if necessary) such that
+        # they are able to copy all of the state events over, then revert them back to their
+        # original power level afterwards
+
         # Copy over user power levels now as this will not be possible with >100PL users once
         # the room has been created
-        old_user_power_levels = initial_state[(EventTypes.PowerLevels, "")].get("users")
-        new_user_power_levels = None
-        if old_user_power_levels:
-            user_level_dict = {}
 
-            # Track the maximum power level in the old room, and temporarily make the
-            # upgrading user this power level so that they can replicate all state events over
-            # They will be returned to their original power level later
-            max_power_level = 100
-            for user, power_level in old_user_power_levels.items():
-                power_level = int(power_level)
-                user_level_dict[user] = power_level
-                max_power_level = max(max_power_level, power_level)
+        power_levels = initial_state[(EventTypes.PowerLevels, "")]
 
-            # Upgrade the requester to the max known room power level so that
-            # they're allowed to send any state event in the new room
-            user_level_dict[requester.user.to_string()] = max_power_level
-            new_user_power_levels = {"users": user_level_dict}
+        # Calculate the minimum power level needed to clone the room
+        event_power_levels = power_levels.get("events", {})
+        state_default = power_levels.get("state_default", 0)
+        ban = power_levels.get("ban")
+        needed_power_level = max(state_default, ban, max(event_power_levels.values()))
 
-        # Prevent the rest of the power level events from being transferred now. They will
-        # be transferred later after the room state has been established
+        # Raise the requester's power level in the new room if necessary
+        current_power_level = power_levels["users"][requester.user.to_string()]
+        raised_power_level = None
+        if current_power_level < needed_power_level:
+            # Save and return this power level
+            raised_power_level = current_power_level
+
+            # Assign this power level to the requester
+            power_levels["users"][requester.user.to_string()] = needed_power_level
+
+        # Transfer the power levels via power_level_content_override instead of initial_state
         del initial_state[(EventTypes.PowerLevels, "")]
 
         yield self._send_events_for_new_room(
@@ -381,7 +407,7 @@ class RoomCreationHandler(BaseHandler):
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
-            power_level_content_override=new_user_power_levels,
+            power_level_content_override=power_levels,
         )
 
         # Transfer membership events
@@ -407,6 +433,8 @@ class RoomCreationHandler(BaseHandler):
                     ratelimit=False,
                     content=old_event.content,
                 )
+
+        return raised_power_level
 
         # XXX invites/joins
         # XXX 3pid invites
