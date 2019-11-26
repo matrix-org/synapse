@@ -12,12 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError, Codes
+from synapse.federation.federation_base import event_from_pdu_json
+from synapse.logging.context import LoggingContext, run_in_background
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 
 from tests import unittest
+
+logger = logging.getLogger(__name__)
 
 
 class FederationTestCase(unittest.HomeserverTestCase):
@@ -79,3 +85,123 @@ class FederationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(failure.code, 403, failure)
         self.assertEqual(failure.errcode, Codes.FORBIDDEN, failure)
         self.assertEqual(failure.msg, "You are not invited to this room.")
+
+    def test_rejected_message_event_state(self):
+        """
+        Check that we store the state group correctly for rejected non-state events.
+
+        Regression test for #6289.
+        """
+        OTHER_SERVER = "otherserver"
+        OTHER_USER = "@otheruser:" + OTHER_SERVER
+
+        # create the room
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+
+        # pretend that another server has joined
+        join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
+
+        # check the state group
+        sg = self.successResultOf(
+            self.store._get_state_group_for_event(join_event.event_id)
+        )
+
+        # build and send an event which will be rejected
+        ev = event_from_pdu_json(
+            {
+                "type": EventTypes.Message,
+                "content": {},
+                "room_id": room_id,
+                "sender": "@yetanotheruser:" + OTHER_SERVER,
+                "depth": join_event["depth"] + 1,
+                "prev_events": [join_event.event_id],
+                "auth_events": [],
+                "origin_server_ts": self.clock.time_msec(),
+            },
+            join_event.format_version,
+        )
+
+        with LoggingContext(request="send_rejected"):
+            d = run_in_background(self.handler.on_receive_pdu, OTHER_SERVER, ev)
+        self.get_success(d)
+
+        # that should have been rejected
+        e = self.get_success(self.store.get_event(ev.event_id, allow_rejected=True))
+        self.assertIsNotNone(e.rejected_reason)
+
+        # ... and the state group should be the same as before
+        sg2 = self.successResultOf(self.store._get_state_group_for_event(ev.event_id))
+
+        self.assertEqual(sg, sg2)
+
+    def test_rejected_state_event_state(self):
+        """
+        Check that we store the state group correctly for rejected state events.
+
+        Regression test for #6289.
+        """
+        OTHER_SERVER = "otherserver"
+        OTHER_USER = "@otheruser:" + OTHER_SERVER
+
+        # create the room
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+
+        # pretend that another server has joined
+        join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
+
+        # check the state group
+        sg = self.successResultOf(
+            self.store._get_state_group_for_event(join_event.event_id)
+        )
+
+        # build and send an event which will be rejected
+        ev = event_from_pdu_json(
+            {
+                "type": "org.matrix.test",
+                "state_key": "test_key",
+                "content": {},
+                "room_id": room_id,
+                "sender": "@yetanotheruser:" + OTHER_SERVER,
+                "depth": join_event["depth"] + 1,
+                "prev_events": [join_event.event_id],
+                "auth_events": [],
+                "origin_server_ts": self.clock.time_msec(),
+            },
+            join_event.format_version,
+        )
+
+        with LoggingContext(request="send_rejected"):
+            d = run_in_background(self.handler.on_receive_pdu, OTHER_SERVER, ev)
+        self.get_success(d)
+
+        # that should have been rejected
+        e = self.get_success(self.store.get_event(ev.event_id, allow_rejected=True))
+        self.assertIsNotNone(e.rejected_reason)
+
+        # ... and the state group should be the same as before
+        sg2 = self.successResultOf(self.store._get_state_group_for_event(ev.event_id))
+
+        self.assertEqual(sg, sg2)
+
+    def _build_and_send_join_event(self, other_server, other_user, room_id):
+        join_event = self.get_success(
+            self.handler.on_make_join_request(other_server, room_id, other_user)
+        )
+        # the auth code requires that a signature exists, but doesn't check that
+        # signature... go figure.
+        join_event.signatures[other_server] = {"x": "y"}
+        with LoggingContext(request="send_join"):
+            d = run_in_background(
+                self.handler.on_send_join_request, other_server, join_event
+            )
+        self.get_success(d)
+
+        # sanity-check: the room should show that the new user is a member
+        r = self.get_success(self.store.get_current_state_ids(room_id))
+        self.assertEqual(r[(EventTypes.Member, other_user)], join_event.event_id)
+
+        return join_event

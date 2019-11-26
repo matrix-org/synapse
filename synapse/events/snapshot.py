@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Dict, Optional, Tuple, Union
+
 from six import iteritems
 
 import attr
@@ -19,54 +21,113 @@ from frozendict import frozendict
 
 from twisted.internet import defer
 
+from synapse.appservice import ApplicationService
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 
 
 @attr.s(slots=True)
 class EventContext:
     """
+    Holds information relevant to persisting an event
+
     Attributes:
-        state_group (int|None): state group id, if the state has been stored
-            as a state group. This is usually only None if e.g. the event is
-            an outlier.
-        rejected (bool|str): A rejection reason if the event was rejected, else
-            False
+        rejected: A rejection reason if the event was rejected, else False
 
-        prev_group (int): Previously persisted state group. ``None`` for an
-            outlier.
-        delta_ids (dict[(str, str), str]): Delta from ``prev_group``.
-            (type, state_key) -> event_id. ``None`` for an outlier.
+        _state_group: The ID of the state group for this event. Note that state events
+            are persisted with a state group which includes the new event, so this is
+            effectively the state *after* the event in question.
 
-        app_service: FIXME
+            For a *rejected* state event, where the state of the rejected event is
+            ignored, this state_group should never make it into the
+            event_to_state_groups table. Indeed, inspecting this value for a rejected
+            state event is almost certainly incorrect.
 
-        _current_state_ids (dict[(str, str), str]|None):
-            The current state map including the current event. None if outlier
-            or we haven't fetched the state from DB yet.
+            For an outlier, where we don't have the state at the event, this will be
+            None.
+
+            Note that this is a private attribute: it should be accessed via
+            the ``state_group`` property.
+
+        state_group_before_event: The ID of the state group representing the state
+            of the room before this event.
+
+            If this is a non-state event, this will be the same as ``state_group``. If
+            it's a state event, it will be the same as ``prev_group``.
+
+            If ``state_group`` is None (ie, the event is an outlier),
+            ``state_group_before_event`` will always also be ``None``.
+
+        prev_group: If it is known, ``state_group``'s prev_group. Note that this being
+            None does not necessarily mean that ``state_group`` does not have
+            a prev_group!
+
+            If the event is a state event, this is normally the same as ``prev_group``.
+
+            If ``state_group`` is None (ie, the event is an outlier), ``prev_group``
+            will always also be ``None``.
+
+            Note that this *not* (necessarily) the state group associated with
+            ``_prev_state_ids``.
+
+        delta_ids: If ``prev_group`` is not None, the state delta between ``prev_group``
+            and ``state_group``.
+
+        app_service: If this event is being sent by a (local) application service, that
+            app service.
+
+        _current_state_ids: The room state map, including this event - ie, the state
+            in ``state_group``.
+
             (type, state_key) -> event_id
 
-        _prev_state_ids (dict[(str, str), str]|None):
-            The current state map excluding the current event. None if outlier
-            or we haven't fetched the state from DB yet.
+            FIXME: what is this for an outlier? it seems ill-defined. It seems like
+            it could be either {}, or the state we were given by the remote
+            server, depending on $THINGS
+
+            Note that this is a private attribute: it should be accessed via
+            ``get_current_state_ids``. _AsyncEventContext impl calculates this
+            on-demand: it will be None until that happens.
+
+        _prev_state_ids: The room state map, excluding this event - ie, the state
+            in ``state_group_before_event``. For a non-state
+            event, this will be the same as _current_state_events.
+
+            Note that it is a completely different thing to prev_group!
+
             (type, state_key) -> event_id
+
+            FIXME: again, what is this for an outlier?
+
+            As with _current_state_ids, this is a private attribute. It should be
+            accessed via get_prev_state_ids.
     """
 
-    state_group = attr.ib(default=None)
-    rejected = attr.ib(default=False)
-    prev_group = attr.ib(default=None)
-    delta_ids = attr.ib(default=None)
-    app_service = attr.ib(default=None)
+    rejected = attr.ib(default=False, type=Union[bool, str])
+    _state_group = attr.ib(default=None, type=Optional[int])
+    state_group_before_event = attr.ib(default=None, type=Optional[int])
+    prev_group = attr.ib(default=None, type=Optional[int])
+    delta_ids = attr.ib(default=None, type=Optional[Dict[Tuple[str, str], str]])
+    app_service = attr.ib(default=None, type=Optional[ApplicationService])
 
-    _prev_state_ids = attr.ib(default=None)
-    _current_state_ids = attr.ib(default=None)
+    _current_state_ids = attr.ib(
+        default=None, type=Optional[Dict[Tuple[str, str], str]]
+    )
+    _prev_state_ids = attr.ib(default=None, type=Optional[Dict[Tuple[str, str], str]])
 
     @staticmethod
     def with_state(
-        state_group, current_state_ids, prev_state_ids, prev_group=None, delta_ids=None
+        state_group,
+        state_group_before_event,
+        current_state_ids,
+        prev_state_ids,
+        prev_group=None,
+        delta_ids=None,
     ):
         return EventContext(
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
             state_group=state_group,
+            state_group_before_event=state_group_before_event,
             prev_group=prev_group,
             delta_ids=delta_ids,
         )
@@ -97,7 +158,8 @@ class EventContext:
             "prev_state_id": prev_state_id,
             "event_type": event.type,
             "event_state_key": event.state_key if event.is_state() else None,
-            "state_group": self.state_group,
+            "state_group": self._state_group,
+            "state_group_before_event": self.state_group_before_event,
             "rejected": self.rejected,
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
@@ -123,6 +185,7 @@ class EventContext:
             event_type=input["event_type"],
             event_state_key=input["event_state_key"],
             state_group=input["state_group"],
+            state_group_before_event=input["state_group_before_event"],
             prev_group=input["prev_group"],
             delta_ids=_decode_state_dict(input["delta_ids"]),
             rejected=input["rejected"],
@@ -134,22 +197,52 @@ class EventContext:
 
         return context
 
+    @property
+    def state_group(self) -> Optional[int]:
+        """The ID of the state group for this event.
+
+        Note that state events are persisted with a state group which includes the new
+        event, so this is effectively the state *after* the event in question.
+
+        For an outlier, where we don't have the state at the event, this will be None.
+
+        It is an error to access this for a rejected event, since rejected state should
+        not make it into the room state. Accessing this property will raise an exception
+        if ``rejected`` is set.
+        """
+        if self.rejected:
+            raise RuntimeError("Attempt to access state_group of rejected event")
+
+        return self._state_group
+
     @defer.inlineCallbacks
     def get_current_state_ids(self, store):
-        """Gets the current state IDs
+        """
+        Gets the room state map, including this event - ie, the state in ``state_group``
+
+        It is an error to access this for a rejected event, since rejected state should
+        not make it into the room state. This method will raise an exception if
+        ``rejected`` is set.
 
         Returns:
             Deferred[dict[(str, str), str]|None]: Returns None if state_group
                 is None, which happens when the associated event is an outlier.
+
                 Maps a (type, state_key) to the event ID of the state event matching
                 this tuple.
         """
+        if self.rejected:
+            raise RuntimeError("Attempt to access state_ids of rejected event")
+
         yield self._ensure_fetched(store)
         return self._current_state_ids
 
     @defer.inlineCallbacks
     def get_prev_state_ids(self, store):
-        """Gets the prev state IDs
+        """
+        Gets the room state map, excluding this event.
+
+        For a non-state event, this will be the same as get_current_state_ids().
 
         Returns:
             Deferred[dict[(str, str), str]|None]: Returns None if state_group
@@ -163,11 +256,17 @@ class EventContext:
     def get_cached_current_state_ids(self):
         """Gets the current state IDs if we have them already cached.
 
+        It is an error to access this for a rejected event, since rejected state should
+        not make it into the room state. This method will raise an exception if
+        ``rejected`` is set.
+
         Returns:
             dict[(str, str), str]|None: Returns None if we haven't cached the
             state or if state_group is None, which happens when the associated
             event is an outlier.
         """
+        if self.rejected:
+            raise RuntimeError("Attempt to access state_ids of rejected event")
 
         return self._current_state_ids
 

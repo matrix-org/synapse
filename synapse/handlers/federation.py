@@ -97,9 +97,9 @@ class FederationHandler(BaseHandler):
     """Handles events that originated from federation.
         Responsible for:
         a) handling received Pdus before handing them on as Events to the rest
-        of the home server (including auth and state conflict resoultion)
+        of the homeserver (including auth and state conflict resoultion)
         b) converting events that were produced by local clients that may need
-        to be sent to remote home servers.
+        to be sent to remote homeservers.
         c) doing the necessary dances to invite remote users and join remote
         rooms.
     """
@@ -1688,7 +1688,11 @@ class FederationHandler(BaseHandler):
         # hack around with a try/finally instead.
         success = False
         try:
-            if not event.internal_metadata.is_outlier() and not backfilled:
+            if (
+                not event.internal_metadata.is_outlier()
+                and not backfilled
+                and not context.rejected
+            ):
                 yield self.action_generator.handle_push_actions_for_event(
                     event, context
                 )
@@ -2276,6 +2280,7 @@ class FederationHandler(BaseHandler):
 
         return EventContext.with_state(
             state_group=state_group,
+            state_group_before_event=context.state_group_before_event,
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
             prev_group=prev_group,
