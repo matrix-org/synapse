@@ -15,6 +15,7 @@
 
 import logging
 import re
+import typing
 from collections import namedtuple
 
 from six import string_types
@@ -704,7 +705,7 @@ def _to_postgres_options(options_dict):
     return "'%s'" % (",".join("%s=%s" % (k, v) for k, v in options_dict.items()),)
 
 
-def _extract_search_keywords(entry: str) -> Iterable[str]:
+def _extract_search_keywords(entry: str) -> typing.Iterable[str]:
     """
     Extract an iterator of words from the string.
 
