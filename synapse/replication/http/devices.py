@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 class ReplicationUserDevicesResyncRestServlet(ReplicationEndpoint):
-    """Notifies that a user has joined or left the room
+    """Ask master to resync the device list for a user by contacting their
+    server.
+
+    This must happen on master so that the results can be correctly cached in
+    the database and streamed to workers.
 
     Request format:
 
