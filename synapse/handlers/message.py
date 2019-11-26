@@ -252,9 +252,7 @@ class MessageHandler(object):
             # Otherwise, figure out how many seconds we need to wait before redacting the
             # event.
             delay = (redaction_ts - now_ms) / 1000
-            self.clock.call_later(
-                delay, self._delete_expired_event, event_id
-            )
+            self.clock.call_later(delay, self._delete_expired_event, event_id)
 
     @defer.inlineCallbacks
     def _schedule_deletions_expired_from_db(self):

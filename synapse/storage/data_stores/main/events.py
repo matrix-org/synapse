@@ -1992,9 +1992,7 @@ class EventsStore(
 
             # Delete the expiry timestamp associated with this event from the database.
             self._simple_delete_txn(
-                txn,
-                table="event_expiry",
-                keyvalues={"event_id": event.event_id},
+                txn, table="event_expiry", keyvalues={"event_id": event.event_id}
             )
 
         yield self.runInteraction("delete_expired_event", delete_expired_event_txn)
