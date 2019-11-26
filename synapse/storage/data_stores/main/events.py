@@ -1957,6 +1957,12 @@ class EventsStore(
         )
 
     def insert_event_expiry(self, event_id, expiry_ts):
+        """Save the expiry timestamp associated with a given event ID.
+
+        Args:
+            event_id (str): The event ID the expiry timestamp is associated with.
+            expiry_ts (int): The timestamp at which to expire (delete) the event.
+        """
         return self._simple_insert(
             table="event_expiry",
             values={"event_id": event_id, "expiry_ts": expiry_ts},
@@ -1964,13 +1970,19 @@ class EventsStore(
         )
 
     def delete_expired_event(self, event):
-        """
+        """Delete an event that has expired by replacing its entry in event_json with a
+        pruned version of its JSON representation, and delete its associated expiry
+        timestamp.
+
         Args:
-             event (events.EventBase):
+             event (events.EventBase): The event to delete.
         """
+        # Prune the event's dict then convert it to a JSON string.
         pruned_json = encode_json(prune_event_dict(event.get_dict()))
 
         def delete_expired_event_txn(txn):
+            # Update the event_json table to replace the event's JSON with the pruned
+            # JSON.
             self._simple_update_one_txn(
                 txn,
                 table="event_json",
@@ -1978,6 +1990,7 @@ class EventsStore(
                 updatevalues={"json": pruned_json},
             )
 
+            # Delete the expiry timestamp associated with this event from the database.
             self._simple_delete_txn(
                 txn,
                 table="event_expiry",
@@ -1986,7 +1999,26 @@ class EventsStore(
 
         yield self.runInteraction("delete_expired_event", delete_expired_event_txn)
 
+    def delete_event_expiry(self, event_id):
+        """Delete the expiry timestamp associated with an event ID without deleting the
+        actual event.
+
+        Args:
+            event_id (str): The event ID to delete the associated expiry timestamp of.
+        """
+        return self._simple_delete(
+            table="event_expiry",
+            keyvalues={"event_id": event_id},
+            desc="delete_event_expiry",
+        )
+
     def get_events_to_expire(self):
+        """Retrieve the IDs of the events we have an expiry timestamp for, along with
+        said timestamp.
+
+        Returns:
+            A list of dicts, each containing an event_id and an expiry_ts.
+        """
         return self._simple_select_list(
             table="event_expiry",
             keyvalues=None,

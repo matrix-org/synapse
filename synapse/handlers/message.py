@@ -64,7 +64,8 @@ class MessageHandler(object):
         self._event_serializer = hs.get_event_client_serializer()
 
         run_as_background_process(
-            "_schedule_redactions_from_db", self._schedule_redactions_from_db
+            "_schedule_deletions_expired_from_db",
+            self._schedule_deletions_expired_from_db,
         )
 
     @defer.inlineCallbacks
@@ -230,7 +231,16 @@ class MessageHandler(object):
         }
 
     @defer.inlineCallbacks
-    def schedule_redaction(self, event_id, redaction_ts):
+    def schedule_deletion_expired(self, event_id, redaction_ts):
+        """Schedule the deletion of an expired event, or if that event should have
+        expired then delete the event immediately.
+
+        Args:
+            event_id (str): The ID of the event to schedule the deletion of.
+            redaction_ts (int): The timestamp to delete the event at.
+        """
+        # Save the timestamp at which the event expires so that we can reschedule its
+        # deletion on startup if the server is stopped before the event is deleted.
         yield self.store.insert_event_expiry(event_id, redaction_ts)
 
         now_ms = self.clock.time_msec()
@@ -247,20 +257,38 @@ class MessageHandler(object):
             )
 
     @defer.inlineCallbacks
-    def _schedule_redactions_from_db(self):
+    def _schedule_deletions_expired_from_db(self):
+        """Load the IDs of the events that have an expiry date from the database (and
+        their expiry timestamp) and either delete them (if the expiry date is now or in
+        the past) or schedule their deletion on the timestamp.
+        """
         events_to_expire = yield self.store.get_events_to_expire()
 
         for event in events_to_expire:
-            yield self.schedule_redaction(event["event_id"], event["expiry_ts"])
+            yield self.schedule_deletion_expired(event["event_id"], event["expiry_ts"])
 
     @defer.inlineCallbacks
     def _delete_expired_event(self, event_id):
+        """Retrieve and delete an expired event from the database.
+
+        If we don't have the event in the database, log it and delete the expiry date
+        from the database (so that we don't try to delete it again).
+
+        Args:
+            event_id (str): The ID of the event to retrieve and delete.
+        """
+        # Try to retrieve the event from the database.
         event = yield self.store.get_event(event_id)
 
         if not event:
+            # If we can't find the event, log a warning and delete the expiry date from
+            # the database so that we don't try to delete it again in the future.
             logger.warning("Can't delete event %s because we don't have it." % event_id)
+            yield self.store.delete_event_expiry(event)
             return
 
+        # Delete the event. This function also deletes the expiry date from the database
+        # in the same database transaction.
         yield self.store.delete_expired_event(event)
 
 
@@ -779,7 +807,9 @@ class EventCreationHandler(object):
         # If there's an expiry timestamp, schedule the redaction of the event.
         expiry_ts = event.content.get("m.self_destruct_after")
         if isinstance(expiry_ts, int):
-            yield self._message_handler.schedule_redaction(event.event_id, expiry_ts)
+            yield self._message_handler.schedule_deletion_expired(
+                event.event_id, expiry_ts
+            )
 
     @defer.inlineCallbacks
     def persist_and_notify_client_event(

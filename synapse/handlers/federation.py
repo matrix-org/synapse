@@ -1712,7 +1712,9 @@ class FederationHandler(BaseHandler):
         # If there's an expiry timestamp, schedule the redaction of the event.
         expiry_ts = event.content.get("m.self_destruct_after")
         if isinstance(expiry_ts, int):
-            yield self._message_handler.schedule_redaction(event.event_id, expiry_ts)
+            yield self._message_handler.schedule_deletion_expired(
+                event.event_id, expiry_ts
+            )
 
         return context
 
