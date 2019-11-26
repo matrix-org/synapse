@@ -2187,12 +2187,6 @@ class FederationHandler(BaseHandler):
             logger.info("Skipping auth_event fetch for outlier")
             return context
 
-        # FIXME: Assumes we have and stored all the state for all the
-        # prev_events
-        #
-        # FIXME: what does the fixme above mean? where do prev_events come into
-        # it, why do we care about the state for those events, and what does "have and
-        # stored" mean? Seems erik wrote it in c1d860870b
         different_auth = event_auth_events.difference(
             e.event_id for e in auth_events.values()
         )
