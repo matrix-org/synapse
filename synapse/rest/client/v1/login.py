@@ -92,8 +92,11 @@ class LoginRestServlet(RestServlet):
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
+        self._clock = hs.get_clock()
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter()
+        self._account_ratelimiter = Ratelimiter()
+        self._failed_attempts_ratelimiter = Ratelimiter()
 
     def on_GET(self, request):
         flows = []
@@ -202,15 +205,27 @@ class LoginRestServlet(RestServlet):
                 # (See add_threepid in synapse/handlers/auth.py)
                 address = address.lower()
 
+            # We also apply account rate limiting using the 3PID as a key, as
+            # otherwise using 3PID bypasses the ratelimiting based on user ID.
+            self._failed_attempts_ratelimiter.ratelimit(
+                (medium, address),
+                time_now_s=self._clock.time(),
+                rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+                burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+                update=False,
+            )
+
             # Check for login providers that support 3pid login types
-            canonical_user_id, callback_3pid = (
-                yield self.auth_handler.check_password_provider_3pid(
-                    medium, address, login_submission["password"]
-                )
+            (
+                canonical_user_id,
+                callback_3pid,
+            ) = yield self.auth_handler.check_password_provider_3pid(
+                medium, address, login_submission["password"]
             )
             if canonical_user_id:
                 # Authentication through password provider and 3pid succeeded
-                result = yield self._register_device_with_callback(
+
+                result = yield self._complete_login(
                     canonical_user_id, login_submission, callback_3pid
                 )
                 return result
@@ -221,8 +236,23 @@ class LoginRestServlet(RestServlet):
                 medium, address
             )
             if not user_id:
-                logger.warn(
+                logger.warning(
                     "unknown 3pid identifier medium %s, address %r", medium, address
+                )
+                # We mark that we've failed to log in here, as
+                # `check_password_provider_3pid` might have returned `None` due
+                # to an incorrect password, rather than the account not
+                # existing.
+                #
+                # If it returned None but the 3PID was bound then we won't hit
+                # this code path, which is fine as then the per-user ratelimit
+                # will kick in below.
+                self._failed_attempts_ratelimiter.can_do_action(
+                    (medium, address),
+                    time_now_s=self._clock.time(),
+                    rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+                    burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+                    update=True,
                 )
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
@@ -235,29 +265,84 @@ class LoginRestServlet(RestServlet):
         if "user" not in identifier:
             raise SynapseError(400, "User identifier is missing 'user' key")
 
-        canonical_user_id, callback = yield self.auth_handler.validate_login(
-            identifier["user"], login_submission
+        if identifier["user"].startswith("@"):
+            qualified_user_id = identifier["user"]
+        else:
+            qualified_user_id = UserID(identifier["user"], self.hs.hostname).to_string()
+
+        # Check if we've hit the failed ratelimit (but don't update it)
+        self._failed_attempts_ratelimiter.ratelimit(
+            qualified_user_id.lower(),
+            time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            update=False,
         )
 
-        result = yield self._register_device_with_callback(
+        try:
+            canonical_user_id, callback = yield self.auth_handler.validate_login(
+                identifier["user"], login_submission
+            )
+        except LoginError:
+            # The user has failed to log in, so we need to update the rate
+            # limiter. Using `can_do_action` avoids us raising a ratelimit
+            # exception and masking the LoginError. The actual ratelimiting
+            # should have happened above.
+            self._failed_attempts_ratelimiter.can_do_action(
+                qualified_user_id.lower(),
+                time_now_s=self._clock.time(),
+                rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+                burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+                update=True,
+            )
+            raise
+
+        result = yield self._complete_login(
             canonical_user_id, login_submission, callback
         )
         return result
 
     @defer.inlineCallbacks
-    def _register_device_with_callback(self, user_id, login_submission, callback=None):
-        """ Registers a device with a given user_id. Optionally run a callback
-        function after registration has completed.
+    def _complete_login(
+        self, user_id, login_submission, callback=None, create_non_existant_users=False
+    ):
+        """Called when we've successfully authed the user and now need to
+        actually login them in (e.g. create devices). This gets called on
+        all succesful logins.
+
+        Applies the ratelimiting for succesful login attempts against an
+        account.
 
         Args:
             user_id (str): ID of the user to register.
             login_submission (dict): Dictionary of login information.
             callback (func|None): Callback function to run after registration.
+            create_non_existant_users (bool): Whether to create the user if
+                they don't exist. Defaults to False.
 
         Returns:
             result (Dict[str,str]): Dictionary of account information after
                 successful registration.
         """
+
+        # Before we actually log them in we check if they've already logged in
+        # too often. This happens here rather than before as we don't
+        # necessarily know the user before now.
+        self._account_ratelimiter.ratelimit(
+            user_id.lower(),
+            time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_account.per_second,
+            burst_count=self.hs.config.rc_login_account.burst_count,
+            update=True,
+        )
+
+        if create_non_existant_users:
+            user_id = yield self.auth_handler.check_user_exists(user_id)
+            if not user_id:
+                user_id = yield self.registration_handler.register_user(
+                    localpart=UserID.from_string(user_id).localpart
+                )
+
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
         device_id, access_token = yield self.registration_handler.register_device(
@@ -280,11 +365,11 @@ class LoginRestServlet(RestServlet):
     def do_token_login(self, login_submission):
         token = login_submission["token"]
         auth_handler = self.auth_handler
-        user_id = (
-            yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
+        user_id = yield auth_handler.validate_short_term_login_token_and_get_user_id(
+            token
         )
 
-        result = yield self._register_device_with_callback(user_id, login_submission)
+        result = yield self._complete_login(user_id, login_submission)
         return result
 
     @defer.inlineCallbacks
@@ -312,15 +397,8 @@ class LoginRestServlet(RestServlet):
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID(user, self.hs.hostname).to_string()
-
-        registered_user_id = yield self.auth_handler.check_user_exists(user_id)
-        if not registered_user_id:
-            registered_user_id = yield self.registration_handler.register_user(
-                localpart=user
-            )
-
-        result = yield self._register_device_with_callback(
-            registered_user_id, login_submission
+        result = yield self._complete_login(
+            user_id, login_submission, create_non_existant_users=True
         )
         return result
 
@@ -377,9 +455,10 @@ class CasTicketServlet(RestServlet):
         super(CasTicketServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url
         self.cas_service_url = hs.config.cas_service_url
+        self.cas_displayname_attribute = hs.config.cas_displayname_attribute
         self.cas_required_attributes = hs.config.cas_required_attributes
         self._sso_auth_handler = SSOAuthHandler(hs)
-        self._http_client = hs.get_simple_http_client()
+        self._http_client = hs.get_proxied_http_client()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -400,6 +479,7 @@ class CasTicketServlet(RestServlet):
 
     def handle_cas_response(self, request, cas_response_body, client_redirect_url):
         user, attributes = self.parse_cas_response(cas_response_body)
+        displayname = attributes.pop(self.cas_displayname_attribute, None)
 
         for required_attribute, required_value in self.cas_required_attributes.items():
             # If required attribute was not in CAS Response - Forbidden
@@ -414,7 +494,7 @@ class CasTicketServlet(RestServlet):
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
         return self._sso_auth_handler.on_successful_auth(
-            user, request, client_redirect_url
+            user, request, client_redirect_url, displayname
         )
 
     def parse_cas_response(self, cas_response_body):

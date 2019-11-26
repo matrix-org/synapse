@@ -19,6 +19,8 @@ from ._base import Config, ConfigError
 
 
 class RoomDirectoryConfig(Config):
+    section = "roomdirectory"
+
     def read_config(self, config, **kwargs):
         self.enable_room_list_search = config.get("enable_room_list_search", True)
 
@@ -168,7 +170,7 @@ class _RoomDirectoryRule(object):
             self.action = action
         else:
             raise ConfigError(
-                "%s rules can only have action of 'allow'" " or 'deny'" % (option_name,)
+                "%s rules can only have action of 'allow' or 'deny'" % (option_name,)
             )
 
         self._alias_matches_all = alias == "*"

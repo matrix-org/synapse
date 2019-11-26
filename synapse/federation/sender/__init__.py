@@ -38,7 +38,7 @@ from synapse.metrics import (
     events_processed_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util.metrics import measure_func
+from synapse.util.metrics import Measure, measure_func
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ sent_pdus_destination_dist_count = Counter(
 
 sent_pdus_destination_dist_total = Counter(
     "synapse_federation_client_sent_pdu_destinations:total",
-    "" "Total number of PDUs queued for sending across all destinations",
+    "Total number of PDUs queued for sending across all destinations",
 )
 
 
@@ -183,8 +183,8 @@ class FederationSender(object):
                         # Otherwise if the last member on a server in a room is
                         # banned then it won't receive the event because it won't
                         # be in the room after the ban.
-                        destinations = yield self.state.get_current_hosts_in_room(
-                            event.room_id, latest_event_ids=event.prev_event_ids()
+                        destinations = yield self.state.get_hosts_in_room_at_events(
+                            event.room_id, event_ids=event.prev_event_ids()
                         )
                     except Exception:
                         logger.exception(
@@ -207,8 +207,9 @@ class FederationSender(object):
 
                 @defer.inlineCallbacks
                 def handle_room_events(events):
-                    for event in events:
-                        yield handle_event(event)
+                    with Measure(self.clock, "handle_room_events"):
+                        for event in events:
+                            yield handle_event(event)
 
                 events_by_room = {}
                 for event in events:

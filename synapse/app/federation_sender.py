@@ -69,7 +69,7 @@ class FederationSenderSlaveStore(
         self.federation_out_pos_startup = self._get_federation_out_pos(db_conn)
 
     def _get_federation_out_pos(self, db_conn):
-        sql = "SELECT stream_id FROM federation_stream_position" " WHERE type = ?"
+        sql = "SELECT stream_id FROM federation_stream_position WHERE type = ?"
         sql = self.database_engine.convert_param_style(sql)
 
         txn = db_conn.cursor()
@@ -123,7 +123,7 @@ class FederationSenderServer(HomeServer):
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(
+                    logger.warning(
                         (
                             "Metrics listener configured, but "
                             "enable_metrics is not True!"
@@ -132,7 +132,7 @@ class FederationSenderServer(HomeServer):
                 else:
                     _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
-                logger.warn("Unrecognized listener type: %s", listener["type"])
+                logger.warning("Unrecognized listener type: %s", listener["type"])
 
         self.get_tcp_replication().start_replication(self)
 

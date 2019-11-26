@@ -73,7 +73,10 @@ class ApplicationServicesHandler(object):
             try:
                 limit = 100
                 while True:
-                    upper_bound, events = yield self.store.get_new_events_for_appservice(
+                    (
+                        upper_bound,
+                        events,
+                    ) = yield self.store.get_new_events_for_appservice(
                         self.current_max, limit
                     )
 

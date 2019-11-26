@@ -161,7 +161,11 @@ def make_request(
         path = path.encode("ascii")
 
     # Decorate it to be the full path, if we're using shorthand
-    if shorthand and not path.startswith(b"/_matrix"):
+    if (
+        shorthand
+        and not path.startswith(b"/_matrix")
+        and not path.startswith(b"/_synapse")
+    ):
         path = b"/_matrix/client/r0/" + path
         path = path.replace(b"//", b"/")
 
@@ -375,6 +379,7 @@ class FakeTransport(object):
 
     disconnecting = False
     disconnected = False
+    connected = True
     buffer = attr.ib(default=b"")
     producer = attr.ib(default=None)
     autoflush = attr.ib(default=True)
@@ -391,11 +396,25 @@ class FakeTransport(object):
             self.disconnecting = True
             if self._protocol:
                 self._protocol.connectionLost(reason)
-            self.disconnected = True
+
+            # if we still have data to write, delay until that is done
+            if self.buffer:
+                logger.info(
+                    "FakeTransport: Delaying disconnect until buffer is flushed"
+                )
+            else:
+                self.connected = False
+                self.disconnected = True
 
     def abortConnection(self):
         logger.info("FakeTransport: abortConnection()")
-        self.loseConnection()
+
+        if not self.disconnecting:
+            self.disconnecting = True
+            if self._protocol:
+                self._protocol.connectionLost(None)
+
+        self.disconnected = True
 
     def pauseProducing(self):
         if not self.producer:
@@ -426,6 +445,9 @@ class FakeTransport(object):
             self._reactor.callLater(0.0, _produce)
 
     def write(self, byt):
+        if self.disconnecting:
+            raise Exception("Writing to disconnecting FakeTransport")
+
         self.buffer = self.buffer + byt
 
         # always actually do the write asynchronously. Some protocols (notably the
@@ -469,6 +491,10 @@ class FakeTransport(object):
         self.buffer = self.buffer[len(to_write) :]
         if self.buffer and self.autoflush:
             self._reactor.callLater(0.0, self.flush)
+
+        if not self.buffer and self.disconnecting:
+            logger.info("FakeTransport: Buffer now empty, completing disconnect")
+            self.disconnected = True
 
 
 def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol:

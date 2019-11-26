@@ -92,6 +92,8 @@ class TrustedKeyServer(object):
 
 
 class KeyConfig(Config):
+    section = "key"
+
     def read_config(self, config, config_dir_path, **kwargs):
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
@@ -123,7 +125,7 @@ class KeyConfig(Config):
 
         # if neither trusted_key_servers nor perspectives are given, use the default.
         if "perspectives" not in config and "trusted_key_servers" not in config:
-            logger.warn(TRUSTED_KEY_SERVER_NOT_CONFIGURED_WARN)
+            logger.warning(TRUSTED_KEY_SERVER_NOT_CONFIGURED_WARN)
             key_servers = [{"server_name": "matrix.org"}]
         else:
             key_servers = config.get("trusted_key_servers", [])
@@ -154,7 +156,7 @@ class KeyConfig(Config):
         if not self.macaroon_secret_key:
             # Unfortunately, there are people out there that don't have this
             # set. Lets just be "nice" and derive one from their secret key.
-            logger.warn("Config is missing macaroon_secret_key")
+            logger.warning("Config is missing macaroon_secret_key")
             seed = bytes(self.signing_key[0])
             self.macaroon_secret_key = hashlib.sha256(seed).digest()
 

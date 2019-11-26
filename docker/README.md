@@ -101,7 +101,7 @@ is suitable for local testing, but for any practical use, you will either need
 to use a reverse proxy, or configure Synapse to expose an HTTPS port.
 
 For documentation on using a reverse proxy, see
-https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
 
 For more information on enabling TLS support in synapse itself, see
 https://github.com/matrix-org/synapse/blob/master/INSTALL.md#tls-certificates. Of
@@ -130,3 +130,15 @@ docker run -it --rm \
 This will generate the same configuration file as the legacy mode used, but
 will store it in `/data/homeserver.yaml` instead of a temporary location. You
 can then use it as shown above at [Running synapse](#running-synapse).
+
+## Building the image
+
+If you need to build the image from a Synapse checkout, use the following `docker
+ build` command from the repo's root:
+ 
+```
+docker build -t matrixdotorg/synapse -f docker/Dockerfile .
+```
+
+You can choose to build a different docker image by changing the value of the `-f` flag to
+point to another Dockerfile.

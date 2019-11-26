@@ -202,7 +202,7 @@ def _parse_auth_header(header_bytes):
         sig = strip_quotes(param_dict["sig"])
         return origin, key, sig
     except Exception as e:
-        logger.warn(
+        logger.warning(
             "Error parsing auth header '%s': %s",
             header_bytes.decode("ascii", "replace"),
             e,
@@ -287,10 +287,12 @@ class BaseFederationServlet(object):
             except NoAuthenticationError:
                 origin = None
                 if self.REQUIRE_AUTH:
-                    logger.warn("authenticate_request failed: missing authentication")
+                    logger.warning(
+                        "authenticate_request failed: missing authentication"
+                    )
                     raise
             except Exception as e:
-                logger.warn("authenticate_request failed: %s", e)
+                logger.warning("authenticate_request failed: %s", e)
                 raise
 
             request_tags = {
@@ -712,7 +714,7 @@ class PublicRoomList(BaseFederationServlet):
 
     This API returns information in the same format as /publicRooms on the
     client API, but will only ever include local public rooms and hence is
-    intended for consumption by other home servers.
+    intended for consumption by other homeservers.
 
     GET /publicRooms HTTP/1.1
 
@@ -765,6 +767,10 @@ class PublicRoomList(BaseFederationServlet):
         else:
             network_tuple = ThirdPartyInstanceID(None, None)
 
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
+
         data = await maybeDeferred(
             self.handler.get_local_public_room_list,
             limit,
@@ -799,6 +805,10 @@ class PublicRoomList(BaseFederationServlet):
 
         if search_filter is None:
             logger.warning("Nonefilter")
+
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
 
         data = await self.handler.get_local_public_room_list(
             limit=limit,

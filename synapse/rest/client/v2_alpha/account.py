@@ -71,7 +71,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "User password resets have been disabled due to lack of email config"
                 )
             raise SynapseError(
@@ -129,66 +129,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         return 200, ret
 
 
-class MsisdnPasswordRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/password/msisdn/requestToken$")
-
-    def __init__(self, hs):
-        super(MsisdnPasswordRequestTokenRestServlet, self).__init__()
-        self.hs = hs
-        self.datastore = self.hs.get_datastore()
-        self.identity_handler = hs.get_handlers().identity_handler
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        body = parse_json_object_from_request(request)
-
-        assert_params_in_dict(
-            body, ["client_secret", "country", "phone_number", "send_attempt"]
-        )
-        client_secret = body["client_secret"]
-        country = body["country"]
-        phone_number = body["phone_number"]
-        send_attempt = body["send_attempt"]
-        next_link = body.get("next_link")  # Optional param
-
-        msisdn = phone_number_to_msisdn(country, phone_number)
-
-        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
-            raise SynapseError(
-                403,
-                "Account phone numbers are not authorized on this server",
-                Codes.THREEPID_DENIED,
-            )
-
-        existing_user_id = yield self.datastore.get_user_id_by_threepid(
-            "msisdn", msisdn
-        )
-
-        if existing_user_id is None:
-            raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
-
-        if not self.hs.config.account_threepid_delegate_msisdn:
-            logger.warn(
-                "No upstream msisdn account_threepid_delegate configured on the server to "
-                "handle this request"
-            )
-            raise SynapseError(
-                400,
-                "Password reset by phone number is not supported on this homeserver",
-            )
-
-        ret = yield self.identity_handler.requestMsisdnToken(
-            self.hs.config.account_threepid_delegate_msisdn,
-            country,
-            phone_number,
-            client_secret,
-            send_attempt,
-            next_link,
-        )
-
-        return 200, ret
-
-
 class PasswordResetSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
 
@@ -208,7 +148,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self.failure_email_template, = load_jinja2_templates(
+            (self.failure_email_template,) = load_jinja2_templates(
                 self.config.email_template_dir,
                 [self.config.email_password_reset_template_failure_html],
             )
@@ -222,7 +162,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             )
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "Password reset emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
@@ -243,7 +183,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             # Perform a 302 redirect if next_link is set
             if next_link:
                 if next_link.startswith("file:///"):
-                    logger.warn(
+                    logger.warning(
                         "Not redirecting to next_link as it is a local file: address"
                     )
                 else:
@@ -301,9 +241,7 @@ class PasswordRestServlet(RestServlet):
         else:
             requester = None
             result, params, _ = yield self.auth_handler.check_auth(
-                [[LoginType.EMAIL_IDENTITY], [LoginType.MSISDN]],
-                body,
-                self.hs.get_ip_from_request(request),
+                [[LoginType.EMAIL_IDENTITY]], body, self.hs.get_ip_from_request(request)
             )
 
             if LoginType.EMAIL_IDENTITY in result:
@@ -412,7 +350,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "Adding emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
@@ -503,7 +441,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         if not self.hs.config.account_threepid_delegate_msisdn:
-            logger.warn(
+            logger.warning(
                 "No upstream msisdn account_threepid_delegate configured on the server to "
                 "handle this request"
             )
@@ -541,7 +479,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self.failure_email_template, = load_jinja2_templates(
+            (self.failure_email_template,) = load_jinja2_templates(
                 self.config.email_template_dir,
                 [self.config.email_add_threepid_template_failure_html],
             )
@@ -550,7 +488,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
     def on_GET(self, request):
         if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.config.local_threepid_handling_disabled_due_to_email_config:
-                logger.warn(
+                logger.warning(
                     "Adding emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
@@ -577,7 +515,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
             # Perform a 302 redirect if next_link is set
             if next_link:
                 if next_link.startswith("file:///"):
-                    logger.warn(
+                    logger.warning(
                         "Not redirecting to next_link as it is a local file: address"
                     )
                 else:
@@ -843,7 +781,6 @@ class WhoamiRestServlet(RestServlet):
 
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
-    MsisdnPasswordRequestTokenRestServlet(hs).register(http_server)
     PasswordResetSubmitTokenServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)

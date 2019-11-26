@@ -45,6 +45,7 @@ from synapse.http import (
     cancelled_to_request_timed_out_error,
     redact_uri,
 )
+from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.util.async_helpers import timeout_deferred
@@ -183,7 +184,15 @@ class SimpleHttpClient(object):
     using HTTP in Matrix
     """
 
-    def __init__(self, hs, treq_args={}, ip_whitelist=None, ip_blacklist=None):
+    def __init__(
+        self,
+        hs,
+        treq_args={},
+        ip_whitelist=None,
+        ip_blacklist=None,
+        http_proxy=None,
+        https_proxy=None,
+    ):
         """
         Args:
             hs (synapse.server.HomeServer)
@@ -192,6 +201,8 @@ class SimpleHttpClient(object):
                 we may not request.
             ip_whitelist (netaddr.IPSet): The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
+            http_proxy (bytes): proxy server to use for http connections. host[:port]
+            https_proxy (bytes): proxy server to use for https connections. host[:port]
         """
         self.hs = hs
 
@@ -236,11 +247,13 @@ class SimpleHttpClient(object):
         # The default context factory in Twisted 14.0.0 (which we require) is
         # BrowserLikePolicyForHTTPS which will do regular cert validation
         # 'like a browser'
-        self.agent = Agent(
+        self.agent = ProxyAgent(
             self.reactor,
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
+            http_proxy=http_proxy,
+            https_proxy=https_proxy,
         )
 
         if self._ip_blacklist:
@@ -327,7 +340,7 @@ class SimpleHttpClient(object):
         Args:
             uri (str):
             args (dict[str, str|List[str]]): query params
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
 
         Returns:
@@ -371,7 +384,7 @@ class SimpleHttpClient(object):
         Args:
             uri (str):
             post_json (object):
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
 
         Returns:
@@ -414,7 +427,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -438,7 +451,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -482,7 +495,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -516,7 +529,7 @@ class SimpleHttpClient(object):
         Args:
             url (str): The URL to GET
             output_stream (file): File to write the response body to.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             A (int,dict,string,int) tuple of the file length, dict of the response
@@ -535,7 +548,7 @@ class SimpleHttpClient(object):
             b"Content-Length" in resp_headers
             and int(resp_headers[b"Content-Length"][0]) > max_size
         ):
-            logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
+            logger.warning("Requested URL is too large > %r bytes" % (self.max_size,))
             raise SynapseError(
                 502,
                 "Requested file is too large > %r bytes" % (self.max_size,),
@@ -543,7 +556,7 @@ class SimpleHttpClient(object):
             )
 
         if response.code > 299:
-            logger.warn("Got %d when downloading %s" % (response.code, url))
+            logger.warning("Got %d when downloading %s" % (response.code, url))
             raise SynapseError(502, "Got error %d" % (response.code,), Codes.UNKNOWN)
 
         # TODO: if our Content-Type is HTML or something, just read the first

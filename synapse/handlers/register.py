@@ -24,7 +24,6 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     ConsentNotGivenError,
-    LimitExceededError,
     RegistrationError,
     SynapseError,
 )
@@ -168,6 +167,7 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
+        yield self.check_registration_ratelimit(address)
 
         yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
@@ -217,10 +217,14 @@ class RegistrationHandler(BaseHandler):
 
         else:
             # autogen a sequential user ID
-            attempts = 0
+            fail_count = 0
             user = None
             while not user:
-                localpart = yield self._generate_user_id(attempts > 0)
+                # Fail after being unable to find a suitable ID a few times
+                if fail_count > 10:
+                    raise SynapseError(500, "Unable to find a suitable guest user ID")
+
+                localpart = yield self._generate_user_id()
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 yield self.check_user_id_not_appservice_exclusive(user_id)
@@ -234,11 +238,14 @@ class RegistrationHandler(BaseHandler):
                         create_profile_with_displayname=default_display_name,
                         address=address,
                     )
+
+                    # Successfully registered
+                    break
                 except SynapseError:
                     # if user id is taken, just generate another
                     user = None
                     user_id = None
-                    attempts += 1
+                    fail_count += 1
 
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
@@ -379,10 +386,10 @@ class RegistrationHandler(BaseHandler):
                 )
 
     @defer.inlineCallbacks
-    def _generate_user_id(self, reseed=False):
-        if reseed or self._next_generated_user_id is None:
+    def _generate_user_id(self):
+        if self._next_generated_user_id is None:
             with (yield self._generate_user_id_linearizer.queue(())):
-                if reseed or self._next_generated_user_id is None:
+                if self._next_generated_user_id is None:
                     self._next_generated_user_id = (
                         yield self.store.find_next_generated_user_id_localpart()
                     )
@@ -398,8 +405,8 @@ class RegistrationHandler(BaseHandler):
             room_id = room_identifier
         elif RoomAlias.is_valid(room_identifier):
             room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = (
-                yield room_member_handler.lookup_room_alias(room_alias)
+            room_id, remote_room_hosts = yield room_member_handler.lookup_room_alias(
+                room_alias
             )
             room_id = room_id.to_string()
         else:
@@ -414,6 +421,29 @@ class RegistrationHandler(BaseHandler):
             remote_room_hosts=remote_room_hosts,
             action="join",
             ratelimit=False,
+        )
+
+    def check_registration_ratelimit(self, address):
+        """A simple helper method to check whether the registration rate limit has been hit
+        for a given IP address
+
+        Args:
+            address (str|None): the IP address used to perform the registration. If this is
+                None, no ratelimiting will be performed.
+
+        Raises:
+            LimitExceededError: If the rate limit has been exceeded.
+        """
+        if not address:
+            return
+
+        time_now = self.clock.time()
+
+        self.ratelimiter.ratelimit(
+            address,
+            time_now_s=time_now,
+            rate_hz=self.hs.config.rc_registration.per_second,
+            burst_count=self.hs.config.rc_registration.burst_count,
         )
 
     def register_with_store(
@@ -448,22 +478,6 @@ class RegistrationHandler(BaseHandler):
         Returns:
             Deferred
         """
-        # Don't rate limit for app services
-        if appservice_id is None and address is not None:
-            time_now = self.clock.time()
-
-            allowed, time_allowed = self.ratelimiter.can_do_action(
-                address,
-                time_now_s=time_now,
-                rate_hz=self.hs.config.rc_registration.per_second,
-                burst_count=self.hs.config.rc_registration.burst_count,
-            )
-
-            if not allowed:
-                raise LimitExceededError(
-                    retry_after_ms=int(1000 * (time_allowed - time_now))
-                )
-
         if self.hs.config.worker_app:
             return self._register_client(
                 user_id=user_id,
@@ -616,7 +630,7 @@ class RegistrationHandler(BaseHandler):
         # And we add an email pusher for them by default, but only
         # if email notifications are enabled (so people don't start
         # getting mail spam where they weren't before if email
-        # notifs are set up on a home server)
+        # notifs are set up on a homeserver)
         if (
             self.hs.config.email_enable_notifs
             and self.hs.config.email_notif_for_new_users

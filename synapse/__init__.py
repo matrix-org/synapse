@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This is a reference implementation of a Matrix home server.
+""" This is a reference implementation of a Matrix homeserver.
 """
 
+import os
 import sys
 
 # Check that we're not running on an unsupported Python version.
@@ -35,4 +36,11 @@ try:
 except ImportError:
     pass
 
-__version__ = "1.4.0rc1"
+__version__ = "1.6.0rc2"
+
+if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
+    # We import here so that we don't have to install a bunch of deps when
+    # running the packaging tox test.
+    from synapse.util.patch_inline_callbacks import do_patch
+
+    do_patch()

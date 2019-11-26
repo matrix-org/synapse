@@ -16,6 +16,7 @@
 
 import logging
 import os
+from typing import Dict
 
 import six
 from six.moves import intern
@@ -37,7 +38,7 @@ def get_cache_factor_for(cache_name):
 
 
 caches_by_name = {}
-collectors_by_name = {}
+collectors_by_name = {}  # type: Dict
 
 cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
 cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
@@ -106,7 +107,7 @@ def register_cache(cache_type, cache_name, cache, collect_callback=None):
                 if collect_callback:
                     collect_callback()
             except Exception as e:
-                logger.warn("Error calculating metrics for %s: %s", cache_name, e)
+                logger.warning("Error calculating metrics for %s: %s", cache_name, e)
                 raise
 
             yield GaugeMetricFamily("__unused", "")

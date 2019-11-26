@@ -55,6 +55,8 @@ def _dict_merge(merge_dict, into_dict):
 
 
 class SAML2Config(Config):
+    section = "saml2"
+
     def read_config(self, config, **kwargs):
         self.saml2_enabled = False
 
@@ -174,7 +176,7 @@ class SAML2Config(Config):
           #      - url: https://our_idp/metadata.xml
           #
           #    # By default, the user has to go to our login page first. If you'd like
-          #    # to allow IdP-initiated login, set 'allow_unsolicited: True' in a
+          #    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
           #    # 'service.sp' section:
           #    #
           #    #service:

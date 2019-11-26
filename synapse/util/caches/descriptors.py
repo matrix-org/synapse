@@ -17,11 +17,13 @@ import functools
 import inspect
 import logging
 import threading
-from collections import namedtuple
+from typing import Any, Tuple, Union, cast
+from weakref import WeakValueDictionary
 
 from six import itervalues
 
 from prometheus_client import Gauge
+from typing_extensions import Protocol
 
 from twisted.internet import defer
 
@@ -35,6 +37,20 @@ from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 from . import register_cache
 
 logger = logging.getLogger(__name__)
+
+CacheKey = Union[Tuple, Any]
+
+
+class _CachedFunction(Protocol):
+    invalidate = None  # type: Any
+    invalidate_all = None  # type: Any
+    invalidate_many = None  # type: Any
+    prefill = None  # type: Any
+    cache = None  # type: Any
+    num_args = None  # type: Any
+
+    def __name__(self):
+        ...
 
 
 cache_pending_metric = Gauge(
@@ -245,7 +261,9 @@ class Cache(object):
 
 
 class _CacheDescriptorBase(object):
-    def __init__(self, orig, num_args, inlineCallbacks, cache_context=False):
+    def __init__(
+        self, orig: _CachedFunction, num_args, inlineCallbacks, cache_context=False
+    ):
         self.orig = orig
 
         if inlineCallbacks:
@@ -404,7 +422,7 @@ class CacheDescriptor(_CacheDescriptorBase):
                 return tuple(get_cache_key_gen(args, kwargs))
 
         @functools.wraps(self.orig)
-        def wrapped(*args, **kwargs):
+        def _wrapped(*args, **kwargs):
             # If we're passed a cache_context then we'll want to call its invalidate()
             # whenever we are invalidated
             invalidate_callback = kwargs.pop("on_invalidate", None)
@@ -414,7 +432,7 @@ class CacheDescriptor(_CacheDescriptorBase):
             # Add our own `cache_context` to argument list if the wrapped function
             # has asked for one
             if self.add_cache_context:
-                kwargs["cache_context"] = _CacheContext(cache, cache_key)
+                kwargs["cache_context"] = _CacheContext.get_instance(cache, cache_key)
 
             try:
                 cached_result_d = cache.get(cache_key, callback=invalidate_callback)
@@ -422,7 +440,7 @@ class CacheDescriptor(_CacheDescriptorBase):
                 if isinstance(cached_result_d, ObservableDeferred):
                     observer = cached_result_d.observe()
                 else:
-                    observer = cached_result_d
+                    observer = defer.succeed(cached_result_d)
 
             except KeyError:
                 ret = defer.maybeDeferred(
@@ -439,6 +457,8 @@ class CacheDescriptor(_CacheDescriptorBase):
                 observer = result_d.observe()
 
             return make_deferred_yieldable(observer)
+
+        wrapped = cast(_CachedFunction, _wrapped)
 
         if self.num_args == 1:
             wrapped.invalidate = lambda key: cache.invalidate(key[0])
@@ -464,9 +484,8 @@ class CacheListDescriptor(_CacheDescriptorBase):
     Given a list of keys it looks in the cache to find any hits, then passes
     the list of missing keys to the wrapped function.
 
-    Once wrapped, the function returns either a Deferred which resolves to
-    the list of results, or (if all results were cached), just the list of
-    results.
+    Once wrapped, the function returns a Deferred which resolves to the list
+    of results.
     """
 
     def __init__(
@@ -600,21 +619,45 @@ class CacheListDescriptor(_CacheDescriptorBase):
                 )
                 return make_deferred_yieldable(d)
             else:
-                return results
+                return defer.succeed(results)
 
         obj.__dict__[self.orig.__name__] = wrapped
 
         return wrapped
 
 
-class _CacheContext(namedtuple("_CacheContext", ("cache", "key"))):
-    # We rely on _CacheContext implementing __eq__ and __hash__ sensibly,
-    # which namedtuple does for us (i.e. two _CacheContext are the same if
-    # their caches and keys match). This is important in particular to
-    # dedupe when we add callbacks to lru cache nodes, otherwise the number
-    # of callbacks would grow.
-    def invalidate(self):
-        self.cache.invalidate(self.key)
+class _CacheContext:
+    """Holds cache information from the cached function higher in the calling order.
+
+    Can be used to invalidate the higher level cache entry if something changes
+    on a lower level.
+    """
+
+    _cache_context_objects = (
+        WeakValueDictionary()
+    )  # type: WeakValueDictionary[Tuple[Cache, CacheKey], _CacheContext]
+
+    def __init__(self, cache, cache_key):  # type: (Cache, CacheKey) -> None
+        self._cache = cache
+        self._cache_key = cache_key
+
+    def invalidate(self):  # type: () -> None
+        """Invalidates the cache entry referred to by the context."""
+        self._cache.invalidate(self._cache_key)
+
+    @classmethod
+    def get_instance(cls, cache, cache_key):  # type: (Cache, CacheKey) -> _CacheContext
+        """Returns an instance constructed with the given arguments.
+
+        A new instance is only created if none already exists.
+        """
+
+        # We make sure there are no identical _CacheContext instances. This is
+        # important in particular to dedupe when we add callbacks to lru cache
+        # nodes, otherwise the number of callbacks would grow.
+        return cls._cache_context_objects.setdefault(
+            (cache, cache_key), cls(cache, cache_key)
+        )
 
 
 def cached(

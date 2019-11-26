@@ -16,7 +16,7 @@
 
 from twisted.internet import defer
 
-from synapse.storage.profile import ProfileStore
+from synapse.storage.data_stores.main.profile import ProfileStore
 from synapse.types import UserID
 
 from tests import unittest

@@ -28,6 +28,8 @@ from ._base import Config, ConfigError
 
 
 class EmailConfig(Config):
+    section = "email"
+
     def read_config(self, config, **kwargs):
         # TODO: We should separate better the email configuration from the notification
         # and account validity config.
@@ -302,13 +304,13 @@ class EmailConfig(Config):
         #   smtp_port: 25 # SSL: 465, STARTTLS: 587
         #   smtp_user: "exampleusername"
         #   smtp_pass: "examplepassword"
-        #   require_transport_security: False
-        #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
+        #   require_transport_security: false
+        #   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
         #   app_name: Matrix
         #
         #   # Enable email notifications by default
         #   #
-        #   notif_for_new_users: True
+        #   notif_for_new_users: true
         #
         #   # Defining a custom URL for Riot is only needed if email notifications
         #   # should contain links to a self-hosted installation of Riot; when set

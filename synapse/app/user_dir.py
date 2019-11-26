@@ -42,8 +42,8 @@ from synapse.replication.tcp.streams.events import (
 )
 from synapse.rest.client.v2_alpha import user_directory
 from synapse.server import HomeServer
+from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
 from synapse.storage.engines import create_engine
-from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
@@ -150,7 +150,7 @@ class UserDirectoryServer(HomeServer):
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(
+                    logger.warning(
                         (
                             "Metrics listener configured, but "
                             "enable_metrics is not True!"
@@ -159,7 +159,7 @@ class UserDirectoryServer(HomeServer):
                 else:
                     _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
-                logger.warn("Unrecognized listener type: %s", listener["type"])
+                logger.warning("Unrecognized listener type: %s", listener["type"])
 
         self.get_tcp_replication().start_replication(self)
 

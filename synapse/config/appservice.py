@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict
 
 from six import string_types
 from six.moves.urllib import parse as urlparse
@@ -29,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 
 class AppServiceConfig(Config):
+    section = "appservice"
+
     def read_config(self, config, **kwargs):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)
@@ -45,7 +48,7 @@ class AppServiceConfig(Config):
         # Uncomment to enable tracking of application service IP addresses. Implicitly
         # enables MAU tracking for application service users.
         #
-        #track_appservice_user_ips: True
+        #track_appservice_user_ips: true
         """
 
 
@@ -56,8 +59,8 @@ def load_appservices(hostname, config_files):
         return []
 
     # Dicts of value -> filename
-    seen_as_tokens = {}
-    seen_ids = {}
+    seen_as_tokens = {}  # type: Dict[str, str]
+    seen_ids = {}  # type: Dict[str, str]
 
     appservices = []
 
@@ -131,7 +134,7 @@ def _load_appservice(hostname, as_info, config_filename):
             for regex_obj in as_info["namespaces"][ns]:
                 if not isinstance(regex_obj, dict):
                     raise ValueError(
-                        "Expected namespace entry in %s to be an object," " but got %s",
+                        "Expected namespace entry in %s to be an object, but got %s",
                         ns,
                         regex_obj,
                     )

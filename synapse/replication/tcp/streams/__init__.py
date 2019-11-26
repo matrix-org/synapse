@@ -45,5 +45,6 @@ STREAMS_MAP = {
         _base.TagAccountDataStream,
         _base.AccountDataStream,
         _base.GroupServerStream,
+        _base.UserSignatureStream,
     )
 }

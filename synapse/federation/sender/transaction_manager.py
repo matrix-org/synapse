@@ -84,7 +84,7 @@ class TransactionManager(object):
             txn_id = str(self._next_txn_id)
 
             logger.debug(
-                "TX [%s] {%s} Attempting new transaction" " (pdus: %d, edus: %d)",
+                "TX [%s] {%s} Attempting new transaction (pdus: %d, edus: %d)",
                 destination,
                 txn_id,
                 len(pdus),
@@ -103,7 +103,7 @@ class TransactionManager(object):
             self._next_txn_id += 1
 
             logger.info(
-                "TX [%s] {%s} Sending transaction [%s]," " (PDUs: %d, EDUs: %d)",
+                "TX [%s] {%s} Sending transaction [%s], (PDUs: %d, EDUs: %d)",
                 destination,
                 txn_id,
                 transaction.transaction_id,
@@ -146,7 +146,7 @@ class TransactionManager(object):
             if code == 200:
                 for e_id, r in response.get("pdus", {}).items():
                     if "error" in r:
-                        logger.warn(
+                        logger.warning(
                             "TX [%s] {%s} Remote returned error for %s: %s",
                             destination,
                             txn_id,
@@ -155,7 +155,7 @@ class TransactionManager(object):
                         )
             else:
                 for p in pdus:
-                    logger.warn(
+                    logger.warning(
                         "TX [%s] {%s} Failed to send event %s",
                         destination,
                         txn_id,

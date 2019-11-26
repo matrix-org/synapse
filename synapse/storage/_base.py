@@ -20,6 +20,7 @@ import random
 import sys
 import threading
 import time
+from typing import Iterable, Tuple
 
 from six import PY2, iteritems, iterkeys, itervalues
 from six.moves import builtins, intern, range
@@ -30,7 +31,7 @@ from prometheus_client import Histogram
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.logging.context import LoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id
@@ -360,14 +361,11 @@ class SQLBaseStore(object):
                 expiration_ts,
             )
 
-        self._simple_insert_txn(
+        self._simple_upsert_txn(
             txn,
             "account_validity",
-            values={
-                "user_id": user_id,
-                "expiration_ts_ms": expiration_ts,
-                "email_sent": False,
-            },
+            keyvalues={"user_id": user_id},
+            values={"expiration_ts_ms": expiration_ts, "email_sent": False},
         )
 
     def start_profiling(self):
@@ -493,7 +491,7 @@ class SQLBaseStore(object):
         exception_callbacks = []
 
         if LoggingContext.current_context() == LoggingContext.sentinel:
-            logger.warn("Starting db txn '%s' from sentinel context", desc)
+            logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
             result = yield self.runWithConnection(
@@ -531,7 +529,7 @@ class SQLBaseStore(object):
         """
         parent_context = LoggingContext.current_context()
         if parent_context == LoggingContext.sentinel:
-            logger.warn(
+            logger.warning(
                 "Starting db connection from sentinel context: metrics will be lost"
             )
             parent_context = None
@@ -550,8 +548,9 @@ class SQLBaseStore(object):
 
                 return func(conn, *args, **kwargs)
 
-        with PreserveLoggingContext():
-            result = yield self._db_pool.runWithConnection(inner_func, *args, **kwargs)
+        result = yield make_deferred_yieldable(
+            self._db_pool.runWithConnection(inner_func, *args, **kwargs)
+        )
 
         return result
 
@@ -717,7 +716,7 @@ class SQLBaseStore(object):
                     raise
 
                 # presumably we raced with another transaction: let's retry.
-                logger.warn(
+                logger.warning(
                     "IntegrityError when upserting into %s; retrying: %s", table, e
                 )
 
@@ -852,7 +851,7 @@ class SQLBaseStore(object):
             allvalues.update(values)
             latter = "UPDATE SET " + ", ".join(k + "=EXCLUDED." + k for k in values)
 
-        sql = ("INSERT INTO %s (%s) VALUES (%s) " "ON CONFLICT (%s) DO %s") % (
+        sql = ("INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO %s") % (
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
@@ -1162,19 +1161,18 @@ class SQLBaseStore(object):
         if not iterable:
             return []
 
-        sql = "SELECT %s FROM %s" % (", ".join(retcols), table)
-
-        clauses = []
-        values = []
-        clauses.append("%s IN (%s)" % (column, ",".join("?" for _ in iterable)))
-        values.extend(iterable)
+        clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
+        clauses = [clause]
 
         for key, value in iteritems(keyvalues):
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
-        if clauses:
-            sql = "%s WHERE %s" % (sql, " AND ".join(clauses))
+        sql = "SELECT %s FROM %s WHERE %s" % (
+            ", ".join(retcols),
+            table,
+            " AND ".join(clauses),
+        )
 
         txn.execute(sql, values)
         return cls.cursor_to_dict(txn)
@@ -1323,10 +1321,8 @@ class SQLBaseStore(object):
 
         sql = "DELETE FROM %s" % table
 
-        clauses = []
-        values = []
-        clauses.append("%s IN (%s)" % (column, ",".join("?" for _ in iterable)))
-        values.extend(iterable)
+        clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
+        clauses = [clause]
 
         for key, value in iteritems(keyvalues):
             clauses.append("%s = ?" % (key,))
@@ -1693,3 +1689,30 @@ def db_to_json(db_content):
     except Exception:
         logging.warning("Tried to decode '%r' as JSON and failed", db_content)
         raise
+
+
+def make_in_list_sql_clause(
+    database_engine, column: str, iterable: Iterable
+) -> Tuple[str, Iterable]:
+    """Returns an SQL clause that checks the given column is in the iterable.
+
+    On SQLite this expands to `column IN (?, ?, ...)`, whereas on Postgres
+    it expands to `column = ANY(?)`. While both DBs support the `IN` form,
+    using the `ANY` form on postgres means that it views queries with
+    different length iterables as the same, helping the query stats.
+
+    Args:
+        database_engine
+        column: Name of the column
+        iterable: The values to check the column against.
+
+    Returns:
+        A tuple of SQL query and the args
+    """
+
+    if database_engine.supports_using_any_list:
+        # This should hopefully be faster, but also makes postgres query
+        # stats easier to understand.
+        return "%s = ANY(?)" % (column,), [list(iterable)]
+    else:
+        return "%s IN (%s)" % (column, ",".join("?" for _ in iterable)), list(iterable)

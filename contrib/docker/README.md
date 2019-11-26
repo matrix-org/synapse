@@ -1,38 +1,25 @@
+
 # Synapse Docker
 
-FIXME: this is out-of-date as of
-https://github.com/matrix-org/synapse/issues/5518. Contributions to bring it up
-to date would be welcome.
-
-### Automated configuration
-
-It is recommended that you use Docker Compose to run your containers, including
-this image and a Postgres server. A sample ``docker-compose.yml`` is provided,
-including example labels for reverse proxying and other artifacts.
-
-Read the section about environment variables and set at least mandatory variables,
-then run the server:
-
-```
-docker-compose up -d
-```
-
-If secrets are not specified in the environment variables, they will be generated
-as part of the startup. Please ensure these secrets are kept between launches of the
-Docker container, as their loss may require users to log in again.
-
-### Manual configuration
+### Configuration
 
 A sample ``docker-compose.yml`` is provided, including example labels for
 reverse proxying and other artifacts. The docker-compose file is an example,
 please comment/uncomment sections that are not suitable for your usecase.
 
 Specify a ``SYNAPSE_CONFIG_PATH``, preferably to a persistent path,
-to use manual configuration. To generate a fresh ``homeserver.yaml``, simply run:
+to use manual configuration.
+
+To generate a fresh `homeserver.yaml`, you can use the `generate` command.
+(See the [documentation](../../docker/README.md#generating-a-configuration-file)
+for more information.) You will need to specify appropriate values for at least the
+`SYNAPSE_SERVER_NAME` and `SYNAPSE_REPORT_STATS` environment variables. For example:
 
 ```
-docker-compose run --rm -e SYNAPSE_SERVER_NAME=my.matrix.host synapse generate
+docker-compose run --rm -e SYNAPSE_SERVER_NAME=my.matrix.host -e SYNAPSE_REPORT_STATS=yes synapse generate
 ```
+
+(This will also generate necessary signing keys.)
 
 Then, customize your configuration and run the server:
 
