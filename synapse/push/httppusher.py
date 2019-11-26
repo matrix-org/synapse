@@ -105,7 +105,7 @@ class HttpPusher(object):
         self.url = self.data["url"]
         self.url = self.url.replace(
             "https://matrix.org/_matrix/push/v1/notify",
-            "http://10.101.0.14/_matrix/push/v1/notify",
+            "http://10.103.0.7/_matrix/push/v1/notify",
         )
         self.http_client = hs.get_proxied_http_client()
         self.data_minus_url = {}
