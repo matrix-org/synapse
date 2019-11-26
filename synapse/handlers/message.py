@@ -68,6 +68,7 @@ class MessageHandler(object):
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
+        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
         run_as_background_process(
             "_schedule_deletions_expired_from_db",
@@ -245,6 +246,9 @@ class MessageHandler(object):
             event_id (str): The ID of the event to schedule the deletion of.
             redaction_ts (int): The timestamp to delete the event at.
         """
+        if not self._ephemeral_events_enabled:
+            return
+
         # Save the timestamp at which the event expires so that we can reschedule its
         # deletion on startup if the server is stopped before the event is deleted.
         yield self.store.insert_event_expiry(event_id, redaction_ts)
@@ -266,6 +270,9 @@ class MessageHandler(object):
         their expiry timestamp) and either delete them (if the expiry date is now or in
         the past) or schedule their deletion on the timestamp.
         """
+        if not self._ephemeral_events_enabled:
+            return
+
         events_to_expire = yield self.store.get_events_to_expire()
 
         for event in events_to_expire:
@@ -281,6 +288,9 @@ class MessageHandler(object):
         Args:
             event_id (str): The ID of the event to retrieve and delete.
         """
+        if not self._ephemeral_events_enabled:
+            return
+
         # Try to retrieve the event from the database.
         event = yield self.store.get_event(event_id)
 
