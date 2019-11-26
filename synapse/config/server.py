@@ -41,7 +41,7 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
-DEFAULT_ROOM_VERSION = "4"
+DEFAULT_ROOM_VERSION = "5"
 
 ROOM_COMPLEXITY_TOO_GREAT = (
     "Your homeserver is unable to join rooms this large or complex. "
@@ -223,7 +223,7 @@ class ServerConfig(Config):
             self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
         except Exception as e:
             raise ConfigError(
-                "Invalid range(s) provided in " "federation_ip_range_blacklist: %s" % e
+                "Invalid range(s) provided in federation_ip_range_blacklist: %s" % e
             )
 
         if self.public_baseurl is not None:
@@ -721,7 +721,7 @@ class ServerConfig(Config):
         # Used by phonehome stats to group together related servers.
         #server_context: context
 
-        # Resource-constrained Homeserver Settings
+        # Resource-constrained homeserver Settings
         #
         # If limit_remote_rooms.enabled is True, the room complexity will be
         # checked before a user joins a new remote room. If it is above
@@ -781,20 +781,20 @@ class ServerConfig(Config):
             "--daemonize",
             action="store_true",
             default=None,
-            help="Daemonize the home server",
+            help="Daemonize the homeserver",
         )
         server_group.add_argument(
             "--print-pidfile",
             action="store_true",
             default=None,
-            help="Print the path to the pidfile just" " before daemonizing",
+            help="Print the path to the pidfile just before daemonizing",
         )
         server_group.add_argument(
             "--manhole",
             metavar="PORT",
             dest="manhole",
             type=int,
-            help="Turn on the twisted telnet manhole" " service on the given port.",
+            help="Turn on the twisted telnet manhole service on the given port.",
         )
 
 

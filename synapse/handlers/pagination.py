@@ -127,7 +127,9 @@ class PaginationHandler(object):
         self._purges_in_progress_by_room.add(room_id)
         try:
             with (yield self.pagination_lock.write(room_id)):
-                yield self.store.purge_history(room_id, token, delete_local_events)
+                yield self.storage.purge_events.purge_history(
+                    room_id, token, delete_local_events
+                )
             logger.info("[purge] complete")
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_COMPLETE
         except Exception:
@@ -170,7 +172,7 @@ class PaginationHandler(object):
             if joined:
                 raise SynapseError(400, "Users are still joined to this room")
 
-            await self.store.purge_room(room_id)
+            await self.storage.purge_events.purge_room(room_id)
 
     @defer.inlineCallbacks
     def get_messages(

@@ -619,7 +619,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     def _get_max_topological_txn(self, txn, room_id):
         txn.execute(
-            "SELECT MAX(topological_ordering) FROM events" " WHERE room_id = ?",
+            "SELECT MAX(topological_ordering) FROM events WHERE room_id = ?",
             (room_id,),
         )
 
@@ -874,14 +874,38 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         args.append(int(limit))
 
-        sql = (
-            "SELECT DISTINCT event_id, topological_ordering, stream_ordering"
-            " FROM events"
-            " LEFT JOIN event_labels USING (event_id, room_id, topological_ordering)"
-            " WHERE outlier = ? AND room_id = ? AND %(bounds)s"
-            " ORDER BY topological_ordering %(order)s,"
-            " stream_ordering %(order)s LIMIT ?"
-        ) % {"bounds": bounds, "order": order}
+        select_keywords = "SELECT"
+        join_clause = ""
+        if event_filter and event_filter.labels:
+            # If we're not filtering on a label, then joining on event_labels will
+            # return as many row for a single event as the number of labels it has. To
+            # avoid this, only join if we're filtering on at least one label.
+            join_clause = """
+                LEFT JOIN event_labels
+                USING (event_id, room_id, topological_ordering)
+            """
+            if len(event_filter.labels) > 1:
+                # Using DISTINCT in this SELECT query is quite expensive, because it
+                # requires the engine to sort on the entire (not limited) result set,
+                # i.e. the entire events table. We only need to use it when we're
+                # filtering on more than two labels, because that's the only scenario
+                # in which we can possibly to get multiple times the same event ID in
+                # the results.
+                select_keywords += "DISTINCT"
+
+        sql = """
+            %(select_keywords)s event_id, topological_ordering, stream_ordering
+            FROM events
+            %(join_clause)s
+            WHERE outlier = ? AND room_id = ? AND %(bounds)s
+            ORDER BY topological_ordering %(order)s,
+            stream_ordering %(order)s LIMIT ?
+        """ % {
+            "select_keywords": select_keywords,
+            "join_clause": join_clause,
+            "bounds": bounds,
+            "order": order,
+        }
 
         txn.execute(sql, args)
 
