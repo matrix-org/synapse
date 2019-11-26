@@ -820,7 +820,7 @@ class EventCreationHandler(object):
 
         # If there's an expiry timestamp, schedule the redaction of the event.
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-        if isinstance(expiry_ts, int):
+        if isinstance(expiry_ts, int) and not event.is_state():
             yield self._message_handler.schedule_deletion_expired(
                 event.event_id, expiry_ts
             )
