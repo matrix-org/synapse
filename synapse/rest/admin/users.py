@@ -270,11 +270,14 @@ class WhoisRestServlet(RestServlet):
         self.handlers = hs.get_handlers()
 
     async def on_GET(self, request, user_id):
+        target_user = UserID.from_string(user_id)
+
         authorised_by_token = await self.check_authorized_admin_token_in_use(request)
         if not authorised_by_token:
-            await assert_requester_is_admin(self.auth, request)
-
-        target_user = UserID.from_string(user_id)
+            requester = await self.auth.get_user_by_req(request)
+            auth_user = requester.user
+            if auth_user != target_user:
+                await assert_user_is_admin(self.auth, auth_user)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only whois a local user")
