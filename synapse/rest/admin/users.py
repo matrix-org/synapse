@@ -383,7 +383,10 @@ class ResetPasswordRestServlet(RestServlet):
         """
         authorised_by_token = await self.check_authorized_admin_token_in_use(request)
         if not authorised_by_token:
-            await assert_requester_is_admin(self.auth, request)
+            requester = await self.auth.get_user_by_req(request)
+            await assert_user_is_admin(self.auth, requester.user)
+        else:
+            requester = None
 
         UserID.from_string(target_user_id)
 
