@@ -180,7 +180,7 @@ class SamlHandler:
             for i in range(1000):
                 # Use the provider's custom handler if available
                 if self._mapping_provider:
-                    localpart = self._mapping_provider.mxid_source_to_mixd_localpart(
+                    localpart = self._mapping_provider.mxid_source_to_mxid_localpart(
                         mxid_source, i
                     )
                 else:
