@@ -714,7 +714,7 @@ class PublicRoomList(BaseFederationServlet):
 
     This API returns information in the same format as /publicRooms on the
     client API, but will only ever include local public rooms and hence is
-    intended for consumption by other home servers.
+    intended for consumption by other homeservers.
 
     GET /publicRooms HTTP/1.1
 
