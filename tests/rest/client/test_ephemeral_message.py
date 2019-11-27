@@ -54,7 +54,7 @@ class EphemeralMessageTestCase(unittest.HomeserverTestCase):
                 "msgtype": "m.text",
                 "body": "hello",
                 EventContentFields.SELF_DESTRUCT_AFTER: 0,
-            }
+            },
         )
         event_id = res["event_id"]
 
@@ -75,7 +75,7 @@ class EphemeralMessageTestCase(unittest.HomeserverTestCase):
                 "msgtype": "m.text",
                 "body": "hello",
                 EventContentFields.SELF_DESTRUCT_AFTER: self.clock.time_msec() + 1000,
-            }
+            },
         )
         event_id = res["event_id"]
 
