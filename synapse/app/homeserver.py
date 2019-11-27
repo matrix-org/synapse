@@ -19,12 +19,13 @@ from __future__ import print_function
 
 import gc
 import logging
+import math
 import os
+import resource
 import sys
 
 from six import iteritems
 
-import psutil
 from prometheus_client import Gauge
 
 from twisted.application import service
@@ -471,6 +472,87 @@ class SynapseService(service.Service):
         return self._port.stopListening()
 
 
+# Contains the list of processes we will be monitoring
+# currently either 0 or 1
+_stats_process = []
+
+
+@defer.inlineCallbacks
+def phone_stats_home(hs, stats, stats_process=_stats_process):
+    logger.info("Gathering stats for reporting")
+    now = int(hs.get_clock().time())
+    uptime = int(now - hs.start_time)
+    if uptime < 0:
+        uptime = 0
+
+    stats["homeserver"] = hs.config.server_name
+    stats["server_context"] = hs.config.server_context
+    stats["timestamp"] = now
+    stats["uptime_seconds"] = uptime
+    version = sys.version_info
+    stats["python_version"] = "{}.{}.{}".format(
+        version.major, version.minor, version.micro
+    )
+    stats["total_users"] = yield hs.get_datastore().count_all_users()
+
+    total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
+    stats["total_nonbridged_users"] = total_nonbridged_users
+
+    daily_user_type_results = yield hs.get_datastore().count_daily_user_type()
+    for name, count in iteritems(daily_user_type_results):
+        stats["daily_user_type_" + name] = count
+
+    room_count = yield hs.get_datastore().get_room_count()
+    stats["total_room_count"] = room_count
+
+    stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
+    stats["monthly_active_users"] = yield hs.get_datastore().count_monthly_users()
+    stats["daily_active_rooms"] = yield hs.get_datastore().count_daily_active_rooms()
+    stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
+
+    r30_results = yield hs.get_datastore().count_r30_users()
+    for name, count in iteritems(r30_results):
+        stats["r30_users_" + name] = count
+
+    daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
+    stats["daily_sent_messages"] = daily_sent_messages
+    stats["cache_factor"] = CACHE_SIZE_FACTOR
+    stats["event_cache_size"] = hs.config.event_cache_size
+
+    #
+    # Performance statistics
+    #
+    old = stats_process[0]
+    new = (now, resource.getrusage(resource.RUSAGE_SELF))
+    stats_process[0] = new
+
+    # Get RSS in bytes
+    stats["memory_rss"] = new[1].ru_maxrss
+
+    # Get CPU time in % of a single core, not % of all cores
+    used_cpu_time = (new[1].ru_utime + new[1].ru_stime) - (
+        old[1].ru_utime + old[1].ru_stime
+    )
+    if used_cpu_time == 0 or new[0] == old[0]:
+        stats["cpu_average"] = 0
+    else:
+        stats["cpu_average"] = math.floor(used_cpu_time / (new[0] - old[0]) * 100)
+
+    #
+    # Database version
+    #
+
+    stats["database_engine"] = hs.get_datastore().database_engine_name
+    stats["database_server_version"] = hs.get_datastore().get_server_version()
+    logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
+    try:
+        yield hs.get_proxied_http_client().put_json(
+            hs.config.report_stats_endpoint, stats
+        )
+    except Exception as e:
+        logger.warning("Error reporting stats: %s", e)
+
+
 def run(hs):
     PROFILE_SYNAPSE = False
     if PROFILE_SYNAPSE:
@@ -497,91 +579,19 @@ def run(hs):
         reactor.run = profile(reactor.run)
 
     clock = hs.get_clock()
-    start_time = clock.time()
 
     stats = {}
 
-    # Contains the list of processes we will be monitoring
-    # currently either 0 or 1
-    stats_process = []
+    def performance_stats_init():
+        _stats_process.clear()
+        _stats_process.append(
+            (int(hs.get_clock().time()), resource.getrusage(resource.RUSAGE_SELF))
+        )
 
     def start_phone_stats_home():
-        return run_as_background_process("phone_stats_home", phone_stats_home)
-
-    @defer.inlineCallbacks
-    def phone_stats_home():
-        logger.info("Gathering stats for reporting")
-        now = int(hs.get_clock().time())
-        uptime = int(now - start_time)
-        if uptime < 0:
-            uptime = 0
-
-        stats["homeserver"] = hs.config.server_name
-        stats["server_context"] = hs.config.server_context
-        stats["timestamp"] = now
-        stats["uptime_seconds"] = uptime
-        version = sys.version_info
-        stats["python_version"] = "{}.{}.{}".format(
-            version.major, version.minor, version.micro
+        return run_as_background_process(
+            "phone_stats_home", phone_stats_home, hs, stats
         )
-        stats["total_users"] = yield hs.get_datastore().count_all_users()
-
-        total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
-        stats["total_nonbridged_users"] = total_nonbridged_users
-
-        daily_user_type_results = yield hs.get_datastore().count_daily_user_type()
-        for name, count in iteritems(daily_user_type_results):
-            stats["daily_user_type_" + name] = count
-
-        room_count = yield hs.get_datastore().get_room_count()
-        stats["total_room_count"] = room_count
-
-        stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
-        stats["monthly_active_users"] = yield hs.get_datastore().count_monthly_users()
-        stats[
-            "daily_active_rooms"
-        ] = yield hs.get_datastore().count_daily_active_rooms()
-        stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
-
-        r30_results = yield hs.get_datastore().count_r30_users()
-        for name, count in iteritems(r30_results):
-            stats["r30_users_" + name] = count
-
-        daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
-        stats["daily_sent_messages"] = daily_sent_messages
-        stats["cache_factor"] = CACHE_SIZE_FACTOR
-        stats["event_cache_size"] = hs.config.event_cache_size
-
-        if len(stats_process) > 0:
-            stats["memory_rss"] = 0
-            stats["cpu_average"] = 0
-            for process in stats_process:
-                stats["memory_rss"] += process.memory_info().rss
-                stats["cpu_average"] += int(process.cpu_percent(interval=None))
-
-        stats["database_engine"] = hs.get_datastore().database_engine_name
-        stats["database_server_version"] = hs.get_datastore().get_server_version()
-        logger.info(
-            "Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats)
-        )
-        try:
-            yield hs.get_simple_http_client().put_json(
-                hs.config.report_stats_endpoint, stats
-            )
-        except Exception as e:
-            logger.warning("Error reporting stats: %s", e)
-
-    def performance_stats_init():
-        try:
-            process = psutil.Process()
-            # Ensure we can fetch both, and make the initial request for cpu_percent
-            # so the next request will use this as the initial point.
-            process.memory_info().rss
-            process.cpu_percent(interval=None)
-            logger.info("report_stats can use psutil")
-            stats_process.append(process)
-        except (AttributeError):
-            logger.warning("Unable to read memory/cpu stats. Disabling reporting.")
 
     def generate_user_daily_visit_stats():
         return run_as_background_process(
