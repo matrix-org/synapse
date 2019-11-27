@@ -610,10 +610,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                         self._simple_insert_txn(
                             txn=txn,
                             table="event_expiry",
-                            values={
-                                "event_id": event_id,
-                                "expiry_ts": expiry_ts
-                            }
+                            values={"event_id": event_id, "expiry_ts": expiry_ts},
                         )
                 except Exception as e:
                     logger.warning(
