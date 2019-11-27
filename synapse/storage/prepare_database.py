@@ -56,7 +56,7 @@ def prepare_database(db_conn, database_engine, config):
             database which we expect to be configured already
     """
 
-    # For now we only have the one datastore.
+    # For now we only have one database and use it for all data stores.
     data_stores = ["main", "state"]
 
     try:
