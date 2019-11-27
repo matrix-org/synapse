@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.errors import Codes, MissingClientTokenError, SynapseError
-from synapse.storage.data_stores.main.admin import TokenState
+from synapse.storage.data_stores.main.admin import TokenLookupResult, TokenState
 from synapse.types import RoomStreamToken
 from synapse.visibility import filter_events_for_client
 
@@ -49,11 +49,16 @@ class AdminHandler(BaseHandler):
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
 
         if not auth_headers:
-            raise MissingClientTokenError("Missing Authorization header.")
+            # No Authorization header, so can't possibly be using an admin token.
+            if raise_if_missing:
+                raise MissingClientTokenError("Missing Authorization header.")
+            else:
+                return False
 
         if len(auth_headers) > 1:
             raise MissingClientTokenError("Too many Authorization headers.")
 
+        # Pull out the Bearer token from the Authorization header.
         parts = auth_headers[0].split(b" ")
         if parts[0] == b"Bearer" and len(parts) == 2:
             token = parts[1].decode("ascii")
@@ -63,6 +68,9 @@ class AdminHandler(BaseHandler):
         token_rules = await self.store.get_permissions_for_token(token)
 
         if not raise_if_missing and token_rules.token_state is TokenState.NON_EXISTANT:
+            # The token doesn't exist, but don't raise. The caller is likely to
+            # try to use some other authentication mechanism (e.g. a user
+            # token).
             return False
 
         action = request.method.decode("ascii")
@@ -72,16 +80,32 @@ class AdminHandler(BaseHandler):
         else:
             raise SynapseError(403, "Forbidden", errcode=Codes.FORBIDDEN)
 
-    async def get_permissions_for_token(self, token):
+    async def get_permissions_for_token(self, admin_token: str) -> TokenLookupResult:
+        """
+        Get a token and its permissions.
 
-        token_rules = await self.store.get_permissions_for_token(token)
+        Args:
+            admin_token: The admin token to look up permissions for.
+        """
+        token_rules = await self.store.get_permissions_for_token(admin_token)
 
         return token_rules
 
     async def set_permission_for_token(
         self, admin_token: str, endpoint: str, action: str, allowed: bool
     ) -> bool:
+        """
+        Set a permission on a token for a given endpoint and action.
 
+        Args:
+            admin_token
+            endpoint: The endpoint token to grant permission to.
+            action: The action to grant permission to do.
+            allowed: Whether this should be granting permission, or removing it.
+
+        Returns:
+            True
+        """
         if action not in ["GET", "PUT", "POST", "DELETE"]:
             raise ValueError("%r is an invalid action" % (action,))
 
@@ -89,8 +113,20 @@ class AdminHandler(BaseHandler):
             admin_token=admin_token, endpoint=endpoint, action=action, allowed=allowed
         )
 
-    async def create_admin_token(self, valid_until, creator, description):
+    async def create_admin_token(
+        self, valid_until: int, creator: str, description: str
+    ) -> str:
+        """
+        Create a new admin token and return it.
 
+        Args:
+            valid_until: Token's end validity, in seconds since the epoch.
+            creator: mxid of the creating user, if applicable.
+            description: A description of the token's use.
+
+        Returns:
+            The admin token.
+        """
         token = await self.store.create_admin_token(
             valid_until=valid_until, creator=creator, description=description
         )

@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 class UsersRestServlet(RestServlet):
     PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)$")
+    PERMISSION_CODE = "USER"
 
     def __init__(self, hs):
         self.hs = hs
@@ -48,8 +49,11 @@ class UsersRestServlet(RestServlet):
         self.admin_handler = hs.get_handlers().admin_handler
 
     async def on_GET(self, request, user_id):
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+        if not authorised_by_token:
+            await assert_requester_is_admin(self.auth, request)
+
         target_user = UserID.from_string(user_id)
-        await assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
@@ -258,6 +262,7 @@ class UserRegisterServlet(RestServlet):
 
 class WhoisRestServlet(RestServlet):
     PATTERNS = historical_admin_path_patterns("/whois/(?P<user_id>[^/]*)")
+    PERMISSION_CODE = "USER"
 
     def __init__(self, hs):
         self.hs = hs
@@ -265,12 +270,11 @@ class WhoisRestServlet(RestServlet):
         self.handlers = hs.get_handlers()
 
     async def on_GET(self, request, user_id):
-        target_user = UserID.from_string(user_id)
-        requester = await self.auth.get_user_by_req(request)
-        auth_user = requester.user
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+        if not authorised_by_token:
+            await assert_requester_is_admin(self.auth, request)
 
-        if target_user != auth_user:
-            await assert_user_is_admin(self.auth, auth_user)
+        target_user = UserID.from_string(user_id)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only whois a local user")
@@ -282,13 +286,17 @@ class WhoisRestServlet(RestServlet):
 
 class DeactivateAccountRestServlet(RestServlet):
     PATTERNS = historical_admin_path_patterns("/deactivate/(?P<target_user_id>[^/]*)")
+    PERMISSION_CODE = "USER_DEACTIVATE"
 
     def __init__(self, hs):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
         self.auth = hs.get_auth()
 
     async def on_POST(self, request, target_user_id):
-        await assert_requester_is_admin(self.auth, request)
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+        if not authorised_by_token:
+            await assert_requester_is_admin(self.auth, request)
+
         body = parse_json_object_from_request(request, allow_empty_body=True)
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
@@ -313,6 +321,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
 class AccountValidityRenewServlet(RestServlet):
     PATTERNS = historical_admin_path_patterns("/account_validity/validity$")
+    PERMISSION_CODE = "USER_VALIDITY"
 
     def __init__(self, hs):
         """
@@ -324,7 +333,9 @@ class AccountValidityRenewServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_POST(self, request):
-        await assert_requester_is_admin(self.auth, request)
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+        if not authorised_by_token:
+            await assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request)
 
@@ -358,6 +369,7 @@ class ResetPasswordRestServlet(RestServlet):
     PATTERNS = historical_admin_path_patterns(
         "/reset_password/(?P<target_user_id>[^/]*)"
     )
+    PERMISSION_CODE = "USER_PASSWORD"
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -369,8 +381,9 @@ class ResetPasswordRestServlet(RestServlet):
         """Post request to allow an administrator reset password for a user.
         This needs user to have administrator access in Synapse.
         """
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+        if not authorised_by_token:
+            await assert_requester_is_admin(self.auth, request)
 
         UserID.from_string(target_user_id)
 
@@ -395,6 +408,7 @@ class SearchUsersRestServlet(RestServlet):
             200 OK with json object {list[dict[str, Any]], count} or empty object.
     """
 
+    PERMISSION_CODE = "USER"
     PATTERNS = historical_admin_path_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
@@ -408,7 +422,9 @@ class SearchUsersRestServlet(RestServlet):
         search term.
         This needs user to have a administrator access in Synapse.
         """
-        await assert_requester_is_admin(self.auth, request)
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+        if not authorised_by_token:
+            await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(target_user_id)
 
@@ -452,6 +468,7 @@ class UserAdminServlet(RestServlet):
                 {}
     """
 
+    PERMISSION_CODE = "USER_ADMIN"
     PATTERNS = (re.compile("^/_synapse/admin/v1/users/(?P<user_id>@[^/]*)/admin$"),)
 
     def __init__(self, hs):
@@ -460,7 +477,9 @@ class UserAdminServlet(RestServlet):
         self.handlers = hs.get_handlers()
 
     async def on_GET(self, request, user_id):
-        await assert_requester_is_admin(self.auth, request)
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+        if not authorised_by_token:
+            await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
 
@@ -473,9 +492,13 @@ class UserAdminServlet(RestServlet):
         return 200, {"admin": is_admin}
 
     async def on_PUT(self, request, user_id):
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
-        auth_user = requester.user
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+        if not authorised_by_token:
+            requester = await self.auth.get_user_by_req(request)
+            await assert_user_is_admin(self.auth, requester.user)
+            auth_user = requester.user
+        else:
+            auth_user = None
 
         target_user = UserID.from_string(user_id)
 

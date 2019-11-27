@@ -44,7 +44,7 @@ class AdminTokenWorkerStore(SQLBaseStore):
         Get a token and its permissions.
 
         Args:
-            admin_token: The admin token to look up permissions for:
+            admin_token: The admin token to look up permissions for.
         """
         result = TokenLookupResult(admin_token=admin_token)
 
