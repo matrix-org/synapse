@@ -33,14 +33,12 @@ def load_module(provider):
     module = importlib.import_module(module)
     provider_class = getattr(module, clz)
 
-    provider_config = None
-    if "config" in provider:
-        try:
-            provider_config = provider_class.parse_config(provider["config"])
-        except Exception as e:
-            raise ConfigError(
-                "Failed to parse config for %r: %r" % (provider["module"], e)
-            )
+    try:
+        provider_config = provider_class.parse_config(provider["config"])
+    except Exception as e:
+        raise ConfigError(
+            "Failed to parse config for %r: %r" % (provider["module"], e)
+        )
 
     return provider_class, provider_config
 

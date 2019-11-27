@@ -178,13 +178,9 @@ class SamlHandler:
 
             # figure out a new mxid for this user
             for i in range(1000):
-                # Use the provider's custom handler if available
-                if self._mapping_provider:
-                    localpart = self._mapping_provider.mxid_source_to_mxid_localpart(
-                        mxid_source, i
-                    )
-                else:
-                    localpart = self.mxid_source_to_mxid_localpart(mxid_source, i)
+                localpart = self._mapping_provider.mxid_source_to_mxid_localpart(
+                    mxid_source, i
+                )
                 logger.info("Allocating mxid for new user with localpart %s", localpart)
 
                 # Check if this mxid already exists
@@ -209,24 +205,6 @@ class SamlHandler:
             )
             return registered_user_id
 
-    def mxid_source_to_mxid_localpart(self, mxid_source: str, failures: int = 0) -> str:
-        """Maps some text from a SAML response to the localpart of a new mxid
-
-        Args:
-            mxid_source (str): The input text from a SAML auth response
-
-            failures (int): How many times a call to this function with this mxid_source has
-                resulted in a failure (possibly due to the localpart already existing)
-
-        Returns:
-            str: The localpart of a new mxid
-        """
-        # Use the configured mapper for this mxid_source
-        base_mxid_localpart = self._mxid_mapper(mxid_source)
-
-        # Append suffix integer if last call to this function failed to produce a usable mxid
-        return base_mxid_localpart + (str(failures) if failures else "")
-
     def expire_sessions(self):
         expire_before = self._clock.time_msec() - self._saml2_session_lifetime
         to_expire = set()
@@ -244,3 +222,38 @@ class Saml2SessionData:
 
     # time the session was created, in milliseconds
     creation_time = attr.ib()
+
+
+class DefaultSamlMappingProvider(object):
+    __version__ = "0.0.1"
+
+    def __init__(self, mxid_mapper: any):
+        self._mxid_mapper = mxid_mapper
+
+    def mxid_source_to_mxid_localpart(self, mxid_source: str, failures: int = 0) -> str:
+        """Maps some text from a SAML response to the localpart of a new mxid
+
+        Args:
+            mxid_source (str): The input text from a SAML auth response
+
+            failures (int): How many times a call to this function with this
+                mxid_source has resulted in a failure (possibly due to the localpart
+                already existing)
+
+        Returns:
+            str: The localpart of a new mxid
+        """
+        # Use the configured mapper for this mxid_source
+        base_mxid_localpart = self._mxid_mapper(mxid_source)
+
+        # Append suffix integer if last call to this function failed to produce
+        # a usable mxid
+        return base_mxid_localpart + (str(failures) if failures else "")
+
+    @staticmethod
+    def parse_config(config):
+        """Parse the dict provided in the homeserver config.
+
+        We currently do not use any config vars
+        """
+        pass

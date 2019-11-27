@@ -1205,10 +1205,17 @@ saml2_config:
   #
   #mxid_mapping: dotreplace
 
-  # A third-party module can be provided here as a custom solution to mapping the
+  # An external module can be provided here as a custom solution to mapping the
   # above configured saml attribute onto a matrix ID. If this is defined, it will
   # override the `mxid_mapping` option.
-  #mxid_mapping_provider: "mapping_provider.SamlMappingProvider"
+  #
+  #mxid_mapping_provider: mapping_provider.SamlMappingProvider
+
+  # Custom configuration values for the module. This will be passed as a
+  # Python dictionary to the module's `parse_config` method.
+  #
+  #mxid_mapping_provider_config:
+  #  some_key: some_value
 
   # In previous versions of synapse, the mapping from SAML attribute to MXID was
   # always calculated dynamically rather than stored in a table. For backwards-
