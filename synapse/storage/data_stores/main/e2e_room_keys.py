@@ -60,9 +60,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         """Bulk add room keys to a given backup.
 
         Args:
-            user_id(str): the user whose backup we're adding to
-            version(str): the version ID of the backup for the set of keys we're adding to
-            room_keys(iterable[(str, str, dict)]): the keys to add, in the form
+            user_id (str): the user whose backup we're adding to
+            version (str): the version ID of the backup for the set of keys we're adding to
+            room_keys (iterable[(str, str, dict)]): the keys to add, in the form
                 (roomID, sessionID, keyData)
         """
 
@@ -100,11 +100,11 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         room, or a given session.
 
         Args:
-            user_id(str): the user whose backup we're querying
-            version(str): the version ID of the backup for the set of keys we're querying
-            room_id(str): Optional. the ID of the room whose keys we're querying, if any.
+            user_id (str): the user whose backup we're querying
+            version (str): the version ID of the backup for the set of keys we're querying
+            room_id (str): Optional. the ID of the room whose keys we're querying, if any.
                 If not specified, we return the keys for all the rooms in the backup.
-            session_id(str): Optional. the session whose room_key we're querying, if any.
+            session_id (str): Optional. the session whose room_key we're querying, if any.
                 If specified, we also require the room_id to be specified.
                 If not specified, we return all the keys in this version of
                 the backup (or for the specified room)
@@ -162,12 +162,12 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         Args:
             user_id(str): the user whose backup we're querying
             version(str): the version ID of the backup we're querying about
-            room_keys(dict[dict[iterable[str]]]): a map of room IDs to dict which
-                has a "session" key that is an iterable of session IDs that we
-                want to query
+            room_keys(dict[str, dict[str, iterable[str]]]): a map from
+                room ID -> {"session": [session ids]} indicating the session IDs
+                that we want to query
 
         Returns:
-           Deferred[dict[dict[dict]]]: a map of room IDs to session IDs to room key
+           Deferred[dict[str, dict[str, dict]]]: a map of room IDs to session IDs to room key
         """
 
         return self.runInteraction(
@@ -230,8 +230,8 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         """Get the number of keys in a backup version.
 
         Args:
-            user_id(str): the user whose backup we're querying
-            version(str): the version ID of the backup we're querying about
+            user_id (str): the user whose backup we're querying
+            version (str): the version ID of the backup we're querying about
         """
 
         return self._simple_select_one_onecol(
@@ -320,7 +320,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             )
             result["auth_data"] = json.loads(result["auth_data"])
             result["version"] = str(result["version"])
-            if not result["etag"]:
+            if result["etag"] is None:
                 result["etag"] = 0
             return result
 
@@ -378,14 +378,16 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         Args:
             user_id(str): the user whose backup version we're updating
             version(str): the version ID of the backup version we're updating
-            info(dict): the new backup version info to store
-            version_etag(int): tag of the keys in the backup
+            info (dict): the new backup version info to store.  If None, then
+                the backup version info is not updated
+            version_etag (Optional[int]): etag of the keys in the backup.  If
+                None, then the etag is not updated
         """
         updatevalues = {}
 
-        if info and "auth_data" in info:
+        if info is not None and "auth_data" in info:
             updatevalues["auth_data"] = json.dumps(info["auth_data"])
-        if version_etag:
+        if version_etag is not None:
             updatevalues["etag"] = version_etag
 
         if updatevalues:
