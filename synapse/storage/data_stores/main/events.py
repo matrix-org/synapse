@@ -1975,7 +1975,7 @@ class EventsStore(
         Args:
              event (events.EventBase): The event to delete.
         """
-        # Prune the event's dict then convert it to a JSON string.
+        # Prune the event's dict then convert it to JSON.
         pruned_json = encode_json(prune_event_dict(event.get_dict()))
 
         def delete_expired_event_txn(txn):
@@ -1993,7 +1993,11 @@ class EventsStore(
                 txn, table="event_expiry", keyvalues={"event_id": event.event_id}
             )
 
-        yield self.runInteraction("delete_expired_event", delete_expired_event_txn)
+            # We need to invalidate the event cache entry for this event because we
+            # changed its content in the database.
+            self._get_event_cache.invalidate((event.event_id,))
+
+        return self.runInteraction("delete_expired_event", delete_expired_event_txn)
 
     def delete_event_expiry(self, event_id):
         """Delete the expiry timestamp associated with an event ID without deleting the

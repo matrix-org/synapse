@@ -254,15 +254,15 @@ class MessageHandler(object):
         yield self.store.insert_event_expiry(event_id, redaction_ts)
 
         now_ms = self.clock.time_msec()
+        delay = (redaction_ts - now_ms) / 1000
 
-        if redaction_ts <= now_ms:
+        if delay > 0:
+            # Figure out how many seconds we need to wait before redacting the event.
+            logger.info("Scheduling deletion of event %s in %.3fs", event_id, delay)
+            self.clock.call_later(delay, self._delete_expired_event, event_id)
+        else:
             # If the event should have already been redacted, redact it now.
             yield self._delete_expired_event(event_id)
-        else:
-            # Otherwise, figure out how many seconds we need to wait before redacting the
-            # event.
-            delay = (redaction_ts - now_ms) / 1000
-            self.clock.call_later(delay, self._delete_expired_event, event_id)
 
     @defer.inlineCallbacks
     def _schedule_deletions_expired_from_db(self):
@@ -290,6 +290,8 @@ class MessageHandler(object):
         """
         if not self._ephemeral_events_enabled:
             return
+
+        logger.info("Deleting expired event %s", event_id)
 
         # Try to retrieve the event from the database.
         event = yield self.store.get_event(event_id)
