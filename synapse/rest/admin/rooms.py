@@ -37,6 +37,7 @@ class ShutdownRoomRestServlet(RestServlet):
     joined to the new room.
     """
 
+    PERMISSION_CODE = "ROOM_SHUTDOWN"
     PATTERNS = historical_admin_path_patterns("/shutdown_room/(?P<room_id>[^/]+)")
 
     DEFAULT_MESSAGE = (
@@ -54,8 +55,15 @@ class ShutdownRoomRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_POST(self, request, room_id):
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+
+        authorised_by_token = await self.check_authorized_admin_token_in_use(request)
+
+        if authorised_by_token:
+            requester_user_id = self.hs.config.admin_token_user
+        else:
+            requester = await self.auth.get_user_by_req(request)
+            await assert_user_is_admin(self.auth, requester.user)
+            requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ["new_room_user_id"])
@@ -76,8 +84,6 @@ class ShutdownRoomRestServlet(RestServlet):
             ratelimit=False,
         )
         new_room_id = info["room_id"]
-
-        requester_user_id = requester.user.to_string()
 
         logger.info(
             "Shutting down room %r, joining to new room: %r", room_id, new_room_id
