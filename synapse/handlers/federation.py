@@ -1714,13 +1714,6 @@ class FederationHandler(BaseHandler):
                     self.store.remove_push_actions_from_staging, event.event_id
                 )
 
-        # If there's an expiry timestamp, schedule the redaction of the event.
-        expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-        if isinstance(expiry_ts, int) and not event.is_state():
-            yield self._message_handler.schedule_deletion_expired(
-                event.event_id, expiry_ts
-            )
-
         return context
 
     @defer.inlineCallbacks
@@ -2725,6 +2718,14 @@ class FederationHandler(BaseHandler):
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:
                     yield self._notify_persisted_event(event, max_stream_id)
+
+        for (event, context) in event_and_contexts:
+            # If there's an expiry timestamp, schedule the redaction of the event.
+            expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
+            if isinstance(expiry_ts, int) and not event.is_state():
+                yield self._message_handler.schedule_event_expiry(
+                    event.event_id, expiry_ts
+                )
 
     def _notify_persisted_event(self, event, max_stream_id):
         """Checks to see if notifier/pushers should be notified about the

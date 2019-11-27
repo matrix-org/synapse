@@ -1967,10 +1967,8 @@ class EventsStore(
             desc="insert_event_expiry",
         )
 
-    def delete_expired_event(self, event):
-        """Delete an event that has expired by replacing its entry in event_json with a
-        pruned version of its JSON representation, and delete its associated expiry
-        timestamp.
+    def expire_event(self, event):
+        """Redact an event that has expired, and delete its associated expiry timestamp.
 
         Args:
              event (events.EventBase): The event to delete.

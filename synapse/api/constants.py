@@ -148,4 +148,4 @@ class EventContentFields(object):
 
     # Timestamp to delete the event after
     # cf https://github.com/matrix-org/matrix-doc/pull/2228
-    SELF_DESTRUCT_AFTER = "m.self_destruct_after"
+    SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
