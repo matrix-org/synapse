@@ -29,7 +29,7 @@ from twisted.internet.defer import Deferred, succeed
 from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.ratelimiting import FederationRateLimitConfig
@@ -565,8 +565,15 @@ class HomeserverTestCase(TestCase):
         self.render(request)
         self.assertEqual(channel.code, 403, channel.result)
 
-    def inject_room_member(self, room, user, membership, replaces_state=None):
+    def inject_room_member(self, room: str, user: str, membership: Membership) -> None:
+        """
+        Inject a membership event into a room.
 
+        Args:
+            room: Room ID to inject the event into.
+            user: MXID of the user to inject the membership for.
+            membership: The membership type.
+        """
         event_builder_factory = self.hs.get_event_builder_factory()
         event_creation_handler = self.hs.get_event_creation_handler()
 
