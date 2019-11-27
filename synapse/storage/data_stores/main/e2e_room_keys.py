@@ -160,9 +160,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         specific key.
 
         Args:
-            user_id(str): the user whose backup we're querying
-            version(str): the version ID of the backup we're querying about
-            room_keys(dict[str, dict[str, iterable[str]]]): a map from
+            user_id (str): the user whose backup we're querying
+            version (str): the version ID of the backup we're querying about
+            room_keys (dict[str, dict[str, iterable[str]]]): a map from
                 room ID -> {"session": [session ids]} indicating the session IDs
                 that we want to query
 
