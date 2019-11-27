@@ -1,1 +1,0 @@
-Replace every instance of `logger.warn` method with `logger.warning` as the former is deprecated.

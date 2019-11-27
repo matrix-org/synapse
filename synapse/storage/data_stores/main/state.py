@@ -285,7 +285,11 @@ class StateGroupWorkerStore(
             room_id (str)
 
         Returns:
-            Deferred[unicode|None]: predecessor room id
+            Deferred[dict|None]: A dictionary containing the structure of the predecessor
+                field from the room's create event. The structure is subject to other servers,
+                but it is expected to be:
+                    * room_id (str): The room ID of the predecessor room
+                    * event_id (str): The ID of the tombstone event in the predecessor room
 
         Raises:
             NotFoundError if the room is unknown
@@ -990,6 +994,29 @@ class StateGroupWorkerStore(
             return state_group
 
         return self.runInteraction("store_state_group", _store_state_group_txn)
+
+    @defer.inlineCallbacks
+    def get_referenced_state_groups(self, state_groups):
+        """Check if the state groups are referenced by events.
+
+        Args:
+            state_groups (Iterable[int])
+
+        Returns:
+            Deferred[set[int]]: The subset of state groups that are
+            referenced.
+        """
+
+        rows = yield self._simple_select_many_batch(
+            table="event_to_state_groups",
+            column="state_group",
+            iterable=state_groups,
+            keyvalues={},
+            retcols=("DISTINCT state_group",),
+            desc="get_referenced_state_groups",
+        )
+
+        return set(row["state_group"] for row in rows)
 
 
 class StateBackgroundUpdateStore(
