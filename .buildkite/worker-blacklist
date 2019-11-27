@@ -28,3 +28,32 @@ User sees updates to presence from other users in the incremental sync.
 Gapped incremental syncs include all state changes
 
 Old members are included in gappy incr LL sync if they start speaking
+
+# new failures as of https://github.com/matrix-org/sytest/pull/732
+Device list doesn't change if remote server is down
+Remote servers cannot set power levels in rooms without existing powerlevels
+Remote servers should reject attempts by non-creators to set the power levels
+
+# new failures as of https://github.com/matrix-org/sytest/pull/753
+GET /rooms/:room_id/messages returns a message
+GET /rooms/:room_id/messages lazy loads members correctly
+Read receipts are sent as events
+Only original members of the room can see messages from erased users
+Device deletion propagates over federation
+If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
+Changing user-signing key notifies local users
+Newly updated tags appear in an incremental v2 /sync
+Server correctly handles incoming m.device_list_update
+Local device key changes get to remote servers with correct prev_id
+AS-ghosted users can use rooms via AS
+Ghost user must register before joining room
+Test that a message is pushed
+Invites are pushed
+Rooms with aliases are correctly named in pushed
+Rooms with names are correctly named in pushed
+Rooms with canonical alias are correctly named in pushed
+Rooms with many users are correctly pushed
+Don't get pushed for rooms you've muted
+Rejected events are not pushed
+Test that rejected pushers are removed.
+Events come down the correct room
