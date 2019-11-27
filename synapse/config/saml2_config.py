@@ -111,9 +111,10 @@ class SAML2Config(Config):
 
         # Load configured module class and config
         mapping_provider_module = config.get(
-            "saml_mapping_provider", "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
+            "user_mapping_provider",
+            "synapse.handlers.saml_handler.DefaultSamlMappingProvider",
         )
-        mapping_provider_config = config.get("saml_mapping_provider_config", {})
+        mapping_provider_config = config.get("user_mapping_provider_config", {})
         self.saml2_mapping_provider, _ = load_module(
             {"mod_name": mapping_provider_module, "config": mapping_provider_config}
         )
@@ -239,12 +240,12 @@ class SAML2Config(Config):
           # above configured saml attribute onto a matrix ID. If this is defined, it will
           # override the `mxid_mapping` option.
           #
-          #mxid_mapping_provider: mapping_provider.SamlMappingProvider
+          #user_mapping_provider: mapping_provider.SamlMappingProvider
 
           # Custom configuration values for the module. This will be passed as a
           # Python dictionary to the module's `parse_config` method.
           #
-          #mxid_mapping_provider_config:
+          #user_mapping_provider_config:
           #  some_key: some_value
 
           # In previous versions of synapse, the mapping from SAML attribute to MXID was
