@@ -90,6 +90,10 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             "event_store_labels", self._event_store_labels
         )
 
+        self.register_background_update_handler(
+            "event_store_expiry", self._event_store_expiry
+        )
+
     @defer.inlineCallbacks
     def _background_reindex_fields_sender(self, progress, batch_size):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
@@ -571,5 +575,68 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
         if not num_rows:
             yield self._end_background_update("event_store_labels")
+
+        return num_rows
+
+    @defer.inlineCallbacks
+    def _event_store_expiry(self, progress, batch_size):
+        """Background update handler which will store expiry timestamps for existing
+        events.
+        """
+        last_event_id = progress.get("last_event_id", "")
+
+        def _event_store_labels_txn(txn):
+            txn.execute(
+                """
+                SELECT event_id, json FROM event_json
+                LEFT JOIN event_expiry USING (event_id)
+                WHERE event_id > ? AND expiry_ts IS NULL
+                ORDER BY event_id LIMIT ?
+                """,
+                (last_event_id, batch_size),
+            )
+
+            results = list(txn)
+
+            nbrows = 0
+            last_row_event_id = ""
+            for (event_id, event_json_raw) in results:
+                try:
+                    event_json = json.loads(event_json_raw)
+
+                    expiry_ts = event_json.get(EventContentFields.SELF_DESTRUCT_AFTER)
+
+                    if isinstance(expiry_ts, int):
+                        self._simple_insert_txn(
+                            txn=txn,
+                            table="event_expiry",
+                            values={
+                                "event_id": event_id,
+                                "expiry_ts": expiry_ts
+                            }
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "Unable to load event %s (no expiry timestamp will be imported):"
+                        " %s",
+                        event_id,
+                        e,
+                    )
+
+                nbrows += 1
+                last_row_event_id = event_id
+
+            self._background_update_progress_txn(
+                txn, "event_store_expiry", {"last_event_id": last_row_event_id}
+            )
+
+            return nbrows
+
+        num_rows = yield self.runInteraction(
+            desc="event_store_expiry", func=_event_store_labels_txn
+        )
+
+        if not num_rows:
+            yield self._end_background_update("event_store_expiry")
 
         return num_rows

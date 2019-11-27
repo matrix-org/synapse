@@ -17,3 +17,6 @@ CREATE TABLE IF NOT EXISTS event_expiry (
     event_id TEXT PRIMARY KEY,
     expiry_ts BIGINT NOT NULL
 );
+
+INSERT INTO background_updates (update_name, progress_json) VALUES
+  ('event_store_expiry', '{}');
