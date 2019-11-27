@@ -95,13 +95,8 @@ class DeactivateAccountHandler(BaseHandler):
                 user_id, threepid["medium"], threepid["address"]
             )
 
-        # Retrieve the 3PIDs this user has bound to the homeserver
-        local_threepids = yield self.store.user_get_threepids(user_id)
-        for threepid in local_threepids:
-            # Delete this threepid locally
-            yield self.store.user_delete_threepid(
-                user_id, threepid["medium"], threepid["address"]
-            )
+        # Remove all 3PIDs this user has bound to the homeserver
+        yield self.store.user_delete_threepids(user_id)
 
         # delete any devices belonging to the user, which will also
         # delete corresponding access tokens.
