@@ -2723,9 +2723,7 @@ class FederationHandler(BaseHandler):
             # If there's an expiry timestamp, schedule the redaction of the event.
             expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
             if isinstance(expiry_ts, int) and not event.is_state():
-                yield self._message_handler.schedule_event_expiry(
-                    event.event_id, expiry_ts
-                )
+                yield self._message_handler.save_expiry_ts(event.event_id, expiry_ts)
 
     def _notify_persisted_event(self, event, max_stream_id):
         """Checks to see if notifier/pushers should be notified about the

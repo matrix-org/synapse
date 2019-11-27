@@ -70,10 +70,9 @@ class MessageHandler(object):
         self._event_serializer = hs.get_event_client_serializer()
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
-        run_as_background_process(
-            "_schedule_event_expiries_from_db",
-            self._schedule_event_expiries_from_db,
-        )
+        self._expiry_scheduled = False
+
+        run_as_background_process("_schedule_next_expiry", self._schedule_next_expiry)
 
     @defer.inlineCallbacks
     def get_room_data(
@@ -238,62 +237,38 @@ class MessageHandler(object):
         }
 
     @defer.inlineCallbacks
-    def schedule_event_expiry(self, event_id, redaction_ts, store_expiry_ts=True):
-        """Schedule the deletion of an expired event, or if that event should have
-        expired then delete the event immediately.
+    def save_expiry_ts(self, event_id, redaction_ts):
+        """Save the expiry timestamp of an event, and schedule an expiry task for it if
+        there isn't one already scheduled.
 
         Args:
             event_id (str): The ID of the event to schedule the expiry of.
             redaction_ts (int): The timestamp to expire the event at.
-            store_expiry_ts (bool): Whether we need to store the expiry timestamp in the
-                database.
         """
         if not self._ephemeral_events_enabled:
             return
 
-        if store_expiry_ts:
-            # Save the timestamp at which the event expires so that we can reschedule
-            # its deletion on startup if the server is stopped before the event is
-            # deleted.
-            yield self.store.insert_event_expiry(event_id, redaction_ts)
+        # Insert the event in the list of events to expire.
+        yield self.store.insert_event_expiry(event_id, redaction_ts)
 
-        # Figure out how many seconds we need to wait before expiring the event.
-        now_ms = self.clock.time_msec()
-        delay = (redaction_ts - now_ms) / 1000
-
-        logger.info("Scheduling expiry of event %s in %.3fs", event_id, delay)
-        self.clock.call_later(delay, self._expire_event, event_id)
+        if not self._expiry_scheduled:
+            # If we don't have any expiry task scheduled, then schedule one so our new
+            # event can be eventually expired.
+            yield self._schedule_next_expiry()
 
     @defer.inlineCallbacks
-    def _schedule_event_expiries_from_db(self):
-        """Load the IDs of the events that have an expiry date from the database (and
-        their expiry timestamp) and either expire them (if the expiry date is now or in
-        the past) or schedule their expiry on the timestamp.
-        """
-        if not self._ephemeral_events_enabled:
-            return
-
-        events_to_expire = yield self.store.get_events_to_expire()
-
-        for event in events_to_expire:
-            # Schedule the expiry of the event but don't try to insert the expiry
-            # timestamp in the database again.
-            yield self.schedule_event_expiry(
-                event["event_id"], event["expiry_ts"], store_expiry_ts=False
-            )
-
-    @defer.inlineCallbacks
-    def _expire_event(self, event_id):
+    def _expire_event(self):
         """Retrieve and expires an event that needs to be expired from the database.
 
-        If we don't have the event in the database, log it and delete the expiry date
+        If the event doesn't exist in the database, log it and delete the expiry date
         from the database (so that we don't try to expire it again).
-
-        Args:
-            event_id (str): The ID of the event to retrieve and expire.
         """
         if not self._ephemeral_events_enabled:
             return
+
+        # Get the ID of the next event to expire.
+        next_event_to_expire = yield self.store.get_next_event_to_expire()
+        event_id = next_event_to_expire["event_id"]
 
         logger.info("Expiring event %s", event_id)
 
@@ -310,6 +285,38 @@ class MessageHandler(object):
         # Expire the event. This function also deletes the expiry date from the database
         # in the same database transaction.
         yield self.store.expire_event(event)
+
+        # Schedule the expiry of the next event to expire.
+        yield self._schedule_next_expiry()
+
+    @defer.inlineCallbacks
+    def _schedule_next_expiry(self):
+        """Retrieve the expiry timestamp of the next event to be expired, and schedule
+        an expiry task for it.
+
+        If there's no event left to expire, set _expiry_scheduled to False so that a
+        future call to save_expiry_ts can schedule a new expiry task.
+        """
+        # Try to get the expiry timestamp of the next event to expire.
+        next_event_to_expire = yield self.store.get_next_event_to_expire()
+
+        if next_event_to_expire:
+            # Figure out how many seconds we need to wait before expiring the event.
+            now_ms = self.clock.time_msec()
+            delay = (next_event_to_expire["expiry_ts"] - now_ms) / 1000
+
+            logger.info(
+                "Scheduling expiry of event %s in %.3fs",
+                next_event_to_expire["event_id"],
+                delay,
+            )
+
+            self._expiry_scheduled = True
+            self.clock.call_later(delay, self._expire_event)
+        else:
+            # If there's no more event to expire, then set _expiry_scheduled to False, so
+            # that the next call to save_expiry_ts can schedule a new expiry task.
+            self._expiry_scheduled = False
 
 
 # The duration (in ms) after which rooms should be removed
@@ -827,9 +834,7 @@ class EventCreationHandler(object):
         # If there's an expiry timestamp, schedule the redaction of the event.
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
         if isinstance(expiry_ts, int) and not event.is_state():
-            yield self._message_handler.schedule_event_expiry(
-                event.event_id, expiry_ts
-            )
+            yield self._message_handler.save_expiry_ts(event.event_id, expiry_ts)
 
     @defer.inlineCallbacks
     def persist_and_notify_client_event(

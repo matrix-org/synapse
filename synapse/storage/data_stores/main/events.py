@@ -2024,6 +2024,24 @@ class EventsStore(
             desc="get_events_to_expire",
         )
 
+    def get_next_event_to_expire(self):
+        def get_next_event_to_expire_txn(txn):
+            txn.execute("""
+                SELECT event_id, expiry_ts FROM event_expiry
+                ORDER BY expiry_ts ASC LIMIT 1
+            """)
+
+            res = self.cursor_to_dict(txn)
+
+            if res:
+                return res[0]
+            else:
+                return None
+
+        return self.runInteraction(
+            desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
+        )
+
 
 AllNewEventsResult = namedtuple(
     "AllNewEventsResult",
