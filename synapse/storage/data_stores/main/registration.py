@@ -572,8 +572,13 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="user_delete_threepid",
         )
 
-    def user_delete_threepids(self, user_id):
-        """Delete all threepid this user has bound"""
+    def user_delete_threepids(self, user_id: str):
+        """Delete all threepid this user has bound
+
+        Args:
+             user_id: The user id to delete all threepids of
+
+        """
         return self._simple_delete(
             "user_threepids",
             keyvalues={"user_id": user_id},
