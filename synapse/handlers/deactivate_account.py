@@ -76,10 +76,6 @@ class DeactivateAccountHandler(BaseHandler):
         # Retrieve the 3PIDs this user has bound to an identity server
         threepids = yield self.store.user_get_bound_threepids(user_id)
 
-        # Retrieve the 3PIDs this user has bound to the homeserver
-        local_threepids = yield self.store.user_get_threepids(user_id)
-        threepids.extend(local_threepids)
-
         for threepid in threepids:
             try:
                 result = yield self._identity_handler.try_unbind_threepid(
@@ -95,6 +91,14 @@ class DeactivateAccountHandler(BaseHandler):
                 # Do we want this to be a fatal error or should we carry on?
                 logger.exception("Failed to remove threepid from ID server")
                 raise SynapseError(400, "Failed to remove threepid from ID server")
+            yield self.store.user_delete_threepid(
+                user_id, threepid["medium"], threepid["address"]
+            )
+
+        # Retrieve the 3PIDs this user has bound to the homeserver
+        local_threepids = yield self.store.user_get_threepids(user_id)
+        for threepid in local_threepids:
+            # Delete this threepid locally
             yield self.store.user_delete_threepid(
                 user_id, threepid["medium"], threepid["address"]
             )
