@@ -2002,7 +2002,12 @@ class EventsStore(
 
             # We need to invalidate the event cache entry for this event because we
             # changed its content in the database.
-            self._get_event_cache.invalidate((event.event_id,))
+            txn.call_after(self._get_event_cache.invalidate, (event.event_id,))
+            # Send that invalidation to replication so that other workers also invalidate
+            # the event cache.
+            self._send_invalidation_to_replication(
+                txn, "_get_event_cache", (event.event_id,)
+            )
 
         return self.runInteraction("delete_expired_event", delete_expired_event_txn)
 

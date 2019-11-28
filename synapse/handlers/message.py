@@ -305,6 +305,11 @@ class MessageHandler(object):
             now_ms = self.clock.time_msec()
             delay = (next_event_to_expire["expiry_ts"] - now_ms) / 1000
 
+            # callLater doesn't support negative delays, so trim the delay to 0 if we're
+            # in that case.
+            if delay < 0:
+                delay = 0
+
             logger.info(
                 "Scheduling expiry of event %s in %.3fs",
                 next_event_to_expire["event_id"],
