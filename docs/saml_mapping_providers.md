@@ -25,19 +25,26 @@ what options it provides (if any).
 
 ## Building a Custom Mapping Provider
 
-A custom mapping provider must specify the following methods:
+A custom mapping provider must specify the following method:
 
-* `saml_response_to_user_attributes`
-    - Receives the `type` object from a SAML response. This method must return a
-      dictionary, which will then be used by Synapse to build a new user. The
-      following keys are allowed:
-       * displayname (required)
-       * user_id_localpart (required)
-       * avatar_url
-* `parse_config(config: dict)`
-    - Receives the parsed content of the `saml2_config.user_mapping_provider`
-      homeserver config option. Runs on homeserver startup. Providers should
-      extract any option values they need here.
+* `saml_response_to_user_attributes(self, saml_response, config, failures)`
+    - Arguments:
+      - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
+                          information from.
+      - `config` - A dictionary with the contents of the homeserver config's
+                   `saml2_config.user_mapping_provider_config` option.
+      - `failures` - Amount of times the returned mxid localpart mapping has failed.
+                     This should be used to create a deduplicated mxid localpart
+                     which should be returned instead.
+                     For example, if this method returns `john.doe` as the value of
+                     `mxid_localpart` in the returned dict, and that is already taken
+                     on the homeserver, this method will be called again with the same
+                     parameters but with failures=1. The method should then return a
+                     different `mxid_localpart` value, such as `john.doe1`.
+    - This method must return a dictionary, which will then be used by Synapse
+      to build a new user. The following keys are allowed:
+       * `mxid_localpart` - Required. The mxid localpart of the new user.
+       * `displayname` - The displayname of the new user.
 
 ## Synapse's Default Provider
 

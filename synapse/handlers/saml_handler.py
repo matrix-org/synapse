@@ -142,7 +142,7 @@ class SamlHandler:
         for i in range(1000):
             try:
                 attribute_dict = self._mapping_provider.saml_response_to_user_attributes(
-                    saml2_auth, i
+                    self.saml2_mapping_provider_config, saml2_auth, i
                 )
             except Exception:
                 logging.exception("Error in SAML mapping provider plugin")
@@ -252,16 +252,17 @@ MXID_MAPPER_MAP = {
 class DefaultSamlMappingProvider(object):
     __version__ = "0.0.1"
 
-    def __init__(self):
-        self._mxid_source_attribute = None
-        self._mxid_mapper = None
-
     def saml_response_to_user_attributes(
-        self, saml_response: saml2.response.AuthnResponse, failures: int = 0,
+        self,
+        config: dict,
+        saml_response: saml2.response.AuthnResponse,
+        failures: int = 0,
     ) -> dict:
         """Maps some text from a SAML response to attributes of a new user
 
         Args:
+            config: A configuration dictionary
+
             saml_response: A SAML auth response object
 
             failures: How many times a call to this function with this
@@ -273,17 +274,19 @@ class DefaultSamlMappingProvider(object):
                 * displayname (str): The displayname of the user
         """
         try:
-            mxid_source = saml_response.ava[self._mxid_source_attribute][0]
+            mxid_source = saml_response.ava[config["mxid_source_attribute"]][0]
         except KeyError:
             logger.warning(
-                "SAML2 response lacks a '%s' attestation", self._mxid_source_attribute
+                "SAML2 response lacks a '%s' attestation",
+                config["mxid_source_attribute"],
             )
             raise SynapseError(
-                400, "%s not in SAML2 response" % (self._mxid_source_attribute,)
+                400, "%s not in SAML2 response" % (config["_mxid_source_attribute"],)
             )
 
         # Use the configured mapper for this mxid_source
-        base_mxid_localpart = self._mxid_mapper(mxid_source)
+        mxid_mapper = MXID_MAPPER_MAP[config["mxid_mapping"]]
+        base_mxid_localpart = mxid_mapper(mxid_source)
 
         # Append suffix integer if last call to this function failed to produce
         # a usable mxid
@@ -296,17 +299,3 @@ class DefaultSamlMappingProvider(object):
             "mxid_localpart": localpart,
             "displayname": displayname,
         }
-
-    def parse_config(self, config: dict):
-        """Parse the dict provided by the homeserver's config
-
-        Args:
-            config: A dictionary containing configuration options for this provider
-        """
-        self._mxid_source_attribute = config.get("mxid_source_attribute", "uid")
-
-        mapping_type = config.get("mxid_mapper", "hexencode")
-        try:
-            self._mxid_mapper = MXID_MAPPER_MAP[mapping_type]
-        except KeyError:
-            raise Exception("%s is not a known mxid_mapping" % (mapping_type,))
