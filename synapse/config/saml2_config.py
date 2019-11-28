@@ -99,7 +99,7 @@ class SAML2Config(Config):
         ]
 
         self.saml2_mapping_provider, _ = load_module(
-            {"mod_name": mapping_provider_module, "config": mapping_provider_config}
+            {"module": mapping_provider_module, "config": mapping_provider_config}
         )
 
         saml2_config_dict = self._default_saml_config_dict()
