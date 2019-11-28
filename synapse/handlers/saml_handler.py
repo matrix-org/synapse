@@ -297,7 +297,6 @@ class DefaultSamlMappingProvider(object):
             "displayname": displayname,
         }
 
-    @staticmethod
     def parse_config(self, config: dict):
         """Parse the dict provided by the homeserver's config
 
