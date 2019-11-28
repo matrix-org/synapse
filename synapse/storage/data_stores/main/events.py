@@ -1098,12 +1098,7 @@ class EventsStore(
         def _update_censor_txn(txn):
             for redaction_id, event_id, pruned_json in updates:
                 if pruned_json:
-                    self._simple_update_one_txn(
-                        txn,
-                        table="event_json",
-                        keyvalues={"event_id": event_id},
-                        updatevalues={"json": pruned_json},
-                    )
+                    self._censor_event_txn(txn, event_id, pruned_json)
 
                 self._simple_update_one_txn(
                     txn,
@@ -1113,6 +1108,22 @@ class EventsStore(
                 )
 
         yield self.runInteraction("_update_censor_txn", _update_censor_txn)
+
+    def _censor_event_txn(self, txn, event_id, pruned_json):
+        """Censor an event by replacing its JSON in the event_json table with the
+        provided pruned JSON.
+
+        Args:
+            txn (LoggingTransaction): The database transaction.
+            event_id (str): The ID of the event to censor.
+            pruned_json (str): The pruned JSON
+        """
+        self._simple_update_one_txn(
+            txn,
+            table="event_json",
+            keyvalues={"event_id": event_id},
+            updatevalues={"json": pruned_json},
+        )
 
     @defer.inlineCallbacks
     def count_daily_messages(self):
@@ -1979,12 +1990,7 @@ class EventsStore(
         def delete_expired_event_txn(txn):
             # Update the event_json table to replace the event's JSON with the pruned
             # JSON.
-            self._simple_update_one_txn(
-                txn,
-                table="event_json",
-                keyvalues={"event_id": event.event_id},
-                updatevalues={"json": pruned_json},
-            )
+            self._censor_event_txn(txn, event.event_id, pruned_json)
 
             # Delete the expiry timestamp associated with this event from the database.
             self._simple_delete_txn(
