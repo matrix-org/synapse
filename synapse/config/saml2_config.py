@@ -122,6 +122,10 @@ class SAML2Config(Config):
         if mxid_mapping:
             mapping_provider_config["mxid_mapping"] = mxid_mapping
 
+        self.saml2_mxid_source_attribute = mapping_provider_config[
+            "mxid_source_attribute"
+        ]
+
         self.saml2_mapping_provider, _ = load_module(
             {"mod_name": mapping_provider_module, "config": mapping_provider_config}
         )
