@@ -297,8 +297,13 @@ class DefaultSamlMappingProvider(object):
             "displayname": displayname,
         }
 
-    def parse_config(self, config):
-        """Parse the dict provided by the homeserver config"""
+    @staticmethod
+    def parse_config(self, config: dict):
+        """Parse the dict provided by the homeserver's config
+
+        Args:
+            config: A dictionary containing configuration options for this provider
+        """
         self._mxid_source_attribute = config.get("mxid_source_attribute", "uid")
 
         mapping_type = config.get("mxid_mapper", "hexencode")
