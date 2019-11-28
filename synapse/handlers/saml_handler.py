@@ -55,6 +55,9 @@ class SamlHandler:
         self._grandfathered_mxid_source_attribute = (
             hs.config.saml2_grandfathered_mxid_source_attribute
         )
+        self._saml2_user_mapping_provider_config = (
+            hs.config.saml2_user_mapping_provider_config
+        )
 
         # plugin to do custom mapping from saml response to mxid
         self._mapping_provider = hs.config.saml2_mapping_provider
@@ -142,7 +145,7 @@ class SamlHandler:
         for i in range(1000):
             try:
                 attribute_dict = self._mapping_provider.saml_response_to_user_attributes(
-                    self.saml2_mapping_provider_config, saml2_auth, i
+                    self._saml2_user_mapping_provider_config, saml2_auth, i
                 )
             except Exception:
                 logging.exception("Error in SAML mapping provider plugin")
