@@ -2041,6 +2041,7 @@ class EventsStore(
             A dict with an event_id and an expiry_ts of there's at least one row in the
             event_expiry table, None otherwise.
         """
+
         def get_next_event_to_expire_txn(txn):
             txn.execute(
                 """
