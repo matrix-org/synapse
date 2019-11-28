@@ -1333,8 +1333,23 @@ password_config:
 #   smtp_user: "exampleusername"
 #   smtp_pass: "examplepassword"
 #   require_transport_security: false
+#
+#   # notif_from defines the "From" address to use when sending emails.
+#   # It must be set if email sending is enabled.
+#   #
+#   # The placeholder '%(app)s' will be replaced by the application name,
+#   # which is normally 'app_name' (below), but may be overridden by the
+#   # Matrix client application.
+#   #
+#   # Note that the placeholder must be written '%(app)s', including the
+#   # trailing 's'.
+#   #
 #   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
-#   app_name: Matrix
+#
+#   # app_name defines the default value for '%(app)s' in notif_from. It
+#   # defaults to 'Matrix'.
+#   #
+#   #app_name: my_branded_matrix_server
 #
 #   # Enable email notifications by default
 #   #
