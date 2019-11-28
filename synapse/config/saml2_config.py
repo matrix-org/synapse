@@ -106,9 +106,10 @@ class SAML2Config(Config):
             "mxid_source_attribute"
         ]
 
-        self.saml2_mapping_provider, _ = load_module(
+        user_mapping_provider_class, _ = load_module(
             {"module": mapping_provider_module}
         )
+        self.saml2_mapping_provider = user_mapping_provider_class()
 
         saml2_config_dict = self._default_saml_config_dict()
         _dict_merge(
