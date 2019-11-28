@@ -16,6 +16,7 @@ import logging
 
 import attr
 import saml2
+import saml2.response
 from saml2.client import Saml2Client
 
 from synapse.api.errors import SynapseError
@@ -123,19 +124,39 @@ class SamlHandler:
             logger.warning("SAML2 response lacks a 'uid' attestation")
             raise SynapseError(400, "uid not in SAML2 response")
 
-        try:
-            mxid_source = saml2_auth.ava[self._mxid_source_attribute][0]
-        except KeyError:
-            logger.warning(
-                "SAML2 response lacks a '%s' attestation", self._mxid_source_attribute
-            )
-            raise SynapseError(
-                400, "%s not in SAML2 response" % (self._mxid_source_attribute,)
-            )
-
         self._outstanding_requests_dict.pop(saml2_auth.in_response_to, None)
 
-        displayName = saml2_auth.ava.get("displayName", [None])[0]
+        # Map saml response to user attributes using the configured mapping provider
+        for i in range(1000):
+            try:
+                attribute_dict = self._mapping_provider.saml_response_to_user_attributes(
+                    saml2_auth, i
+                )
+            except Exception:
+                logging.exception("Error in SAML mapping provider plugin")
+                raise SynapseError(500, "Error parsing SAML2 response")
+
+            localpart = attribute_dict.get("mxid_localpart")
+            if not localpart:
+                logger.error(
+                    "SAML mapping provider plugin did not return a mxid_localpart object"
+                )
+                raise SynapseError(500, "Error parsing SAML2 response")
+
+            displayname = attribute_dict.get("displayname")
+
+            # Check if this mxid already exists
+            if not await self._datastore.get_users_by_id_case_insensitive(
+                UserID(localpart, self._hostname).to_string()
+            ):
+                # This mxid is free
+                break
+        else:
+            # Unable to generate a username in 1000 iterations
+            # Break and return error to the user
+            raise SynapseError(
+                500, "Unable to generate a Matrix ID from the SAML response"
+            )
 
         with (await self._mapping_lock.queue(self._auth_provider_id)):
             # first of all, check if we already have a mapping for this user
@@ -176,28 +197,8 @@ class SamlHandler:
                     )
                     return registered_user_id
 
-            # figure out a new mxid for this user
-            for i in range(1000):
-                localpart = self._mapping_provider.mxid_source_to_mxid_localpart(
-                    mxid_source, i
-                )
-                logger.info("Allocating mxid for new user with localpart %s", localpart)
-
-                # Check if this mxid already exists
-                if not await self._datastore.get_users_by_id_case_insensitive(
-                    UserID(localpart, self._hostname).to_string()
-                ):
-                    # This mxid is free
-                    break
-            else:
-                # Unable to generate a username in 1000 iterations
-                # Break and return error to the user
-                raise SynapseError(
-                    500, "Unable to generate a Matrix ID from the SAML response"
-                )
-
             registered_user_id = await self._registration_handler.register_user(
-                localpart=localpart, default_display_name=displayName
+                localpart=localpart, default_display_name=displayname
             )
 
             await self._datastore.record_user_external_id(
@@ -227,33 +228,52 @@ class Saml2SessionData:
 class DefaultSamlMappingProvider(object):
     __version__ = "0.0.1"
 
-    def __init__(self, mxid_mapper: any):
-        self._mxid_mapper = mxid_mapper
+    def __init__(self):
+        self._mxid_mapper = None
+        self._mxid_source_attribute = None
 
-    def mxid_source_to_mxid_localpart(self, mxid_source: str, failures: int = 0) -> str:
-        """Maps some text from a SAML response to the localpart of a new mxid
+    def saml_response_to_user_attributes(
+        self, saml_response: saml2.response.AuthnResponse, failures: int = 0,
+    ) -> dict:
+        """Maps some text from a SAML response to attributes of a new user
 
         Args:
-            mxid_source (str): The input text from a SAML auth response
+            saml_response: A SAML auth response object
 
-            failures (int): How many times a call to this function with this
-                mxid_source has resulted in a failure (possibly due to the localpart
-                already existing)
+            failures: How many times a call to this function with this
+                saml_response has resulted in a failure
 
         Returns:
-            str: The localpart of a new mxid
+            dict: A dict containing new user attributes. Possible keys:
+                * mxid_localpart (str): Required. The localpart of the user's mxid
+                * displayname (str): The displayname of the user
         """
+        try:
+            mxid_source = saml_response.ava[self._mxid_source_attribute][0]
+        except KeyError:
+            logger.warning(
+                "SAML2 response lacks a '%s' attestation", self._mxid_source_attribute
+            )
+            raise SynapseError(
+                400, "%s not in SAML2 response" % (self._mxid_source_attribute,)
+            )
+
         # Use the configured mapper for this mxid_source
         base_mxid_localpart = self._mxid_mapper(mxid_source)
 
         # Append suffix integer if last call to this function failed to produce
         # a usable mxid
-        return base_mxid_localpart + (str(failures) if failures else "")
+        localpart = base_mxid_localpart + (str(failures) if failures else "")
 
-    @staticmethod
-    def parse_config(config):
-        """Parse the dict provided in the homeserver config.
+        # Retrieve the display name from the saml response
+        displayname = saml_response.ava.get("displayName", [None])[0]
 
-        We currently do not use any config vars
-        """
-        pass
+        return {
+            "mxid_localpart": localpart,
+            "displayname": displayname,
+        }
+
+    def parse_config(self, config):
+        """Parse the dict provided by the homeserver config"""
+        self._mxid_source_attribute = config.get("mxid_source_attribute", "uid")
+        self._mxid_source_attribute = config.get("mxid_mapping", "hexencode")

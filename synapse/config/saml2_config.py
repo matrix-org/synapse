@@ -75,10 +75,6 @@ class SAML2Config(Config):
 
         self.saml2_enabled = True
 
-        self.saml2_mxid_source_attribute = saml2_config.get(
-            "mxid_source_attribute", "uid"
-        )
-
         self.saml2_grandfathered_mxid_source_attribute = saml2_config.get(
             "grandfathered_mxid_source_attribute", "uid"
         )
@@ -115,6 +111,17 @@ class SAML2Config(Config):
             "synapse.handlers.saml_handler.DefaultSamlMappingProvider",
         )
         mapping_provider_config = config.get("user_mapping_provider_config", {})
+
+        # If mxid_source_attribute is defined, use that instead for backwards compatibility
+        mxid_source_attribute = saml2_config.get("mxid_source_attribute")
+        if mxid_source_attribute:
+            mapping_provider_config["mxid_source_attribute"] = mxid_source_attribute
+
+        # If mxid_mapping is defined, use that instead for backwards compatibility
+        mxid_mapping = saml2_config.get("mxid_mapping")
+        if mxid_mapping:
+            mapping_provider_config["mxid_mapping"] = mxid_mapping
+
         self.saml2_mapping_provider, _ = load_module(
             {"mod_name": mapping_provider_module, "config": mapping_provider_config}
         )
@@ -223,19 +230,6 @@ class SAML2Config(Config):
           #
           #saml_session_lifetime: 5m
 
-          # The SAML attribute (after mapping via the attribute maps) to use to derive
-          # the Matrix ID from. 'uid' by default.
-          #
-          #mxid_source_attribute: displayName
-
-          # The mapping system to use for mapping the saml attribute onto a matrix ID.
-          # Options include:
-          #  * 'hexencode' (which maps unpermitted characters to '=xx')
-          #  * 'dotreplace' (which replaces unpermitted characters with '.').
-          # The default is 'hexencode'.
-          #
-          #mxid_mapping: dotreplace
-
           # An external module can be provided here as a custom solution to mapping the
           # above configured saml attribute onto a matrix ID. If this is defined, it will
           # override the `mxid_mapping` option.
@@ -246,7 +240,24 @@ class SAML2Config(Config):
           # Python dictionary to the module's `parse_config` method.
           #
           #user_mapping_provider_config:
-          #  some_key: some_value
+          #  # The SAML attribute (after mapping via the attribute maps) to use to derive
+          #  # the Matrix ID from. 'uid' by default.
+          #  #
+          #  # Note: This used to be configured by the saml2_config.mxid_source_attribute
+          #  # option. If that is still defined, its value will be used instead.
+          #  #
+          #  #mxid_source_attribute: displayName
+          #
+          #  # The mapping system to use for mapping the saml attribute onto a matrix ID.
+          #  # Options include:
+          #  #  * 'hexencode' (which maps unpermitted characters to '=xx')
+          #  #  * 'dotreplace' (which replaces unpermitted characters with '.').
+          #  # The default is 'hexencode'.
+          #  #
+          #  # Note: This used to be configured by the saml2_config.mxid_mapping
+          #  # option. If that is still defined, its value will be used instead.
+          #  #
+          #  #mxid_mapping: dotreplace
 
           # In previous versions of synapse, the mapping from SAML attribute to MXID was
           # always calculated dynamically rather than stored in a table. For backwards-
