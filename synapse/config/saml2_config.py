@@ -114,12 +114,12 @@ class SAML2Config(Config):
 
         # If mxid_source_attribute is defined, use that instead for backwards compatibility
         mxid_source_attribute = saml2_config.get("mxid_source_attribute")
-        if mxid_source_attribute:
+        if not mxid_source_attribute:
             mapping_provider_config["mxid_source_attribute"] = mxid_source_attribute
 
         # If mxid_mapping is defined, use that instead for backwards compatibility
         mxid_mapping = saml2_config.get("mxid_mapping")
-        if mxid_mapping:
+        if not mxid_mapping:
             mapping_provider_config["mxid_mapping"] = mxid_mapping
 
         self.saml2_mxid_source_attribute = mapping_provider_config[
