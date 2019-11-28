@@ -86,6 +86,14 @@ def filter_events_for_client(
 
     erased_senders = yield storage.main.are_users_erased((e.sender for e in events))
 
+    room_ids = set(e.room_id for e in events)
+    retention_policies = {}
+
+    for room_id in room_ids:
+        retention_policies[room_id] = yield storage.main.get_retention_policy_for_room(
+            room_id
+        )
+
     def allowed(event):
         """
         Args:
@@ -102,6 +110,18 @@ def filter_events_for_client(
         """
         if not event.is_state() and event.sender in ignore_list:
             return None
+
+        # Don't try to apply the room's retention policy if the event is a state event, as
+        # MSC1763 states that retention is only considered for non-state events.
+        if not event.is_state():
+            retention_policy = retention_policies[event.room_id]
+            max_lifetime = retention_policy.get("max_lifetime")
+
+            if max_lifetime is not None:
+                oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
+
+                if event.origin_server_ts < oldest_allowed_ts:
+                    return None
 
         if event.event_id in always_include_ids:
             return event
