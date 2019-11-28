@@ -78,7 +78,7 @@ class SAML2Config(Config):
             "user_mapping_provider",
             "synapse.handlers.saml_handler.DefaultSamlMappingProvider",
         )
-        self.saml2_user_mapping_provider_config = config.get(
+        self.saml2_user_mapping_provider_config = saml2_config.get(
             "user_mapping_provider_config", {}
         )
 

@@ -29,10 +29,10 @@ A custom mapping provider must specify the following method:
 
 * `saml_response_to_user_attributes(self, saml_response, config, failures)`
     - Arguments:
-      - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
-                          information from.
       - `config` - A dictionary with the contents of the homeserver config's
                    `saml2_config.user_mapping_provider_config` option.
+      - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
+                          information from.
       - `failures` - Amount of times the returned mxid localpart mapping has failed.
                      This should be used to create a deduplicated mxid localpart
                      which should be returned instead.
