@@ -2034,11 +2034,20 @@ class EventsStore(
         )
 
     def get_next_event_to_expire(self):
+        """Retrieve the entry with the lowest expiry timestamp in the event_expiry
+        table, or None if there's no more event to expire.
+
+        Returns:
+            A dict with an event_id and an expiry_ts of there's at least one row in the
+            event_expiry table, None otherwise.
+        """
         def get_next_event_to_expire_txn(txn):
-            txn.execute("""
+            txn.execute(
+                """
                 SELECT event_id, expiry_ts FROM event_expiry
                 ORDER BY expiry_ts ASC LIMIT 1
-            """)
+                """
+            )
 
             res = self.cursor_to_dict(txn)
 
