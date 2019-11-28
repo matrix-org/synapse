@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 
 import attr
 import saml2
@@ -22,10 +23,22 @@ from saml2.client import Saml2Client
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import parse_string
 from synapse.rest.client.v1.login import SSOAuthHandler
-from synapse.types import UserID, map_username_to_mxid_localpart
+from synapse.types import (
+    UserID,
+    map_username_to_mxid_localpart,
+    mxid_localpart_allowed_characters,
+)
 from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s
+class Saml2SessionData:
+    """Data we track about SAML2 sessions"""
+
+    # time the session was created, in milliseconds
+    creation_time = attr.ib()
 
 
 class SamlHandler:
@@ -42,7 +55,6 @@ class SamlHandler:
         self._grandfathered_mxid_source_attribute = (
             hs.config.saml2_grandfathered_mxid_source_attribute
         )
-        self._mxid_mapper = hs.config.saml2_mxid_mapper
 
         # plugin to do custom mapping from saml response to mxid
         self._mapping_provider = hs.config.saml2_mapping_provider
@@ -217,20 +229,32 @@ class SamlHandler:
             del self._outstanding_requests_dict[reqid]
 
 
-@attr.s
-class Saml2SessionData:
-    """Data we track about SAML2 sessions"""
+DOT_REPLACE_PATTERN = re.compile(
+    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),))
+)
 
-    # time the session was created, in milliseconds
-    creation_time = attr.ib()
+
+def dot_replace_for_mxid(username: str) -> str:
+    username = username.lower()
+    username = DOT_REPLACE_PATTERN.sub(".", username)
+
+    # regular mxids aren't allowed to start with an underscore either
+    username = re.sub("^_", "", username)
+    return username
+
+
+MXID_MAPPER_MAP = {
+    "hexencode": map_username_to_mxid_localpart,
+    "dotreplace": dot_replace_for_mxid,
+}
 
 
 class DefaultSamlMappingProvider(object):
     __version__ = "0.0.1"
 
     def __init__(self):
-        self._mxid_mapper = None
         self._mxid_source_attribute = None
+        self._mxid_mapper = None
 
     def saml_response_to_user_attributes(
         self, saml_response: saml2.response.AuthnResponse, failures: int = 0,
@@ -276,4 +300,9 @@ class DefaultSamlMappingProvider(object):
     def parse_config(self, config):
         """Parse the dict provided by the homeserver config"""
         self._mxid_source_attribute = config.get("mxid_source_attribute", "uid")
-        self._mxid_source_attribute = config.get("mxid_mapping", "hexencode")
+
+        mapping_type = config.get("mxid_mapper", "hexencode")
+        try:
+            self._mxid_mapper = MXID_MAPPER_MAP[mapping_type]
+        except KeyError:
+            raise Exception("%s is not a known mxid_mapping" % (mapping_type,))

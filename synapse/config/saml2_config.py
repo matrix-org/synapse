@@ -14,13 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-
 from synapse.python_dependencies import DependencyException, check_requirements
-from synapse.types import (
-    map_username_to_mxid_localpart,
-    mxid_localpart_allowed_characters,
-)
 from synapse.util.module_loader import load_module, load_python_module
 
 from ._base import Config, ConfigError
@@ -79,6 +73,31 @@ class SAML2Config(Config):
             "grandfathered_mxid_source_attribute", "uid"
         )
 
+        # Load configured module class and config
+        mapping_provider_module = saml2_config.get(
+            "user_mapping_provider",
+            "synapse.handlers.saml_handler.DefaultSamlMappingProvider",
+        )
+        mapping_provider_config = config.get("user_mapping_provider_config", {})
+
+        # If mxid_source_attribute is defined, use that instead for backwards compatibility
+        mxid_source_attribute = saml2_config.get("mxid_source_attribute")
+        if mxid_source_attribute:
+            mapping_provider_config["mxid_source_attribute"] = mxid_source_attribute
+
+        # If mxid_mapping is defined, use that instead for backwards compatibility
+        mxid_mapping = saml2_config.get("mxid_mapping")
+        if mxid_mapping:
+            mapping_provider_config["mxid_mapping"] = mxid_mapping
+
+        self.saml2_mxid_source_attribute = mapping_provider_config[
+            "mxid_source_attribute"
+        ]
+
+        self.saml2_mapping_provider, _ = load_module(
+            {"mod_name": mapping_provider_module, "config": mapping_provider_config}
+        )
+
         saml2_config_dict = self._default_saml_config_dict()
         _dict_merge(
             merge_dict=saml2_config.get("sp_config", {}), into_dict=saml2_config_dict
@@ -97,37 +116,6 @@ class SAML2Config(Config):
         # session lifetime: in milliseconds
         self.saml2_session_lifetime = self.parse_duration(
             saml2_config.get("saml_session_lifetime", "5m")
-        )
-
-        mapping = saml2_config.get("mxid_mapping", "hexencode")
-        try:
-            self.saml2_mxid_mapper = MXID_MAPPER_MAP[mapping]
-        except KeyError:
-            raise ConfigError("%s is not a known mxid_mapping" % (mapping,))
-
-        # Load configured module class and config
-        mapping_provider_module = config.get(
-            "user_mapping_provider",
-            "synapse.handlers.saml_handler.DefaultSamlMappingProvider",
-        )
-        mapping_provider_config = config.get("user_mapping_provider_config", {})
-
-        # If mxid_source_attribute is defined, use that instead for backwards compatibility
-        mxid_source_attribute = saml2_config.get("mxid_source_attribute")
-        if not mxid_source_attribute:
-            mapping_provider_config["mxid_source_attribute"] = mxid_source_attribute
-
-        # If mxid_mapping is defined, use that instead for backwards compatibility
-        mxid_mapping = saml2_config.get("mxid_mapping")
-        if not mxid_mapping:
-            mapping_provider_config["mxid_mapping"] = mxid_mapping
-
-        self.saml2_mxid_source_attribute = mapping_provider_config[
-            "mxid_source_attribute"
-        ]
-
-        self.saml2_mapping_provider, _ = load_module(
-            {"mod_name": mapping_provider_module, "config": mapping_provider_config}
         )
 
     def _default_saml_config_dict(self):
@@ -278,23 +266,3 @@ class SAML2Config(Config):
         """ % {
             "config_dir_path": config_dir_path
         }
-
-
-DOT_REPLACE_PATTERN = re.compile(
-    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),))
-)
-
-
-def dot_replace_for_mxid(username: str) -> str:
-    username = username.lower()
-    username = DOT_REPLACE_PATTERN.sub(".", username)
-
-    # regular mxids aren't allowed to start with an underscore either
-    username = re.sub("^_", "", username)
-    return username
-
-
-MXID_MAPPER_MAP = {
-    "hexencode": map_username_to_mxid_localpart,
-    "dotreplace": dot_replace_for_mxid,
-}
