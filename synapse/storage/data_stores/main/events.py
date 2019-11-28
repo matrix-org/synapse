@@ -41,8 +41,8 @@ from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.data_stores.main.event_federation import EventFederationStore
 from synapse.storage.data_stores.main.events_worker import (
+    EventsWorkerStore,
     encode_json,
-    EventsWorkerStore
 )
 from synapse.storage.data_stores.main.state import StateGroupWorkerStore
 from synapse.types import RoomStreamToken, get_domain_from_id
