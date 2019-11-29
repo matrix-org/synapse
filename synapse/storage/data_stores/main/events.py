@@ -940,6 +940,11 @@ class EventsStore(
                     txn, event.event_id, labels, event.room_id, event.depth
                 )
 
+            # If there's an expiry timestamp on the event, store it.
+            expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
+            if isinstance(expiry_ts, int) and not event.is_state():
+                self.insert_event_expiry_txn(txn, event.event_id, expiry_ts)
+
         # Insert into the room_memberships table.
         self._store_room_members_txn(
             txn,
@@ -1968,17 +1973,18 @@ class EventsStore(
             ],
         )
 
-    def insert_event_expiry(self, event_id, expiry_ts):
+    def insert_event_expiry_txn(self, txn, event_id, expiry_ts):
         """Save the expiry timestamp associated with a given event ID.
 
         Args:
+            txn (LoggingTransaction): The database transaction to use.
             event_id (str): The event ID the expiry timestamp is associated with.
             expiry_ts (int): The timestamp at which to expire (delete) the event.
         """
-        return self._simple_insert(
+        return self._simple_insert_txn(
+            txn=txn,
             table="event_expiry",
             values={"event_id": event_id, "expiry_ts": expiry_ts},
-            desc="insert_event_expiry",
         )
 
     def expire_event(self, event):

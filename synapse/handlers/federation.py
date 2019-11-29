@@ -2722,15 +2722,15 @@ class FederationHandler(BaseHandler):
                 event_and_contexts, backfilled=backfilled
             )
 
+            for (event, context) in event_and_contexts:
+                # If there's an expiry timestamp on the event, schedule its expiry.
+                expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
+                if isinstance(expiry_ts, int) and not event.is_state():
+                    yield self._message_handler.maybe_schedule_next_expiry(expiry_ts)
+
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:
                     yield self._notify_persisted_event(event, max_stream_id)
-
-        for (event, context) in event_and_contexts:
-            # If there's an expiry timestamp, schedule the redaction of the event.
-            expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-            if isinstance(expiry_ts, int) and not event.is_state():
-                yield self._message_handler.save_expiry_ts(event.event_id, expiry_ts)
 
     def _notify_persisted_event(self, event, max_stream_id):
         """Checks to see if notifier/pushers should be notified about the
