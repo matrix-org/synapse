@@ -543,7 +543,7 @@ class HomeServer(object):
     def build_account_validity_handler(self):
         return AccountValidityHandler(self)
 
-    def build_saml_handler(self,):
+    def build_saml_handler(self):
         from synapse.handlers.saml_handler import SamlHandler
 
         return SamlHandler(self)
