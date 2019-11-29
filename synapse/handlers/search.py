@@ -21,7 +21,7 @@ from unpaddedbase64 import decode_base64, encode_base64
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import SynapseError
+from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.storage.state import StateFilter
 from synapse.visibility import filter_events_for_client
@@ -61,26 +61,18 @@ class SearchHandler(BaseHandler):
         historical_room_ids = []
 
         while True:
-            predecessor = yield self.store.get_room_predecessor(room_id)
-
-            # If no predecessor, assume we've hit a dead end
-            if not predecessor:
-                break
-
-            predecessor_room_id = predecessor["room_id"]
-
-            # Don't bother trying to search in rooms we're not in
-            in_room = yield self.auth.check_host_in_room(
-                predecessor_room_id, self.hs.hostname
-            )
-            if not in_room:
+            try:
+                predecessor = yield self.store.get_room_predecessor(room_id)
+                predecessor_room_id = predecessor["room_id"]
+            except NotFoundError:
+                # This room does not have a predecessor
                 break
 
             # Add predecessor's room ID
             historical_room_ids.append(predecessor_room_id)
 
             # Scan through the old room for further predecessors
-            room_id = predecessor["room_id"]
+            room_id = predecessor_room_id
 
         return historical_room_ids
 
