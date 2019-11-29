@@ -1428,9 +1428,9 @@ class FederationHandler(BaseHandler):
         return event
 
     @defer.inlineCallbacks
-    def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
+    def do_remotely_reject_invite(self, target_hosts, room_id, user_id, content):
         origin, event, event_format_version = yield self._make_and_verify_event(
-            target_hosts, room_id, user_id, "leave"
+            target_hosts, room_id, user_id, "leave", content=content,
         )
         # Mark as outlier as we don't have any state for this event; we're not
         # even in the room.
