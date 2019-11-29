@@ -78,38 +78,45 @@ class SAML2Config(Config):
             "user_mapping_provider",
             "synapse.handlers.saml_handler.DefaultSamlMappingProvider",
         )
-        self.saml2_user_mapping_provider_config = saml2_config.get(
+        saml2_user_mapping_provider_config = saml2_config.get(
             "user_mapping_provider_config", {}
         )
 
-        # If mxid_source_attribute is defined, use that instead for backwards compatibility
+        # If mxid_source_attribute is defined in the deprecated location, use
+        # that instead for backwards compatibility
         old_mxid_source_attribute = saml2_config.get("mxid_source_attribute")
         if old_mxid_source_attribute:
-            self.saml2_user_mapping_provider_config[
+            saml2_user_mapping_provider_config[
                 "mxid_source_attribute"
             ] = old_mxid_source_attribute
         else:
-            self.saml2_user_mapping_provider_config.setdefault(
+            # If the option doesn't exist in saml2_config, and it's not set under
+            # user_mapping_provider_config, set it to a default value
+            saml2_user_mapping_provider_config.setdefault(
                 "mxid_source_attribute", "uid"
             )
 
         # If mxid_mapping is defined, use that instead for backwards compatibility
-        old_mxid_mapping = saml2_config.get("mxid_source_attribute")
+        old_mxid_mapping = saml2_config.get("mxid_mapping")
         if old_mxid_mapping:
-            self.saml2_user_mapping_provider_config["mxid_mapping"] = old_mxid_mapping
+            saml2_user_mapping_provider_config["mxid_mapping"] = old_mxid_mapping
         else:
-            self.saml2_user_mapping_provider_config.setdefault(
-                "mxid_mapping", "hexencode"
-            )
+            # If the option doesn't exist in saml2_config, and it's not set under
+            # user_mapping_provider_config, set it to a default value
+            saml2_user_mapping_provider_config.setdefault("mxid_mapping", "hexencode")
 
-        self.saml2_mxid_source_attribute = self.saml2_user_mapping_provider_config[
+        # Some places in Synapse need this value directly
+        self.saml2_mxid_source_attribute = saml2_user_mapping_provider_config[
             "mxid_source_attribute"
         ]
 
+        # We don't use nor provide the module's config here, and instead make it available
+        # under the hs' config object
         user_mapping_provider_class, _ = load_module(
             {"module": mapping_provider_module}
         )
-        self.saml2_mapping_provider = user_mapping_provider_class()
+        self.saml2_user_mapping_provider = user_mapping_provider_class()
+        self.saml2_user_mapping_provider_config = saml2_user_mapping_provider_config
 
         saml2_config_dict = self._default_saml_config_dict()
         _dict_merge(

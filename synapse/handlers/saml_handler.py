@@ -60,7 +60,7 @@ class SamlHandler:
         )
 
         # plugin to do custom mapping from saml response to mxid
-        self._mapping_provider = hs.config.saml2_mapping_provider
+        self._user_mapping_provider = hs.config.saml2_user_mapping_provider
 
         # identifier for the external_ids table
         self._auth_provider_id = "saml"
@@ -144,7 +144,7 @@ class SamlHandler:
         # Map saml response to user attributes using the configured mapping provider
         for i in range(1000):
             try:
-                attribute_dict = self._mapping_provider.saml_response_to_user_attributes(
+                attribute_dict = self._user_mapping_provider.saml_response_to_user_attributes(
                     self._saml2_user_mapping_provider_config, saml2_auth, i
                 )
             except Exception:

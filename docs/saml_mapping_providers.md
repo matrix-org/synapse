@@ -10,11 +10,11 @@ As an example, a SSO service may return the email address
 to turn that into a displayname when creating a Matrix user for this individual.
 It may choose `John Smith`, or `Smith, John [Example.com]` or any number of
 variations. As each Synapse configuration may want something different, this is
-where SAML mapping providers come in.
+where SAML mapping providers come into play.
 
 ## Enabling Providers
 
-External mapping providers are provided to Synapse in the form of a external
+External mapping providers are provided to Synapse in the form of an external
 Python module. Retrieve this module from [PyPi](https://pypi.org) or elsewhere,
 then tell Synapse where to look for the handler class by changing the
 `saml2_config.user_mapping_provider` config option.
@@ -33,14 +33,15 @@ A custom mapping provider must specify the following method:
                    `saml2_config.user_mapping_provider_config` option.
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
                           information from.
-      - `failures` - Amount of times the returned mxid localpart mapping has failed.
-                     This should be used to create a deduplicated mxid localpart
-                     which should be returned instead.
-                     For example, if this method returns `john.doe` as the value of
-                     `mxid_localpart` in the returned dict, and that is already taken
-                     on the homeserver, this method will be called again with the same
-                     parameters but with failures=1. The method should then return a
-                     different `mxid_localpart` value, such as `john.doe1`.
+      - `failures` - An int that represents the amount of times the returned
+                     mxid localpart mapping has failed.  This should be used
+                     to create a deduplicated mxid localpart which should be
+                     returned instead.  For example, if this method returns
+                     `john.doe` as the value of `mxid_localpart` in the returned
+                     dict, and that is already taken on the homeserver, this
+                     method will be called again with the same parameters but
+                     with failures=1. The method should then return a different
+                     `mxid_localpart` value, such as `john.doe1`.
     - This method must return a dictionary, which will then be used by Synapse
       to build a new user. The following keys are allowed:
        * `mxid_localpart` - Required. The mxid localpart of the new user.
