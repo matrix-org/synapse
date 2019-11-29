@@ -25,7 +25,9 @@ from twisted.internet import defer
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.handlers.pagination import PurgeStatus
 from synapse.rest.client.v1 import login, profile, room
+from synapse.util.stringutils import random_string
 
 from tests import unittest
 
@@ -910,6 +912,78 @@ class RoomMessageListTestCase(RoomBase):
 
         return channel.json_body["chunk"]
 
+    def test_room_messages_purge(self):
+        store = self.hs.get_datastore()
+        pagination_handler = self.hs.get_pagination_handler()
+
+        # Send a first message in the room, which will be removed by the purge.
+        first_event_id = self.helper.send(self.room_id, "message 1")["event_id"]
+        first_token = self.get_success(
+            store.get_topological_token_for_event(first_event_id)
+        )
+
+        # Send a second message in the room, which won't be removed, and which we'll
+        # use as the marker to purge events before.
+        second_event_id = self.helper.send(self.room_id, "message 2")["event_id"]
+        second_token = self.get_success(
+            store.get_topological_token_for_event(second_event_id)
+        )
+
+        # Send a third event in the room to ensure we don't fall under any edge case
+        # due to our marker being the latest forward extremity in the room.
+        self.helper.send(self.room_id, "message 3")
+
+        # Check that we get the first and second message when querying /messages.
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
+            % (self.room_id, second_token, json.dumps({"types": [EventTypes.Message]})),
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 2, [event["content"] for event in chunk])
+
+        # Purge every event before the second event.
+        purge_id = random_string(16)
+        pagination_handler._purges_by_id[purge_id] = PurgeStatus()
+        self.get_success(
+            pagination_handler._purge_history(
+                purge_id=purge_id,
+                room_id=self.room_id,
+                token=second_token,
+                delete_local_events=True,
+            )
+        )
+
+        # Check that we only get the second message through /message now that the first
+        # has been purged.
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
+            % (self.room_id, second_token, json.dumps({"types": [EventTypes.Message]})),
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 1, [event["content"] for event in chunk])
+
+        # Check that we get no event, but also no error, when querying /messages with
+        # the token that was pointing at the first event, because we don't have it
+        # anymore.
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
+            % (self.room_id, first_token, json.dumps({"types": [EventTypes.Message]})),
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 0, [event["content"] for event in chunk])
+
 
 class RoomSearchTestCase(unittest.HomeserverTestCase):
     servlets = [
@@ -1106,3 +1180,143 @@ class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
 
         res_displayname = channel.json_body["content"]["displayname"]
         self.assertEqual(res_displayname, self.displayname, channel.result)
+
+
+class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
+    """Tests that clients can add a "reason" field to membership events and
+    that they get correctly added to the generated events and propagated.
+    """
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.creator = self.register_user("creator", "test")
+        self.creator_tok = self.login("creator", "test")
+
+        self.second_user_id = self.register_user("second", "test")
+        self.second_tok = self.login("second", "test")
+
+        self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
+
+    def test_join_reason(self):
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
+            content={"reason": reason},
+            access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_leave_reason(self):
+        self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
+
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            content={"reason": reason},
+            access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_kick_reason(self):
+        self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
+
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
+            content={"reason": reason, "user_id": self.second_user_id},
+            access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_ban_reason(self):
+        self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
+
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/ban".format(self.room_id),
+            content={"reason": reason, "user_id": self.second_user_id},
+            access_token=self.creator_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_unban_reason(self):
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/unban".format(self.room_id),
+            content={"reason": reason, "user_id": self.second_user_id},
+            access_token=self.creator_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_invite_reason(self):
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/invite".format(self.room_id),
+            content={"reason": reason, "user_id": self.second_user_id},
+            access_token=self.creator_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_reject_invite_reason(self):
+        self.helper.invite(
+            self.room_id,
+            src=self.creator,
+            targ=self.second_user_id,
+            tok=self.creator_tok,
+        )
+
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            content={"reason": reason},
+            access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def _check_for_reason(self, reason):
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/{}/state/m.room.member/{}".format(
+                self.room_id, self.second_user_id
+            ),
+            access_token=self.creator_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        event_content = channel.json_body
+
+        self.assertEqual(event_content.get("reason"), reason, channel.result)

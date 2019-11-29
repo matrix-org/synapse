@@ -642,6 +642,7 @@ class ThreepidAddRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
+    @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
@@ -651,6 +652,10 @@ class ThreepidAddRestServlet(RestServlet):
         assert_params_in_dict(body, ["client_secret", "sid"])
         client_secret = body["client_secret"]
         sid = body["sid"]
+
+        yield self.auth_handler.validate_user_via_ui_auth(
+            requester, body, self.hs.get_ip_from_request(request)
+        )
 
         validation_session = yield self.identity_handler.validate_threepid_session(
             client_secret, sid
