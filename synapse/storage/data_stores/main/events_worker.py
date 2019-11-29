@@ -28,13 +28,12 @@ from synapse.api.errors import NotFoundError
 from synapse.api.room_versions import EventFormatVersions
 from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
-from synapse.events.utils import prune_event, prune_event_dict
+from synapse.events.utils import prune_event
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.types import get_domain_from_id
 from synapse.util import batch_iter
-from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -48,16 +47,6 @@ logger = logging.getLogger(__name__)
 EVENT_QUEUE_THREADS = 3  # Max number of threads that will fetch events
 EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for requests for events
 EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
-
-
-def encode_json(json_object):
-    """
-    Encode a Python object as JSON and return it in a Unicode string.
-    """
-    out = frozendict_json_encoder.encode(json_object)
-    if isinstance(out, bytes):
-        out = out.decode("utf8")
-    return out
 
 
 _EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
@@ -891,117 +880,3 @@ class EventsWorkerStore(SQLBaseStore):
         complexity_v1 = round(state_events / 500, 2)
 
         return {"v1": complexity_v1}
-
-    def insert_event_expiry(self, event_id, expiry_ts):
-        """Save the expiry timestamp associated with a given event ID.
-
-        Args:
-            event_id (str): The event ID the expiry timestamp is associated with.
-            expiry_ts (int): The timestamp at which to expire (delete) the event.
-        """
-        return self._simple_insert(
-            table="event_expiry",
-            values={"event_id": event_id, "expiry_ts": expiry_ts},
-            desc="insert_event_expiry",
-        )
-
-    def _censor_event_txn(self, txn, event_id, pruned_json):
-        """Censor an event by replacing its JSON in the event_json table with the
-        provided pruned JSON.
-
-        Args:
-            txn (LoggingTransaction): The database transaction.
-            event_id (str): The ID of the event to censor.
-            pruned_json (str): The pruned JSON
-        """
-        self._simple_update_one_txn(
-            txn,
-            table="event_json",
-            keyvalues={"event_id": event_id},
-            updatevalues={"json": pruned_json},
-        )
-
-    def expire_event(self, event):
-        """Redact an event that has expired, and delete its associated expiry timestamp.
-
-        Args:
-             event (events.EventBase): The event to delete.
-        """
-        # Prune the event's dict then convert it to JSON.
-        pruned_json = encode_json(prune_event_dict(event.get_dict()))
-
-        def delete_expired_event_txn(txn):
-            # Update the event_json table to replace the event's JSON with the pruned
-            # JSON.
-            self._censor_event_txn(txn, event.event_id, pruned_json)
-
-            # Delete the expiry timestamp associated with this event from the database.
-            self._simple_delete_txn(
-                txn, table="event_expiry", keyvalues={"event_id": event.event_id}
-            )
-
-            # We need to invalidate the event cache entry for this event because we
-            # changed its content in the database.
-            txn.call_after(self._get_event_cache.invalidate, (event.event_id,))
-            # Send that invalidation to replication so that other workers also invalidate
-            # the event cache.
-            self._send_invalidation_to_replication(
-                txn, "_get_event_cache", (event.event_id,)
-            )
-
-        return self.runInteraction("delete_expired_event", delete_expired_event_txn)
-
-    def delete_event_expiry(self, event_id):
-        """Delete the expiry timestamp associated with an event ID without deleting the
-        actual event.
-
-        Args:
-            event_id (str): The event ID to delete the associated expiry timestamp of.
-        """
-        return self._simple_delete(
-            table="event_expiry",
-            keyvalues={"event_id": event_id},
-            desc="delete_event_expiry",
-        )
-
-    def get_events_to_expire(self):
-        """Retrieve the IDs of the events we have an expiry timestamp for, along with
-        said timestamp.
-
-        Returns:
-            A list of dicts, each containing an event_id and an expiry_ts.
-        """
-        return self._simple_select_list(
-            table="event_expiry",
-            keyvalues=None,
-            retcols=["event_id", "expiry_ts"],
-            desc="get_events_to_expire",
-        )
-
-    def get_next_event_to_expire(self):
-        """Retrieve the entry with the lowest expiry timestamp in the event_expiry
-        table, or None if there's no more event to expire.
-
-        Returns:
-            A dict with an event_id and an expiry_ts of there's at least one row in the
-            event_expiry table, None otherwise.
-        """
-
-        def get_next_event_to_expire_txn(txn):
-            txn.execute(
-                """
-                SELECT event_id, expiry_ts FROM event_expiry
-                ORDER BY expiry_ts ASC LIMIT 1
-                """
-            )
-
-            res = self.cursor_to_dict(txn)
-
-            if res:
-                return res[0]
-            else:
-                return None
-
-        return self.runInteraction(
-            desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
-        )
