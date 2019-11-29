@@ -1,0 +1,1 @@
+Fix bug: TypeError in `register_user()` while using LDAP auth module.
