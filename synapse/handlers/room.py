@@ -170,7 +170,7 @@ class RoomCreationHandler(BaseHandler):
             old_room_version, tombstone_event, tombstone_context
         )
 
-        requester_original_power_level = yield self.clone_existing_room(
+        yield self.clone_existing_room(
             requester,
             old_room_id=old_room_id,
             new_room_id=new_room_id,
@@ -198,23 +198,14 @@ class RoomCreationHandler(BaseHandler):
         # finally, shut down the PLs in the old room, and update them in the new
         # room.
         yield self._update_upgraded_room_pls(
-            requester,
-            old_room_id,
-            new_room_id,
-            old_room_state,
-            requester_original_power_level=requester_original_power_level,
+            requester, old_room_id, new_room_id, old_room_state,
         )
 
         return new_room_id
 
     @defer.inlineCallbacks
     def _update_upgraded_room_pls(
-        self,
-        requester,
-        old_room_id,
-        new_room_id,
-        old_room_state,
-        requester_original_power_level=None,
+        self, requester, old_room_id, new_room_id, old_room_state,
     ):
         """Send updated power levels in both rooms after an upgrade
 
@@ -223,8 +214,6 @@ class RoomCreationHandler(BaseHandler):
             old_room_id (str): the id of the room to be replaced
             new_room_id (str): the id of the replacement room
             old_room_state (dict[tuple[str, str], str]): the state map for the old room
-            requester_original_power_level (int|None): If not None, reduce the requester's
-                power level to this value in the new room
 
         Returns:
             Deferred
@@ -282,13 +271,6 @@ class RoomCreationHandler(BaseHandler):
                 logger.warning("Unable to update PLs in old room: %s", e)
 
         logger.info("Setting correct PLs in new room")
-        if requester_original_power_level:
-            # The requester's power level was temporarily raised earlier in the upgrade
-            # process in order for them to be allowed to send the room's initial state.
-            # Return them to their original power level in the old room now
-            old_room_pl_state.content["users"][
-                requester.user.to_string()
-            ] = requester_original_power_level
         yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
@@ -316,11 +298,7 @@ class RoomCreationHandler(BaseHandler):
             tombstone_event_id (unicode|str): the ID of the tombstone event in the old
                 room.
         Returns:
-            Deferred[int|None]: Returns an int if the requester's power level
-                needed to be raised in the new room to send initial state events.
-                The returned int is the user's original power level. The calling function
-                should return the user's powerlevel to this value for consistency
-                once all other initial state events have been sent. None otherwise.
+            Deferred
         """
         user_id = requester.user.to_string()
 
@@ -387,16 +365,12 @@ class RoomCreationHandler(BaseHandler):
 
         # Raise the requester's power level in the new room if necessary
         current_power_level = power_levels["users"][requester.user.to_string()]
-        raised_power_level = None
         if current_power_level < needed_power_level:
-            # Save and return this power level
-            raised_power_level = current_power_level
-
             # Assign this power level to the requester
             power_levels["users"][requester.user.to_string()] = needed_power_level
 
-        # Transfer the power levels via power_level_content_override instead of initial_state
-        del initial_state[(EventTypes.PowerLevels, "")]
+        # Set the power levels to the modified state
+        initial_state[(EventTypes.PowerLevels, "")] = power_levels
 
         yield self._send_events_for_new_room(
             requester,
@@ -407,7 +381,6 @@ class RoomCreationHandler(BaseHandler):
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
-            power_level_content_override=power_levels,
         )
 
         # Transfer membership events
@@ -433,8 +406,6 @@ class RoomCreationHandler(BaseHandler):
                     ratelimit=False,
                     content=old_event.content,
                 )
-
-        return raised_power_level
 
         # XXX invites/joins
         # XXX 3pid invites
