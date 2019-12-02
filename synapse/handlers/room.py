@@ -350,7 +350,7 @@ class RoomCreationHandler(BaseHandler):
         # Resolve the minimum power level required to send any state event
         # We will give the upgrading user this power level temporarily (if necessary) such that
         # they are able to copy all of the state events over, then revert them back to their
-        # original power level afterwards
+        # original power level afterwards in _update_upgraded_room_pls
 
         # Copy over user power levels now as this will not be possible with >100PL users once
         # the room has been created
