@@ -13,19 +13,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+from contextlib import redirect_stderr
+from io import StringIO
+
 import pyperf
-
-from twisted.python import reflect
-
+from synmark import make_reactor, setup_database
 from synmark.suites import SUITES
+
+from twisted.internet.defer import ensureDeferred
+from twisted.logger import globalLogBeginner, textFileLogObserver
+from twisted.python.failure import Failure
+
+
+def make_test(main):
+    """
+    Take main, the test function, and wrap it in a reactor start and stop.
+    """
+
+    def _main(loops):
+
+        reactor = make_reactor()
+
+        file_out = StringIO()
+        with redirect_stderr(file_out):
+
+            d = ensureDeferred(main(reactor, loops))
+
+            def on_done(_):
+                if isinstance(_, Failure):
+                    _.printTraceback()
+                    print(file_out.getvalue())
+                reactor.stop()
+                return _
+
+            d.addBoth(on_done)
+            reactor.run()
+
+        return d.result
+
+    return _main
+
 
 if __name__ == "__main__":
 
-    runner = pyperf.Runner(processes=5, values=1, warmups=0)
+    def add_cmdline_args(cmd, args):
+        if args.log:
+            cmd.extend(["--log"])
+
+    runner = pyperf.Runner(
+        processes=3, min_time=2, show_name=True, add_cmdline_args=add_cmdline_args
+    )
+    runner.argparser.add_argument("--log", action="store_true")
     runner.parse_args()
+
+    orig_loops = runner.args.loops
     runner.args.inherit_environ = ["SYNAPSE_POSTGRES"]
 
+    if runner.args.worker:
+        if runner.args.log:
+            globalLogBeginner.beginLoggingTo(
+                [textFileLogObserver(sys.__stdout__)], redirectStandardIO=False
+            )
+        setup_database()
+
     for suite, loops in SUITES:
-        print(suite, loops)
-        runner.args.loops = loops
-        runner.bench_time_func(suite.__name__ + "_" + str(loops), suite.main)
+        if loops:
+            runner.args.loops = loops
+        else:
+            runner.args.loops = orig_loops
+            loops = "auto"
+        runner.bench_time_func(
+            suite.__name__ + "_" + str(loops), make_test(suite.main),
+        )

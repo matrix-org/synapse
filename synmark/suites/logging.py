@@ -14,21 +14,18 @@
 # limitations under the License.
 
 import warnings
-from contextlib import redirect_stderr
 from io import StringIO
 
 from mock import Mock
-import sys
 
 from pyperf import perf_counter
+from synmark import make_homeserver
 
-from twisted.internet.defer import ensureDeferred
+from twisted.internet.defer import Deferred
 from twisted.internet.protocol import ServerFactory
-from twisted.logger import LogBeginner, Logger, LogPublisher, globalLogBeginner, textFileLogObserver
+from twisted.logger import LogBeginner, Logger, LogPublisher
 from twisted.protocols.basic import LineOnlyReceiver
-from twisted.python.failure import Failure
 
-from synmark import make_homeserver, setup_database
 from synapse.logging._structured import setup_structured_logging
 
 
@@ -43,13 +40,15 @@ class LineCounter(LineOnlyReceiver):
     def lineReceived(self, line):
         self.count += 1
 
+        if self.count >= self.factory.wait_for and self.factory.on_done:
+            on_done = self.factory.on_done
+            self.factory.on_done = None
+            on_done.callback(True)
 
-async def _main(reactor, loops):
+
+async def main(reactor, loops):
 
     servers = []
-
-    print("?")
-
 
     def protocol():
         p = LineCounter()
@@ -57,6 +56,8 @@ async def _main(reactor, loops):
         return p
 
     logger_factory = ServerFactory.forProtocol(protocol)
+    logger_factory.wait_for = loops
+    logger_factory.on_done = Deferred()
     port = reactor.listenTCP(0, logger_factory, interface="127.0.0.1")
 
     hs, wait, cleanup = await make_homeserver(reactor)
@@ -81,22 +82,18 @@ async def _main(reactor, loops):
     }
 
     logger = Logger(namespace="synapse.logging.test_terse_json", observer=publisher)
-
-    start = perf_counter()
-
     logging_system = setup_structured_logging(
         hs, hs.config, log_config, logBeginner=beginner, redirect_stdlib_logging=False
     )
 
-    print("hi")
-
     # Wait for it to connect...
     await logging_system._observers[0]._service.whenConnected()
+
+    start = perf_counter()
 
     # Send a bunch of useful messages
     for i in range(0, loops):
         logger.info("test message %s" % (i,))
-        print(i)
 
         if (
             len(logging_system._observers[0]._buffer)
@@ -108,9 +105,7 @@ async def _main(reactor, loops):
             ):
                 await wait(0.01)
 
-    while servers[0].count != loops:
-        print(servers[0].count, loops)
-        await wait(0.01)
+    await logger_factory.on_done
 
     end = perf_counter() - start
 
@@ -119,33 +114,3 @@ async def _main(reactor, loops):
     cleanup()
 
     return end
-
-
-def main(loops):
-
-    print("hi?")
-    print(loops)
-
-    setup_database()
-
-    if globalLogBeginner._temporaryObserver:
-        globalLogBeginner.beginLoggingTo([textFileLogObserver(sys.__stderr__)])
-
-    file_out = StringIO()
-    with redirect_stderr(file_out):
-
-        from twisted.internet import epollreactor
-
-        reactor = epollreactor.EPollReactor()
-        d = ensureDeferred(_main(reactor, loops))
-
-        def on_done(_):
-            if isinstance(_, Failure):
-                _.printTraceback()
-            reactor.stop()
-            return _
-
-        d.addBoth(on_done)
-        reactor.run()
-
-    return d.result

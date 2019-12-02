@@ -13,21 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet.defer import Deferred
+import sys
+
+from twisted.internet import epollreactor
+from twisted.internet.main import installReactor
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.util import Clock
 
 from tests.utils import default_config, setup_test_homeserver, setupdb
 
-DB_SETUP = False
-
 
 def setup_database():
-    global DB_SETUP
-    if not DB_SETUP:
-        setupdb()
-        DB_SETUP = True
+    setupdb()
 
 
 async def make_homeserver(reactor, config=None):
@@ -56,3 +54,16 @@ async def make_homeserver(reactor, config=None):
             i()
 
     return hs, clock.sleep, cleanup
+
+
+def make_reactor():
+    """
+    Make an install a Twisted reactor.
+    """
+    reactor = epollreactor.EPollReactor()
+
+    if "twisted.internet.reactor" in sys.modules:
+        del sys.modules["twisted.internet.reactor"]
+    installReactor(reactor)
+
+    return reactor
