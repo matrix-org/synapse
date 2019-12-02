@@ -18,16 +18,17 @@ from contextlib import redirect_stderr
 from io import StringIO
 
 from mock import Mock
+import sys
 
 from pyperf import perf_counter
 
 from twisted.internet.defer import ensureDeferred
 from twisted.internet.protocol import ServerFactory
-from twisted.logger import LogBeginner, Logger, LogPublisher, globalLogBeginner
+from twisted.logger import LogBeginner, Logger, LogPublisher, globalLogBeginner, textFileLogObserver
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
-from synapse.benchmarks import make_homeserver, setup_database
+from synmark import make_homeserver, setup_database
 from synapse.logging._structured import setup_structured_logging
 
 
@@ -46,6 +47,9 @@ class LineCounter(LineOnlyReceiver):
 async def _main(reactor, loops):
 
     servers = []
+
+    print("?")
+
 
     def protocol():
         p = LineCounter()
@@ -84,12 +88,15 @@ async def _main(reactor, loops):
         hs, hs.config, log_config, logBeginner=beginner, redirect_stdlib_logging=False
     )
 
+    print("hi")
+
     # Wait for it to connect...
     await logging_system._observers[0]._service.whenConnected()
 
     # Send a bunch of useful messages
     for i in range(0, loops):
         logger.info("test message %s" % (i,))
+        print(i)
 
         if (
             len(logging_system._observers[0]._buffer)
@@ -102,6 +109,7 @@ async def _main(reactor, loops):
                 await wait(0.01)
 
     while servers[0].count != loops:
+        print(servers[0].count, loops)
         await wait(0.01)
 
     end = perf_counter() - start
@@ -115,10 +123,13 @@ async def _main(reactor, loops):
 
 def main(loops):
 
+    print("hi?")
+    print(loops)
+
     setup_database()
 
     if globalLogBeginner._temporaryObserver:
-        globalLogBeginner.beginLoggingTo([lambda event: None])
+        globalLogBeginner.beginLoggingTo([textFileLogObserver(sys.__stderr__)])
 
     file_out = StringIO()
     with redirect_stderr(file_out):

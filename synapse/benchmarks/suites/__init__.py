@@ -1,1 +1,0 @@
-SUITES = [("LOGGING", 1000), ("LOGGING", 10000)]

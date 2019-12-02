@@ -31,13 +31,8 @@ def setup_database():
 
 
 async def make_homeserver(reactor, config=None):
-    def wait(time):
-        d = Deferred()
-        reactor.callLater(time, d.callback, True)
-        return d
 
     cleanup_tasks = []
-
     clock = Clock(reactor)
 
     if not config:
@@ -60,4 +55,4 @@ async def make_homeserver(reactor, config=None):
         for i in cleanup_tasks:
             i()
 
-    return hs, wait, cleanup
+    return hs, clock.sleep, cleanup

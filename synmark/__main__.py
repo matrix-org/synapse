@@ -17,7 +17,7 @@ import pyperf
 
 from twisted.python import reflect
 
-from synapse.benchmarks.suites import SUITES
+from synmark.suites import SUITES
 
 if __name__ == "__main__":
 
@@ -26,7 +26,6 @@ if __name__ == "__main__":
     runner.args.inherit_environ = ["SYNAPSE_POSTGRES"]
 
     for suite, loops in SUITES:
-
-        func = reflect.namedAny("synapse.benchmarks.suites.%s.main" % (suite.lower(),))
+        print(suite, loops)
         runner.args.loops = loops
-        runner.bench_time_func(suite + "_" + str(loops), func)
+        runner.bench_time_func(suite.__name__ + "_" + str(loops), suite.main)
