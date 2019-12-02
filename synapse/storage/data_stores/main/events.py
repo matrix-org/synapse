@@ -2035,7 +2035,7 @@ class EventsStore(
                 txn, "_get_event_cache", (event.event_id,)
             )
 
-        return self.runInteraction("delete_expired_event", delete_expired_event_txn)
+        yield self.runInteraction("delete_expired_event", delete_expired_event_txn)
 
     def _delete_event_expiry_txn(self, txn, event_id):
         """Delete the expiry timestamp associated with an event ID without deleting the

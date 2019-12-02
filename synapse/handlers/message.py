@@ -295,7 +295,7 @@ class MessageHandler(object):
             # Try to get the expiry timestamp of the next event to expire.
             next_event_to_expire = yield self.store.get_next_event_to_expire()
             if next_event_to_expire:
-                expiry_ts = next_event_to_expire.get("expiry_ts")
+                expiry_ts = next_event_to_expire[1]
 
         if expiry_ts is not None:
             # Figure out how many seconds we need to wait before expiring the event.
@@ -327,7 +327,7 @@ class MessageHandler(object):
 
         # Get the ID of the next event to expire.
         next_event_to_expire = yield self.store.get_next_event_to_expire()
-        event_id = next_event_to_expire["event_id"]
+        event_id = next_event_to_expire[0]
 
         logger.info("Expiring event %s", event_id)
 
