@@ -1,1 +1,1 @@
-Add script to automatically remove empty communities/groups
+Add script to automatically remove empty communities/groups.
