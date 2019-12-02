@@ -18,10 +18,11 @@ from contextlib import redirect_stderr
 from io import StringIO
 
 import pyperf
+from argparse import REMAINDER
 from synmark import make_reactor
 from synmark.suites import SUITES
 
-from twisted.internet.defer import ensureDeferred
+from twisted.internet.defer import ensureDeferred, Deferred
 from twisted.logger import globalLogBeginner, textFileLogObserver
 from twisted.python.failure import Failure
 
@@ -40,7 +41,8 @@ def make_test(main):
         file_out = StringIO()
         with redirect_stderr(file_out):
 
-            d = ensureDeferred(main(reactor, loops))
+            d = Deferred()
+            d.addCallback(lambda _: ensureDeferred(main(reactor, loops)))
 
             def on_done(_):
                 if isinstance(_, Failure):
@@ -50,6 +52,7 @@ def make_test(main):
                 return _
 
             d.addBoth(on_done)
+            reactor.callWhenRunning(lambda: d.callback(True))
             reactor.run()
 
         return d.result
@@ -62,11 +65,13 @@ if __name__ == "__main__":
     def add_cmdline_args(cmd, args):
         if args.log:
             cmd.extend(["--log"])
+        cmd.extend(args.tests)
 
     runner = pyperf.Runner(
-        processes=3, min_time=2, show_name=True, add_cmdline_args=add_cmdline_args
+        processes=3, min_time=1.5, show_name=True, add_cmdline_args=add_cmdline_args
     )
     runner.argparser.add_argument("--log", action="store_true")
+    runner.argparser.add_argument("tests", nargs=REMAINDER)
     runner.parse_args()
 
     orig_loops = runner.args.loops
@@ -78,6 +83,9 @@ if __name__ == "__main__":
                 [textFileLogObserver(sys.__stdout__)], redirectStandardIO=False
             )
         setupdb()
+
+    if runner.args.tests:
+        SUITES = list(filter(lambda x: x[0].__name__.split(".")[-1] in runner.args.tests, SUITES))
 
     for suite, loops in SUITES:
         if loops:
