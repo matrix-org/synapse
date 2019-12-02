@@ -1,0 +1,1 @@
+Change the index on the `e2e_cross_signing_signatures` table to be non-unique.
