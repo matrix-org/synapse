@@ -15,6 +15,8 @@
 import os.path
 import shutil
 import tempfile
+from contextlib import redirect_stdout
+from io import StringIO
 
 import yaml
 
@@ -26,7 +28,6 @@ from tests import unittest
 class ConfigLoadingTestCase(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
-        print(self.dir)
         self.file = os.path.join(self.dir, "homeserver.yaml")
 
     def tearDown(self):
@@ -43,7 +44,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
         self.generate_config()
 
         with open(self.file, "r") as f:
-            raw = yaml.load(f)
+            raw = yaml.safe_load(f)
         self.assertIn("macaroon_secret_key", raw)
 
         config = HomeServerConfig.load_config("", ["-c", self.file])
@@ -94,18 +95,27 @@ class ConfigLoadingTestCase(unittest.TestCase):
         )
         self.assertTrue(config.enable_registration)
 
+    def test_stats_enabled(self):
+        self.generate_config_and_remove_lines_containing("enable_metrics")
+        self.add_lines_to_config(["enable_metrics: true"])
+
+        # The default Metrics Flags are off by default.
+        config = HomeServerConfig.load_config("", ["-c", self.file])
+        self.assertFalse(config.metrics_flags.known_servers)
+
     def generate_config(self):
-        HomeServerConfig.load_or_generate_config(
-            "",
-            [
-                "--generate-config",
-                "-c",
-                self.file,
-                "--report-stats=yes",
-                "-H",
-                "lemurs.win",
-            ],
-        )
+        with redirect_stdout(StringIO()):
+            HomeServerConfig.load_or_generate_config(
+                "",
+                [
+                    "--generate-config",
+                    "-c",
+                    self.file,
+                    "--report-stats=yes",
+                    "-H",
+                    "lemurs.win",
+                ],
+            )
 
     def generate_config_and_remove_lines_containing(self, needle):
         self.generate_config()

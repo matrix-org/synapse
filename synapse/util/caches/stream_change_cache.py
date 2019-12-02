@@ -77,9 +77,8 @@ class StreamChangeCache(object):
 
         if stream_pos >= self._earliest_known_stream_pos:
             changed_entities = {
-                self._cache[k] for k in self._cache.islice(
-                    start=self._cache.bisect_right(stream_pos),
-                )
+                self._cache[k]
+                for k in self._cache.islice(start=self._cache.bisect_right(stream_pos))
             }
 
             result = changed_entities.intersection(entities)
@@ -114,8 +113,10 @@ class StreamChangeCache(object):
         assert type(stream_pos) is int
 
         if stream_pos >= self._earliest_known_stream_pos:
-            return [self._cache[k] for k in self._cache.islice(
-                start=self._cache.bisect_right(stream_pos))]
+            return [
+                self._cache[k]
+                for k in self._cache.islice(start=self._cache.bisect_right(stream_pos))
+            ]
         else:
             return None
 
@@ -136,7 +137,7 @@ class StreamChangeCache(object):
             while len(self._cache) > self._max_size:
                 k, r = self._cache.popitem(0)
                 self._earliest_known_stream_pos = max(
-                    k, self._earliest_known_stream_pos,
+                    k, self._earliest_known_stream_pos
                 )
                 self._entity_to_key.pop(r, None)
 

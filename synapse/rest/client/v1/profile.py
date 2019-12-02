@@ -16,32 +16,39 @@
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 from twisted.internet import defer
 
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
 
-from .base import ClientV1RestServlet, client_path_patterns
 
-
-class ProfileDisplaynameRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/displayname")
+class ProfileDisplaynameRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
 
     def __init__(self, hs):
-        super(ProfileDisplaynameRestServlet, self).__init__(hs)
+        super(ProfileDisplaynameRestServlet, self).__init__()
+        self.hs = hs
         self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        requester_user = None
+
+        if self.hs.config.require_auth_for_profile_requests:
+            requester = yield self.auth.get_user_by_req(request)
+            requester_user = requester.user
+
         user = UserID.from_string(user_id)
 
-        displayname = yield self.profile_handler.get_displayname(
-            user,
-        )
+        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        displayname = yield self.profile_handler.get_displayname(user)
 
         ret = {}
         if displayname is not None:
             ret["displayname"] = displayname
 
-        defer.returnValue((200, ret))
+        return 200, ret
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -54,37 +61,44 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         try:
             new_name = content["displayname"]
         except Exception:
-            defer.returnValue((400, "Unable to parse name"))
+            return 400, "Unable to parse name"
 
-        yield self.profile_handler.set_displayname(
-            user, requester, new_name, is_admin)
+        yield self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
     def on_OPTIONS(self, request, user_id):
-        return (200, {})
+        return 200, {}
 
 
-class ProfileAvatarURLRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/avatar_url")
+class ProfileAvatarURLRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/avatar_url", v1=True)
 
     def __init__(self, hs):
-        super(ProfileAvatarURLRestServlet, self).__init__(hs)
+        super(ProfileAvatarURLRestServlet, self).__init__()
+        self.hs = hs
         self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        requester_user = None
+
+        if self.hs.config.require_auth_for_profile_requests:
+            requester = yield self.auth.get_user_by_req(request)
+            requester_user = requester.user
+
         user = UserID.from_string(user_id)
 
-        avatar_url = yield self.profile_handler.get_avatar_url(
-            user,
-        )
+        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        avatar_url = yield self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
-        defer.returnValue((200, ret))
+        return 200, ret
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -96,34 +110,39 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         try:
             new_name = content["avatar_url"]
         except Exception:
-            defer.returnValue((400, "Unable to parse name"))
+            return 400, "Unable to parse name"
 
-        yield self.profile_handler.set_avatar_url(
-            user, requester, new_name, is_admin)
+        yield self.profile_handler.set_avatar_url(user, requester, new_name, is_admin)
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
     def on_OPTIONS(self, request, user_id):
-        return (200, {})
+        return 200, {}
 
 
-class ProfileRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)")
+class ProfileRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)", v1=True)
 
     def __init__(self, hs):
-        super(ProfileRestServlet, self).__init__(hs)
+        super(ProfileRestServlet, self).__init__()
+        self.hs = hs
         self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        requester_user = None
+
+        if self.hs.config.require_auth_for_profile_requests:
+            requester = yield self.auth.get_user_by_req(request)
+            requester_user = requester.user
+
         user = UserID.from_string(user_id)
 
-        displayname = yield self.profile_handler.get_displayname(
-            user,
-        )
-        avatar_url = yield self.profile_handler.get_avatar_url(
-            user,
-        )
+        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        displayname = yield self.profile_handler.get_displayname(user)
+        avatar_url = yield self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if displayname is not None:
@@ -131,7 +150,7 @@ class ProfileRestServlet(ClientV1RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 def register_servlets(hs, http_server):

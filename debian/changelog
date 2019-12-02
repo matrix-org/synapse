@@ -1,3 +1,135 @@
+matrix-synapse-py3 (1.6.1) stable; urgency=medium
+
+  * New synapse release 1.6.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 28 Nov 2019 11:10:40 +0000
+
+matrix-synapse-py3 (1.6.0) stable; urgency=medium
+
+  * New synapse release 1.6.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 26 Nov 2019 12:15:40 +0000
+
+matrix-synapse-py3 (1.5.1) stable; urgency=medium
+
+  * New synapse release 1.5.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 06 Nov 2019 10:02:14 +0000
+
+matrix-synapse-py3 (1.5.0) stable; urgency=medium
+
+  * New synapse release 1.5.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 29 Oct 2019 14:28:41 +0000
+
+matrix-synapse-py3 (1.4.1) stable; urgency=medium
+
+  * New synapse release 1.4.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 18 Oct 2019 10:13:27 +0100
+
+matrix-synapse-py3 (1.4.0) stable; urgency=medium
+
+  * New synapse release 1.4.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 03 Oct 2019 13:22:25 +0100
+
+matrix-synapse-py3 (1.3.1) stable; urgency=medium
+
+  * New synapse release 1.3.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Sat, 17 Aug 2019 09:15:49 +0100
+
+matrix-synapse-py3 (1.3.0) stable; urgency=medium
+
+  [ Andrew Morgan ]
+  * Remove libsqlite3-dev from required build dependencies.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.3.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 15 Aug 2019 12:04:23 +0100
+
+matrix-synapse-py3 (1.2.0) stable; urgency=medium
+
+  [ Amber Brown ]
+  * Update logging config defaults to match API changes in Synapse.
+
+  [ Richard van der Hoff ]
+  * Add Recommends and Depends for some libraries which you probably want.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.2.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 25 Jul 2019 14:10:07 +0100
+
+matrix-synapse-py3 (1.1.0) stable; urgency=medium
+
+  [ Silke Hofstra ]
+  * Include systemd-python to allow logging to the systemd journal.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.1.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 04 Jul 2019 11:43:41 +0100
+
+matrix-synapse-py3 (1.0.0) stable; urgency=medium
+
+  * New synapse release 1.0.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 11 Jun 2019 17:09:53 +0100
+
+matrix-synapse-py3 (0.99.5.2) stable; urgency=medium
+
+  * New synapse release 0.99.5.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 30 May 2019 16:28:07 +0100
+
+matrix-synapse-py3 (0.99.5.1) stable; urgency=medium
+
+  * New synapse release 0.99.5.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 22 May 2019 16:22:24 +0000
+
+matrix-synapse-py3 (0.99.4) stable; urgency=medium
+
+  [ Christoph Müller ]
+  * Configure the systemd units to have a log identifier of `matrix-synapse`
+
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.4.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 15 May 2019 13:58:08 +0100
+
+matrix-synapse-py3 (0.99.3.2) stable; urgency=medium
+
+  * New synapse release 0.99.3.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 18:56:20 +0100
+
+matrix-synapse-py3 (0.99.3.1) stable; urgency=medium
+
+  * New synapse release 0.99.3.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 16:02:43 +0100
+
+matrix-synapse-py3 (0.99.3) stable; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Fix warning during preconfiguration. (Fixes: #4819)
+
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.3.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 01 Apr 2019 12:48:21 +0000
+
+matrix-synapse-py3 (0.99.2) stable; urgency=medium
+
+  * Fix overwriting of config settings on upgrade.
+  * New synapse release 0.99.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 01 Mar 2019 10:55:08 +0000
+
 matrix-synapse-py3 (0.99.1.1) stable; urgency=medium
 
   * New synapse release 0.99.1.1

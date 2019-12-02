@@ -20,6 +20,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import (
     EventTypes,
+    LimitBlockingTypes,
     ServerNoticeLimitReached,
     ServerNoticeMsgType,
 )
@@ -33,6 +34,7 @@ class ResourceLimitsServerNotices(object):
     """ Keeps track of whether the server has reached it's resource limit and
     ensures that the client is kept up to date.
     """
+
     def __init__(self, hs):
         """
         Args:
@@ -69,7 +71,7 @@ class ResourceLimitsServerNotices(object):
             return
 
         if not self._server_notices_manager.is_enabled():
-            # Don't try and send server notices unles they've been enabled
+            # Don't try and send server notices unless they've been enabled
             return
 
         timestamp = yield self._store.user_last_seen_monthly_active(user_id)
@@ -78,64 +80,91 @@ class ResourceLimitsServerNotices(object):
             # In practice, not sure we can ever get here
             return
 
-        # Determine current state of room
-
         room_id = yield self._server_notices_manager.get_notice_room_for_user(user_id)
 
         if not room_id:
-            logger.warn("Failed to get server notices room")
+            logger.warning("Failed to get server notices room")
             return
 
         yield self._check_and_set_tags(user_id, room_id)
+
+        # Determine current state of room
         currently_blocked, ref_events = yield self._is_room_currently_blocked(room_id)
 
+        limit_msg = None
+        limit_type = None
         try:
-            # Normally should always pass in user_id if you have it, but in
-            # this case are checking what would happen to other users if they
-            # were to arrive.
-            try:
-                yield self._auth.check_auth_blocking()
-                is_auth_blocking = False
-            except ResourceLimitError as e:
-                is_auth_blocking = True
-                event_content = e.msg
-                event_limit_type = e.limit_type
+            # Normally should always pass in user_id to check_auth_blocking
+            # if you have it, but in this case are checking what would happen
+            # to other users if they were to arrive.
+            yield self._auth.check_auth_blocking()
+        except ResourceLimitError as e:
+            limit_msg = e.msg
+            limit_type = e.limit_type
 
-            if currently_blocked and not is_auth_blocking:
+        try:
+            if (
+                limit_type == LimitBlockingTypes.MONTHLY_ACTIVE_USER
+                and not self._config.mau_limit_alerting
+            ):
+                # We have hit the MAU limit, but MAU alerting is disabled:
+                # reset room if necessary and return
+                if currently_blocked:
+                    self._remove_limit_block_notification(user_id, ref_events)
+                return
+
+            if currently_blocked and not limit_msg:
                 # Room is notifying of a block, when it ought not to be.
-                # Remove block notification
-                content = {
-                    "pinned": ref_events
-                }
-                yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.Pinned, '',
-                )
-
-            elif not currently_blocked and is_auth_blocking:
+                yield self._remove_limit_block_notification(user_id, ref_events)
+            elif not currently_blocked and limit_msg:
                 # Room is not notifying of a block, when it ought to be.
-                # Add block notification
-                content = {
-                    'body': event_content,
-                    'msgtype': ServerNoticeMsgType,
-                    'server_notice_type': ServerNoticeLimitReached,
-                    'admin_contact': self._config.admin_contact,
-                    'limit_type': event_limit_type
-                }
-                event = yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.Message,
+                yield self._apply_limit_block_notification(
+                    user_id, limit_msg, limit_type
                 )
-
-                content = {
-                    "pinned": [
-                        event.event_id,
-                    ]
-                }
-                yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.Pinned, '',
-                )
-
         except SynapseError as e:
             logger.error("Error sending resource limits server notice: %s", e)
+
+    @defer.inlineCallbacks
+    def _remove_limit_block_notification(self, user_id, ref_events):
+        """Utility method to remove limit block notifications from the server
+        notices room.
+
+        Args:
+            user_id (str): user to notify
+            ref_events (list[str]): The event_ids of pinned events that are unrelated to
+            limit blocking and need to be preserved.
+        """
+        content = {"pinned": ref_events}
+        yield self._server_notices_manager.send_notice(
+            user_id, content, EventTypes.Pinned, ""
+        )
+
+    @defer.inlineCallbacks
+    def _apply_limit_block_notification(self, user_id, event_body, event_limit_type):
+        """Utility method to apply limit block notifications in the server
+        notices room.
+
+        Args:
+            user_id (str): user to notify
+            event_body(str): The human readable text that describes the block.
+            event_limit_type(str): Specifies the type of block e.g. monthly active user
+            limit has been exceeded.
+        """
+        content = {
+            "body": event_body,
+            "msgtype": ServerNoticeMsgType,
+            "server_notice_type": ServerNoticeLimitReached,
+            "admin_contact": self._config.admin_contact,
+            "limit_type": event_limit_type,
+        }
+        event = yield self._server_notices_manager.send_notice(
+            user_id, content, EventTypes.Message
+        )
+
+        content = {"pinned": [event.event_id]}
+        yield self._server_notices_manager.send_notice(
+            user_id, content, EventTypes.Pinned, ""
+        )
 
     @defer.inlineCallbacks
     def _check_and_set_tags(self, user_id, room_id):
@@ -156,9 +185,7 @@ class ResourceLimitsServerNotices(object):
             max_id = yield self._store.add_tag_to_room(
                 user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
             )
-            self._notifier.on_new_event(
-                "account_data_key", max_id, users=[user_id]
-            )
+            self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
     @defer.inlineCallbacks
     def _is_room_currently_blocked(self, room_id):
@@ -188,7 +215,7 @@ class ResourceLimitsServerNotices(object):
 
         referenced_events = []
         if pinned_state_event is not None:
-            referenced_events = list(pinned_state_event.content.get('pinned', []))
+            referenced_events = list(pinned_state_event.content.get("pinned", []))
 
         events = yield self._store.get_events(referenced_events)
         for event_id, event in iteritems(events):
@@ -200,4 +227,4 @@ class ResourceLimitsServerNotices(object):
                 if event_id in referenced_events:
                     referenced_events.remove(event.event_id)
 
-        defer.returnValue((currently_blocked, referenced_events))
+        return currently_blocked, referenced_events

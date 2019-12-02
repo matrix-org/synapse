@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.storage import DataStore
-from synapse.storage.presence import PresenceStore
+from synapse.storage.data_stores.main.presence import PresenceStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from ._base import BaseSlavedStore, __func__
@@ -24,9 +24,7 @@ from ._slaved_id_tracker import SlavedIdTracker
 class SlavedPresenceStore(BaseSlavedStore):
     def __init__(self, db_conn, hs):
         super(SlavedPresenceStore, self).__init__(db_conn, hs)
-        self._presence_id_gen = SlavedIdTracker(
-            db_conn, "presence_stream", "stream_id",
-        )
+        self._presence_id_gen = SlavedIdTracker(db_conn, "presence_stream", "stream_id")
 
         self._presence_on_startup = self._get_active_presence(db_conn)
 
@@ -39,32 +37,23 @@ class SlavedPresenceStore(BaseSlavedStore):
     _get_presence_for_user = PresenceStore.__dict__["_get_presence_for_user"]
     get_presence_for_users = PresenceStore.__dict__["get_presence_for_users"]
 
-    # XXX: This is a bit broken because we don't persist the accepted list in a
-    # way that can be replicated. This means that we don't have a way to
-    # invalidate the cache correctly.
-    get_presence_list_accepted = PresenceStore.__dict__[
-        "get_presence_list_accepted"
-    ]
-    get_presence_list_observers_accepted = PresenceStore.__dict__[
-        "get_presence_list_observers_accepted"
-    ]
-
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()
 
     def stream_positions(self):
         result = super(SlavedPresenceStore, self).stream_positions()
-        position = self._presence_id_gen.get_current_token()
-        result["presence"] = position
+
+        if self.hs.config.use_presence:
+            position = self._presence_id_gen.get_current_token()
+            result["presence"] = position
+
         return result
 
     def process_replication_rows(self, stream_name, token, rows):
         if stream_name == "presence":
             self._presence_id_gen.advance(token)
             for row in rows:
-                self.presence_stream_cache.entity_has_changed(
-                    row.user_id, token
-                )
+                self.presence_stream_cache.entity_has_changed(row.user_id, token)
                 self._get_presence_for_user.invalidate((row.user_id,))
         return super(SlavedPresenceStore, self).process_replication_rows(
             stream_name, token, rows

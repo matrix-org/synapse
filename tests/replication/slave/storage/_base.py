@@ -31,23 +31,27 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver(
             "blue",
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["send_message"]),
+            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
 
-        hs.get_ratelimiter().send_message.return_value = (True, 0)
+        hs.get_ratelimiter().can_do_action.return_value = (True, 0)
 
         return hs
 
     def prepare(self, reactor, clock, hs):
 
         self.master_store = self.hs.get_datastore()
+        self.storage = hs.get_storage()
         self.slaved_store = self.STORE_TYPE(self.hs.get_db_conn(), self.hs)
         self.event_id = 0
 
         server_factory = ReplicationStreamProtocolFactory(self.hs)
         self.streamer = server_factory.streamer
 
+        handler_factory = Mock()
         self.replication_handler = ReplicationClientHandler(self.slaved_store)
+        self.replication_handler.factory = handler_factory
+
         client_factory = ReplicationClientFactory(
             self.hs, "client_name", self.replication_handler
         )
@@ -56,7 +60,9 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         client = client_factory.buildProtocol(None)
 
         client.makeConnection(FakeTransport(server, reactor))
-        server.makeConnection(FakeTransport(client, reactor))
+
+        self.server_to_client_transport = FakeTransport(client, reactor)
+        server.makeConnection(self.server_to_client_transport)
 
     def replicate(self):
         """Tell the master side of replication that something has happened, and then
@@ -69,6 +75,21 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         master_result = self.get_success(getattr(self.master_store, method)(*args))
         slaved_result = self.get_success(getattr(self.slaved_store, method)(*args))
         if expected_result is not None:
-            self.assertEqual(master_result, expected_result)
-            self.assertEqual(slaved_result, expected_result)
-        self.assertEqual(master_result, slaved_result)
+            self.assertEqual(
+                master_result,
+                expected_result,
+                "Expected master result to be %r but was %r"
+                % (expected_result, master_result),
+            )
+            self.assertEqual(
+                slaved_result,
+                expected_result,
+                "Expected slave result to be %r but was %r"
+                % (expected_result, slaved_result),
+            )
+        self.assertEqual(
+            master_result,
+            slaved_result,
+            "Slave result %r does not match master result %r"
+            % (slaved_result, master_result),
+        )

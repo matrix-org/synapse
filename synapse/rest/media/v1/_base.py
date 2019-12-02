@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +25,7 @@ from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.http.server import finish_request, respond_with_json
-from synapse.util import logcontext
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util.stringutils import is_ascii
 
 logger = logging.getLogger(__name__)
@@ -37,8 +38,8 @@ def parse_media_id(request):
         server_name, media_id = request.postpath[:2]
 
         if isinstance(server_name, bytes):
-            server_name = server_name.decode('utf-8')
-            media_id = media_id.decode('utf8')
+            server_name = server_name.decode("utf-8")
+            media_id = media_id.decode("utf8")
 
         file_name = None
         if len(request.postpath) > 2:
@@ -74,9 +75,7 @@ def respond_with_file(request, media_type, file_path, file_size=None, upload_nam
         add_file_headers(request, media_type, file_size, upload_name)
 
         with open(file_path, "rb") as f:
-            yield logcontext.make_deferred_yieldable(
-                FileSender().beginFileTransfer(f, request)
-            )
+            yield make_deferred_yieldable(FileSender().beginFileTransfer(f, request))
 
         finish_request(request)
     else:
@@ -99,12 +98,31 @@ def add_file_headers(request, media_type, file_size, upload_name):
 
     request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
     if upload_name:
-        if is_ascii(upload_name):
-            disposition = "inline; filename=%s" % (_quote(upload_name),)
+        # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
+        #
+        # `filename` is defined to be a `value`, which is defined by RFC2616
+        # section 3.6 [2] to be a `token` or a `quoted-string`, where a `token`
+        # is (essentially) a single US-ASCII word, and a `quoted-string` is a
+        # US-ASCII string surrounded by double-quotes, using backslash as an
+        # escape charater. Note that %-encoding is *not* permitted.
+        #
+        # `filename*` is defined to be an `ext-value`, which is defined in
+        # RFC5987 section 3.2.1 [3] to be `charset "'" [ language ] "'" value-chars`,
+        # where `value-chars` is essentially a %-encoded string in the given charset.
+        #
+        # [1]: https://tools.ietf.org/html/rfc6266#section-4.1
+        # [2]: https://tools.ietf.org/html/rfc2616#section-3.6
+        # [3]: https://tools.ietf.org/html/rfc5987#section-3.2.1
+
+        # We avoid the quoted-string version of `filename`, because (a) synapse didn't
+        # correctly interpret those as of 0.99.2 and (b) they are a bit of a pain and we
+        # may as well just do the filename* version.
+        if _can_encode_filename_as_token(upload_name):
+            disposition = "inline; filename=%s" % (upload_name,)
         else:
             disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name),)
 
-        request.setHeader(b"Content-Disposition", disposition.encode('ascii'))
+        request.setHeader(b"Content-Disposition", disposition.encode("ascii"))
 
     # cache for at least a day.
     # XXX: we might want to turn this off for data we don't want to
@@ -113,6 +131,52 @@ def add_file_headers(request, media_type, file_size, upload_name):
     # clients are smart enough to be happy with Cache-Control
     request.setHeader(b"Cache-Control", b"public,max-age=86400,s-maxage=86400")
     request.setHeader(b"Content-Length", b"%d" % (file_size,))
+
+
+# separators as defined in RFC2616. SP and HT are handled separately.
+# see _can_encode_filename_as_token.
+_FILENAME_SEPARATOR_CHARS = set(
+    (
+        "(",
+        ")",
+        "<",
+        ">",
+        "@",
+        ",",
+        ";",
+        ":",
+        "\\",
+        '"',
+        "/",
+        "[",
+        "]",
+        "?",
+        "=",
+        "{",
+        "}",
+    )
+)
+
+
+def _can_encode_filename_as_token(x):
+    for c in x:
+        # from RFC2616:
+        #
+        #        token          = 1*<any CHAR except CTLs or separators>
+        #
+        #        separators     = "(" | ")" | "<" | ">" | "@"
+        #                       | "," | ";" | ":" | "\" | <">
+        #                       | "/" | "[" | "]" | "?" | "="
+        #                       | "{" | "}" | SP | HT
+        #
+        #        CHAR           = <any US-ASCII character (octets 0 - 127)>
+        #
+        #        CTL            = <any US-ASCII control character
+        #                         (octets 0 - 31) and DEL (127)>
+        #
+        if ord(c) >= 127 or ord(c) <= 32 or c in _FILENAME_SEPARATOR_CHARS:
+            return False
+    return True
 
 
 @defer.inlineCallbacks
@@ -131,10 +195,21 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
         respond_404(request)
         return
 
-    logger.debug("Responding to media request with responder %s")
+    logger.debug("Responding to media request with responder %s", responder)
     add_file_headers(request, media_type, file_size, upload_name)
-    with responder:
-        yield responder.write_to_consumer(request)
+    try:
+        with responder:
+            yield responder.write_to_consumer(request)
+    except Exception as e:
+        # The majority of the time this will be due to the client having gone
+        # away. Unfortunately, Twisted simply throws a generic exception at us
+        # in that case.
+        logger.warning("Failed to write to consumer: %s %s", type(e), e)
+
+        # Unregister the producer, if it has one, so Twisted doesn't complain
+        if request.producer:
+            request.unregisterProducer()
+
     finish_request(request)
 
 
@@ -206,35 +281,23 @@ def get_filename_from_headers(headers):
     Content-Disposition HTTP header.
 
     Args:
-        headers (twisted.web.http_headers.Headers): The HTTP
-            request headers.
+        headers (dict[bytes, list[bytes]]): The HTTP request headers.
 
     Returns:
         A Unicode string of the filename, or None.
     """
-    content_disposition = headers.get(b"Content-Disposition", [b''])
+    content_disposition = headers.get(b"Content-Disposition", [b""])
 
     # No header, bail out.
     if not content_disposition[0]:
         return
 
-    # dict of unicode: bytes, corresponding to the key value sections of the
-    # Content-Disposition header.
-    params = {}
-    parts = content_disposition[0].split(b";")
-    for i in parts:
-        # Split into key-value pairs, if able
-        # We don't care about things like `inline`, so throw it out
-        if b"=" not in i:
-            continue
-
-        key, value = i.strip().split(b"=")
-        params[key.decode('ascii')] = value
+    _, params = _parse_header(content_disposition[0])
 
     upload_name = None
 
     # First check if there is a valid UTF-8 filename
-    upload_name_utf8 = params.get("filename*", None)
+    upload_name_utf8 = params.get(b"filename*", None)
     if upload_name_utf8:
         if upload_name_utf8.lower().startswith(b"utf-8''"):
             upload_name_utf8 = upload_name_utf8[7:]
@@ -245,7 +308,7 @@ def get_filename_from_headers(headers):
                     # Once it is decoded, we can then unquote the %-encoded
                     # parts strictly into a unicode string.
                     upload_name = urllib.parse.unquote(
-                        upload_name_utf8.decode('ascii'), errors="strict"
+                        upload_name_utf8.decode("ascii"), errors="strict"
                     )
                 except UnicodeDecodeError:
                     # Incorrect UTF-8.
@@ -254,18 +317,74 @@ def get_filename_from_headers(headers):
                 # On Python 2, we first unquote the %-encoded parts and then
                 # decode it strictly using UTF-8.
                 try:
-                    upload_name = urllib.parse.unquote(upload_name_utf8).decode('utf8')
+                    upload_name = urllib.parse.unquote(upload_name_utf8).decode("utf8")
                 except UnicodeDecodeError:
                     pass
 
     # If there isn't check for an ascii name.
     if not upload_name:
-        upload_name_ascii = params.get("filename", None)
+        upload_name_ascii = params.get(b"filename", None)
         if upload_name_ascii and is_ascii(upload_name_ascii):
-            # Make sure there's no %-quoted bytes. If there is, reject it as
-            # non-valid ASCII.
-            if b"%" not in upload_name_ascii:
-                upload_name = upload_name_ascii.decode('ascii')
+            upload_name = upload_name_ascii.decode("ascii")
 
     # This may be None here, indicating we did not find a matching name.
     return upload_name
+
+
+def _parse_header(line):
+    """Parse a Content-type like header.
+
+    Cargo-culted from `cgi`, but works on bytes rather than strings.
+
+    Args:
+        line (bytes): header to be parsed
+
+    Returns:
+        Tuple[bytes, dict[bytes, bytes]]:
+            the main content-type, followed by the parameter dictionary
+    """
+    parts = _parseparam(b";" + line)
+    key = next(parts)
+    pdict = {}
+    for p in parts:
+        i = p.find(b"=")
+        if i >= 0:
+            name = p[:i].strip().lower()
+            value = p[i + 1 :].strip()
+
+            # strip double-quotes
+            if len(value) >= 2 and value[0:1] == value[-1:] == b'"':
+                value = value[1:-1]
+                value = value.replace(b"\\\\", b"\\").replace(b'\\"', b'"')
+            pdict[name] = value
+
+    return key, pdict
+
+
+def _parseparam(s):
+    """Generator which splits the input on ;, respecting double-quoted sequences
+
+    Cargo-culted from `cgi`, but works on bytes rather than strings.
+
+    Args:
+        s (bytes): header to be parsed
+
+    Returns:
+        Iterable[bytes]: the split input
+    """
+    while s[:1] == b";":
+        s = s[1:]
+
+        # look for the next ;
+        end = s.find(b";")
+
+        # if there is an odd number of " marks between here and the next ;, skip to the
+        # next ; instead
+        while end > 0 and (s.count(b'"', 0, end) - s.count(b'\\"', 0, end)) % 2:
+            end = s.find(b";", end + 1)
+
+        if end < 0:
+            end = len(s)
+        f = s[:end]
+        yield f.strip()
+        s = s[end:]

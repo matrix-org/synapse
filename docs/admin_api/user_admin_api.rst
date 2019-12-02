@@ -5,7 +5,7 @@ This API returns information about a specific user account.
 
 The api is::
 
-    GET /_matrix/client/r0/admin/whois/<user_id>
+    GET /_synapse/admin/v1/whois/<user_id>
 
 including an ``access_token`` of a server admin.
 
@@ -50,7 +50,7 @@ references to it).
 
 The api is::
 
-    POST /_matrix/client/r0/admin/deactivate/<user_id>
+    POST /_synapse/admin/v1/deactivate/<user_id>
 
 with a body of:
 
@@ -69,11 +69,11 @@ An empty body may be passed for backwards compatibility.
 Reset password
 ==============
 
-Changes the password of another user.
+Changes the password of another user. This will automatically log the user out of all their devices.
 
 The api is::
 
-    POST /_matrix/client/r0/admin/reset_password/<user_id>
+    POST /_synapse/admin/v1/reset_password/<user_id>
 
 with a body of:
 
@@ -82,5 +82,44 @@ with a body of:
    {
        "new_password": "<secret>"
    }
+
+including an ``access_token`` of a server admin.
+
+
+Get whether a user is a server administrator or not
+===================================================
+
+
+The api is::
+
+    GET /_synapse/admin/v1/users/<user_id>/admin
+
+including an ``access_token`` of a server admin.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+        "admin": true
+    }
+
+
+Change whether a user is a server administrator or not
+======================================================
+
+Note that you cannot demote yourself.
+
+The api is::
+
+    PUT /_synapse/admin/v1/users/<user_id>/admin
+
+with a body of:
+
+.. code:: json
+
+    {
+        "admin": true
+    }
 
 including an ``access_token`` of a server admin.

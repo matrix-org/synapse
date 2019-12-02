@@ -80,7 +80,10 @@ Thanks for using Matrix!
 Synapse Installation
 ====================
 
-For details on how to install synapse, see `<INSTALL.md>`_.
+.. _federation:
+
+* For details on how to install synapse, see `<INSTALL.md>`_.
+* For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
 
 
 Connecting to Synapse from a client
@@ -93,13 +96,13 @@ Unless you are running a test instance of Synapse on your local machine, in
 general, you will need to enable TLS support before you can successfully
 connect from a client: see `<INSTALL.md#tls-certificates>`_.
 
-An easy way to get started is to login or register via Riot at 
-https://riot.im/app/#/login or https://riot.im/app/#/register respectively. 
+An easy way to get started is to login or register via Riot at
+https://riot.im/app/#/login or https://riot.im/app/#/register respectively.
 You will need to change the server you are logging into from ``matrix.org``
-and instead specify a Homeserver URL of ``https://<server_name>:8448`` 
-(or just ``https://<server_name>`` if you are using a reverse proxy). 
-(Leave the identity server as the default - see `Identity servers`_.) 
-If you prefer to use another client, refer to our 
+and instead specify a Homeserver URL of ``https://<server_name>:8448``
+(or just ``https://<server_name>`` if you are using a reverse proxy).
+(Leave the identity server as the default - see `Identity servers`_.)
+If you prefer to use another client, refer to our
 `client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
 
 If all goes well you should at least be able to log in, create a room, and
@@ -112,14 +115,14 @@ Registering a new user from a client
 
 By default, registration of new users via Matrix clients is disabled. To enable
 it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
-recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.rst>`_.)
+recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.md>`_.)
 
 Once ``enable_registration`` is set to ``true``, it is possible to register a
 user via `riot.im <https://riot.im/app/#/register>`_ or other Matrix clients.
 
-Your new user name will be formed partly from the ``server_name`` (see
-`Configuring synapse`_), and partly from a localpart you specify when you
-create the account. Your name will take the form of::
+Your new user name will be formed partly from the ``server_name``, and partly
+from a localpart you specify when you create the account. Your name will take
+the form of::
 
     @localpart:my.domain.name
 
@@ -151,54 +154,6 @@ server on the same domain.
 See https://github.com/vector-im/riot-web/issues/1977 and
 https://developer.github.com/changes/2014-04-25-user-content-security for more details.
 
-Troubleshooting
-===============
-
-Running out of File Handles
----------------------------
-
-If synapse runs out of filehandles, it typically fails badly - live-locking
-at 100% CPU, and/or failing to accept new TCP connections (blocking the
-connecting client).  Matrix currently can legitimately use a lot of file handles,
-thanks to busy rooms like #matrix:matrix.org containing hundreds of participating
-servers.  The first time a server talks in a room it will try to connect
-simultaneously to all participating servers, which could exhaust the available
-file descriptors between DNS queries & HTTPS sockets, especially if DNS is slow
-to respond.  (We need to improve the routing algorithm used to be better than
-full mesh, but as of June 2017 this hasn't happened yet).
-
-If you hit this failure mode, we recommend increasing the maximum number of
-open file handles to be at least 4096 (assuming a default of 1024 or 256).
-This is typically done by editing ``/etc/security/limits.conf``
-
-Separately, Synapse may leak file handles if inbound HTTP requests get stuck
-during processing - e.g. blocked behind a lock or talking to a remote server etc.
-This is best diagnosed by matching up the 'Received request' and 'Processed request'
-log lines and looking for any 'Processed request' lines which take more than
-a few seconds to execute.  Please let us know at #synapse:matrix.org if
-you see this failure mode so we can help debug it, however.
-
-Help!! Synapse eats all my RAM!
--------------------------------
-
-Synapse's architecture is quite RAM hungry currently - we deliberately
-cache a lot of recent room data and metadata in RAM in order to speed up
-common requests.  We'll improve this in future, but for now the easiest
-way to either reduce the RAM usage (at the risk of slowing things down)
-is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
-variable.  The default is 0.5, which can be decreased to reduce RAM usage
-in memory constrained enviroments, or increased if performance starts to
-degrade.
-
-Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
-improvement in overall amount, and especially in terms of giving back RAM
-to the OS. To use it, the library must simply be put in the LD_PRELOAD
-environment variable when launching Synapse. On Debian, this can be done
-by installing the ``libjemalloc1`` package and adding this line to
-``/etc/default/matrix-synapse``::
-
-    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
-
 
 Upgrading an existing Synapse
 =============================
@@ -209,100 +164,19 @@ versions of synapse.
 
 .. _UPGRADE.rst: UPGRADE.rst
 
-.. _federation:
-
-Setting up Federation
-=====================
-
-Federation is the process by which users on different servers can participate
-in the same room. For this to work, those other servers must be able to contact
-yours to send messages.
-
-The ``server_name`` in your ``homeserver.yaml`` file determines the way that
-other servers will reach yours. By default, they will treat it as a hostname
-and try to connect to port 8448. This is easy to set up and will work with the
-default configuration, provided you set the ``server_name`` to match your
-machine's public DNS hostname, and give Synapse a TLS certificate which is
-valid for your ``server_name``.
-
-For a more flexible configuration, you can set up a DNS SRV record. This allows
-you to run your server on a machine that might not have the same name as your
-domain name. For example, you might want to run your server at
-``synapse.example.com``, but have your Matrix user-ids look like
-``@user:example.com``. (A SRV record also allows you to change the port from
-the default 8448).
-
-To use a SRV record, first create your SRV record and publish it in DNS. This
-should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
-<synapse.server.name>``. The DNS record should then look something like::
-
-    $ dig -t srv _matrix._tcp.example.com
-    _matrix._tcp.example.com. 3600    IN      SRV     10 0 8448 synapse.example.com.
-
-Note that the server hostname cannot be an alias (CNAME record): it has to point
-directly to the server hosting the synapse instance.
-
-You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
-its user-ids, by setting ``server_name``::
-
-    python -m synapse.app.homeserver \
-        --server-name <yourdomain.com> \
-        --config-path homeserver.yaml \
-        --generate-config
-    python -m synapse.app.homeserver --config-path homeserver.yaml
-
-If you've already generated the config file, you need to edit the ``server_name``
-in your ``homeserver.yaml`` file. If you've already started Synapse and a
-database has been created, you will have to recreate the database.
-
-If all goes well, you should be able to `connect to your server with a client`__,
-and then join a room via federation. (Try ``#matrix-dev:matrix.org`` as a first
-step. "Matrix HQ"'s sheer size and activity level tends to make even the
-largest boxes pause for thought.)
-
-.. __: `Connecting to Synapse from a client`_
-
-Troubleshooting
----------------
-
-You can use the `federation tester <https://matrix.org/federationtester>`_ to
-check if your homeserver is all set.
-
-The typical failure mode with federation is that when you try to join a room,
-it is rejected with "401: Unauthorized". Generally this means that other
-servers in the room couldn't access yours. (Joining a room over federation is a
-complicated dance which requires connections in both directions).
-
-So, things to check are:
-
-* If you are not using a SRV record, check that your ``server_name`` (the part
-  of your user-id after the ``:``) matches your hostname, and that port 8448 on
-  that hostname is reachable from outside your network.
-* If you *are* using a SRV record, check that it matches your ``server_name``
-  (it should be ``_matrix._tcp.<server_name>``), and that the port and hostname
-  it specifies are reachable from outside your network.
-
-Another common problem is that people on other servers can't join rooms that
-you invite them to. This can be caused by an incorrectly-configured reverse
-proxy: see `<docs/reverse_proxy.rst>`_ for instructions on how to correctly
-configure a reverse proxy.
-
-Running a Demo Federation of Synapses
--------------------------------------
-
-If you want to get up and running quickly with a trio of homeservers in a
-private federation, there is a script in the ``demo`` directory. This is mainly
-useful just for development purposes. See `<demo/README>`_.
-
 
 Using PostgreSQL
 ================
 
-As of Synapse 0.9, `PostgreSQL <https://www.postgresql.org>`_ is supported as an
-alternative to the `SQLite <https://sqlite.org/>`_ database that Synapse has
-traditionally used for convenience and simplicity.
+Synapse offers two database engines:
+ * `SQLite <https://sqlite.org/>`_
+ * `PostgreSQL <https://www.postgresql.org>`_
 
-The advantages of Postgres include:
+By default Synapse uses SQLite in and doing so trades performance for convenience.
+SQLite is only recommended in Synapse for testing purposes or for servers with
+light workloads.
+
+Almost all installations should opt to use PostreSQL. Advantages include:
 
 * significant performance improvements due to the superior threading and
   caching model, smarter query optimiser
@@ -312,7 +186,7 @@ The advantages of Postgres include:
   synapse itself.
 
 For information on how to install and use PostgreSQL, please see
-`docs/postgres.rst <docs/postgres.rst>`_.
+`docs/postgres.md <docs/postgres.md>`_.
 
 .. _reverse-proxy:
 
@@ -327,7 +201,7 @@ It is recommended to put a reverse proxy such as
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 
-For information on configuring one, see `<docs/reverse_proxy.rst>`_.
+For information on configuring one, see `<docs/reverse_proxy.md>`_.
 
 Identity Servers
 ================
@@ -398,7 +272,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python3 env
     source env/bin/activate
-    python -m pip install -e .[all]
+    python -m pip install --no-use-pep517 -e .[all]
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -438,3 +312,85 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     python setup.py build_sphinx
+
+Troubleshooting
+===============
+
+Running out of File Handles
+---------------------------
+
+If synapse runs out of file handles, it typically fails badly - live-locking
+at 100% CPU, and/or failing to accept new TCP connections (blocking the
+connecting client).  Matrix currently can legitimately use a lot of file handles,
+thanks to busy rooms like #matrix:matrix.org containing hundreds of participating
+servers.  The first time a server talks in a room it will try to connect
+simultaneously to all participating servers, which could exhaust the available
+file descriptors between DNS queries & HTTPS sockets, especially if DNS is slow
+to respond. (We need to improve the routing algorithm used to be better than
+full mesh, but as of March 2019 this hasn't happened yet).
+
+If you hit this failure mode, we recommend increasing the maximum number of
+open file handles to be at least 4096 (assuming a default of 1024 or 256).
+This is typically done by editing ``/etc/security/limits.conf``
+
+Separately, Synapse may leak file handles if inbound HTTP requests get stuck
+during processing - e.g. blocked behind a lock or talking to a remote server etc.
+This is best diagnosed by matching up the 'Received request' and 'Processed request'
+log lines and looking for any 'Processed request' lines which take more than
+a few seconds to execute. Please let us know at #synapse:matrix.org if
+you see this failure mode so we can help debug it, however.
+
+Help!! Synapse is slow and eats all my RAM/CPU!
+-----------------------------------------------
+
+First, ensure you are running the latest version of Synapse, using Python 3
+with a PostgreSQL database.
+
+Synapse's architecture is quite RAM hungry currently - we deliberately
+cache a lot of recent room data and metadata in RAM in order to speed up
+common requests. We'll improve this in the future, but for now the easiest
+way to either reduce the RAM usage (at the risk of slowing things down)
+is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
+variable. The default is 0.5, which can be decreased to reduce RAM usage
+in memory constrained enviroments, or increased if performance starts to
+degrade.
+
+However, degraded performance due to a low cache factor, common on
+machines with slow disks, often leads to explosions in memory use due
+backlogged requests. In this case, reducing the cache factor will make
+things worse. Instead, try increasing it drastically. 2.0 is a good
+starting value.
+
+Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
+improvement in overall memory use, and especially in terms of giving back
+RAM to the OS. To use it, the library must simply be put in the
+LD_PRELOAD environment variable when launching Synapse. On Debian, this
+can be done by installing the ``libjemalloc1`` package and adding this
+line to ``/etc/default/matrix-synapse``::
+
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
+
+This can make a significant difference on Python 2.7 - it's unclear how
+much of an improvement it provides on Python 3.x.
+
+If you're encountering high CPU use by the Synapse process itself, you
+may be affected by a bug with presence tracking that leads to a
+massive excess of outgoing federation requests (see `discussion
+<https://github.com/matrix-org/synapse/issues/3971>`_). If metrics
+indicate that your server is also issuing far more outgoing federation
+requests than can be accounted for by your users' activity, this is a
+likely cause. The misbehavior can be worked around by setting
+``use_presence: false`` in the Synapse config file.
+
+People can't accept room invitations from me
+--------------------------------------------
+
+The typical failure mode here is that you send an invitation to someone 
+to join a room or direct chat, but when they go to accept it, they get an
+error (typically along the lines of "Invalid signature"). They might see
+something like the following in their logs::
+
+    2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
+
+This is normally caused by a misconfiguration in your reverse-proxy. See
+`<docs/reverse_proxy.rst>`_ and double-check that your settings are correct.

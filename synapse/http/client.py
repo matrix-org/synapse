@@ -15,8 +15,9 @@
 # limitations under the License.
 
 import logging
+from io import BytesIO
 
-from six import text_type
+from six import raise_from, text_type
 from six.moves import urllib
 
 import treq
@@ -34,15 +35,21 @@ from twisted.internet.interfaces import (
 )
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import Agent, HTTPConnectionPool, PartialDownloadError, readBody
+from twisted.web.client import Agent, HTTPConnectionPool, readBody
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
-from synapse.http import cancelled_to_request_timed_out_error, redact_uri
+from synapse.http import (
+    QuieterFileBodyProducer,
+    cancelled_to_request_timed_out_error,
+    redact_uri,
+)
+from synapse.http.proxyagent import ProxyAgent
+from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.caches import CACHE_SIZE_FACTOR
-from synapse.util.logcontext import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +92,31 @@ class IPBlacklistingResolver(object):
     def resolveHostName(self, recv, hostname, portNumber=0):
 
         r = recv()
-        d = defer.Deferred()
         addresses = []
+
+        def _callback():
+            r.resolutionBegan(None)
+
+            has_bad_ip = False
+            for i in addresses:
+                ip_address = IPAddress(i.host)
+
+                if check_against_blacklist(
+                    ip_address, self._ip_whitelist, self._ip_blacklist
+                ):
+                    logger.info(
+                        "Dropped %s from DNS resolution to %s due to blacklist"
+                        % (ip_address, hostname)
+                    )
+                    has_bad_ip = True
+
+            # if we have a blacklisted IP, we'd like to raise an error to block the
+            # request, but all we can really do from here is claim that there were no
+            # valid results.
+            if not has_bad_ip:
+                for i in addresses:
+                    r.addressResolved(i)
+            r.resolutionComplete()
 
         @provider(IResolutionReceiver)
         class EndpointReceiver(object):
@@ -96,33 +126,15 @@ class IPBlacklistingResolver(object):
 
             @staticmethod
             def addressResolved(address):
-                ip_address = IPAddress(address.host)
-
-                if check_against_blacklist(
-                    ip_address, self._ip_whitelist, self._ip_blacklist
-                ):
-                    logger.info(
-                        "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
-                    )
-                    raise SynapseError(403, "IP address blocked by IP blacklist entry")
-
                 addresses.append(address)
 
             @staticmethod
             def resolutionComplete():
-                d.callback(addresses)
+                _callback()
 
         self._reactor.nameResolver.resolveHostName(
             EndpointReceiver, hostname, portNumber=portNumber
         )
-
-        def _callback(addrs):
-            r.resolutionBegan(None)
-            for i in addrs:
-                r.addressResolved(i)
-            r.resolutionComplete()
-
-        d.addCallback(_callback)
 
         return r
 
@@ -146,7 +158,7 @@ class BlacklistingAgentWrapper(Agent):
         self._ip_blacklist = ip_blacklist
 
     def request(self, method, uri, headers=None, bodyProducer=None):
-        h = urllib.parse.urlparse(uri.decode('ascii'))
+        h = urllib.parse.urlparse(uri.decode("ascii"))
 
         try:
             ip_address = IPAddress(h.hostname)
@@ -154,9 +166,7 @@ class BlacklistingAgentWrapper(Agent):
             if check_against_blacklist(
                 ip_address, self._ip_whitelist, self._ip_blacklist
             ):
-                logger.info(
-                    "Blocking access to %s because of blacklist" % (ip_address,)
-                )
+                logger.info("Blocking access to %s due to blacklist" % (ip_address,))
                 e = SynapseError(403, "IP address blocked by IP blacklist entry")
                 return defer.fail(Failure(e))
         except Exception:
@@ -174,7 +184,15 @@ class SimpleHttpClient(object):
     using HTTP in Matrix
     """
 
-    def __init__(self, hs, treq_args={}, ip_whitelist=None, ip_blacklist=None):
+    def __init__(
+        self,
+        hs,
+        treq_args={},
+        ip_whitelist=None,
+        ip_blacklist=None,
+        http_proxy=None,
+        https_proxy=None,
+    ):
         """
         Args:
             hs (synapse.server.HomeServer)
@@ -183,6 +201,8 @@ class SimpleHttpClient(object):
                 we may not request.
             ip_whitelist (netaddr.IPSet): The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
+            http_proxy (bytes): proxy server to use for http connections. host[:port]
+            https_proxy (bytes): proxy server to use for https connections. host[:port]
         """
         self.hs = hs
 
@@ -195,7 +215,7 @@ class SimpleHttpClient(object):
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
 
-        self.user_agent = self.user_agent.encode('ascii')
+        self.user_agent = self.user_agent.encode("ascii")
 
         if self._ip_blacklist:
             real_reactor = hs.get_reactor()
@@ -227,11 +247,13 @@ class SimpleHttpClient(object):
         # The default context factory in Twisted 14.0.0 (which we require) is
         # BrowserLikePolicyForHTTPS which will do regular cert validation
         # 'like a browser'
-        self.agent = Agent(
+        self.agent = ProxyAgent(
             self.reactor,
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
+            http_proxy=http_proxy,
+            https_proxy=https_proxy,
         )
 
         if self._ip_blacklist:
@@ -246,16 +268,13 @@ class SimpleHttpClient(object):
             )
 
     @defer.inlineCallbacks
-    def request(self, method, uri, data=b'', headers=None):
+    def request(self, method, uri, data=None, headers=None):
         """
         Args:
             method (str): HTTP method to use.
             uri (str): URI to query.
             data (bytes): Data to send in the request body, if applicable.
             headers (t.w.http_headers.Headers): Request headers.
-
-        Raises:
-            SynapseError: If the IP is blacklisted.
         """
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
@@ -264,38 +283,56 @@ class SimpleHttpClient(object):
         # log request but strip `access_token` (AS requests for example include this)
         logger.info("Sending request %s %s", method, redact_uri(uri))
 
-        try:
-            request_deferred = treq.request(
-                method,
-                uri,
-                agent=self.agent,
-                data=data,
-                headers=headers,
-                **self._extra_treq_args
-            )
-            request_deferred = timeout_deferred(
-                request_deferred,
-                60,
-                self.hs.get_reactor(),
-                cancelled_to_request_timed_out_error,
-            )
-            response = yield make_deferred_yieldable(request_deferred)
+        with start_active_span(
+            "outgoing-client-request",
+            tags={
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
+                tags.HTTP_METHOD: method,
+                tags.HTTP_URL: uri,
+            },
+            finish_on_close=True,
+        ):
+            try:
+                body_producer = None
+                if data is not None:
+                    body_producer = QuieterFileBodyProducer(BytesIO(data))
 
-            incoming_responses_counter.labels(method, response.code).inc()
-            logger.info(
-                "Received response to %s %s: %s", method, redact_uri(uri), response.code
-            )
-            defer.returnValue(response)
-        except Exception as e:
-            incoming_responses_counter.labels(method, "ERR").inc()
-            logger.info(
-                "Error sending request to  %s %s: %s %s",
-                method,
-                redact_uri(uri),
-                type(e).__name__,
-                e.args[0],
-            )
-            raise
+                request_deferred = treq.request(
+                    method,
+                    uri,
+                    agent=self.agent,
+                    data=body_producer,
+                    headers=headers,
+                    **self._extra_treq_args
+                )
+                request_deferred = timeout_deferred(
+                    request_deferred,
+                    60,
+                    self.hs.get_reactor(),
+                    cancelled_to_request_timed_out_error,
+                )
+                response = yield make_deferred_yieldable(request_deferred)
+
+                incoming_responses_counter.labels(method, response.code).inc()
+                logger.info(
+                    "Received response to %s %s: %s",
+                    method,
+                    redact_uri(uri),
+                    response.code,
+                )
+                return response
+            except Exception as e:
+                incoming_responses_counter.labels(method, "ERR").inc()
+                logger.info(
+                    "Error sending request to  %s %s: %s %s",
+                    method,
+                    redact_uri(uri),
+                    type(e).__name__,
+                    e.args[0],
+                )
+                set_tag(tags.ERROR, True)
+                set_tag("error_reason", e.args[0])
+                raise
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}, headers=None):
@@ -303,7 +340,7 @@ class SimpleHttpClient(object):
         Args:
             uri (str):
             args (dict[str, str|List[str]]): query params
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
 
         Returns:
@@ -336,7 +373,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            defer.returnValue(json.loads(body))
+            return json.loads(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -347,7 +384,7 @@ class SimpleHttpClient(object):
         Args:
             uri (str):
             post_json (object):
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
 
         Returns:
@@ -376,7 +413,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            defer.returnValue(json.loads(body))
+            return json.loads(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -390,7 +427,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -401,7 +438,7 @@ class SimpleHttpClient(object):
             ValueError: if the response was not JSON
         """
         body = yield self.get_raw(uri, args, headers=headers)
-        defer.returnValue(json.loads(body))
+        return json.loads(body)
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}, headers=None):
@@ -414,7 +451,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -444,7 +481,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            defer.returnValue(json.loads(body))
+            return json.loads(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -458,7 +495,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -479,7 +516,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            defer.returnValue(body)
+            return body
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -492,7 +529,7 @@ class SimpleHttpClient(object):
         Args:
             url (str): The URL to GET
             output_stream (file): File to write the response body to.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             A (int,dict,string,int) tuple of the file length, dict of the response
@@ -508,10 +545,10 @@ class SimpleHttpClient(object):
         resp_headers = dict(response.headers.getAllRawHeaders())
 
         if (
-            b'Content-Length' in resp_headers
-            and int(resp_headers[b'Content-Length'][0]) > max_size
+            b"Content-Length" in resp_headers
+            and int(resp_headers[b"Content-Length"][0]) > max_size
         ):
-            logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
+            logger.warning("Requested URL is too large > %r bytes" % (self.max_size,))
             raise SynapseError(
                 502,
                 "Requested file is too large > %r bytes" % (self.max_size,),
@@ -519,7 +556,7 @@ class SimpleHttpClient(object):
             )
 
         if response.code > 299:
-            logger.warn("Got %d when downloading %s" % (response.code, url))
+            logger.warning("Got %d when downloading %s" % (response.code, url))
             raise SynapseError(502, "Got error %d" % (response.code,), Codes.UNKNOWN)
 
         # TODO: if our Content-Type is HTML or something, just read the first
@@ -530,19 +567,17 @@ class SimpleHttpClient(object):
             length = yield make_deferred_yieldable(
                 _readBodyToFile(response, output_stream, max_size)
             )
+        except SynapseError:
+            # This can happen e.g. because the body is too large.
+            raise
         except Exception as e:
-            logger.exception("Failed to download body")
-            raise SynapseError(
-                502, ("Failed to download remote body: %s" % e), Codes.UNKNOWN
-            )
+            raise_from(SynapseError(502, ("Failed to download remote body: %s" % e)), e)
 
-        defer.returnValue(
-            (
-                length,
-                resp_headers,
-                response.request.absoluteURI.decode('ascii'),
-                response.code,
-            )
+        return (
+            length,
+            resp_headers,
+            response.request.absoluteURI.decode("ascii"),
+            response.code,
         )
 
 
@@ -592,45 +627,13 @@ def _readBodyToFile(response, stream, max_size):
     return d
 
 
-class CaptchaServerHttpClient(SimpleHttpClient):
-    """
-    Separate HTTP client for talking to google's captcha servers
-    Only slightly special because accepts partial download responses
-
-    used only by c/s api v1
-    """
-
-    @defer.inlineCallbacks
-    def post_urlencoded_get_raw(self, url, args={}):
-        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True)
-
-        response = yield self.request(
-            "POST",
-            url,
-            data=query_bytes,
-            headers=Headers(
-                {
-                    b"Content-Type": [b"application/x-www-form-urlencoded"],
-                    b"User-Agent": [self.user_agent],
-                }
-            ),
-        )
-
-        try:
-            body = yield make_deferred_yieldable(readBody(response))
-            defer.returnValue(body)
-        except PartialDownloadError as e:
-            # twisted dislikes google's response, no content length.
-            defer.returnValue(e.response)
-
-
 def encode_urlencode_args(args):
     return {k: encode_urlencode_arg(v) for k, v in args.items()}
 
 
 def encode_urlencode_arg(arg):
     if isinstance(arg, text_type):
-        return arg.encode('utf-8')
+        return arg.encode("utf-8")
     elif isinstance(arg, list):
         return [encode_urlencode_arg(i) for i in arg]
     else:

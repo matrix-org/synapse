@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +27,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.logging.opentracing import log_kv, trace
 from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)
@@ -49,6 +51,7 @@ class E2eRoomKeysHandler(object):
         # changed.
         self._upload_linearizer = Linearizer("upload_room_keys_lock")
 
+    @trace
     @defer.inlineCallbacks
     def get_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk get the E2E room keys for a given backup, optionally filtered to a given
@@ -84,8 +87,10 @@ class E2eRoomKeysHandler(object):
                 user_id, version, room_id, session_id
             )
 
-            defer.returnValue(results)
+            log_kv(results)
+            return results
 
+    @trace
     @defer.inlineCallbacks
     def delete_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
@@ -99,14 +104,36 @@ class E2eRoomKeysHandler(object):
                 rooms
             session_id(string): session ID to delete keys for, for None to delete keys
                 for all sessions
+        Raises:
+            NotFoundError: if the backup version does not exist
         Returns:
-            A deferred of the deletion transaction
+            A dict containing the count and etag for the backup version
         """
 
         # lock for consistency with uploading
         with (yield self._upload_linearizer.queue(user_id)):
+            # make sure the backup version exists
+            try:
+                version_info = yield self.store.get_e2e_room_keys_version_info(
+                    user_id, version
+                )
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError("Unknown backup version")
+                else:
+                    raise
+
             yield self.store.delete_e2e_room_keys(user_id, version, room_id, session_id)
 
+            version_etag = version_info["etag"] + 1
+            yield self.store.update_e2e_room_keys_version(
+                user_id, version, None, version_etag
+            )
+
+            count = yield self.store.count_e2e_room_keys(user_id, version)
+            return {"etag": str(version_etag), "count": count}
+
+    @trace
     @defer.inlineCallbacks
     def upload_room_keys(self, user_id, version, room_keys):
         """Bulk upload a list of room keys into a given backup version, asserting
@@ -133,6 +160,9 @@ class E2eRoomKeysHandler(object):
             }
         }
 
+        Returns:
+            A dict containing the count and etag for the backup version
+
         Raises:
             NotFoundError: if there are no versions defined
             RoomKeysVersionError: if the uploaded version is not the current version
@@ -152,57 +182,76 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
 
-            if version_info['version'] != version:
+            if version_info["version"] != version:
                 # Check that the version we're trying to upload actually exists
                 try:
                     version_info = yield self.store.get_e2e_room_keys_version_info(
-                        user_id, version,
+                        user_id, version
                     )
                     # if we get this far, the version must exist
-                    raise RoomKeysVersionError(current_version=version_info['version'])
+                    raise RoomKeysVersionError(current_version=version_info["version"])
                 except StoreError as e:
                     if e.code == 404:
                         raise NotFoundError("Version '%s' not found" % (version,))
                     else:
                         raise
 
-            # go through the room_keys.
-            # XXX: this should/could be done concurrently, given we're in a lock.
-            for room_id, room in iteritems(room_keys['rooms']):
-                for session_id, session in iteritems(room['sessions']):
-                    yield self._upload_room_key(
-                        user_id, version, room_id, session_id, session
+            # Fetch any existing room keys for the sessions that have been
+            # submitted.  Then compare them with the submitted keys.  If the
+            # key is new, insert it; if the key should be updated, then update
+            # it; otherwise, drop it.
+            existing_keys = yield self.store.get_e2e_room_keys_multi(
+                user_id, version, room_keys["rooms"]
+            )
+            to_insert = []  # batch the inserts together
+            changed = False  # if anything has changed, we need to update the etag
+            for room_id, room in iteritems(room_keys["rooms"]):
+                for session_id, room_key in iteritems(room["sessions"]):
+                    log_kv(
+                        {
+                            "message": "Trying to upload room key",
+                            "room_id": room_id,
+                            "session_id": session_id,
+                            "user_id": user_id,
+                        }
                     )
+                    current_room_key = existing_keys.get(room_id, {}).get(session_id)
+                    if current_room_key:
+                        if self._should_replace_room_key(current_room_key, room_key):
+                            log_kv({"message": "Replacing room key."})
+                            # updates are done one at a time in the DB, so send
+                            # updates right away rather than batching them up,
+                            # like we do with the inserts
+                            yield self.store.update_e2e_room_key(
+                                user_id, version, room_id, session_id, room_key
+                            )
+                            changed = True
+                        else:
+                            log_kv({"message": "Not replacing room_key."})
+                    else:
+                        log_kv(
+                            {
+                                "message": "Room key not found.",
+                                "room_id": room_id,
+                                "user_id": user_id,
+                            }
+                        )
+                        log_kv({"message": "Replacing room key."})
+                        to_insert.append((room_id, session_id, room_key))
+                        changed = True
 
-    @defer.inlineCallbacks
-    def _upload_room_key(self, user_id, version, room_id, session_id, room_key):
-        """Upload a given room_key for a given room and session into a given
-        version of the backup.  Merges the key with any which might already exist.
+            if len(to_insert):
+                yield self.store.add_e2e_room_keys(user_id, version, to_insert)
 
-        Args:
-            user_id(str): the user whose backup we're setting
-            version(str): the version ID of the backup we're updating
-            room_id(str): the ID of the room whose keys we're setting
-            session_id(str): the session whose room_key we're setting
-            room_key(dict): the room_key being set
-        """
+            version_etag = version_info["etag"]
+            if changed:
+                version_etag = version_etag + 1
+                yield self.store.update_e2e_room_keys_version(
+                    user_id, version, None, version_etag
+                )
 
-        # get the room_key for this particular row
-        current_room_key = None
-        try:
-            current_room_key = yield self.store.get_e2e_room_key(
-                user_id, version, room_id, session_id
-            )
-        except StoreError as e:
-            if e.code == 404:
-                pass
-            else:
-                raise
-
-        if self._should_replace_room_key(current_room_key, room_key):
-            yield self.store.set_e2e_room_key(
-                user_id, version, room_id, session_id, room_key
-            )
+            count = yield self.store.count_e2e_room_keys(user_id, version)
+            return {"etag": str(version_etag), "count": count}
 
     @staticmethod
     def _should_replace_room_key(current_room_key, room_key):
@@ -223,19 +272,20 @@ class E2eRoomKeysHandler(object):
             # spelt out with if/elifs rather than nested boolean expressions
             # purely for legibility.
 
-            if room_key['is_verified'] and not current_room_key['is_verified']:
+            if room_key["is_verified"] and not current_room_key["is_verified"]:
                 return True
             elif (
-                room_key['first_message_index'] <
-                current_room_key['first_message_index']
+                room_key["first_message_index"]
+                < current_room_key["first_message_index"]
             ):
                 return True
-            elif room_key['forwarded_count'] < current_room_key['forwarded_count']:
+            elif room_key["forwarded_count"] < current_room_key["forwarded_count"]:
                 return True
             else:
                 return False
         return True
 
+    @trace
     @defer.inlineCallbacks
     def create_version(self, user_id, version_info):
         """Create a new backup version.  This automatically becomes the new
@@ -262,7 +312,7 @@ class E2eRoomKeysHandler(object):
             new_version = yield self.store.create_e2e_room_keys_version(
                 user_id, version_info
             )
-            defer.returnValue(new_version)
+            return new_version
 
     @defer.inlineCallbacks
     def get_version_info(self, user_id, version=None):
@@ -292,8 +342,11 @@ class E2eRoomKeysHandler(object):
                     raise NotFoundError("Unknown backup version")
                 else:
                     raise
-            defer.returnValue(res)
 
+            res["count"] = yield self.store.count_e2e_room_keys(user_id, res["version"])
+            return res
+
+    @trace
     @defer.inlineCallbacks
     def delete_version(self, user_id, version=None):
         """Deletes a given version of the user's e2e_room_keys backup
@@ -314,6 +367,7 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
 
+    @trace
     @defer.inlineCallbacks
     def update_version(self, user_id, version, version_info):
         """Update the info about a given version of the user's backup
@@ -328,16 +382,10 @@ class E2eRoomKeysHandler(object):
             A deferred of an empty dict.
         """
         if "version" not in version_info:
+            version_info["version"] = version
+        elif version_info["version"] != version:
             raise SynapseError(
-                400,
-                "Missing version in body",
-                Codes.MISSING_PARAM
-            )
-        if version_info["version"] != version:
-            raise SynapseError(
-                400,
-                "Version in body does not match",
-                Codes.INVALID_PARAM
+                400, "Version in body does not match", Codes.INVALID_PARAM
             )
         with (yield self._upload_linearizer.queue(user_id)):
             try:
@@ -350,12 +398,10 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
             if old_info["algorithm"] != version_info["algorithm"]:
-                raise SynapseError(
-                    400,
-                    "Algorithm does not match",
-                    Codes.INVALID_PARAM
-                )
+                raise SynapseError(400, "Algorithm does not match", Codes.INVALID_PARAM)
 
-            yield self.store.update_e2e_room_keys_version(user_id, version, version_info)
+            yield self.store.update_e2e_room_keys_version(
+                user_id, version, version_info
+            )
 
-            defer.returnValue({})
+            return {}

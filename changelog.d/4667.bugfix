@@ -1,1 +1,0 @@
-Fix kicking guest users on guest access revocation in worker mode.

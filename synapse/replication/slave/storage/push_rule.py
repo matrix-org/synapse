@@ -14,16 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.push_rule import PushRulesWorkerStore
+from synapse.storage.data_stores.main.push_rule import PushRulesWorkerStore
 
 from ._slaved_id_tracker import SlavedIdTracker
 from .events import SlavedEventStore
 
 
-class SlavedPushRuleStore(PushRulesWorkerStore, SlavedEventStore):
+class SlavedPushRuleStore(SlavedEventStore, PushRulesWorkerStore):
     def __init__(self, db_conn, hs):
         self._push_rules_stream_id_gen = SlavedIdTracker(
-            db_conn, "push_rules_stream", "stream_id",
+            db_conn, "push_rules_stream", "stream_id"
         )
         super(SlavedPushRuleStore, self).__init__(db_conn, hs)
 
@@ -47,9 +47,7 @@ class SlavedPushRuleStore(PushRulesWorkerStore, SlavedEventStore):
             for row in rows:
                 self.get_push_rules_for_user.invalidate((row.user_id,))
                 self.get_push_rules_enabled_for_user.invalidate((row.user_id,))
-                self.push_rules_stream_cache.entity_has_changed(
-                    row.user_id, token
-                )
+                self.push_rules_stream_cache.entity_has_changed(row.user_id, token)
         return super(SlavedPushRuleStore, self).process_replication_rows(
             stream_name, token, rows
         )

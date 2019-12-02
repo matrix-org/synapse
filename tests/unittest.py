@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector
+# Copyright 2019 Matrix.org Federation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,25 +14,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import gc
 import hashlib
 import hmac
 import logging
+import time
 
 from mock import Mock
 
 from canonicaljson import json
 
-import twisted
-import twisted.logger
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import Deferred, succeed
+from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
 
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.config.homeserver import HomeServerConfig
+from synapse.config.ratelimiting import FederationRateLimitConfig
+from synapse.federation.transport import server as federation_server
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest
+from synapse.logging.context import LoggingContext
 from synapse.server import HomeServer
-from synapse.types import UserID, create_requester
-from synapse.util.logcontext import LoggingContext
+from synapse.types import Requester, UserID, create_requester
+from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
 from tests.test_utils.logging_setup import setup_logging
@@ -76,17 +84,12 @@ class TestCase(unittest.TestCase):
 
         @around(self)
         def setUp(orig):
-            # enable debugging of delayed calls - this means that we get a
-            # traceback when a unit test exits leaving things on the reactor.
-            twisted.internet.base.DelayedCall.debug = True
-
             # if we're not starting in the sentinel logcontext, then to be honest
             # all future bets are off.
             if LoggingContext.current_context() is not LoggingContext.sentinel:
                 self.fail(
-                    "Test starting with non-sentinel logging context %s" % (
-                        LoggingContext.current_context(),
-                    )
+                    "Test starting with non-sentinel logging context %s"
+                    % (LoggingContext.current_context(),)
                 )
 
             old_level = logging.getLogger().level
@@ -154,6 +157,21 @@ class HomeserverTestCase(TestCase):
     """
     A base TestCase that reduces boilerplate for HomeServer-using test cases.
 
+    Defines a setUp method which creates a mock reactor, and instantiates a homeserver
+    running on that reactor.
+
+    There are various hooks for modifying the way that the homeserver is instantiated:
+
+    * override make_homeserver, for example by making it pass different parameters into
+      setup_test_homeserver.
+
+    * override default_config, to return a modified configuration dictionary for use
+      by setup_test_homeserver.
+
+    * On a per-test basis, you can use the @override_config decorator to give a
+      dictionary containing additional configuration settings to be added to the basic
+      config dict.
+
     Attributes:
         servlets (list[function]): List of servlet registration function.
         user_id (str): The user ID to assume if auth is hijacked.
@@ -163,6 +181,14 @@ class HomeserverTestCase(TestCase):
 
     servlets = []
     hijack_auth = True
+    needs_threadpool = False
+
+    def __init__(self, methodName, *args, **kwargs):
+        super().__init__(methodName, *args, **kwargs)
+
+        # see if we have any additional config for this test
+        method = getattr(self, methodName)
+        self._extra_config = getattr(method, "_extra_config", None)
 
     def setUp(self):
         """
@@ -181,10 +207,7 @@ class HomeserverTestCase(TestCase):
             raise Exception("A homeserver wasn't returned, but %r" % (self.hs,))
 
         # Register the resources
-        self.resource = JsonResource(self.hs)
-
-        for servlet in self.servlets:
-            servlet(self.hs, self.resource)
+        self.resource = self.create_test_json_resource()
 
         from tests.rest.client.v1.utils import RestHelper
 
@@ -194,15 +217,19 @@ class HomeserverTestCase(TestCase):
             if self.hijack_auth:
 
                 def get_user_by_access_token(token=None, allow_guest=False):
-                    return {
-                        "user": UserID.from_string(self.helper.auth_user_id),
-                        "token_id": 1,
-                        "is_guest": False,
-                    }
+                    return succeed(
+                        {
+                            "user": UserID.from_string(self.helper.auth_user_id),
+                            "token_id": 1,
+                            "is_guest": False,
+                        }
+                    )
 
                 def get_user_by_req(request, allow_guest=False, rights="access"):
-                    return create_requester(
-                        UserID.from_string(self.helper.auth_user_id), 1, False, None
+                    return succeed(
+                        create_requester(
+                            UserID.from_string(self.helper.auth_user_id), 1, False, None
+                        )
                     )
 
                 self.hs.get_auth().get_user_by_req = get_user_by_req
@@ -211,8 +238,25 @@ class HomeserverTestCase(TestCase):
                     return_value="1234"
                 )
 
+        if self.needs_threadpool:
+            self.reactor.threadpool = ThreadPool()
+            self.addCleanup(self.reactor.threadpool.stop)
+            self.reactor.threadpool.start()
+
         if hasattr(self, "prepare"):
             self.prepare(self.reactor, self.clock, self.hs)
+
+    def wait_on_thread(self, deferred, timeout=10):
+        """
+        Wait until a Deferred is done, where it's waiting on a real thread.
+        """
+        start_time = time.time()
+
+        while not deferred.called:
+            if start_time + timeout < time.time():
+                raise ValueError("Timed out waiting for threadpool")
+            self.reactor.advance(0.01)
+            time.sleep(0.01)
 
     def make_homeserver(self, reactor, clock):
         """
@@ -230,14 +274,38 @@ class HomeserverTestCase(TestCase):
         hs = self.setup_test_homeserver()
         return hs
 
+    def create_test_json_resource(self):
+        """
+        Create a test JsonResource, with the relevant servlets registerd to it
+
+        The default implementation calls each function in `servlets` to do the
+        registration.
+
+        Returns:
+            JsonResource:
+        """
+        resource = JsonResource(self.hs)
+
+        for servlet in self.servlets:
+            servlet(self.hs, resource)
+
+        return resource
+
     def default_config(self, name="test"):
         """
-        Get a default HomeServer config object.
+        Get a default HomeServer config dict.
 
         Args:
             name (str): The homeserver name/domain.
         """
-        return default_config(name)
+        config = default_config(name)
+
+        # apply any additional config which was specified via the override_config
+        # decorator.
+        if self._extra_config is not None:
+            config.update(self._extra_config)
+
+        return config
 
     def prepare(self, reactor, clock, homeserver):
         """
@@ -262,6 +330,7 @@ class HomeserverTestCase(TestCase):
         access_token=None,
         request=SynapseRequest,
         shorthand=True,
+        federation_auth_origin=None,
     ):
         """
         Create a SynapseRequest at the path using the method and containing the
@@ -275,15 +344,24 @@ class HomeserverTestCase(TestCase):
             a dict.
             shorthand: Whether to try and be helpful and prefix the given URL
             with the usual REST API path, if it doesn't contain it.
+            federation_auth_origin (bytes|None): if set to not-None, we will add a fake
+                Authorization header pretenting to be the given server name.
 
         Returns:
-            A synapse.http.site.SynapseRequest.
+            Tuple[synapse.http.site.SynapseRequest, channel]
         """
         if isinstance(content, dict):
-            content = json.dumps(content).encode('utf8')
+            content = json.dumps(content).encode("utf8")
 
         return make_request(
-            self.reactor, method, path, content, access_token, request, shorthand
+            self.reactor,
+            method,
+            path,
+            content,
+            access_token,
+            request,
+            shorthand,
+            federation_auth_origin,
         )
 
     def render(self, request):
@@ -310,6 +388,16 @@ class HomeserverTestCase(TestCase):
         """
         kwargs = dict(kwargs)
         kwargs.update(self._hs_args)
+        if "config" not in kwargs:
+            config = self.default_config()
+        else:
+            config = kwargs["config"]
+
+        # Parse the config from a config dict into a HomeServerConfig
+        config_obj = HomeServerConfig()
+        config_obj.parse_config_dict(config, "", "")
+        kwargs["config"] = config_obj
+
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()
 
@@ -326,11 +414,20 @@ class HomeserverTestCase(TestCase):
         """
         self.reactor.pump([by] * 100)
 
-    def get_success(self, d):
+    def get_success(self, d, by=0.0):
+        if not isinstance(d, Deferred):
+            return d
+        self.pump(by=by)
+        return self.successResultOf(d)
+
+    def get_failure(self, d, exc):
+        """
+        Run a Deferred and get a Failure from it. The failure must be of the type `exc`.
+        """
         if not isinstance(d, Deferred):
             return d
         self.pump()
-        return self.successResultOf(d)
+        return self.failureResultOf(d, exc)
 
     def register_user(self, username, password, admin=False):
         """
@@ -345,21 +442,22 @@ class HomeserverTestCase(TestCase):
         Returns:
             The MXID of the new user (unicode).
         """
-        self.hs.config.registration_shared_secret = u"shared"
+        self.hs.config.registration_shared_secret = "shared"
 
         # Create the user
         request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
         self.render(request)
+        self.assertEqual(channel.code, 200)
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        nonce_str = b"\x00".join([username.encode('utf8'), password.encode('utf8')])
+        nonce_str = b"\x00".join([username.encode("utf8"), password.encode("utf8")])
         if admin:
             nonce_str += b"\x00admin"
         else:
             nonce_str += b"\x00notadmin"
 
-        want_mac.update(nonce.encode('ascii') + b"\x00" + nonce_str)
+        want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -372,10 +470,10 @@ class HomeserverTestCase(TestCase):
             }
         )
         request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/admin/register", body.encode('utf8')
+            "POST", "/_matrix/client/r0/admin/register", body.encode("utf8")
         )
         self.render(request)
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
         return user_id
@@ -391,10 +489,162 @@ class HomeserverTestCase(TestCase):
             body["device_id"] = device_id
 
         request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode('utf8')
+            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
         )
         self.render(request)
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.result)
 
         access_token = channel.json_body["access_token"]
         return access_token
+
+    def create_and_send_event(
+        self, room_id, user, soft_failed=False, prev_event_ids=None
+    ):
+        """
+        Create and send an event.
+
+        Args:
+            soft_failed (bool): Whether to create a soft failed event or not
+            prev_event_ids (list[str]|None): Explicitly set the prev events,
+                or if None just use the default
+
+        Returns:
+            str: The new event's ID.
+        """
+        event_creator = self.hs.get_event_creation_handler()
+        secrets = self.hs.get_secrets()
+        requester = Requester(user, None, False, None, None)
+
+        prev_events_and_hashes = None
+        if prev_event_ids:
+            prev_events_and_hashes = [[p, {}, 0] for p in prev_event_ids]
+
+        event, context = self.get_success(
+            event_creator.create_event(
+                requester,
+                {
+                    "type": EventTypes.Message,
+                    "room_id": room_id,
+                    "sender": user.to_string(),
+                    "content": {"body": secrets.token_hex(), "msgtype": "m.text"},
+                },
+                prev_events_and_hashes=prev_events_and_hashes,
+            )
+        )
+
+        if soft_failed:
+            event.internal_metadata.soft_failed = True
+
+        self.get_success(event_creator.send_nonmember_event(requester, event, context))
+
+        return event.event_id
+
+    def add_extremity(self, room_id, event_id):
+        """
+        Add the given event as an extremity to the room.
+        """
+        self.get_success(
+            self.hs.get_datastore()._simple_insert(
+                table="event_forward_extremities",
+                values={"room_id": room_id, "event_id": event_id},
+                desc="test_add_extremity",
+            )
+        )
+
+        self.hs.get_datastore().get_latest_event_ids_in_room.invalidate((room_id,))
+
+    def attempt_wrong_password_login(self, username, password):
+        """Attempts to login as the user with the given password, asserting
+        that the attempt *fails*.
+        """
+        body = {"type": "m.login.password", "user": username, "password": password}
+
+        request, channel = self.make_request(
+            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 403, channel.result)
+
+    def inject_room_member(self, room: str, user: str, membership: Membership) -> None:
+        """
+        Inject a membership event into a room.
+
+        Args:
+            room: Room ID to inject the event into.
+            user: MXID of the user to inject the membership for.
+            membership: The membership type.
+        """
+        event_builder_factory = self.hs.get_event_builder_factory()
+        event_creation_handler = self.hs.get_event_creation_handler()
+
+        room_version = self.get_success(self.hs.get_datastore().get_room_version(room))
+
+        builder = event_builder_factory.for_room_version(
+            KNOWN_ROOM_VERSIONS[room_version],
+            {
+                "type": EventTypes.Member,
+                "sender": user,
+                "state_key": user,
+                "room_id": room,
+                "content": {"membership": membership},
+            },
+        )
+
+        event, context = self.get_success(
+            event_creation_handler.create_new_client_event(builder)
+        )
+
+        self.get_success(
+            self.hs.get_storage().persistence.persist_event(event, context)
+        )
+
+
+class FederatingHomeserverTestCase(HomeserverTestCase):
+    """
+    A federating homeserver that authenticates incoming requests as `other.example.com`.
+    """
+
+    def prepare(self, reactor, clock, homeserver):
+        class Authenticator(object):
+            def authenticate_request(self, request, content):
+                return succeed("other.example.com")
+
+        ratelimiter = FederationRateLimiter(
+            clock,
+            FederationRateLimitConfig(
+                window_size=1,
+                sleep_limit=1,
+                sleep_msec=1,
+                reject_limit=1000,
+                concurrent_requests=1000,
+            ),
+        )
+        federation_server.register_servlets(
+            homeserver, self.resource, Authenticator(), ratelimiter
+        )
+
+        return super().prepare(reactor, clock, homeserver)
+
+
+def override_config(extra_config):
+    """A decorator which can be applied to test functions to give additional HS config
+
+    For use
+
+    For example:
+
+        class MyTestCase(HomeserverTestCase):
+            @override_config({"enable_registration": False, ...})
+            def test_foo(self):
+                ...
+
+    Args:
+        extra_config(dict): Additional config settings to be merged into the default
+            config dict before instantiating the test homeserver.
+    """
+
+    def decorator(func):
+        func._extra_config = extra_config
+        return func
+
+    return decorator

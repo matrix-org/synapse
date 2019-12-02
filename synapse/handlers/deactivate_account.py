@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 class DeactivateAccountHandler(BaseHandler):
     """Handler which deals with deactivating user accounts."""
+
     def __init__(self, hs):
         super(DeactivateAccountHandler, self).__init__(hs)
         self._auth_handler = hs.get_auth_handler()
@@ -42,13 +44,18 @@ class DeactivateAccountHandler(BaseHandler):
         # it left off (if it has work left to do).
         hs.get_reactor().callWhenRunning(self._start_user_parting)
 
+        self._account_validity_enabled = hs.config.account_validity.enabled
+
     @defer.inlineCallbacks
-    def deactivate_account(self, user_id, erase_data):
+    def deactivate_account(self, user_id, erase_data, id_server=None):
         """Deactivate a user's account
 
         Args:
             user_id (str): ID of user to be deactivated
             erase_data (bool): whether to GDPR-erase the user's data
+            id_server (str|None): Use the given identity server when unbinding
+                any threepids. If None then will attempt to unbind using the
+                identity server specified when binding (if known).
 
         Returns:
             Deferred[bool]: True if identity server supports removing
@@ -66,14 +73,17 @@ class DeactivateAccountHandler(BaseHandler):
         # unbinding
         identity_server_supports_unbinding = True
 
-        threepids = yield self.store.user_get_threepids(user_id)
+        # Retrieve the 3PIDs this user has bound to an identity server
+        threepids = yield self.store.user_get_bound_threepids(user_id)
+
         for threepid in threepids:
             try:
                 result = yield self._identity_handler.try_unbind_threepid(
                     user_id,
                     {
-                        'medium': threepid['medium'],
-                        'address': threepid['address'],
+                        "medium": threepid["medium"],
+                        "address": threepid["address"],
+                        "id_server": id_server,
                     },
                 )
                 identity_server_supports_unbinding &= result
@@ -82,8 +92,11 @@ class DeactivateAccountHandler(BaseHandler):
                 logger.exception("Failed to remove threepid from ID server")
                 raise SynapseError(400, "Failed to remove threepid from ID server")
             yield self.store.user_delete_threepid(
-                user_id, threepid['medium'], threepid['address'],
+                user_id, threepid["medium"], threepid["address"]
             )
+
+        # Remove all 3PIDs this user has bound to the homeserver
+        yield self.store.user_delete_threepids(user_id)
 
         # delete any devices belonging to the user, which will also
         # delete corresponding access tokens.
@@ -110,7 +123,51 @@ class DeactivateAccountHandler(BaseHandler):
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
 
-        defer.returnValue(identity_server_supports_unbinding)
+        # Reject all pending invites for the user, so that the user doesn't show up in the
+        # "invited" section of rooms' members list.
+        yield self._reject_pending_invites_for_user(user_id)
+
+        # Remove all information on the user from the account_validity table.
+        if self._account_validity_enabled:
+            yield self.store.delete_account_validity_for_user(user_id)
+
+        # Mark the user as deactivated.
+        yield self.store.set_user_deactivated_status(user_id, True)
+
+        return identity_server_supports_unbinding
+
+    @defer.inlineCallbacks
+    def _reject_pending_invites_for_user(self, user_id):
+        """Reject pending invites addressed to a given user ID.
+
+        Args:
+            user_id (str): The user ID to reject pending invites for.
+        """
+        user = UserID.from_string(user_id)
+        pending_invites = yield self.store.get_invited_rooms_for_user(user_id)
+
+        for room in pending_invites:
+            try:
+                yield self._room_member_handler.update_membership(
+                    create_requester(user),
+                    user,
+                    room.room_id,
+                    "leave",
+                    ratelimit=False,
+                    require_consent=False,
+                )
+                logger.info(
+                    "Rejected invite for deactivated user %r in room %r",
+                    user_id,
+                    room.room_id,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to reject invite for user %r in room %r:"
+                    " ignoring and continuing",
+                    user_id,
+                    room.room_id,
+                )
 
     def _start_user_parting(self):
         """
@@ -164,9 +221,11 @@ class DeactivateAccountHandler(BaseHandler):
                     room_id,
                     "leave",
                     ratelimit=False,
+                    require_consent=False,
                 )
             except Exception:
                 logger.exception(
                     "Failed to part user %r from room %r: ignoring and continuing",
-                    user_id, room_id,
+                    user_id,
+                    room_id,
                 )

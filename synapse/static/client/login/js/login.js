@@ -49,7 +49,7 @@ var show_login = function() {
     $("#loading").hide();
 
     var this_page = window.location.origin + window.location.pathname;
-    $("#sso_redirect_url").val(encodeURIComponent(this_page));
+    $("#sso_redirect_url").val(this_page);
 
     if (matrixLogin.serverAcceptsPassword) {
         $("#password_flow").show();
@@ -62,7 +62,7 @@ var show_login = function() {
         $("#sso_flow").show();
     }
 
-    if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsCas) {
+    if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsCas && !matrixLogin.serverAcceptsSso) {
         $("#no_login_types").show();
     }
 };

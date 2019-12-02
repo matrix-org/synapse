@@ -14,12 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.appservice import (
+from synapse.storage.data_stores.main.appservice import (
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
 )
 
 
-class SlavedApplicationServiceStore(ApplicationServiceTransactionWorkerStore,
-                                    ApplicationServiceWorkerStore):
+class SlavedApplicationServiceStore(
+    ApplicationServiceTransactionWorkerStore, ApplicationServiceWorkerStore
+):
     pass

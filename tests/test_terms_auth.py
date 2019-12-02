@@ -28,6 +28,21 @@ from tests import unittest
 class TermsTestCase(unittest.HomeserverTestCase):
     servlets = [register_servlets]
 
+    def default_config(self, name="test"):
+        config = super().default_config(name)
+        config.update(
+            {
+                "public_baseurl": "https://example.org/",
+                "user_consent": {
+                    "version": "1.0",
+                    "policy_name": "My Cool Privacy Policy",
+                    "template_dir": "/",
+                    "require_at_registration": True,
+                },
+            }
+        )
+        return config
+
     def prepare(self, reactor, clock, hs):
         self.clock = MemoryReactorClock()
         self.hs_clock = Clock(self.clock)
@@ -35,17 +50,8 @@ class TermsTestCase(unittest.HomeserverTestCase):
         self.registration_handler = Mock()
         self.auth_handler = Mock()
         self.device_handler = Mock()
-        hs.config.enable_registration = True
-        hs.config.registrations_require_3pid = []
-        hs.config.auto_join_rooms = []
-        hs.config.enable_registration_captcha = False
 
     def test_ui_auth(self):
-        self.hs.config.user_consent_at_registration = True
-        self.hs.config.user_consent_policy_name = "My Cool Privacy Policy"
-        self.hs.config.public_baseurl = "https://example.org/"
-        self.hs.config.user_consent_version = "1.0"
-
         # Do a UI auth request
         request, channel = self.make_request(b"POST", self.url, b"{}")
         self.render(request)
@@ -59,7 +65,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
         for flow in channel.json_body["flows"]:
             self.assertIsInstance(flow["stages"], list)
             self.assertTrue(len(flow["stages"]) > 0)
-            self.assertEquals(flow["stages"][-1], "m.login.terms")
+            self.assertTrue("m.login.terms" in flow["stages"])
 
         expected_params = {
             "m.login.terms": {
@@ -69,10 +75,10 @@ class TermsTestCase(unittest.HomeserverTestCase):
                             "name": "My Cool Privacy Policy",
                             "url": "https://example.org/_matrix/consent?v=1.0",
                         },
-                        "version": "1.0"
-                    },
-                },
-            },
+                        "version": "1.0",
+                    }
+                }
+            }
         }
         self.assertIsInstance(channel.json_body["params"], dict)
         self.assertDictContainsSubset(channel.json_body["params"], expected_params)

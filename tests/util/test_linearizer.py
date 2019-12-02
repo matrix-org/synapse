@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd.
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,8 @@ from six.moves import range
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError
 
-from synapse.util import Clock, logcontext
+from synapse.logging.context import LoggingContext
+from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 
 from tests import unittest
@@ -51,13 +52,13 @@ class LinearizerTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def func(i, sleep=False):
-            with logcontext.LoggingContext("func(%s)" % i) as lc:
+            with LoggingContext("func(%s)" % i) as lc:
                 with (yield linearizer.queue("")):
-                    self.assertEqual(logcontext.LoggingContext.current_context(), lc)
+                    self.assertEqual(LoggingContext.current_context(), lc)
                     if sleep:
                         yield Clock(reactor).sleep(0)
 
-                self.assertEqual(logcontext.LoggingContext.current_context(), lc)
+                self.assertEqual(LoggingContext.current_context(), lc)
 
         func(0, sleep=True)
         for i in range(1, 100):

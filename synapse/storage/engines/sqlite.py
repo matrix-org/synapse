@@ -38,6 +38,20 @@ class Sqlite3Engine(object):
         """
         return self.module.sqlite_version_info >= (3, 24, 0)
 
+    @property
+    def supports_tuple_comparison(self):
+        """
+        Do we support comparing tuples, i.e. `(a, b) > (c, d)`? This requires
+        SQLite 3.15+.
+        """
+        return self.module.sqlite_version_info >= (3, 15, 0)
+
+    @property
+    def supports_using_any_list(self):
+        """Do we support using `a = ANY(?)` and passing a list
+        """
+        return False
+
     def check_database(self, txn):
         pass
 
@@ -70,12 +84,22 @@ class Sqlite3Engine(object):
             self._current_state_group_id += 1
             return self._current_state_group_id
 
+    @property
+    def server_version(self):
+        """Gets a string giving the server version. For example: '3.22.0'
+
+        Returns:
+            string
+        """
+        return "%i.%i.%i" % self.module.sqlite_version_info
+
 
 # Following functions taken from: https://github.com/coleifer/peewee
 
+
 def _parse_match_info(buf):
     bufsize = len(buf)
-    return [struct.unpack('@I', buf[i:i + 4])[0] for i in range(0, bufsize, 4)]
+    return [struct.unpack("@I", buf[i : i + 4])[0] for i in range(0, bufsize, 4)]
 
 
 def _rank(raw_match_info):
@@ -89,7 +113,7 @@ def _rank(raw_match_info):
         phrase_info_idx = 2 + (phrase_num * c * 3)
         for col_num in range(c):
             col_idx = phrase_info_idx + (col_num * 3)
-            x1, x2 = match_info[col_idx:col_idx + 2]
+            x1, x2 = match_info[col_idx : col_idx + 2]
             if x1 > 0:
                 score += float(x1) / x2
     return score

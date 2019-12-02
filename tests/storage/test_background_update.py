@@ -9,9 +9,7 @@ from tests.utils import setup_test_homeserver
 class BackgroundUpdateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver(
-            self.addCleanup
-        )
+        hs = yield setup_test_homeserver(self.addCleanup)
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
@@ -45,7 +43,7 @@ class BackgroundUpdateTestCase(unittest.TestCase):
                 "test_update",
                 progress,
             )
-            defer.returnValue(count)
+            return count
 
         self.update_handler.side_effect = update
 
@@ -62,7 +60,7 @@ class BackgroundUpdateTestCase(unittest.TestCase):
         @defer.inlineCallbacks
         def update(progress, count):
             yield self.store._end_background_update("test_update")
-            defer.returnValue(count)
+            return count
 
         self.update_handler.side_effect = update
         self.update_handler.reset_mock()

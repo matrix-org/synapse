@@ -14,7 +14,9 @@
 Description=Synapse Matrix homeserver
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-abort
 
 User=synapse
@@ -22,10 +24,10 @@ Group=nogroup
 
 WorkingDirectory=/opt/synapse
 ExecStart=/opt/synapse/env/bin/python -m synapse.app.homeserver --config-path=/opt/synapse/homeserver.yaml
+SyslogIdentifier=matrix-synapse
 
 # adjust the cache factor if necessary
 # Environment=SYNAPSE_CACHE_FACTOR=2.0
 
 [Install]
 WantedBy=multi-user.target
-

@@ -20,8 +20,7 @@ import shutil
 from twisted.internet import defer
 
 from synapse.config._base import Config
-from synapse.util import logcontext
-from synapse.util.logcontext import run_in_background
+from synapse.logging.context import defer_to_thread, run_in_background
 
 from .media_storage import FileResponder
 
@@ -32,6 +31,7 @@ class StorageProvider(object):
     """A storage provider is a service that can store uploaded media and
     retrieve them.
     """
+
     def store_file(self, path, file_info):
         """Store the file described by file_info. The actual contents can be
         retrieved by reading the file in file_info.upload_path.
@@ -67,9 +67,10 @@ class StorageProviderWrapper(StorageProvider):
         backend (StorageProvider)
         store_local (bool): Whether to store new local files or not.
         store_synchronous (bool): Whether to wait for file to be successfully
-            uploaded, or todo the upload in the backgroud.
+            uploaded, or todo the upload in the background.
         store_remote (bool): Whether remote media should be uploaded
     """
+
     def __init__(self, backend, store_local, store_synchronous, store_remote):
         self.backend = backend
         self.store_local = store_local
@@ -92,6 +93,7 @@ class StorageProviderWrapper(StorageProvider):
                     return self.backend.store_file(path, file_info)
                 except Exception:
                     logger.exception("Error storing file")
+
             run_in_background(store)
             return defer.succeed(None)
 
@@ -108,6 +110,7 @@ class FileStorageProviderBackend(StorageProvider):
     """
 
     def __init__(self, hs, config):
+        self.hs = hs
         self.cache_directory = hs.config.media_store_path
         self.base_directory = config
 
@@ -121,9 +124,8 @@ class FileStorageProviderBackend(StorageProvider):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        return logcontext.defer_to_thread(
-            self.hs.get_reactor(),
-            shutil.copyfile, primary_fname, backup_fname,
+        return defer_to_thread(
+            self.hs.get_reactor(), shutil.copyfile, primary_fname, backup_fname
         )
 
     def fetch(self, path, file_info):

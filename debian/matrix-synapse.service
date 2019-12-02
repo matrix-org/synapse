@@ -11,6 +11,7 @@ ExecStart=/opt/venvs/matrix-synapse/bin/python -m synapse.app.homeserver --confi
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=3
+SyslogIdentifier=matrix-synapse
 
 [Install]
 WantedBy=multi-user.target

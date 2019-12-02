@@ -1,3 +1,5 @@
+from typing import Dict
+
 from six import itervalues
 
 SENTINEL = object()
@@ -9,9 +11,10 @@ class TreeCache(object):
     efficiently.
     Keys must be tuples.
     """
+
     def __init__(self):
         self.size = 0
-        self.root = {}
+        self.root = {}  # type: Dict
 
     def __setitem__(self, key, value):
         return self.set(key, value)

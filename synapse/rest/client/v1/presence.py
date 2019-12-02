@@ -23,21 +23,22 @@ from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError
 from synapse.handlers.presence import format_user_presence_state
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
-
-from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class PresenceStatusRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/presence/(?P<user_id>[^/]*)/status")
+class PresenceStatusRestServlet(RestServlet):
+    PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status", v1=True)
 
     def __init__(self, hs):
-        super(PresenceStatusRestServlet, self).__init__(hs)
+        super(PresenceStatusRestServlet, self).__init__()
+        self.hs = hs
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -46,7 +47,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
         if requester.user != user:
             allowed = yield self.presence_handler.is_visible(
-                observed_user=user, observer_user=requester.user,
+                observed_user=user, observer_user=requester.user
             )
 
             if not allowed:
@@ -55,7 +56,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
         state = yield self.presence_handler.get_state(target_user=user)
         state = format_user_presence_state(state, self.clock.time_msec())
 
-        defer.returnValue((200, state))
+        return 200, state
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -87,78 +88,11 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
         if self.hs.config.use_presence:
             yield self.presence_handler.set_state(user, state)
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
     def on_OPTIONS(self, request):
-        return (200, {})
-
-
-class PresenceListRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/presence/list/(?P<user_id>[^/]*)")
-
-    def __init__(self, hs):
-        super(PresenceListRestServlet, self).__init__(hs)
-        self.presence_handler = hs.get_presence_handler()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
-        user = UserID.from_string(user_id)
-
-        if not self.hs.is_mine(user):
-            raise SynapseError(400, "User not hosted on this Home Server")
-
-        if requester.user != user:
-            raise SynapseError(400, "Cannot get another user's presence list")
-
-        presence = yield self.presence_handler.get_presence_list(
-            observer_user=user, accepted=True
-        )
-
-        defer.returnValue((200, presence))
-
-    @defer.inlineCallbacks
-    def on_POST(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
-        user = UserID.from_string(user_id)
-
-        if not self.hs.is_mine(user):
-            raise SynapseError(400, "User not hosted on this Home Server")
-
-        if requester.user != user:
-            raise SynapseError(
-                400, "Cannot modify another user's presence list")
-
-        content = parse_json_object_from_request(request)
-
-        if "invite" in content:
-            for u in content["invite"]:
-                if not isinstance(u, string_types):
-                    raise SynapseError(400, "Bad invite value.")
-                if len(u) == 0:
-                    continue
-                invited_user = UserID.from_string(u)
-                yield self.presence_handler.send_presence_invite(
-                    observer_user=user, observed_user=invited_user
-                )
-
-        if "drop" in content:
-            for u in content["drop"]:
-                if not isinstance(u, string_types):
-                    raise SynapseError(400, "Bad drop value.")
-                if len(u) == 0:
-                    continue
-                dropped_user = UserID.from_string(u)
-                yield self.presence_handler.drop(
-                    observer_user=user, observed_user=dropped_user
-                )
-
-        defer.returnValue((200, {}))
-
-    def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):
     PresenceStatusRestServlet(hs).register(http_server)
-    PresenceListRestServlet(hs).register(http_server)

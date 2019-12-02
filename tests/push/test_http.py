@@ -17,22 +17,17 @@ from mock import Mock
 
 from twisted.internet.defer import Deferred
 
-from synapse.rest.client.v1 import admin, login, room
-from synapse.util.logcontext import make_deferred_yieldable
+import synapse.rest.admin
+from synapse.logging.context import make_deferred_yieldable
+from synapse.rest.client.v1 import login, room
 
 from tests.unittest import HomeserverTestCase
-
-try:
-    from synapse.push.mailer import load_jinja2_templates
-except Exception:
-    load_jinja2_templates = None
 
 
 class HTTPPusherTests(HomeserverTestCase):
 
-    skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
@@ -53,9 +48,9 @@ class HTTPPusherTests(HomeserverTestCase):
         m.post_json_get_json = post_json_get_json
 
         config = self.default_config()
-        config.start_pushers = True
+        config["start_pushers"] = True
 
-        hs = self.setup_test_homeserver(config=config, simple_http_client=m)
+        hs = self.setup_test_homeserver(config=config, proxied_http_client=m)
 
         return hs
 

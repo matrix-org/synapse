@@ -30,21 +30,19 @@ use github's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
-We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Travis CI 
-<https://travis-ci.org/matrix-org/synapse>`_ for continuous integration. All
-pull requests to synapse get automatically tested by Travis and CircleCI.
-If your change breaks the build, this will be shown in GitHub, so please
-keep an eye on the pull request for feedback.
+We use `Buildkite <https://buildkite.com/matrix-dot-org/synapse>`_ for
+continuous integration.  Buildkite builds need to be authorised by a
+maintainer. If your change breaks the build, this will be shown in GitHub, so
+please keep an eye on the pull request for feedback.
 
 To run unit tests in a local development environment, you can use:
 
-- ``tox -e py27`` (requires tox to be installed by ``pip install tox``) for
-  SQLite-backed Synapse on Python 2.7.
-- ``tox -e py35`` for SQLite-backed Synapse on Python 3.5.
+- ``tox -e py35`` (requires tox to be installed by ``pip install tox``)
+  for SQLite-backed Synapse on Python 3.5.
 - ``tox -e py36`` for SQLite-backed Synapse on Python 3.6.
-- ``tox -e py27-postgres`` for PostgreSQL-backed Synapse on Python 2.7
+- ``tox -e py36-postgres`` for PostgreSQL-backed Synapse on Python 3.6
   (requires a running local PostgreSQL with access to create databases).
-- ``./test_postgresql.sh`` for PostgreSQL-backed Synapse on Python 2.7
+- ``./test_postgresql.sh`` for PostgreSQL-backed Synapse on Python 3.5
   (requires Docker). Entirely self-contained, recommended if you don't want to
   set up PostgreSQL yourself.
 
@@ -58,11 +56,30 @@ Code style
 
 All Matrix projects have a well-defined code-style - and sometimes we've even
 got as far as documenting it... For instance, synapse's code style doc lives
-at https://github.com/matrix-org/synapse/tree/master/docs/code_style.rst.
+at https://github.com/matrix-org/synapse/tree/master/docs/code_style.md.
+
+To facilitate meeting these criteria you can run ``scripts-dev/lint.sh``
+locally. Since this runs the tools listed in the above document, you'll need
+python 3.6 and to install each tool. **Note that the script does not just
+test/check, but also reformats code, so you may wish to ensure any new code is
+committed first**. By default this script checks all files and can take some
+time; if you alter only certain files, you might wish to specify paths as
+arguments to reduce the run-time.
 
 Please ensure your changes match the cosmetic style of the existing project,
 and **never** mix cosmetic and functional changes in the same commit, as it
 makes it horribly hard to review otherwise.
+
+Before doing a commit, ensure the changes you've made don't produce
+linting errors. You can do this by running the linters as follows. Ensure to
+commit any files that were corrected.
+
+::
+    # Install the dependencies
+    pip install -U black flake8 isort
+    
+    # Run the linter script
+    ./scripts-dev/lint.sh
 
 Changelog
 ~~~~~~~~~
@@ -71,30 +88,50 @@ All changes, even minor ones, need a corresponding changelog / newsfragment
 entry. These are managed by Towncrier
 (https://github.com/hawkowl/towncrier).
 
-To create a changelog entry, make a new file in the ``changelog.d``
-file named in the format of ``PRnumber.type``. The type can be
-one of ``feature``, ``bugfix``, ``removal`` (also used for
-deprecations), or ``misc`` (for internal-only changes). The content of
-the file is your changelog entry, which can contain Markdown
-formatting. Adding credits to the changelog is encouraged, we value
-your contributions and would like to have you shouted out in the
-release notes!
+To create a changelog entry, make a new file in the ``changelog.d`` file named
+in the format of ``PRnumber.type``. The type can be one of the following:
+
+* ``feature``.
+* ``bugfix``.
+* ``docker`` (for updates to the Docker image).
+* ``doc`` (for updates to the documentation).
+* ``removal`` (also used for deprecations).
+* ``misc`` (for internal-only changes).
+
+The content of the file is your changelog entry, which should be a short
+description of your change in the same style as the rest of our `changelog
+<https://github.com/matrix-org/synapse/blob/master/CHANGES.md>`_. The file can
+contain Markdown formatting, and should end with a full stop ('.') for
+consistency.
+
+Adding credits to the changelog is encouraged, we value your
+contributions and would like to have you shouted out in the release notes!
 
 For example, a fix in PR #1234 would have its changelog entry in
 ``changelog.d/1234.bugfix``, and contain content like "The security levels of
 Florbs are now validated when recieved over federation. Contributed by Jane
-Matrix".
+Matrix.".
 
-Attribution
-~~~~~~~~~~~
+Debian changelog
+----------------
 
-Everyone who contributes anything to Matrix is welcome to be listed in the
-AUTHORS.rst file for the project in question. Please feel free to include a
-change to AUTHORS.rst in your pull request to list yourself and a short
-description of the area(s) you've worked on. Also, we sometimes have swag to
-give away to contributors - if you feel that Matrix-branded apparel is missing
-from your life, please mail us your shipping address to matrix at matrix.org and
-we'll try to fix it :)
+Changes which affect the debian packaging files (in ``debian``) are an
+exception.
+
+In this case, you will need to add an entry to the debian changelog for the
+next release. For this, run the following command::
+
+  dch
+
+This will make up a new version number (if there isn't already an unreleased
+version in flight), and open an editor where you can add a new changelog entry.
+(Our release process will ensure that the version number and maintainer name is
+corrected for the release.)
+
+If your change affects both the debian packaging *and* files outside the debian
+directory, you will need both a regular newsfragment *and* an entry in the
+debian changelog. (Though typically such changes should be submitted as two
+separate pull requests.)
 
 Sign off
 ~~~~~~~~

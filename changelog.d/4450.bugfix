@@ -1,2 +1,0 @@
-The dependency checker now correctly reports a version mismatch for optional
-dependencies, instead of reporting the dependency missing.

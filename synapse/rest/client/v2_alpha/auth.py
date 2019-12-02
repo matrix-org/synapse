@@ -19,11 +19,11 @@ from twisted.internet import defer
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
-from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
+from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet, parse_string
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ RECAPTCHA_TEMPLATE = """
 <title>Authentication</title>
 <meta name='viewport' content='width=device-width, initial-scale=1,
     user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<script src="https://www.google.com/recaptcha/api.js"
+<script src="https://www.recaptcha.net/recaptcha/api.js"
     async defer></script>
 <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
 <link rel="stylesheet" href="/_matrix/static/client/register/style.css">
@@ -122,7 +122,8 @@ class AuthRestServlet(RestServlet):
     cannot be handled in the normal flow (with requests to the same endpoint).
     Current use is for web fallback auth.
     """
-    PATTERNS = client_v2_patterns(r"/auth/(?P<stagetype>[\w\.]*)/fallback/web")
+
+    PATTERNS = client_patterns(r"/auth/(?P<stagetype>[\w\.]*)/fallback/web")
 
     def __init__(self, hs):
         super(AuthRestServlet, self).__init__()
@@ -138,11 +139,10 @@ class AuthRestServlet(RestServlet):
 
         if stagetype == LoginType.RECAPTCHA:
             html = RECAPTCHA_TEMPLATE % {
-                'session': session,
-                'myurl': "%s/auth/%s/fallback/web" % (
-                    CLIENT_V2_ALPHA_PREFIX, LoginType.RECAPTCHA
-                ),
-                'sitekey': self.hs.config.recaptcha_public_key,
+                "session": session,
+                "myurl": "%s/r0/auth/%s/fallback/web"
+                % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
+                "sitekey": self.hs.config.recaptcha_public_key,
             }
             html_bytes = html.encode("utf8")
             request.setResponseCode(200)
@@ -154,14 +154,11 @@ class AuthRestServlet(RestServlet):
             return None
         elif stagetype == LoginType.TERMS:
             html = TERMS_TEMPLATE % {
-                'session': session,
-                'terms_url': "%s_matrix/consent?v=%s" % (
-                    self.hs.config.public_baseurl,
-                    self.hs.config.user_consent_version,
-                ),
-                'myurl': "%s/auth/%s/fallback/web" % (
-                    CLIENT_V2_ALPHA_PREFIX, LoginType.TERMS
-                ),
+                "session": session,
+                "terms_url": "%s_matrix/consent?v=%s"
+                % (self.hs.config.public_baseurl, self.hs.config.user_consent_version),
+                "myurl": "%s/r0/auth/%s/fallback/web"
+                % (CLIENT_API_PREFIX, LoginType.TERMS),
             }
             html_bytes = html.encode("utf8")
             request.setResponseCode(200)
@@ -187,26 +184,20 @@ class AuthRestServlet(RestServlet):
             if not response:
                 raise SynapseError(400, "No captcha response supplied")
 
-            authdict = {
-                'response': response,
-                'session': session,
-            }
+            authdict = {"response": response, "session": session}
 
             success = yield self.auth_handler.add_oob_auth(
-                LoginType.RECAPTCHA,
-                authdict,
-                self.hs.get_ip_from_request(request)
+                LoginType.RECAPTCHA, authdict, self.hs.get_ip_from_request(request)
             )
 
             if success:
                 html = SUCCESS_TEMPLATE
             else:
                 html = RECAPTCHA_TEMPLATE % {
-                    'session': session,
-                    'myurl': "%s/auth/%s/fallback/web" % (
-                        CLIENT_V2_ALPHA_PREFIX, LoginType.RECAPTCHA
-                    ),
-                    'sitekey': self.hs.config.recaptcha_public_key,
+                    "session": session,
+                    "myurl": "%s/r0/auth/%s/fallback/web"
+                    % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
+                    "sitekey": self.hs.config.recaptcha_public_key,
                 }
             html_bytes = html.encode("utf8")
             request.setResponseCode(200)
@@ -216,33 +207,30 @@ class AuthRestServlet(RestServlet):
             request.write(html_bytes)
             finish_request(request)
 
-            defer.returnValue(None)
+            return None
         elif stagetype == LoginType.TERMS:
-            if ('session' not in request.args or
-                    len(request.args['session'])) == 0:
+            if ("session" not in request.args or len(request.args["session"])) == 0:
                 raise SynapseError(400, "No session supplied")
 
-            session = request.args['session'][0]
-            authdict = {'session': session}
+            session = request.args["session"][0]
+            authdict = {"session": session}
 
             success = yield self.auth_handler.add_oob_auth(
-                LoginType.TERMS,
-                authdict,
-                self.hs.get_ip_from_request(request)
+                LoginType.TERMS, authdict, self.hs.get_ip_from_request(request)
             )
 
             if success:
                 html = SUCCESS_TEMPLATE
             else:
                 html = TERMS_TEMPLATE % {
-                    'session': session,
-                    'terms_url': "%s_matrix/consent?v=%s" % (
+                    "session": session,
+                    "terms_url": "%s_matrix/consent?v=%s"
+                    % (
                         self.hs.config.public_baseurl,
                         self.hs.config.user_consent_version,
                     ),
-                    'myurl': "%s/auth/%s/fallback/web" % (
-                        CLIENT_V2_ALPHA_PREFIX, LoginType.TERMS
-                    ),
+                    "myurl": "%s/r0/auth/%s/fallback/web"
+                    % (CLIENT_API_PREFIX, LoginType.TERMS),
                 }
             html_bytes = html.encode("utf8")
             request.setResponseCode(200)
@@ -251,7 +239,7 @@ class AuthRestServlet(RestServlet):
 
             request.write(html_bytes)
             finish_request(request)
-            defer.returnValue(None)
+            return None
         else:
             raise SynapseError(404, "Unknown auth stage type")
 

@@ -22,7 +22,7 @@ from twisted.internet.error import ConnectError
 from twisted.names import dns, error
 
 from synapse.http.federation.srv_resolver import SrvResolver
-from synapse.util.logcontext import LoggingContext
+from synapse.logging.context import LoggingContext
 
 from tests import unittest
 from tests.utils import MockClock
@@ -61,16 +61,14 @@ class SrvResolverTestCase(unittest.TestCase):
                 # should have restored our context
                 self.assertIs(LoggingContext.current_context(), ctx)
 
-                defer.returnValue(result)
+                return result
 
         test_d = do_lookup()
         self.assertNoResult(test_d)
 
         dns_client_mock.lookupService.assert_called_once_with(service_name)
 
-        result_deferred.callback(
-            ([answer_srv], None, None)
-        )
+        result_deferred.callback(([answer_srv], None, None))
 
         servers = self.successResultOf(test_d)
 
@@ -85,8 +83,10 @@ class SrvResolverTestCase(unittest.TestCase):
 
         service_name = b"test_service.example.com"
 
-        entry = Mock(spec_set=["expires"])
+        entry = Mock(spec_set=["expires", "priority", "weight"])
         entry.expires = 0
+        entry.priority = 0
+        entry.weight = 0
 
         cache = {service_name: [entry]}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
@@ -102,17 +102,19 @@ class SrvResolverTestCase(unittest.TestCase):
     def test_from_cache(self):
         clock = MockClock()
 
-        dns_client_mock = Mock(spec_set=['lookupService'])
+        dns_client_mock = Mock(spec_set=["lookupService"])
         dns_client_mock.lookupService = Mock(spec_set=[])
 
         service_name = b"test_service.example.com"
 
-        entry = Mock(spec_set=["expires"])
+        entry = Mock(spec_set=["expires", "priority", "weight"])
         entry.expires = 999999999
+        entry.priority = 0
+        entry.weight = 0
 
         cache = {service_name: [entry]}
         resolver = SrvResolver(
-            dns_client=dns_client_mock, cache=cache, get_time=clock.time,
+            dns_client=dns_client_mock, cache=cache, get_time=clock.time
         )
 
         servers = yield resolver.resolve_service(service_name)
@@ -168,11 +170,13 @@ class SrvResolverTestCase(unittest.TestCase):
         self.assertNoResult(resolve_d)
 
         # returning a single "." should make the lookup fail with a ConenctError
-        lookup_deferred.callback((
-            [dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"."))],
-            None,
-            None,
-        ))
+        lookup_deferred.callback(
+            (
+                [dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"."))],
+                None,
+                None,
+            )
+        )
 
         self.failureResultOf(resolve_d, ConnectError)
 
@@ -191,14 +195,16 @@ class SrvResolverTestCase(unittest.TestCase):
         resolve_d = resolver.resolve_service(service_name)
         self.assertNoResult(resolve_d)
 
-        lookup_deferred.callback((
-            [
-                dns.RRHeader(type=dns.A, payload=dns.Record_A()),
-                dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"host")),
-            ],
-            None,
-            None,
-        ))
+        lookup_deferred.callback(
+            (
+                [
+                    dns.RRHeader(type=dns.A, payload=dns.Record_A()),
+                    dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"host")),
+                ],
+                None,
+                None,
+            )
+        )
 
         servers = self.successResultOf(resolve_d)
 

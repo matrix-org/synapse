@@ -14,10 +14,12 @@
 # limitations under the License.
 import logging
 
+from mock import Mock
+
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
-from synapse.api.constants import RoomVersions
+from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.visibility import filter_events_for_server
 
@@ -36,6 +38,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.store = self.hs.get_datastore()
+        self.storage = self.hs.get_storage()
 
         yield create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM")
 
@@ -62,7 +65,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             events_to_filter.append(evt)
 
         filtered = yield filter_events_for_server(
-            self.store, "test_server", events_to_filter
+            self.storage, "test_server", events_to_filter
         )
 
         # the result should be 5 redacted events, and 5 unredacted events.
@@ -74,7 +77,6 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertEqual(filtered[i].content["a"], "b")
 
-    @tests.unittest.DEBUG
     @defer.inlineCallbacks
     def test_erased_user(self):
         # 4 message events, from erased and unerased users, with a membership
@@ -101,7 +103,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         # ... and the filtering happens.
         filtered = yield filter_events_for_server(
-            self.store, "test_server", events_to_filter
+            self.storage, "test_server", events_to_filter
         )
 
         for i in range(0, len(events_to_filter)):
@@ -124,7 +126,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def inject_visibility(self, user_id, visibility):
         content = {"history_visibility": visibility}
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": "m.room.history_visibility",
@@ -132,20 +134,20 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
                 "state_key": "",
                 "room_id": TEST_ROOM_ID,
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder
         )
-        yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        yield self.storage.persistence.persist_event(event, context)
+        return event
 
     @defer.inlineCallbacks
     def inject_room_member(self, user_id, membership="join", extra_content={}):
         content = {"membership": membership}
         content.update(extra_content)
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": "m.room.member",
@@ -153,36 +155,36 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
                 "state_key": user_id,
                 "room_id": TEST_ROOM_ID,
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder
         )
 
-        yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        yield self.storage.persistence.persist_event(event, context)
+        return event
 
     @defer.inlineCallbacks
     def inject_message(self, user_id, content=None):
         if content is None:
             content = {"body": "testytest", "msgtype": "m.text"}
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": "m.room.message",
                 "sender": user_id,
                 "room_id": TEST_ROOM_ID,
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder
         )
 
-        yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        yield self.storage.persistence.persist_event(event, context)
+        return event
 
     @defer.inlineCallbacks
     def test_large_room(self):
@@ -258,6 +260,11 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         logger.info("Starting filtering")
         start = time.time()
+
+        storage = Mock()
+        storage.main = test_store
+        storage.state = test_store
+
         filtered = yield filter_events_for_server(
             test_store, "test_server", events_to_filter
         )
@@ -265,7 +272,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         pr.disable()
         with open("filter_events_for_server.profile", "w+") as f:
-            ps = pstats.Stats(pr, stream=f).sort_stats('cumulative')
+            ps = pstats.Stats(pr, stream=f).sort_stats("cumulative")
             ps.print_stats()
 
         # the result should be 5 redacted events, and 5 unredacted events.

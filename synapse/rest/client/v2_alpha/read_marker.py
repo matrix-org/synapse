@@ -15,17 +15,15 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class ReadMarkerRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/rooms/(?P<room_id>[^/]*)/read_markers$")
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/read_markers$")
 
     def __init__(self, hs):
         super(ReadMarkerRestServlet, self).__init__()
@@ -34,32 +32,31 @@ class ReadMarkerRestServlet(RestServlet):
         self.read_marker_handler = hs.get_read_marker_handler()
         self.presence_handler = hs.get_presence_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
 
-        yield self.presence_handler.bump_presence_active_time(requester.user)
+        await self.presence_handler.bump_presence_active_time(requester.user)
 
         body = parse_json_object_from_request(request)
 
         read_event_id = body.get("m.read", None)
         if read_event_id:
-            yield self.receipts_handler.received_client_receipt(
+            await self.receipts_handler.received_client_receipt(
                 room_id,
                 "m.read",
                 user_id=requester.user.to_string(),
-                event_id=read_event_id
+                event_id=read_event_id,
             )
 
         read_marker_event_id = body.get("m.fully_read", None)
         if read_marker_event_id:
-            yield self.read_marker_handler.received_client_read_marker(
+            await self.read_marker_handler.received_client_read_marker(
                 room_id,
                 user_id=requester.user.to_string(),
-                event_id=read_marker_event_id
+                event_id=read_marker_event_id,
             )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

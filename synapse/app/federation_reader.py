@@ -21,15 +21,15 @@ from twisted.web.resource import NoResource
 
 import synapse
 from synapse import events
-from synapse.api.urls import FEDERATION_PREFIX
+from synapse.api.urls import FEDERATION_PREFIX, SERVER_KEY_V2_PREFIX
 from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.site import SynapseSite
-from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
+from synapse.logging.context import LoggingContext
+from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
@@ -44,10 +44,10 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 
@@ -85,19 +85,21 @@ class FederationReaderServer(HomeServer):
                 if name == "metrics":
                     resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "federation":
-                    resources.update({
-                        FEDERATION_PREFIX: TransportLayerServer(self),
-                    })
+                    resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 if name == "openid" and "federation" not in res["names"]:
                     # Only load the openid resource separately if federation resource
                     # is not specified since federation resource includes openid
                     # resource.
-                    resources.update({
-                        FEDERATION_PREFIX: TransportLayerServer(
-                            self,
-                            servlet_groups=["openid"],
-                        ),
-                    })
+                    resources.update(
+                        {
+                            FEDERATION_PREFIX: TransportLayerServer(
+                                self, servlet_groups=["openid"]
+                            )
+                        }
+                    )
+
+                if name in ["keys", "federation"]:
+                    resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         root_resource = create_resource_tree(resources, NoResource())
 
@@ -111,7 +113,7 @@ class FederationReaderServer(HomeServer):
                 root_resource,
                 self.version_string,
             ),
-            reactor=self.get_reactor()
+            reactor=self.get_reactor(),
         )
 
         logger.info("Synapse federation reader now listening on port %d", port)
@@ -125,20 +127,21 @@ class FederationReaderServer(HomeServer):
                     listener["bind_addresses"],
                     listener["port"],
                     manhole(
-                        username="matrix",
-                        password="rabbithole",
-                        globals={"hs": self},
-                    )
+                        username="matrix", password="rabbithole", globals={"hs": self}
+                    ),
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(("Metrics listener configured, but "
-                                 "enable_metrics is not True!"))
+                    logger.warning(
+                        (
+                            "Metrics listener configured, but "
+                            "enable_metrics is not True!"
+                        )
+                    )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"],
-                                         listener["port"])
+                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
-                logger.warn("Unrecognized listener type: %s", listener["type"])
+                logger.warning("Unrecognized listener type: %s", listener["type"])
 
         self.get_tcp_replication().start_replication(self)
 
@@ -157,8 +160,6 @@ def start(config_options):
 
     assert config.worker_app == "synapse.app.federation_reader"
 
-    setup_logging(config, use_worker_options=True)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -171,12 +172,16 @@ def start(config_options):
         database_engine=database_engine,
     )
 
+    setup_logging(ss, config, use_worker_options=True)
+
     ss.setup()
-    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
+    reactor.addSystemEventTrigger(
+        "before", "startup", _base.start, ss, config.worker_listeners
+    )
 
     _base.start_worker_reactor("synapse-federation-reader", config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with LoggingContext("main"):
         start(sys.argv[1:])

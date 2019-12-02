@@ -20,13 +20,13 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class UserDirectorySearchRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/user_directory/search$")
+    PATTERNS = client_patterns("/user_directory/search$")
 
     def __init__(self, hs):
         """
@@ -59,6 +59,9 @@ class UserDirectorySearchRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
+        if not self.hs.config.user_directory_search_enabled:
+            return 200, {"limited": False, "results": []}
+
         body = parse_json_object_from_request(request)
 
         limit = body.get("limit", 10)
@@ -70,10 +73,10 @@ class UserDirectorySearchRestServlet(RestServlet):
             raise SynapseError(400, "`search_term` is required field")
 
         results = yield self.user_directory_handler.search_users(
-            user_id, search_term, limit,
+            user_id, search_term, limit
         )
 
-        defer.returnValue((200, results))
+        return 200, results
 
 
 def register_servlets(hs, http_server):

@@ -16,9 +16,8 @@ from twisted.internet import defer
 from twisted.internet.defer import CancelledError, Deferred
 from twisted.internet.task import Clock
 
-from synapse.util import logcontext
+from synapse.logging.context import LoggingContext, PreserveLoggingContext
 from synapse.util.async_helpers import timeout_deferred
-from synapse.util.logcontext import LoggingContext
 
 from tests.unittest import TestCase
 
@@ -42,10 +41,10 @@ class TimeoutDeferredTest(TestCase):
         self.assertNoResult(timing_out_d)
         self.assertFalse(cancelled[0], "deferred was cancelled prematurely")
 
-        self.clock.pump((1.0, ))
+        self.clock.pump((1.0,))
 
         self.assertTrue(cancelled[0], "deferred was not cancelled by timeout")
-        self.failureResultOf(timing_out_d, defer.TimeoutError, )
+        self.failureResultOf(timing_out_d, defer.TimeoutError)
 
     def test_times_out_when_canceller_throws(self):
         """Test that we have successfully worked around
@@ -59,9 +58,9 @@ class TimeoutDeferredTest(TestCase):
 
         self.assertNoResult(timing_out_d)
 
-        self.clock.pump((1.0, ))
+        self.clock.pump((1.0,))
 
-        self.failureResultOf(timing_out_d, defer.TimeoutError, )
+        self.failureResultOf(timing_out_d, defer.TimeoutError)
 
     def test_logcontext_is_preserved_on_cancellation(self):
         blocking_was_cancelled = [False]
@@ -69,21 +68,21 @@ class TimeoutDeferredTest(TestCase):
         @defer.inlineCallbacks
         def blocking():
             non_completing_d = Deferred()
-            with logcontext.PreserveLoggingContext():
+            with PreserveLoggingContext():
                 try:
                     yield non_completing_d
                 except CancelledError:
                     blocking_was_cancelled[0] = True
                     raise
 
-        with logcontext.LoggingContext("one") as context_one:
+        with LoggingContext("one") as context_one:
             # the errbacks should be run in the test logcontext
             def errback(res, deferred_name):
                 self.assertIs(
-                    LoggingContext.current_context(), context_one,
-                    "errback %s run in unexpected logcontext %s" % (
-                        deferred_name, LoggingContext.current_context(),
-                    )
+                    LoggingContext.current_context(),
+                    context_one,
+                    "errback %s run in unexpected logcontext %s"
+                    % (deferred_name, LoggingContext.current_context()),
                 )
                 return res
 
@@ -94,11 +93,10 @@ class TimeoutDeferredTest(TestCase):
             self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
             timing_out_d.addErrback(errback, "timingout")
 
-            self.clock.pump((1.0, ))
+            self.clock.pump((1.0,))
 
             self.assertTrue(
-                blocking_was_cancelled[0],
-                "non-completing deferred was not cancelled",
+                blocking_was_cancelled[0], "non-completing deferred was not cancelled"
             )
-            self.failureResultOf(timing_out_d, defer.TimeoutError, )
+            self.failureResultOf(timing_out_d, defer.TimeoutError)
             self.assertIs(LoggingContext.current_context(), context_one)

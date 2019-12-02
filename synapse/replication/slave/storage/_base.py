@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict
 
 import six
 
@@ -37,14 +38,21 @@ class BaseSlavedStore(SQLBaseStore):
         super(BaseSlavedStore, self).__init__(db_conn, hs)
         if isinstance(self.database_engine, PostgresEngine):
             self._cache_id_gen = SlavedIdTracker(
-                db_conn, "cache_invalidation_stream", "stream_id",
+                db_conn, "cache_invalidation_stream", "stream_id"
             )
         else:
             self._cache_id_gen = None
 
         self.hs = hs
 
-    def stream_positions(self):
+    def stream_positions(self) -> Dict[str, int]:
+        """
+        Get the current positions of all the streams this store wants to subscribe to
+
+        Returns:
+            map from stream name to the most recent update we have for
+            that stream (ie, the point we want to start replicating from)
+        """
         pos = {}
         if self._cache_id_gen:
             pos["caches"] = self._cache_id_gen.get_current_token()
@@ -59,12 +67,7 @@ class BaseSlavedStore(SQLBaseStore):
                     members_changed = set(row.keys[1:])
                     self._invalidate_state_caches(room_id, members_changed)
                 else:
-                    try:
-                        getattr(self, row.cache_func).invalidate(tuple(row.keys))
-                    except AttributeError:
-                        # We probably haven't pulled in the cache in this worker,
-                        # which is fine.
-                        pass
+                    self._attempt_to_invalidate_cache(row.cache_func, tuple(row.keys))
 
     def _invalidate_cache_and_stream(self, txn, cache_func, keys):
         txn.call_after(cache_func.invalidate, keys)

@@ -1,13 +1,31 @@
-* [Installing Synapse](#installing-synapse)
-  * [Installing from source](#installing-from-source)
-    * [Platform-Specific Instructions](#platform-specific-instructions)
-    * [Troubleshooting Installation](#troubleshooting-installation)
-  * [Prebuilt packages](#prebuilt-packages)
-* [Setting up Synapse](#setting-up-synapse)
-  * [TLS certificates](#tls-certificates)
-  * [Registering a user](#registering-a-user)
-  * [Setting up a TURN server](#setting-up-a-turn-server)
-  * [URL previews](#url-previews)
+- [Choosing your server name](#choosing-your-server-name)
+- [Installing Synapse](#installing-synapse)
+  - [Installing from source](#installing-from-source)
+    - [Platform-Specific Instructions](#platform-specific-instructions)
+    - [Troubleshooting Installation](#troubleshooting-installation)
+  - [Prebuilt packages](#prebuilt-packages)
+- [Setting up Synapse](#setting-up-synapse)
+  - [TLS certificates](#tls-certificates)
+  - [Email](#email)
+  - [Registering a user](#registering-a-user)
+  - [Setting up a TURN server](#setting-up-a-turn-server)
+  - [URL previews](#url-previews)
+
+# Choosing your server name
+
+It is important to choose the name for your server before you install Synapse,
+because it cannot be changed later.
+
+The server name determines the "domain" part of user-ids for users on your
+server: these will all be of the format `@user:my.domain.name`. It also
+determines how other matrix servers will reach yours for federation.
+
+For a test configuration, set this to the hostname of your server. For a more
+production-ready setup, you will probably want to specify your domain
+(`example.com`) rather than a matrix-specific hostname here (in the same way
+that your email address is probably `user@example.com` rather than
+`user@email.example.com`) - but doing so may require more advanced setup: see
+[Setting up Federation](docs/federate.md).
 
 # Installing Synapse
 
@@ -18,7 +36,7 @@
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, 3.7, or 2.7
+- Python 3.5, 3.6, 3.7 or 3.8.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
@@ -35,7 +53,7 @@ virtualenv -p python3 ~/synapse/env
 source ~/synapse/env/bin/activate
 pip install --upgrade pip
 pip install --upgrade setuptools
-pip install matrix-synapse[all]
+pip install matrix-synapse
 ```
 
 This will download Synapse from [PyPI](https://pypi.org/project/matrix-synapse)
@@ -48,7 +66,7 @@ update flag:
 
 ```
 source ~/synapse/env/bin/activate
-pip install -U matrix-synapse[all]
+pip install -U matrix-synapse
 ```
 
 Before you can start Synapse, you will need to generate a configuration
@@ -63,15 +81,7 @@ python -m synapse.app.homeserver \
     --report-stats=[yes|no]
 ```
 
-... substituting an appropriate value for `--server-name`. The server name
-determines the "domain" part of user-ids for users on your server: these will
-all be of the format `@user:my.domain.name`. It also determines how other
-matrix servers will reach yours for Federation. For a test configuration,
-set this to the hostname of your server. For a more production-ready setup, you
-will probably want to specify your domain (`example.com`) rather than a
-matrix-specific hostname here (in the same way that your email address is
-probably `user@example.com` rather than `user@email.example.com`) - but
-doing so may require more advanced setup. - see [Setting up Federation](README.rst#setting-up-federation). Beware that the server name cannot be changed later.
+... substituting an appropriate value for `--server-name`.
 
 This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your Home Server to
@@ -83,9 +93,6 @@ key in the `<server name>.signing.key` file (the second word) to something
 different. See the
 [spec](https://matrix.org/docs/spec/server_server/latest.html#retrieving-server-keys)
 for more information on key management.)
-
-You will need to give Synapse a TLS certficate before it will start - see [TLS
-certificates](#tls-certificates).
 
 To actually run your new homeserver, pick a working directory for Synapse to
 run (e.g. `~/synapse`), and::
@@ -126,15 +133,23 @@ sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
 sudo yum groupinstall "Development Tools"
 ```
 
-#### Mac OS X
+#### macOS
 
-Installing prerequisites on Mac OS X:
+Installing prerequisites on macOS:
 
 ```
 xcode-select --install
 sudo easy_install pip
 sudo pip install virtualenv
 brew install pkg-config libffi
+```
+
+On macOS Catalina (10.15) you may need to explicitly install OpenSSL
+via brew and inform `pip` about it so that `psycopg2` builds:
+
+```
+brew install openssl@1.1
+export LDFLAGS=-L/usr/local/Cellar/openssl\@1.1/1.1.1d/lib/
 ```
 
 #### OpenSUSE
@@ -256,17 +271,28 @@ https://github.com/spantaleev/matrix-docker-ansible-deploy
 #### Matrix.org packages
 
 Matrix.org provides Debian/Ubuntu packages of the latest stable version of
-Synapse via https://matrix.org/packages/debian/. To use them:
+Synapse via https://packages.matrix.org/debian/. They are available for Debian
+9 (Stretch), Ubuntu 16.04 (Xenial), and later. To use them:
 
 ```
-sudo apt install -y lsb-release curl apt-transport-https
-echo "deb https://matrix.org/packages/debian `lsb_release -cs` main" |
+sudo apt install -y lsb-release wget apt-transport-https
+sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main" |
     sudo tee /etc/apt/sources.list.d/matrix-org.list
-curl "https://matrix.org/packages/debian/repo-key.asc" |
-    sudo apt-key add -
 sudo apt update
 sudo apt install matrix-synapse-py3
 ```
+
+**Note**: if you followed a previous version of these instructions which
+recommended using `apt-key add` to add an old key from
+`https://matrix.org/packages/debian/`, you should note that this key has been
+revoked. You should remove the old key with `sudo apt-key remove
+C35EB17E1EAE708E6603A9B3AD0592FE47F0DF61`, and follow the above instructions to
+update your configuration.
+
+The fingerprint of the repository signing key (as shown by `gpg
+/usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
+`AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
 
 #### Downstream Debian/Ubuntu packages
 
@@ -331,6 +357,13 @@ sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
 ```
 
+### Void Linux
+
+Synapse can be found in the void repositories as 'synapse':
+
+    xbps-install -Su
+    xbps-install -S synapse
+
 ### FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
@@ -355,38 +388,59 @@ is suitable for local testing, but for any practical use, you will either need
 to enable a reverse proxy, or configure Synapse to expose an HTTPS port.
 
 For information on using a reverse proxy, see
-[docs/reverse_proxy.rst](docs/reverse_proxy.rst).
+[docs/reverse_proxy.md](docs/reverse_proxy.md).
 
 To configure Synapse to expose an HTTPS port, you will need to edit
-`homeserver.yaml`.
+`homeserver.yaml`, as follows:
 
-First, under the `listeners` section, uncomment the configuration for the
-TLS-enabled listener. (Remove the hash sign (`#`) and space at the start of
-each line). The relevant lines are like this:
+* First, under the `listeners` section, uncomment the configuration for the
+  TLS-enabled listener. (Remove the hash sign (`#`) at the start of
+  each line). The relevant lines are like this:
 
-```
-  - port: 8448
-    type: http
-    tls: true
-    resources:
-      - names: [client, federation]
-```
+  ```
+    - port: 8448
+      type: http
+      tls: true
+      resources:
+        - names: [client, federation]
+  ```
+* You will also need to uncomment the `tls_certificate_path` and
+  `tls_private_key_path` lines under the `TLS` section. You can either
+  point these settings at an existing certificate and key, or you can
+  enable Synapse's built-in ACME (Let's Encrypt) support. Instructions
+  for having Synapse automatically provision and renew federation
+  certificates through ACME can be found at [ACME.md](docs/ACME.md). If you
+  are using your own certificate, be sure to use a `.pem` file that includes
+  the full certificate chain including any intermediate certificates (for
+  instance, if using certbot, use `fullchain.pem` as your certificate, not
+  `cert.pem`).
 
-You will also need to uncomment the `tls_certificate_path` and
-`tls_private_key_path` lines under the `TLS` section. You can either point
-these settings at an existing certificate and key, or you can enable Synapse's
-built-in ACME (Let's Encrypt) support.  Instructions for having Synapse
-automatically provision and renew federation certificates through ACME can be
-found at [ACME.md](docs/ACME.md).
+For a more detailed guide to configuring your server for federation, see
+[federate.md](docs/federate.md)
+
+
+## Email
+
+It is desirable for Synapse to have the capability to send email. This allows
+Synapse to send password reset emails, send verifications when an email address
+is added to a user's account, and send email notifications to users when they
+receive new messages.
+
+To configure an SMTP server for Synapse, modify the configuration section
+headed `email`, and be sure to have at least the `smtp_host`, `smtp_port`
+and `notif_from` fields filled out.  You may also need to set `smtp_user`,
+`smtp_pass`, and `require_transport_security`.
+
+If email is not configured, password reset, registration and notifications via
+email will be disabled.
 
 ## Registering a user
 
-You will need at least one user on your server in order to use a Matrix
-client. Users can be registered either via a Matrix client, or via a
-commandline script.
+The easiest way to create a new user is to do so from a client like [Riot](https://riot.im).
 
-To get started, it is easiest to use the command line to register new
-users. This can be done as follows:
+Alternatively you can do so from the command line if you have installed via pip.
+
+This can be done as follows:
 
 ```
 $ source ~/synapse/env/bin/activate
@@ -403,13 +457,13 @@ This process uses a setting `registration_shared_secret` in
 `homeserver.yaml`, which is shared between Synapse itself and the
 `register_new_matrix_user` script. It doesn't matter what it is (a random
 value is generated by `--generate-config`), but it should be kept secret, as
-anyone with knowledge of it can register users on your server even if
-`enable_registration` is `false`.
+anyone with knowledge of it can register users, including admin accounts,
+on your server even if `enable_registration` is `false`.
 
 ## Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server.  See [docs/turn-howto.rst](docs/turn-howto.rst) for details.
+a TURN server.  See [docs/turn-howto.md](docs/turn-howto.md) for details.
 
 ## URL previews
 

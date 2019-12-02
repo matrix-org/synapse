@@ -1,40 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "5.2.4"
-    },
-    {
-      "type": "panel",
-      "id": "graph",
-      "name": "Graph",
-      "version": "5.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "heatmap",
-      "name": "Heatmap",
-      "version": "5.0.0"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "5.0.0"
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -53,8 +17,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": null,
-  "iteration": 1537878047048,
+  "id": 1,
+  "iteration": 1561447718159,
   "links": [
     {
       "asDropdown": true,
@@ -108,6 +72,8 @@
       "linewidth": 1,
       "links": [],
       "nullPointMode": "null",
+      "options": {},
+      "paceLength": 10,
       "percentage": false,
       "pointradius": 5,
       "points": false,
@@ -125,8 +91,18 @@
           "refId": "A"
         }
       ],
-      "thresholds": [],
+      "thresholds": [
+        {
+          "colorMode": "critical",
+          "fill": true,
+          "line": true,
+          "op": "gt",
+          "value": 1,
+          "yaxis": "left"
+        }
+      ],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "CPU usage",
       "tooltip": {
@@ -148,13 +124,103 @@
           "format": "percentunit",
           "label": null,
           "logBase": 1,
-          "max": "1",
+          "max": "1.5",
           "min": "0",
           "show": true
         },
         {
           "format": "short",
           "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "editable": true,
+      "error": false,
+      "fill": 1,
+      "grid": {},
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 33,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {},
+      "paceLength": 10,
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(rate(synapse_storage_events_persisted_events{instance=\"$instance\"}[$bucket_size])) without (job,index)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "",
+          "refId": "A",
+          "step": 20,
+          "target": ""
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Events Persisted",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "hertz",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
           "logBase": 1,
           "max": null,
           "min": null,
@@ -183,16 +249,19 @@
       "gridPos": {
         "h": 9,
         "w": 12,
-        "x": 12,
-        "y": 1
+        "x": 0,
+        "y": 10
       },
       "heatmap": {},
+      "hideZeroBuckets": true,
       "highlightCards": true,
       "id": 85,
       "legend": {
         "show": false
       },
       "links": [],
+      "options": {},
+      "reverseYBuckets": false,
       "targets": [
         {
           "expr": "sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\"}[$bucket_size])) by (le)",
@@ -232,57 +301,91 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "$datasource",
-      "editable": true,
-      "error": false,
-      "fill": 1,
-      "grid": {},
+      "fill": 0,
       "gridPos": {
-        "h": 7,
+        "h": 9,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 10
       },
-      "id": 33,
+      "id": 107,
       "legend": {
         "avg": false,
         "current": false,
         "max": false,
         "min": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
       "lines": true,
-      "linewidth": 2,
+      "linewidth": 1,
       "links": [],
       "nullPointMode": "null",
+      "options": {},
+      "paceLength": 10,
       "percentage": false,
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
+      "repeat": null,
+      "repeatDirection": "h",
+      "seriesOverrides": [
+        {
+          "alias": "mean",
+          "linewidth": 2
+        }
+      ],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(rate(synapse_storage_events_persisted_events{instance=\"$instance\"}[$bucket_size])) without (job,index)",
+          "expr": "histogram_quantile(0.99, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
           "format": "time_series",
-          "intervalFactor": 2,
-          "legendFormat": "",
-          "refId": "A",
-          "step": 20,
-          "target": ""
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "99%",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "95%",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "90%",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "50%",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(rate(synapse_http_server_response_time_seconds_sum{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method) / sum(rate(synapse_http_server_response_time_seconds_count{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method)",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "mean",
+          "refId": "E"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
-      "title": "Events Persisted",
+      "title": "Event send time quantiles",
       "tooltip": {
         "shared": true,
         "sort": 0,
-        "value_type": "cumulative"
+        "value_type": "individual"
       },
       "type": "graph",
       "xaxis": {
@@ -294,7 +397,8 @@
       },
       "yaxes": [
         {
-          "format": "hertz",
+          "format": "s",
+          "label": null,
           "logBase": 1,
           "max": null,
           "min": null,
@@ -302,6 +406,129 @@
         },
         {
           "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fill": 0,
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "id": 118,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {},
+      "paceLength": 10,
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "repeatDirection": "h",
+      "seriesOverrides": [
+        {
+          "alias": "mean",
+          "linewidth": 2
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{job}}-{{index}} 99%",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{job}}-{{index}} 95%",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{job}}-{{index}} 90%",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{job}}-{{index}} 50%",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(rate(synapse_http_server_response_time_seconds_sum{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method) / sum(rate(synapse_http_server_response_time_seconds_count{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method)",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{job}}-{{index}} mean",
+          "refId": "E"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Event send time quantiles by worker",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "s",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
           "logBase": 1,
           "max": null,
           "min": null,
@@ -319,7 +546,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 28
       },
       "id": 54,
       "panels": [
@@ -331,55 +558,95 @@
           "datasource": "$datasource",
           "editable": true,
           "error": false,
-          "fill": 0,
+          "fill": 1,
           "grid": {},
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 18
+            "y": 29
           },
-          "id": 34,
+          "id": 5,
           "legend": {
+            "alignAsTable": false,
             "avg": false,
             "current": false,
+            "hideEmpty": false,
+            "hideZero": false,
             "max": false,
             "min": false,
+            "rightSide": false,
             "show": true,
             "total": false,
             "values": false
           },
           "lines": true,
-          "linewidth": 2,
+          "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": true,
-          "targets": [
+          "seriesOverrides": [
             {
-              "expr": "process_resident_memory_bytes{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
-              "format": "time_series",
-              "intervalFactor": 2,
-              "legendFormat": "{{job}} {{index}}",
-              "refId": "A",
-              "step": 20,
-              "target": ""
+              "alias": "/user/"
+            },
+            {
+              "alias": "/system/"
             }
           ],
-          "thresholds": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "rate(process_cpu_system_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "{{job}}-{{index}} system ",
+              "metric": "",
+              "refId": "B",
+              "step": 20
+            },
+            {
+              "expr": "rate(process_cpu_user_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{job}}-{{index}} user",
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "thresholds": [
+            {
+              "colorMode": "custom",
+              "fillColor": "rgba(255, 255, 255, 1)",
+              "line": true,
+              "lineColor": "rgba(216, 200, 27, 0.27)",
+              "op": "gt",
+              "value": 0.5
+            },
+            {
+              "colorMode": "custom",
+              "fillColor": "rgba(255, 255, 255, 1)",
+              "line": true,
+              "lineColor": "rgba(234, 112, 112, 0.22)",
+              "op": "gt",
+              "value": 0.8
+            }
+          ],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
-          "title": "Memory",
+          "title": "CPU",
           "tooltip": {
             "shared": true,
             "sort": 0,
-            "value_type": "cumulative"
+            "value_type": "individual"
           },
           "type": "graph",
           "xaxis": {
@@ -391,10 +658,12 @@
           },
           "yaxes": [
             {
-              "format": "bytes",
+              "decimals": null,
+              "format": "percentunit",
+              "label": "",
               "logBase": 1,
-              "max": null,
-              "min": "0",
+              "max": "1.2",
+              "min": 0,
               "show": true
             },
             {
@@ -421,7 +690,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 18
+            "y": 29
           },
           "id": 37,
           "legend": {
@@ -437,6 +706,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -474,6 +744,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Open FDs",
           "tooltip": {
@@ -518,14 +789,17 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "$datasource",
-          "fill": 1,
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {},
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 25
+            "y": 36
           },
-          "id": 50,
+          "id": 34,
           "legend": {
             "avg": false,
             "current": false,
@@ -539,6 +813,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -549,23 +824,24 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(python_twisted_reactor_tick_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_twisted_reactor_tick_time_count[$bucket_size])",
+              "expr": "process_resident_memory_bytes{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
-              "interval": "",
               "intervalFactor": 2,
-              "legendFormat": "{{job}}-{{index}}",
+              "legendFormat": "{{job}} {{index}}",
               "refId": "A",
-              "step": 20
+              "step": 20,
+              "target": ""
             }
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
-          "title": "Avg reactor tick time",
+          "title": "Memory",
           "tooltip": {
             "shared": true,
             "sort": 0,
-            "value_type": "individual"
+            "value_type": "cumulative"
           },
           "type": "graph",
           "xaxis": {
@@ -577,20 +853,18 @@
           },
           "yaxes": [
             {
-              "format": "s",
-              "label": null,
+              "format": "bytes",
               "logBase": 1,
               "max": null,
-              "min": null,
+              "min": "0",
               "show": true
             },
             {
               "format": "short",
-              "label": null,
               "logBase": 1,
               "max": null,
               "min": null,
-              "show": false
+              "show": true
             }
           ],
           "yaxis": {
@@ -610,7 +884,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 25
+            "y": 36
           },
           "id": 105,
           "legend": {
@@ -626,6 +900,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -667,6 +942,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Reactor tick quantiles",
           "tooltip": {
@@ -711,12 +987,195 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "$datasource",
+          "fill": 1,
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 43
+          },
+          "id": 50,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "paceLength": 10,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "rate(python_twisted_reactor_tick_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_twisted_reactor_tick_time_count[$bucket_size])",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 2,
+              "legendFormat": "{{job}}-{{index}}",
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Avg reactor tick time",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "s",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 43
+          },
+          "id": 49,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "paceLength": 10,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "/^up/",
+              "legend": false,
+              "yaxis": 2
+            }
+          ],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "scrape_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 2,
+              "legendFormat": "{{job}}-{{index}}",
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Prometheus scrape time",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "s",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "decimals": 0,
+              "format": "none",
+              "label": "",
+              "logBase": 1,
+              "max": "0",
+              "min": "-1",
+              "show": false
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
           "fill": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 32
+            "y": 50
           },
           "id": 53,
           "legend": {
@@ -732,6 +1191,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -751,6 +1211,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Up",
           "tooltip": {
@@ -800,9 +1261,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 32
+            "y": 50
           },
-          "id": 49,
+          "id": 120,
           "legend": {
             "avg": false,
             "current": false,
@@ -817,162 +1278,48 @@
           "links": [],
           "nullPointMode": "null",
           "percentage": false,
-          "pointradius": 5,
+          "pointradius": 2,
           "points": false,
           "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "alias": "/^up/",
-              "legend": false,
-              "yaxis": 2
-            }
-          ],
+          "seriesOverrides": [],
           "spaceLength": 10,
-          "stack": false,
+          "stack": true,
           "steppedLine": false,
           "targets": [
             {
-              "expr": "scrape_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "rate(synapse_http_server_response_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
-              "interval": "",
-              "intervalFactor": 2,
-              "legendFormat": "{{job}}-{{index}}",
-              "refId": "A",
-              "step": 20
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "Prometheus scrape time",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "s",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": "0",
-              "show": true
-            },
-            {
-              "decimals": 0,
-              "format": "none",
-              "label": "",
-              "logBase": 1,
-              "max": "0",
-              "min": "-1",
-              "show": false
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "$datasource",
-          "editable": true,
-          "error": false,
-          "fill": 1,
-          "grid": {},
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 0,
-            "y": 39
-          },
-          "id": 5,
-          "legend": {
-            "alignAsTable": false,
-            "avg": false,
-            "current": false,
-            "hideEmpty": false,
-            "hideZero": false,
-            "max": false,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "links": [],
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "alias": "/user/"
-            },
-            {
-              "alias": "/system/"
-            }
-          ],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "expr": "rate(process_cpu_system_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
-              "format": "time_series",
+              "instant": false,
               "intervalFactor": 1,
-              "legendFormat": "{{job}}-{{index}} system ",
-              "metric": "",
-              "refId": "B",
-              "step": 20
+              "legendFormat": "{{job}}-{{index}} {{method}} {{servlet}} {{tag}}",
+              "refId": "A"
             },
             {
-              "expr": "rate(process_cpu_user_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_background_process_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
-              "hide": false,
+              "instant": false,
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{job}}-{{index}} user",
-              "refId": "A",
-              "step": 20
+              "legendFormat": "{{job}}-{{index}} {{name}}",
+              "refId": "B"
             }
           ],
           "thresholds": [
             {
-              "colorMode": "custom",
+              "colorMode": "critical",
+              "fill": true,
               "line": true,
-              "lineColor": "rgba(216, 200, 27, 0.27)",
               "op": "gt",
-              "value": 0.5
-            },
-            {
-              "colorMode": "custom",
-              "line": true,
-              "lineColor": "rgba(234, 112, 112, 0.22)",
-              "op": "gt",
-              "value": 0.8
+              "value": 1,
+              "yaxis": "left"
             }
           ],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
-          "title": "CPU",
+          "title": "Stacked CPU usage",
           "tooltip": {
-            "shared": true,
+            "shared": false,
             "sort": 0,
             "value_type": "individual"
           },
@@ -986,16 +1333,16 @@
           },
           "yaxes": [
             {
-              "decimals": null,
               "format": "percentunit",
-              "label": "",
+              "label": null,
               "logBase": 1,
-              "max": "1.2",
-              "min": 0,
+              "max": null,
+              "min": null,
               "show": true
             },
             {
               "format": "short",
+              "label": null,
               "logBase": 1,
               "max": null,
               "min": null,
@@ -1018,7 +1365,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 29
       },
       "id": 56,
       "panels": [
@@ -1034,7 +1381,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 47
+            "y": 58
           },
           "id": 40,
           "legend": {
@@ -1069,6 +1416,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Events/s Local vs Remote",
           "tooltip": {
@@ -1119,7 +1467,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 47
+            "y": 58
           },
           "id": 46,
           "legend": {
@@ -1156,6 +1504,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Events/s by Type",
           "tooltip": {
@@ -1208,7 +1557,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 54
+            "y": 65
           },
           "id": 44,
           "legend": {
@@ -1247,6 +1596,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Events/s by Origin",
           "tooltip": {
@@ -1297,7 +1647,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 54
+            "y": 65
           },
           "id": 45,
           "legend": {
@@ -1326,7 +1676,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum(rate(synapse_storage_events_persisted_events_sep{job=~\"$job\",index=~\"$index\", type=\"m.room.member\",instance=\"$instance\"}[$bucket_size])) by (origin_type, origin_entity)",
+              "expr": "sum(rate(synapse_storage_events_persisted_events_sep{job=~\"$job\",index=~\"$index\", type=\"m.room.member\",instance=\"$instance\", origin_type=\"local\"}[$bucket_size])) by (origin_type, origin_entity)",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{origin_entity}} ({{origin_type}})",
@@ -1336,6 +1686,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Memberships/s by Origin",
           "tooltip": {
@@ -1385,7 +1736,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 30
       },
       "id": 57,
       "panels": [
@@ -1404,7 +1755,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 62
+            "y": 31
           },
           "id": 4,
           "legend": {
@@ -1424,6 +1775,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1460,6 +1812,7 @@
             }
           ],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Request Count by arrival time",
           "tooltip": {
@@ -1467,7 +1820,6 @@
             "sort": 0,
             "value_type": "individual"
           },
-          "transparent": false,
           "type": "graph",
           "xaxis": {
             "buckets": null,
@@ -1511,7 +1863,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 62
+            "y": 31
           },
           "id": 32,
           "legend": {
@@ -1527,6 +1879,7 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1548,6 +1901,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Top 10 Request Counts",
           "tooltip": {
@@ -1599,7 +1953,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 70
+            "y": 39
           },
           "id": 23,
           "legend": {
@@ -1619,6 +1973,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1657,6 +2012,7 @@
             }
           ],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Total CPU Usage by Endpoint",
           "tooltip": {
@@ -1664,7 +2020,6 @@
             "sort": 0,
             "value_type": "individual"
           },
-          "transparent": false,
           "type": "graph",
           "xaxis": {
             "buckets": null,
@@ -1709,7 +2064,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 70
+            "y": 39
           },
           "id": 52,
           "legend": {
@@ -1729,6 +2084,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1765,6 +2121,7 @@
             }
           ],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Average CPU Usage by Endpoint",
           "tooltip": {
@@ -1772,7 +2129,6 @@
             "sort": 0,
             "value_type": "individual"
           },
-          "transparent": false,
           "type": "graph",
           "xaxis": {
             "buckets": null,
@@ -1816,7 +2172,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 78
+            "y": 47
           },
           "id": 7,
           "legend": {
@@ -1835,6 +2191,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1856,6 +2213,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "DB Usage by endpoint",
           "tooltip": {
@@ -1907,7 +2265,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 78
+            "y": 47
           },
           "id": 47,
           "legend": {
@@ -1927,6 +2285,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1937,17 +2296,19 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_http_server_response_time_seconds_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])/rate(synapse_http_server_response_time_seconds_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])",
+              "expr": "(sum(rate(synapse_http_server_response_time_seconds_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])) without (code))/(sum(rate(synapse_http_server_response_time_seconds_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])) without (code))",
               "format": "time_series",
+              "hide": false,
               "interval": "",
               "intervalFactor": 2,
-              "legendFormat": "{{job}}-{{index}} {{method}} {{servlet}} {{tag}}",
+              "legendFormat": "{{job}}-{{index}} {{method}} {{servlet}}",
               "refId": "A",
               "step": 20
             }
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Non-sync avg response time",
           "tooltip": {
@@ -1955,7 +2316,6 @@
             "sort": 0,
             "value_type": "individual"
           },
-          "transparent": false,
           "type": "graph",
           "xaxis": {
             "buckets": null,
@@ -1996,7 +2356,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 86
+            "y": 55
           },
           "id": 103,
           "legend": {
@@ -2012,6 +2372,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2032,6 +2393,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Requests in flight",
           "tooltip": {
@@ -2081,7 +2443,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 31
       },
       "id": 97,
       "panels": [
@@ -2096,7 +2458,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 49
+            "y": 32
           },
           "id": 99,
           "legend": {
@@ -2112,6 +2474,8 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2132,10 +2496,11 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "CPU usage by background jobs",
           "tooltip": {
-            "shared": true,
+            "shared": false,
             "sort": 0,
             "value_type": "individual"
           },
@@ -2181,7 +2546,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 49
+            "y": 32
           },
           "id": 101,
           "legend": {
@@ -2197,6 +2562,8 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2223,6 +2590,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "DB usage by background jobs (including scheduling time)",
           "tooltip": {
@@ -2271,7 +2639,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 32
       },
       "id": 81,
       "panels": [
@@ -2286,7 +2654,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 64
+            "y": 61
           },
           "id": 79,
           "legend": {
@@ -2302,6 +2670,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2312,7 +2681,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_federation_client_sent_transactions{instance=\"$instance\", job=~\"$job\", index=~\"$index\"}[$bucket_size])",
+              "expr": "sum(rate(synapse_federation_client_sent_transactions{instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "txn rate",
@@ -2321,6 +2690,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Outgoing federation transaction rate",
           "tooltip": {
@@ -2370,7 +2740,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 64
+            "y": 61
           },
           "id": 83,
           "legend": {
@@ -2386,6 +2756,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2396,14 +2767,14 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_federation_server_received_pdus{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "sum(rate(synapse_federation_server_received_pdus{instance=~\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "pdus",
               "refId": "A"
             },
             {
-              "expr": "rate(synapse_federation_server_received_edus{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "sum(rate(synapse_federation_server_received_edus{instance=~\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "edus",
@@ -2412,8 +2783,190 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Incoming PDU/EDU rate",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "hertz",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 70
+          },
+          "id": 109,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "paceLength": 10,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(rate(synapse_federation_client_sent_pdu_destinations:total{instance=\"$instance\"}[$bucket_size]))",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "pdus",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(rate(synapse_federation_client_sent_edus{instance=\"$instance\"}[$bucket_size]))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "edus",
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Outgoing PDU/EDU rate",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "hertz",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 70
+          },
+          "id": 111,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "paceLength": 10,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "rate(synapse_federation_client_sent_edus_by_type{instance=\"$instance\"}[$bucket_size])",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{type}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Outgoing EDUs by type",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -2460,7 +3013,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 33
       },
       "id": 60,
       "panels": [
@@ -2475,7 +3028,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 65
+            "y": 62
           },
           "id": 51,
           "legend": {
@@ -2491,6 +3044,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2501,7 +3055,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_push_httppusher_http_pushes_processed{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_httppusher_http_pushes_processed{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed + synapse_http_httppusher_http_pushes_processed) > 0",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -2510,7 +3064,7 @@
               "step": 20
             },
             {
-              "expr": "rate(synapse_push_httppusher_http_pushes_failed{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_httppusher_http_pushes_failed{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed + synapse_http_httppusher_http_pushes_processed) > 0",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "failed {{job}}",
@@ -2520,6 +3074,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "HTTP Push rate",
           "tooltip": {
@@ -2569,7 +3124,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 34
       },
       "id": 58,
       "panels": [
@@ -2584,7 +3139,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 24
+            "y": 35
           },
           "id": 48,
           "legend": {
@@ -2600,6 +3155,8 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2620,6 +3177,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Avg time waiting for db conn",
           "tooltip": {
@@ -2671,10 +3229,11 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 24
+            "y": 35
           },
           "id": 104,
           "legend": {
+            "alignAsTable": true,
             "avg": false,
             "current": false,
             "max": false,
@@ -2687,6 +3246,8 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2718,14 +3279,23 @@
               "intervalFactor": 1,
               "legendFormat": "{{job}} {{index}} 90%",
               "refId": "C"
+            },
+            {
+              "expr": "rate(synapse_storage_schedule_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_schedule_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{job}} {{index}} mean",
+              "refId": "D"
             }
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Db scheduling time quantiles",
           "tooltip": {
-            "shared": true,
+            "shared": false,
             "sort": 0,
             "value_type": "individual"
           },
@@ -2775,7 +3345,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 31
+            "y": 42
           },
           "id": 10,
           "legend": {
@@ -2793,6 +3363,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2814,6 +3386,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Top DB transactions by txn rate",
           "tooltip": {
@@ -2864,7 +3437,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 31
+            "y": 42
           },
           "id": 11,
           "legend": {
@@ -2882,14 +3455,16 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {},
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
           "seriesOverrides": [],
           "spaceLength": 10,
-          "stack": true,
-          "steppedLine": true,
+          "stack": false,
+          "steppedLine": false,
           "targets": [
             {
               "expr": "rate(synapse_storage_transaction_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
@@ -2904,6 +3479,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Top DB transactions by total txn time",
           "tooltip": {
@@ -2951,7 +3527,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 35
       },
       "id": 59,
       "panels": [
@@ -2969,7 +3545,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 60
+            "y": 36
           },
           "id": 12,
           "legend": {
@@ -2986,6 +3562,7 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -3007,6 +3584,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Total CPU Usage by Block",
           "tooltip": {
@@ -3057,7 +3635,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 60
+            "y": 36
           },
           "id": 26,
           "legend": {
@@ -3074,6 +3652,7 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -3095,6 +3674,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Average CPU Time per Block",
           "tooltip": {
@@ -3145,7 +3725,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 73
+            "y": 49
           },
           "id": 13,
           "legend": {
@@ -3162,6 +3742,7 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -3183,6 +3764,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Total DB Usage by Block",
           "tooltip": {
@@ -3233,7 +3815,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 73
+            "y": 49
           },
           "id": 27,
           "legend": {
@@ -3250,6 +3832,7 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -3271,6 +3854,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Average Database Time per Block",
           "tooltip": {
@@ -3321,7 +3905,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 86
+            "y": 62
           },
           "id": 28,
           "legend": {
@@ -3337,6 +3921,7 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -3358,6 +3943,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Average Transactions per Block",
           "tooltip": {
@@ -3408,7 +3994,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 86
+            "y": 62
           },
           "id": 25,
           "legend": {
@@ -3424,6 +4010,7 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -3445,6 +4032,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Average Wallclock Time per Block",
           "tooltip": {
@@ -3492,7 +4080,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 36
       },
       "id": 61,
       "panels": [
@@ -3511,7 +4099,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 68
+            "y": 37
           },
           "id": 1,
           "legend": {
@@ -3550,6 +4138,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Cache Hit Ratio",
           "tooltip": {
@@ -3603,7 +4192,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 68
+            "y": 37
           },
           "id": 8,
           "legend": {
@@ -3643,6 +4232,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Cache Size",
           "tooltip": {
@@ -3693,7 +4283,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 78
+            "y": 47
           },
           "id": 38,
           "legend": {
@@ -3732,6 +4322,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Cache request rate",
           "tooltip": {
@@ -3779,7 +4370,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 78
+            "y": 47
           },
           "id": 39,
           "legend": {
@@ -3816,10 +4407,11 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Top 10 cache misses",
           "tooltip": {
-            "shared": true,
+            "shared": false,
             "sort": 0,
             "value_type": "individual"
           },
@@ -3865,7 +4457,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 88
+            "y": 57
           },
           "id": 65,
           "legend": {
@@ -3901,6 +4493,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Cache eviction rate",
           "tooltip": {
@@ -3908,7 +4501,6 @@
             "sort": 0,
             "value_type": "individual"
           },
-          "transparent": false,
           "type": "graph",
           "xaxis": {
             "buckets": null,
@@ -3952,7 +4544,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 37
       },
       "id": 62,
       "panels": [
@@ -3967,7 +4559,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 27
+            "y": 66
           },
           "id": 91,
           "legend": {
@@ -4003,6 +4595,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Total GC time by bucket (10m smoothing)",
           "tooltip": {
@@ -4057,7 +4650,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 27
+            "y": 66
           },
           "id": 21,
           "legend": {
@@ -4084,7 +4677,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(python_gc_time_sum{instance=\"$instance\",job=~\"$job\"}[$bucket_size])/rate(python_gc_time_count[$bucket_size])",
+              "expr": "rate(python_gc_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_gc_time_count[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}} {{index}} gen {{gen}} ",
@@ -4095,6 +4688,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Average GC Time Per Collection",
           "tooltip": {
@@ -4137,12 +4731,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "$datasource",
+          "description": "'gen 0' shows the number of objects allocated since the last gen0 GC.\n'gen 1' / 'gen 2' show the number of gen0/gen1 GCs since the last gen1/gen2 GC.",
           "fill": 1,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 36
+            "y": 75
           },
           "id": 89,
           "legend": {
@@ -4164,7 +4759,12 @@
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
-          "seriesOverrides": [],
+          "seriesOverrides": [
+            {
+              "alias": "/gen 0$/",
+              "yaxis": 2
+            }
+          ],
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
@@ -4179,8 +4779,9 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
-          "title": "Currently allocated objects",
+          "title": "Allocation counts",
           "tooltip": {
             "shared": false,
             "sort": 0,
@@ -4197,15 +4798,16 @@
           "yaxes": [
             {
               "format": "short",
-              "label": null,
+              "label": "Gen N-1 GCs since last Gen N GC",
               "logBase": 1,
               "max": null,
               "min": null,
               "show": true
             },
             {
+              "decimals": null,
               "format": "short",
-              "label": null,
+              "label": "Objects since last Gen 0 GC",
               "logBase": 1,
               "max": null,
               "min": null,
@@ -4228,7 +4830,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 36
+            "y": 75
           },
           "id": 93,
           "legend": {
@@ -4263,6 +4865,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Object counts per collection",
           "tooltip": {
@@ -4312,7 +4915,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 45
+            "y": 84
           },
           "id": 95,
           "legend": {
@@ -4347,6 +4950,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "GC frequency",
           "tooltip": {
@@ -4400,20 +5004,22 @@
             "mode": "spectrum"
           },
           "dataFormat": "tsbuckets",
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "Prometheus",
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 45
+            "y": 84
           },
           "heatmap": {},
+          "hideZeroBuckets": true,
           "highlightCards": true,
           "id": 87,
           "legend": {
             "show": true
           },
           "links": [],
+          "reverseYBuckets": false,
           "targets": [
             {
               "expr": "sum(rate(python_gc_time_bucket[$bucket_size])) by (le)",
@@ -4458,7 +5064,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 38
       },
       "id": 63,
       "panels": [
@@ -4473,7 +5079,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 97
+            "y": 67
           },
           "id": 2,
           "legend": {
@@ -4489,6 +5095,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4541,10 +5148,11 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Rate of events on replication master",
           "tooltip": {
-            "shared": true,
+            "shared": false,
             "sort": 0,
             "value_type": "individual"
           },
@@ -4590,7 +5198,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 97
+            "y": 67
           },
           "id": 41,
           "legend": {
@@ -4606,6 +5214,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4627,10 +5236,11 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Outgoing stream updates",
           "tooltip": {
-            "shared": true,
+            "shared": false,
             "sort": 0,
             "value_type": "individual"
           },
@@ -4676,7 +5286,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 104
+            "y": 74
           },
           "id": 42,
           "legend": {
@@ -4692,6 +5302,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4712,10 +5323,11 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Rate of incoming commands",
           "tooltip": {
-            "shared": true,
+            "shared": false,
             "sort": 0,
             "value_type": "individual"
           },
@@ -4761,7 +5373,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 104
+            "y": 74
           },
           "id": 43,
           "legend": {
@@ -4777,6 +5389,7 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4797,8 +5410,181 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Rate of outgoing commands",
+          "tooltip": {
+            "shared": false,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "hertz",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 81
+          },
+          "id": 113,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "paceLength": 10,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "synapse_replication_tcp_resource_connections_per_stream{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "{{job}}-{{index}} {{stream_name}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Replication connections",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 81
+          },
+          "id": 115,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "paceLength": 10,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "rate(synapse_replication_tcp_protocol_close_reason{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "{{job}}-{{index}} {{reason_type}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Replication connection close reasons",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -4846,7 +5632,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 39
       },
       "id": 69,
       "panels": [
@@ -4861,7 +5647,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 29
+            "y": 13
           },
           "id": 67,
           "legend": {
@@ -4877,6 +5663,8 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "connected",
+          "options": {},
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4897,6 +5685,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Event processing lag",
           "tooltip": {
@@ -4946,7 +5735,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 29
+            "y": 13
           },
           "id": 71,
           "legend": {
@@ -4962,6 +5751,8 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "connected",
+          "options": {},
+          "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4982,6 +5773,7 @@
           ],
           "thresholds": [],
           "timeFrom": null,
+          "timeRegions": [],
           "timeShift": null,
           "title": "Age of last processed event",
           "tooltip": {
@@ -5019,14 +5811,803 @@
             "align": false,
             "alignLevel": null
           }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 22
+          },
+          "id": 121,
+          "interval": "",
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "connected",
+          "options": {},
+          "paceLength": 10,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "deriv(synapse_event_processing_last_ts{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/1000 - 1",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{job}}-{{index}} {{name}}",
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Event processing catchup rate",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": null,
+              "format": "none",
+              "label": "fallbehind(-) / catchup(+):  s/sec",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         }
       ],
       "title": "Event processing loop positions",
       "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 126,
+      "panels": [
+        {
+          "cards": {
+            "cardPadding": 0,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#B877D9",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateInferno",
+            "exponent": 0.5,
+            "max": null,
+            "min": 0,
+            "mode": "opacity"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "$datasource",
+          "description": "Colour reflects the number of rooms with the given number of forward extremities, or fewer.\n\nThis is only updated once an hour.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 14
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 122,
+          "legend": {
+            "show": true
+          },
+          "links": [],
+          "options": {},
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "format": "heatmap",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Number of rooms, by number of forward extremities in room",
+          "tooltip": {
+            "show": true,
+            "showHistogram": true
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "short",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "auto",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "description": "Number of rooms with the given number of forward extremities or fewer.\n\nThis is only updated once an hour.",
+          "fill": 0,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 14
+          },
+          "id": 124,
+          "interval": "",
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {},
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} > 0",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Room counts, by number of extremities",
+          "tooltip": {
+            "shared": false,
+            "sort": 1,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": null,
+              "format": "none",
+              "label": "Number of rooms",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "cards": {
+            "cardPadding": 0,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#5794F2",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateInferno",
+            "exponent": 0.5,
+            "min": 0,
+            "mode": "opacity"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "$datasource",
+          "description": "Colour reflects the number of events persisted to rooms with the given number of forward extremities, or fewer.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 22
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 127,
+          "legend": {
+            "show": true
+          },
+          "links": [],
+          "options": {},
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "format": "heatmap",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Events persisted, by number of forward extremities in room (heatmap)",
+          "tooltip": {
+            "show": true,
+            "showHistogram": true
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "short",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "auto",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "description": "For a given percentage P, the number X where P% of events were persisted to rooms with X forward extremities or fewer.",
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 22
+          },
+          "id": 128,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {},
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50%",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "75%",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "C"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "refId": "D"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Events persisted, by number of forward extremities in room (quantiles)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": "Number of extremities in room",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "cards": {
+            "cardPadding": 0,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#FF9830",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateInferno",
+            "exponent": 0.5,
+            "min": 0,
+            "mode": "opacity"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "$datasource",
+          "description": "Colour reflects the number of events persisted to rooms with the given number of stale forward extremities, or fewer.\n\nStale forward extremities are those that were in the previous set of extremities as well as the new.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 30
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 129,
+          "legend": {
+            "show": true
+          },
+          "links": [],
+          "options": {},
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "format": "heatmap",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Events persisted, by number of stale forward extremities in room (heatmap)",
+          "tooltip": {
+            "show": true,
+            "showHistogram": true
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "short",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "auto",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "description": "For  given percentage P, the number X where P% of events were persisted to rooms with X stale forward extremities or fewer.\n\nStale forward extremities are those that were in the previous set of extremities as well as the new.",
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 30
+          },
+          "id": 130,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {},
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50%",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "75%",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "C"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "refId": "D"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Events persisted, by number of stale forward extremities in room (quantiles)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": "Number of stale forward extremities in room",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "cards": {
+            "cardPadding": 0,
+            "cardRound": null
+          },
+          "color": {
+            "cardColor": "#73BF69",
+            "colorScale": "sqrt",
+            "colorScheme": "interpolateInferno",
+            "exponent": 0.5,
+            "min": 0,
+            "mode": "opacity"
+          },
+          "dataFormat": "tsbuckets",
+          "datasource": "$datasource",
+          "description": "Colour reflects the number of state resolution operations performed over the given number of state groups, or fewer.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 38
+          },
+          "heatmap": {},
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "id": 131,
+          "legend": {
+            "show": true
+          },
+          "links": [],
+          "options": {},
+          "reverseYBuckets": false,
+          "targets": [
+            {
+              "expr": "rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "format": "heatmap",
+              "intervalFactor": 1,
+              "legendFormat": "{{le}}",
+              "refId": "A"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Number of state resolution performed, by number of state groups involved (heatmap)",
+          "tooltip": {
+            "show": true,
+            "showHistogram": true
+          },
+          "type": "heatmap",
+          "xAxis": {
+            "show": true
+          },
+          "xBucketNumber": null,
+          "xBucketSize": null,
+          "yAxis": {
+            "decimals": 0,
+            "format": "short",
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true,
+            "splitFactor": null
+          },
+          "yBucketBound": "auto",
+          "yBucketNumber": null,
+          "yBucketSize": null
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "description": "For a given percentage P, the number X where P% of state resolution operations took place over X state groups or fewer.",
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 38
+          },
+          "id": 132,
+          "interval": "",
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {},
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)) ",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50%",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.75, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "75%",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.90, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "C"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "refId": "D"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Number of state resolution performed, by number of state groups involved (quantiles)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": "Number of state groups",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        }
+      ],
+      "title": "Extremities",
+      "type": "row"
     }
   ],
-  "refresh": "1m",
-  "schemaVersion": 16,
+  "refresh": "5m",
+  "schemaVersion": 18,
   "style": "dark",
   "tags": [
     "matrix"
@@ -5035,16 +6616,20 @@
     "list": [
       {
         "current": {
+          "tags": [],
           "text": "Prometheus",
           "value": "Prometheus"
         },
         "hide": 0,
+        "includeAll": false,
         "label": null,
+        "multi": false,
         "name": "datasource",
         "options": [],
         "query": "prometheus",
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "type": "datasource"
       },
       {
@@ -5102,12 +6687,17 @@
         ],
         "query": "30s,1m,2m,5m,10m,15m",
         "refresh": 2,
+        "skipUrlSync": false,
         "type": "interval"
       },
       {
         "allValue": null,
-        "current": {},
+        "current": {
+          "text": "matrix.org",
+          "value": "matrix.org"
+        },
         "datasource": "$datasource",
+        "definition": "",
         "hide": 0,
         "includeAll": false,
         "label": null,
@@ -5117,6 +6707,7 @@
         "query": "label_values(synapse_util_metrics_block_ru_utime_seconds, instance)",
         "refresh": 2,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
         "tags": [],
@@ -5127,8 +6718,14 @@
       {
         "allFormat": "regex wildcard",
         "allValue": "",
-        "current": {},
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
         "datasource": "$datasource",
+        "definition": "",
         "hide": 0,
         "hideLabel": false,
         "includeAll": true,
@@ -5141,6 +6738,7 @@
         "refresh": 2,
         "refresh_on_load": false,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
         "tags": [],
@@ -5151,8 +6749,12 @@
       {
         "allFormat": "regex wildcard",
         "allValue": ".*",
-        "current": {},
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "datasource": "$datasource",
+        "definition": "",
         "hide": 0,
         "hideLabel": false,
         "includeAll": true,
@@ -5165,6 +6767,7 @@
         "refresh": 2,
         "refresh_on_load": false,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 3,
         "tagValuesQuery": "",
         "tags": [],
@@ -5207,5 +6810,5 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 3
+  "version": 10
 }

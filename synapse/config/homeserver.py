@@ -13,6 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from ._base import RootConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
 from .captcha import CaptchaConfig
@@ -36,20 +38,46 @@ from .saml2_config import SAML2Config
 from .server import ServerConfig
 from .server_notices_config import ServerNoticesConfig
 from .spam_checker import SpamCheckerConfig
+from .stats import StatsConfig
+from .third_party_event_rules import ThirdPartyRulesConfig
 from .tls import TlsConfig
+from .tracer import TracerConfig
 from .user_directory import UserDirectoryConfig
 from .voip import VoipConfig
 from .workers import WorkerConfig
 
 
-class HomeServerConfig(ServerConfig, TlsConfig, DatabaseConfig, LoggingConfig,
-                       RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
-                       VoipConfig, RegistrationConfig, MetricsConfig, ApiConfig,
-                       AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
-                       JWTConfig, PasswordConfig, EmailConfig,
-                       WorkerConfig, PasswordAuthProviderConfig, PushConfig,
-                       SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,
-                       ConsentConfig,
-                       ServerNoticesConfig, RoomDirectoryConfig,
-                       ):
-    pass
+class HomeServerConfig(RootConfig):
+
+    config_classes = [
+        ServerConfig,
+        TlsConfig,
+        DatabaseConfig,
+        LoggingConfig,
+        RatelimitConfig,
+        ContentRepositoryConfig,
+        CaptchaConfig,
+        VoipConfig,
+        RegistrationConfig,
+        MetricsConfig,
+        ApiConfig,
+        AppServiceConfig,
+        KeyConfig,
+        SAML2Config,
+        CasConfig,
+        JWTConfig,
+        PasswordConfig,
+        EmailConfig,
+        WorkerConfig,
+        PasswordAuthProviderConfig,
+        PushConfig,
+        SpamCheckerConfig,
+        GroupsConfig,
+        UserDirectoryConfig,
+        ConsentConfig,
+        StatsConfig,
+        ServerNoticesConfig,
+        RoomDirectoryConfig,
+        ThirdPartyRulesConfig,
+        TracerConfig,
+    ]

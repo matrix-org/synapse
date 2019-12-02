@@ -16,10 +16,10 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.constants import DEFAULT_ROOM_VERSION, RoomDisposition, RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import RestServlet
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class CapabilitiesRestServlet(RestServlet):
     """End point to expose the capabilities of the server."""
 
-    PATTERNS = client_v2_patterns("/capabilities$")
+    PATTERNS = client_patterns("/capabilities$")
 
     def __init__(self, hs):
         """
@@ -36,6 +36,7 @@ class CapabilitiesRestServlet(RestServlet):
         """
         super(CapabilitiesRestServlet, self).__init__()
         self.hs = hs
+        self.config = hs.config
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
@@ -48,18 +49,16 @@ class CapabilitiesRestServlet(RestServlet):
         response = {
             "capabilities": {
                 "m.room_versions": {
-                    "default": DEFAULT_ROOM_VERSION,
+                    "default": self.config.default_room_version.identifier,
                     "available": {
-                        RoomVersions.V1: RoomDisposition.STABLE,
-                        RoomVersions.V2: RoomDisposition.STABLE,
-                        RoomVersions.STATE_V2_TEST: RoomDisposition.UNSTABLE,
-                        RoomVersions.V3: RoomDisposition.STABLE,
+                        v.identifier: v.disposition
+                        for v in KNOWN_ROOM_VERSIONS.values()
                     },
                 },
                 "m.change_password": {"enabled": change_password},
             }
         }
-        defer.returnValue((200, response))
+        return 200, response
 
 
 def register_servlets(hs, http_server):

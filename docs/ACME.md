@@ -10,13 +10,14 @@ through [Let's Encrypt](https://letsencrypt.org/) if you tell it to.
 
 In the case that your `server_name` config variable is the same as
 the hostname that the client connects to, then the same certificate can be
-used between client and federation ports without issue. 
+used between client and federation ports without issue.
 
-For a sample configuration, please inspect the new ACME section in the example
-generated config by running the `generate-config` executable. For example:
+If your configuration file does not already have an `acme` section, you can
+generate an example config by running the `generate_config` executable. For
+example:
 
 ```
-~/synapse/env3/bin/generate-config
+~/synapse/env3/bin/generate_config
 ```
 
 You will need to provide Let's Encrypt (or another ACME provider) access to
@@ -27,10 +28,9 @@ like `authbind` to allow Synapse to listen on port 80 without root access.
 (Do not run Synapse with root permissions!) Detailed instructions are
 available under "ACME setup" below.
 
-If you are already using self-signed certificates, you will need to back up
-or delete them (files `example.com.tls.crt` and `example.com.tls.key` in
-Synapse's root directory), Synapse's ACME implementation will not overwrite
-them.
+If you already have certificates, you will need to back up or delete them
+(files `example.com.tls.crt` and `example.com.tls.key` in Synapse's root
+directory), Synapse's ACME implementation will not overwrite them.
 
 You may wish to use alternate methods such as Certbot to obtain a certificate
 from Let's Encrypt, depending on your server configuration. Of course, if you
@@ -67,7 +67,7 @@ For nginx users, add the following line to your existing `server` block:
 
 ```
 location /.well-known/acme-challenge {
-    proxy_pass http://localhost:8009/;
+    proxy_pass http://localhost:8009;
 }
 ```
 
@@ -86,7 +86,6 @@ acme:
     enabled: true
     port: 8009
 ```
-
 
 #### Authbind
 

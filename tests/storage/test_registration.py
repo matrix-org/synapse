@@ -37,7 +37,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_register(self):
-        yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
+        yield self.store.register_user(self.user_id, self.pwhash)
 
         self.assertEquals(
             {
@@ -49,21 +49,16 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "consent_server_notice_sent": None,
                 "appservice_id": None,
                 "creation_ts": 1000,
+                "user_type": None,
             },
             (yield self.store.get_user_by_id(self.user_id)),
         )
 
-        result = yield self.store.get_user_by_access_token(self.tokens[0])
-
-        self.assertDictContainsSubset({"name": self.user_id}, result)
-
-        self.assertTrue("token_id" in result)
-
     @defer.inlineCallbacks
     def test_add_tokens(self):
-        yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
+        yield self.store.register_user(self.user_id, self.pwhash)
         yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[1], self.device_id
+            self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
         )
 
         result = yield self.store.get_user_by_access_token(self.tokens[1])
@@ -77,9 +72,12 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_user_delete_access_tokens(self):
         # add some tokens
-        yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
+        yield self.store.register_user(self.user_id, self.pwhash)
         yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[1], self.device_id
+            self.user_id, self.tokens[0], device_id=None, valid_until_ms=None
+        )
+        yield self.store.add_access_token_to_user(
+            self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
         )
 
         # now delete some
@@ -108,24 +106,12 @@ class RegistrationStoreTestCase(unittest.TestCase):
 
         res = yield self.store.is_support_user(None)
         self.assertFalse(res)
-        yield self.store.register(user_id=TEST_USER, token="123", password_hash=None)
+        yield self.store.register_user(user_id=TEST_USER, password_hash=None)
         res = yield self.store.is_support_user(TEST_USER)
         self.assertFalse(res)
 
-        yield self.store.register(
-            user_id=SUPPORT_USER,
-            token="456",
-            password_hash=None,
-            user_type=UserTypes.SUPPORT
+        yield self.store.register_user(
+            user_id=SUPPORT_USER, password_hash=None, user_type=UserTypes.SUPPORT
         )
         res = yield self.store.is_support_user(SUPPORT_USER)
         self.assertTrue(res)
-
-
-class TokenGenerator:
-    def __init__(self):
-        self._last_issued_token = 0
-
-    def generate(self, user_id):
-        self._last_issued_token += 1
-        return u"%s-%d" % (user_id, self._last_issued_token)

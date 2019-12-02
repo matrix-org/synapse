@@ -15,19 +15,19 @@
 
 from twisted.internet import defer
 
-from synapse.http.servlet import parse_boolean
+from synapse.http.servlet import RestServlet, parse_boolean
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.streams.config import PaginationConfig
-
-from .base import ClientV1RestServlet, client_path_patterns
 
 
 # TODO: Needs unit testing
-class InitialSyncRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/initialSync$")
+class InitialSyncRestServlet(RestServlet):
+    PATTERNS = client_patterns("/initialSync$", v1=True)
 
     def __init__(self, hs):
-        super(InitialSyncRestServlet, self).__init__(hs)
+        super(InitialSyncRestServlet, self).__init__()
         self.initial_sync_handler = hs.get_initial_sync_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -42,7 +42,7 @@ class InitialSyncRestServlet(ClientV1RestServlet):
             include_archived=include_archived,
         )
 
-        defer.returnValue((200, content))
+        return 200, content
 
 
 def register_servlets(hs, http_server):

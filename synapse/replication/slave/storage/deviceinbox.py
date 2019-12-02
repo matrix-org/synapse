@@ -13,27 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage import DataStore
+from synapse.replication.slave.storage._base import BaseSlavedStore
+from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
+from synapse.storage.data_stores.main.deviceinbox import DeviceInboxWorkerStore
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
-from ._base import BaseSlavedStore, __func__
-from ._slaved_id_tracker import SlavedIdTracker
 
-
-class SlavedDeviceInboxStore(BaseSlavedStore):
+class SlavedDeviceInboxStore(DeviceInboxWorkerStore, BaseSlavedStore):
     def __init__(self, db_conn, hs):
         super(SlavedDeviceInboxStore, self).__init__(db_conn, hs)
         self._device_inbox_id_gen = SlavedIdTracker(
-            db_conn, "device_max_stream_id", "stream_id",
+            db_conn, "device_max_stream_id", "stream_id"
         )
         self._device_inbox_stream_cache = StreamChangeCache(
             "DeviceInboxStreamChangeCache",
-            self._device_inbox_id_gen.get_current_token()
+            self._device_inbox_id_gen.get_current_token(),
         )
         self._device_federation_outbox_stream_cache = StreamChangeCache(
             "DeviceFederationOutboxStreamChangeCache",
-            self._device_inbox_id_gen.get_current_token()
+            self._device_inbox_id_gen.get_current_token(),
         )
 
         self._last_device_delete_cache = ExpiringCache(
@@ -42,12 +41,6 @@ class SlavedDeviceInboxStore(BaseSlavedStore):
             max_len=10000,
             expiry_ms=30 * 60 * 1000,
         )
-
-    get_to_device_stream_token = __func__(DataStore.get_to_device_stream_token)
-    get_new_messages_for_device = __func__(DataStore.get_new_messages_for_device)
-    get_new_device_msgs_for_remote = __func__(DataStore.get_new_device_msgs_for_remote)
-    delete_messages_for_device = __func__(DataStore.delete_messages_for_device)
-    delete_device_msgs_for_remote = __func__(DataStore.delete_device_msgs_for_remote)
 
     def stream_positions(self):
         result = super(SlavedDeviceInboxStore, self).stream_positions()

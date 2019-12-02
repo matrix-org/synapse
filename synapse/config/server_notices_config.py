@@ -30,11 +30,11 @@ DEFAULT_CONFIG = """\
 # It's also possible to override the room name, the display name of the
 # "notices" user, and the avatar for the user.
 #
-# server_notices:
-#   system_mxid_localpart: notices
-#   system_mxid_display_name: "Server Notices"
-#   system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
-#   room_name: "Server Notices"
+#server_notices:
+#  system_mxid_localpart: notices
+#  system_mxid_display_name: "Server Notices"
+#  system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
+#  room_name: "Server Notices"
 """
 
 
@@ -58,30 +58,27 @@ class ServerNoticesConfig(Config):
             The name to use for the server notices room.
             None if server notices are not enabled.
     """
-    def __init__(self):
-        super(ServerNoticesConfig, self).__init__()
+
+    section = "servernotices"
+
+    def __init__(self, *args):
+        super(ServerNoticesConfig, self).__init__(*args)
         self.server_notices_mxid = None
         self.server_notices_mxid_display_name = None
         self.server_notices_mxid_avatar_url = None
         self.server_notices_room_name = None
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         c = config.get("server_notices")
         if c is None:
             return
 
-        mxid_localpart = c['system_mxid_localpart']
-        self.server_notices_mxid = UserID(
-            mxid_localpart, self.server_name,
-        ).to_string()
-        self.server_notices_mxid_display_name = c.get(
-            'system_mxid_display_name', None,
-        )
-        self.server_notices_mxid_avatar_url = c.get(
-            'system_mxid_avatar_url', None,
-        )
+        mxid_localpart = c["system_mxid_localpart"]
+        self.server_notices_mxid = UserID(mxid_localpart, self.server_name).to_string()
+        self.server_notices_mxid_display_name = c.get("system_mxid_display_name", None)
+        self.server_notices_mxid_avatar_url = c.get("system_mxid_avatar_url", None)
         # todo: i18n
-        self.server_notices_room_name = c.get('room_name', "Server Notices")
+        self.server_notices_room_name = c.get("room_name", "Server Notices")
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return DEFAULT_CONFIG

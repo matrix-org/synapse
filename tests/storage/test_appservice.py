@@ -24,7 +24,7 @@ from twisted.internet import defer
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.config._base import ConfigError
-from synapse.storage.appservice import (
+from synapse.storage.data_stores.main.appservice import (
     ApplicationServiceStore,
     ApplicationServiceTransactionStore,
 )
@@ -74,7 +74,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             namespaces={},
         )
         # use the token as the filename
-        with open(as_token, 'w') as outfile:
+        with open(as_token, "w") as outfile:
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
@@ -135,7 +135,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             namespaces={},
         )
         # use the token as the filename
-        with open(as_token, 'w') as outfile:
+        with open(as_token, "w") as outfile:
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
@@ -340,7 +340,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         other_events = [Mock(event_id="e5"), Mock(event_id="e6")]
 
         # we aren't testing store._base stuff here, so mock this out
-        self.store._get_events = Mock(return_value=events)
+        self.store.get_events_as_list = Mock(return_value=events)
 
         yield self._insert_txn(self.as_list[1]["id"], 9, other_events)
         yield self._insert_txn(service.id, 10, events)

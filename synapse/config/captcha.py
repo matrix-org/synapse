@@ -16,33 +16,44 @@ from ._base import Config
 
 
 class CaptchaConfig(Config):
+    section = "captcha"
 
-    def read_config(self, config):
-        self.recaptcha_private_key = config["recaptcha_private_key"]
-        self.recaptcha_public_key = config["recaptcha_public_key"]
-        self.enable_registration_captcha = config["enable_registration_captcha"]
+    def read_config(self, config, **kwargs):
+        self.recaptcha_private_key = config.get("recaptcha_private_key")
+        self.recaptcha_public_key = config.get("recaptcha_public_key")
+        self.enable_registration_captcha = config.get(
+            "enable_registration_captcha", False
+        )
         self.captcha_bypass_secret = config.get("captcha_bypass_secret")
-        self.recaptcha_siteverify_api = config["recaptcha_siteverify_api"]
+        self.recaptcha_siteverify_api = config.get(
+            "recaptcha_siteverify_api",
+            "https://www.recaptcha.net/recaptcha/api/siteverify",
+        )
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         ## Captcha ##
         # See docs/CAPTCHA_SETUP for full details of configuring this.
 
-        # This Home Server's ReCAPTCHA public key.
-        recaptcha_public_key: "YOUR_PUBLIC_KEY"
+        # This homeserver's ReCAPTCHA public key.
+        #
+        #recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
-        # This Home Server's ReCAPTCHA private key.
-        recaptcha_private_key: "YOUR_PRIVATE_KEY"
+        # This homeserver's ReCAPTCHA private key.
+        #
+        #recaptcha_private_key: "YOUR_PRIVATE_KEY"
 
         # Enables ReCaptcha checks when registering, preventing signup
         # unless a captcha is answered. Requires a valid ReCaptcha
         # public/private key.
-        enable_registration_captcha: False
+        #
+        #enable_registration_captcha: false
 
         # A secret key used to bypass the captcha test entirely.
+        #
         #captcha_bypass_secret: "YOUR_SECRET_HERE"
 
         # The API endpoint to use for verifying m.login.recaptcha responses.
-        recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
+        #
+        #recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
         """

@@ -11,12 +11,12 @@
 #    docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
 #
 
-ARG PYTHON_VERSION=2
+ARG PYTHON_VERSION=3.7
 
 ###
 ### Stage 0: builder
 ###
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.8 as builder
+FROM docker.io/python:${PYTHON_VERSION}-alpine3.10 as builder
 
 # install the OS build deps
 
@@ -55,8 +55,9 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 ### Stage 1: runtime
 ###
 
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.8
+FROM docker.io/python:${PYTHON_VERSION}-alpine3.10
 
+# xmlsec is required for saml support
 RUN apk add --no-cache --virtual .runtime_deps \
         libffi \
         libjpeg-turbo \
@@ -64,7 +65,9 @@ RUN apk add --no-cache --virtual .runtime_deps \
         libxslt \
         libpq \
         zlib \
-        su-exec
+        su-exec \
+        tzdata \
+        xmlsec
 
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py

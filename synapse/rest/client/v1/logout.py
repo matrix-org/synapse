@@ -17,59 +17,52 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError
-
-from .base import ClientV1RestServlet, client_path_patterns
+from synapse.http.servlet import RestServlet
+from synapse.rest.client.v2_alpha._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class LogoutRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/logout$")
+class LogoutRestServlet(RestServlet):
+    PATTERNS = client_patterns("/logout$", v1=True)
 
     def __init__(self, hs):
-        super(LogoutRestServlet, self).__init__(hs)
-        self._auth = hs.get_auth()
-        self._auth_handler = hs.get_auth_handler()
-        self._device_handler = hs.get_device_handler()
-
-    def on_OPTIONS(self, request):
-        return (200, {})
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        try:
-            requester = yield self.auth.get_user_by_req(request)
-        except AuthError:
-            # this implies the access token has already been deleted.
-            defer.returnValue((401, {
-                "errcode": "M_UNKNOWN_TOKEN",
-                "error": "Access Token unknown or expired"
-            }))
-        else:
-            if requester.device_id is None:
-                # the acccess token wasn't associated with a device.
-                # Just delete the access token
-                access_token = self._auth.get_access_token_from_request(request)
-                yield self._auth_handler.delete_access_token(access_token)
-            else:
-                yield self._device_handler.delete_device(
-                    requester.user.to_string(), requester.device_id)
-
-        defer.returnValue((200, {}))
-
-
-class LogoutAllRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/logout/all$")
-
-    def __init__(self, hs):
-        super(LogoutAllRestServlet, self).__init__(hs)
+        super(LogoutRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+
+        if requester.device_id is None:
+            # the acccess token wasn't associated with a device.
+            # Just delete the access token
+            access_token = self.auth.get_access_token_from_request(request)
+            yield self._auth_handler.delete_access_token(access_token)
+        else:
+            yield self._device_handler.delete_device(
+                requester.user.to_string(), requester.device_id
+            )
+
+        return 200, {}
+
+
+class LogoutAllRestServlet(RestServlet):
+    PATTERNS = client_patterns("/logout/all$", v1=True)
+
+    def __init__(self, hs):
+        super(LogoutAllRestServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self._auth_handler = hs.get_auth_handler()
+        self._device_handler = hs.get_device_handler()
+
+    def on_OPTIONS(self, request):
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -82,7 +75,7 @@ class LogoutAllRestServlet(ClientV1RestServlet):
         # .. and then delete any access tokens which weren't associated with
         # devices.
         yield self._auth_handler.delete_access_tokens_for_user(user_id)
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

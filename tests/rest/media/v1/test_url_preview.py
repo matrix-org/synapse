@@ -16,7 +16,6 @@
 import os
 
 import attr
-from netaddr import IPSet
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
@@ -24,9 +23,6 @@ from twisted.internet.error import DNSLookupError
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol
 from twisted.web._newclient import ResponseDone
-
-from synapse.config.repository import MediaStorageProviderConfig
-from synapse.util.module_loader import load_module
 
 from tests import unittest
 from tests.server import FakeTransport
@@ -59,31 +55,31 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     hijack_auth = True
     user_id = "@test:user"
     end_content = (
-        b'<html><head>'
+        b"<html><head>"
         b'<meta property="og:title" content="~matrix~" />'
         b'<meta property="og:description" content="hi" />'
-        b'</head></html>'
+        b"</head></html>"
     )
 
     def make_homeserver(self, reactor, clock):
 
-        self.storage_path = self.mktemp()
-        os.mkdir(self.storage_path)
-
         config = self.default_config()
-        config.url_preview_enabled = True
-        config.max_spider_size = 9999999
-        config.url_preview_ip_range_blacklist = IPSet(
-            (
-                "192.168.1.1",
-                "1.0.0.0/8",
-                "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-                "2001:800::/21",
-            )
+        config["url_preview_enabled"] = True
+        config["max_spider_size"] = 9999999
+        config["url_preview_ip_range_blacklist"] = (
+            "192.168.1.1",
+            "1.0.0.0/8",
+            "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+            "2001:800::/21",
         )
-        config.url_preview_ip_range_whitelist = IPSet(("1.1.1.1",))
-        config.url_preview_url_blacklist = []
-        config.media_store_path = self.storage_path
+        config["url_preview_ip_range_whitelist"] = ("1.1.1.1",)
+        config["url_preview_url_blacklist"] = []
+
+        self.storage_path = self.mktemp()
+        self.media_store_path = self.mktemp()
+        os.mkdir(self.storage_path)
+        os.mkdir(self.media_store_path)
+        config["media_store_path"] = self.media_store_path
 
         provider_config = {
             "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
@@ -93,11 +89,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "config": {"directory": self.storage_path},
         }
 
-        loaded = list(load_module(provider_config)) + [
-            MediaStorageProviderConfig(False, False, False)
-        ]
-
-        config.media_storage_providers = [loaded]
+        config["media_storage_providers"] = [provider_config]
 
         hs = self.setup_test_homeserver(config=config)
 
@@ -106,7 +98,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
 
         self.media_repo = hs.get_media_repository_resource()
-        self.preview_url = self.media_repo.children[b'preview_url']
+        self.preview_url = self.media_repo.children[b"preview_url"]
 
         self.lookups = {}
 
@@ -117,7 +109,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 hostName,
                 portNumber=0,
                 addressTypes=None,
-                transportSemantics='TCP',
+                transportSemantics="TCP",
             ):
 
                 resolution = HostResolution(hostName)
@@ -126,7 +118,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                     raise DNSLookupError("OH NO")
 
                 for i in self.lookups[hostName]:
-                    resolutionReceiver.addressResolved(i[0]('TCP', i[1], portNumber))
+                    resolutionReceiver.addressResolved(i[0]("TCP", i[1], portNumber))
                 resolutionReceiver.resolutionComplete()
                 return resolutionReceiver
 
@@ -192,11 +184,11 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
 
         end_content = (
-            b'<html><head>'
+            b"<html><head>"
             b'<meta http-equiv="Content-Type" content="text/html; charset=windows-1251"/>'
             b'<meta property="og:title" content="\xe4\xea\xe0" />'
             b'<meta property="og:description" content="hi" />'
-            b'</head></html>'
+            b"</head></html>"
         )
 
         request, channel = self.make_request(
@@ -212,7 +204,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         client.dataReceived(
             (
                 b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                b"Content-Type: text/html; charset=\"utf8\"\r\n\r\n"
+                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
             )
             % (len(end_content),)
             + end_content
@@ -220,16 +212,16 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.pump()
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
+        self.assertEqual(channel.json_body["og:title"], "\u0434\u043a\u0430")
 
     def test_non_ascii_preview_content_type(self):
         self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
 
         end_content = (
-            b'<html><head>'
+            b"<html><head>"
             b'<meta property="og:title" content="\xe4\xea\xe0" />'
             b'<meta property="og:description" content="hi" />'
-            b'</head></html>'
+            b"</head></html>"
         )
 
         request, channel = self.make_request(
@@ -245,7 +237,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         client.dataReceived(
             (
                 b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                b"Content-Type: text/html; charset=\"windows-1251\"\r\n\r\n"
+                b'Content-Type: text/html; charset="windows-1251"\r\n\r\n'
             )
             % (len(end_content),)
             + end_content
@@ -253,7 +245,42 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.pump()
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
+        self.assertEqual(channel.json_body["og:title"], "\u0434\u043a\u0430")
+
+    def test_overlong_title(self):
+        self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
+
+        end_content = (
+            b"<html><head>"
+            b"<title>" + b"x" * 2000 + b"</title>"
+            b'<meta property="og:description" content="hi" />'
+            b"</head></html>"
+        )
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://matrix.org", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="windows-1251"\r\n\r\n'
+            )
+            % (len(end_content),)
+            + end_content
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        res = channel.json_body
+        # We should only see the `og:description` field, as `title` is too long and should be stripped out
+        self.assertCountEqual(["og:description"], res.keys())
 
     def test_ipaddr(self):
         """
@@ -297,12 +324,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
-                'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                "errcode": "M_UNKNOWN",
+                "error": "DNS resolution failure during URL preview generation",
             },
         )
 
@@ -318,12 +345,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
-                'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                "errcode": "M_UNKNOWN",
+                "error": "DNS resolution failure during URL preview generation",
             },
         )
 
@@ -339,14 +366,14 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 403)
         self.assertEqual(
             channel.json_body,
             {
-                'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                "errcode": "M_UNKNOWN",
+                "error": "IP address blocked by IP blacklist entry",
             },
         )
+        self.assertEqual(channel.code, 403)
 
     def test_blacklisted_ip_range_direct(self):
         """
@@ -362,8 +389,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(
             channel.json_body,
             {
-                'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                "errcode": "M_UNKNOWN",
+                "error": "IP address blocked by IP blacklist entry",
             },
         )
 
@@ -404,7 +431,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         non-blacklisted one, it will be rejected.
         """
         # Hardcode the URL resolving to the IP we want.
-        self.lookups[u"example.com"] = [
+        self.lookups["example.com"] = [
             (IPv4Address, "1.1.1.2"),
             (IPv4Address, "8.8.8.8"),
         ]
@@ -414,12 +441,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
         request.render(self.preview_url)
         self.pump()
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
-                'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                "errcode": "M_UNKNOWN",
+                "error": "DNS resolution failure during URL preview generation",
             },
         )
 
@@ -439,12 +466,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
-                'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                "errcode": "M_UNKNOWN",
+                "error": "DNS resolution failure during URL preview generation",
             },
         )
 
@@ -460,11 +487,23 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
-                'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                "errcode": "M_UNKNOWN",
+                "error": "DNS resolution failure during URL preview generation",
             },
         )
+
+    def test_OPTIONS(self):
+        """
+        OPTIONS returns the OPTIONS.
+        """
+        request, channel = self.make_request(
+            "OPTIONS", "url_preview?url=http://example.com", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body, {})

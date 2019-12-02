@@ -17,16 +17,20 @@ from ._base import Config
 
 
 class GroupsConfig(Config):
-    def read_config(self, config):
+    section = "groups"
+
+    def read_config(self, config, **kwargs):
         self.enable_group_creation = config.get("enable_group_creation", False)
         self.group_creation_prefix = config.get("group_creation_prefix", "")
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
-        # Whether to allow non server admins to create groups on this server
-        enable_group_creation: false
+        # Uncomment to allow non-server-admin users to create groups on this server
+        #
+        #enable_group_creation: true
 
         # If enabled, non server admins can only create groups with local parts
         # starting with this prefix
-        # group_creation_prefix: "unofficial/"
+        #
+        #group_creation_prefix: "unofficial/"
         """

@@ -15,6 +15,8 @@
 
 import logging
 import threading
+from asyncio import iscoroutine
+from functools import wraps
 
 import six
 
@@ -22,7 +24,7 @@ from prometheus_client.core import REGISTRY, Counter, GaugeMetricFamily
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.logging.context import LoggingContext, PreserveLoggingContext
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +62,10 @@ _background_process_db_txn_count = Counter(
 
 _background_process_db_txn_duration = Counter(
     "synapse_background_process_db_txn_duration_seconds",
-    ("Seconds spent by background processes waiting for database "
-     "transactions, excluding scheduling time"),
+    (
+        "Seconds spent by background processes waiting for database "
+        "transactions, excluding scheduling time"
+    ),
     ["name"],
     registry=None,
 )
@@ -94,6 +98,7 @@ class _Collector(object):
     Ensures that all of the metrics are up-to-date with any in-flight processes
     before they are returned.
     """
+
     def collect(self):
         background_process_in_flight_count = GaugeMetricFamily(
             "synapse_background_process_in_flight_count",
@@ -105,14 +110,11 @@ class _Collector(object):
         # We also copy the process lists as that can also change
         with _bg_metrics_lock:
             _background_processes_copy = {
-                k: list(v)
-                for k, v in six.iteritems(_background_processes)
+                k: list(v) for k, v in six.iteritems(_background_processes)
             }
 
         for desc, processes in six.iteritems(_background_processes_copy):
-            background_process_in_flight_count.add_metric(
-                (desc,), len(processes),
-            )
+            background_process_in_flight_count.add_metric((desc,), len(processes))
             for process in processes:
                 process.update_metrics()
 
@@ -121,11 +123,11 @@ class _Collector(object):
         # now we need to run collect() over each of the static Counters, and
         # yield each metric they return.
         for m in (
-                _background_process_ru_utime,
-                _background_process_ru_stime,
-                _background_process_db_txn_count,
-                _background_process_db_txn_duration,
-                _background_process_db_sched_duration,
+            _background_process_ru_utime,
+            _background_process_ru_stime,
+            _background_process_db_txn_count,
+            _background_process_db_txn_duration,
+            _background_process_db_sched_duration,
         ):
             for r in m.collect():
                 yield r
@@ -151,14 +153,12 @@ class _BackgroundProcess(object):
 
         _background_process_ru_utime.labels(self.desc).inc(diff.ru_utime)
         _background_process_ru_stime.labels(self.desc).inc(diff.ru_stime)
-        _background_process_db_txn_count.labels(self.desc).inc(
-            diff.db_txn_count,
-        )
+        _background_process_db_txn_count.labels(self.desc).inc(diff.db_txn_count)
         _background_process_db_txn_duration.labels(self.desc).inc(
-            diff.db_txn_duration_sec,
+            diff.db_txn_duration_sec
         )
         _background_process_db_sched_duration.labels(self.desc).inc(
-            diff.db_sched_duration_sec,
+            diff.db_sched_duration_sec
         )
 
 
@@ -175,13 +175,14 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
     Args:
         desc (str): a description for this background process type
-        func: a function, which may return a Deferred
+        func: a function, which may return a Deferred or a coroutine
         args: positional args for func
         kwargs: keyword args for func
 
     Returns: Deferred which returns the result of func, but note that it does not
         follow the synapse logcontext rules.
     """
+
     @defer.inlineCallbacks
     def run():
         with _bg_metrics_lock:
@@ -198,7 +199,17 @@ def run_as_background_process(desc, func, *args, **kwargs):
                 _background_processes.setdefault(desc, set()).add(proc)
 
             try:
-                yield func(*args, **kwargs)
+                result = func(*args, **kwargs)
+
+                # We probably don't have an ensureDeferred in our call stack to handle
+                # coroutine results, so we need to ensureDeferred here.
+                #
+                # But we need this check because ensureDeferred doesn't like being
+                # called on immediate values (as opposed to Deferreds or coroutines).
+                if iscoroutine(result):
+                    result = defer.ensureDeferred(result)
+
+                return (yield result)
             except Exception:
                 logger.exception("Background process '%s' threw an exception", desc)
             finally:
@@ -209,3 +220,20 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
     with PreserveLoggingContext():
         return run()
+
+
+def wrap_as_background_process(desc):
+    """Decorator that wraps a function that gets called as a background
+    process.
+
+    Equivalent of calling the function with `run_as_background_process`
+    """
+
+    def wrap_as_background_process_inner(func):
+        @wraps(func)
+        def wrap_as_background_process_inner_2(*args, **kwargs):
+            return run_as_background_process(desc, func, *args, **kwargs)
+
+        return wrap_as_background_process_inner_2
+
+    return wrap_as_background_process_inner
