@@ -130,6 +130,8 @@ class EventsStore(
         if self.hs.config.redaction_retention_period is not None:
             hs.get_clock().looping_call(_censor_redactions, 5 * 60 * 1000)
 
+        self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
+
     @defer.inlineCallbacks
     def _read_forward_extremities(self):
         def fetch(txn):
@@ -908,6 +910,8 @@ class EventsStore(
                 # Remove from relations table.
                 self._handle_redaction(txn, event.redacts)
 
+                self._delete_event_expiry_txn(txn, event.redacts)
+
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
         self._handle_mult_prev_events(
@@ -940,10 +944,11 @@ class EventsStore(
                     txn, event.event_id, labels, event.room_id, event.depth
                 )
 
-            # If there's an expiry timestamp on the event, store it.
-            expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-            if isinstance(expiry_ts, int) and not event.is_state():
-                self.insert_event_expiry_txn(txn, event.event_id, expiry_ts)
+            if self._ephemeral_messages_enabled:
+                # If there's an expiry timestamp on the event, store it.
+                expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
+                if isinstance(expiry_ts, int) and not event.is_state():
+                    self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
 
         # Insert into the room_memberships table.
         self._store_room_members_txn(
@@ -1973,7 +1978,7 @@ class EventsStore(
             ],
         )
 
-    def insert_event_expiry_txn(self, txn, event_id, expiry_ts):
+    def _insert_event_expiry_txn(self, txn, event_id, expiry_ts):
         """Save the expiry timestamp associated with a given event ID.
 
         Args:
@@ -1987,27 +1992,42 @@ class EventsStore(
             values={"event_id": event_id, "expiry_ts": expiry_ts},
         )
 
-    def expire_event(self, event):
-        """Redact an event that has expired, and delete its associated expiry timestamp.
+    @defer.inlineCallbacks
+    def expire_event(self, event_id):
+        """Retrieve and expire an event that has expired, and delete its associated
+        expiry timestamp. If the event can't be retrieved, delete its associated
+        timestamp so we don't try to expire it again in the future.
 
         Args:
-             event (events.EventBase): The event to delete.
+             event_id (str): The ID of the event to delete.
         """
-        # Prune the event's dict then convert it to JSON.
-        pruned_json = encode_json(prune_event_dict(event.get_dict()))
+        # Try to retrieve the event's content from the database or the event cache.
+        event = yield self.get_event(event_id)
 
         def delete_expired_event_txn(txn):
+            # Delete the expiry timestamp associated with this event from the database.
+            self._delete_event_expiry_txn(txn, event_id)
+
+            if not event:
+                # If we can't find the event, log a warning and delete the expiry date
+                # from the database so that we don't try to expire it again in the
+                # future.
+                logger.warning(
+                    "Can't expire event %s because we don't have it.", event_id
+                )
+                return
+
+            # Prune the event's dict then convert it to JSON.
+            pruned_json = encode_json(prune_event_dict(event.get_dict()))
+
             # Update the event_json table to replace the event's JSON with the pruned
             # JSON.
             self._censor_event_txn(txn, event.event_id, pruned_json)
 
-            # Delete the expiry timestamp associated with this event from the database.
-            self._simple_delete_txn(
-                txn, table="event_expiry", keyvalues={"event_id": event.event_id}
-            )
-
             # We need to invalidate the event cache entry for this event because we
-            # changed its content in the database.
+            # changed its content in the database. We can't call
+            # self._invalidate_cache_and_stream because self.get_event_cache isn't of the
+            # right type.
             txn.call_after(self._get_event_cache.invalidate, (event.event_id,))
             # Send that invalidation to replication so that other workers also invalidate
             # the event cache.
@@ -2017,31 +2037,18 @@ class EventsStore(
 
         return self.runInteraction("delete_expired_event", delete_expired_event_txn)
 
-    def delete_event_expiry(self, event_id):
+    def _delete_event_expiry_txn(self, txn, event_id):
         """Delete the expiry timestamp associated with an event ID without deleting the
         actual event.
 
         Args:
+            txn (LoggingTransaction): The transaction to use to perform the deletion.
             event_id (str): The event ID to delete the associated expiry timestamp of.
         """
-        return self._simple_delete(
+        return self._simple_delete_txn(
+            txn=txn,
             table="event_expiry",
             keyvalues={"event_id": event_id},
-            desc="delete_event_expiry",
-        )
-
-    def get_events_to_expire(self):
-        """Retrieve the IDs of the events we have an expiry timestamp for, along with
-        said timestamp.
-
-        Returns:
-            A list of dicts, each containing an event_id and an expiry_ts.
-        """
-        return self._simple_select_list(
-            table="event_expiry",
-            keyvalues=None,
-            retcols=["event_id", "expiry_ts"],
-            desc="get_events_to_expire",
         )
 
     def get_next_event_to_expire(self):
@@ -2049,7 +2056,7 @@ class EventsStore(
         table, or None if there's no more event to expire.
 
         Returns:
-            A dict with an event_id and an expiry_ts of there's at least one row in the
+            A dict with an event_id and an expiry_ts if there's at least one row in the
             event_expiry table, None otherwise.
         """
 
@@ -2061,12 +2068,7 @@ class EventsStore(
                 """
             )
 
-            res = self.cursor_to_dict(txn)
-
-            if res:
-                return res[0]
-            else:
-                return None
+            return txn.fetchone()
 
         return self.runInteraction(
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn

@@ -18,5 +18,4 @@ CREATE TABLE IF NOT EXISTS event_expiry (
     expiry_ts BIGINT NOT NULL
 );
 
-INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('event_store_expiry', '{}');
+CREATE INDEX event_expiry_expiry_ts_idx ON event_expiry(expiry_ts);
