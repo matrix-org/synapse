@@ -18,6 +18,7 @@ from __future__ import division
 import itertools
 import logging
 from collections import namedtuple
+from typing import Any, List
 
 from canonicaljson import json
 
@@ -189,21 +190,23 @@ class EventsWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_events_as_list(
         self,
-        event_ids,
-        check_redacted=True,
-        get_prev_content=False,
-        allow_rejected=False,
+        event_ids,  # type: List[Any]
+        check_redacted=True,  # type: bool
+        get_prev_content=False,  # type: bool
+        allow_rejected=False,  # type: bool
+        allow_redacted=True,  # type: bool
     ):
         """Get events from the database and return in a list in the same order
         as given by `event_ids` arg.
 
         Args:
-            event_ids (list): The event_ids of the events to fetch
-            check_redacted (bool): If True, check if event has been redacted
+            event_ids: The event_ids of the events to fetch
+            check_redacted: If True, check if event has been redacted
                 and redact it.
-            get_prev_content (bool): If True and event is a state event,
+            get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
-            allow_rejected (bool): If True return rejected events.
+            allow_rejected: If True, return rejected events.
+            allow_redacted: If True, return redacted events.
 
         Returns:
             Deferred[list[EventBase]]: List of events fetched from the database. The
@@ -305,10 +308,14 @@ class EventsWorkerStore(SQLBaseStore):
                     # Update the cache to save doing the checks again.
                     entry.event.internal_metadata.recheck_redaction = False
 
-            if check_redacted and entry.redacted_event:
-                event = entry.redacted_event
-            else:
-                event = entry.event
+            event = entry.event
+
+            if entry.redacted_event:
+                if check_redacted:
+                    event = entry.redacted_event
+                if not allow_redacted:
+                    # Skip this event
+                    continue
 
             events.append(event)
 

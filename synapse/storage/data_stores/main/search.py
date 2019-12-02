@@ -445,7 +445,9 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
-        events = yield self.get_events_as_list([r["event_id"] for r in results])
+        events = yield self.get_events_as_list(
+            [r["event_id"] for r in results], allow_redacted=False
+        )  # Don't return redacted
 
         event_map = {ev.event_id: ev for ev in events}
 
