@@ -14,31 +14,39 @@ SQLITE_FULL_SCHEMA_OUTPUT_FILE="full.sql.sqlite"
 POSTGRES_FULL_SCHEMA_OUTPUT_FILE="full.sql.postgres"
 OUTPUT_DIR=$(pwd)
 
+REQUIRED_DEPS=("matrix-synapse" "psycopg2")
+
 usage() {
-  echo "Usage: $0 -p <postgres_username> [-c] [-v] [-o] [-h]"
+  echo "Usage: $0 -p <postgres_username> -o <path> [-c] [-n] [-h]"
   echo
   echo "-p <postgres_username>"
   echo "  Username to connect to local postgres instance. The password will be requested"
   echo "  during script execution."
   echo "-c"
-  echo "  Enable coverage tracking. Useful for CI runs."
-  echo "-v"
+  echo "  CI mode. Enables coverage tracking and prints every command that the script runs."
+  echo "-n"
   echo "  Suppress warning about requiring the use of a virtualenv."
-  echo "-o"
-  echo "  Directory to output full schema files to. Defaults to the current directory."
+  echo "-o <path>"
+  echo "  Directory to output full schema files to."
   echo "-h"
   echo "  Display this help text."
 }
 
-while getopts "p:cvo:h" opt; do
+while getopts "p:cno:h" opt; do
   case $opt in
     p)
       POSTGRES_USERNAME=$OPTARG
       ;;
     c)
+      # Print all commands that are being executed
+      set -x
+
+      # Modify required dependencies for coverage
+      REQUIRED_DEPS+=("coverage" "coverage-enable-subprocess")
+
       COVERAGE=1
       ;;
-    v)
+    n)
       NO_VIRTUALENV=1
       ;;
     o)
@@ -57,15 +65,31 @@ while getopts "p:cvo:h" opt; do
   esac
 done
 
-# Check that the script is running with a virtualenv enabled
-if [ -z ${NO_VIRTUALENV+x} ] && [ -z ${VIRTUAL_ENV+x} ]; then
-  echo "It is highly recommended to run this script with a virtualenv activated. Exiting now."
-  echo "If you wish to suppress this warning, please run with the -v option."
+# Check that required dependencies are installed
+unsatisfied_requirements=()
+for dep in "${REQUIRED_DEPS[@]}"; do
+  pip show "$dep" --quiet || unsatisfied_requirements+=("$dep")
+done
+if [ ! ${#unsatisfied_requirements} -eq 0 ]; then
+  echo "Please install the following python packages: ${unsatisfied_requirements[*]}"
   exit 1
 fi
 
-if [ -z ${POSTGRES_USERNAME+x} ]; then
+# Check that the script is running with a virtualenv enabled
+if [ -z "$NO_VIRTUALENV" ] && [ -z "$VIRTUAL_ENV" ]; then
+  echo "It is highly recommended to run this script with a virtualenv activated. Exiting now."
+  echo "If you wish to suppress this warning, please run with the -n option."
+  exit 1
+fi
+
+if [ -z "$POSTGRES_USERNAME" ]; then
   echo "No postgres username supplied"
+  usage
+  exit 1
+fi
+
+if [ -z "$OUTPUT_DIR" ]; then
+  echo "No output directory supplied"
   usage
   exit 1
 fi
@@ -73,32 +97,24 @@ fi
 read -rsp "Postgres password for '$POSTGRES_USERNAME':" POSTGRES_PASSWORD
 echo ""
 
-set -xe
+# Exit immediately if a command fails
+set -e
 
 # cd to root of the synapse directory
 cd "$(dirname "$0")/.."
 
-# Install required dependencies
-echo "Installing dependencies..."
-if [ -z ${COVERAGE+x} ]; then
-  # No coverage needed
-  pip install psycopg2
-else
-  # Coverage desired
-  pip install psycopg2 coverage coverage-enable-subprocess
-fi
-
-# Install Synapse itself. This won't update any libraries.
-pip install -e .
-
 # Create temporary SQLite and Postgres homeserver db configs and key file
-KEY_FILE=$(mktemp)
-SQLITE_CONFIG=$(mktemp)
-POSTGRES_CONFIG=$(mktemp)
+TMPDIR=$(mktemp -d)
+KEY_FILE=$TMPDIR/test.signing.key # default Synapse signing key path
+SQLITE_CONFIG=$TMPDIR/sqlite.conf
+POSTGRES_CONFIG=$TMPDIR/postgres.conf
+
+# Ensure these files are delete on script exit
+trap 'rm -rf $TMPDIR' EXIT
+
 cat > "$SQLITE_CONFIG" <<EOF
 server_name: "test"
 
-signing_key_path: "$KEY_FILE"
 macaroon_secret_key: "abcde"
 
 report_stats: false
@@ -110,7 +126,6 @@ database:
 
 # Suppress the key server warning.
 trusted_key_servers:
-  - server_name: "matrix.org"
 suppress_key_server_warning: true
 EOF
 
@@ -132,7 +147,6 @@ database:
 
 # Suppress the key server warning.
 trusted_key_servers:
-  - server_name: "matrix.org"
 suppress_key_server_warning: true
 EOF
 
@@ -149,7 +163,7 @@ echo "Creating postgres database..."
 createdb synapse_full_schema
 
 echo "Copying data from SQLite3 to Postgres with synapse_port_db..."
-if [ -z ${COVERAGE+x} ]; then
+if [ -z "$COVERAGE" ]; then
   # No coverage needed
   scripts/synapse_port_db --sqlite-database "$SQLITE_DB_FILE_NAME" --postgres-config "$POSTGRES_CONFIG"
 else
@@ -160,12 +174,13 @@ fi
 # Delete schema_version, applied_schema_deltas and applied_module_schemas tables
 # This needs to be done after synapse_port_db is run
 echo "Dropping unwanted db tables..."
-sqlite3 $SQLITE_DB_FILE_NAME "DROP TABLE schema_version"
-sqlite3 $SQLITE_DB_FILE_NAME "DROP TABLE applied_schema_deltas"
-sqlite3 $SQLITE_DB_FILE_NAME "DROP TABLE applied_module_schemas"
-psql $POSTGRES_DB_NAME -U "$POSTGRES_USERNAME" -w -c 'DROP TABLE schema_version'
-psql $POSTGRES_DB_NAME -U "$POSTGRES_USERNAME" -w -c 'DROP TABLE applied_schema_deltas'
-psql $POSTGRES_DB_NAME -U "$POSTGRES_USERNAME" -w -c 'DROP TABLE applied_module_schemas'
+SQL="
+DROP TABLE schema_version;
+DROP TABLE applied_schema_deltas;
+DROP TABLE applied_module_schemas;
+"
+sqlite3 $SQLITE_DB_FILE_NAME <<< "$SQL"
+psql $POSTGRES_DB_NAME -U "$POSTGRES_USERNAME" -w <<< "$SQL"
 
 echo "Dumping SQLite3 schema to '$SQLITE_FULL_SCHEMA_OUTPUT_FILE'..."
 sqlite3 "$SQLITE_DB_FILE_NAME" ".dump" > "$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE"
