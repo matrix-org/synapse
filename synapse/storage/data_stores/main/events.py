@@ -2046,9 +2046,7 @@ class EventsStore(
             event_id (str): The event ID to delete the associated expiry timestamp of.
         """
         return self._simple_delete_txn(
-            txn=txn,
-            table="event_expiry",
-            keyvalues={"event_id": event_id},
+            txn=txn, table="event_expiry", keyvalues={"event_id": event_id}
         )
 
     def get_next_event_to_expire(self):
