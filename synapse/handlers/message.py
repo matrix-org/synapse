@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Optional
 
 from six import iteritems, itervalues, string_types
 
@@ -22,6 +23,7 @@ from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
 from twisted.internet.defer import succeed
+from twisted.internet.interfaces import IDelayedCall
 
 from synapse import event_auth
 from synapse.api.constants import (
@@ -72,7 +74,7 @@ class MessageHandler(object):
 
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
-        self._scheduled_expiry = None  # type: twisted.internet.interfaces.IDelayedCall
+        self._scheduled_expiry = None  # type: Optional[IDelayedCall]
         # Whether the handler is currently running through the logic for scheduling a
         # call to self._expire_event.
         self._scheduling_expiry = False
