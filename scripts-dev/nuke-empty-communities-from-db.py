@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 import sqlite3
-import psycopg2
 from getopt import getopt
 from sys import argv
+
+import psycopg2
 
 if len(argv) < 3 or (argv[1] != "sqlite" and argv[1] != "postgresql"):
     print("Usage:")
