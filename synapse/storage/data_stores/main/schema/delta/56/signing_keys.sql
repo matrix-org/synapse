@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS e2e_cross_signing_signatures (
     signature TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX e2e_cross_signing_signatures_idx ON e2e_cross_signing_signatures(user_id, target_user_id, target_device_id);
+CREATE INDEX e2e_cross_signing_signatures2_idx ON e2e_cross_signing_signatures(user_id, target_user_id, target_device_id);
 
 -- stream of user signature updates
 CREATE TABLE IF NOT EXISTS user_signature_stream (
