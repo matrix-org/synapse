@@ -8,7 +8,6 @@
 
 POSTGRES_HOST="localhost"
 POSTGRES_DB_NAME="synapse_full_schema.$$"
-SQLITE_DB_FILE_NAME="full_schema_sqlite.db"
 
 SQLITE_FULL_SCHEMA_OUTPUT_FILE="full.sql.sqlite"
 POSTGRES_FULL_SCHEMA_OUTPUT_FILE="full.sql.postgres"
@@ -107,6 +106,7 @@ cd "$(dirname "$0")/.."
 TMPDIR=$(mktemp -d)
 KEY_FILE=$TMPDIR/test.signing.key # default Synapse signing key path
 SQLITE_CONFIG=$TMPDIR/sqlite.conf
+SQLITE_DB=$TMPDIR/homeserver.db
 POSTGRES_CONFIG=$TMPDIR/postgres.conf
 
 # Ensure these files are delete on script exit
@@ -115,6 +115,7 @@ trap 'rm -rf $TMPDIR' EXIT
 cat > "$SQLITE_CONFIG" <<EOF
 server_name: "test"
 
+signing_key_path: "$KEY_FILE"
 macaroon_secret_key: "abcde"
 
 report_stats: false
@@ -122,10 +123,10 @@ report_stats: false
 database:
   name: "sqlite3"
   args:
-    database: "$SQLITE_DB_FILE_NAME"
+    database: "$SQLITE_DB"
 
 # Suppress the key server warning.
-trusted_key_servers:
+trusted_key_servers: []
 suppress_key_server_warning: true
 EOF
 
@@ -146,7 +147,7 @@ database:
     database: "$POSTGRES_DB_NAME"
 
 # Suppress the key server warning.
-trusted_key_servers:
+trusted_key_servers: []
 suppress_key_server_warning: true
 EOF
 
@@ -160,15 +161,15 @@ scripts-dev/update_database --database-config "$SQLITE_CONFIG"
 
 # Create the PostgreSQL database.
 echo "Creating postgres database..."
-createdb synapse_full_schema
+createdb $POSTGRES_DB_NAME
 
 echo "Copying data from SQLite3 to Postgres with synapse_port_db..."
 if [ -z "$COVERAGE" ]; then
   # No coverage needed
-  scripts/synapse_port_db --sqlite-database "$SQLITE_DB_FILE_NAME" --postgres-config "$POSTGRES_CONFIG"
+  scripts/synapse_port_db --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
 else
   # Coverage desired
-  coverage run scripts/synapse_port_db --sqlite-database "$SQLITE_DB_FILE_NAME" --postgres-config "$POSTGRES_CONFIG"
+  coverage run scripts/synapse_port_db --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
 fi
 
 # Delete schema_version, applied_schema_deltas and applied_module_schemas tables
@@ -179,7 +180,7 @@ DROP TABLE schema_version;
 DROP TABLE applied_schema_deltas;
 DROP TABLE applied_module_schemas;
 "
-sqlite3 $SQLITE_DB_FILE_NAME <<< "$SQL"
+sqlite3 "$SQLITE_DB" <<< "$SQL"
 psql $POSTGRES_DB_NAME -U "$POSTGRES_USERNAME" -w <<< "$SQL"
 
 echo "Dumping SQLite3 schema to '$SQLITE_FULL_SCHEMA_OUTPUT_FILE'..."
@@ -188,11 +189,7 @@ sqlite3 "$SQLITE_DB_FILE_NAME" ".dump" > "$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT
 echo "Dumping Postgres schema to '$POSTGRES_FULL_SCHEMA_OUTPUT_FILE'..."
 pg_dump --format=plain --no-tablespaces --no-acl --no-owner $POSTGRES_DB_NAME | sed -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE"
 
-echo "Cleaning up temporary files and databases..."
-rm "$SQLITE_DB_FILE_NAME"
-rm "$POSTGRES_CONFIG"
-rm "$SQLITE_CONFIG"
-rm "$KEY_FILE"
+echo "Cleaning up temporary Postgres database..."
 dropdb $POSTGRES_DB_NAME
 
 # Remove last pesky instance of this table from the output
