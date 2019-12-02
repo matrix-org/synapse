@@ -7,7 +7,7 @@
 # synapse_port_db to convert it to Postgres. It then dumps the contents of both.
 
 POSTGRES_HOST="localhost"
-POSTGRES_DB_NAME="synapse_full_schema"
+POSTGRES_DB_NAME="synapse_full_schema.$$"
 SQLITE_DB_FILE_NAME="full_schema_sqlite.db"
 
 SQLITE_FULL_SCHEMA_OUTPUT_FILE="full.sql.sqlite"
@@ -21,7 +21,7 @@ usage() {
   echo "  Username to connect to local postgres instance. The password will be requested"
   echo "  during script execution."
   echo "-c"
-  echo "  Whether to enable coverage tracking. Useful for CI runs."
+  echo "  Enable coverage tracking. Useful for CI runs."
   echo "-v"
   echo "  Suppress warning about requiring the use of a virtualenv."
   echo "-o"

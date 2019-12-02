@@ -9,5 +9,5 @@ Ensure postgres is installed and your user has the ability to run bash commands
 such as `createdb`.
 
 ```
-/scripts-dev/generate_full_schema.sh -p postgres_username -o output_dir/
+./scripts-dev/generate_full_schema.sh -p postgres_username -o output_dir/
 ```
