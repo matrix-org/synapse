@@ -21,15 +21,17 @@ from twisted.internet.main import installReactor
 from synapse.config.homeserver import HomeServerConfig
 from synapse.util import Clock
 
-from tests.utils import default_config, setup_test_homeserver, setupdb
-
-
-def setup_database():
-    setupdb()
+from tests.utils import default_config, setup_test_homeserver
 
 
 async def make_homeserver(reactor, config=None):
+    """
+    Make a Homeserver suitable for running benchmarks against.
 
+    Args:
+        reactor: A Twisted reactor to run under.
+        config: A HomeServerConfig to use, or None.
+    """
     cleanup_tasks = []
     clock = Clock(reactor)
 
@@ -58,7 +60,8 @@ async def make_homeserver(reactor, config=None):
 
 def make_reactor():
     """
-    Make an install a Twisted reactor.
+    Instantiate and install a Twisted reactor suitable for testing (i.e. not the
+    default global one).
     """
     reactor = epollreactor.EPollReactor()
 

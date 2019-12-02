@@ -18,17 +18,19 @@ from contextlib import redirect_stderr
 from io import StringIO
 
 import pyperf
-from synmark import make_reactor, setup_database
+from synmark import make_reactor
 from synmark.suites import SUITES
 
 from twisted.internet.defer import ensureDeferred
 from twisted.logger import globalLogBeginner, textFileLogObserver
 from twisted.python.failure import Failure
 
+from tests.utils import setupdb
+
 
 def make_test(main):
     """
-    Take main, the test function, and wrap it in a reactor start and stop.
+    Take a benchmark function and wrap it in a reactor start and stop.
     """
 
     def _main(loops):
@@ -75,7 +77,7 @@ if __name__ == "__main__":
             globalLogBeginner.beginLoggingTo(
                 [textFileLogObserver(sys.__stdout__)], redirectStandardIO=False
             )
-        setup_database()
+        setupdb()
 
     for suite, loops in SUITES:
         if loops:

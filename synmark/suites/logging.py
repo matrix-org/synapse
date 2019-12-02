@@ -47,7 +47,9 @@ class LineCounter(LineOnlyReceiver):
 
 
 async def main(reactor, loops):
-
+    """
+    Benchmark how long it takes to send `loops` messages.
+    """
     servers = []
 
     def protocol():
