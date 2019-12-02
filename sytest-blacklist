@@ -1,6 +1,6 @@
 # This file serves as a blacklist for SyTest tests that we expect will fail in
 # Synapse.
-# 
+#
 # Each line of this file is scanned by sytest during a run and if the line
 # exactly matches the name of a test, it will be marked as "expected fail",
 # meaning the test will still run, but failure will not mark the entire test
@@ -29,3 +29,7 @@ Enabling an unknown default rule fails with 404
 
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1663
 New federated private chats get full presence information (SYN-115)
+
+# Blacklisted due to https://github.com/matrix-org/matrix-doc/pull/2314 removing
+# this requirement from the spec
+Inbound federation of state requires event_id as a mandatory paramater
