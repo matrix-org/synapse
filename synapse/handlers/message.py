@@ -159,7 +159,7 @@ class MessageHandler(object):
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
             visible_events = yield filter_events_for_client(
-                self.storage, user_id, last_events
+                self.storage, user_id, last_events, apply_retention_policies=False
             )
 
             event = last_events[0]

@@ -57,3 +57,10 @@ Don't get pushed for rooms you've muted
 Rejected events are not pushed
 Test that rejected pushers are removed.
 Events come down the correct room
+
+# https://buildkite.com/matrix-dot-org/sytest/builds/326#cca62404-a88a-4fcb-ad41-175fd3377603
+Presence changes to UNAVAILABLE are reported to remote room members
+If remote user leaves room, changes device and rejoins we see update in sync
+uploading self-signing key notifies over federation
+Inbound federation can receive redacted events
+Outbound federation can request missing events
