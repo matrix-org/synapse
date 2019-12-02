@@ -14,15 +14,15 @@
 # limitations under the License.
 
 import sys
+from argparse import REMAINDER
 from contextlib import redirect_stderr
 from io import StringIO
 
 import pyperf
-from argparse import REMAINDER
 from synmark import make_reactor
 from synmark.suites import SUITES
 
-from twisted.internet.defer import ensureDeferred, Deferred
+from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.logger import globalLogBeginner, textFileLogObserver
 from twisted.python.failure import Failure
 
@@ -85,7 +85,9 @@ if __name__ == "__main__":
         setupdb()
 
     if runner.args.tests:
-        SUITES = list(filter(lambda x: x[0].__name__.split(".")[-1] in runner.args.tests, SUITES))
+        SUITES = list(
+            filter(lambda x: x[0].__name__.split(".")[-1] in runner.args.tests, SUITES)
+        )
 
     for suite, loops in SUITES:
         if loops:

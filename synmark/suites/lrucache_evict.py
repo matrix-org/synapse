@@ -13,16 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
-from io import StringIO
-
-from mock import Mock
-
 from pyperf import perf_counter
-from synmark import make_homeserver
 
 from synapse.util.caches.lrucache import LruCache
-from synapse.logging._structured import setup_structured_logging
 
 
 async def main(reactor, loops):
