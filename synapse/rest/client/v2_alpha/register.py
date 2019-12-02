@@ -19,7 +19,6 @@ import hmac
 import logging
 import re
 from hashlib import sha1
-from string import capwords
 
 from six import string_types
 
@@ -486,21 +485,8 @@ class RegisterRestServlet(RestServlet):
                     if self.hs.config.register_just_use_email_for_display_name:
                         desired_display_name = address
                     else:
-                        # XXX: a nasty heuristic to turn an email address into
-                        # a displayname, as part of register_mxid_from_3pid
-                        parts = address.replace('.', ' ').split('@')
-                        org_parts = parts[1].split(' ')
-
-                        if org_parts[-2] == "matrix" and org_parts[-1] == "org":
-                            org = "Tchap Admin"
-                        elif org_parts[-2] == "gouv" and org_parts[-1] == "fr":
-                            org = org_parts[-3] if len(org_parts) > 2 else org_parts[-2]
-                        else:
-                            org = org_parts[-2]
-
-                        desired_display_name = (
-                            capwords(parts[0]) + " [" + capwords(org) + "]"
-                        )
+                        # Custom mapping between email address and display name
+                        desired_display_name = self._map_email_to_displayname(address)
                 elif (
                     self.hs.config.register_mxid_from_3pid == 'msisdn' and
                     LoginType.MSISDN in auth_result
@@ -741,6 +727,62 @@ class RegisterRestServlet(RestServlet):
             "access_token": access_token,
             "home_server": self.hs.hostname,
         }))
+
+
+def cap(name):
+    """Capitalise parts of a name containing different words, including those
+    separated by hyphens.
+    For example, 'John-Doe'
+
+    Args:
+        name (str): The name to parse
+    """
+    if not name:
+        return name
+
+    # Split the name by whitespace then hyphens, capitalizing each part then
+    # joining it back together.
+    capatilized_name = " ".join(
+        "-".join(part.capitalize() for part in space_part.split("-"))
+        for space_part in name.split()
+    )
+    return capatilized_name
+
+
+def _map_email_to_displayname(address):
+    """Custom mapping from an email address to a user displayname
+
+    Args:
+        address (str): The email address to process
+    Returns:
+        str: The new displayname
+    """
+    # Split the part before and after the @ in the email.
+    # Replace all . with spaces in the first part
+    parts = address.replace('.', ' ').split('@')
+
+    # Figure out which org this email address belongs to
+    org_parts = parts[1].split(' ')
+
+    # If this is a ...matrix.org email, mark them as an Admin
+    if org_parts[-2] == "matrix" and org_parts[-1] == "org":
+        org = "Tchap Admin"
+
+    # Is this is a ...gouv.fr address, set the org to whatever is before
+    # gouv.fr. If there isn't anything (a @gouv.fr email) simply mark their
+    # org as "gouv"
+    elif org_parts[-2] == "gouv" and org_parts[-1] == "fr":
+        org = org_parts[-3] if len(org_parts) > 2 else org_parts[-2]
+
+    # Otherwise, mark their org as the email's second-level domain name
+    else:
+        org = org_parts[-2]
+
+    desired_display_name = (
+        cap(parts[0]) + " [" + cap(org) + "]"
+    )
+
+    return desired_display_name
 
 
 def register_servlets(hs, http_server):
