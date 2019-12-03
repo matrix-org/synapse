@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import urllib.parse
 
 from six.moves import urllib
 
@@ -91,11 +92,28 @@ class ApplicationServiceApi(SimpleHttpClient):
             hs, "as_protocol_meta", timeout_ms=HOUR_IN_MS
         )
 
+    @staticmethod
+    def build_uri(service, endpoint_name, key):
+        uri = urllib.parse.urljoin(
+            service.url,
+            APP_SERVICE_PREFIX
+        )
+        uri = urllib.parse.urljoin(
+            uri,
+            endpoint_name,
+        )
+        uri = urllib.parse.urljoin(
+            uri,
+            key,
+        )
+        return uri
+
+
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
         if service.url is None:
             return False
-        uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
+        uri = ApplicationServiceApi.build_uri(service, "users", urllib.parse.quote(user_id))
         response = None
         try:
             response = yield self.get_json(uri, {"access_token": service.hs_token})
@@ -113,7 +131,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     def query_alias(self, service, alias):
         if service.url is None:
             return False
-        uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
+        uri = ApplicationServiceApi.build_uri(service, "rooms", urllib.parse.quote(alias))
         response = None
         try:
             response = yield self.get_json(uri, {"access_token": service.hs_token})
@@ -138,12 +156,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
-        uri = "%s%s/thirdparty/%s/%s" % (
-            service.url,
-            APP_SERVICE_PREFIX,
-            kind,
-            urllib.parse.quote(protocol),
+        uri = ApplicationServiceApi.build_uri(
+            service,
+            "thirdparty/%s" % kind,
+            urllib.parse.quote(protocol)
         )
+
         try:
             response = yield self.get_json(uri, fields)
             if not isinstance(response, list):
@@ -172,10 +190,10 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         @defer.inlineCallbacks
         def _get():
-            uri = "%s%s/thirdparty/protocol/%s" % (
-                service.url,
-                APP_SERVICE_PREFIX,
-                urllib.parse.quote(protocol),
+            uri = ApplicationServiceApi.build_uri(
+                service,
+                "thirdparty/protocol",
+                urllib.parse.quote(protocol)
             )
             try:
                 info = yield self.get_json(uri, {})
@@ -212,10 +230,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning(
                 "push_bulk: Missing txn ID sending events to %s", service.url
             )
-            txn_id = str(0)
-        txn_id = str(txn_id)
+            txn_id = 0
 
-        uri = service.url + ("/transactions/%s" % urllib.parse.quote(txn_id))
+        uri = ApplicationServiceApi.build_uri(
+            service,
+            "transactions",
+            urllib.parse.quote(str(txn_id))
+        )
         try:
             yield self.put_json(
                 uri=uri,
