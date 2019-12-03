@@ -20,7 +20,7 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import ThirdPartyEntityKind
+from synapse.api.constants import EventTypes, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
 from synapse.events.utils import serialize_event
 from synapse.http.client import SimpleHttpClient
@@ -209,7 +209,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return True
 
-        events = self._serialize(events)
+        events = self._serialize(service, events)
 
         if txn_id is None:
             logger.warning(
@@ -235,9 +235,18 @@ class ApplicationServiceApi(SimpleHttpClient):
         failed_transactions_counter.labels(service.id).inc()
         return False
 
-    def _serialize(self, events):
+    def _serialize(self, service, events):
         time_now = self.clock.time_msec()
         return [
-            serialize_event(e, time_now, as_client_event=True, is_invite=True)
+            serialize_event(
+                e,
+                time_now,
+                as_client_event=True,
+                is_invite=(
+                    e.type == EventTypes.Member
+                    and e.membership == "invite"
+                    and service.is_interested_in_user(e.state_key)
+                ),
+            )
             for e in events
         ]
