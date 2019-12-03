@@ -237,4 +237,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
     def _serialize(self, events):
         time_now = self.clock.time_msec()
-        return [serialize_event(e, time_now, as_client_event=True, is_invite=True) for e in events]
+        return [
+            serialize_event(e, time_now, as_client_event=True, is_invite=True)
+            for e in events
+        ]
