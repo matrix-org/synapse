@@ -255,7 +255,7 @@ class MessageHandler(object):
         if not isinstance(expiry_ts, int) or event.is_state():
             return
 
-        if self._scheduling_expiry:
+        if self._scheduled_expiry:
             # If the provided timestamp refers to a time before the scheduled time of the
             # next expiry task, cancel that task and reschedule it for this timestamp.
             next_scheduled_expiry_ts = self._scheduled_expiry.getTime() * 1000
