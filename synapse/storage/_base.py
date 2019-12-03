@@ -18,7 +18,6 @@ import itertools
 import logging
 import random
 import sys
-import threading
 import time
 from typing import Iterable, Tuple
 
@@ -36,7 +35,6 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id
 from synapse.util import batch_iter
-from synapse.util.caches.descriptors import Cache
 from synapse.util.stringutils import exception_to_unicode
 
 # import a function which will return a monotonic time, in seconds
@@ -236,16 +234,6 @@ class SQLBaseStore(object):
         #   is running in mainline, and we have some nice monitoring frontends
         #   to watch it
         self._txn_perf_counters = PerformanceCounters()
-
-        self._get_event_cache = Cache(
-            "*getEvent*", keylen=3, max_entries=hs.config.event_cache_size
-        )
-
-        self._event_fetch_lock = threading.Condition()
-        self._event_fetch_list = []
-        self._event_fetch_ongoing = 0
-
-        self._pending_ds = []
 
         self.database_engine = hs.database_engine
 
