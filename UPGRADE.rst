@@ -87,7 +87,7 @@ room directory information with other servers over federation.
 
 If your installation does not explicitly set these settings one way or the other
 and you want either setting to be ``true`` then it will necessary to update
-``homeserver.yaml`` accordingly.
+your homeserver configuration file accordingly.
 
 For more details on the surrounding context see our `explainer
 <https://matrix.org/blog/2019/11/09/avoiding-unwelcome-visitors-on-private-matrix-servers>`_.
