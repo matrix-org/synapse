@@ -2722,7 +2722,7 @@ class FederationHandler(BaseHandler):
             if self._ephemeral_messages_enabled:
                 for (event, context) in event_and_contexts:
                     # If there's an expiry timestamp on the event, schedule its expiry.
-                    self._message_handler.maybe_schedule_next_expiry(event)
+                    self._message_handler.maybe_schedule_expiry(event)
 
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:

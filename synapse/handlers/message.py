@@ -310,7 +310,11 @@ class MessageHandler(object):
         logger.info("Scheduling expiry for event %s in %.3fs", event_id, delay)
 
         self._scheduled_expiry = self.clock.call_later(
-            delay, run_as_background_process, self._expire_event, event_id
+            delay,
+            run_as_background_process,
+            "_expire_event",
+            self._expire_event,
+            event_id,
         )
 
     @defer.inlineCallbacks
@@ -320,7 +324,7 @@ class MessageHandler(object):
         If the event doesn't exist in the database, log it and delete the expiry date
         from the database (so that we don't try to expire it again).
         """
-        assert not self._ephemeral_events_enabled
+        assert self._ephemeral_events_enabled
 
         logger.info("Expiring event %s", event_id)
 
@@ -992,7 +996,7 @@ class EventCreationHandler(object):
 
         if self._ephemeral_events_enabled:
             # If there's an expiry timestamp on the event, schedule its expiry.
-            self._message_handler.maybe_schedule_next_expiry(event)
+            self._message_handler.maybe_schedule_expiry(event)
 
         yield self.pusher_pool.on_new_notifications(event_stream_id, max_stream_id)
 
