@@ -219,7 +219,14 @@ def check_functionality():
     feature_availability["postgres"] = bool(requireModule("psycopg2"))
     feature_availability["resources.consent"] = bool(requireModule("jinja2"))
     feature_availability["acme"] = bool(requireModule("txacme"))
-    feature_availability["saml2"] = bool(requireModule("saml2"))
+
+    try:
+        from saml2.sigver import get_xmlsec_binary
+
+        feature_availability["saml2"] = bool(get_xmlsec_binary())
+    except ImportError:
+        feature_availability["saml2"] = False
+
     feature_availability["systemd"] = bool(requireModule("systemd"))
     feature_availability["url_preview"] = bool(requireModule("lxml"))
     feature_availability["sentry"] = bool(requireModule("sentry_sdk"))
