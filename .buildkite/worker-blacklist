@@ -64,9 +64,3 @@ If remote user leaves room, changes device and rejoins we see update in sync
 uploading self-signing key notifies over federation
 Inbound federation can receive redacted events
 Outbound federation can request missing events
-
-# Flakey tests noticed as of https://github.com/matrix-org/synapse/pull/6409
-Can recv device messages over federation
-Device messages over federation wake up /sync
-Federation handles empty auth_events in state_ids sanely
-An event which redacts itself should be ignored
