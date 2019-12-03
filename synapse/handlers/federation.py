@@ -148,6 +148,8 @@ class FederationHandler(BaseHandler):
 
         self._message_handler = hs.get_message_handler()
 
+        self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
+
     @defer.inlineCallbacks
     def on_receive_pdu(self, origin, pdu, sent_to_us_directly=False):
         """ Process a PDU received via a federation /send/ transaction, or
@@ -2722,11 +2724,10 @@ class FederationHandler(BaseHandler):
                 event_and_contexts, backfilled=backfilled
             )
 
-            for (event, context) in event_and_contexts:
-                # If there's an expiry timestamp on the event, schedule its expiry.
-                expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-                if isinstance(expiry_ts, int) and not event.is_state():
-                    yield self._message_handler.maybe_schedule_next_expiry(expiry_ts)
+            if self._ephemeral_messages_enabled:
+                for (event, context) in event_and_contexts:
+                    # If there's an expiry timestamp on the event, schedule its expiry.
+                    self._message_handler.maybe_schedule_next_expiry(event)
 
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:

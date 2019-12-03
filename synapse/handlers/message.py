@@ -247,97 +247,101 @@ class MessageHandler(object):
             for user_id, profile in iteritems(users_with_profile)
         }
 
-    @defer.inlineCallbacks
-    def maybe_schedule_next_expiry(self, expiry_ts):
+    def maybe_schedule_next_expiry(self, event):
         """Schedule the expiry of an event if there's not already one running, or if the
         one running is for an event that will expire after the provided timestamp.
 
         Args:
-            expiry_ts (int): Timestamp to compare the time at which the next expiry will
-                happen with.
+            event (EventBase): The event to schedule the expiry of.
         """
-        # Ensure that we're not scheduling an expiry task if we're already doing that
-        # while processing a different request.
-        if self._scheduling_expiry:
+        expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
+        if not isinstance(expiry_ts, int) or event.is_state():
             return
+
         self._scheduling_expiry = True
 
         try:
             # Don't schedule an expiry task if there's already one scheduled.
             if not self._scheduled_expiry or not self._scheduled_expiry.active():
-                yield self._schedule_next_expiry()
+                self._schedule_expiry_for_event(
+                    event_id=event.event_id,
+                    expiry_ts=expiry_ts,
+                )
+                return
 
             # If the provided timestamp refers to a time before the scheduled time of the
             # next expiry task, cancel that task and reschedule it for this timestamp.
             next_scheduled_expiry_ts = self._scheduled_expiry.getTime() * 1000
             if expiry_ts < next_scheduled_expiry_ts:
                 self._scheduled_expiry.cancel()
-                yield self._schedule_next_expiry(expiry_ts)
+                self._schedule_expiry_for_event(
+                    event_id=event.event_id,
+                    expiry_ts=expiry_ts,
+                )
         finally:
             self._scheduling_expiry = False
 
     @defer.inlineCallbacks
-    def _schedule_next_expiry(self, expiry_ts=None):
-        """Retrieve the expiry timestamp of the next event to be expired, and schedule
-        an expiry task for it.
+    def _schedule_next_expiry(self):
+        """Retrieve the ID and the expiry timestamp of the next event to be expired,
+        and schedule an expiry task for it.
 
-        Optionally, if an expiry timestamp is already provided as part of the call to
-        this function, use it and skip the database lookup.
-
-        If there's no event left to expire, set _expiry_scheduled to False so that a
+        If there's no event left to expire, set _expiry_scheduled to None so that a
         future call to save_expiry_ts can schedule a new expiry task.
+        """
+        # Try to get the expiry timestamp of the next event to expire.
+        res = yield self.store.get_next_event_to_expire()
+        if res:
+            event_id, expiry_ts = res
+            self._schedule_expiry_for_event(event_id, expiry_ts)
+        else:
+            # If there's no more event to expire, then set _expiry_scheduled to None, so
+            # that the next call to save_expiry_ts can schedule a new expiry task.
+            self._scheduled_expiry = None
+
+    def _schedule_expiry_for_event(self, event_id, expiry_ts):
+        """Schedule an expiry task for the provided event.
 
         Args:
-            expiry_ts (int|None): The expiry timestamp to use to schedule the next expiry
-                task. If not provided, the timestamp of event that'll expire the soonest
-                will be retrieved from the database and used instead.
+            event_id (str): The ID of the event to expire.
+            expiry_ts (int): The timestamp at which to expire the event.
         """
-        if expiry_ts is None:
-            # Try to get the expiry timestamp of the next event to expire.
-            next_event_to_expire = yield self.store.get_next_event_to_expire()
-            if next_event_to_expire:
-                expiry_ts = next_event_to_expire[1]
+        # Figure out how many seconds we need to wait before expiring the event.
+        now_ms = self.clock.time_msec()
+        delay = (expiry_ts - now_ms) / 1000
 
-        if expiry_ts is not None:
-            # Figure out how many seconds we need to wait before expiring the event.
-            now_ms = self.clock.time_msec()
-            delay = (expiry_ts - now_ms) / 1000
+        # callLater doesn't support negative delays, so trim the delay to 0 if we're
+        # in that case.
+        if delay < 0:
+            delay = 0
 
-            # callLater doesn't support negative delays, so trim the delay to 0 if we're
-            # in that case.
-            if delay < 0:
-                delay = 0
+        logger.info("Scheduling expiry for event %s in %.3fs", event_id, delay)
 
-            logger.info("Scheduling next expiry task in %.3fs", delay)
-
-            self._scheduled_expiry = self.clock.call_later(delay, self._expire_event)
-        else:
-            # If there's no more event to expire, then set _expiry_scheduled to False, so
-            # that the next call to save_expiry_ts can schedule a new expiry task.
-            self._scheduled_expiry = False
+        self._scheduled_expiry = self.clock.call_later(
+            delay, run_as_background_process, self._expire_event, event_id
+        )
 
     @defer.inlineCallbacks
-    def _expire_event(self):
+    def _expire_event(self, event_id):
         """Retrieve and expire an event that needs to be expired from the database.
 
         If the event doesn't exist in the database, log it and delete the expiry date
         from the database (so that we don't try to expire it again).
         """
-        if not self._ephemeral_events_enabled:
-            return
-
-        # Get the ID of the next event to expire.
-        next_event_to_expire = yield self.store.get_next_event_to_expire()
-        event_id = next_event_to_expire[0]
+        assert not self._ephemeral_events_enabled
 
         logger.info("Expiring event %s", event_id)
 
-        # Expire the event if we know about it. This function also deletes the expiry
-        # date from the database in the same database transaction.
-        yield self.store.expire_event(event_id)
+        try:
+            # Expire the event if we know about it. This function also deletes the expiry
+            # date from the database in the same database transaction.
+            yield self.store.expire_event(event_id)
+        except Exception as e:
+            logger.error("Could not expire event %s: %r", event_id, e)
 
         # Schedule the expiry of the next event to expire.
-        yield self._schedule_next_expiry()
+        if not self._scheduling_expiry:
+            yield self._schedule_next_expiry()
 
 
 # The duration (in ms) after which rooms should be removed
@@ -410,6 +414,8 @@ class EventCreationHandler(object):
             )
 
         self._message_handler = hs.get_message_handler()
+
+        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
     @defer.inlineCallbacks
     def create_event(
@@ -993,10 +999,9 @@ class EventCreationHandler(object):
             event, context=context
         )
 
-        # If there's an expiry timestamp on the event, schedule its expiry.
-        expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-        if isinstance(expiry_ts, int) and not event.is_state():
-            yield self._message_handler.maybe_schedule_next_expiry(expiry_ts)
+        if self._ephemeral_events_enabled:
+            # If there's an expiry timestamp on the event, schedule its expiry.
+            self._message_handler.maybe_schedule_next_expiry(event)
 
         yield self.pusher_pool.on_new_notifications(event_stream_id, max_stream_id)
 

@@ -910,8 +910,6 @@ class EventsStore(
                 # Remove from relations table.
                 self._handle_redaction(txn, event.redacts)
 
-                self._delete_event_expiry_txn(txn, event.redacts)
-
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
         self._handle_mult_prev_events(
@@ -2054,8 +2052,9 @@ class EventsStore(
         table, or None if there's no more event to expire.
 
         Returns:
-            A dict with an event_id and an expiry_ts if there's at least one row in the
-            event_expiry table, None otherwise.
+            A tuple containing the event ID as its first element and an expiry timestamp
+            as its second one, if there's at least one row in the event_expiry table.
+            None otherwise.
         """
 
         def get_next_event_to_expire_txn(txn):
