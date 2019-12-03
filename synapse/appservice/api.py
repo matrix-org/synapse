@@ -46,10 +46,7 @@ sent_events_counter = Counter(
 )
 
 HOUR_IN_MS = 60 * 60 * 1000
-
-
-APP_SERVICE_PREFIX = "/_matrix/app/unstable"
-
+APP_SERVICE_PREFIX = "/_matrix/app/v1"
 
 def _is_valid_3pe_metadata(info):
     if "instances" not in info:
