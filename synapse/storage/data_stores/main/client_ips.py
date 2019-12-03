@@ -21,8 +21,8 @@ from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage import background_updates
-from synapse.util.caches.descriptors import Cache
 from synapse.util.caches import CACHE_SIZE_FACTOR
+from synapse.util.caches.descriptors import Cache
 
 logger = logging.getLogger(__name__)
 
