@@ -75,6 +75,7 @@ class MessageHandler(object):
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
         self._scheduled_expiry = None  # type: Optional[IDelayedCall]
+
         # Whether the handler is currently running through the logic for scheduling a
         # call to self._expire_event.
         self._scheduling_expiry = False
