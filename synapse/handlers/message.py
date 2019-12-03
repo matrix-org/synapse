@@ -76,10 +76,6 @@ class MessageHandler(object):
         # scheduled.
         self._scheduled_expiry = None  # type: Optional[IDelayedCall]
 
-        # Whether the handler is currently running through the logic for scheduling a
-        # call to self._expire_event.
-        self._scheduling_expiry = False
-
         if not hs.config.worker_app:
             run_as_background_process(
                 "_schedule_next_expiry", self._schedule_next_expiry
@@ -248,18 +244,15 @@ class MessageHandler(object):
         }
 
     def maybe_schedule_expiry(self, event):
-        """Schedule the expiry of an event if there's not already one running, or if the
-        one running is for an event that will expire after the provided timestamp.
+        """Schedule the expiry of an event if there's not already one scheduled,
+        or if the one running is for an event that will expire after the provided
+        timestamp.
 
         Args:
             event (EventBase): The event to schedule the expiry of.
         """
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
         if not isinstance(expiry_ts, int) or event.is_state():
-            return
-
-        # Don't schedule an expiry task if there's already one scheduled.
-        if self._scheduled_expiry and self._scheduled_expiry.active():
             return
 
         if self._scheduling_expiry:
@@ -271,6 +264,8 @@ class MessageHandler(object):
             else:
                 return
 
+        # _schedule_expiry_for_event won't actually schedule anything if there's already
+        # a task scheduled.
         self._schedule_expiry_for_event(event.event_id, expiry_ts)
 
     @defer.inlineCallbacks
@@ -292,12 +287,17 @@ class MessageHandler(object):
             self._scheduled_expiry = None
 
     def _schedule_expiry_for_event(self, event_id, expiry_ts):
-        """Schedule an expiry task for the provided event.
+        """Schedule an expiry task for the provided event if there's not already one
+        scheduled.
 
         Args:
             event_id (str): The ID of the event to expire.
             expiry_ts (int): The timestamp at which to expire the event.
         """
+        # Don't schedule an expiry task if there's already one scheduled.
+        if self._scheduled_expiry and self._scheduled_expiry.active():
+            return
+
         # Figure out how many seconds we need to wait before expiring the event.
         now_ms = self.clock.time_msec()
         delay = (expiry_ts - now_ms) / 1000
