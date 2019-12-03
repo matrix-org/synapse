@@ -490,6 +490,8 @@ class ServerConfig(Config):
             "cleanup_extremities_with_dummy_events", True
         )
 
+        self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
+
     def has_tls_listener(self) -> bool:
         return any(l["tls"] for l in self.listeners)
 
