@@ -264,8 +264,7 @@ class MessageHandler(object):
             # Don't schedule an expiry task if there's already one scheduled.
             if not self._scheduled_expiry or not self._scheduled_expiry.active():
                 self._schedule_expiry_for_event(
-                    event_id=event.event_id,
-                    expiry_ts=expiry_ts,
+                    event_id=event.event_id, expiry_ts=expiry_ts,
                 )
                 return
 
@@ -275,8 +274,7 @@ class MessageHandler(object):
             if expiry_ts < next_scheduled_expiry_ts:
                 self._scheduled_expiry.cancel()
                 self._schedule_expiry_for_event(
-                    event_id=event.event_id,
-                    expiry_ts=expiry_ts,
+                    event_id=event.event_id, expiry_ts=expiry_ts,
                 )
         finally:
             self._scheduling_expiry = False
