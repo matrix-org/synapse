@@ -247,7 +247,7 @@ class MessageHandler(object):
             for user_id, profile in iteritems(users_with_profile)
         }
 
-    def maybe_schedule_next_expiry(self, event):
+    def maybe_schedule_expiry(self, event):
         """Schedule the expiry of an event if there's not already one running, or if the
         one running is for an event that will expire after the provided timestamp.
 
@@ -258,26 +258,19 @@ class MessageHandler(object):
         if not isinstance(expiry_ts, int) or event.is_state():
             return
 
-        self._scheduling_expiry = True
+        # Don't schedule an expiry task if there's already one scheduled.
+        if self._scheduled_expiry and self._scheduled_expiry.active():
+            return
 
-        try:
-            # Don't schedule an expiry task if there's already one scheduled.
-            if not self._scheduled_expiry or not self._scheduled_expiry.active():
-                self._schedule_expiry_for_event(
-                    event_id=event.event_id, expiry_ts=expiry_ts,
-                )
-                return
+        # If the provided timestamp refers to a time before the scheduled time of the
+        # next expiry task, cancel that task and reschedule it for this timestamp.
+        next_scheduled_expiry_ts = self._scheduled_expiry.getTime() * 1000
+        if expiry_ts < next_scheduled_expiry_ts:
+            self._scheduled_expiry.cancel()
+        else:
+            return
 
-            # If the provided timestamp refers to a time before the scheduled time of the
-            # next expiry task, cancel that task and reschedule it for this timestamp.
-            next_scheduled_expiry_ts = self._scheduled_expiry.getTime() * 1000
-            if expiry_ts < next_scheduled_expiry_ts:
-                self._scheduled_expiry.cancel()
-                self._schedule_expiry_for_event(
-                    event_id=event.event_id, expiry_ts=expiry_ts,
-                )
-        finally:
-            self._scheduling_expiry = False
+        self._schedule_expiry_for_event(event.event_id, expiry_ts)
 
     @defer.inlineCallbacks
     def _schedule_next_expiry(self):
@@ -338,8 +331,7 @@ class MessageHandler(object):
             logger.error("Could not expire event %s: %r", event_id, e)
 
         # Schedule the expiry of the next event to expire.
-        if not self._scheduling_expiry:
-            yield self._schedule_next_expiry()
+        yield self._schedule_next_expiry()
 
 
 # The duration (in ms) after which rooms should be removed

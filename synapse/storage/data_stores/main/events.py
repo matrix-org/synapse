@@ -2051,7 +2051,7 @@ class EventsStore(
         """Retrieve the entry with the lowest expiry timestamp in the event_expiry
         table, or None if there's no more event to expire.
 
-        Returns:
+        Returns: Deferred[Optional[Tuple[str, int]]]
             A tuple containing the event ID as its first element and an expiry timestamp
             as its second one, if there's at least one row in the event_expiry table.
             None otherwise.
