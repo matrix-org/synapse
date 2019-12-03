@@ -221,9 +221,12 @@ def check_functionality():
     feature_availability["acme"] = bool(requireModule("txacme"))
 
     try:
-        from saml2.sigver import get_xmlsec_binary
+        from saml2.sigver import get_xmlsec_binary, SigverError
 
-        feature_availability["saml2"] = bool(get_xmlsec_binary())
+        try:
+            feature_availability["saml2"] = bool(get_xmlsec_binary())
+        except SigverError:
+            feature_availability["saml2"] = False
     except ImportError:
         feature_availability["saml2"] = False
 
