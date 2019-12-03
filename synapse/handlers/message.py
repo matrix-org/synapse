@@ -71,6 +71,7 @@ class MessageHandler(object):
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+        self._is_worker_app = bool(hs.config.worker_app)
 
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
@@ -248,24 +249,20 @@ class MessageHandler(object):
         or if the one running is for an event that will expire after the provided
         timestamp.
 
+        This function needs to invalidate the event cache, which is only possible on
+        the master process, and therefore needs to be run on there.
+
         Args:
             event (EventBase): The event to schedule the expiry of.
         """
+        assert not self._is_worker_app
+
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
         if not isinstance(expiry_ts, int) or event.is_state():
             return
 
-        if self._scheduled_expiry:
-            # If the provided timestamp refers to a time before the scheduled time of the
-            # next expiry task, cancel that task and reschedule it for this timestamp.
-            next_scheduled_expiry_ts = self._scheduled_expiry.getTime() * 1000
-            if expiry_ts < next_scheduled_expiry_ts:
-                self._scheduled_expiry.cancel()
-            else:
-                return
-
         # _schedule_expiry_for_event won't actually schedule anything if there's already
-        # a task scheduled.
+        # a task scheduled for a timestamp that's sooner than the provided one.
         self._schedule_expiry_for_event(event.event_id, expiry_ts)
 
     @defer.inlineCallbacks
@@ -281,22 +278,23 @@ class MessageHandler(object):
         if res:
             event_id, expiry_ts = res
             self._schedule_expiry_for_event(event_id, expiry_ts)
-        else:
-            # If there's no more event to expire, then set _expiry_scheduled to None, so
-            # that the next call to save_expiry_ts can schedule a new expiry task.
-            self._scheduled_expiry = None
 
     def _schedule_expiry_for_event(self, event_id, expiry_ts):
         """Schedule an expiry task for the provided event if there's not already one
-        scheduled.
+        scheduled at a timestamp that's sooner than the provided one.
 
         Args:
             event_id (str): The ID of the event to expire.
             expiry_ts (int): The timestamp at which to expire the event.
         """
-        # Don't schedule an expiry task if there's already one scheduled.
-        if self._scheduled_expiry and self._scheduled_expiry.active():
-            return
+        if self._scheduled_expiry:
+            # If the provided timestamp refers to a time before the scheduled time of the
+            # next expiry task, cancel that task and reschedule it for this timestamp.
+            next_scheduled_expiry_ts = self._scheduled_expiry.getTime() * 1000
+            if expiry_ts < next_scheduled_expiry_ts:
+                self._scheduled_expiry.cancel()
+            else:
+                return
 
         # Figure out how many seconds we need to wait before expiring the event.
         now_ms = self.clock.time_msec()
@@ -325,6 +323,8 @@ class MessageHandler(object):
         from the database (so that we don't try to expire it again).
         """
         assert self._ephemeral_events_enabled
+
+        self._scheduled_expiry = None
 
         logger.info("Expiring event %s", event_id)
 

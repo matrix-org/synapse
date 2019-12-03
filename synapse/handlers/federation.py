@@ -121,6 +121,7 @@ class FederationHandler(BaseHandler):
         self.pusher_pool = hs.get_pusherpool()
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_simple_http_client()
@@ -140,8 +141,6 @@ class FederationHandler(BaseHandler):
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
-
-        self._message_handler = hs.get_message_handler()
 
         self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
 
