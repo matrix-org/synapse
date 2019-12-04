@@ -118,15 +118,16 @@ class ServerConfig(Config):
             self.allow_public_rooms_without_auth = False
             self.allow_public_rooms_over_federation = False
         else:
-            # If set to 'False', requires authentication to access the server's public
-            # rooms directory through the client API. Defaults to 'True'.
+            # If set to 'true', removes the need for authentication to access the server's
+            # public rooms directory through the client API, meaning that anyone can
+            # query the room directory. Defaults to 'false'.
             self.allow_public_rooms_without_auth = config.get(
-                "allow_public_rooms_without_auth", True
+                "allow_public_rooms_without_auth", False
             )
-            # If set to 'False', forbids any other homeserver to fetch the server's public
-            # rooms directory via federation. Defaults to 'True'.
+            # If set to 'true', allows any other homeserver to fetch the server's public
+            # rooms directory via federation. Defaults to 'false'.
             self.allow_public_rooms_over_federation = config.get(
-                "allow_public_rooms_over_federation", True
+                "allow_public_rooms_over_federation", False
             )
 
         default_room_version = config.get("default_room_version", DEFAULT_ROOM_VERSION)
@@ -620,15 +621,16 @@ class ServerConfig(Config):
         #
         #require_auth_for_profile_requests: true
 
-        # If set to 'false', requires authentication to access the server's public rooms
-        # directory through the client API. Defaults to 'true'.
+        # If set to 'true', removes the need for authentication to access the server's
+        # public rooms directory through the client API, meaning that anyone can
+        # query the room directory. Defaults to 'false'.
         #
-        #allow_public_rooms_without_auth: false
+        #allow_public_rooms_without_auth: true
 
-        # If set to 'false', forbids any other homeserver to fetch the server's public
-        # rooms directory via federation. Defaults to 'true'.
+        # If set to 'true', allows any other homeserver to fetch the server's public
+        # rooms directory via federation. Defaults to 'false'.
         #
-        #allow_public_rooms_over_federation: false
+        #allow_public_rooms_over_federation: true
 
         # The default room version for newly created rooms.
         #
