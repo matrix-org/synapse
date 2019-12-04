@@ -548,6 +548,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                         txn=txn,
                         event_id=event_id,
                         replaces=replaces,
+                        sender=event_json["sender"],
                         labels=labels,
                         room_id=event_json["room_id"],
                         topological_ordering=event_json["depth"],

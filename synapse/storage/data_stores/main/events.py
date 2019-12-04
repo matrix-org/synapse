@@ -1928,7 +1928,7 @@ class EventsStore(
         """Extract labels from an event and store them.
 
         Args:
-            txn (LoggingTransaction): database cursor
+            txn (LoggingTransaction): The database cursor to use.
             event (EventBase): The event to process.
         """
         # Check if the event replaces another one (e.g. it's an edit)
@@ -1942,11 +1942,17 @@ class EventsStore(
 
         # Insert the labels, if any.
         self.insert_labels_for_event_txn(
-            txn, event.event_id, replaces, labels, event.room_id, event.depth
+            txn=txn,
+            event_id=event.event_id,
+            sender=event.sender,
+            replaces=replaces,
+            labels=labels,
+            room_id=event.room_id,
+            topological_ordering=event.depth,
         )
 
     def insert_labels_for_event_txn(
-        self, txn, event_id, replaces, labels, room_id, topological_ordering
+        self, txn, event_id, replaces, sender, labels, room_id, topological_ordering
     ):
         """Store the mapping between an event's ID and its labels, with one row per
         (event_id, label) tuple, after deleting labels associated with the event it
@@ -1955,15 +1961,38 @@ class EventsStore(
         Can be called with labels being None, in which case it will only delete labels
         associated with the replaced event.
 
+        If the event is an edit and the provided sender doesn't match with the sender
+        of the original event, log and return.
+
         Args:
-            txn (LoggingTransaction): The transaction to execute.
+            txn (LoggingTransaction): The database cursor to use.
             event_id (str): The event's ID.
             replaces (str|None): The ID of the event this event replaces, if any.
+            sender (str): The sender of the event.
             labels (list[str]|None): A list of text labels, if any.
             room_id (str): The ID of the room the event was sent to.
             topological_ordering (int): The position of the event in the room's topology.
         """
         if replaces:
+            # Make sure that the sender of the edit match the original event's sender,
+            # otherwise ignore this edit. We do this here because _store_labels_txn and
+            # the background update converge here.
+            original_sender = self._simple_select_one_onecol_txn(
+                txn=txn,
+                table="events",
+                keyvalues={"event_id": replaces},
+                retcol="sender",
+            )
+
+            if sender != original_sender:
+                logger.error(
+                    "The edit's sender of edit %s doesn't match the sender of the "
+                    "original event %s, not updating labels.",
+                    sender,
+                    original_sender,
+                )
+                return
+
             # Check that processing that edit won't overwrite the processing of a more
             # recent edit of the same event.
             txn.execute(
