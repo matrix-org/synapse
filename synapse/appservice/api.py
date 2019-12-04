@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import urllib.parse
+import os.path
 
 from six.moves import urllib
 
@@ -49,6 +49,7 @@ sent_events_counter = Counter(
 HOUR_IN_MS = 60 * 60 * 1000
 APP_SERVICE_PREFIX = "/_matrix/app/v1"
 
+
 def _is_valid_3pe_metadata(info):
     if "instances" not in info:
         return False
@@ -79,6 +80,11 @@ def _is_valid_3pe_result(r, field):
     return True
 
 
+def _build_as_uri(service, endpoint_name, key):
+    key = urllib.parse.quote(user_id)
+    return os.path.join(service.url, APP_SERVICE_PREFIX, endpoint_name, key)
+
+
 class ApplicationServiceApi(SimpleHttpClient):
     """This class manages HS -> AS communications, including querying and
     pushing.
@@ -92,28 +98,11 @@ class ApplicationServiceApi(SimpleHttpClient):
             hs, "as_protocol_meta", timeout_ms=HOUR_IN_MS
         )
 
-    @staticmethod
-    def build_uri(service, endpoint_name, key):
-        uri = urllib.parse.urljoin(
-            service.url,
-            APP_SERVICE_PREFIX
-        )
-        uri = urllib.parse.urljoin(
-            uri,
-            endpoint_name,
-        )
-        uri = urllib.parse.urljoin(
-            uri,
-            key,
-        )
-        return uri
-
-
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
         if service.url is None:
             return False
-        uri = ApplicationServiceApi.build_uri(service, "users", urllib.parse.quote(user_id))
+        uri = _build_as_uri(service, "users", user_id)
         response = None
         try:
             response = yield self.get_json(uri, {"access_token": service.hs_token})
@@ -131,7 +120,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     def query_alias(self, service, alias):
         if service.url is None:
             return False
-        uri = ApplicationServiceApi.build_uri(service, "rooms", urllib.parse.quote(alias))
+        uri = _build_as_uri(service, "rooms", alias)
         response = None
         try:
             response = yield self.get_json(uri, {"access_token": service.hs_token})
@@ -156,11 +145,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
-        uri = ApplicationServiceApi.build_uri(
-            service,
-            "thirdparty/%s" % kind,
-            urllib.parse.quote(protocol)
-        )
+        uri = _build_as_uri(service, "thirdparty/%s" % kind, protocol)
 
         try:
             response = yield self.get_json(uri, fields)
@@ -190,11 +175,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         @defer.inlineCallbacks
         def _get():
-            uri = ApplicationServiceApi.build_uri(
-                service,
-                "thirdparty/protocol",
-                urllib.parse.quote(protocol)
-            )
+            uri = _build_as_uri(service, "thirdparty/protocol", protocol)
             try:
                 info = yield self.get_json(uri, {})
 
@@ -232,11 +213,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             )
             txn_id = 0
 
-        uri = ApplicationServiceApi.build_uri(
-            service,
-            "transactions",
-            urllib.parse.quote(str(txn_id))
-        )
+        uri = _build_as_uri(service, "transactions", str(txn_id))
         try:
             yield self.put_json(
                 uri=uri,
