@@ -1,0 +1,1 @@
+Fix error from the Pillow library when uploading RGBA images.

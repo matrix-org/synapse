@@ -77,8 +77,8 @@ class PreviewUrlResource(DirectServeResource):
             treq_args={"browser_like_redirects": True},
             ip_whitelist=hs.config.url_preview_ip_range_whitelist,
             ip_blacklist=hs.config.url_preview_ip_range_blacklist,
-            http_proxy=os.getenv("http_proxy"),
-            https_proxy=os.getenv("HTTPS_PROXY"),
+            http_proxy=os.getenvb(b"http_proxy"),
+            https_proxy=os.getenvb(b"HTTPS_PROXY"),
         )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
@@ -122,7 +122,7 @@ class PreviewUrlResource(DirectServeResource):
                 pattern = entry[attrib]
                 value = getattr(url_tuple, attrib)
                 logger.debug(
-                    "Matching attrib '%s' with value '%s' against" " pattern '%s'",
+                    "Matching attrib '%s' with value '%s' against pattern '%s'",
                     attrib,
                     value,
                     pattern,

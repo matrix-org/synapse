@@ -530,24 +530,31 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             nbrows = 0
             last_row_event_id = ""
             for (event_id, event_json_raw) in results:
-                event_json = json.loads(event_json_raw)
+                try:
+                    event_json = json.loads(event_json_raw)
 
-                self._simple_insert_many_txn(
-                    txn=txn,
-                    table="event_labels",
-                    values=[
-                        {
-                            "event_id": event_id,
-                            "label": label,
-                            "room_id": event_json["room_id"],
-                            "topological_ordering": event_json["depth"],
-                        }
-                        for label in event_json["content"].get(
-                            EventContentFields.LABELS, []
-                        )
-                        if isinstance(label, str)
-                    ],
-                )
+                    self._simple_insert_many_txn(
+                        txn=txn,
+                        table="event_labels",
+                        values=[
+                            {
+                                "event_id": event_id,
+                                "label": label,
+                                "room_id": event_json["room_id"],
+                                "topological_ordering": event_json["depth"],
+                            }
+                            for label in event_json["content"].get(
+                                EventContentFields.LABELS, []
+                            )
+                            if isinstance(label, str)
+                        ],
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Unable to load event %s (no labels will be imported): %s",
+                        event_id,
+                        e,
+                    )
 
                 nbrows += 1
                 last_row_event_id = event_id

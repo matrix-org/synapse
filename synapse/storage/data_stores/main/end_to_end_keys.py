@@ -138,20 +138,35 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 result.setdefault(user_id, {})[device_id] = None
 
         # get signatures on the device
-        signature_sql = (
-            "SELECT * " "  FROM e2e_cross_signing_signatures " " WHERE %s"
-        ) % (" OR ".join("(" + q + ")" for q in signature_query_clauses))
+        signature_sql = ("SELECT *  FROM e2e_cross_signing_signatures WHERE %s") % (
+            " OR ".join("(" + q + ")" for q in signature_query_clauses)
+        )
 
         txn.execute(signature_sql, signature_query_params)
         rows = self.cursor_to_dict(txn)
 
+        # add each cross-signing signature to the correct device in the result dict.
         for row in rows:
+            signing_user_id = row["user_id"]
+            signing_key_id = row["key_id"]
             target_user_id = row["target_user_id"]
             target_device_id = row["target_device_id"]
-            if target_user_id in result and target_device_id in result[target_user_id]:
-                result[target_user_id][target_device_id].setdefault(
-                    "signatures", {}
-                ).setdefault(row["user_id"], {})[row["key_id"]] = row["signature"]
+            signature = row["signature"]
+
+            target_user_result = result.get(target_user_id)
+            if not target_user_result:
+                continue
+
+            target_device_result = target_user_result.get(target_device_id)
+            if not target_device_result:
+                # note that target_device_result will be None for deleted devices.
+                continue
+
+            target_device_signatures = target_device_result.setdefault("signatures", {})
+            signing_user_signatures = target_device_signatures.setdefault(
+                signing_user_id, {}
+            )
+            signing_user_signatures[signing_key_id] = signature
 
         log_kv(result)
         return result

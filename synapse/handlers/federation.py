@@ -121,6 +121,7 @@ class FederationHandler(BaseHandler):
         self.pusher_pool = hs.get_pusherpool()
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_simple_http_client()
@@ -140,6 +141,8 @@ class FederationHandler(BaseHandler):
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
+
+        self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
 
     @defer.inlineCallbacks
     def on_receive_pdu(self, origin, pdu, sent_to_us_directly=False):
@@ -1428,9 +1431,9 @@ class FederationHandler(BaseHandler):
         return event
 
     @defer.inlineCallbacks
-    def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
+    def do_remotely_reject_invite(self, target_hosts, room_id, user_id, content):
         origin, event, event_format_version = yield self._make_and_verify_event(
-            target_hosts, room_id, user_id, "leave"
+            target_hosts, room_id, user_id, "leave", content=content,
         )
         # Mark as outlier as we don't have any state for this event; we're not
         # even in the room.
@@ -2040,8 +2043,10 @@ class FederationHandler(BaseHandler):
             auth_events (dict[(str, str)->synapse.events.EventBase]):
                 Map from (event_type, state_key) to event
 
-                What we expect the event's auth_events to be, based on the event's
-                position in the dag. I think? maybe??
+                Normally, our calculated auth_events based on the state of the room
+                at the event's position in the DAG, though occasionally (eg if the
+                event is an outlier), may be the auth events claimed by the remote
+                server.
 
                 Also NB that this function adds entries to it.
         Returns:
@@ -2091,30 +2096,35 @@ class FederationHandler(BaseHandler):
             origin (str):
             event (synapse.events.EventBase):
             context (synapse.events.snapshot.EventContext):
+
             auth_events (dict[(str, str)->synapse.events.EventBase]):
+                Map from (event_type, state_key) to event
+
+                Normally, our calculated auth_events based on the state of the room
+                at the event's position in the DAG, though occasionally (eg if the
+                event is an outlier), may be the auth events claimed by the remote
+                server.
+
+                Also NB that this function adds entries to it.
 
         Returns:
             defer.Deferred[EventContext]: updated context
         """
         event_auth_events = set(event.auth_event_ids())
 
-        if event.is_state():
-            event_key = (event.type, event.state_key)
-        else:
-            event_key = None
-
-        # if the event's auth_events refers to events which are not in our
-        # calculated auth_events, we need to fetch those events from somewhere.
-        #
-        # we start by fetching them from the store, and then try calling /event_auth/.
+        # missing_auth is the set of the event's auth_events which we don't yet have
+        # in auth_events.
         missing_auth = event_auth_events.difference(
             e.event_id for e in auth_events.values()
         )
 
+        # if we have missing events, we need to fetch those events from somewhere.
+        #
+        # we start by checking if they are in the store, and then try calling /event_auth/.
         if missing_auth:
             # TODO: can we use store.have_seen_events here instead?
             have_events = yield self.store.get_seen_events_with_rejections(missing_auth)
-            logger.debug("Got events %s from store", have_events)
+            logger.debug("Found events %s in the store", have_events)
             missing_auth.difference_update(have_events.keys())
         else:
             have_events = {}
@@ -2169,15 +2179,17 @@ class FederationHandler(BaseHandler):
                     event.auth_event_ids()
                 )
             except Exception:
-                # FIXME:
                 logger.exception("Failed to get auth chain")
 
         if event.internal_metadata.is_outlier():
+            # XXX: given that, for an outlier, we'll be working with the
+            # event's *claimed* auth events rather than those we calculated:
+            # (a) is there any point in this test, since different_auth below will
+            # obviously be empty
+            # (b) alternatively, why don't we do it earlier?
             logger.info("Skipping auth_event fetch for outlier")
             return context
 
-        # FIXME: Assumes we have and stored all the state for all the
-        # prev_events
         different_auth = event_auth_events.difference(
             e.event_id for e in auth_events.values()
         )
@@ -2191,27 +2203,22 @@ class FederationHandler(BaseHandler):
             different_auth,
         )
 
+        # now we state-resolve between our own idea of the auth events, and the remote's
+        # idea of them.
+
         room_version = yield self.store.get_room_version(event.room_id)
+        different_event_ids = [
+            d for d in different_auth if d in have_events and not have_events[d]
+        ]
 
-        different_events = yield make_deferred_yieldable(
-            defer.gatherResults(
-                [
-                    run_in_background(
-                        self.store.get_event, d, allow_none=True, allow_rejected=False
-                    )
-                    for d in different_auth
-                    if d in have_events and not have_events[d]
-                ],
-                consumeErrors=True,
-            )
-        ).addErrback(unwrapFirstError)
+        if different_event_ids:
+            # XXX: currently this checks for redactions but I'm not convinced that is
+            # necessary?
+            different_events = yield self.store.get_events_as_list(different_event_ids)
 
-        if different_events:
             local_view = dict(auth_events)
             remote_view = dict(auth_events)
-            remote_view.update(
-                {(d.type, d.state_key): d for d in different_events if d}
-            )
+            remote_view.update({(d.type, d.state_key): d for d in different_events})
 
             new_state = yield self.state_handler.resolve_events(
                 room_version,
@@ -2231,13 +2238,13 @@ class FederationHandler(BaseHandler):
             auth_events.update(new_state)
 
             context = yield self._update_context_for_auth_events(
-                event, context, auth_events, event_key
+                event, context, auth_events
             )
 
         return context
 
     @defer.inlineCallbacks
-    def _update_context_for_auth_events(self, event, context, auth_events, event_key):
+    def _update_context_for_auth_events(self, event, context, auth_events):
         """Update the state_ids in an event context after auth event resolution,
         storing the changes as a new state group.
 
@@ -2246,18 +2253,21 @@ class FederationHandler(BaseHandler):
 
             context (synapse.events.snapshot.EventContext): initial event context
 
-            auth_events (dict[(str, str)->str]): Events to update in the event
+            auth_events (dict[(str, str)->EventBase]): Events to update in the event
                 context.
-
-            event_key ((str, str)): (type, state_key) for the current event.
-                this will not be included in the current_state in the context.
 
         Returns:
             Deferred[EventContext]: new event context
         """
+        # exclude the state key of the new event from the current_state in the context.
+        if event.is_state():
+            event_key = (event.type, event.state_key)
+        else:
+            event_key = None
         state_updates = {
             k: a.event_id for k, a in iteritems(auth_events) if k != event_key
         }
+
         current_state_ids = yield context.get_current_state_ids(self.store)
         current_state_ids = dict(current_state_ids)
 
@@ -2459,7 +2469,7 @@ class FederationHandler(BaseHandler):
                 room_version, event_dict, event, context
             )
 
-            EventValidator().validate_new(event)
+            EventValidator().validate_new(event, self.config)
 
             # We need to tell the transaction queue to send this out, even
             # though the sender isn't a local user.
@@ -2574,7 +2584,7 @@ class FederationHandler(BaseHandler):
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder=builder
         )
-        EventValidator().validate_new(event)
+        EventValidator().validate_new(event, self.config)
         return (event, context)
 
     @defer.inlineCallbacks
@@ -2707,6 +2717,11 @@ class FederationHandler(BaseHandler):
             max_stream_id = yield self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
+
+            if self._ephemeral_messages_enabled:
+                for (event, context) in event_and_contexts:
+                    # If there's an expiry timestamp on the event, schedule its expiry.
+                    self._message_handler.maybe_schedule_expiry(event)
 
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:

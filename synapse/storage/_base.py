@@ -14,11 +14,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import itertools
 import logging
 import random
 import sys
-import threading
 import time
 from typing import Iterable, Tuple
 
@@ -35,8 +33,6 @@ from synapse.logging.context import LoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id
-from synapse.util import batch_iter
-from synapse.util.caches.descriptors import Cache
 from synapse.util.stringutils import exception_to_unicode
 
 # import a function which will return a monotonic time, in seconds
@@ -78,10 +74,6 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "device_lists_remote_cache": "device_lists_remote_cache_unique_idx",
     "event_search": "event_search_event_id_idx",
 }
-
-# This is a special cache name we use to batch multiple invalidations of caches
-# based on the current state when notifying workers over replication.
-_CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 
 
 class LoggingTransaction(object):
@@ -237,22 +229,10 @@ class SQLBaseStore(object):
         #   to watch it
         self._txn_perf_counters = PerformanceCounters()
 
-        self._get_event_cache = Cache(
-            "*getEvent*", keylen=3, max_entries=hs.config.event_cache_size
-        )
-
-        self._event_fetch_lock = threading.Condition()
-        self._event_fetch_list = []
-        self._event_fetch_ongoing = 0
-
-        self._pending_ds = []
-
         self.database_engine = hs.database_engine
 
         # A set of tables that are not safe to use native upserts in.
         self._unsafe_to_upsert_tables = set(UNIQUE_INDEX_BACKGROUND_UPDATES.keys())
-
-        self._account_validity = self.hs.config.account_validity
 
         # We add the user_directory_search table to the blacklist on SQLite
         # because the existing search table does not have an index, making it
@@ -271,14 +251,6 @@ class SQLBaseStore(object):
             )
 
         self.rand = random.SystemRandom()
-
-        if self._account_validity.enabled:
-            self._clock.call_later(
-                0.0,
-                run_as_background_process,
-                "account_validity_set_expiration_dates",
-                self._set_expiration_date_when_missing,
-            )
 
     @defer.inlineCallbacks
     def _check_safe_to_upsert(self):
@@ -311,62 +283,6 @@ class SQLBaseStore(object):
                 "upsert_safety_check",
                 self._check_safe_to_upsert,
             )
-
-    @defer.inlineCallbacks
-    def _set_expiration_date_when_missing(self):
-        """
-        Retrieves the list of registered users that don't have an expiration date, and
-        adds an expiration date for each of them.
-        """
-
-        def select_users_with_no_expiration_date_txn(txn):
-            """Retrieves the list of registered users with no expiration date from the
-            database, filtering out deactivated users.
-            """
-            sql = (
-                "SELECT users.name FROM users"
-                " LEFT JOIN account_validity ON (users.name = account_validity.user_id)"
-                " WHERE account_validity.user_id is NULL AND users.deactivated = 0;"
-            )
-            txn.execute(sql, [])
-
-            res = self.cursor_to_dict(txn)
-            if res:
-                for user in res:
-                    self.set_expiration_date_for_user_txn(
-                        txn, user["name"], use_delta=True
-                    )
-
-        yield self.runInteraction(
-            "get_users_with_no_expiration_date",
-            select_users_with_no_expiration_date_txn,
-        )
-
-    def set_expiration_date_for_user_txn(self, txn, user_id, use_delta=False):
-        """Sets an expiration date to the account with the given user ID.
-
-        Args:
-             user_id (str): User ID to set an expiration date for.
-             use_delta (bool): If set to False, the expiration date for the user will be
-                now + validity period. If set to True, this expiration date will be a
-                random value in the [now + period - d ; now + period] range, d being a
-                delta equal to 10% of the validity period.
-        """
-        now_ms = self._clock.time_msec()
-        expiration_ts = now_ms + self._account_validity.period
-
-        if use_delta:
-            expiration_ts = self.rand.randrange(
-                expiration_ts - self._account_validity.startup_job_max_delta,
-                expiration_ts,
-            )
-
-        self._simple_upsert_txn(
-            txn,
-            "account_validity",
-            keyvalues={"user_id": user_id},
-            values={"expiration_ts_ms": expiration_ts, "email_sent": False},
-        )
 
     def start_profiling(self):
         self._previous_loop_ts = monotonic_time()
@@ -409,16 +325,15 @@ class SQLBaseStore(object):
             i = 0
             N = 5
             while True:
+                cursor = LoggingTransaction(
+                    conn.cursor(),
+                    name,
+                    self.database_engine,
+                    after_callbacks,
+                    exception_callbacks,
+                )
                 try:
-                    txn = conn.cursor()
-                    txn = LoggingTransaction(
-                        txn,
-                        name,
-                        self.database_engine,
-                        after_callbacks,
-                        exception_callbacks,
-                    )
-                    r = func(txn, *args, **kwargs)
+                    r = func(cursor, *args, **kwargs)
                     conn.commit()
                     return r
                 except self.database_engine.module.OperationalError as e:
@@ -456,6 +371,40 @@ class SQLBaseStore(object):
                                 )
                             continue
                     raise
+                finally:
+                    # we're either about to retry with a new cursor, or we're about to
+                    # release the connection. Once we release the connection, it could
+                    # get used for another query, which might do a conn.rollback().
+                    #
+                    # In the latter case, even though that probably wouldn't affect the
+                    # results of this transaction, python's sqlite will reset all
+                    # statements on the connection [1], which will make our cursor
+                    # invalid [2].
+                    #
+                    # In any case, continuing to read rows after commit()ing seems
+                    # dubious from the PoV of ACID transactional semantics
+                    # (sqlite explicitly says that once you commit, you may see rows
+                    # from subsequent updates.)
+                    #
+                    # In psycopg2, cursors are essentially a client-side fabrication -
+                    # all the data is transferred to the client side when the statement
+                    # finishes executing - so in theory we could go on streaming results
+                    # from the cursor, but attempting to do so would make us
+                    # incompatible with sqlite, so let's make sure we're not doing that
+                    # by closing the cursor.
+                    #
+                    # (*named* cursors in psycopg2 are different and are proper server-
+                    # side things, but (a) we don't use them and (b) they are implicitly
+                    # closed by ending the transaction anyway.)
+                    #
+                    # In short, if we haven't finished with the cursor yet, that's a
+                    # problem waiting to bite us.
+                    #
+                    # TL;DR: we're done with the cursor, so we can close it.
+                    #
+                    # [1]: https://github.com/python/cpython/blob/v3.8.0/Modules/_sqlite/connection.c#L465
+                    # [2]: https://github.com/python/cpython/blob/v3.8.0/Modules/_sqlite/cursor.c#L236
+                    cursor.close()
         except Exception as e:
             logger.debug("[TXN FAIL] {%s} %s", name, e)
             raise
@@ -851,7 +800,7 @@ class SQLBaseStore(object):
             allvalues.update(values)
             latter = "UPDATE SET " + ", ".join(k + "=EXCLUDED." + k for k in values)
 
-        sql = ("INSERT INTO %s (%s) VALUES (%s) " "ON CONFLICT (%s) DO %s") % (
+        sql = ("INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO %s") % (
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
@@ -1367,47 +1316,6 @@ class SQLBaseStore(object):
 
         return cache, min_val
 
-    def _invalidate_cache_and_stream(self, txn, cache_func, keys):
-        """Invalidates the cache and adds it to the cache stream so slaves
-        will know to invalidate their caches.
-
-        This should only be used to invalidate caches where slaves won't
-        otherwise know from other replication streams that the cache should
-        be invalidated.
-        """
-        txn.call_after(cache_func.invalidate, keys)
-        self._send_invalidation_to_replication(txn, cache_func.__name__, keys)
-
-    def _invalidate_state_caches_and_stream(self, txn, room_id, members_changed):
-        """Special case invalidation of caches based on current state.
-
-        We special case this so that we can batch the cache invalidations into a
-        single replication poke.
-
-        Args:
-            txn
-            room_id (str): Room where state changed
-            members_changed (iterable[str]): The user_ids of members that have changed
-        """
-        txn.call_after(self._invalidate_state_caches, room_id, members_changed)
-
-        if members_changed:
-            # We need to be careful that the size of the `members_changed` list
-            # isn't so large that it causes problems sending over replication, so we
-            # send them in chunks.
-            # Max line length is 16K, and max user ID length is 255, so 50 should
-            # be safe.
-            for chunk in batch_iter(members_changed, 50):
-                keys = itertools.chain([room_id], chunk)
-                self._send_invalidation_to_replication(
-                    txn, _CURRENT_STATE_CACHE_NAME, keys
-                )
-        else:
-            # if no members changed, we still need to invalidate the other caches.
-            self._send_invalidation_to_replication(
-                txn, _CURRENT_STATE_CACHE_NAME, [room_id]
-            )
-
     def _invalidate_state_caches(self, room_id, members_changed):
         """Invalidates caches that are based on the current state, but does
         not stream invalidations down replication.
@@ -1440,63 +1348,6 @@ class SQLBaseStore(object):
             # We probably haven't pulled in the cache in this worker,
             # which is fine.
             pass
-
-    def _send_invalidation_to_replication(self, txn, cache_name, keys):
-        """Notifies replication that given cache has been invalidated.
-
-        Note that this does *not* invalidate the cache locally.
-
-        Args:
-            txn
-            cache_name (str)
-            keys (iterable[str])
-        """
-
-        if isinstance(self.database_engine, PostgresEngine):
-            # get_next() returns a context manager which is designed to wrap
-            # the transaction. However, we want to only get an ID when we want
-            # to use it, here, so we need to call __enter__ manually, and have
-            # __exit__ called after the transaction finishes.
-            ctx = self._cache_id_gen.get_next()
-            stream_id = ctx.__enter__()
-            txn.call_on_exception(ctx.__exit__, None, None, None)
-            txn.call_after(ctx.__exit__, None, None, None)
-            txn.call_after(self.hs.get_notifier().on_new_replication_data)
-
-            self._simple_insert_txn(
-                txn,
-                table="cache_invalidation_stream",
-                values={
-                    "stream_id": stream_id,
-                    "cache_func": cache_name,
-                    "keys": list(keys),
-                    "invalidation_ts": self.clock.time_msec(),
-                },
-            )
-
-    def get_all_updated_caches(self, last_id, current_id, limit):
-        if last_id == current_id:
-            return defer.succeed([])
-
-        def get_all_updated_caches_txn(txn):
-            # We purposefully don't bound by the current token, as we want to
-            # send across cache invalidations as quickly as possible. Cache
-            # invalidations are idempotent, so duplicates are fine.
-            sql = (
-                "SELECT stream_id, cache_func, keys, invalidation_ts"
-                " FROM cache_invalidation_stream"
-                " WHERE stream_id > ? ORDER BY stream_id ASC LIMIT ?"
-            )
-            txn.execute(sql, (last_id, limit))
-            return txn.fetchall()
-
-        return self.runInteraction("get_all_updated_caches", get_all_updated_caches_txn)
-
-    def get_cache_stream_token(self):
-        if self._cache_id_gen:
-            return self._cache_id_gen.get_current_token()
-        else:
-            return 0
 
     def _simple_select_list_paginate(
         self,

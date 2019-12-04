@@ -84,7 +84,7 @@ class TransactionManager(object):
             txn_id = str(self._next_txn_id)
 
             logger.debug(
-                "TX [%s] {%s} Attempting new transaction" " (pdus: %d, edus: %d)",
+                "TX [%s] {%s} Attempting new transaction (pdus: %d, edus: %d)",
                 destination,
                 txn_id,
                 len(pdus),
@@ -103,7 +103,7 @@ class TransactionManager(object):
             self._next_txn_id += 1
 
             logger.info(
-                "TX [%s] {%s} Sending transaction [%s]," " (PDUs: %d, EDUs: %d)",
+                "TX [%s] {%s} Sending transaction [%s], (PDUs: %d, EDUs: %d)",
                 destination,
                 txn_id,
                 transaction.transaction_id,
