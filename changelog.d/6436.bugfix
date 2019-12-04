@@ -1,0 +1,1 @@
+Fix a bug where a room could become unusable with a low retention policy and a low activity.

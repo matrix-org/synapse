@@ -203,6 +203,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     @unittest.override_config(
         {
+            "public_baseurl": "https://test_server",
             "enable_registration_captcha": True,
             "user_consent": {
                 "version": "1",

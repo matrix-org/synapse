@@ -530,27 +530,34 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             nbrows = 0
             last_row_event_id = ""
             for (event_id, event_json_raw) in results:
-                event_json = json.loads(event_json_raw)
+                try:
+                    event_json = json.loads(event_json_raw)
 
-                # Check if the event replaces another one (e.g. it's an edit)
-                relation = event_json["content"].get("m.relates_to", {})
-                replaces = None
-                if relation.get("rel_type") == RelationTypes.REPLACE:
-                    replaces = relation.get("event_id")
+                    # Check if the event replaces another one (e.g. it's an edit)
+                    relation = event_json["content"].get("m.relates_to", {})
+                    replaces = None
+                    if relation.get("rel_type") == RelationTypes.REPLACE:
+                        replaces = relation.get("event_id")
 
-                # Extract the labels from the event's JSON
-                labels = event_json["content"].get(EventContentFields.LABELS, [])
+                    # Extract the labels from the event's JSON
+                    labels = event_json["content"].get(EventContentFields.LABELS, [])
 
-                # Inserts the labels in the database table. This function will take care
-                # of processing the edit (if it's one) correctly.
-                self.insert_labels_for_event_txn(
-                    txn=txn,
-                    event_id=event_id,
-                    replaces=replaces,
-                    labels=labels,
-                    room_id=event_json["room_id"],
-                    topological_ordering=event_json["depth"],
-                )
+                    # Inserts the labels in the database table. This function will take
+                    # care of processing the edit (if it's one) correctly.
+                    self.insert_labels_for_event_txn(
+                        txn=txn,
+                        event_id=event_id,
+                        replaces=replaces,
+                        labels=labels,
+                        room_id=event_json["room_id"],
+                        topological_ordering=event_json["depth"],
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Unable to load event %s (no labels will be imported): %s",
+                        event_id,
+                        e,
+                    )
 
                 nbrows += 1
                 last_row_event_id = event_id
