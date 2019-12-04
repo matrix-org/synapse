@@ -1927,7 +1927,7 @@ class EventsStore(
         """Extract labels from an event and store them.
 
         Args:
-            txn (LoggingTransaction): The transaction to execute.
+            txn (LoggingTransaction): database cursor
             event (EventBase): The event to process.
         """
         # Check if the event replaces another one (e.g. it's an edit)
