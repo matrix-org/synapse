@@ -67,10 +67,24 @@ class SearchHandler(BaseHandler):
                     # This room does not have a predecessor
                     break
             except NotFoundError:
-                # Unknown room_id
+                # room_id is not a known room
                 break
 
-            predecessor_room_id = predecessor["room_id"]
+            if not isinstance(predecessor, dict):
+                # predecessor object is not a dict. Bail out!
+                break
+
+            predecessor_room_id = predecessor.get("room_id")
+            if not predecessor_room_id:
+                # The predecessor object did not include a room_id
+                break
+
+            # Check that the server is in the predecessor room before trying to search it
+            try:
+                yield self.store.get_create_event_for_room(room_id)
+            except NotFoundError:
+                # The server is not in this room. We cannot search its contents
+                break
 
             # Add predecessor's room ID
             historical_room_ids.append(predecessor_room_id)
