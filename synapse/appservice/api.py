@@ -14,6 +14,7 @@
 # limitations under the License.
 import logging
 import os.path
+import urllib.parse
 
 from six.moves import urllib
 
@@ -47,7 +48,7 @@ sent_events_counter = Counter(
 )
 
 HOUR_IN_MS = 60 * 60 * 1000
-APP_SERVICE_PREFIX = "/_matrix/app/v1"
+APP_SERVICE_PREFIX = "_matrix/app/v1"
 
 
 def _is_valid_3pe_metadata(info):
