@@ -1258,7 +1258,8 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_context_filter_labels(self):
         """Test that we can filter by a label on a /context request."""
-        event_id = self._send_labelled_messages_in_room()
+        res = self._send_labelled_messages_in_room()
+        event_id = res[3]
 
         request, channel = self.make_request(
             "GET",
@@ -1289,7 +1290,8 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_context_filter_not_labels(self):
         """Test that we can filter by the absence of a label on a /context request."""
-        event_id = self._send_labelled_messages_in_room()
+        res = self._send_labelled_messages_in_room()
+        event_id = res[3]
 
         request, channel = self.make_request(
             "GET",
@@ -1325,7 +1327,8 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """Test that we can filter by both a label and the absence of another label on a
         /context request.
         """
-        event_id = self._send_labelled_messages_in_room()
+        res = self._send_labelled_messages_in_room()
+        event_id = res[3]
 
         request, channel = self.make_request(
             "GET",
@@ -1536,7 +1539,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         Returns:
             The ID of the event to use if we're testing filtering on /context.
         """
-        self.helper.send_event(
+        event_ids = []
+
+        res = self.helper.send_event(
             room_id=self.room_id,
             type=EventTypes.Message,
             content={
@@ -1546,13 +1551,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
             },
             tok=self.tok,
         )
-
-        self.helper.send_event(
-            room_id=self.room_id,
-            type=EventTypes.Message,
-            content={"msgtype": "m.text", "body": "without label"},
-            tok=self.tok,
-        )
+        event_ids.append(res["event_id"])
 
         res = self.helper.send_event(
             room_id=self.room_id,
@@ -1560,10 +1559,17 @@ class LabelsTestCase(unittest.HomeserverTestCase):
             content={"msgtype": "m.text", "body": "without label"},
             tok=self.tok,
         )
-        # Return this event's ID when we test filtering in /context requests.
-        event_id = res["event_id"]
+        event_ids.append(res["event_id"])
 
-        self.helper.send_event(
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "without label"},
+            tok=self.tok,
+        )
+        event_ids.append(res["event_id"])
+
+        res = self.helper.send_event(
             room_id=self.room_id,
             type=EventTypes.Message,
             content={
@@ -1573,8 +1579,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
             },
             tok=self.tok,
         )
+        event_ids.append(res["event_id"])
 
-        self.helper.send_event(
+        res = self.helper.send_event(
             room_id=self.room_id,
             type=EventTypes.Message,
             content={
@@ -1584,6 +1591,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
             },
             tok=self.tok,
         )
+        event_ids.append(res["event_id"])
 
         self.helper.send_event(
             room_id=self.room_id,
@@ -1595,5 +1603,6 @@ class LabelsTestCase(unittest.HomeserverTestCase):
             },
             tok=self.tok,
         )
+        event_ids.append(res["event_id"])
 
-        return event_id
+        return event_ids
