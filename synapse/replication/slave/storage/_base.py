@@ -19,7 +19,7 @@ from typing import Dict
 import six
 
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.data_stores.main.cache import _CURRENT_STATE_CACHE_NAME
+from synapse.storage.data_stores.main.cache import CURRENT_STATE_CACHE_NAME
 from synapse.storage.engines import PostgresEngine
 
 from ._slaved_id_tracker import SlavedIdTracker
@@ -63,7 +63,7 @@ class BaseSlavedStore(SQLBaseStore):
         if stream_name == "caches":
             self._cache_id_gen.advance(token)
             for row in rows:
-                if row.cache_func == _CURRENT_STATE_CACHE_NAME:
+                if row.cache_func == CURRENT_STATE_CACHE_NAME:
                     room_id = row.keys[0]
                     members_changed = set(row.keys[1:])
                     self._invalidate_state_caches(room_id, members_changed)

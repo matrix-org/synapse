@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # This is a special cache name we use to batch multiple invalidations of caches
 # based on the current state when notifying workers over replication.
-_CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
+CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 
 
 class CacheInvalidationStore(SQLBaseStore):
@@ -65,12 +65,12 @@ class CacheInvalidationStore(SQLBaseStore):
             for chunk in batch_iter(members_changed, 50):
                 keys = itertools.chain([room_id], chunk)
                 self._send_invalidation_to_replication(
-                    txn, _CURRENT_STATE_CACHE_NAME, keys
+                    txn, CURRENT_STATE_CACHE_NAME, keys
                 )
         else:
             # if no members changed, we still need to invalidate the other caches.
             self._send_invalidation_to_replication(
-                txn, _CURRENT_STATE_CACHE_NAME, [room_id]
+                txn, CURRENT_STATE_CACHE_NAME, [room_id]
             )
 
     def _send_invalidation_to_replication(self, txn, cache_name, keys):
