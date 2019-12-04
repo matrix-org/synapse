@@ -147,3 +147,7 @@ class EventContentFields(object):
 
     # Labels for the event, cf https://github.com/matrix-org/matrix-doc/pull/2326
     LABELS = "org.matrix.labels"
+
+    # Timestamp to delete the event after
+    # cf https://github.com/matrix-org/matrix-doc/pull/2228
+    SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
