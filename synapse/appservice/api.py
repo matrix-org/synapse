@@ -81,7 +81,7 @@ def _is_valid_3pe_result(r, field):
 
 
 def _build_as_uri(service, endpoint_name, key):
-    key = urllib.parse.quote(user_id)
+    key = urllib.parse.quote(key)
     return os.path.join(service.url, APP_SERVICE_PREFIX, endpoint_name, key)
 
 
