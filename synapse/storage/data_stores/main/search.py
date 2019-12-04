@@ -93,7 +93,7 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
             # store_search_entries_txn with a generator function, but that
             # would mean having two cursors open on the database at once.
             # Instead we just build a list of results.
-            rows = self.cursor_to_dict(txn)
+            rows = self.db.cursor_to_dict(txn)
             if not rows:
                 return 0
 
@@ -159,7 +159,7 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
 
             return len(event_search_rows)
 
-        result = yield self.runInteraction(
+        result = yield self.db.runInteraction(
             self.EVENT_SEARCH_UPDATE_NAME, reindex_search_txn
         )
 
@@ -206,7 +206,7 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
                 conn.set_session(autocommit=False)
 
         if isinstance(self.database_engine, PostgresEngine):
-            yield self.runWithConnection(create_index)
+            yield self.db.runWithConnection(create_index)
 
         yield self._end_background_update(self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME)
         return 1
@@ -237,12 +237,12 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
                 )
                 conn.set_session(autocommit=False)
 
-            yield self.runWithConnection(create_index)
+            yield self.db.runWithConnection(create_index)
 
             pg = dict(progress)
             pg["have_added_indexes"] = True
 
-            yield self.runInteraction(
+            yield self.db.runInteraction(
                 self.EVENT_SEARCH_ORDER_UPDATE_NAME,
                 self._background_update_progress_txn,
                 self.EVENT_SEARCH_ORDER_UPDATE_NAME,
@@ -280,7 +280,7 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
 
             return len(rows), True
 
-        num_rows, finished = yield self.runInteraction(
+        num_rows, finished = yield self.db.runInteraction(
             self.EVENT_SEARCH_ORDER_UPDATE_NAME, reindex_search_txn
         )
 
@@ -441,7 +441,9 @@ class SearchStore(SearchBackgroundUpdateStore):
         # entire table from the database.
         sql += " ORDER BY rank DESC LIMIT 500"
 
-        results = yield self.execute("search_msgs", self.cursor_to_dict, sql, *args)
+        results = yield self.db.execute(
+            "search_msgs", self.db.cursor_to_dict, sql, *args
+        )
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
@@ -455,8 +457,8 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         count_sql += " GROUP BY room_id"
 
-        count_results = yield self.execute(
-            "search_rooms_count", self.cursor_to_dict, count_sql, *count_args
+        count_results = yield self.db.execute(
+            "search_rooms_count", self.db.cursor_to_dict, count_sql, *count_args
         )
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
@@ -586,7 +588,9 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         args.append(limit)
 
-        results = yield self.execute("search_rooms", self.cursor_to_dict, sql, *args)
+        results = yield self.db.execute(
+            "search_rooms", self.db.cursor_to_dict, sql, *args
+        )
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
@@ -600,8 +604,8 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         count_sql += " GROUP BY room_id"
 
-        count_results = yield self.execute(
-            "search_rooms_count", self.cursor_to_dict, count_sql, *count_args
+        count_results = yield self.db.execute(
+            "search_rooms_count", self.db.cursor_to_dict, count_sql, *count_args
         )
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
@@ -686,7 +690,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
             return highlight_words
 
-        return self.runInteraction("_find_highlights", f)
+        return self.db.runInteraction("_find_highlights", f)
 
 
 def _to_postgres_options(options_dict):

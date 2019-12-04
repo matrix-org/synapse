@@ -171,9 +171,11 @@ class DataStore(
         else:
             self._cache_id_gen = None
 
+        super(DataStore, self).__init__(db_conn, hs)
+
         self._presence_on_startup = self._get_active_presence(db_conn)
 
-        presence_cache_prefill, min_presence_val = self.get_cache_dict(
+        presence_cache_prefill, min_presence_val = self.db.get_cache_dict(
             db_conn,
             "presence_stream",
             entity_column="user_id",
@@ -187,7 +189,7 @@ class DataStore(
         )
 
         max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
-        device_inbox_prefill, min_device_inbox_id = self.get_cache_dict(
+        device_inbox_prefill, min_device_inbox_id = self.db.get_cache_dict(
             db_conn,
             "device_inbox",
             entity_column="user_id",
@@ -202,7 +204,7 @@ class DataStore(
         )
         # The federation outbox and the local device inbox uses the same
         # stream_id generator.
-        device_outbox_prefill, min_device_outbox_id = self.get_cache_dict(
+        device_outbox_prefill, min_device_outbox_id = self.db.get_cache_dict(
             db_conn,
             "device_federation_outbox",
             entity_column="destination",
@@ -228,7 +230,7 @@ class DataStore(
         )
 
         events_max = self._stream_id_gen.get_current_token()
-        curr_state_delta_prefill, min_curr_state_delta_id = self.get_cache_dict(
+        curr_state_delta_prefill, min_curr_state_delta_id = self.db.get_cache_dict(
             db_conn,
             "current_state_delta_stream",
             entity_column="room_id",
@@ -242,7 +244,7 @@ class DataStore(
             prefilled_cache=curr_state_delta_prefill,
         )
 
-        _group_updates_prefill, min_group_updates_id = self.get_cache_dict(
+        _group_updates_prefill, min_group_updates_id = self.db.get_cache_dict(
             db_conn,
             "local_group_updates",
             entity_column="user_id",
@@ -261,8 +263,6 @@ class DataStore(
 
         # Used in _generate_user_daily_visits to keep track of progress
         self._last_user_visit_update = self._get_start_of_day()
-
-        super(DataStore, self).__init__(db_conn, hs)
 
     def take_presence_startup_info(self):
         active_on_startup = self._presence_on_startup
@@ -283,7 +283,7 @@ class DataStore(
 
         txn = db_conn.cursor()
         txn.execute(sql, (PresenceState.OFFLINE,))
-        rows = self.cursor_to_dict(txn)
+        rows = self.db.cursor_to_dict(txn)
         txn.close()
 
         for row in rows:
@@ -296,7 +296,7 @@ class DataStore(
         Counts the number of users who used this homeserver in the last 24 hours.
         """
         yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
-        return self.runInteraction("count_daily_users", self._count_users, yesterday)
+        return self.db.runInteraction("count_daily_users", self._count_users, yesterday)
 
     def count_monthly_users(self):
         """
@@ -306,7 +306,7 @@ class DataStore(
         amongst other things, includes a 3 day grace period before a user counts.
         """
         thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
-        return self.runInteraction(
+        return self.db.runInteraction(
             "count_monthly_users", self._count_users, thirty_days_ago
         )
 
@@ -406,7 +406,7 @@ class DataStore(
 
             return results
 
-        return self.runInteraction("count_r30_users", _count_r30_users)
+        return self.db.runInteraction("count_r30_users", _count_r30_users)
 
     def _get_start_of_day(self):
         """
@@ -471,7 +471,7 @@ class DataStore(
             # frequently
             self._last_user_visit_update = now
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "generate_user_daily_visits", _generate_user_daily_visits
         )
 
@@ -482,7 +482,7 @@ class DataStore(
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
-        return self.simple_select_list(
+        return self.db.simple_select_list(
             table="users",
             keyvalues={},
             retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
@@ -502,9 +502,9 @@ class DataStore(
         Returns:
             defer.Deferred: resolves to json object {list[dict[str, Any]], count}
         """
-        users = yield self.runInteraction(
+        users = yield self.db.runInteraction(
             "get_users_paginate",
-            self.simple_select_list_paginate_txn,
+            self.db.simple_select_list_paginate_txn,
             table="users",
             keyvalues={"is_guest": False},
             orderby=order,
@@ -512,7 +512,9 @@ class DataStore(
             limit=limit,
             retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
         )
-        count = yield self.runInteraction("get_users_paginate", self.get_user_count_txn)
+        count = yield self.db.runInteraction(
+            "get_users_paginate", self.get_user_count_txn
+        )
         retval = {"users": users, "total": count}
         return retval
 
@@ -526,7 +528,7 @@ class DataStore(
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
-        return self.simple_search_list(
+        return self.db.simple_search_list(
             table="users",
             term=term,
             col="name",

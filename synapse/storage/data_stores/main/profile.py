@@ -24,7 +24,7 @@ class ProfileWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_profileinfo(self, user_localpart):
         try:
-            profile = yield self.simple_select_one(
+            profile = yield self.db.simple_select_one(
                 table="profiles",
                 keyvalues={"user_id": user_localpart},
                 retcols=("displayname", "avatar_url"),
@@ -42,7 +42,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def get_profile_displayname(self, user_localpart):
-        return self.simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="displayname",
@@ -50,7 +50,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def get_profile_avatar_url(self, user_localpart):
-        return self.simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="avatar_url",
@@ -58,7 +58,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def get_from_remote_profile_cache(self, user_id):
-        return self.simple_select_one(
+        return self.db.simple_select_one(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             retcols=("displayname", "avatar_url"),
@@ -67,12 +67,12 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def create_profile(self, user_localpart):
-        return self.simple_insert(
+        return self.db.simple_insert(
             table="profiles", values={"user_id": user_localpart}, desc="create_profile"
         )
 
     def set_profile_displayname(self, user_localpart, new_displayname):
-        return self.simple_update_one(
+        return self.db.simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             updatevalues={"displayname": new_displayname},
@@ -80,7 +80,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def set_profile_avatar_url(self, user_localpart, new_avatar_url):
-        return self.simple_update_one(
+        return self.db.simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             updatevalues={"avatar_url": new_avatar_url},
@@ -95,7 +95,7 @@ class ProfileStore(ProfileWorkerStore):
         This should only be called when `is_subscribed_remote_profile_for_user`
         would return true for the user.
         """
-        return self.simple_upsert(
+        return self.db.simple_upsert(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             values={
@@ -107,7 +107,7 @@ class ProfileStore(ProfileWorkerStore):
         )
 
     def update_remote_profile_cache(self, user_id, displayname, avatar_url):
-        return self.simple_update(
+        return self.db.simple_update(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             values={
@@ -125,7 +125,7 @@ class ProfileStore(ProfileWorkerStore):
         """
         subscribed = yield self.is_subscribed_remote_profile_for_user(user_id)
         if not subscribed:
-            yield self.simple_delete(
+            yield self.db.simple_delete(
                 table="remote_profile_cache",
                 keyvalues={"user_id": user_id},
                 desc="delete_remote_profile_cache",
@@ -144,9 +144,9 @@ class ProfileStore(ProfileWorkerStore):
 
             txn.execute(sql, (last_checked,))
 
-            return self.cursor_to_dict(txn)
+            return self.db.cursor_to_dict(txn)
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_remote_profile_cache_entries_that_expire",
             _get_remote_profile_cache_entries_that_expire_txn,
         )
@@ -155,7 +155,7 @@ class ProfileStore(ProfileWorkerStore):
     def is_subscribed_remote_profile_for_user(self, user_id):
         """Check whether we are interested in a remote user's profile.
         """
-        res = yield self.simple_select_one_onecol(
+        res = yield self.db.simple_select_one_onecol(
             table="group_users",
             keyvalues={"user_id": user_id},
             retcol="user_id",
@@ -166,7 +166,7 @@ class ProfileStore(ProfileWorkerStore):
         if res:
             return True
 
-        res = yield self.simple_select_one_onecol(
+        res = yield self.db.simple_select_one_onecol(
             table="group_invites",
             keyvalues={"user_id": user_id},
             retcol="user_id",

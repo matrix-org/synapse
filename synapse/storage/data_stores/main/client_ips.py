@@ -91,7 +91,7 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
             txn.execute("DROP INDEX IF EXISTS user_ips_user_ip")
             txn.close()
 
-        yield self.runWithConnection(f)
+        yield self.db.runWithConnection(f)
         yield self._end_background_update("user_ips_drop_nonunique_index")
         return 1
 
@@ -106,7 +106,7 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
         def user_ips_analyze(txn):
             txn.execute("ANALYZE user_ips")
 
-        yield self.runInteraction("user_ips_analyze", user_ips_analyze)
+        yield self.db.runInteraction("user_ips_analyze", user_ips_analyze)
 
         yield self._end_background_update("user_ips_analyze")
 
@@ -140,7 +140,7 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
                 return None
 
         # Get a last seen that has roughly `batch_size` since `begin_last_seen`
-        end_last_seen = yield self.runInteraction(
+        end_last_seen = yield self.db.runInteraction(
             "user_ips_dups_get_last_seen", get_last_seen
         )
 
@@ -275,7 +275,7 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
                 txn, "user_ips_remove_dupes", {"last_seen": end_last_seen}
             )
 
-        yield self.runInteraction("user_ips_dups_remove", remove)
+        yield self.db.runInteraction("user_ips_dups_remove", remove)
 
         if last:
             yield self._end_background_update("user_ips_remove_dupes")
@@ -352,7 +352,7 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
 
             return len(rows)
 
-        updated = yield self.runInteraction(
+        updated = yield self.db.runInteraction(
             "_devices_last_seen_update", _devices_last_seen_update_txn
         )
 
@@ -417,12 +417,12 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         to_update = self._batch_row_update
         self._batch_row_update = {}
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
         )
 
     def _update_client_ips_batch_txn(self, txn, to_update):
-        if "user_ips" in self._unsafe_to_upsert_tables or (
+        if "user_ips" in self.db._unsafe_to_upsert_tables or (
             not self.database_engine.can_native_upsert
         ):
             self.database_engine.lock_table(txn, "user_ips")
@@ -431,7 +431,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
             try:
-                self.simple_upsert_txn(
+                self.db.simple_upsert_txn(
                     txn,
                     table="user_ips",
                     keyvalues={
@@ -450,7 +450,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
                 # Technically an access token might not be associated with
                 # a device so we need to check.
                 if device_id:
-                    self.simple_upsert_txn(
+                    self.db.simple_upsert_txn(
                         txn,
                         table="devices",
                         keyvalues={"user_id": user_id, "device_id": device_id},
@@ -483,7 +483,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         if device_id is not None:
             keyvalues["device_id"] = device_id
 
-        res = yield self.simple_select_list(
+        res = yield self.db.simple_select_list(
             table="devices",
             keyvalues=keyvalues,
             retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
@@ -516,7 +516,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
                 user_agent, _, last_seen = self._batch_row_update[key]
                 results[(access_token, ip)] = (user_agent, last_seen)
 
-        rows = yield self.simple_select_list(
+        rows = yield self.db.simple_select_list(
             table="user_ips",
             keyvalues={"user_id": user_id},
             retcols=["access_token", "ip", "user_agent", "last_seen"],
@@ -577,4 +577,4 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         def _prune_old_user_ips_txn(txn):
             txn.execute(sql, (timestamp,))
 
-        await self.runInteraction("_prune_old_user_ips", _prune_old_user_ips_txn)
+        await self.db.runInteraction("_prune_old_user_ips", _prune_old_user_ips_txn)

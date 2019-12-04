@@ -116,7 +116,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn.execute(query)
             return list(txn)[0][0]
 
-        count = yield self.runInteraction("get_known_servers", _transact)
+        count = yield self.db.runInteraction("get_known_servers", _transact)
 
         # We always know about ourselves, even if we have nothing in
         # room_memberships (for example, the server is new).
@@ -128,7 +128,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         membership column is up to date
         """
 
-        pending_update = self.simple_select_one_txn(
+        pending_update = self.db.simple_select_one_txn(
             txn,
             table="background_updates",
             keyvalues={"update_name": _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME},
@@ -144,7 +144,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 15.0,
                 run_as_background_process,
                 "_check_safe_current_state_events_membership_updated",
-                self.runInteraction,
+                self.db.runInteraction,
                 "_check_safe_current_state_events_membership_updated",
                 self._check_safe_current_state_events_membership_updated_txn,
             )
@@ -161,7 +161,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=100000, iterable=True)
     def get_users_in_room(self, room_id):
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
         )
 
@@ -269,7 +269,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
             return res
 
-        return self.runInteraction("get_room_summary", _get_room_summary_txn)
+        return self.db.runInteraction("get_room_summary", _get_room_summary_txn)
 
     def _get_user_counts_in_room_txn(self, txn, room_id):
         """
@@ -339,7 +339,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         if not membership_list:
             return defer.succeed(None)
 
-        rooms = yield self.runInteraction(
+        rooms = yield self.db.runInteraction(
             "get_rooms_for_user_where_membership_is",
             self._get_rooms_for_user_where_membership_is_txn,
             user_id,
@@ -392,7 +392,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 )
 
             txn.execute(sql, (user_id, *args))
-            results = [RoomsForUser(**r) for r in self.cursor_to_dict(txn)]
+            results = [RoomsForUser(**r) for r in self.db.cursor_to_dict(txn)]
 
         if do_invite:
             sql = (
@@ -412,7 +412,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     stream_ordering=r["stream_ordering"],
                     membership=Membership.INVITE,
                 )
-                for r in self.cursor_to_dict(txn)
+                for r in self.db.cursor_to_dict(txn)
             )
 
         return results
@@ -603,7 +603,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             to `user_id` and ProfileInfo (or None if not join event).
         """
 
-        rows = yield self.simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="room_memberships",
             column="event_id",
             iterable=event_ids,
@@ -643,7 +643,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # the returned user actually has the correct domain.
         like_clause = "%:" + host
 
-        rows = yield self.execute("is_host_joined", None, sql, room_id, like_clause)
+        rows = yield self.db.execute("is_host_joined", None, sql, room_id, like_clause)
 
         if not rows:
             return False
@@ -683,7 +683,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # the returned user actually has the correct domain.
         like_clause = "%:" + host
 
-        rows = yield self.execute("was_host_joined", None, sql, room_id, like_clause)
+        rows = yield self.db.execute("was_host_joined", None, sql, room_id, like_clause)
 
         if not rows:
             return False
@@ -753,7 +753,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             rows = txn.fetchall()
             return rows[0][0]
 
-        count = yield self.runInteraction("did_forget_membership", f)
+        count = yield self.db.runInteraction("did_forget_membership", f)
         return count == 0
 
     @cached()
@@ -790,7 +790,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn.execute(sql, (user_id,))
             return set(row[0] for row in txn if row[1] == 0)
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_forgotten_rooms_for_user", _get_forgotten_rooms_for_user_txn
         )
 
@@ -805,7 +805,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             Deferred[set[str]]: Set of room IDs.
         """
 
-        room_ids = yield self.simple_select_onecol(
+        room_ids = yield self.db.simple_select_onecol(
             table="room_memberships",
             keyvalues={"membership": Membership.JOIN, "user_id": user_id},
             retcol="room_id",
@@ -820,7 +820,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """Get user_id and membership of a set of event IDs.
         """
 
-        return self.simple_select_many_batch(
+        return self.db.simple_select_many_batch(
             table="room_memberships",
             column="event_id",
             iterable=member_event_ids,
@@ -874,7 +874,7 @@ class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
 
             txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
 
-            rows = self.cursor_to_dict(txn)
+            rows = self.db.cursor_to_dict(txn)
             if not rows:
                 return 0
 
@@ -915,7 +915,7 @@ class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
 
             return len(rows)
 
-        result = yield self.runInteraction(
+        result = yield self.db.runInteraction(
             _MEMBERSHIP_PROFILE_UPDATE_NAME, add_membership_profile_txn
         )
 
@@ -971,7 +971,7 @@ class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
         # string, which will compare before all room IDs correctly.
         last_processed_room = progress.get("last_processed_room", "")
 
-        row_count, finished = yield self.runInteraction(
+        row_count, finished = yield self.db.runInteraction(
             "_background_current_state_membership_update",
             _background_current_state_membership_txn,
             last_processed_room,
@@ -990,7 +990,7 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
     def _store_room_members_txn(self, txn, events, backfilled):
         """Store a room member in the database.
         """
-        self.simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="room_memberships",
             values=[
@@ -1028,7 +1028,7 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
             is_mine = self.hs.is_mine_id(event.state_key)
             if is_new_state and is_mine:
                 if event.membership == Membership.INVITE:
-                    self.simple_insert_txn(
+                    self.db.simple_insert_txn(
                         txn,
                         table="local_invites",
                         values={
@@ -1068,7 +1068,7 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
             txn.execute(sql, (stream_ordering, True, room_id, user_id))
 
         with self._stream_id_gen.get_next() as stream_ordering:
-            yield self.runInteraction("locally_reject_invite", f, stream_ordering)
+            yield self.db.runInteraction("locally_reject_invite", f, stream_ordering)
 
     def forget(self, user_id, room_id):
         """Indicate that user_id wishes to discard history for room_id."""
@@ -1091,7 +1091,7 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
                 txn, self.get_forgotten_rooms_for_user, (user_id,)
             )
 
-        return self.runInteraction("forget_membership", f)
+        return self.db.runInteraction("forget_membership", f)
 
 
 class _JoinedHostsCache(object):

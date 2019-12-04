@@ -151,7 +151,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             return len(rows)
 
-        result = yield self.runInteraction(
+        result = yield self.db.runInteraction(
             self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, reindex_txn
         )
 
@@ -189,7 +189,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             chunks = [event_ids[i : i + 100] for i in range(0, len(event_ids), 100)]
             for chunk in chunks:
-                ev_rows = self.simple_select_many_txn(
+                ev_rows = self.db.simple_select_many_txn(
                     txn,
                     table="event_json",
                     column="event_id",
@@ -228,7 +228,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             return len(rows_to_update)
 
-        result = yield self.runInteraction(
+        result = yield self.db.runInteraction(
             self.EVENT_ORIGIN_SERVER_TS_NAME, reindex_search_txn
         )
 
@@ -366,7 +366,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             to_delete.intersection_update(original_set)
 
-            deleted = self.simple_delete_many_txn(
+            deleted = self.db.simple_delete_many_txn(
                 txn=txn,
                 table="event_forward_extremities",
                 column="event_id",
@@ -382,7 +382,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             if deleted:
                 # We now need to invalidate the caches of these rooms
-                rows = self.simple_select_many_txn(
+                rows = self.db.simple_select_many_txn(
                     txn,
                     table="events",
                     column="event_id",
@@ -396,7 +396,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                         self.get_latest_event_ids_in_room.invalidate, (room_id,)
                     )
 
-            self.simple_delete_many_txn(
+            self.db.simple_delete_many_txn(
                 txn=txn,
                 table="_extremities_to_check",
                 column="event_id",
@@ -406,7 +406,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             return len(original_set)
 
-        num_handled = yield self.runInteraction(
+        num_handled = yield self.db.runInteraction(
             "_cleanup_extremities_bg_update", _cleanup_extremities_bg_update_txn
         )
 
@@ -416,7 +416,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             def _drop_table_txn(txn):
                 txn.execute("DROP TABLE _extremities_to_check")
 
-            yield self.runInteraction(
+            yield self.db.runInteraction(
                 "_cleanup_extremities_bg_update_drop_table", _drop_table_txn
             )
 
@@ -470,7 +470,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             return len(rows)
 
-        count = yield self.runInteraction(
+        count = yield self.db.runInteraction(
             "_redactions_received_ts", _redactions_received_ts_txn
         )
 
@@ -501,7 +501,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             txn.execute("DROP INDEX redactions_censored_redacts")
 
-        yield self.runInteraction(
+        yield self.db.runInteraction(
             "_event_fix_redactions_bytes", _event_fix_redactions_bytes_txn
         )
 
@@ -533,7 +533,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                 try:
                     event_json = json.loads(event_json_raw)
 
-                    self.simple_insert_many_txn(
+                    self.db.simple_insert_many_txn(
                         txn=txn,
                         table="event_labels",
                         values=[
@@ -565,7 +565,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             return nbrows
 
-        num_rows = yield self.runInteraction(
+        num_rows = yield self.db.runInteraction(
             desc="event_store_labels", func=_event_store_labels_txn
         )
 

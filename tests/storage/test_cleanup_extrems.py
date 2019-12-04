@@ -62,7 +62,9 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
             prepare_database.executescript(txn, schema_path)
 
         self.get_success(
-            self.store.runInteraction("test_delete_forward_extremities", run_delta_file)
+            self.store.db.runInteraction(
+                "test_delete_forward_extremities", run_delta_file
+            )
         )
 
         # Ugh, have to reset this flag

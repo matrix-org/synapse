@@ -37,7 +37,7 @@ class BackgroundUpdateTestCase(unittest.TestCase):
         def update(progress, count):
             self.clock.advance_time_msec(count * duration_ms)
             progress = {"my_key": progress["my_key"] + 1}
-            yield self.store.runInteraction(
+            yield self.store.db.runInteraction(
                 "update_progress",
                 self.store._background_update_progress_txn,
                 "test_update",

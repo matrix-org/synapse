@@ -29,7 +29,7 @@ class PresenceStore(SQLBaseStore):
         )
 
         with stream_ordering_manager as stream_orderings:
-            yield self.runInteraction(
+            yield self.db.runInteraction(
                 "update_presence",
                 self._update_presence_txn,
                 stream_orderings,
@@ -46,7 +46,7 @@ class PresenceStore(SQLBaseStore):
             txn.call_after(self._get_presence_for_user.invalidate, (state.user_id,))
 
         # Actually insert new rows
-        self.simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="presence_stream",
             values=[
@@ -88,7 +88,7 @@ class PresenceStore(SQLBaseStore):
             txn.execute(sql, (last_id, current_id))
             return txn.fetchall()
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_all_presence_updates", get_all_presence_updates_txn
         )
 
@@ -103,7 +103,7 @@ class PresenceStore(SQLBaseStore):
         inlineCallbacks=True,
     )
     def get_presence_for_users(self, user_ids):
-        rows = yield self.simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="presence_stream",
             column="user_id",
             iterable=user_ids,
@@ -129,7 +129,7 @@ class PresenceStore(SQLBaseStore):
         return self._presence_id_gen.get_current_token()
 
     def allow_presence_visible(self, observed_localpart, observer_userid):
-        return self.simple_insert(
+        return self.db.simple_insert(
             table="presence_allow_inbound",
             values={
                 "observed_user_id": observed_localpart,
@@ -140,7 +140,7 @@ class PresenceStore(SQLBaseStore):
         )
 
     def disallow_presence_visible(self, observed_localpart, observer_userid):
-        return self.simple_delete_one(
+        return self.db.simple_delete_one(
             table="presence_allow_inbound",
             keyvalues={
                 "observed_user_id": observed_localpart,
