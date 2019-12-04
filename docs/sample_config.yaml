@@ -1186,49 +1186,58 @@ saml2_config:
   #
   #config_path: "CONFDIR/sp_conf.py"
 
-  # the lifetime of a SAML session. This defines how long a user has to
+  # The lifetime of a SAML session. This defines how long a user has to
   # complete the authentication process, if allow_unsolicited is unset.
   # The default is 5 minutes.
   #
   #saml_session_lifetime: 5m
 
-  # An external module can be provided here as a custom solution to mapping the
-  # above configured saml attribute onto a matrix ID. If this is defined, it will
-  # override the `mxid_mapping` option.
+  # An external module can be provided here as a custom solution to
+  # mapping the above configured saml attribute onto a matrix ID.
   #
-  #user_mapping_provider: mapping_provider.SamlMappingProvider
+  user_mapping_provider:
+    # The custom module's class. Uncomment to use a custom module.
+    #
+    #module: mapping_provider.SamlMappingProvider
 
-  # Custom configuration values for the module. This will be passed as a
-  # Python dictionary to the module's `parse_config` method.
-  #
-  #user_mapping_provider_config:
-  #  # The SAML attribute (after mapping via the attribute maps) to use to derive
-  #  # the Matrix ID from. 'uid' by default.
-  #  #
-  #  # Note: This used to be configured by the saml2_config.mxid_source_attribute
-  #  # option. If that is still defined, its value will be used instead.
-  #  #
-  #  #mxid_source_attribute: displayName
-  #
-  #  # The mapping system to use for mapping the saml attribute onto a matrix ID.
-  #  # Options include:
-  #  #  * 'hexencode' (which maps unpermitted characters to '=xx')
-  #  #  * 'dotreplace' (which replaces unpermitted characters with '.').
-  #  # The default is 'hexencode'.
-  #  #
-  #  # Note: This used to be configured by the saml2_config.mxid_mapping
-  #  # option. If that is still defined, its value will be used instead.
-  #  #
-  #  #mxid_mapping: dotreplace
+    # Custom configuration values for the module. Below options are
+    # intended for the built-in provider, they should be changed if
+    # using a custom module. This section will be passed as a Python
+    # dictionary to the module's `parse_config` method.
+    #
+    config:
+      # The SAML attribute (after mapping via the attribute maps) to use
+      # to derive the Matrix ID from. 'uid' by default.
+      #
+      # Note: This used to be configured by the
+      # saml2_config.mxid_source_attribute option. If that is still
+      # defined, its value will be used instead.
+      #
+      #mxid_source_attribute: displayName
 
-  # In previous versions of synapse, the mapping from SAML attribute to MXID was
-  # always calculated dynamically rather than stored in a table. For backwards-
-  # compatibility, we will look for user_ids matching such a pattern before
-  # creating a new account.
+      # The mapping system to use for mapping the saml attribute onto a
+      # matrix ID.
+      #
+      # Options include:
+      #  * 'hexencode' (which maps unpermitted characters to '=xx')
+      #  * 'dotreplace' (which replaces unpermitted characters with
+      #     '.').
+      # The default is 'hexencode'.
+      #
+      # Note: This used to be configured by the
+      # saml2_config.mxid_mapping option. If that is still defined, its
+      # value will be used instead.
+      #
+      #mxid_mapping: dotreplace
+
+  # In previous versions of synapse, the mapping from SAML attribute to
+  # MXID was always calculated dynamically rather than stored in a
+  # table. For backwards- compatibility, we will look for user_ids
+  # matching such a pattern before creating a new account.
   #
   # This setting controls the SAML attribute which will be used for this
-  # backwards-compatibility lookup. Typically it should be 'uid', but if the
-  # attribute maps are changed, it may be necessary to change it.
+  # backwards-compatibility lookup. Typically it should be 'uid', but if
+  # the attribute maps are changed, it may be necessary to change it.
   #
   # The default is 'uid'.
   #

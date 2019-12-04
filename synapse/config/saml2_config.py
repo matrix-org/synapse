@@ -73,50 +73,58 @@ class SAML2Config(Config):
             "grandfathered_mxid_source_attribute", "uid"
         )
 
+        user_mapping_provider_dict = saml2_config.get("user_mapping_provider")
+        if user_mapping_provider_dict is None:
+            user_mapping_provider_dict = {}
+
         # Load configured module class and config
-        mapping_provider_module = saml2_config.get(
-            "user_mapping_provider",
-            "synapse.handlers.saml_handler.DefaultSamlMappingProvider",
+        default_mapping_provider = (
+            "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
         )
-        saml2_user_mapping_provider_config = saml2_config.get(
-            "user_mapping_provider_config", {}
+        user_mapping_provider_module = user_mapping_provider_dict.get(
+            "module", default_mapping_provider,
         )
+        user_mapping_provider_config = user_mapping_provider_dict.get("config", {})
 
-        # If mxid_source_attribute is defined in the deprecated location, use
-        # that instead for backwards compatibility
-        old_mxid_source_attribute = saml2_config.get("mxid_source_attribute")
-        if old_mxid_source_attribute:
-            saml2_user_mapping_provider_config[
-                "mxid_source_attribute"
-            ] = old_mxid_source_attribute
-        else:
-            # If the option doesn't exist in saml2_config, and it's not set under
-            # user_mapping_provider_config, set it to a default value
-            saml2_user_mapping_provider_config.setdefault(
-                "mxid_source_attribute", "uid"
-            )
+        if user_mapping_provider_module == default_mapping_provider:
+            # Handle deprecated options in default module config
 
-        # If mxid_mapping is defined, use that instead for backwards compatibility
-        old_mxid_mapping = saml2_config.get("mxid_mapping")
-        if old_mxid_mapping:
-            saml2_user_mapping_provider_config["mxid_mapping"] = old_mxid_mapping
-        else:
-            # If the option doesn't exist in saml2_config, and it's not set under
-            # user_mapping_provider_config, set it to a default value
-            saml2_user_mapping_provider_config.setdefault("mxid_mapping", "hexencode")
+            # If mxid_source_attribute is defined in the deprecated location, use
+            # that instead for backwards compatibility
+            old_mxid_source_attribute = saml2_config.get("mxid_source_attribute")
+            if old_mxid_source_attribute:
+                self.using_old_mxid_source_attribute = True
+                user_mapping_provider_config[
+                    "mxid_source_attribute"
+                ] = old_mxid_source_attribute
+            else:
+                # If the option doesn't exist in saml2_config, and it's not set under
+                # user_mapping_provider_config, set it to a default value
+                user_mapping_provider_config.setdefault("mxid_source_attribute", "uid")
+
+            # If mxid_mapping is defined, use that instead for backwards compatibility
+            old_mxid_mapping = saml2_config.get("mxid_mapping")
+            if old_mxid_mapping:
+                self.using_old_mxid_mapping = True
+                user_mapping_provider_config["mxid_mapping"] = old_mxid_mapping
+            else:
+                # If the option doesn't exist in saml2_config, and it's not set under
+                # user_mapping_provider_config, set it to a default value
+                user_mapping_provider_config.setdefault("mxid_mapping", "hexencode")
 
         # Some places in Synapse need this value directly
-        self.saml2_mxid_source_attribute = saml2_user_mapping_provider_config[
+        # TODO: This isn't going to be a thing without the default module
+        self.saml2_mxid_source_attribute = user_mapping_provider_config[
             "mxid_source_attribute"
         ]
 
-        # We don't use nor provide the module's config here, and instead make it available
-        # under the hs' config object
-        user_mapping_provider_class, _ = load_module(
-            {"module": mapping_provider_module}
+        # We don't use nor provide the module's config here
+        self.saml2_user_mapping_provider_class, _ = load_module(
+            {
+                "module": user_mapping_provider_module,
+                "config": user_mapping_provider_config,
+            }
         )
-        self.saml2_user_mapping_provider = user_mapping_provider_class()
-        self.saml2_user_mapping_provider_config = saml2_user_mapping_provider_config
 
         saml2_config_dict = self._default_saml_config_dict()
         _dict_merge(
@@ -236,49 +244,58 @@ class SAML2Config(Config):
           #
           #config_path: "%(config_dir_path)s/sp_conf.py"
 
-          # the lifetime of a SAML session. This defines how long a user has to
+          # The lifetime of a SAML session. This defines how long a user has to
           # complete the authentication process, if allow_unsolicited is unset.
           # The default is 5 minutes.
           #
           #saml_session_lifetime: 5m
 
-          # An external module can be provided here as a custom solution to mapping the
-          # above configured saml attribute onto a matrix ID. If this is defined, it will
-          # override the `mxid_mapping` option.
+          # An external module can be provided here as a custom solution to
+          # mapping the above configured saml attribute onto a matrix ID.
           #
-          #user_mapping_provider: mapping_provider.SamlMappingProvider
+          user_mapping_provider:
+            # The custom module's class. Uncomment to use a custom module.
+            #
+            #module: mapping_provider.SamlMappingProvider
 
-          # Custom configuration values for the module. This will be passed as a
-          # Python dictionary to the module's `parse_config` method.
-          #
-          #user_mapping_provider_config:
-          #  # The SAML attribute (after mapping via the attribute maps) to use to derive
-          #  # the Matrix ID from. 'uid' by default.
-          #  #
-          #  # Note: This used to be configured by the saml2_config.mxid_source_attribute
-          #  # option. If that is still defined, its value will be used instead.
-          #  #
-          #  #mxid_source_attribute: displayName
-          #
-          #  # The mapping system to use for mapping the saml attribute onto a matrix ID.
-          #  # Options include:
-          #  #  * 'hexencode' (which maps unpermitted characters to '=xx')
-          #  #  * 'dotreplace' (which replaces unpermitted characters with '.').
-          #  # The default is 'hexencode'.
-          #  #
-          #  # Note: This used to be configured by the saml2_config.mxid_mapping
-          #  # option. If that is still defined, its value will be used instead.
-          #  #
-          #  #mxid_mapping: dotreplace
+            # Custom configuration values for the module. Below options are
+            # intended for the built-in provider, they should be changed if
+            # using a custom module. This section will be passed as a Python
+            # dictionary to the module's `parse_config` method.
+            #
+            config:
+              # The SAML attribute (after mapping via the attribute maps) to use
+              # to derive the Matrix ID from. 'uid' by default.
+              #
+              # Note: This used to be configured by the
+              # saml2_config.mxid_source_attribute option. If that is still
+              # defined, its value will be used instead.
+              #
+              #mxid_source_attribute: displayName
 
-          # In previous versions of synapse, the mapping from SAML attribute to MXID was
-          # always calculated dynamically rather than stored in a table. For backwards-
-          # compatibility, we will look for user_ids matching such a pattern before
-          # creating a new account.
+              # The mapping system to use for mapping the saml attribute onto a
+              # matrix ID.
+              #
+              # Options include:
+              #  * 'hexencode' (which maps unpermitted characters to '=xx')
+              #  * 'dotreplace' (which replaces unpermitted characters with
+              #     '.').
+              # The default is 'hexencode'.
+              #
+              # Note: This used to be configured by the
+              # saml2_config.mxid_mapping option. If that is still defined, its
+              # value will be used instead.
+              #
+              #mxid_mapping: dotreplace
+
+          # In previous versions of synapse, the mapping from SAML attribute to
+          # MXID was always calculated dynamically rather than stored in a
+          # table. For backwards- compatibility, we will look for user_ids
+          # matching such a pattern before creating a new account.
           #
           # This setting controls the SAML attribute which will be used for this
-          # backwards-compatibility lookup. Typically it should be 'uid', but if the
-          # attribute maps are changed, it may be necessary to change it.
+          # backwards-compatibility lookup. Typically it should be 'uid', but if
+          # the attribute maps are changed, it may be necessary to change it.
           #
           # The default is 'uid'.
           #

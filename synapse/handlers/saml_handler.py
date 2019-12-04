@@ -60,7 +60,9 @@ class SamlHandler:
         )
 
         # plugin to do custom mapping from saml response to mxid
-        self._user_mapping_provider = hs.config.saml2_user_mapping_provider
+        self._user_mapping_provider = hs.config.saml2_user_mapping_provider_class(
+            hs.config.saml2_user_mapping_provider_config
+        )
 
         # identifier for the external_ids table
         self._auth_provider_id = "saml"
@@ -70,6 +72,22 @@ class SamlHandler:
 
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="saml_mapping", clock=self._clock)
+
+        # Check for deprecated config options
+        if hasattr(hs.config, "using_old_mxid_source_attribute"):
+            logger.warning(
+                "The config option saml2_config.mxid_source_attribute is "
+                "deprecated. Please use "
+                "saml2_config.user_mapping_provider.config.mxid_source_attribute "
+                "instead."
+            )
+        if hasattr(hs.config, "using_old_mxid_mapping"):
+            logger.warning(
+                "The config option saml2_config.mxid_mapping is "
+                "deprecated. Please use "
+                "saml2_config.user_mapping_provider.config.mxid_mapping "
+                "instead."
+            )
 
     def handle_redirect_request(self, client_redirect_url):
         """Handle an incoming request to /login/sso/redirect
@@ -137,41 +155,9 @@ class SamlHandler:
             remote_user_id = saml2_auth.ava["uid"][0]
         except KeyError:
             logger.warning("SAML2 response lacks a 'uid' attestation")
-            raise SynapseError(400, "uid not in SAML2 response")
+            raise SynapseError(400, "'uid' not in SAML2 response")
 
         self._outstanding_requests_dict.pop(saml2_auth.in_response_to, None)
-
-        # Map saml response to user attributes using the configured mapping provider
-        for i in range(1000):
-            try:
-                attribute_dict = self._user_mapping_provider.saml_response_to_user_attributes(
-                    self._saml2_user_mapping_provider_config, saml2_auth, i
-                )
-            except Exception:
-                logging.exception("Error in SAML mapping provider plugin")
-                raise SynapseError(500, "Error parsing SAML2 response")
-
-            localpart = attribute_dict.get("mxid_localpart")
-            if not localpart:
-                logger.error(
-                    "SAML mapping provider plugin did not return a mxid_localpart object"
-                )
-                raise SynapseError(500, "Error parsing SAML2 response")
-
-            displayname = attribute_dict.get("displayname")
-
-            # Check if this mxid already exists
-            if not await self._datastore.get_users_by_id_case_insensitive(
-                UserID(localpart, self._hostname).to_string()
-            ):
-                # This mxid is free
-                break
-        else:
-            # Unable to generate a username in 1000 iterations
-            # Break and return error to the user
-            raise SynapseError(
-                500, "Unable to generate a Matrix ID from the SAML response"
-            )
 
         with (await self._mapping_lock.queue(self._auth_provider_id)):
             # first of all, check if we already have a mapping for this user
@@ -211,6 +197,38 @@ class SamlHandler:
                         self._auth_provider_id, remote_user_id, registered_user_id
                     )
                     return registered_user_id
+
+            # Map saml response to user attributes using the configured mapping provider
+            for i in range(1000):
+                try:
+                    attribute_dict = self._user_mapping_provider.saml_response_to_user_attributes(
+                        saml2_auth, i
+                    )
+                except Exception:
+                    logging.exception("Error in SAML mapping provider plugin")
+                    raise
+
+                localpart = attribute_dict.get("mxid_localpart")
+                if not localpart:
+                    logger.error(
+                        "SAML mapping provider plugin did not return a mxid_localpart object"
+                    )
+                    raise SynapseError(500, "Error parsing SAML2 response")
+
+                displayname = attribute_dict.get("displayname")
+
+                # Check if this mxid already exists
+                if not await self._datastore.get_users_by_id_case_insensitive(
+                    UserID(localpart, self._hostname).to_string()
+                ):
+                    # This mxid is free
+                    break
+            else:
+                # Unable to generate a username in 1000 iterations
+                # Break and return error to the user
+                raise SynapseError(
+                    500, "Unable to generate a Matrix ID from the SAML response"
+                )
 
             registered_user_id = await self._registration_handler.register_user(
                 localpart=localpart, default_display_name=displayname
@@ -255,11 +273,17 @@ MXID_MAPPER_MAP = {
 class DefaultSamlMappingProvider(object):
     __version__ = "0.0.1"
 
+    def __init__(self, config: dict):
+        """The default SAML user mapping provider
+
+        Args:
+            config: Module configuration dictionary
+        """
+        self._mxid_source_attribute = config["mxid_source_attribute"]
+        self._mxid_mapping = config["mxid_mapping"]
+
     def saml_response_to_user_attributes(
-        self,
-        config: dict,
-        saml_response: saml2.response.AuthnResponse,
-        failures: int = 0,
+        self, saml_response: saml2.response.AuthnResponse, failures: int = 0,
     ) -> dict:
         """Maps some text from a SAML response to attributes of a new user
 
@@ -277,18 +301,17 @@ class DefaultSamlMappingProvider(object):
                 * displayname (str): The displayname of the user
         """
         try:
-            mxid_source = saml_response.ava[config["mxid_source_attribute"]][0]
+            mxid_source = saml_response.ava[self._mxid_source_attribute][0]
         except KeyError:
             logger.warning(
-                "SAML2 response lacks a '%s' attestation",
-                config["mxid_source_attribute"],
+                "SAML2 response lacks a '%s' attestation", self._mxid_source_attribute,
             )
             raise SynapseError(
-                400, "%s not in SAML2 response" % (config["_mxid_source_attribute"],)
+                400, "%s not in SAML2 response" % (self._mxid_source_attribute,)
             )
 
         # Use the configured mapper for this mxid_source
-        mxid_mapper = MXID_MAPPER_MAP[config["mxid_mapping"]]
+        mxid_mapper = MXID_MAPPER_MAP[self._mxid_mapping]
         base_mxid_localpart = mxid_mapper(mxid_source)
 
         # Append suffix integer if last call to this function failed to produce
