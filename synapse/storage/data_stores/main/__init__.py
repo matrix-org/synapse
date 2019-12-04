@@ -32,6 +32,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
+from .cache import CacheInvalidationStore
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .devices import DeviceStore
@@ -110,6 +111,7 @@ class DataStore(
     MonthlyActiveUsersStore,
     StatsStore,
     RelationsStore,
+    CacheInvalidationStore,
 ):
     def __init__(self, db_conn, hs):
         self.hs = hs
