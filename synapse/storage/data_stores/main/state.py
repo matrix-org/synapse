@@ -27,7 +27,6 @@ from synapse.api.errors import NotFoundError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.state import StateFilter
@@ -1023,9 +1022,7 @@ class StateGroupWorkerStore(
         return set(row["state_group"] for row in rows)
 
 
-class StateBackgroundUpdateStore(
-    StateGroupBackgroundUpdateStore, BackgroundUpdateStore
-):
+class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
 
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
@@ -1034,21 +1031,21 @@ class StateBackgroundUpdateStore(
 
     def __init__(self, db_conn, hs):
         super(StateBackgroundUpdateStore, self).__init__(db_conn, hs)
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME,
             self._background_deduplicate_state,
         )
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             self.STATE_GROUP_INDEX_UPDATE_NAME, self._background_index_state
         )
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             self.CURRENT_STATE_INDEX_UPDATE_NAME,
             index_name="current_state_events_member_index",
             table="current_state_events",
             columns=["state_key"],
             where_clause="type='m.room.member'",
         )
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             self.EVENT_STATE_GROUP_INDEX_UPDATE_NAME,
             index_name="event_to_state_groups_sg_index",
             table="event_to_state_groups",
@@ -1181,7 +1178,7 @@ class StateBackgroundUpdateStore(
                 "max_group": max_group,
             }
 
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn, self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME, progress
             )
 
@@ -1192,7 +1189,7 @@ class StateBackgroundUpdateStore(
         )
 
         if finished:
-            yield self._end_background_update(
+            yield self.db.updates._end_background_update(
                 self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME
             )
 
@@ -1224,7 +1221,7 @@ class StateBackgroundUpdateStore(
 
         yield self.db.runWithConnection(reindex_txn)
 
-        yield self._end_background_update(self.STATE_GROUP_INDEX_UPDATE_NAME)
+        yield self.db.updates._end_background_update(self.STATE_GROUP_INDEX_UPDATE_NAME)
 
         return 1
 

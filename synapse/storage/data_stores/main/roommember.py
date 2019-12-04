@@ -26,8 +26,11 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage._base import LoggingTransaction, make_in_list_sql_clause
-from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.storage._base import (
+    LoggingTransaction,
+    SQLBaseStore,
+    make_in_list_sql_clause,
+)
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import Sqlite3Engine
 from synapse.storage.roommember import (
@@ -831,17 +834,17 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
 
-class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
+class RoomMemberBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
         super(RoomMemberBackgroundUpdateStore, self).__init__(db_conn, hs)
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             _MEMBERSHIP_PROFILE_UPDATE_NAME, self._background_add_membership_profile
         )
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME,
             self._background_current_state_membership,
         )
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "room_membership_forgotten_idx",
             index_name="room_memberships_user_room_forgotten",
             table="room_memberships",
@@ -909,7 +912,7 @@ class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
                 "max_stream_id_exclusive": min_stream_id,
             }
 
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn, _MEMBERSHIP_PROFILE_UPDATE_NAME, progress
             )
 
@@ -920,7 +923,9 @@ class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
         )
 
         if not result:
-            yield self._end_background_update(_MEMBERSHIP_PROFILE_UPDATE_NAME)
+            yield self.db.updates._end_background_update(
+                _MEMBERSHIP_PROFILE_UPDATE_NAME
+            )
 
         return result
 
@@ -959,7 +964,7 @@ class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
 
                 last_processed_room = next_room
 
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn,
                 _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME,
                 {"last_processed_room": last_processed_room},
@@ -978,7 +983,9 @@ class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
         )
 
         if finished:
-            yield self._end_background_update(_CURRENT_STATE_MEMBERSHIP_UPDATE_NAME)
+            yield self.db.updates._end_background_update(
+                _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME
+            )
 
         return row_count
 

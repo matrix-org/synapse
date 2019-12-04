@@ -31,7 +31,6 @@ from synapse.logging.opentracing import (
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.types import get_verify_key_from_cross_signing_key
 from synapse.util import batch_iter
 from synapse.util.caches.descriptors import (
@@ -642,11 +641,11 @@ class DeviceWorkerStore(SQLBaseStore):
         return results
 
 
-class DeviceBackgroundUpdateStore(BackgroundUpdateStore):
+class DeviceBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
         super(DeviceBackgroundUpdateStore, self).__init__(db_conn, hs)
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "device_lists_stream_idx",
             index_name="device_lists_stream_user_id",
             table="device_lists_stream",
@@ -654,7 +653,7 @@ class DeviceBackgroundUpdateStore(BackgroundUpdateStore):
         )
 
         # create a unique index on device_lists_remote_cache
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "device_lists_remote_cache_unique_idx",
             index_name="device_lists_remote_cache_unique_id",
             table="device_lists_remote_cache",
@@ -663,7 +662,7 @@ class DeviceBackgroundUpdateStore(BackgroundUpdateStore):
         )
 
         # And one on device_lists_remote_extremeties
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "device_lists_remote_extremeties_unique_idx",
             index_name="device_lists_remote_extremeties_unique_idx",
             table="device_lists_remote_extremeties",
@@ -672,7 +671,7 @@ class DeviceBackgroundUpdateStore(BackgroundUpdateStore):
         )
 
         # once they complete, we can remove the old non-unique indexes.
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES,
             self._drop_device_list_streams_non_unique_indexes,
         )
@@ -686,7 +685,9 @@ class DeviceBackgroundUpdateStore(BackgroundUpdateStore):
             txn.close()
 
         yield self.db.runWithConnection(f)
-        yield self._end_background_update(DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES)
+        yield self.db.updates._end_background_update(
+            DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES
+        )
         return 1
 
 

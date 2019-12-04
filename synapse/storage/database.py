@@ -30,6 +30,7 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.logging.context import LoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.util.stringutils import exception_to_unicode
 
@@ -222,6 +223,8 @@ class Database(object):
         self.hs = hs
         self._clock = hs.get_clock()
         self._db_pool = hs.get_db_pool()
+
+        self.updates = BackgroundUpdater(hs, self)
 
         self._previous_txn_total_time = 0
         self._current_txn_total_time = 0

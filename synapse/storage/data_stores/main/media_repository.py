@@ -12,14 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.storage._base import SQLBaseStore
 
 
-class MediaRepositoryBackgroundUpdateStore(BackgroundUpdateStore):
+class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
         super(MediaRepositoryBackgroundUpdateStore, self).__init__(db_conn, hs)
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             update_name="local_media_repository_url_idx",
             index_name="local_media_repository_url_idx",
             table="local_media_repository",

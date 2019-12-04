@@ -20,7 +20,7 @@ from six import iteritems
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage import background_updates
+from synapse.storage._base import SQLBaseStore
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.caches.descriptors import Cache
 
@@ -32,41 +32,41 @@ logger = logging.getLogger(__name__)
 LAST_SEEN_GRANULARITY = 120 * 1000
 
 
-class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
+class ClientIpBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
         super(ClientIpBackgroundUpdateStore, self).__init__(db_conn, hs)
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "user_ips_device_index",
             index_name="user_ips_device_id",
             table="user_ips",
             columns=["user_id", "device_id", "last_seen"],
         )
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "user_ips_last_seen_index",
             index_name="user_ips_last_seen",
             table="user_ips",
             columns=["user_id", "last_seen"],
         )
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "user_ips_last_seen_only_index",
             index_name="user_ips_last_seen_only",
             table="user_ips",
             columns=["last_seen"],
         )
 
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "user_ips_analyze", self._analyze_user_ip
         )
 
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "user_ips_remove_dupes", self._remove_user_ip_dupes
         )
 
         # Register a unique index
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "user_ips_device_unique_index",
             index_name="user_ips_user_token_ip_unique_index",
             table="user_ips",
@@ -75,12 +75,12 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
         )
 
         # Drop the old non-unique index
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "user_ips_drop_nonunique_index", self._remove_user_ip_nonunique
         )
 
         # Update the last seen info in devices.
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "devices_last_seen", self._devices_last_seen_update
         )
 
@@ -92,7 +92,7 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
             txn.close()
 
         yield self.db.runWithConnection(f)
-        yield self._end_background_update("user_ips_drop_nonunique_index")
+        yield self.db.updates._end_background_update("user_ips_drop_nonunique_index")
         return 1
 
     @defer.inlineCallbacks
@@ -108,7 +108,7 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
 
         yield self.db.runInteraction("user_ips_analyze", user_ips_analyze)
 
-        yield self._end_background_update("user_ips_analyze")
+        yield self.db.updates._end_background_update("user_ips_analyze")
 
         return 1
 
@@ -271,14 +271,14 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
                     (user_id, access_token, ip, device_id, user_agent, last_seen),
                 )
 
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn, "user_ips_remove_dupes", {"last_seen": end_last_seen}
             )
 
         yield self.db.runInteraction("user_ips_dups_remove", remove)
 
         if last:
-            yield self._end_background_update("user_ips_remove_dupes")
+            yield self.db.updates._end_background_update("user_ips_remove_dupes")
 
         return batch_size
 
@@ -344,7 +344,7 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
             txn.execute_batch(sql, rows)
 
             _, _, _, user_id, device_id = rows[-1]
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn,
                 "devices_last_seen",
                 {"last_user_id": user_id, "last_device_id": device_id},
@@ -357,7 +357,7 @@ class ClientIpBackgroundUpdateStore(background_updates.BackgroundUpdateStore):
         )
 
         if not updated:
-            yield self._end_background_update("devices_last_seen")
+            yield self.db.updates._end_background_update("devices_last_seen")
 
         return updated
 
@@ -546,7 +546,9 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             # Nothing to do
             return
 
-        if not await self.has_completed_background_update("devices_last_seen"):
+        if not await self.db.updates.has_completed_background_update(
+            "devices_last_seen"
+        ):
             # Only start pruning if we have finished populating the devices
             # last seen info.
             return

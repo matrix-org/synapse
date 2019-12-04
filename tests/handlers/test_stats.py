@@ -42,7 +42,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         Add the background updates we need to run.
         """
         # Ugh, have to reset this flag
-        self.store._all_done = False
+        self.store.db.updates._all_done = False
 
         self.get_success(
             self.store.db.simple_insert(
@@ -108,8 +108,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # Do the initial population of the stats via the background update
         self._add_background_updates()
 
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
     def test_initial_room(self):
         """
@@ -141,8 +145,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # Do the initial population of the user directory via the background update
         self._add_background_updates()
 
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         r = self.get_success(self.get_all_room_state())
 
@@ -178,7 +186,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # the position that the deltas should begin at, once they take over.
         self.hs.config.stats_enabled = True
         self.handler.stats_enabled = True
-        self.store._all_done = False
+        self.store.db.updates._all_done = False
         self.get_success(
             self.store.db.simple_update_one(
                 table="stats_incremental_position",
@@ -194,8 +202,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         # Now, before the table is actually ingested, add some more events.
         self.helper.invite(room=room_1, src=u1, targ=u2, tok=u1_token)
@@ -221,9 +233,13 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-        self.store._all_done = False
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        self.store.db.updates._all_done = False
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         self.reactor.advance(86401)
 
@@ -653,7 +669,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # preparation stage of the initial background update
         # Ugh, have to reset this flag
-        self.store._all_done = False
+        self.store.db.updates._all_done = False
 
         self.get_success(
             self.store.db.simple_delete(
@@ -673,7 +689,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # now do the background updates
 
-        self.store._all_done = False
+        self.store.db.updates._all_done = False
         self.get_success(
             self.store.db.simple_insert(
                 "background_updates",
@@ -705,8 +721,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         r1stats_complete = self._get_current_stats("room", r1)
         u1stats_complete = self._get_current_stats("user", u1)

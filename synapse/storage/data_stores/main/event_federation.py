@@ -494,7 +494,7 @@ class EventFederationStore(EventFederationWorkerStore):
     def __init__(self, db_conn, hs):
         super(EventFederationStore, self).__init__(db_conn, hs)
 
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             self.EVENT_AUTH_STATE_ONLY, self._background_delete_non_state_event_auth
         )
 
@@ -654,7 +654,7 @@ class EventFederationStore(EventFederationWorkerStore):
                 "max_stream_id_exclusive": min_stream_id,
             }
 
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn, self.EVENT_AUTH_STATE_ONLY, new_progress
             )
 
@@ -665,6 +665,6 @@ class EventFederationStore(EventFederationWorkerStore):
         )
 
         if not result:
-            yield self._end_background_update(self.EVENT_AUTH_STATE_ONLY)
+            yield self.db.updates._end_background_update(self.EVENT_AUTH_STATE_ONLY)
 
         return batch_size

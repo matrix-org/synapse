@@ -68,17 +68,17 @@ class StatsStore(StateDeltasStore):
 
         self.stats_delta_processing_lock = DeferredLock()
 
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "populate_stats_process_rooms", self._populate_stats_process_rooms
         )
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "populate_stats_process_users", self._populate_stats_process_users
         )
         # we no longer need to perform clean-up, but we will give ourselves
         # the potential to reintroduce it in the future – so documentation
         # will still encourage the use of this no-op handler.
-        self.register_noop_background_update("populate_stats_cleanup")
-        self.register_noop_background_update("populate_stats_prepare")
+        self.db.updates.register_noop_background_update("populate_stats_cleanup")
+        self.db.updates.register_noop_background_update("populate_stats_prepare")
 
     def quantise_stats_time(self, ts):
         """
@@ -102,7 +102,7 @@ class StatsStore(StateDeltasStore):
         This is a background update which regenerates statistics for users.
         """
         if not self.stats_enabled:
-            yield self._end_background_update("populate_stats_process_users")
+            yield self.db.updates._end_background_update("populate_stats_process_users")
             return 1
 
         last_user_id = progress.get("last_user_id", "")
@@ -123,7 +123,7 @@ class StatsStore(StateDeltasStore):
 
         # No more rooms -- complete the transaction.
         if not users_to_work_on:
-            yield self._end_background_update("populate_stats_process_users")
+            yield self.db.updates._end_background_update("populate_stats_process_users")
             return 1
 
         for user_id in users_to_work_on:
@@ -132,7 +132,7 @@ class StatsStore(StateDeltasStore):
 
         yield self.db.runInteraction(
             "populate_stats_process_users",
-            self._background_update_progress_txn,
+            self.db.updates._background_update_progress_txn,
             "populate_stats_process_users",
             progress,
         )
@@ -145,7 +145,7 @@ class StatsStore(StateDeltasStore):
         This is a background update which regenerates statistics for rooms.
         """
         if not self.stats_enabled:
-            yield self._end_background_update("populate_stats_process_rooms")
+            yield self.db.updates._end_background_update("populate_stats_process_rooms")
             return 1
 
         last_room_id = progress.get("last_room_id", "")
@@ -166,7 +166,7 @@ class StatsStore(StateDeltasStore):
 
         # No more rooms -- complete the transaction.
         if not rooms_to_work_on:
-            yield self._end_background_update("populate_stats_process_rooms")
+            yield self.db.updates._end_background_update("populate_stats_process_rooms")
             return 1
 
         for room_id in rooms_to_work_on:
@@ -175,7 +175,7 @@ class StatsStore(StateDeltasStore):
 
         yield self.db.runInteraction(
             "_populate_stats_process_rooms",
-            self._background_update_progress_txn,
+            self.db.updates._background_update_progress_txn,
             "populate_stats_process_rooms",
             progress,
         )

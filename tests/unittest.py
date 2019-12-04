@@ -401,10 +401,12 @@ class HomeserverTestCase(TestCase):
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()
 
-        # Run the database background updates.
-        if hasattr(stor, "do_next_background_update"):
-            while not self.get_success(stor.has_completed_background_updates()):
-                self.get_success(stor.do_next_background_update(1))
+        # Run the database background updates, when running against "master".
+        if hs.__class__.__name__ == "TestHomeServer":
+            while not self.get_success(
+                stor.db.updates.has_completed_background_updates()
+            ):
+                self.get_success(stor.db.updates.do_next_background_update(1))
 
         return hs
 

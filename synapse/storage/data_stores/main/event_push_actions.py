@@ -614,14 +614,14 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
     def __init__(self, db_conn, hs):
         super(EventPushActionsStore, self).__init__(db_conn, hs)
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             self.EPA_HIGHLIGHT_INDEX,
             index_name="event_push_actions_u_highlight",
             table="event_push_actions",
             columns=["user_id", "stream_ordering"],
         )
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "event_push_actions_highlights_index",
             index_name="event_push_actions_highlights_index",
             table="event_push_actions",

@@ -21,7 +21,6 @@ from twisted.internet import defer
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
-from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.util.caches.expiringcache import ExpiringCache
 
 logger = logging.getLogger(__name__)
@@ -208,20 +207,20 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         )
 
 
-class DeviceInboxBackgroundUpdateStore(BackgroundUpdateStore):
+class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
 
     def __init__(self, db_conn, hs):
         super(DeviceInboxBackgroundUpdateStore, self).__init__(db_conn, hs)
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "device_inbox_stream_index",
             index_name="device_inbox_stream_id_user_id",
             table="device_inbox",
             columns=["stream_id", "user_id"],
         )
 
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             self.DEVICE_INBOX_STREAM_ID, self._background_drop_index_device_inbox
         )
 
@@ -234,7 +233,7 @@ class DeviceInboxBackgroundUpdateStore(BackgroundUpdateStore):
 
         yield self.db.runWithConnection(reindex_txn)
 
-        yield self._end_background_update(self.DEVICE_INBOX_STREAM_ID)
+        yield self.db.updates._end_background_update(self.DEVICE_INBOX_STREAM_ID)
 
         return 1
 

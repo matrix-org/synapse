@@ -19,7 +19,6 @@ import re
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
-from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.data_stores.main.state import StateFilter
 from synapse.storage.data_stores.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
@@ -32,7 +31,7 @@ logger = logging.getLogger(__name__)
 TEMP_TABLE = "_temp_populate_user_directory"
 
 
-class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore):
+class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
@@ -43,19 +42,19 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
 
         self.server_name = hs.hostname
 
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "populate_user_directory_createtables",
             self._populate_user_directory_createtables,
         )
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "populate_user_directory_process_rooms",
             self._populate_user_directory_process_rooms,
         )
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "populate_user_directory_process_users",
             self._populate_user_directory_process_users,
         )
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             "populate_user_directory_cleanup", self._populate_user_directory_cleanup
         )
 
@@ -108,7 +107,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
         )
         yield self.db.simple_insert(TEMP_TABLE + "_position", {"position": new_pos})
 
-        yield self._end_background_update("populate_user_directory_createtables")
+        yield self.db.updates._end_background_update(
+            "populate_user_directory_createtables"
+        )
         return 1
 
     @defer.inlineCallbacks
@@ -130,7 +131,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
             "populate_user_directory_cleanup", _delete_staging_area
         )
 
-        yield self._end_background_update("populate_user_directory_cleanup")
+        yield self.db.updates._end_background_update("populate_user_directory_cleanup")
         return 1
 
     @defer.inlineCallbacks
@@ -176,7 +177,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
 
         # No more rooms -- complete the transaction.
         if not rooms_to_work_on:
-            yield self._end_background_update("populate_user_directory_process_rooms")
+            yield self.db.updates._end_background_update(
+                "populate_user_directory_process_rooms"
+            )
             return 1
 
         logger.info(
@@ -248,7 +251,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
             progress["remaining"] -= 1
             yield self.db.runInteraction(
                 "populate_user_directory",
-                self._background_update_progress_txn,
+                self.db.updates._background_update_progress_txn,
                 "populate_user_directory_process_rooms",
                 progress,
             )
@@ -267,7 +270,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
         If search_all_users is enabled, add all of the users to the user directory.
         """
         if not self.hs.config.user_directory_search_all_users:
-            yield self._end_background_update("populate_user_directory_process_users")
+            yield self.db.updates._end_background_update(
+                "populate_user_directory_process_users"
+            )
             return 1
 
         def _get_next_batch(txn):
@@ -297,7 +302,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
 
         # No more users -- complete the transaction.
         if not users_to_work_on:
-            yield self._end_background_update("populate_user_directory_process_users")
+            yield self.db.updates._end_background_update(
+                "populate_user_directory_process_users"
+            )
             return 1
 
         logger.info(
@@ -317,7 +324,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
             progress["remaining"] -= 1
             yield self.db.runInteraction(
                 "populate_user_directory",
-                self._background_update_progress_txn,
+                self.db.updates._background_update_progress_txn,
                 "populate_user_directory_process_users",
                 progress,
             )
