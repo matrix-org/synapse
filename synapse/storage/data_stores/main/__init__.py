@@ -509,7 +509,7 @@ class DataStore(
         """
         name_filter = {}
         if name:
-            name_filter["name"] = "%%" + name + "%%"
+            name_filter["name"] = "%" + name + "%"
 
         attr_filter = {}
         if not guests:
