@@ -10,7 +10,8 @@ The api is::
 including an ``access_token`` of a server admin.
 The parameters ``from`` and ``limit`` are required only for pagination.
 By default, a ``limit`` of 100 is used.
-The parameter ``user_id`` can be used to filter by user id using an SQL regexp.
+The parameter ``user_id`` can be used to select only users with user ids that
+contain this value.
 The parameter ``guests=false`` can be used to exclude guest users,
 default is to include guest users.
 The parameter ``deactivated=true`` can be used to include deactivated users,
@@ -23,14 +24,14 @@ It returns a JSON body like the following:
     {
         "users": [
             {
-                "user_id": "<user_id1>",
+                "name": "<user_id1>",
                 "password_hash": "<password_hash1>",
                 "is_guest": 0,
                 "admin": 0,
                 "user_type": null,
                 "deactivated": 0
             }, {
-                "user_id": "<user_id2>",
+                "name": "<user_id2>",
                 "password_hash": "<password_hash2>",
                 "is_guest": 0,
                 "admin": 1,
