@@ -95,6 +95,8 @@ class EventTypes(object):
     ServerACL = "m.room.server_acl"
     Pinned = "m.room.pinned_events"
 
+    Retention = "m.room.retention"
+
 
 class RejectedReason(object):
     AUTH_ERROR = "auth_error"

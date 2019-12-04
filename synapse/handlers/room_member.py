@@ -94,7 +94,9 @@ class RoomMemberHandler(object):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
+    def _remote_reject_invite(
+        self, requester, remote_room_hosts, room_id, target, content
+    ):
         """Attempt to reject an invite for a room this server is not in. If we
         fail to do so we locally mark the invite as rejected.
 
@@ -104,6 +106,7 @@ class RoomMemberHandler(object):
                 reject invite
             room_id (str)
             target (UserID): The user rejecting the invite
+            content (dict): The content for the rejection event
 
         Returns:
             Deferred[dict]: A dictionary to be returned to the client, may
@@ -471,7 +474,7 @@ class RoomMemberHandler(object):
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
                     res = yield self._remote_reject_invite(
-                        requester, remote_room_hosts, room_id, target
+                        requester, remote_room_hosts, room_id, target, content,
                     )
                     return res
 
@@ -514,6 +517,15 @@ class RoomMemberHandler(object):
         if old_room and old_room["is_public"]:
             yield self.store.set_room_is_public(old_room_id, False)
             yield self.store.set_room_is_public(room_id, True)
+
+        # Check if any groups we own contain the predecessor room
+        local_group_ids = yield self.store.get_local_groups_for_room(old_room_id)
+        for group_id in local_group_ids:
+            # Add new the new room to those groups
+            yield self.store.add_room_to_group(group_id, room_id, old_room["is_public"])
+
+            # Remove the old room from those groups
+            yield self.store.remove_room_from_group(group_id, old_room_id)
 
     @defer.inlineCallbacks
     def copy_user_state_on_room_upgrade(self, old_room_id, new_room_id, user_ids):
@@ -962,13 +974,15 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             )
 
     @defer.inlineCallbacks
-    def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
+    def _remote_reject_invite(
+        self, requester, remote_room_hosts, room_id, target, content
+    ):
         """Implements RoomMemberHandler._remote_reject_invite
         """
         fed_handler = self.federation_handler
         try:
             ret = yield fed_handler.do_remotely_reject_invite(
-                remote_room_hosts, room_id, target.to_string()
+                remote_room_hosts, room_id, target.to_string(), content=content,
             )
             return ret
         except Exception as e:

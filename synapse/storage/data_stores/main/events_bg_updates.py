@@ -21,6 +21,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventContentFields
 from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.background_updates import BackgroundUpdateStore
 
@@ -83,6 +84,10 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
         self.register_background_update_handler(
             "event_fix_redactions_bytes", self._event_fix_redactions_bytes
+        )
+
+        self.register_background_update_handler(
+            "event_store_labels", self._event_store_labels
         )
 
     @defer.inlineCallbacks
@@ -503,3 +508,68 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         yield self._end_background_update("event_fix_redactions_bytes")
 
         return 1
+
+    @defer.inlineCallbacks
+    def _event_store_labels(self, progress, batch_size):
+        """Background update handler which will store labels for existing events."""
+        last_event_id = progress.get("last_event_id", "")
+
+        def _event_store_labels_txn(txn):
+            txn.execute(
+                """
+                SELECT event_id, json FROM event_json
+                LEFT JOIN event_labels USING (event_id)
+                WHERE event_id > ? AND label IS NULL
+                ORDER BY event_id LIMIT ?
+                """,
+                (last_event_id, batch_size),
+            )
+
+            results = list(txn)
+
+            nbrows = 0
+            last_row_event_id = ""
+            for (event_id, event_json_raw) in results:
+                try:
+                    event_json = json.loads(event_json_raw)
+
+                    self._simple_insert_many_txn(
+                        txn=txn,
+                        table="event_labels",
+                        values=[
+                            {
+                                "event_id": event_id,
+                                "label": label,
+                                "room_id": event_json["room_id"],
+                                "topological_ordering": event_json["depth"],
+                            }
+                            for label in event_json["content"].get(
+                                EventContentFields.LABELS, []
+                            )
+                            if isinstance(label, str)
+                        ],
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Unable to load event %s (no labels will be imported): %s",
+                        event_id,
+                        e,
+                    )
+
+                nbrows += 1
+                last_row_event_id = event_id
+
+            self._background_update_progress_txn(
+                txn, "event_store_labels", {"last_event_id": last_row_event_id}
+            )
+
+            return nbrows
+
+        num_rows = yield self.runInteraction(
+            desc="event_store_labels", func=_event_store_labels_txn
+        )
+
+        if not num_rows:
+            yield self._end_background_update("event_store_labels")
+
+        return num_rows
