@@ -28,6 +28,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.data_stores.main.search import SearchStore
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -360,9 +361,9 @@ class RoomWorkerStore(SQLBaseStore):
         defer.returnValue(row)
 
 
-class RoomStore(RoomWorkerStore, SearchStore):
+class RoomBackgroundUpdateStore(BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
-        super(RoomStore, self).__init__(db_conn, hs)
+        super(RoomBackgroundUpdateStore, self).__init__(db_conn, hs)
 
         self.config = hs.config
 
@@ -437,6 +438,13 @@ class RoomStore(RoomWorkerStore, SearchStore):
             yield self._end_background_update("insert_room_retention")
 
         defer.returnValue(batch_size)
+
+
+class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
+    def __init__(self, db_conn, hs):
+        super(RoomStore, self).__init__(db_conn, hs)
+
+        self.config = hs.config
 
     @defer.inlineCallbacks
     def store_room(self, room_id, room_creator_user_id, is_public):
