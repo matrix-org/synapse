@@ -157,7 +157,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             if not target_user_result:
                 continue
 
-            target_device_result = result.get(target_device_id)
+            target_device_result = target_user_result.get(target_device_id)
             if not target_device_result:
                 # note that target_device_result will be None for deleted devices.
                 continue
