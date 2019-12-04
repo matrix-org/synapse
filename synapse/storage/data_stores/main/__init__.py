@@ -516,6 +516,18 @@ class DataStore(
         retval = {"users": users, "total": count}
         return retval
 
+    def get_user_count_txn(self, txn):
+        """Get a total number of registered users in the users list.
+
+        Args:
+            txn : Transaction object
+        Returns:
+            int : number of users
+        """
+        sql_count = "SELECT COUNT(*) FROM users WHERE is_guest = 0;"
+        txn.execute(sql_count)
+        return txn.fetchone()[0]
+
     def search_users(self, term):
         """Function to search users list for one or more users with
         the matched term.
