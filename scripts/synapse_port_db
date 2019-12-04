@@ -47,6 +47,7 @@ from synapse.storage.data_stores.main.media_repository import (
 from synapse.storage.data_stores.main.registration import (
     RegistrationBackgroundUpdateStore,
 )
+from synapse.storage.data_stores.main.room import RoomBackgroundUpdateStore
 from synapse.storage.data_stores.main.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.data_stores.main.search import SearchBackgroundUpdateStore
 from synapse.storage.data_stores.main.state import StateBackgroundUpdateStore
@@ -131,6 +132,7 @@ class Store(
     EventsBackgroundUpdatesStore,
     MediaRepositoryBackgroundUpdateStore,
     RegistrationBackgroundUpdateStore,
+    RoomBackgroundUpdateStore,
     RoomMemberBackgroundUpdateStore,
     SearchBackgroundUpdateStore,
     StateBackgroundUpdateStore,
