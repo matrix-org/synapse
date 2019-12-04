@@ -432,7 +432,7 @@ class EventsStore(
         # event's auth chain, but its easier for now just to store them (and
         # it doesn't take much storage compared to storing the entire event
         # anyway).
-        self._simple_insert_many_txn(
+        self.simple_insert_many_txn(
             txn,
             table="event_auth",
             values=[
@@ -580,12 +580,12 @@ class EventsStore(
         self, txn, new_forward_extremities, max_stream_order
     ):
         for room_id, new_extrem in iteritems(new_forward_extremities):
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
             txn.call_after(self.get_latest_event_ids_in_room.invalidate, (room_id,))
 
-        self._simple_insert_many_txn(
+        self.simple_insert_many_txn(
             txn,
             table="event_forward_extremities",
             values=[
@@ -598,7 +598,7 @@ class EventsStore(
         # new stream_ordering to new forward extremeties in the room.
         # This allows us to later efficiently look up the forward extremeties
         # for a room before a given stream_ordering
-        self._simple_insert_many_txn(
+        self.simple_insert_many_txn(
             txn,
             table="stream_ordering_to_exterm",
             values=[
@@ -722,7 +722,7 @@ class EventsStore(
                 # change in outlier status to our workers.
                 stream_order = event.internal_metadata.stream_ordering
                 state_group_id = context.state_group
-                self._simple_insert_txn(
+                self.simple_insert_txn(
                     txn,
                     table="ex_outlier_stream",
                     values={
@@ -794,7 +794,7 @@ class EventsStore(
             d.pop("redacted_because", None)
             return d
 
-        self._simple_insert_many_txn(
+        self.simple_insert_many_txn(
             txn,
             table="event_json",
             values=[
@@ -811,7 +811,7 @@ class EventsStore(
             ],
         )
 
-        self._simple_insert_many_txn(
+        self.simple_insert_many_txn(
             txn,
             table="events",
             values=[
@@ -841,7 +841,7 @@ class EventsStore(
                 # If we're persisting an unredacted event we go and ensure
                 # that we mark any redactions that reference this event as
                 # requiring censoring.
-                self._simple_update_txn(
+                self.simple_update_txn(
                     txn,
                     table="redactions",
                     keyvalues={"redacts": event.event_id},
@@ -983,7 +983,7 @@ class EventsStore(
 
             state_values.append(vals)
 
-        self._simple_insert_many_txn(txn, table="state_events", values=state_values)
+        self.simple_insert_many_txn(txn, table="state_events", values=state_values)
 
         # Prefill the event cache
         self._add_to_cache(txn, events_and_contexts)
@@ -1032,7 +1032,7 @@ class EventsStore(
         # invalidate the cache for the redacted event
         txn.call_after(self._invalidate_get_event_cache, event.redacts)
 
-        self._simple_insert_txn(
+        self.simple_insert_txn(
             txn,
             table="redactions",
             values={
@@ -1077,9 +1077,7 @@ class EventsStore(
             LIMIT ?
         """
 
-        rows = yield self._execute(
-            "_censor_redactions_fetch", None, sql, before_ts, 100
-        )
+        rows = yield self.execute("_censor_redactions_fetch", None, sql, before_ts, 100)
 
         updates = []
 
@@ -1111,7 +1109,7 @@ class EventsStore(
                 if pruned_json:
                     self._censor_event_txn(txn, event_id, pruned_json)
 
-                self._simple_update_one_txn(
+                self.simple_update_one_txn(
                     txn,
                     table="redactions",
                     keyvalues={"event_id": redaction_id},
@@ -1129,7 +1127,7 @@ class EventsStore(
             event_id (str): The ID of the event to censor.
             pruned_json (str): The pruned JSON
         """
-        self._simple_update_one_txn(
+        self.simple_update_one_txn(
             txn,
             table="event_json",
             keyvalues={"event_id": event_id},
@@ -1780,7 +1778,7 @@ class EventsStore(
             "[purge] found %i state groups to delete", len(state_groups_to_delete)
         )
 
-        rows = self._simple_select_many_txn(
+        rows = self.simple_select_many_txn(
             txn,
             table="state_group_edges",
             column="prev_state_group",
@@ -1807,15 +1805,15 @@ class EventsStore(
             curr_state = self._get_state_groups_from_groups_txn(txn, [sg])
             curr_state = curr_state[sg]
 
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn, table="state_groups_state", keyvalues={"state_group": sg}
             )
 
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn, table="state_group_edges", keyvalues={"state_group": sg}
             )
 
-            self._simple_insert_many_txn(
+            self.simple_insert_many_txn(
                 txn,
                 table="state_groups_state",
                 values=[
@@ -1852,7 +1850,7 @@ class EventsStore(
             state group.
         """
 
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.simple_select_many_batch(
             table="state_group_edges",
             column="prev_state_group",
             iterable=state_groups,
@@ -1882,7 +1880,7 @@ class EventsStore(
         # first we have to delete the state groups states
         logger.info("[purge] removing %s from state_groups_state", room_id)
 
-        self._simple_delete_many_txn(
+        self.simple_delete_many_txn(
             txn,
             table="state_groups_state",
             column="state_group",
@@ -1893,7 +1891,7 @@ class EventsStore(
         # ... and the state group edges
         logger.info("[purge] removing %s from state_group_edges", room_id)
 
-        self._simple_delete_many_txn(
+        self.simple_delete_many_txn(
             txn,
             table="state_group_edges",
             column="state_group",
@@ -1904,7 +1902,7 @@ class EventsStore(
         # ... and the state groups
         logger.info("[purge] removing %s from state_groups", room_id)
 
-        self._simple_delete_many_txn(
+        self.simple_delete_many_txn(
             txn,
             table="state_groups",
             column="id",
@@ -1921,7 +1919,7 @@ class EventsStore(
 
     @cachedInlineCallbacks(max_entries=5000)
     def _get_event_ordering(self, event_id):
-        res = yield self._simple_select_one(
+        res = yield self.simple_select_one(
             table="events",
             retcols=["topological_ordering", "stream_ordering"],
             keyvalues={"event_id": event_id},
@@ -1962,7 +1960,7 @@ class EventsStore(
             room_id (str): The ID of the room the event was sent to.
             topological_ordering (int): The position of the event in the room's topology.
         """
-        return self._simple_insert_many_txn(
+        return self.simple_insert_many_txn(
             txn=txn,
             table="event_labels",
             values=[
@@ -1984,7 +1982,7 @@ class EventsStore(
             event_id (str): The event ID the expiry timestamp is associated with.
             expiry_ts (int): The timestamp at which to expire (delete) the event.
         """
-        return self._simple_insert_txn(
+        return self.simple_insert_txn(
             txn=txn,
             table="event_expiry",
             values={"event_id": event_id, "expiry_ts": expiry_ts},
@@ -2043,7 +2041,7 @@ class EventsStore(
             txn (LoggingTransaction): The transaction to use to perform the deletion.
             event_id (str): The event ID to delete the associated expiry timestamp of.
         """
-        return self._simple_delete_txn(
+        return self.simple_delete_txn(
             txn=txn, table="event_expiry", keyvalues={"event_id": event_id}
         )
 

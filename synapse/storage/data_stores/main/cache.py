@@ -95,7 +95,7 @@ class CacheInvalidationStore(SQLBaseStore):
             txn.call_after(ctx.__exit__, None, None, None)
             txn.call_after(self.hs.get_notifier().on_new_replication_data)
 
-            self._simple_insert_txn(
+            self.simple_insert_txn(
                 txn,
                 table="cache_invalidation_stream",
                 values={
