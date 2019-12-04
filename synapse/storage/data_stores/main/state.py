@@ -277,28 +277,54 @@ class StateGroupWorkerStore(
         return create_event.content.get("room_version", "1")
 
     @defer.inlineCallbacks
-    def get_room_predecessor(self, room_id):
-        """Get the predecessor room of an upgraded room if one exists.
+    def get_room_predecessor(self, room_id: str, require_local=True):
+        """Get the predecessor of an upgraded room if it exists.
         Otherwise return None.
 
         Args:
-            room_id (str)
+            room_id: The ID of an upgraded room
+
+            require_local: If the server is not in the predecessor room, this function will
+                return None.
 
         Returns:
-            Deferred[dict|None]: A dictionary containing the structure of the predecessor
-                field from the room's create event. The structure is subject to other servers,
-                but it is expected to be:
+            Deferred[dict|None]: The content of the predecessor dict. The
+                structure is subject to other servers, but it is expected to be:
                     * room_id (str): The room ID of the predecessor room
                     * event_id (str): The ID of the tombstone event in the predecessor room
 
+                None if a predecessor room doesn't exist, or if require_local is
+                true and the server is not in the predecessor room.
+
         Raises:
-            NotFoundError if the room is unknown
+            NotFoundError if the given room is unknown
         """
         # Retrieve the room's create event
         create_event = yield self.get_create_event_for_room(room_id)
 
-        # Return predecessor if present
-        return create_event.content.get("predecessor", None)
+        # Retrieve the predecessor key of the create event
+        predecessor = create_event.content.get("predecessor", None)
+
+        # Ensure the key is a dictionary
+        if not isinstance(predecessor, dict):
+            return None
+
+        if not require_local:
+            return predecessor
+
+        predecessor_room_id = predecessor.get("room_id")
+        if not predecessor_room_id:
+            # The predecessor object did not include a room_id
+            return None
+
+        # Check that the server is in the predecessor room
+        try:
+            yield self.get_create_event_for_room(room_id)
+        except NotFoundError:
+            # The server is not in this room
+            return None
+
+        return predecessor
 
     @defer.inlineCallbacks
     def get_create_event_for_room(self, room_id):
@@ -318,7 +344,7 @@ class StateGroupWorkerStore(
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
-            raise NotFoundError("Unknown room %s" % (room_id))
+            raise NotFoundError("Unknown room %s" % (room_id,))
 
         # Retrieve the room's create event and return
         create_event = yield self.get_event(create_id)
