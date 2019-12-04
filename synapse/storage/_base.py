@@ -31,11 +31,17 @@ logger = logging.getLogger(__name__)
 
 
 class SQLBaseStore(object):
+    """Base class for data stores that holds helper functions.
+
+    Note that multiple instances of this class will exist as there will be one
+    per data store (and not one per physical database).
+    """
+
     def __init__(self, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = hs.database_engine
-        self.db = Database(hs)
+        self.db = Database(hs)  # In future this will be passed in
         self.rand = random.SystemRandom()
 
     def _invalidate_state_caches(self, room_id, members_changed):

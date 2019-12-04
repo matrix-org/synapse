@@ -211,6 +211,11 @@ class PerformanceCounters(object):
 
 
 class Database(object):
+    """Wraps a single physical database and connection pool.
+
+    A single database may be used by multiple data stores.
+    """
+
     _TXN_ID = 0
 
     def __init__(self, hs):
