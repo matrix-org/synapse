@@ -63,10 +63,14 @@ class SearchHandler(BaseHandler):
         while True:
             try:
                 predecessor = yield self.store.get_room_predecessor(room_id)
-                predecessor_room_id = predecessor["room_id"]
+                if not predecessor:
+                    # This room does not have a predecessor
+                    break
             except NotFoundError:
-                # This room does not have a predecessor
+                # Unknown room_id
                 break
+
+            predecessor_room_id = predecessor["room_id"]
 
             # Add predecessor's room ID
             historical_room_ids.append(predecessor_room_id)
