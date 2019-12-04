@@ -1534,12 +1534,12 @@ class SQLBaseStore(object):
     def _simple_select_list_paginate(
         self,
         table,
-        filters,
-        keyvalues,
         orderby,
         start,
         limit,
         retcols,
+        filters=None,
+        keyvalues=None,
         order_direction="ASC",
         desc="_simple_select_list_paginate",
     ):
@@ -1568,12 +1568,12 @@ class SQLBaseStore(object):
             desc,
             self._simple_select_list_paginate_txn,
             table,
-            filters,
-            keyvalues,
             orderby,
             start,
             limit,
             retcols,
+            filters=filters,
+            keyvalues=keyvalues,
             order_direction=order_direction,
         )
 
@@ -1582,32 +1582,35 @@ class SQLBaseStore(object):
         cls,
         txn,
         table,
-        filters,
-        keyvalues,
         orderby,
         start,
         limit,
         retcols,
+        filters=None,
+        keyvalues=None,
         order_direction="ASC",
     ):
         """
         Executes a SELECT query on the named table with start and limit,
         of row numbers, which may return zero or number of rows from start to limit,
         returning the result as a list of dicts.
+        Use filters to search attributes using SQL regular expressions and/or keyvalues
+        to select attributes with exact matches. All constraints are joined together
+        using 'AND'.
 
         Args:
             txn : Transaction object
             table (str): the table name
+            orderby (str): Column to order the results by.
+            start (int): Index to begin the query at.
+            limit (int): Number of results to return.
+            retcols (iterable[str]): the names of the columns to return
             filters (dict[str, T] | None):
                 column names and values to filter the rows with, or None to not
                 apply a WHERE ? LIKE ? clause.
             keyvalues (dict[str, T] | None):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
-            orderby (str): Column to order the results by.
-            start (int): Index to begin the query at.
-            limit (int): Number of results to return.
-            retcols (iterable[str]): the names of the columns to return
             order_direction (str): Whether the results should be ordered "ASC" or "DESC".
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
@@ -1629,7 +1632,9 @@ class SQLBaseStore(object):
             orderby,
             order_direction,
         )
-        txn.execute(sql, list(keyvalues.values()) + [limit, start])
+        txn.execute(
+            sql, list(filters.values()) + list(keyvalues.values()) + [limit, start]
+        )
 
         return cls.cursor_to_dict(txn)
 

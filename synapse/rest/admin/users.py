@@ -66,15 +66,14 @@ class UsersRestServletV2(RestServlet):
     """Get request to list all local users.
     This needs user to have administrator access in Synapse.
 
-    GET /_synapse/admin/v2/users?offset=0&limit=10&guests=false
+    GET /_synapse/admin/v2/users?from=0&limit=10&guests=false
 
     returns:
         200 OK with list of users if success otherwise an error.
 
-    The parameters `offset` and `limit` are required only for pagination.
-    Per default a `limit` of 100 is used. If the endpoint returns less entries
-    than specified by `limit` then there are no more users left.
-    The parameter `name` can be used to filter by user name.
+    The parameters `from` and `limit` are required only for pagination.
+    By default, a `limit` of 100 is used.
+    The parameter `user_id` can be used to filter by user id.
     The parameter `guests` can be used to exclude guest users.
     The parameter `deactivated` can be used to include deactivated users.
     """
@@ -87,16 +86,20 @@ class UsersRestServletV2(RestServlet):
     async def on_GET(self, request):
         await assert_requester_is_admin(self.auth, request)
 
-        start = parse_integer(request, "offset", default=0)
+        start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
-        name = parse_string(request, "name", default=None)
+        user_id = parse_string(request, "user_id", default=None)
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
         users = await self.admin_handler.get_users_paginate(
-            start, limit, name, guests, deactivated
+            start, limit, user_id, guests, deactivated
         )
-        return 200, {"users": users, "next_token": start + len(users)}
+        ret = {"users": users}
+        if len(users) >= limit:
+            ret["next_token"] = str(start + len(users))
+
+        return 200, ret
 
 
 class UserRegisterServlet(RestServlet):

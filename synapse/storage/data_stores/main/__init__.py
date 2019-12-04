@@ -519,11 +519,11 @@ class DataStore(
 
         return self._simple_select_list_paginate(
             table="users",
-            filters=name_filter,
-            keyvalues=attr_filter,
             orderby="name",
             start=start,
             limit=limit,
+            filters=name_filter,
+            keyvalues=attr_filter,
             retcols=[
                 "name",
                 "password_hash",
