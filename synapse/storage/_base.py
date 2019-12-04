@@ -1619,11 +1619,14 @@ class SQLBaseStore(object):
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
 
         where_clause = "WHERE " if filters or keyvalues else ""
+        arg_list = []
         if filters:
             where_clause += " AND ".join("%s LIKE ?" % (k,) for k in filters)
+            arg_list += list(filters.values())
         where_clause += " AND " if filters and keyvalues else ""
         if keyvalues:
             where_clause += " AND ".join("%s = ?" % (k,) for k in keyvalues)
+            arg_list += list(keyvalues.values())
 
         sql = "SELECT %s FROM %s %s ORDER BY %s %s LIMIT ? OFFSET ?" % (
             ", ".join(retcols),
@@ -1632,9 +1635,7 @@ class SQLBaseStore(object):
             orderby,
             order_direction,
         )
-        txn.execute(
-            sql, list(filters.values()) + list(keyvalues.values()) + [limit, start]
-        )
+        txn.execute(sql, arg_list + [limit, start])
 
         return cls.cursor_to_dict(txn)
 
