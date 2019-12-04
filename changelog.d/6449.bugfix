@@ -1,1 +1,1 @@
-Fix assumed missing state_groups index in synapse_port_db.
+Fix error when using synapse_port_db on a vanilla synapse db.
