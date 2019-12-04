@@ -2195,21 +2195,21 @@ class FederationHandler(BaseHandler):
             different_auth,
         )
 
-        # now we state-resolve between our own idea of the auth events, and the remote's
-        # idea of them.
-
-        room_version = yield self.store.get_room_version(event.room_id)
-
         # XXX: currently this checks for redactions but I'm not convinced that is
         # necessary?
         different_events = yield self.store.get_events_as_list(different_auth)
 
-        local_view = dict(auth_events)
-        remote_view = dict(auth_events)
-        remote_view.update({(d.type, d.state_key): d for d in different_events})
+        # now we state-resolve between our own idea of the auth events, and the remote's
+        # idea of them.
 
+        local_state = auth_events.values()
+        remote_auth_events = dict(auth_events)
+        remote_auth_events.update({(d.type, d.state_key): d for d in different_events})
+        remote_state = remote_auth_events.values()
+
+        room_version = yield self.store.get_room_version(event.room_id)
         new_state = yield self.state_handler.resolve_events(
-            room_version, [list(local_view.values()), list(remote_view.values())], event
+            room_version, (local_state, remote_state), event
         )
 
         logger.info(
