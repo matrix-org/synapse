@@ -88,7 +88,7 @@ makes it horribly hard to review otherwise.
 All changes, even minor ones, need a corresponding changelog / newsfragment
 entry. These are managed by [Towncrier](https://github.com/hawkowl/towncrier).
 
-To create a changelog entry, make a new file in the `changelog.d` file named
+To create a changelog entry, make a new file in the `changelog.d` directory named
 in the format of `PRnumber.type`. The type can be one of the following:
 
 * `feature`
