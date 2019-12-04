@@ -93,10 +93,12 @@ class SAML2Config(Config):
             # that instead for backwards compatibility
             old_mxid_source_attribute = saml2_config.get("mxid_source_attribute")
             if old_mxid_source_attribute:
-                self.using_old_mxid_source_attribute = True
                 user_mapping_provider_config[
                     "mxid_source_attribute"
                 ] = old_mxid_source_attribute
+
+                # Provide a deprecation warning
+                self.using_old_mxid_source_attribute = True
             else:
                 # If the option doesn't exist in saml2_config, and it's not set under
                 # user_mapping_provider_config, set it to a default value
@@ -105,25 +107,18 @@ class SAML2Config(Config):
             # If mxid_mapping is defined, use that instead for backwards compatibility
             old_mxid_mapping = saml2_config.get("mxid_mapping")
             if old_mxid_mapping:
-                self.using_old_mxid_mapping = True
                 user_mapping_provider_config["mxid_mapping"] = old_mxid_mapping
+
+                # Provide a deprecation warning
+                self.using_old_mxid_mapping = True
             else:
                 # If the option doesn't exist in saml2_config, and it's not set under
                 # user_mapping_provider_config, set it to a default value
                 user_mapping_provider_config.setdefault("mxid_mapping", "hexencode")
 
-        # Some places in Synapse need this value directly
-        # TODO: This isn't going to be a thing without the default module
-        self.saml2_mxid_source_attribute = user_mapping_provider_config[
-            "mxid_source_attribute"
-        ]
-
         # We don't use nor provide the module's config here
         self.saml2_user_mapping_provider_class, _ = load_module(
-            {
-                "module": user_mapping_provider_module,
-                "config": user_mapping_provider_config,
-            }
+            {"module": user_mapping_provider_module}
         )
 
         saml2_config_dict = self._default_saml_config_dict()
@@ -153,7 +148,7 @@ class SAML2Config(Config):
         if public_baseurl is None:
             raise ConfigError("saml2_config requires a public_baseurl to be set")
 
-        required_attributes = {"uid", self.saml2_mxid_source_attribute}
+        required_attributes = {"uid"}
 
         optional_attributes = {"displayName"}
         if self.saml2_grandfathered_mxid_source_attribute:
