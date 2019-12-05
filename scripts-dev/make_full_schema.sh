@@ -23,15 +23,13 @@ usage() {
   echo "  during script execution."
   echo "-c"
   echo "  CI mode. Enables coverage tracking and prints every command that the script runs."
-  echo "-n"
-  echo "  Suppress warning about requiring the use of a virtualenv."
   echo "-o <path>"
   echo "  Directory to output full schema files to."
   echo "-h"
   echo "  Display this help text."
 }
 
-while getopts "p:cno:h" opt; do
+while getopts "p:co:h" opt; do
   case $opt in
     p)
       POSTGRES_USERNAME=$OPTARG
@@ -44,9 +42,6 @@ while getopts "p:cno:h" opt; do
       REQUIRED_DEPS+=("coverage" "coverage-enable-subprocess")
 
       COVERAGE=1
-      ;;
-    n)
-      NO_VIRTUALENV=1
       ;;
     o)
       command -v realpath > /dev/null || (echo "The -o flag requires the 'realpath' binary to be installed" && exit 1)
@@ -69,15 +64,8 @@ unsatisfied_requirements=()
 for dep in "${REQUIRED_DEPS[@]}"; do
   pip show "$dep" --quiet || unsatisfied_requirements+=("$dep")
 done
-if [ ! ${#unsatisfied_requirements} -eq 0 ]; then
+if [ ${#unsatisfied_requirements} -ne 0 ]; then
   echo "Please install the following python packages: ${unsatisfied_requirements[*]}"
-  exit 1
-fi
-
-# Check that the script is running with a virtualenv enabled
-if [ -z "$NO_VIRTUALENV" ] && [ -z "$VIRTUAL_ENV" ]; then
-  echo "It is highly recommended to run this script with a virtualenv activated. Exiting now."
-  echo "If you wish to suppress this warning, please run with the -n option."
   exit 1
 fi
 
@@ -127,7 +115,6 @@ database:
 
 # Suppress the key server warning.
 trusted_key_servers: []
-suppress_key_server_warning: true
 EOF
 
 cat > "$POSTGRES_CONFIG" <<EOF
@@ -148,7 +135,6 @@ database:
 
 # Suppress the key server warning.
 trusted_key_servers: []
-suppress_key_server_warning: true
 EOF
 
 # Generate the server's signing key.
