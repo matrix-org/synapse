@@ -16,8 +16,6 @@
 import struct
 import threading
 
-from synapse.storage.prepare_database import prepare_database
-
 
 class Sqlite3Engine(object):
     single_threaded = True
@@ -59,6 +57,9 @@ class Sqlite3Engine(object):
         return sql
 
     def on_new_connection(self, db_conn):
+
+        from synapse.storage.prepare_database import prepare_database
+
         prepare_database(db_conn, self, config=None)
         db_conn.create_function("rank", 1, _rank)
 

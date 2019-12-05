@@ -15,7 +15,6 @@
 
 import logging
 
-from synapse.storage.data_stores.state import StateGroupDataStore
 from synapse.storage.prepare_database import prepare_database
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,6 @@ class DataStores(object):
 
     Attributes:
         main (DataStore)
-        state (StateGroupDataStore)
     """
 
     def __init__(self, main_store_class, hs):
@@ -39,7 +37,7 @@ class DataStores(object):
         # which databases.
 
         db_to_store = {}
-        for store_name in ("main", "state"):
+        for store_name in ("main",):
             db_to_store.setdefault(hs.config.data_stores[store_name], []).append(
                 store_name
             )
@@ -56,10 +54,6 @@ class DataStores(object):
                 if "main" in store_names:
                     logger.info("Starting 'main' data store")
                     self.main = main_store_class(database, db_conn, hs)
-
-                if "state" in store_names:
-                    logger.info("Starting 'state' data store")
-                    self.state = StateGroupDataStore(database, db_conn, hs)
 
                 db_conn.commit()
 
