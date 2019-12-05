@@ -1410,7 +1410,7 @@ class SQLBaseStore(object):
         Executes a SELECT query on the named table with start and limit,
         of row numbers, which may return zero or number of rows from start to limit,
         returning the result as a list of dicts.
-        
+
         Use `filters` to search attributes using SQL wildcards and/or `keyvalues` to
         select attributes with exact matches. All constraints are joined together
         using 'AND'.
