@@ -77,6 +77,13 @@ pid_file: DATADIR/homeserver.pid
 #
 #require_auth_for_profile_requests: true
 
+# Whether to require a user to share a room with another user in order
+# to retrieve their profile information. Only checked on Client-Server
+# requests. Profile requests from other servers should be checked by the
+# requesting server. Defaults to 'false'.
+#
+# limit_profile_requests_to_known_users: true
+
 # If set to 'false', requires authentication to access the server's public rooms
 # directory through the client API. Defaults to 'true'.
 #
