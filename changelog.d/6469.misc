@@ -1,0 +1,1 @@
+Move per database functionality out of the data stores and into a dedicated `Database` class.
