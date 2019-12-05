@@ -1187,7 +1187,7 @@ class FederationHandler(BaseHandler):
             # Check whether this room is the result of an upgrade of a room we already know
             # about. If so, migrate over user information
             predecessor = yield self.store.get_room_predecessor(room_id)
-            if not predecessor:
+            if not predecessor or "room_id" not in predecessor:
                 return
             old_room_id = predecessor["room_id"]
             logger.debug(

@@ -54,29 +54,38 @@ class SearchHandler(BaseHandler):
             room_id (str): id of the room to search through.
 
         Returns:
-            Deferred[iterable[unicode]]: predecessor room ids
+            Deferred[iterable[str]]: predecessor room ids
         """
 
         historical_room_ids = []
 
+        # The initial room must have been known for us to get this far
+        predecessor = yield self.store.get_room_predecessor(room_id)
+
         while True:
-            try:
-                predecessor = yield self.store.get_room_predecessor(room_id)
-            except NotFoundError:
-                # The room_id is not a known room
+            if not predecessor:
+                # We have reached the end of the chain of predecessors
                 break
 
-            if not predecessor:
-                # This room does not have a predecessor
+            if "room_id" not in predecessor:
+                # This predecessor object is malformed. Exit here
                 break
 
             predecessor_room_id = predecessor["room_id"]
 
-            # Add predecessor's room ID
+            # Don't add it to the list until we have checked that we are in the room
+            try:
+                next_predecessor_room = yield self.store.get_room_predecessor(
+                    predecessor_room_id
+                )
+            except NotFoundError:
+                # The predecessor is not a known room, so we are done here
+                break
+
             historical_room_ids.append(predecessor_room_id)
 
-            # Scan through the old room for further predecessors
-            room_id = predecessor_room_id
+            # And repeat
+            predecessor = next_predecessor_room
 
         return historical_room_ids
 
