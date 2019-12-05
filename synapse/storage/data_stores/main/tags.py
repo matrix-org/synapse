@@ -41,7 +41,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             tag strings to tag content.
         """
 
-        deferred = self._simple_select_list(
+        deferred = self.simple_select_list(
             "room_tags", {"user_id": user_id}, ["room_id", "tag", "content"]
         )
 
@@ -153,7 +153,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
         Returns:
             A deferred list of string tags.
         """
-        return self._simple_select_list(
+        return self.simple_select_list(
             table="room_tags",
             keyvalues={"user_id": user_id, "room_id": room_id},
             retcols=("tag", "content"),
@@ -178,7 +178,7 @@ class TagsStore(TagsWorkerStore):
         content_json = json.dumps(content)
 
         def add_tag_txn(txn, next_id):
-            self._simple_upsert_txn(
+            self.simple_upsert_txn(
                 txn,
                 table="room_tags",
                 keyvalues={"user_id": user_id, "room_id": room_id, "tag": tag},

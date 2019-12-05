@@ -89,7 +89,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             count = 0
 
             while next_group:
-                next_group = self._simple_select_one_onecol_txn(
+                next_group = self.simple_select_one_onecol_txn(
                     txn,
                     table="state_group_edges",
                     keyvalues={"state_group": next_group},
@@ -192,7 +192,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     ):
                         break
 
-                    next_group = self._simple_select_one_onecol_txn(
+                    next_group = self.simple_select_one_onecol_txn(
                         txn,
                         table="state_group_edges",
                         keyvalues={"state_group": next_group},
@@ -431,7 +431,7 @@ class StateGroupWorkerStore(
         """
 
         def _get_state_group_delta_txn(txn):
-            prev_group = self._simple_select_one_onecol_txn(
+            prev_group = self.simple_select_one_onecol_txn(
                 txn,
                 table="state_group_edges",
                 keyvalues={"state_group": state_group},
@@ -442,7 +442,7 @@ class StateGroupWorkerStore(
             if not prev_group:
                 return _GetStateGroupDelta(None, None)
 
-            delta_ids = self._simple_select_list_txn(
+            delta_ids = self.simple_select_list_txn(
                 txn,
                 table="state_groups_state",
                 keyvalues={"state_group": state_group},
@@ -644,7 +644,7 @@ class StateGroupWorkerStore(
 
     @cached(max_entries=50000)
     def _get_state_group_for_event(self, event_id):
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="event_to_state_groups",
             keyvalues={"event_id": event_id},
             retcol="state_group",
@@ -661,7 +661,7 @@ class StateGroupWorkerStore(
     def _get_state_group_for_events(self, event_ids):
         """Returns mapping event_id -> state_group
         """
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.simple_select_many_batch(
             table="event_to_state_groups",
             column="event_id",
             iterable=event_ids,
@@ -902,7 +902,7 @@ class StateGroupWorkerStore(
 
             state_group = self.database_engine.get_next_state_group_id(txn)
 
-            self._simple_insert_txn(
+            self.simple_insert_txn(
                 txn,
                 table="state_groups",
                 values={"id": state_group, "room_id": room_id, "event_id": event_id},
@@ -911,7 +911,7 @@ class StateGroupWorkerStore(
             # We persist as a delta if we can, while also ensuring the chain
             # of deltas isn't tooo long, as otherwise read performance degrades.
             if prev_group:
-                is_in_db = self._simple_select_one_onecol_txn(
+                is_in_db = self.simple_select_one_onecol_txn(
                     txn,
                     table="state_groups",
                     keyvalues={"id": prev_group},
@@ -926,13 +926,13 @@ class StateGroupWorkerStore(
 
                 potential_hops = self._count_state_group_hops_txn(txn, prev_group)
             if prev_group and potential_hops < MAX_STATE_DELTA_HOPS:
-                self._simple_insert_txn(
+                self.simple_insert_txn(
                     txn,
                     table="state_group_edges",
                     values={"state_group": state_group, "prev_state_group": prev_group},
                 )
 
-                self._simple_insert_many_txn(
+                self.simple_insert_many_txn(
                     txn,
                     table="state_groups_state",
                     values=[
@@ -947,7 +947,7 @@ class StateGroupWorkerStore(
                     ],
                 )
             else:
-                self._simple_insert_many_txn(
+                self.simple_insert_many_txn(
                     txn,
                     table="state_groups_state",
                     values=[
@@ -1007,7 +1007,7 @@ class StateGroupWorkerStore(
             referenced.
         """
 
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.simple_select_many_batch(
             table="event_to_state_groups",
             column="state_group",
             iterable=state_groups,
@@ -1065,7 +1065,7 @@ class StateBackgroundUpdateStore(
         batch_size = max(1, int(batch_size / BATCH_SIZE_SCALE_FACTOR))
 
         if max_group is None:
-            rows = yield self._execute(
+            rows = yield self.execute(
                 "_background_deduplicate_state",
                 None,
                 "SELECT coalesce(max(id), 0) FROM state_groups",
@@ -1135,13 +1135,13 @@ class StateBackgroundUpdateStore(
                             if prev_state.get(key, None) != value
                         }
 
-                        self._simple_delete_txn(
+                        self.simple_delete_txn(
                             txn,
                             table="state_group_edges",
                             keyvalues={"state_group": state_group},
                         )
 
-                        self._simple_insert_txn(
+                        self.simple_insert_txn(
                             txn,
                             table="state_group_edges",
                             values={
@@ -1150,13 +1150,13 @@ class StateBackgroundUpdateStore(
                             },
                         )
 
-                        self._simple_delete_txn(
+                        self.simple_delete_txn(
                             txn,
                             table="state_groups_state",
                             keyvalues={"state_group": state_group},
                         )
 
-                        self._simple_insert_many_txn(
+                        self.simple_insert_many_txn(
                             txn,
                             table="state_groups_state",
                             values=[
@@ -1263,7 +1263,7 @@ class StateStore(StateGroupWorkerStore, StateBackgroundUpdateStore):
 
             state_groups[event.event_id] = context.state_group
 
-        self._simple_insert_many_txn(
+        self.simple_insert_many_txn(
             txn,
             table="event_to_state_groups",
             values=[

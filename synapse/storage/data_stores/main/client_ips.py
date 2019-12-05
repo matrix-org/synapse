@@ -21,8 +21,8 @@ from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage import background_updates
-from synapse.storage._base import Cache
 from synapse.util.caches import CACHE_SIZE_FACTOR
+from synapse.util.caches.descriptors import Cache
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +431,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
             try:
-                self._simple_upsert_txn(
+                self.simple_upsert_txn(
                     txn,
                     table="user_ips",
                     keyvalues={
@@ -450,7 +450,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
                 # Technically an access token might not be associated with
                 # a device so we need to check.
                 if device_id:
-                    self._simple_upsert_txn(
+                    self.simple_upsert_txn(
                         txn,
                         table="devices",
                         keyvalues={"user_id": user_id, "device_id": device_id},
@@ -483,7 +483,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         if device_id is not None:
             keyvalues["device_id"] = device_id
 
-        res = yield self._simple_select_list(
+        res = yield self.simple_select_list(
             table="devices",
             keyvalues=keyvalues,
             retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
@@ -516,7 +516,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
                 user_agent, _, last_seen = self._batch_row_update[key]
                 results[(access_token, ip)] = (user_agent, last_seen)
 
-        rows = yield self._simple_select_list(
+        rows = yield self.simple_select_list(
             table="user_ips",
             keyvalues={"user_id": user_id},
             retcols=["access_token", "ip", "user_agent", "last_seen"],

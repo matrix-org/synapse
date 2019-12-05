@@ -1,0 +1,1 @@
+Fix `synapse_port_db` not exiting with a 0 code if something went wrong during the port process.

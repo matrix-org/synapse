@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -252,7 +255,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         super(StreamWorkerStore, self).__init__(db_conn, hs)
 
         events_max = self.get_room_max_stream_ordering()
-        event_cache_prefill, min_event_val = self._get_cache_dict(
+        event_cache_prefill, min_event_val = self.get_cache_dict(
             db_conn,
             "events",
             entity_column="room_id",
@@ -573,7 +576,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             A deferred "s%d" stream token.
         """
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="events", keyvalues={"event_id": event_id}, retcol="stream_ordering"
         ).addCallback(lambda row: "s%d" % (row,))
 
@@ -586,7 +589,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             A deferred "t%d-%d" topological token.
         """
-        return self._simple_select_one(
+        return self.simple_select_one(
             table="events",
             keyvalues={"event_id": event_id},
             retcols=("stream_ordering", "topological_ordering"),
@@ -610,7 +613,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "SELECT coalesce(max(topological_ordering), 0) FROM events"
             " WHERE room_id = ? AND stream_ordering < ?"
         )
-        return self._execute(
+        return self.execute(
             "get_max_topological_token", None, sql, room_id, stream_key
         ).addCallback(lambda r: r[0][0] if r else 0)
 
@@ -706,7 +709,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             dict
         """
 
-        results = self._simple_select_one_txn(
+        results = self.simple_select_one_txn(
             txn,
             "events",
             keyvalues={"event_id": event_id, "room_id": room_id},
@@ -794,7 +797,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         return upper_bound, events
 
     def get_federation_out_pos(self, typ):
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="federation_stream_position",
             retcol="stream_id",
             keyvalues={"type": typ},
@@ -802,7 +805,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
     def update_federation_out_pos(self, typ, stream_id):
-        return self._simple_update_one(
+        return self.simple_update_one(
             table="federation_stream_position",
             keyvalues={"type": typ},
             updatevalues={"stream_id": stream_id},

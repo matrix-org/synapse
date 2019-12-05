@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -900,6 +901,10 @@ class RoomContextHandler(object):
             room_id, event_id, before_limit, after_limit, event_filter
         )
 
+        if event_filter:
+            results["events_before"] = event_filter.filter(results["events_before"])
+            results["events_after"] = event_filter.filter(results["events_after"])
+
         results["events_before"] = yield filter_evts(results["events_before"])
         results["events_after"] = yield filter_evts(results["events_after"])
         results["event"] = event
@@ -928,7 +933,12 @@ class RoomContextHandler(object):
         state = yield self.state_store.get_state_for_events(
             [last_event_id], state_filter=state_filter
         )
-        results["state"] = list(state[last_event_id].values())
+
+        state_events = list(state[last_event_id].values())
+        if event_filter:
+            state_events = event_filter.filter(state_events)
+
+        results["state"] = state_events
 
         # We use a dummy token here as we only care about the room portion of
         # the token, which we replace.

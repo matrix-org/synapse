@@ -30,6 +30,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
+from .cache import CacheInvalidationStore
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .devices import DeviceStore
@@ -108,6 +109,7 @@ class DataStore(
     MonthlyActiveUsersStore,
     StatsStore,
     RelationsStore,
+    CacheInvalidationStore,
 ):
     def __init__(self, db_conn, hs):
         self.hs = hs
@@ -169,7 +171,7 @@ class DataStore(
 
         self._presence_on_startup = self._get_active_presence(db_conn)
 
-        presence_cache_prefill, min_presence_val = self._get_cache_dict(
+        presence_cache_prefill, min_presence_val = self.get_cache_dict(
             db_conn,
             "presence_stream",
             entity_column="user_id",
@@ -183,7 +185,7 @@ class DataStore(
         )
 
         max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
-        device_inbox_prefill, min_device_inbox_id = self._get_cache_dict(
+        device_inbox_prefill, min_device_inbox_id = self.get_cache_dict(
             db_conn,
             "device_inbox",
             entity_column="user_id",
@@ -198,7 +200,7 @@ class DataStore(
         )
         # The federation outbox and the local device inbox uses the same
         # stream_id generator.
-        device_outbox_prefill, min_device_outbox_id = self._get_cache_dict(
+        device_outbox_prefill, min_device_outbox_id = self.get_cache_dict(
             db_conn,
             "device_federation_outbox",
             entity_column="destination",
@@ -224,7 +226,7 @@ class DataStore(
         )
 
         events_max = self._stream_id_gen.get_current_token()
-        curr_state_delta_prefill, min_curr_state_delta_id = self._get_cache_dict(
+        curr_state_delta_prefill, min_curr_state_delta_id = self.get_cache_dict(
             db_conn,
             "current_state_delta_stream",
             entity_column="room_id",
@@ -238,7 +240,7 @@ class DataStore(
             prefilled_cache=curr_state_delta_prefill,
         )
 
-        _group_updates_prefill, min_group_updates_id = self._get_cache_dict(
+        _group_updates_prefill, min_group_updates_id = self.get_cache_dict(
             db_conn,
             "local_group_updates",
             entity_column="user_id",
@@ -478,7 +480,7 @@ class DataStore(
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
-        return self._simple_select_list(
+        return self.simple_select_list(
             table="users",
             keyvalues={},
             retcols=[
@@ -517,7 +519,8 @@ class DataStore(
         if not deactivated:
             attr_filter["deactivated"] = False
 
-        return self._simple_select_list_paginate(
+        return self.simple_select_list_paginate(
+            desc="get_users_paginate",
             table="users",
             orderby="name",
             start=start,
@@ -544,7 +547,7 @@ class DataStore(
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
-        return self._simple_search_list(
+        return self.simple_search_list(
             table="users",
             term=term,
             col="name",
