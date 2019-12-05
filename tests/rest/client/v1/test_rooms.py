@@ -26,7 +26,12 @@ from six.moves.urllib import parse as urlparse
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RelationTypes,
+)
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest.client.v1 import login, profile, room
 from synapse.util.stringutils import random_string
@@ -1256,6 +1261,11 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         self.tok = self.login("test", "test")
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
 
+        self.other_user_id = self.register_user("test2", "test2")
+        self.other_tok = self.login("test2", "test2")
+        self.helper.invite(self.room_id, self.user_id, self.other_user_id, tok=self.tok)
+        self.helper.join(self.room_id, self.other_user_id, tok=self.other_tok)
+
     def test_context_filter_labels(self):
         """Test that we can filter by a label on a /context request."""
         res = self._send_labelled_messages_in_room()
@@ -1532,6 +1542,124 @@ class LabelsTestCase(unittest.HomeserverTestCase):
             "with wrong label",
             results[0]["result"]["content"]["body"],
         )
+
+    def test_edits_labels(self):
+        """Test that a user can edit the list of labels on a message they sent,
+        and that no other user than the original event's sender can edit that list of
+        labels.
+        """
+        event_ids = self._send_labelled_messages_in_room()
+
+        # Check that we can add a label.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#fun", "#work"],
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REPLACE,
+                    "event_id": event_ids[0],
+                },
+            },
+            tok=self.tok,
+        )
+        edit_event_id = res["event_id"]
+
+        token = "s0_0_0_0_0_0_0_0_0"
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS_NOT_LABELS)),
+        )
+        self.render(request)
+
+        chunk = channel.json_body["chunk"]
+
+        event_ids_from_messages = self._event_ids_from_messages_chunk(chunk)
+
+        self.assertTrue(
+            edit_event_id in event_ids_from_messages,
+            [event["content"] for event in chunk],
+        )
+
+        # Check that we can remove a label.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#work"],
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REPLACE,
+                    "event_id": event_ids[0],
+                },
+            },
+            tok=self.tok,
+        )
+        edit_event_id = res["event_id"]
+
+        token = "s0_0_0_0_0_0_0_0_0"
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS)),
+        )
+        self.render(request)
+
+        chunk = channel.json_body["chunk"]
+
+        event_ids_from_messages = self._event_ids_from_messages_chunk(chunk)
+
+        self.assertTrue(
+            edit_event_id not in event_ids_from_messages,
+            [event["content"] for event in chunk],
+        )
+
+        # Make sure the original event is filterd out of the response.
+        self.assertTrue(
+            event_ids[0] not in event_ids_from_messages,
+            [event["content"] for event in chunk],
+        )
+
+        # Check that only the sender of the original event can edit the labels on that
+        # event.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#fun", "#work"],
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REPLACE,
+                    "event_id": event_ids[0],
+                },
+            },
+            tok=self.tok,
+        )
+        edit_event_id = res["event_id"]
+
+        token = "s0_0_0_0_0_0_0_0_0"
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS)),
+        )
+        self.render(request)
+
+        self.assertTrue(
+            edit_event_id not in event_ids_from_messages,
+            [event["content"] for event in chunk],
+        )
+
+    def _event_ids_from_messages_chunk(self, chunk):
+        event_ids = []
+        for event in chunk:
+            event_ids.append(event.get("event_id"))
+        return event_ids
 
     def _send_labelled_messages_in_room(self):
         """Sends several messages to a room with different labels (or without any) to test
