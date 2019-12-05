@@ -365,7 +365,9 @@ class Porter(object):
 
                 return headers, forward_rows, backward_rows
 
-            headers, frows, brows = yield self.sqlite_store.db.runInteraction("select", r)
+            headers, frows, brows = yield self.sqlite_store.db.runInteraction(
+                "select", r
+            )
 
             if frows or brows:
                 if frows:
@@ -521,7 +523,9 @@ class Porter(object):
     @defer.inlineCallbacks
     def run_background_updates_on_postgres(self):
         # Manually apply all background updates on the PostgreSQL database.
-        postgres_ready = yield self.postgres_store.has_completed_background_updates()
+        postgres_ready = (
+            yield self.postgres_store.db.updates.has_completed_background_updates()
+        )
 
         if not postgres_ready:
             # Only say that we're running background updates when there are background
@@ -529,9 +533,9 @@ class Porter(object):
             self.progress.set_state("Running background updates on PostgreSQL")
 
         while not postgres_ready:
-            yield self.postgres_store.do_next_background_update(100)
+            yield self.postgres_store.db.updates.do_next_background_update(100)
             postgres_ready = yield (
-                self.postgres_store.has_completed_background_updates()
+                self.postgres_store.db.updates.has_completed_background_updates()
             )
 
     @defer.inlineCallbacks
@@ -541,7 +545,7 @@ class Porter(object):
 
             # Check if all background updates are done, abort if not.
             updates_complete = (
-                yield self.sqlite_store.has_completed_background_updates()
+                yield self.sqlite_store.db.updates.has_completed_background_updates()
             )
             if not updates_complete:
                 sys.stderr.write(
