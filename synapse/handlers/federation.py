@@ -624,7 +624,7 @@ class FederationHandler(BaseHandler):
                 "[%s %s] persisting newly-received auth/state events %s",
                 room_id,
                 event_id,
-                [e["event"].event_id for e in event_infos],
+                [e.event.event_id for e in event_infos],
             )
             yield self._handle_new_events(origin, event_infos)
 
