@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import (
@@ -59,9 +57,8 @@ class RoomUpgradeRestServlet(RestServlet):
         self._room_creation_handler = hs.get_room_creation_handler()
         self._auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id):
-        requester = yield self._auth.get_user_by_req(request)
+    async def on_POST(self, request, room_id):
+        requester = await self._auth.get_user_by_req(request)
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ("new_version",))
@@ -74,7 +71,7 @@ class RoomUpgradeRestServlet(RestServlet):
                 Codes.UNSUPPORTED_ROOM_VERSION,
             )
 
-        new_room_id = yield self._room_creation_handler.upgrade_room(
+        new_room_id = await self._room_creation_handler.upgrade_room(
             requester, room_id, new_version
         )
 
