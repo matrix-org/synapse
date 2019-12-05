@@ -37,14 +37,10 @@ class MessageAcceptTests(unittest.TestCase):
 
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
-<<<<<<< HEAD
             maybeDeferred(
                 self.homeserver.get_datastore().get_latest_event_ids_in_room,
                 self.room_id,
             )
-=======
-            maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
->>>>>>> 396c0248b... Fix up tests
         )[0]
 
         join_event = FrozenEvent(
