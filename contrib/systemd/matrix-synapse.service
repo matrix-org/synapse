@@ -4,8 +4,11 @@
 #    systemctl enable matrix-synapse
 #    systemctl start matrix-synapse
 #
+# This assumes that Synapse has been installed by a user named
+# synapse.
+#
 # This assumes that Synapse has been installed in a virtualenv in
-# /opt/synapse/env.
+# the user's home directory: `/home/synapse/synapse/env`.
 #
 # **NOTE:** This is an example service file that may change in the future. If you
 # wish to use this please copy rather than symlink it.
@@ -23,7 +26,7 @@ User=synapse
 Group=nogroup
 
 WorkingDirectory=/opt/synapse
-ExecStart=/opt/synapse/env/bin/python -m synapse.app.homeserver --config-path=/opt/synapse/homeserver.yaml
+ExecStart=/home/synapse/synapse/env/bin/python -m synapse.app.homeserver --config-path=/home/synapse/synapse/homeserver.yaml
 SyslogIdentifier=matrix-synapse
 
 # adjust the cache factor if necessary
