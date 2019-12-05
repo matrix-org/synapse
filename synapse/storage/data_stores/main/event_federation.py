@@ -126,7 +126,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         Returns
             Deferred[int]
         """
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.simple_select_many_batch(
             table="events",
             column="event_id",
             iterable=event_ids,
@@ -140,7 +140,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             return max(row["depth"] for row in rows)
 
     def _get_oldest_events_in_room_txn(self, txn, room_id):
-        return self._simple_select_onecol_txn(
+        return self.simple_select_onecol_txn(
             txn,
             table="event_backward_extremities",
             keyvalues={"room_id": room_id},
@@ -235,7 +235,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
     @cached(max_entries=5000, iterable=True)
     def get_latest_event_ids_in_room(self, room_id):
-        return self._simple_select_onecol(
+        return self.simple_select_onecol(
             table="event_forward_extremities",
             keyvalues={"room_id": room_id},
             retcol="event_id",
@@ -271,7 +271,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     def _get_min_depth_interaction(self, txn, room_id):
-        min_depth = self._simple_select_one_onecol_txn(
+        min_depth = self.simple_select_one_onecol_txn(
             txn,
             table="room_depth",
             keyvalues={"room_id": room_id},
@@ -383,7 +383,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         queue = PriorityQueue()
 
         for event_id in event_list:
-            depth = self._simple_select_one_onecol_txn(
+            depth = self.simple_select_one_onecol_txn(
                 txn,
                 table="events",
                 keyvalues={"event_id": event_id, "room_id": room_id},
@@ -468,7 +468,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         Returns:
             Deferred[list[str]]
         """
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.simple_select_many_batch(
             table="event_edges",
             column="prev_event_id",
             iterable=event_ids,
@@ -508,7 +508,7 @@ class EventFederationStore(EventFederationWorkerStore):
         if min_depth and depth >= min_depth:
             return
 
-        self._simple_upsert_txn(
+        self.simple_upsert_txn(
             txn,
             table="room_depth",
             keyvalues={"room_id": room_id},
@@ -520,7 +520,7 @@ class EventFederationStore(EventFederationWorkerStore):
         For the given event, update the event edges table and forward and
         backward extremities tables.
         """
-        self._simple_insert_many_txn(
+        self.simple_insert_many_txn(
             txn,
             table="event_edges",
             values=[

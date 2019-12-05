@@ -54,7 +54,7 @@ class RoomWorkerStore(SQLBaseStore):
         Returns:
             A dict containing the room information, or None if the room is unknown.
         """
-        return self._simple_select_one(
+        return self.simple_select_one(
             table="rooms",
             keyvalues={"room_id": room_id},
             retcols=("room_id", "is_public", "creator"),
@@ -63,7 +63,7 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
     def get_public_room_ids(self):
-        return self._simple_select_onecol(
+        return self.simple_select_onecol(
             table="rooms",
             keyvalues={"is_public": True},
             retcol="room_id",
@@ -267,7 +267,7 @@ class RoomWorkerStore(SQLBaseStore):
 
     @cached(max_entries=10000)
     def is_room_blocked(self, room_id):
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="blocked_rooms",
             keyvalues={"room_id": room_id},
             retcol="1",
@@ -288,7 +288,7 @@ class RoomWorkerStore(SQLBaseStore):
             of RatelimitOverride are None or 0 then ratelimitng has been
             disabled for that user entirely.
         """
-        row = yield self._simple_select_one(
+        row = yield self.simple_select_one(
             table="ratelimit_override",
             keyvalues={"user_id": user_id},
             retcols=("messages_per_second", "burst_count"),
@@ -408,7 +408,7 @@ class RoomBackgroundUpdateStore(BackgroundUpdateStore):
                     ev = json.loads(row["json"])
                     retention_policy = json.dumps(ev["content"])
 
-                self._simple_insert_txn(
+                self.simple_insert_txn(
                     txn=txn,
                     table="room_retention",
                     values={
@@ -461,7 +461,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         try:
 
             def store_room_txn(txn, next_id):
-                self._simple_insert_txn(
+                self.simple_insert_txn(
                     txn,
                     "rooms",
                     {
@@ -471,7 +471,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     },
                 )
                 if is_public:
-                    self._simple_insert_txn(
+                    self.simple_insert_txn(
                         txn,
                         table="public_room_list_stream",
                         values={
@@ -490,14 +490,14 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
     @defer.inlineCallbacks
     def set_room_is_public(self, room_id, is_public):
         def set_room_is_public_txn(txn, next_id):
-            self._simple_update_one_txn(
+            self.simple_update_one_txn(
                 txn,
                 table="rooms",
                 keyvalues={"room_id": room_id},
                 updatevalues={"is_public": is_public},
             )
 
-            entries = self._simple_select_list_txn(
+            entries = self.simple_select_list_txn(
                 txn,
                 table="public_room_list_stream",
                 keyvalues={
@@ -515,7 +515,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 add_to_stream = bool(entries[-1]["visibility"]) != is_public
 
             if add_to_stream:
-                self._simple_insert_txn(
+                self.simple_insert_txn(
                     txn,
                     table="public_room_list_stream",
                     values={
@@ -555,7 +555,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         def set_room_is_public_appservice_txn(txn, next_id):
             if is_public:
                 try:
-                    self._simple_insert_txn(
+                    self.simple_insert_txn(
                         txn,
                         table="appservice_room_list",
                         values={
@@ -568,7 +568,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     # We've already inserted, nothing to do.
                     return
             else:
-                self._simple_delete_txn(
+                self.simple_delete_txn(
                     txn,
                     table="appservice_room_list",
                     keyvalues={
@@ -578,7 +578,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     },
                 )
 
-            entries = self._simple_select_list_txn(
+            entries = self.simple_select_list_txn(
                 txn,
                 table="public_room_list_stream",
                 keyvalues={
@@ -596,7 +596,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 add_to_stream = bool(entries[-1]["visibility"]) != is_public
 
             if add_to_stream:
-                self._simple_insert_txn(
+                self.simple_insert_txn(
                     txn,
                     table="public_room_list_stream",
                     values={
@@ -660,7 +660,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 # Ignore the event if one of the value isn't an integer.
                 return
 
-            self._simple_insert_txn(
+            self.simple_insert_txn(
                 txn=txn,
                 table="room_retention",
                 values={
@@ -679,7 +679,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         self, room_id, event_id, user_id, reason, content, received_ts
     ):
         next_id = self._event_reports_id_gen.get_next()
-        return self._simple_insert(
+        return self.simple_insert(
             table="event_reports",
             values={
                 "id": next_id,
@@ -725,7 +725,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         Returns:
             Deferred
         """
-        yield self._simple_upsert(
+        yield self.simple_upsert(
             table="blocked_rooms",
             keyvalues={"room_id": room_id},
             values={},

@@ -356,7 +356,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
         self.get_success(
             self.storage.runInteraction(
                 "test",
-                self.storage._simple_upsert_many_txn,
+                self.storage.simple_upsert_many_txn,
                 self.table_name,
                 key_names,
                 key_values,
@@ -367,7 +367,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
 
         # Check results are what we expect
         res = self.get_success(
-            self.storage._simple_select_list(
+            self.storage.simple_select_list(
                 self.table_name, None, ["id, username, value"]
             )
         )
@@ -383,7 +383,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
         self.get_success(
             self.storage.runInteraction(
                 "test",
-                self.storage._simple_upsert_many_txn,
+                self.storage.simple_upsert_many_txn,
                 self.table_name,
                 key_names,
                 key_values,
@@ -394,7 +394,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
 
         # Check results are what we expect
         res = self.get_success(
-            self.storage._simple_select_list(
+            self.storage.simple_select_list(
                 self.table_name, None, ["id, username, value"]
             )
         )
