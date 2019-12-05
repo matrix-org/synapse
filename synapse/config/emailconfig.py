@@ -146,6 +146,8 @@ class EmailConfig(Config):
                 if k not in email_config:
                     missing.append("email." + k)
 
+            # public_baseurl is required to build password reset and validation links that
+            # will be emailed to users
             if config.get("public_baseurl") is None:
                 missing.append("public_baseurl")
 
@@ -305,8 +307,23 @@ class EmailConfig(Config):
         #   smtp_user: "exampleusername"
         #   smtp_pass: "examplepassword"
         #   require_transport_security: false
-        #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
-        #   app_name: Matrix
+        #
+        #   # notif_from defines the "From" address to use when sending emails.
+        #   # It must be set if email sending is enabled.
+        #   #
+        #   # The placeholder '%(app)s' will be replaced by the application name,
+        #   # which is normally 'app_name' (below), but may be overridden by the
+        #   # Matrix client application.
+        #   #
+        #   # Note that the placeholder must be written '%(app)s', including the
+        #   # trailing 's'.
+        #   #
+        #   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
+        #
+        #   # app_name defines the default value for '%(app)s' in notif_from. It
+        #   # defaults to 'Matrix'.
+        #   #
+        #   #app_name: my_branded_matrix_server
         #
         #   # Enable email notifications by default
         #   #

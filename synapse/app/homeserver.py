@@ -542,8 +542,8 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     # Database version
     #
 
-    stats["database_engine"] = hs.get_datastore().database_engine_name
-    stats["database_server_version"] = hs.get_datastore().get_server_version()
+    stats["database_engine"] = hs.database_engine.module.__name__
+    stats["database_server_version"] = hs.database_engine.server_version
     logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
     try:
         yield hs.get_proxied_http_client().put_json(
@@ -585,7 +585,7 @@ def run(hs):
     def performance_stats_init():
         _stats_process.clear()
         _stats_process.append(
-            (int(hs.get_clock().time(), resource.getrusage(resource.RUSAGE_SELF)))
+            (int(hs.get_clock().time()), resource.getrusage(resource.RUSAGE_SELF))
         )
 
     def start_phone_stats_home():

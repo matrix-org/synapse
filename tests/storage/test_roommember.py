@@ -16,8 +16,7 @@
 
 from unittest.mock import Mock
 
-from synapse.api.constants import EventTypes, Membership
-from synapse.api.room_versions import RoomVersions
+from synapse.api.constants import Membership
 from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.rest.client.v1 import login, room
 from synapse.types import Requester, UserID
@@ -44,9 +43,6 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # We can't test the RoomMemberStore on its own without the other event
         # storage logic
         self.store = hs.get_datastore()
-        self.storage = hs.get_storage()
-        self.event_builder_factory = hs.get_event_builder_factory()
-        self.event_creation_handler = hs.get_event_creation_handler()
 
         self.u_alice = self.register_user("alice", "pass")
         self.t_alice = self.login("alice", "pass")
@@ -54,26 +50,6 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
 
         # User elsewhere on another host
         self.u_charlie = UserID.from_string("@charlie:elsewhere")
-
-    def inject_room_member(self, room, user, membership, replaces_state=None):
-        builder = self.event_builder_factory.for_room_version(
-            RoomVersions.V1,
-            {
-                "type": EventTypes.Member,
-                "sender": user,
-                "state_key": user,
-                "room_id": room,
-                "content": {"membership": membership},
-            },
-        )
-
-        event, context = self.get_success(
-            self.event_creation_handler.create_new_client_event(builder)
-        )
-
-        self.get_success(self.storage.persistence.persist_event(event, context))
-
-        return event
 
     def test_one_member(self):
 
@@ -156,7 +132,7 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
 
         # Register the background update to run again.
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 table="background_updates",
                 values={
                     "update_name": "current_state_events_membership",

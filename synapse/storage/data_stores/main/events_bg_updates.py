@@ -189,7 +189,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             chunks = [event_ids[i : i + 100] for i in range(0, len(event_ids), 100)]
             for chunk in chunks:
-                ev_rows = self._simple_select_many_txn(
+                ev_rows = self.simple_select_many_txn(
                     txn,
                     table="event_json",
                     column="event_id",
@@ -366,7 +366,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             to_delete.intersection_update(original_set)
 
-            deleted = self._simple_delete_many_txn(
+            deleted = self.simple_delete_many_txn(
                 txn=txn,
                 table="event_forward_extremities",
                 column="event_id",
@@ -382,7 +382,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
             if deleted:
                 # We now need to invalidate the caches of these rooms
-                rows = self._simple_select_many_txn(
+                rows = self.simple_select_many_txn(
                     txn,
                     table="events",
                     column="event_id",
@@ -396,7 +396,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
                         self.get_latest_event_ids_in_room.invalidate, (room_id,)
                     )
 
-            self._simple_delete_many_txn(
+            self.simple_delete_many_txn(
                 txn=txn,
                 table="_extremities_to_check",
                 column="event_id",
@@ -530,24 +530,31 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             nbrows = 0
             last_row_event_id = ""
             for (event_id, event_json_raw) in results:
-                event_json = json.loads(event_json_raw)
+                try:
+                    event_json = json.loads(event_json_raw)
 
-                self._simple_insert_many_txn(
-                    txn=txn,
-                    table="event_labels",
-                    values=[
-                        {
-                            "event_id": event_id,
-                            "label": label,
-                            "room_id": event_json["room_id"],
-                            "topological_ordering": event_json["depth"],
-                        }
-                        for label in event_json["content"].get(
-                            EventContentFields.LABELS, []
-                        )
-                        if isinstance(label, str)
-                    ],
-                )
+                    self.simple_insert_many_txn(
+                        txn=txn,
+                        table="event_labels",
+                        values=[
+                            {
+                                "event_id": event_id,
+                                "label": label,
+                                "room_id": event_json["room_id"],
+                                "topological_ordering": event_json["depth"],
+                            }
+                            for label in event_json["content"].get(
+                                EventContentFields.LABELS, []
+                            )
+                            if isinstance(label, str)
+                        ],
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Unable to load event %s (no labels will be imported): %s",
+                        event_id,
+                        e,
+                    )
 
                 nbrows += 1
                 last_row_event_id = event_id

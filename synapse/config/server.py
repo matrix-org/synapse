@@ -19,7 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import List
+from typing import Dict, List, Optional
 
 import attr
 import yaml
@@ -41,7 +41,7 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
-DEFAULT_ROOM_VERSION = "4"
+DEFAULT_ROOM_VERSION = "5"
 
 ROOM_COMPLEXITY_TOO_GREAT = (
     "Your homeserver is unable to join rooms this large or complex. "
@@ -118,15 +118,16 @@ class ServerConfig(Config):
             self.allow_public_rooms_without_auth = False
             self.allow_public_rooms_over_federation = False
         else:
-            # If set to 'False', requires authentication to access the server's public
-            # rooms directory through the client API. Defaults to 'True'.
+            # If set to 'true', removes the need for authentication to access the server's
+            # public rooms directory through the client API, meaning that anyone can
+            # query the room directory. Defaults to 'false'.
             self.allow_public_rooms_without_auth = config.get(
-                "allow_public_rooms_without_auth", True
+                "allow_public_rooms_without_auth", False
             )
-            # If set to 'False', forbids any other homeserver to fetch the server's public
-            # rooms directory via federation. Defaults to 'True'.
+            # If set to 'true', allows any other homeserver to fetch the server's public
+            # rooms directory via federation. Defaults to 'false'.
             self.allow_public_rooms_over_federation = config.get(
-                "allow_public_rooms_over_federation", True
+                "allow_public_rooms_over_federation", False
             )
 
         default_room_version = config.get("default_room_version", DEFAULT_ROOM_VERSION)
@@ -223,7 +224,7 @@ class ServerConfig(Config):
             self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
         except Exception as e:
             raise ConfigError(
-                "Invalid range(s) provided in " "federation_ip_range_blacklist: %s" % e
+                "Invalid range(s) provided in federation_ip_range_blacklist: %s" % e
             )
 
         if self.public_baseurl is not None:
@@ -245,6 +246,124 @@ class ServerConfig(Config):
         # Whether to allow per-room membership profiles through the send of membership
         # events with profile information that differ from the target's global profile.
         self.allow_per_room_profiles = config.get("allow_per_room_profiles", True)
+
+        retention_config = config.get("retention")
+        if retention_config is None:
+            retention_config = {}
+
+        self.retention_enabled = retention_config.get("enabled", False)
+
+        retention_default_policy = retention_config.get("default_policy")
+
+        if retention_default_policy is not None:
+            self.retention_default_min_lifetime = retention_default_policy.get(
+                "min_lifetime"
+            )
+            if self.retention_default_min_lifetime is not None:
+                self.retention_default_min_lifetime = self.parse_duration(
+                    self.retention_default_min_lifetime
+                )
+
+            self.retention_default_max_lifetime = retention_default_policy.get(
+                "max_lifetime"
+            )
+            if self.retention_default_max_lifetime is not None:
+                self.retention_default_max_lifetime = self.parse_duration(
+                    self.retention_default_max_lifetime
+                )
+
+            if (
+                self.retention_default_min_lifetime is not None
+                and self.retention_default_max_lifetime is not None
+                and (
+                    self.retention_default_min_lifetime
+                    > self.retention_default_max_lifetime
+                )
+            ):
+                raise ConfigError(
+                    "The default retention policy's 'min_lifetime' can not be greater"
+                    " than its 'max_lifetime'"
+                )
+        else:
+            self.retention_default_min_lifetime = None
+            self.retention_default_max_lifetime = None
+
+        self.retention_allowed_lifetime_min = retention_config.get(
+            "allowed_lifetime_min"
+        )
+        if self.retention_allowed_lifetime_min is not None:
+            self.retention_allowed_lifetime_min = self.parse_duration(
+                self.retention_allowed_lifetime_min
+            )
+
+        self.retention_allowed_lifetime_max = retention_config.get(
+            "allowed_lifetime_max"
+        )
+        if self.retention_allowed_lifetime_max is not None:
+            self.retention_allowed_lifetime_max = self.parse_duration(
+                self.retention_allowed_lifetime_max
+            )
+
+        if (
+            self.retention_allowed_lifetime_min is not None
+            and self.retention_allowed_lifetime_max is not None
+            and self.retention_allowed_lifetime_min
+            > self.retention_allowed_lifetime_max
+        ):
+            raise ConfigError(
+                "Invalid retention policy limits: 'allowed_lifetime_min' can not be"
+                " greater than 'allowed_lifetime_max'"
+            )
+
+        self.retention_purge_jobs = []  # type: List[Dict[str, Optional[int]]]
+        for purge_job_config in retention_config.get("purge_jobs", []):
+            interval_config = purge_job_config.get("interval")
+
+            if interval_config is None:
+                raise ConfigError(
+                    "A retention policy's purge jobs configuration must have the"
+                    " 'interval' key set."
+                )
+
+            interval = self.parse_duration(interval_config)
+
+            shortest_max_lifetime = purge_job_config.get("shortest_max_lifetime")
+
+            if shortest_max_lifetime is not None:
+                shortest_max_lifetime = self.parse_duration(shortest_max_lifetime)
+
+            longest_max_lifetime = purge_job_config.get("longest_max_lifetime")
+
+            if longest_max_lifetime is not None:
+                longest_max_lifetime = self.parse_duration(longest_max_lifetime)
+
+            if (
+                shortest_max_lifetime is not None
+                and longest_max_lifetime is not None
+                and shortest_max_lifetime > longest_max_lifetime
+            ):
+                raise ConfigError(
+                    "A retention policy's purge jobs configuration's"
+                    " 'shortest_max_lifetime' value can not be greater than its"
+                    " 'longest_max_lifetime' value."
+                )
+
+            self.retention_purge_jobs.append(
+                {
+                    "interval": interval,
+                    "shortest_max_lifetime": shortest_max_lifetime,
+                    "longest_max_lifetime": longest_max_lifetime,
+                }
+            )
+
+        if not self.retention_purge_jobs:
+            self.retention_purge_jobs = [
+                {
+                    "interval": self.parse_duration("1d"),
+                    "shortest_max_lifetime": None,
+                    "longest_max_lifetime": None,
+                }
+            ]
 
         self.listeners = []  # type: List[dict]
         for listener in config.get("listeners", []):
@@ -371,6 +490,8 @@ class ServerConfig(Config):
         self.cleanup_extremities_with_dummy_events = config.get(
             "cleanup_extremities_with_dummy_events", True
         )
+
+        self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
 
     def has_tls_listener(self) -> bool:
         return any(l["tls"] for l in self.listeners)
@@ -500,15 +621,16 @@ class ServerConfig(Config):
         #
         #require_auth_for_profile_requests: true
 
-        # If set to 'false', requires authentication to access the server's public rooms
-        # directory through the client API. Defaults to 'true'.
+        # If set to 'true', removes the need for authentication to access the server's
+        # public rooms directory through the client API, meaning that anyone can
+        # query the room directory. Defaults to 'false'.
         #
-        #allow_public_rooms_without_auth: false
+        #allow_public_rooms_without_auth: true
 
-        # If set to 'false', forbids any other homeserver to fetch the server's public
-        # rooms directory via federation. Defaults to 'true'.
+        # If set to 'true', allows any other homeserver to fetch the server's public
+        # rooms directory via federation. Defaults to 'false'.
         #
-        #allow_public_rooms_over_federation: false
+        #allow_public_rooms_over_federation: true
 
         # The default room version for newly created rooms.
         #
@@ -721,7 +843,7 @@ class ServerConfig(Config):
         # Used by phonehome stats to group together related servers.
         #server_context: context
 
-        # Resource-constrained Homeserver Settings
+        # Resource-constrained homeserver Settings
         #
         # If limit_remote_rooms.enabled is True, the room complexity will be
         # checked before a user joins a new remote room. If it is above
@@ -761,6 +883,69 @@ class ServerConfig(Config):
         # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
         #
         #user_ips_max_age: 14d
+
+        # Message retention policy at the server level.
+        #
+        # Room admins and mods can define a retention period for their rooms using the
+        # 'm.room.retention' state event, and server admins can cap this period by setting
+        # the 'allowed_lifetime_min' and 'allowed_lifetime_max' config options.
+        #
+        # If this feature is enabled, Synapse will regularly look for and purge events
+        # which are older than the room's maximum retention period. Synapse will also
+        # filter events received over federation so that events that should have been
+        # purged are ignored and not stored again.
+        #
+        retention:
+          # The message retention policies feature is disabled by default. Uncomment the
+          # following line to enable it.
+          #
+          #enabled: true
+
+          # Default retention policy. If set, Synapse will apply it to rooms that lack the
+          # 'm.room.retention' state event. Currently, the value of 'min_lifetime' doesn't
+          # matter much because Synapse doesn't take it into account yet.
+          #
+          #default_policy:
+          #  min_lifetime: 1d
+          #  max_lifetime: 1y
+
+          # Retention policy limits. If set, a user won't be able to send a
+          # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
+          # that's not within this range. This is especially useful in closed federations,
+          # in which server admins can make sure every federating server applies the same
+          # rules.
+          #
+          #allowed_lifetime_min: 1d
+          #allowed_lifetime_max: 1y
+
+          # Server admins can define the settings of the background jobs purging the
+          # events which lifetime has expired under the 'purge_jobs' section.
+          #
+          # If no configuration is provided, a single job will be set up to delete expired
+          # events in every room daily.
+          #
+          # Each job's configuration defines which range of message lifetimes the job
+          # takes care of. For example, if 'shortest_max_lifetime' is '2d' and
+          # 'longest_max_lifetime' is '3d', the job will handle purging expired events in
+          # rooms whose state defines a 'max_lifetime' that's both higher than 2 days, and
+          # lower than or equal to 3 days. Both the minimum and the maximum value of a
+          # range are optional, e.g. a job with no 'shortest_max_lifetime' and a
+          # 'longest_max_lifetime' of '3d' will handle every room with a retention policy
+          # which 'max_lifetime' is lower than or equal to three days.
+          #
+          # The rationale for this per-job configuration is that some rooms might have a
+          # retention policy with a low 'max_lifetime', where history needs to be purged
+          # of outdated messages on a very frequent basis (e.g. every 5min), but not want
+          # that purge to be performed by a job that's iterating over every room it knows,
+          # which would be quite heavy on the server.
+          #
+          #purge_jobs:
+          #  - shortest_max_lifetime: 1d
+          #    longest_max_lifetime: 3d
+          #    interval: 5m:
+          #  - shortest_max_lifetime: 3d
+          #    longest_max_lifetime: 1y
+          #    interval: 24h
         """
             % locals()
         )
@@ -781,20 +966,20 @@ class ServerConfig(Config):
             "--daemonize",
             action="store_true",
             default=None,
-            help="Daemonize the home server",
+            help="Daemonize the homeserver",
         )
         server_group.add_argument(
             "--print-pidfile",
             action="store_true",
             default=None,
-            help="Print the path to the pidfile just" " before daemonizing",
+            help="Print the path to the pidfile just before daemonizing",
         )
         server_group.add_argument(
             "--manhole",
             metavar="PORT",
             dest="manhole",
             type=int,
-            help="Turn on the twisted telnet manhole" " service on the given port.",
+            help="Turn on the twisted telnet manhole service on the given port.",
         )
 
 

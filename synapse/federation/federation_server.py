@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 Matrix.org Federation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,6 +74,7 @@ class FederationServer(FederationBase):
 
         self.auth = hs.get_auth()
         self.handler = hs.get_handlers().federation_handler
+        self.state = hs.get_state_handler()
 
         self._server_linearizer = Linearizer("fed_server")
         self._transaction_linearizer = Linearizer("fed_txn_handler")
@@ -264,9 +266,6 @@ class FederationServer(FederationBase):
         await self.registry.on_edu(edu_type, origin, content)
 
     async def on_context_state_request(self, origin, room_id, event_id):
-        if not event_id:
-            raise NotImplementedError("Specify an event")
-
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
 
@@ -280,12 +279,17 @@ class FederationServer(FederationBase):
         # - but that's non-trivial to get right, and anyway somewhat defeats
         # the point of the linearizer.
         with (await self._server_linearizer.queue((origin, room_id))):
-            resp = await self._state_resp_cache.wrap(
-                (room_id, event_id),
-                self._on_context_state_request_compute,
-                room_id,
-                event_id,
+            resp = dict(
+                await self._state_resp_cache.wrap(
+                    (room_id, event_id),
+                    self._on_context_state_request_compute,
+                    room_id,
+                    event_id,
+                )
             )
+
+        room_version = await self.store.get_room_version(room_id)
+        resp["room_version"] = room_version
 
         return 200, resp
 
@@ -306,7 +310,11 @@ class FederationServer(FederationBase):
         return 200, {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
     async def _on_context_state_request_compute(self, room_id, event_id):
-        pdus = await self.handler.get_state_for_pdu(room_id, event_id)
+        if event_id:
+            pdus = await self.handler.get_state_for_pdu(room_id, event_id)
+        else:
+            pdus = (await self.state.get_current_state(room_id)).values()
+
         auth_chain = await self.store.get_auth_chain([pdu.event_id for pdu in pdus])
 
         return {

@@ -32,7 +32,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         self._clock = hs.get_clock()
         self.hs = hs
         # Do not add more reserved users than the total allowable number
-        self._new_transaction(
+        self.new_transaction(
             dbconn,
             "initialise_mau_threepids",
             [],
@@ -261,7 +261,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # never be a big table and alternative approaches (batching multiple
         # upserts into a single txn) introduced a lot of extra complexity.
         # See https://github.com/matrix-org/synapse/issues/3854 for more
-        is_insert = self._simple_upsert_txn(
+        is_insert = self.simple_upsert_txn(
             txn,
             table="monthly_active_users",
             keyvalues={"user_id": user_id},
@@ -281,7 +281,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
         """
 
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="monthly_active_users",
             keyvalues={"user_id": user_id},
             retcol="timestamp",

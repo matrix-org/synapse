@@ -44,7 +44,7 @@ class TransactionActions(object):
             response code and response body.
         """
         if not transaction.transaction_id:
-            raise RuntimeError("Cannot persist a transaction with no " "transaction_id")
+            raise RuntimeError("Cannot persist a transaction with no transaction_id")
 
         return self.store.get_received_txn_response(transaction.transaction_id, origin)
 
@@ -56,7 +56,7 @@ class TransactionActions(object):
             Deferred
         """
         if not transaction.transaction_id:
-            raise RuntimeError("Cannot persist a transaction with no " "transaction_id")
+            raise RuntimeError("Cannot persist a transaction with no transaction_id")
 
         return self.store.set_received_txn_response(
             transaction.transaction_id, origin, code, response

@@ -98,4 +98,4 @@ class SignatureStore(SignatureWorkerStore):
                 }
             )
 
-        self._simple_insert_many_txn(txn, table="event_reference_hashes", values=vals)
+        self.simple_insert_many_txn(txn, table="event_reference_hashes", values=vals)
