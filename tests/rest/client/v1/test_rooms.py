@@ -1575,7 +1575,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
                 self.room_id,
                 self.tok,
                 token,
-                json.dumps(self.FILTER_LABELS_NOT_LABELS)
+                json.dumps(self.FILTER_LABELS_NOT_LABELS),
             ),
         )
         self.render(request)
