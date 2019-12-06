@@ -58,7 +58,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         Returns:
             list of event_ids
         """
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_auth_chain_ids", self._get_auth_chain_ids_txn, event_ids, include_given
         )
 
@@ -90,12 +90,12 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         return list(results)
 
     def get_oldest_events_in_room(self, room_id):
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_oldest_events_in_room", self._get_oldest_events_in_room_txn, room_id
         )
 
     def get_oldest_events_with_depth_in_room(self, room_id):
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_oldest_events_with_depth_in_room",
             self.get_oldest_events_with_depth_in_room_txn,
             room_id,
@@ -126,7 +126,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         Returns
             Deferred[int]
         """
-        rows = yield self.simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="events",
             column="event_id",
             iterable=event_ids,
@@ -140,7 +140,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             return max(row["depth"] for row in rows)
 
     def _get_oldest_events_in_room_txn(self, txn, room_id):
-        return self.simple_select_onecol_txn(
+        return self.db.simple_select_onecol_txn(
             txn,
             table="event_backward_extremities",
             keyvalues={"room_id": room_id},
@@ -188,7 +188,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 where *hashes* is a map from algorithm to hash.
         """
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_latest_event_ids_and_hashes_in_room",
             self._get_latest_event_ids_and_hashes_in_room,
             room_id,
@@ -229,13 +229,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             txn.execute(sql, query_args)
             return [room_id for room_id, in txn]
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_rooms_with_many_extremities", _get_rooms_with_many_extremities_txn
         )
 
     @cached(max_entries=5000, iterable=True)
     def get_latest_event_ids_in_room(self, room_id):
-        return self.simple_select_onecol(
+        return self.db.simple_select_onecol(
             table="event_forward_extremities",
             keyvalues={"room_id": room_id},
             retcol="event_id",
@@ -266,12 +266,12 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
     def get_min_depth(self, room_id):
         """ For hte given room, get the minimum depth we have seen for it.
         """
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_min_depth", self._get_min_depth_interaction, room_id
         )
 
     def _get_min_depth_interaction(self, txn, room_id):
-        min_depth = self.simple_select_one_onecol_txn(
+        min_depth = self.db.simple_select_one_onecol_txn(
             txn,
             table="room_depth",
             keyvalues={"room_id": room_id},
@@ -337,7 +337,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             txn.execute(sql, (stream_ordering, room_id))
             return [event_id for event_id, in txn]
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_forward_extremeties_for_room", get_forward_extremeties_for_room_txn
         )
 
@@ -352,7 +352,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             limit (int)
         """
         return (
-            self.runInteraction(
+            self.db.runInteraction(
                 "get_backfill_events",
                 self._get_backfill_events,
                 room_id,
@@ -383,7 +383,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         queue = PriorityQueue()
 
         for event_id in event_list:
-            depth = self.simple_select_one_onecol_txn(
+            depth = self.db.simple_select_one_onecol_txn(
                 txn,
                 table="events",
                 keyvalues={"event_id": event_id, "room_id": room_id},
@@ -415,7 +415,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
     @defer.inlineCallbacks
     def get_missing_events(self, room_id, earliest_events, latest_events, limit):
-        ids = yield self.runInteraction(
+        ids = yield self.db.runInteraction(
             "get_missing_events",
             self._get_missing_events,
             room_id,
@@ -468,7 +468,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         Returns:
             Deferred[list[str]]
         """
-        rows = yield self.simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="event_edges",
             column="prev_event_id",
             iterable=event_ids,
@@ -494,7 +494,7 @@ class EventFederationStore(EventFederationWorkerStore):
     def __init__(self, db_conn, hs):
         super(EventFederationStore, self).__init__(db_conn, hs)
 
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             self.EVENT_AUTH_STATE_ONLY, self._background_delete_non_state_event_auth
         )
 
@@ -508,7 +508,7 @@ class EventFederationStore(EventFederationWorkerStore):
         if min_depth and depth >= min_depth:
             return
 
-        self.simple_upsert_txn(
+        self.db.simple_upsert_txn(
             txn,
             table="room_depth",
             keyvalues={"room_id": room_id},
@@ -520,7 +520,7 @@ class EventFederationStore(EventFederationWorkerStore):
         For the given event, update the event edges table and forward and
         backward extremities tables.
         """
-        self.simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="event_edges",
             values=[
@@ -604,13 +604,13 @@ class EventFederationStore(EventFederationWorkerStore):
 
         return run_as_background_process(
             "delete_old_forward_extrem_cache",
-            self.runInteraction,
+            self.db.runInteraction,
             "_delete_old_forward_extrem_cache",
             _delete_old_forward_extrem_cache_txn,
         )
 
     def clean_room_for_join(self, room_id):
-        return self.runInteraction(
+        return self.db.runInteraction(
             "clean_room_for_join", self._clean_room_for_join_txn, room_id
         )
 
@@ -654,17 +654,17 @@ class EventFederationStore(EventFederationWorkerStore):
                 "max_stream_id_exclusive": min_stream_id,
             }
 
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn, self.EVENT_AUTH_STATE_ONLY, new_progress
             )
 
             return min_stream_id >= target_min_stream_id
 
-        result = yield self.runInteraction(
+        result = yield self.db.runInteraction(
             self.EVENT_AUTH_STATE_ONLY, delete_event_auth
         )
 
         if not result:
-            yield self._end_background_update(self.EVENT_AUTH_STATE_ONLY)
+            yield self.db.updates._end_background_update(self.EVENT_AUTH_STATE_ONLY)
 
         return batch_size

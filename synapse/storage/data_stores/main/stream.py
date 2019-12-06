@@ -255,7 +255,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         super(StreamWorkerStore, self).__init__(db_conn, hs)
 
         events_max = self.get_room_max_stream_ordering()
-        event_cache_prefill, min_event_val = self.get_cache_dict(
+        event_cache_prefill, min_event_val = self.db.get_cache_dict(
             db_conn,
             "events",
             entity_column="room_id",
@@ -400,7 +400,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             rows = [_EventDictReturn(row[0], None, row[1]) for row in txn]
             return rows
 
-        rows = yield self.runInteraction("get_room_events_stream_for_room", f)
+        rows = yield self.db.runInteraction("get_room_events_stream_for_room", f)
 
         ret = yield self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
@@ -450,7 +450,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return rows
 
-        rows = yield self.runInteraction("get_membership_changes_for_user", f)
+        rows = yield self.db.runInteraction("get_membership_changes_for_user", f)
 
         ret = yield self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
@@ -511,7 +511,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         end_token = RoomStreamToken.parse(end_token)
 
-        rows, token = yield self.runInteraction(
+        rows, token = yield self.db.runInteraction(
             "get_recent_event_ids_for_room",
             self._paginate_room_events_txn,
             room_id,
@@ -548,7 +548,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             txn.execute(sql, (room_id, stream_ordering))
             return txn.fetchone()
 
-        return self.runInteraction("get_room_event_after_stream_ordering", _f)
+        return self.db.runInteraction("get_room_event_after_stream_ordering", _f)
 
     @defer.inlineCallbacks
     def get_room_events_max_id(self, room_id=None):
@@ -562,7 +562,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         if room_id is None:
             return "s%d" % (token,)
         else:
-            topo = yield self.runInteraction(
+            topo = yield self.db.runInteraction(
                 "_get_max_topological_txn", self._get_max_topological_txn, room_id
             )
             return "t%d-%d" % (topo, token)
@@ -576,7 +576,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             A deferred "s%d" stream token.
         """
-        return self.simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="events", keyvalues={"event_id": event_id}, retcol="stream_ordering"
         ).addCallback(lambda row: "s%d" % (row,))
 
@@ -589,7 +589,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             A deferred "t%d-%d" topological token.
         """
-        return self.simple_select_one(
+        return self.db.simple_select_one(
             table="events",
             keyvalues={"event_id": event_id},
             retcols=("stream_ordering", "topological_ordering"),
@@ -613,7 +613,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "SELECT coalesce(max(topological_ordering), 0) FROM events"
             " WHERE room_id = ? AND stream_ordering < ?"
         )
-        return self.execute(
+        return self.db.execute(
             "get_max_topological_token", None, sql, room_id, stream_key
         ).addCallback(lambda r: r[0][0] if r else 0)
 
@@ -667,7 +667,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             dict
         """
 
-        results = yield self.runInteraction(
+        results = yield self.db.runInteraction(
             "get_events_around",
             self._get_events_around_txn,
             room_id,
@@ -709,7 +709,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             dict
         """
 
-        results = self.simple_select_one_txn(
+        results = self.db.simple_select_one_txn(
             txn,
             "events",
             keyvalues={"event_id": event_id, "room_id": room_id},
@@ -788,7 +788,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return upper_bound, [row[1] for row in rows]
 
-        upper_bound, event_ids = yield self.runInteraction(
+        upper_bound, event_ids = yield self.db.runInteraction(
             "get_all_new_events_stream", get_all_new_events_stream_txn
         )
 
@@ -797,7 +797,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         return upper_bound, events
 
     def get_federation_out_pos(self, typ):
-        return self.simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="federation_stream_position",
             retcol="stream_id",
             keyvalues={"type": typ},
@@ -805,7 +805,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
     def update_federation_out_pos(self, typ, stream_id):
-        return self.simple_update_one(
+        return self.db.simple_update_one(
             table="federation_stream_position",
             keyvalues={"type": typ},
             updatevalues={"stream_id": stream_id},
@@ -956,7 +956,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         if to_key:
             to_key = RoomStreamToken.parse(to_key)
 
-        rows, token = yield self.runInteraction(
+        rows, token = yield self.db.runInteraction(
             "paginate_room_events",
             self._paginate_room_events_txn,
             room_id,
