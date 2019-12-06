@@ -17,7 +17,10 @@ from textwrap import indent
 
 import yaml
 
-from ._base import Config
+from twisted.enterprise import adbapi
+
+from synapse.config._base import Config, ConfigError
+from synapse.storage.engines import create_engine
 
 
 class DatabaseConfig(Config):
@@ -91,3 +94,49 @@ class DatabaseConfig(Config):
             metavar="SQLITE_DATABASE_PATH",
             help="The path to a sqlite database to use.",
         )
+
+
+class DatabaseConnectionConfig(object):
+    """Contains the connection config for a particular database.
+    """
+
+    def __init__(self, db_config):
+        if db_config["name"] not in ("sqlite3", "psycopg2"):
+            raise ConfigError("Unsupported database type %r" % (db_config["name"],))
+
+        if db_config["name"] == "sqlite3":
+            db_config.setdefault("args", {}).update(
+                {"cp_min": 1, "cp_max": 1, "check_same_thread": False}
+            )
+
+        self.config = db_config
+        self.engine = create_engine(db_config)
+        self.config["args"]["cp_openfun"] = self.engine.on_new_connection
+
+        self._pool = None
+
+    def get_pool(self, reactor) -> adbapi.ConnectionPool:
+        """Get the connection pool for the database.
+        """
+
+        if self._pool is None:
+            self._pool = adbapi.ConnectionPool(
+                self.config["name"], cp_reactor=reactor, **self.config.get("args", {})
+            )
+
+        return self._pool
+
+    def make_conn(self):
+        """Make a new connection to the database and return it.
+
+        Returns:
+            Connection
+        """
+
+        db_params = {
+            k: v
+            for k, v in self.config.get("args", {}).items()
+            if not k.startswith("cp_")
+        }
+        db_conn = self.engine.module.connect(**db_params)
+        return db_conn
