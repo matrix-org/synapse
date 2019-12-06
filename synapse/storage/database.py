@@ -256,8 +256,6 @@ class Database(object):
                 self._check_safe_to_upsert,
             )
 
-        self.rand = random.SystemRandom()
-
     @defer.inlineCallbacks
     def _check_safe_to_upsert(self):
         """
