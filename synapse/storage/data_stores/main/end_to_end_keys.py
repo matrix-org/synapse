@@ -333,7 +333,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         )
 
     def _get_e2e_cross_signing_keys_bulk_txn(
-            self, txn, users, key_type, from_user_id=None
+        self, txn, users, key_type, from_user_id=None
     ):
         """Returns the cross-signing keys for a set of users.
 
@@ -359,9 +359,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             "         GROUP BY user_id)"
             " USING (user_id, stream_id)"
             " WHERE k.user_id IN (%s) AND k.keytype = ?"
-        ) % (
-            ",".join("?" for u in users)
-        )
+        ) % (",".join("?" for u in users))
         query_params = [key_type]
         query_params.extend(users)
         query_params.append(key_type)
@@ -386,9 +384,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 "  FROM e2e_cross_signing_signatures "
                 " WHERE user_id = ?"
                 "   AND (target_user_id, target_device_id) IN (VALUES %s)"
-            ) % (
-                ",".join("(?,?)" for d in devices)
-            )
+            ) % (",".join("(?,?)" for d in devices))
             query_params = [from_user_id]
             for item in devices.items():
                 query_params.extend(item)
