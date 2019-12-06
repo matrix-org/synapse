@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.http import servlet
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.logging.opentracing import set_tag, trace
@@ -51,15 +49,14 @@ class SendToDeviceRestServlet(servlet.RestServlet):
             request, self._put, request, message_type, txn_id
         )
 
-    @defer.inlineCallbacks
-    def _put(self, request, message_type, txn_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def _put(self, request, message_type, txn_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         content = parse_json_object_from_request(request)
 
         sender_user_id = requester.user.to_string()
 
-        yield self.device_message_handler.send_device_message(
+        await self.device_message_handler.send_device_message(
             sender_user_id, message_type, content["messages"]
         )
 

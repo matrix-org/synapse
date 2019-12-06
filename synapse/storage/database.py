@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import random
 import sys
 import time
 from typing import Iterable, Tuple
@@ -1321,11 +1320,12 @@ class Database(object):
     def simple_select_list_paginate(
         self,
         table,
-        keyvalues,
         orderby,
         start,
         limit,
         retcols,
+        filters=None,
+        keyvalues=None,
         order_direction="ASC",
         desc="simple_select_list_paginate",
     ):
@@ -1336,6 +1336,9 @@ class Database(object):
 
         Args:
             table (str): the table name
+            filters (dict[str, T] | None):
+                column names and values to filter the rows with, or None to not
+                apply a WHERE ? LIKE ? clause.
             keyvalues (dict[str, T] | None):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
@@ -1351,11 +1354,12 @@ class Database(object):
             desc,
             self.simple_select_list_paginate_txn,
             table,
-            keyvalues,
             orderby,
             start,
             limit,
             retcols,
+            filters=filters,
+            keyvalues=keyvalues,
             order_direction=order_direction,
         )
 
@@ -1364,11 +1368,12 @@ class Database(object):
         cls,
         txn,
         table,
-        keyvalues,
         orderby,
         start,
         limit,
         retcols,
+        filters=None,
+        keyvalues=None,
         order_direction="ASC",
     ):
         """
@@ -1376,16 +1381,23 @@ class Database(object):
         of row numbers, which may return zero or number of rows from start to limit,
         returning the result as a list of dicts.
 
+        Use `filters` to search attributes using SQL wildcards and/or `keyvalues` to
+        select attributes with exact matches. All constraints are joined together
+        using 'AND'.
+
         Args:
             txn : Transaction object
             table (str): the table name
-            keyvalues (dict[str, T] | None):
-                column names and values to select the rows with, or None to not
-                apply a WHERE clause.
             orderby (str): Column to order the results by.
             start (int): Index to begin the query at.
             limit (int): Number of results to return.
             retcols (iterable[str]): the names of the columns to return
+            filters (dict[str, T] | None):
+                column names and values to filter the rows with, or None to not
+                apply a WHERE ? LIKE ? clause.
+            keyvalues (dict[str, T] | None):
+                column names and values to select the rows with, or None to not
+                apply a WHERE clause.
             order_direction (str): Whether the results should be ordered "ASC" or "DESC".
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
@@ -1393,10 +1405,15 @@ class Database(object):
         if order_direction not in ["ASC", "DESC"]:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
 
+        where_clause = "WHERE " if filters or keyvalues else ""
+        arg_list = []
+        if filters:
+            where_clause += " AND ".join("%s LIKE ?" % (k,) for k in filters)
+            arg_list += list(filters.values())
+        where_clause += " AND " if filters and keyvalues else ""
         if keyvalues:
-            where_clause = "WHERE " + " AND ".join("%s = ?" % (k,) for k in keyvalues)
-        else:
-            where_clause = ""
+            where_clause += " AND ".join("%s = ?" % (k,) for k in keyvalues)
+            arg_list += list(keyvalues.values())
 
         sql = "SELECT %s FROM %s %s ORDER BY %s %s LIMIT ? OFFSET ?" % (
             ", ".join(retcols),
@@ -1405,21 +1422,9 @@ class Database(object):
             orderby,
             order_direction,
         )
-        txn.execute(sql, list(keyvalues.values()) + [limit, start])
+        txn.execute(sql, arg_list + [limit, start])
 
         return cls.cursor_to_dict(txn)
-
-    def get_user_count_txn(self, txn):
-        """Get a total number of registered users in the users list.
-
-        Args:
-            txn : Transaction object
-        Returns:
-            int : number of users
-        """
-        sql_count = "SELECT COUNT(*) FROM users WHERE is_guest = 0;"
-        txn.execute(sql_count)
-        return txn.fetchone()[0]
 
     def simple_search_list(self, table, term, col, retcols, desc="simple_search_list"):
         """Executes a SELECT query on the named table, which may return zero or

@@ -1,7 +1,7 @@
 # Configuration file used for testing the 'synapse_port_db' script.
 # Tells the script to connect to the postgresql database that will be available in the
 # CI's Docker setup at the point where this file is considered.
-server_name: "localhost:8080"
+server_name: "test"
 
 signing_key_path: "/src/.buildkite/test.signing.key"
 

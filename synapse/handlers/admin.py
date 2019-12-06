@@ -56,7 +56,7 @@ class AdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_users(self):
-        """Function to reterive a list of users in users table.
+        """Function to retrieve a list of users in users table.
 
         Args:
         Returns:
@@ -67,19 +67,22 @@ class AdminHandler(BaseHandler):
         return ret
 
     @defer.inlineCallbacks
-    def get_users_paginate(self, order, start, limit):
-        """Function to reterive a paginated list of users from
-        users list. This will return a json object, which contains
-        list of users and the total number of users in users table.
+    def get_users_paginate(self, start, limit, name, guests, deactivated):
+        """Function to retrieve a paginated list of users from
+        users list. This will return a json list of users.
 
         Args:
-            order (str): column name to order the select by this column
             start (int): start number to begin the query from
-            limit (int): number of rows to reterive
+            limit (int): number of rows to retrieve
+            name (string): filter for user names
+            guests (bool): whether to in include guest users
+            deactivated (bool): whether to include deactivated users
         Returns:
-            defer.Deferred: resolves to json object {list[dict[str, Any]], count}
+            defer.Deferred: resolves to json list[dict[str, Any]]
         """
-        ret = yield self.store.get_users_paginate(order, start, limit)
+        ret = yield self.store.get_users_paginate(
+            start, limit, name, guests, deactivated
+        )
 
         return ret
 

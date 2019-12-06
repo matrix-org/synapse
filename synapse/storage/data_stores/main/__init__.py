@@ -19,8 +19,6 @@ import calendar
 import logging
 import time
 
-from twisted.internet import defer
-
 from synapse.api.constants import PresenceState
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
@@ -476,7 +474,7 @@ class DataStore(
         )
 
     def get_users(self):
-        """Function to reterive a list of users in users table.
+        """Function to retrieve a list of users in users table.
 
         Args:
         Returns:
@@ -485,38 +483,59 @@ class DataStore(
         return self.db.simple_select_list(
             table="users",
             keyvalues={},
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
+            retcols=[
+                "name",
+                "password_hash",
+                "is_guest",
+                "admin",
+                "user_type",
+                "deactivated",
+            ],
             desc="get_users",
         )
 
-    @defer.inlineCallbacks
-    def get_users_paginate(self, order, start, limit):
-        """Function to reterive a paginated list of users from
-        users list. This will return a json object, which contains
-        list of users and the total number of users in users table.
+    def get_users_paginate(
+        self, start, limit, name=None, guests=True, deactivated=False
+    ):
+        """Function to retrieve a paginated list of users from
+        users list. This will return a json list of users.
 
         Args:
-            order (str): column name to order the select by this column
             start (int): start number to begin the query from
-            limit (int): number of rows to reterive
+            limit (int): number of rows to retrieve
+            name (string): filter for user names
+            guests (bool): whether to in include guest users
+            deactivated (bool): whether to include deactivated users
         Returns:
-            defer.Deferred: resolves to json object {list[dict[str, Any]], count}
+            defer.Deferred: resolves to list[dict[str, Any]]
         """
-        users = yield self.db.runInteraction(
-            "get_users_paginate",
-            self.db.simple_select_list_paginate_txn,
+        name_filter = {}
+        if name:
+            name_filter["name"] = "%" + name + "%"
+
+        attr_filter = {}
+        if not guests:
+            attr_filter["is_guest"] = False
+        if not deactivated:
+            attr_filter["deactivated"] = False
+
+        return self.db.simple_select_list_paginate(
+            desc="get_users_paginate",
             table="users",
-            keyvalues={"is_guest": False},
-            orderby=order,
+            orderby="name",
             start=start,
             limit=limit,
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
+            filters=name_filter,
+            keyvalues=attr_filter,
+            retcols=[
+                "name",
+                "password_hash",
+                "is_guest",
+                "admin",
+                "user_type",
+                "deactivated",
+            ],
         )
-        count = yield self.db.runInteraction(
-            "get_users_paginate", self.get_user_count_txn
-        )
-        retval = {"users": users, "total": count}
-        return retval
 
     def search_users(self, term):
         """Function to search users list for one or more users with

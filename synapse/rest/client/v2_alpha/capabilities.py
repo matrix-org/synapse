@@ -14,8 +14,6 @@
 # limitations under the License.
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import RestServlet
 
@@ -40,10 +38,9 @@ class CapabilitiesRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        user = yield self.store.get_user_by_id(requester.user.to_string())
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        user = await self.store.get_user_by_id(requester.user.to_string())
         change_password = bool(user["password_hash"])
 
         response = {

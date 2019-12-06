@@ -78,7 +78,7 @@ def interactive_auth_handler(orig):
             """
 
     def wrapped(*args, **kwargs):
-        res = defer.maybeDeferred(orig, *args, **kwargs)
+        res = defer.ensureDeferred(orig(*args, **kwargs))
         res.addErrback(_catch_incomplete_interactive_auth)
         return res
 
