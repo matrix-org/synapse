@@ -218,10 +218,10 @@ class Database(object):
 
     _TXN_ID = 0
 
-    def __init__(self, hs):
+    def __init__(self, hs, database_config):
         self.hs = hs
         self._clock = hs.get_clock()
-        self._db_pool = hs.get_db_pool()
+        self._db_pool = database_config.get_pool(hs.get_reactor())
 
         self.updates = BackgroundUpdater(hs, self)
 
@@ -234,7 +234,7 @@ class Database(object):
         #   to watch it
         self._txn_perf_counters = PerformanceCounters()
 
-        self.engine = hs.database_engine
+        self.engine = database_config.engine
 
         # A set of tables that are not safe to use native upserts in.
         self._unsafe_to_upsert_tables = set(UNIQUE_INDEX_BACKGROUND_UPDATES.keys())
