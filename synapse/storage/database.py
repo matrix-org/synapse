@@ -221,6 +221,7 @@ class Database(object):
     def __init__(self, hs, database_config):
         self.hs = hs
         self._clock = hs.get_clock()
+        self._database_config = database_config
         self._db_pool = database_config.get_pool(hs.get_reactor())
 
         self.updates = BackgroundUpdater(hs, self)
@@ -254,6 +255,11 @@ class Database(object):
                 "upsert_safety_check",
                 self._check_safe_to_upsert,
             )
+
+    def is_running(self):
+        """Is the database pool currently running
+        """
+        return self._db_pool.running
 
     @defer.inlineCallbacks
     def _check_safe_to_upsert(self):
