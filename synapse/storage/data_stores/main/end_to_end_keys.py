@@ -356,7 +356,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             "  JOIN (SELECT user_id, MAX(stream_id) AS stream_id"
             "          FROM e2e_cross_signing_keys"
             "         WHERE keytype = ?"
-            "         GROUP BY user_id)"
+            "         GROUP BY user_id) s"
             " USING (user_id, stream_id)"
             " WHERE k.user_id IN (%s) AND k.keytype = ?"
         ) % (",".join("?" for u in users))
