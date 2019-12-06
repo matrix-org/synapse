@@ -133,7 +133,7 @@ class ApplicationServiceTransactionWorkerStore(
             A Deferred which resolves to a list of ApplicationServices, which
             may be empty.
         """
-        results = yield self._simple_select_list(
+        results = yield self.simple_select_list(
             "application_services_state", dict(state=state), ["as_id"]
         )
         # NB: This assumes this class is linked with ApplicationServiceStore
@@ -155,7 +155,7 @@ class ApplicationServiceTransactionWorkerStore(
         Returns:
             A Deferred which resolves to ApplicationServiceState.
         """
-        result = yield self._simple_select_one(
+        result = yield self.simple_select_one(
             "application_services_state",
             dict(as_id=service.id),
             ["state"],
@@ -175,7 +175,7 @@ class ApplicationServiceTransactionWorkerStore(
         Returns:
             A Deferred which resolves when the state was set successfully.
         """
-        return self._simple_upsert(
+        return self.simple_upsert(
             "application_services_state", dict(as_id=service.id), dict(state=state)
         )
 
@@ -249,7 +249,7 @@ class ApplicationServiceTransactionWorkerStore(
                 )
 
             # Set current txn_id for AS to 'txn_id'
-            self._simple_upsert_txn(
+            self.simple_upsert_txn(
                 txn,
                 "application_services_state",
                 dict(as_id=service.id),
@@ -257,7 +257,7 @@ class ApplicationServiceTransactionWorkerStore(
             )
 
             # Delete txn
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn, "application_services_txns", dict(txn_id=txn_id, as_id=service.id)
             )
 

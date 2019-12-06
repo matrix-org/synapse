@@ -3,7 +3,7 @@ from synapse.storage._base import SQLBaseStore
 
 class OpenIdStore(SQLBaseStore):
     def insert_open_id_token(self, token, ts_valid_until_ms, user_id):
-        return self._simple_insert(
+        return self.simple_insert(
             table="open_id_tokens",
             values={
                 "token": token,

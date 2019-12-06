@@ -61,7 +61,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     @cached(num_args=2)
     def get_receipts_for_room(self, room_id, receipt_type):
-        return self._simple_select_list(
+        return self.simple_select_list(
             table="receipts_linearized",
             keyvalues={"room_id": room_id, "receipt_type": receipt_type},
             retcols=("user_id", "event_id"),
@@ -70,7 +70,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     @cached(num_args=3)
     def get_last_receipt_event_id_for_user(self, user_id, room_id, receipt_type):
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="receipts_linearized",
             keyvalues={
                 "room_id": room_id,
@@ -84,7 +84,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     @cachedInlineCallbacks(num_args=2)
     def get_receipts_for_user(self, user_id, receipt_type):
-        rows = yield self._simple_select_list(
+        rows = yield self.simple_select_list(
             table="receipts_linearized",
             keyvalues={"user_id": user_id, "receipt_type": receipt_type},
             retcols=("room_id", "event_id"),
@@ -335,7 +335,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             otherwise, the rx timestamp of the event that the RR corresponds to
                 (or 0 if the event is unknown)
         """
-        res = self._simple_select_one_txn(
+        res = self.simple_select_one_txn(
             txn,
             table="events",
             retcols=["stream_ordering", "received_ts"],
@@ -388,7 +388,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             (user_id, room_id, receipt_type),
         )
 
-        self._simple_delete_txn(
+        self.simple_delete_txn(
             txn,
             table="receipts_linearized",
             keyvalues={
@@ -398,7 +398,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             },
         )
 
-        self._simple_insert_txn(
+        self.simple_insert_txn(
             txn,
             table="receipts_linearized",
             values={
@@ -514,7 +514,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             self._get_linearized_receipts_for_room.invalidate_many, (room_id,)
         )
 
-        self._simple_delete_txn(
+        self.simple_delete_txn(
             txn,
             table="receipts_graph",
             keyvalues={
@@ -523,7 +523,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
                 "user_id": user_id,
             },
         )
-        self._simple_insert_txn(
+        self.simple_insert_txn(
             txn,
             table="receipts_graph",
             values={

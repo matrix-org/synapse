@@ -186,7 +186,7 @@ class StatsStore(StateDeltasStore):
         """
         Returns the stats processor positions.
         """
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="stats_incremental_position",
             keyvalues={},
             retcol="stream_id",
@@ -215,7 +215,7 @@ class StatsStore(StateDeltasStore):
             if field and "\0" in field:
                 fields[col] = None
 
-        return self._simple_upsert(
+        return self.simple_upsert(
             table="room_stats_state",
             keyvalues={"room_id": room_id},
             values=fields,
@@ -257,14 +257,14 @@ class StatsStore(StateDeltasStore):
             ABSOLUTE_STATS_FIELDS[stats_type] + PER_SLICE_FIELDS[stats_type]
         )
 
-        slice_list = self._simple_select_list_paginate_txn(
+        slice_list = self.simple_select_list_paginate_txn(
             txn,
             table + "_historical",
-            {id_col: stats_id},
             "end_ts",
             start,
             size,
             retcols=selected_columns + ["bucket_size", "end_ts"],
+            keyvalues={id_col: stats_id},
             order_direction="DESC",
         )
 
@@ -282,7 +282,7 @@ class StatsStore(StateDeltasStore):
                 "name", "topic", "canonical_alias", "avatar", "join_rules",
                 "history_visibility"
         """
-        return self._simple_select_one(
+        return self.simple_select_one(
             "room_stats_state",
             {"room_id": room_id},
             retcols=(
@@ -308,7 +308,7 @@ class StatsStore(StateDeltasStore):
         """
         table, id_col = TYPE_TO_TABLE[stats_type]
 
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             "%s_current" % (table,),
             keyvalues={id_col: id},
             retcol="completed_delta_stream_id",
@@ -344,7 +344,7 @@ class StatsStore(StateDeltasStore):
                         complete_with_stream_id=stream_id,
                     )
 
-            self._simple_update_one_txn(
+            self.simple_update_one_txn(
                 txn,
                 table="stats_incremental_position",
                 keyvalues={},
@@ -517,17 +517,17 @@ class StatsStore(StateDeltasStore):
         else:
             self.database_engine.lock_table(txn, table)
             retcols = list(chain(absolutes.keys(), additive_relatives.keys()))
-            current_row = self._simple_select_one_txn(
+            current_row = self.simple_select_one_txn(
                 txn, table, keyvalues, retcols, allow_none=True
             )
             if current_row is None:
                 merged_dict = {**keyvalues, **absolutes, **additive_relatives}
-                self._simple_insert_txn(txn, table, merged_dict)
+                self.simple_insert_txn(txn, table, merged_dict)
             else:
                 for (key, val) in additive_relatives.items():
                     current_row[key] += val
                 current_row.update(absolutes)
-                self._simple_update_one_txn(txn, table, keyvalues, current_row)
+                self.simple_update_one_txn(txn, table, keyvalues, current_row)
 
     def _upsert_copy_from_table_with_additive_relatives_txn(
         self,
@@ -614,11 +614,11 @@ class StatsStore(StateDeltasStore):
             txn.execute(sql, qargs)
         else:
             self.database_engine.lock_table(txn, into_table)
-            src_row = self._simple_select_one_txn(
+            src_row = self.simple_select_one_txn(
                 txn, src_table, keyvalues, copy_columns
             )
             all_dest_keyvalues = {**keyvalues, **extra_dst_keyvalues}
-            dest_current_row = self._simple_select_one_txn(
+            dest_current_row = self.simple_select_one_txn(
                 txn,
                 into_table,
                 keyvalues=all_dest_keyvalues,
@@ -634,11 +634,11 @@ class StatsStore(StateDeltasStore):
                     **src_row,
                     **additive_relatives,
                 }
-                self._simple_insert_txn(txn, into_table, merged_dict)
+                self.simple_insert_txn(txn, into_table, merged_dict)
             else:
                 for (key, val) in additive_relatives.items():
                     src_row[key] = dest_current_row[key] + val
-                self._simple_update_txn(txn, into_table, all_dest_keyvalues, src_row)
+                self.simple_update_txn(txn, into_table, all_dest_keyvalues, src_row)
 
     def get_changes_room_total_events_and_bytes(self, min_pos, max_pos):
         """Fetches the counts of events in the given range of stream IDs.
@@ -735,7 +735,7 @@ class StatsStore(StateDeltasStore):
         def _fetch_current_state_stats(txn):
             pos = self.get_room_max_stream_ordering()
 
-            rows = self._simple_select_many_txn(
+            rows = self.simple_select_many_txn(
                 txn,
                 table="current_state_events",
                 column="type",

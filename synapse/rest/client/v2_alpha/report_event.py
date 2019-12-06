@@ -18,8 +18,6 @@ import logging
 from six import string_types
 from six.moves import http_client
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
     RestServlet,
@@ -42,9 +40,8 @@ class ReportEventRestServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id, event_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request, room_id, event_id):
+        requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         body = parse_json_object_from_request(request)
@@ -63,7 +60,7 @@ class ReportEventRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
-        yield self.store.add_event_report(
+        await self.store.add_event_report(
             room_id=room_id,
             event_id=event_id,
             user_id=user_id,

@@ -47,6 +47,7 @@ from synapse.storage.data_stores.main.media_repository import (
 from synapse.storage.data_stores.main.registration import (
     RegistrationBackgroundUpdateStore,
 )
+from synapse.storage.data_stores.main.room import RoomBackgroundUpdateStore
 from synapse.storage.data_stores.main.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.data_stores.main.search import SearchBackgroundUpdateStore
 from synapse.storage.data_stores.main.state import StateBackgroundUpdateStore
@@ -131,6 +132,7 @@ class Store(
     EventsBackgroundUpdatesStore,
     MediaRepositoryBackgroundUpdateStore,
     RegistrationBackgroundUpdateStore,
+    RoomBackgroundUpdateStore,
     RoomMemberBackgroundUpdateStore,
     SearchBackgroundUpdateStore,
     StateBackgroundUpdateStore,
@@ -221,7 +223,7 @@ class Porter(object):
     def setup_table(self, table):
         if table in APPEND_ONLY_TABLES:
             # It's safe to just carry on inserting.
-            row = yield self.postgres_store._simple_select_one(
+            row = yield self.postgres_store.simple_select_one(
                 table="port_from_sqlite3",
                 keyvalues={"table_name": table},
                 retcols=("forward_rowid", "backward_rowid"),
@@ -236,7 +238,7 @@ class Porter(object):
                     )
                     backward_chunk = 0
                 else:
-                    yield self.postgres_store._simple_insert(
+                    yield self.postgres_store.simple_insert(
                         table="port_from_sqlite3",
                         values={
                             "table_name": table,
@@ -266,7 +268,7 @@ class Porter(object):
 
             yield self.postgres_store.execute(delete_all)
 
-            yield self.postgres_store._simple_insert(
+            yield self.postgres_store.simple_insert(
                 table="port_from_sqlite3",
                 values={"table_name": table, "forward_rowid": 1, "backward_rowid": 0},
             )
@@ -320,7 +322,7 @@ class Porter(object):
         if table == "user_directory_stream_pos":
             # We need to make sure there is a single row, `(X, null), as that is
             # what synapse expects to be there.
-            yield self.postgres_store._simple_insert(
+            yield self.postgres_store.simple_insert(
                 table=table, values={"stream_id": None}
             )
             self.progress.update(table, table_size)  # Mark table as done
@@ -375,7 +377,7 @@ class Porter(object):
                 def insert(txn):
                     self.postgres_store.insert_many_txn(txn, table, headers[1:], rows)
 
-                    self.postgres_store._simple_update_one_txn(
+                    self.postgres_store.simple_update_one_txn(
                         txn,
                         table="port_from_sqlite3",
                         keyvalues={"table_name": table},
@@ -452,7 +454,7 @@ class Porter(object):
                         ],
                     )
 
-                    self.postgres_store._simple_update_one_txn(
+                    self.postgres_store.simple_update_one_txn(
                         txn,
                         table="port_from_sqlite3",
                         keyvalues={"table_name": "event_search"},
@@ -591,11 +593,11 @@ class Porter(object):
 
             # Step 2. Get tables.
             self.progress.set_state("Fetching tables")
-            sqlite_tables = yield self.sqlite_store._simple_select_onecol(
+            sqlite_tables = yield self.sqlite_store.simple_select_onecol(
                 table="sqlite_master", keyvalues={"type": "table"}, retcol="name"
             )
 
-            postgres_tables = yield self.postgres_store._simple_select_onecol(
+            postgres_tables = yield self.postgres_store.simple_select_onecol(
                 table="information_schema.tables",
                 keyvalues={},
                 retcol="distinct table_name",
@@ -722,7 +724,7 @@ class Porter(object):
         next_chunk = yield self.sqlite_store.execute(get_start_id)
         next_chunk = max(max_inserted_rowid + 1, next_chunk)
 
-        yield self.postgres_store._simple_insert(
+        yield self.postgres_store.simple_insert(
             table="port_from_sqlite3",
             values={
                 "table_name": "sent_transactions",
@@ -1055,3 +1057,4 @@ if __name__ == "__main__":
     if end_error_exec_info:
         exc_type, exc_value, exc_traceback = end_error_exec_info
         traceback.print_exception(exc_type, exc_value, exc_traceback)
+        sys.exit(5)
