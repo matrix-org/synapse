@@ -14,15 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
 
-import logging
+from ._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
-
-
-from ._base import Config, ConfigError
 
 
 def _dict_merge(merge_dict, into_dict):
@@ -89,13 +88,40 @@ class SAML2Config(Config):
         user_mapping_provider_module = user_mapping_provider_dict.get(
             "module", default_mapping_provider,
         )
-        logger.warning("hiiiiiii")
         user_mapping_provider_config = user_mapping_provider_dict.get("config", {})
-        if user_mapping_provider_module == default_mapping_provider:
-            # Handle deprecated options in default module config
 
-            # If mxid_source_attribute is defined in the deprecated location, use
-            # that instead for backwards compatibility
+        # Retrieve an instance of the module's class
+        # Pass the config dictionary to the module for processing
+        (
+            self.saml2_user_mapping_provider_class,
+            self.saml2_user_mapping_provider_config,
+        ) = load_module(
+            {
+                "module": user_mapping_provider_module,
+                "config": user_mapping_provider_config,
+            }
+        )
+
+        # Ensure loaded user mapping module has defined all necessary methods
+        required_methods = [
+            "parse_config",
+            "get_required_attributes",
+            "saml_response_to_user_attributes",
+        ]
+        missing_methods = [
+            method
+            for method in required_methods
+            if not hasattr(self.saml2_user_mapping_provider_class, method)
+        ]
+        if missing_methods:
+            raise ConfigError(
+                "Class specified by saml2_config."
+                "user_mapping_provider.module is missing required "
+                "methods: %s" % (", ".join(missing_methods),)
+            )
+
+        if user_mapping_provider_module == default_mapping_provider:
+            # Load deprecated options for use by the default module
             old_mxid_source_attribute = saml2_config.get("mxid_source_attribute")
             if old_mxid_source_attribute:
                 logger.warning(
@@ -103,40 +129,25 @@ class SAML2Config(Config):
                     "Please use saml2_config.user_mapping_provider.config"
                     ".mxid_source_attribute instead."
                 )
-                user_mapping_provider_config[
-                    "mxid_source_attribute"
-                ] = old_mxid_source_attribute
+            self.saml2_user_mapping_provider_config[
+                "old_mxid_source_attribute"
+            ] = old_mxid_source_attribute
 
-                # Provide a deprecation warning
-                self.using_old_mxid_source_attribute = True
-            else:
-                # If the option doesn't exist in saml2_config, and it's not set under
-                # user_mapping_provider_config, set it to a default value
-                user_mapping_provider_config.setdefault("mxid_source_attribute", "uid")
-
-            # If mxid_mapping is defined, use that instead for backwards compatibility
             old_mxid_mapping = saml2_config.get("mxid_mapping")
             if old_mxid_mapping:
                 logger.warning(
                     "The config option saml2_config.mxid_mapping is deprecated. Please use "
                     "saml2_config.user_mapping_provider.config.mxid_mapping instead."
                 )
+            self.saml2_user_mapping_provider_config[
+                "old_mxid_mapping"
+            ] = old_mxid_mapping
 
-                user_mapping_provider_config["mxid_mapping"] = old_mxid_mapping
-
-                # Provide a deprecation warning
-                self.using_old_mxid_mapping = True
-            else:
-                # If the option doesn't exist in saml2_config, and it's not set under
-                # user_mapping_provider_config, set it to a default value
-                user_mapping_provider_config.setdefault("mxid_mapping", "hexencode")
-
-        # We don't use nor provide the module's config here
-        self.saml2_user_mapping_provider_class, _ = load_module(
-            {"module": user_mapping_provider_module}
+        saml2_config_dict = self._default_saml_config_dict(
+            *self.saml2_user_mapping_provider_class.get_required_attributes(
+                self.saml2_user_mapping_provider_config
+            )
         )
-
-        saml2_config_dict = self._default_saml_config_dict()
         _dict_merge(
             merge_dict=saml2_config.get("sp_config", {}), into_dict=saml2_config_dict
         )
@@ -156,16 +167,26 @@ class SAML2Config(Config):
             saml2_config.get("saml_session_lifetime", "5m")
         )
 
-    def _default_saml_config_dict(self):
+    def _default_saml_config_dict(
+        self, required_attributes: set, optional_attributes: set
+    ):
+        """Generate a configuration dictionary with required and optional attributes that
+        will be needed to process new user registration
+
+        Args:
+            required_attributes: SAML auth response attributes that are necessary to function
+            optional_attributes: SAML auth response attributes that can be used to add
+                additional information to Synapse user accounts, but are not required
+
+        Returns:
+            dict: A SAML configuration dictionary
+        """
         import saml2
 
         public_baseurl = self.public_baseurl
         if public_baseurl is None:
             raise ConfigError("saml2_config requires a public_baseurl to be set")
 
-        required_attributes = {"uid"}
-
-        optional_attributes = {"displayName"}
         if self.saml2_grandfathered_mxid_source_attribute:
             optional_attributes.add(self.saml2_grandfathered_mxid_source_attribute)
         optional_attributes -= required_attributes

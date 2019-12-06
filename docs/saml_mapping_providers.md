@@ -27,13 +27,18 @@ comment these options out and use those specified by the module instead.
 
 ## Building a Custom Mapping Provider
 
-A custom mapping provider must specify the following method:
+A custom mapping provider must specify the following methods:
 
+* `__init__(self, parsed_config)`
+   - Arguments:
+     - `config` - A configuration object that is the return value of the
+       `parse_config` method. You should set any configuration options needed
+       by the module here.
 * `saml_response_to_user_attributes(self, saml_response, failures)`
     - Arguments:
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
                           information from.
-      - `failures` - An int that represents the amount of times the returned
+      - `failures` - An `int` that represents the amount of times the returned
                      mxid localpart mapping has failed.  This should be used
                      to create a deduplicated mxid localpart which should be
                      returned instead.  For example, if this method returns
@@ -46,6 +51,26 @@ A custom mapping provider must specify the following method:
       to build a new user. The following keys are allowed:
        * `mxid_localpart` - Required. The mxid localpart of the new user.
        * `displayname` - The displayname of the new user.
+* `parse_config(config)`
+    - This method should have the `@staticmethod` decoration.
+    - Arguments:
+        - `config` - A `dict` representing the parsed content of the
+          `saml2_config.user_mapping_provider.config` homeserver config option.
+           Runs on homeserver startup. Providers should extract any option values
+           they need here.
+    - Whatever is returned will be passed back to the user mapping provider module's
+      `__init__` method during construction.
+* `get_required_attributes(config)`
+    - This method should have the `@staticmethod` decoration.
+    - Arguments:
+        - `config` - A `dict` representing the parsed content of the
+          `saml2_config.user_mapping_provider.config` homeserver config option.
+           Runs on homeserver startup. Providers should extract any option values
+           they need here.
+    - Returns a tuple of two sets. The first set equates to the saml auth
+      response attributes that are required for the module to function, whereas
+      the second set consists of those attributes which can be used if available,
+      but are not necessary.
 
 ## Synapse's Default Provider
 

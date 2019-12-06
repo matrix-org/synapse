@@ -21,6 +21,7 @@ import saml2.response
 from saml2.client import Saml2Client
 
 from synapse.api.errors import SynapseError
+from synapse.config import ConfigError
 from synapse.http.servlet import parse_string
 from synapse.rest.client.v1.login import SSOAuthHandler
 from synapse.types import (
@@ -252,14 +253,14 @@ MXID_MAPPER_MAP = {
 class DefaultSamlMappingProvider(object):
     __version__ = "0.0.1"
 
-    def __init__(self, config: dict):
+    def __init__(self, parsed_config):
         """The default SAML user mapping provider
 
         Args:
-            config: Module configuration dictionary
+            parsed_config: Module configuration
         """
-        self._mxid_source_attribute = config["mxid_source_attribute"]
-        self._mxid_mapping = config["mxid_mapping"]
+        self._mxid_source_attribute = parsed_config.mxid_source_attribute
+        self._mxid_mapping = parsed_config.mxid_mapping
 
     def saml_response_to_user_attributes(
         self, saml_response: saml2.response.AuthnResponse, failures: int = 0,
@@ -267,8 +268,6 @@ class DefaultSamlMappingProvider(object):
         """Maps some text from a SAML response to attributes of a new user
 
         Args:
-            config: A configuration dictionary
-
             saml_response: A SAML auth response object
 
             failures: How many times a call to this function with this
@@ -304,3 +303,53 @@ class DefaultSamlMappingProvider(object):
             "mxid_localpart": localpart,
             "displayname": displayname,
         }
+
+    @staticmethod
+    def parse_config(config: dict):
+        """Parse the dict provided by the homeserver's config
+        Args:
+            config: A dictionary containing configuration options for this provider
+        Returns:
+            _SamlConfig: A custom config object
+        """
+
+        class _SamlConfig(object):
+            pass
+
+        saml_config = _SamlConfig()
+
+        # Handle deprecated options
+
+        # If mxid_source_attribute or mxid_mapping is defined in the deprecated location, use
+        # that instead for backwards compatibility
+        saml_config.mxid_source_attribute = config[
+            "old_mxid_source_attribute"
+        ] or config.get("mxid_source_attribute", "uid")
+
+        # If mxid_mapping is defined, use that instead for backwards compatibility
+        mapping_type = config["old_mxid_mapping"] or config.get(
+            "mxid_mapping", "hexencode"
+        )
+        try:
+            saml_config.mxid_mapper = MXID_MAPPER_MAP[mapping_type]
+        except KeyError:
+            raise ConfigError(
+                "saml2_config.user_mapping_provider.config: %s is not a valid "
+                "mxid_mapping value" % (mapping_type,)
+            )
+        return saml_config
+
+    @staticmethod
+    def get_required_saml_attributes(config: dict):
+        """Returns the required attributes of a SAML
+
+        Args:
+            config: A dictionary containing configuration options for this provider
+
+        Returns:
+            tuple[set,set]: The first set equates to the saml auth response attributes that
+                are required for the module to function, whereas the second set consists of
+                those attributes which can be used if available, but are not necessary
+        """
+        saml_config = DefaultSamlMappingProvider.parse_config(config)
+        return {"uid", saml_config.mxid_source_attribute}, {"displayName"}
