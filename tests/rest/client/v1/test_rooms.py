@@ -1571,7 +1571,12 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
-            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS_NOT_LABELS)),
+            % (
+                self.room_id,
+                self.tok,
+                token,
+                json.dumps(self.FILTER_LABELS_NOT_LABELS)
+            ),
         )
         self.render(request)
 
