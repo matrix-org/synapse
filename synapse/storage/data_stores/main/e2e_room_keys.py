@@ -38,7 +38,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             StoreError
         """
 
-        yield self.simple_update_one(
+        yield self.db.simple_update_one(
             table="e2e_room_keys",
             keyvalues={
                 "user_id": user_id,
@@ -89,7 +89,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 }
             )
 
-        yield self.simple_insert_many(
+        yield self.db.simple_insert_many(
             table="e2e_room_keys", values=values, desc="add_e2e_room_keys"
         )
 
@@ -125,7 +125,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             if session_id:
                 keyvalues["session_id"] = session_id
 
-        rows = yield self.simple_select_list(
+        rows = yield self.db.simple_select_list(
             table="e2e_room_keys",
             keyvalues=keyvalues,
             retcols=(
@@ -170,7 +170,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
            Deferred[dict[str, dict[str, dict]]]: a map of room IDs to session IDs to room key
         """
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_e2e_room_keys_multi",
             self._get_e2e_room_keys_multi_txn,
             user_id,
@@ -234,7 +234,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             version (str): the version ID of the backup we're querying about
         """
 
-        return self.simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="e2e_room_keys",
             keyvalues={"user_id": user_id, "version": version},
             retcol="COUNT(*)",
@@ -267,7 +267,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             if session_id:
                 keyvalues["session_id"] = session_id
 
-        yield self.simple_delete(
+        yield self.db.simple_delete(
             table="e2e_room_keys", keyvalues=keyvalues, desc="delete_e2e_room_keys"
         )
 
@@ -312,7 +312,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     # it isn't there.
                     raise StoreError(404, "No row found")
 
-            result = self.simple_select_one_txn(
+            result = self.db.simple_select_one_txn(
                 txn,
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": this_version, "deleted": 0},
@@ -324,7 +324,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 result["etag"] = 0
             return result
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_e2e_room_keys_version_info", _get_e2e_room_keys_version_info_txn
         )
 
@@ -352,7 +352,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
             new_version = str(int(current_version) + 1)
 
-            self.simple_insert_txn(
+            self.db.simple_insert_txn(
                 txn,
                 table="e2e_room_keys_versions",
                 values={
@@ -365,7 +365,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
             return new_version
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
@@ -391,7 +391,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             updatevalues["etag"] = version_etag
 
         if updatevalues:
-            return self.simple_update(
+            return self.db.simple_update(
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": version},
                 updatevalues=updatevalues,
@@ -420,19 +420,19 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             else:
                 this_version = version
 
-            self.simple_delete_txn(
+            self.db.simple_delete_txn(
                 txn,
                 table="e2e_room_keys",
                 keyvalues={"user_id": user_id, "version": this_version},
             )
 
-            return self.simple_update_one_txn(
+            return self.db.simple_update_one_txn(
                 txn,
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": this_version},
                 updatevalues={"deleted": 1},
             )
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "delete_e2e_room_keys_version", _delete_e2e_room_keys_version_txn
         )

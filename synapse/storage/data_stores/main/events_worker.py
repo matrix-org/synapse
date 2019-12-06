@@ -78,7 +78,7 @@ class EventsWorkerStore(SQLBaseStore):
             Deferred[int|None]: Timestamp in milliseconds, or None for events
             that were persisted before received_ts was implemented.
         """
-        return self.simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="events",
             keyvalues={"event_id": event_id},
             retcol="received_ts",
@@ -117,7 +117,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             return ts
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_approximate_received_ts", _get_approximate_received_ts_txn
         )
 
@@ -452,7 +452,7 @@ class EventsWorkerStore(SQLBaseStore):
                     event_id for events, _ in event_list for event_id in events
                 )
 
-                row_dict = self.new_transaction(
+                row_dict = self.db.new_transaction(
                     conn, "do_fetch", [], [], self._fetch_event_rows, events_to_fetch
                 )
 
@@ -584,7 +584,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         if should_start:
             run_as_background_process(
-                "fetch_events", self.runWithConnection, self._do_fetch
+                "fetch_events", self.db.runWithConnection, self._do_fetch
             )
 
         logger.debug("Loading %d events: %s", len(events), events)
@@ -745,7 +745,7 @@ class EventsWorkerStore(SQLBaseStore):
         """Given a list of event ids, check if we have already processed and
         stored them as non outliers.
         """
-        rows = yield self.simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="events",
             retcols=("event_id",),
             column="event_id",
@@ -780,7 +780,9 @@ class EventsWorkerStore(SQLBaseStore):
         # break the input up into chunks of 100
         input_iterator = iter(event_ids)
         for chunk in iter(lambda: list(itertools.islice(input_iterator, 100)), []):
-            yield self.runInteraction("have_seen_events", have_seen_events_txn, chunk)
+            yield self.db.runInteraction(
+                "have_seen_events", have_seen_events_txn, chunk
+            )
         return results
 
     def _get_total_state_event_counts_txn(self, txn, room_id):
@@ -807,7 +809,7 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             Deferred[int]
         """
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_total_state_event_counts",
             self._get_total_state_event_counts_txn,
             room_id,
@@ -832,7 +834,7 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             Deferred[int]
         """
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_current_state_event_counts",
             self._get_current_state_event_counts_txn,
             room_id,
