@@ -30,6 +30,7 @@ import yaml
 from twisted.enterprise import adbapi
 from twisted.internet import defer, reactor
 
+from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.context import PreserveLoggingContext
 from synapse.storage._base import LoggingTransaction
@@ -165,22 +166,16 @@ class Store(
 
 
 class MockHomeserver:
-    def __init__(self, config, database_engine, db_conn, db_pool):
-        self.database_engine = database_engine
-        self.db_conn = db_conn
-        self.db_pool = db_pool
+    def __init__(self, config):
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server_name
 
-    def get_db_conn(self):
-        return self.db_conn
-
-    def get_db_pool(self):
-        return self.db_pool
-
     def get_clock(self):
         return self.clock
+
+    def get_reactor(self):
+        return reactor
 
 
 class Porter(object):
@@ -445,45 +440,35 @@ class Porter(object):
             else:
                 return
 
-    def setup_db(self, db_config, database_engine):
-        db_conn = database_engine.module.connect(
-            **{
-                k: v
-                for k, v in db_config.get("args", {}).items()
-                if not k.startswith("cp_")
-            }
-        )
-
-        prepare_database(db_conn, database_engine, config=None)
+    def setup_db(self, db_config: DatabaseConnectionConfig):
+        db_conn = db_config.make_conn()
+        prepare_database(db_conn, db_config.engine, config=None)
 
         db_conn.commit()
 
         return db_conn
 
     @defer.inlineCallbacks
-    def build_db_store(self, config):
+    def build_db_store(self, db_config: DatabaseConnectionConfig):
         """Builds and returns a database store using the provided configuration.
 
         Args:
-            config: The database configuration, i.e. a dict following the structure of
-                the "database" section of Synapse's configuration file.
+            config: The database configuration
 
         Returns:
             The built Store object.
         """
-        engine = create_engine(config)
+        self.progress.set_state("Preparing %s" % db_config.config["name"])
 
-        self.progress.set_state("Preparing %s" % config["name"])
-        conn = self.setup_db(config, engine)
+        conn = self.setup_db(db_config)
 
-        db_pool = adbapi.ConnectionPool(config["name"], **config["args"])
+        hs = MockHomeserver(self.hs_config)
 
-        hs = MockHomeserver(self.hs_config, engine, conn, db_pool)
-
-        store = Store(Database(hs), conn, hs)
+        store = Store(Database(hs, db_config), conn, hs)
 
         yield store.db.runInteraction(
-            "%s_engine.check_database" % config["name"], engine.check_database,
+            "%s_engine.check_database" % db_config.config["name"],
+            db_config.engine.check_database,
         )
 
         return store
@@ -509,7 +494,7 @@ class Porter(object):
     @defer.inlineCallbacks
     def run(self):
         try:
-            self.sqlite_store = yield self.build_db_store(self.sqlite_config)
+            self.sqlite_store = yield self.build_db_store(DatabaseConnectionConfig(self.sqlite_config))
 
             # Check if all background updates are done, abort if not.
             updates_complete = (
@@ -524,7 +509,7 @@ class Porter(object):
                 defer.returnValue(None)
 
             self.postgres_store = yield self.build_db_store(
-                self.hs_config.database_config
+                self.hs_config.get_single_database()
             )
 
             yield self.run_background_updates_on_postgres()

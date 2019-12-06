@@ -26,7 +26,6 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 
 logger = logging.getLogger("update_database")
@@ -86,23 +85,16 @@ if __name__ == "__main__":
     config.parse_config_dict(hs_config, "", "")
 
     # Create the database engine and a connection to it.
-    database_engine = create_engine(config.database_config)
-    db_conn = database_engine.module.connect(
-        **{
-            k: v
-            for k, v in config.database_config.get("args", {}).items()
-            if not k.startswith("cp_")
-        }
-    )
+    database = config.get_single_database()
+    database_engine = database.engine
+    db_conn = database.make_conn()
 
     # Update the database to the latest schema.
     prepare_database(db_conn, database_engine, config=config)
     db_conn.commit()
 
     # Instantiate and initialise the homeserver object.
-    hs = MockHomeserver(
-        config, database_engine, db_conn, db_config=config.database_config,
-    )
+    hs = MockHomeserver(config, database_engine, db_conn,)
     # setup instantiates the store within the homeserver object.
     hs.setup()
     store = hs.get_datastore()
