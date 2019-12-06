@@ -20,6 +20,7 @@ import logging
 import time
 
 from synapse.api.constants import PresenceState
+from synapse.storage.database import Database
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
     ChainedIdGenerator,
@@ -111,7 +112,7 @@ class DataStore(
     RelationsStore,
     CacheInvalidationStore,
 ):
-    def __init__(self, db_conn, hs):
+    def __init__(self, database: Database, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = hs.database_engine
@@ -169,7 +170,7 @@ class DataStore(
         else:
             self._cache_id_gen = None
 
-        super(DataStore, self).__init__(db_conn, hs)
+        super(DataStore, self).__init__(database, db_conn, hs)
 
         self._presence_on_startup = self._get_active_presence(db_conn)
 
