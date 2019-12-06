@@ -81,7 +81,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.pump(0)
 
         result = self.get_success(
-            self.store._simple_select_list(
+            self.store.db.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
@@ -112,7 +112,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.pump(0)
 
         result = self.get_success(
-            self.store._simple_select_list(
+            self.store.db.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
@@ -202,8 +202,12 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
     def test_devices_last_seen_bg_update(self):
         # First make sure we have completed all updates.
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         # Insert a user IP
         user_id = "@user:id"
@@ -218,7 +222,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         # But clear the associated entry in devices table
         self.get_success(
-            self.store._simple_update(
+            self.store.db.simple_update(
                 table="devices",
                 keyvalues={"user_id": user_id, "device_id": "device_id"},
                 updatevalues={"last_seen": None, "ip": None, "user_agent": None},
@@ -245,7 +249,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         # Register the background update to run again.
         self.get_success(
-            self.store._simple_insert(
+            self.store.db.simple_insert(
                 table="background_updates",
                 values={
                     "update_name": "devices_last_seen",
@@ -256,11 +260,15 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         # ... and tell the DataStore that it hasn't finished all updates yet
-        self.store._all_done = False
+        self.store.db.updates._all_done = False
 
         # Now let's actually drive the updates to completion
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         # We should now get the correct result again
         result = self.get_success(
@@ -281,8 +289,12 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
     def test_old_user_ips_pruned(self):
         # First make sure we have completed all updates.
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         # Insert a user IP
         user_id = "@user:id"
@@ -297,7 +309,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         # We should see that in the DB
         result = self.get_success(
-            self.store._simple_select_list(
+            self.store.db.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
@@ -323,7 +335,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
         # We should get no results.
         result = self.get_success(
-            self.store._simple_select_list(
+            self.store.db.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],

@@ -1,3 +1,36 @@
+Synapse 1.6.1 (2019-11-28)
+==========================
+
+Security updates
+----------------
+
+This release includes a security fix ([\#6426](https://github.com/matrix-org/synapse/issues/6426), below). Administrators are encouraged to upgrade as soon as possible.
+
+Bugfixes
+--------
+
+- Clean up local threepids from user on account deactivation. ([\#6426](https://github.com/matrix-org/synapse/issues/6426))
+- Fix startup error when http proxy is defined. ([\#6421](https://github.com/matrix-org/synapse/issues/6421))
+
+
+Synapse 1.6.0 (2019-11-26)
+==========================
+
+Bugfixes
+--------
+
+- Fix phone home stats reporting. ([\#6418](https://github.com/matrix-org/synapse/issues/6418))
+
+
+Synapse 1.6.0rc2 (2019-11-25)
+=============================
+
+Bugfixes
+--------
+
+- Fix a bug which could cause the background database update hander for event labels to get stuck in a loop raising exceptions. ([\#6407](https://github.com/matrix-org/synapse/issues/6407))
+
+
 Synapse 1.6.0rc1 (2019-11-20)
 =============================
 

@@ -38,7 +38,6 @@ from synapse.logging.utils import log_function
 from synapse.metrics import BucketCollector
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import make_in_list_sql_clause
-from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.data_stores.main.event_federation import EventFederationStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.data_stores.main.state import StateGroupWorkerStore
@@ -94,10 +93,7 @@ def _retry_on_integrity_error(func):
 # inherits from EventFederationStore so that we can call _update_backward_extremities
 # and _handle_mult_prev_events (though arguably those could both be moved in here)
 class EventsStore(
-    StateGroupWorkerStore,
-    EventFederationStore,
-    EventsWorkerStore,
-    BackgroundUpdateStore,
+    StateGroupWorkerStore, EventFederationStore, EventsWorkerStore,
 ):
     def __init__(self, db_conn, hs):
         super(EventsStore, self).__init__(db_conn, hs)
@@ -130,6 +126,8 @@ class EventsStore(
         if self.hs.config.redaction_retention_period is not None:
             hs.get_clock().looping_call(_censor_redactions, 5 * 60 * 1000)
 
+        self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
+
     @defer.inlineCallbacks
     def _read_forward_extremities(self):
         def fetch(txn):
@@ -141,7 +139,7 @@ class EventsStore(
             )
             return txn.fetchall()
 
-        res = yield self.runInteraction("read_forward_extremities", fetch)
+        res = yield self.db.runInteraction("read_forward_extremities", fetch)
         self._current_forward_extremities_amount = c_counter(list(x[0] for x in res))
 
     @_retry_on_integrity_error
@@ -206,7 +204,7 @@ class EventsStore(
             for (event, context), stream in zip(events_and_contexts, stream_orderings):
                 event.internal_metadata.stream_ordering = stream
 
-            yield self.runInteraction(
+            yield self.db.runInteraction(
                 "persist_events",
                 self._persist_events_txn,
                 events_and_contexts=events_and_contexts,
@@ -279,7 +277,7 @@ class EventsStore(
             results.extend(r[0] for r in txn if not json.loads(r[1]).get("soft_failed"))
 
         for chunk in batch_iter(event_ids, 100):
-            yield self.runInteraction(
+            yield self.db.runInteraction(
                 "_get_events_which_are_prevs", _get_events_which_are_prevs_txn, chunk
             )
 
@@ -343,7 +341,7 @@ class EventsStore(
                         existing_prevs.add(prev_event_id)
 
         for chunk in batch_iter(event_ids, 100):
-            yield self.runInteraction(
+            yield self.db.runInteraction(
                 "_get_prevs_before_rejected", _get_prevs_before_rejected_txn, chunk
             )
 
@@ -430,7 +428,7 @@ class EventsStore(
         # event's auth chain, but its easier for now just to store them (and
         # it doesn't take much storage compared to storing the entire event
         # anyway).
-        self._simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="event_auth",
             values=[
@@ -578,12 +576,12 @@ class EventsStore(
         self, txn, new_forward_extremities, max_stream_order
     ):
         for room_id, new_extrem in iteritems(new_forward_extremities):
-            self._simple_delete_txn(
+            self.db.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
             txn.call_after(self.get_latest_event_ids_in_room.invalidate, (room_id,))
 
-        self._simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="event_forward_extremities",
             values=[
@@ -596,7 +594,7 @@ class EventsStore(
         # new stream_ordering to new forward extremeties in the room.
         # This allows us to later efficiently look up the forward extremeties
         # for a room before a given stream_ordering
-        self._simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="stream_ordering_to_exterm",
             values=[
@@ -720,7 +718,7 @@ class EventsStore(
                 # change in outlier status to our workers.
                 stream_order = event.internal_metadata.stream_ordering
                 state_group_id = context.state_group
-                self._simple_insert_txn(
+                self.db.simple_insert_txn(
                     txn,
                     table="ex_outlier_stream",
                     values={
@@ -792,7 +790,7 @@ class EventsStore(
             d.pop("redacted_because", None)
             return d
 
-        self._simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="event_json",
             values=[
@@ -809,7 +807,7 @@ class EventsStore(
             ],
         )
 
-        self._simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="events",
             values=[
@@ -839,7 +837,7 @@ class EventsStore(
                 # If we're persisting an unredacted event we go and ensure
                 # that we mark any redactions that reference this event as
                 # requiring censoring.
-                self._simple_update_txn(
+                self.db.simple_update_txn(
                     txn,
                     table="redactions",
                     keyvalues={"redacts": event.event_id},
@@ -927,6 +925,9 @@ class EventsStore(
             elif event.type == EventTypes.Redaction:
                 # Insert into the redactions table.
                 self._store_redaction(txn, event)
+            elif event.type == EventTypes.Retention:
+                # Update the room_retention table.
+                self._store_retention_policy_for_room_txn(txn, event)
 
             self._handle_event_relations(txn, event)
 
@@ -936,6 +937,12 @@ class EventsStore(
                 self.insert_labels_for_event_txn(
                     txn, event.event_id, labels, event.room_id, event.depth
                 )
+
+            if self._ephemeral_messages_enabled:
+                # If there's an expiry timestamp on the event, store it.
+                expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
+                if isinstance(expiry_ts, int) and not event.is_state():
+                    self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
 
         # Insert into the room_memberships table.
         self._store_room_members_txn(
@@ -972,7 +979,7 @@ class EventsStore(
 
             state_values.append(vals)
 
-        self._simple_insert_many_txn(txn, table="state_events", values=state_values)
+        self.db.simple_insert_many_txn(txn, table="state_events", values=state_values)
 
         # Prefill the event cache
         self._add_to_cache(txn, events_and_contexts)
@@ -1003,7 +1010,7 @@ class EventsStore(
             )
 
             txn.execute(sql + clause, args)
-            rows = self.cursor_to_dict(txn)
+            rows = self.db.cursor_to_dict(txn)
             for row in rows:
                 event = ev_map[row["event_id"]]
                 if not row["rejects"] and not row["redacts"]:
@@ -1021,7 +1028,7 @@ class EventsStore(
         # invalidate the cache for the redacted event
         txn.call_after(self._invalidate_get_event_cache, event.redacts)
 
-        self._simple_insert_txn(
+        self.db.simple_insert_txn(
             txn,
             table="redactions",
             values={
@@ -1066,7 +1073,7 @@ class EventsStore(
             LIMIT ?
         """
 
-        rows = yield self._execute(
+        rows = yield self.db.execute(
             "_censor_redactions_fetch", None, sql, before_ts, 100
         )
 
@@ -1098,21 +1105,32 @@ class EventsStore(
         def _update_censor_txn(txn):
             for redaction_id, event_id, pruned_json in updates:
                 if pruned_json:
-                    self._simple_update_one_txn(
-                        txn,
-                        table="event_json",
-                        keyvalues={"event_id": event_id},
-                        updatevalues={"json": pruned_json},
-                    )
+                    self._censor_event_txn(txn, event_id, pruned_json)
 
-                self._simple_update_one_txn(
+                self.db.simple_update_one_txn(
                     txn,
                     table="redactions",
                     keyvalues={"event_id": redaction_id},
                     updatevalues={"have_censored": True},
                 )
 
-        yield self.runInteraction("_update_censor_txn", _update_censor_txn)
+        yield self.db.runInteraction("_update_censor_txn", _update_censor_txn)
+
+    def _censor_event_txn(self, txn, event_id, pruned_json):
+        """Censor an event by replacing its JSON in the event_json table with the
+        provided pruned JSON.
+
+        Args:
+            txn (LoggingTransaction): The database transaction.
+            event_id (str): The ID of the event to censor.
+            pruned_json (str): The pruned JSON
+        """
+        self.db.simple_update_one_txn(
+            txn,
+            table="event_json",
+            keyvalues={"event_id": event_id},
+            updatevalues={"json": pruned_json},
+        )
 
     @defer.inlineCallbacks
     def count_daily_messages(self):
@@ -1133,7 +1151,7 @@ class EventsStore(
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.runInteraction("count_messages", _count_messages)
+        ret = yield self.db.runInteraction("count_messages", _count_messages)
         return ret
 
     @defer.inlineCallbacks
@@ -1154,7 +1172,7 @@ class EventsStore(
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.runInteraction("count_daily_sent_messages", _count_messages)
+        ret = yield self.db.runInteraction("count_daily_sent_messages", _count_messages)
         return ret
 
     @defer.inlineCallbacks
@@ -1169,7 +1187,7 @@ class EventsStore(
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.runInteraction("count_daily_active_rooms", _count)
+        ret = yield self.db.runInteraction("count_daily_active_rooms", _count)
         return ret
 
     def get_current_backfill_token(self):
@@ -1221,7 +1239,7 @@ class EventsStore(
 
             return new_event_updates
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_all_new_forward_event_rows", get_all_new_forward_event_rows
         )
 
@@ -1266,7 +1284,7 @@ class EventsStore(
 
             return new_event_updates
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_all_new_backfill_event_rows", get_all_new_backfill_event_rows
         )
 
@@ -1359,7 +1377,7 @@ class EventsStore(
                 backward_ex_outliers,
             )
 
-        return self.runInteraction("get_all_new_events", get_all_new_events_txn)
+        return self.db.runInteraction("get_all_new_events", get_all_new_events_txn)
 
     def purge_history(self, room_id, token, delete_local_events):
         """Deletes room history before a certain point
@@ -1379,7 +1397,7 @@ class EventsStore(
             deleted events.
         """
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "purge_history",
             self._purge_history_txn,
             room_id,
@@ -1627,7 +1645,7 @@ class EventsStore(
             Deferred[List[int]]: The list of state groups to delete.
         """
 
-        return self.runInteraction("purge_room", self._purge_room_txn, room_id)
+        return self.db.runInteraction("purge_room", self._purge_room_txn, room_id)
 
     def _purge_room_txn(self, txn, room_id):
         # First we fetch all the state groups that should be deleted, before
@@ -1746,7 +1764,7 @@ class EventsStore(
                 to delete.
         """
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "purge_unreferenced_state_groups",
             self._purge_unreferenced_state_groups,
             room_id,
@@ -1758,7 +1776,7 @@ class EventsStore(
             "[purge] found %i state groups to delete", len(state_groups_to_delete)
         )
 
-        rows = self._simple_select_many_txn(
+        rows = self.db.simple_select_many_txn(
             txn,
             table="state_group_edges",
             column="prev_state_group",
@@ -1785,15 +1803,15 @@ class EventsStore(
             curr_state = self._get_state_groups_from_groups_txn(txn, [sg])
             curr_state = curr_state[sg]
 
-            self._simple_delete_txn(
+            self.db.simple_delete_txn(
                 txn, table="state_groups_state", keyvalues={"state_group": sg}
             )
 
-            self._simple_delete_txn(
+            self.db.simple_delete_txn(
                 txn, table="state_group_edges", keyvalues={"state_group": sg}
             )
 
-            self._simple_insert_many_txn(
+            self.db.simple_insert_many_txn(
                 txn,
                 table="state_groups_state",
                 values=[
@@ -1830,7 +1848,7 @@ class EventsStore(
             state group.
         """
 
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="state_group_edges",
             column="prev_state_group",
             iterable=state_groups,
@@ -1849,7 +1867,7 @@ class EventsStore(
             state_groups_to_delete (list[int]): State groups to delete
         """
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "purge_room_state",
             self._purge_room_state_txn,
             room_id,
@@ -1860,7 +1878,7 @@ class EventsStore(
         # first we have to delete the state groups states
         logger.info("[purge] removing %s from state_groups_state", room_id)
 
-        self._simple_delete_many_txn(
+        self.db.simple_delete_many_txn(
             txn,
             table="state_groups_state",
             column="state_group",
@@ -1871,7 +1889,7 @@ class EventsStore(
         # ... and the state group edges
         logger.info("[purge] removing %s from state_group_edges", room_id)
 
-        self._simple_delete_many_txn(
+        self.db.simple_delete_many_txn(
             txn,
             table="state_group_edges",
             column="state_group",
@@ -1882,7 +1900,7 @@ class EventsStore(
         # ... and the state groups
         logger.info("[purge] removing %s from state_groups", room_id)
 
-        self._simple_delete_many_txn(
+        self.db.simple_delete_many_txn(
             txn,
             table="state_groups",
             column="id",
@@ -1899,7 +1917,7 @@ class EventsStore(
 
     @cachedInlineCallbacks(max_entries=5000)
     def _get_event_ordering(self, event_id):
-        res = yield self._simple_select_one(
+        res = yield self.db.simple_select_one(
             table="events",
             retcols=["topological_ordering", "stream_ordering"],
             keyvalues={"event_id": event_id},
@@ -1922,7 +1940,7 @@ class EventsStore(
             txn.execute(sql, (from_token, to_token, limit))
             return txn.fetchall()
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_all_updated_current_state_deltas",
             get_all_updated_current_state_deltas_txn,
         )
@@ -1940,7 +1958,7 @@ class EventsStore(
             room_id (str): The ID of the room the event was sent to.
             topological_ordering (int): The position of the event in the room's topology.
         """
-        return self._simple_insert_many_txn(
+        return self.db.simple_insert_many_txn(
             txn=txn,
             table="event_labels",
             values=[
@@ -1952,6 +1970,101 @@ class EventsStore(
                 }
                 for label in labels
             ],
+        )
+
+    def _insert_event_expiry_txn(self, txn, event_id, expiry_ts):
+        """Save the expiry timestamp associated with a given event ID.
+
+        Args:
+            txn (LoggingTransaction): The database transaction to use.
+            event_id (str): The event ID the expiry timestamp is associated with.
+            expiry_ts (int): The timestamp at which to expire (delete) the event.
+        """
+        return self.db.simple_insert_txn(
+            txn=txn,
+            table="event_expiry",
+            values={"event_id": event_id, "expiry_ts": expiry_ts},
+        )
+
+    @defer.inlineCallbacks
+    def expire_event(self, event_id):
+        """Retrieve and expire an event that has expired, and delete its associated
+        expiry timestamp. If the event can't be retrieved, delete its associated
+        timestamp so we don't try to expire it again in the future.
+
+        Args:
+             event_id (str): The ID of the event to delete.
+        """
+        # Try to retrieve the event's content from the database or the event cache.
+        event = yield self.get_event(event_id)
+
+        def delete_expired_event_txn(txn):
+            # Delete the expiry timestamp associated with this event from the database.
+            self._delete_event_expiry_txn(txn, event_id)
+
+            if not event:
+                # If we can't find the event, log a warning and delete the expiry date
+                # from the database so that we don't try to expire it again in the
+                # future.
+                logger.warning(
+                    "Can't expire event %s because we don't have it.", event_id
+                )
+                return
+
+            # Prune the event's dict then convert it to JSON.
+            pruned_json = encode_json(prune_event_dict(event.get_dict()))
+
+            # Update the event_json table to replace the event's JSON with the pruned
+            # JSON.
+            self._censor_event_txn(txn, event.event_id, pruned_json)
+
+            # We need to invalidate the event cache entry for this event because we
+            # changed its content in the database. We can't call
+            # self._invalidate_cache_and_stream because self.get_event_cache isn't of the
+            # right type.
+            txn.call_after(self._get_event_cache.invalidate, (event.event_id,))
+            # Send that invalidation to replication so that other workers also invalidate
+            # the event cache.
+            self._send_invalidation_to_replication(
+                txn, "_get_event_cache", (event.event_id,)
+            )
+
+        yield self.db.runInteraction("delete_expired_event", delete_expired_event_txn)
+
+    def _delete_event_expiry_txn(self, txn, event_id):
+        """Delete the expiry timestamp associated with an event ID without deleting the
+        actual event.
+
+        Args:
+            txn (LoggingTransaction): The transaction to use to perform the deletion.
+            event_id (str): The event ID to delete the associated expiry timestamp of.
+        """
+        return self.db.simple_delete_txn(
+            txn=txn, table="event_expiry", keyvalues={"event_id": event_id}
+        )
+
+    def get_next_event_to_expire(self):
+        """Retrieve the entry with the lowest expiry timestamp in the event_expiry
+        table, or None if there's no more event to expire.
+
+        Returns: Deferred[Optional[Tuple[str, int]]]
+            A tuple containing the event ID as its first element and an expiry timestamp
+            as its second one, if there's at least one row in the event_expiry table.
+            None otherwise.
+        """
+
+        def get_next_event_to_expire_txn(txn):
+            txn.execute(
+                """
+                SELECT event_id, expiry_ts FROM event_expiry
+                ORDER BY expiry_ts ASC LIMIT 1
+                """
+            )
+
+            return txn.fetchone()
+
+        return self.db.runInteraction(
+            desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
 
 

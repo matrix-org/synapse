@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.http.servlet import RestServlet
 from synapse.rest.client.v2_alpha._base import client_patterns
 
@@ -35,17 +33,16 @@ class LogoutRestServlet(RestServlet):
     def on_OPTIONS(self, request):
         return 200, {}
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
 
         if requester.device_id is None:
             # the acccess token wasn't associated with a device.
             # Just delete the access token
             access_token = self.auth.get_access_token_from_request(request)
-            yield self._auth_handler.delete_access_token(access_token)
+            await self._auth_handler.delete_access_token(access_token)
         else:
-            yield self._device_handler.delete_device(
+            await self._device_handler.delete_device(
                 requester.user.to_string(), requester.device_id
             )
 
@@ -64,17 +61,16 @@ class LogoutAllRestServlet(RestServlet):
     def on_OPTIONS(self, request):
         return 200, {}
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         # first delete all of the user's devices
-        yield self._device_handler.delete_all_devices_for_user(user_id)
+        await self._device_handler.delete_all_devices_for_user(user_id)
 
         # .. and then delete any access tokens which weren't associated with
         # devices.
-        yield self._auth_handler.delete_access_tokens_for_user(user_id)
+        await self._auth_handler.delete_access_tokens_for_user(user_id)
         return 200, {}
 
 

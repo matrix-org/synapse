@@ -32,7 +32,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         self._clock = hs.get_clock()
         self.hs = hs
         # Do not add more reserved users than the total allowable number
-        self._new_transaction(
+        self.db.new_transaction(
             dbconn,
             "initialise_mau_threepids",
             [],
@@ -146,7 +146,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                     txn.execute(sql, query_args)
 
         reserved_users = yield self.get_registered_reserved_users()
-        yield self.runInteraction(
+        yield self.db.runInteraction(
             "reap_monthly_active_users", _reap_users, reserved_users
         )
         # It seems poor to invalidate the whole cache, Postgres supports
@@ -174,7 +174,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        return self.runInteraction("count_users", _count_users)
+        return self.db.runInteraction("count_users", _count_users)
 
     @defer.inlineCallbacks
     def get_registered_reserved_users(self):
@@ -217,7 +217,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         if is_support:
             return
 
-        yield self.runInteraction(
+        yield self.db.runInteraction(
             "upsert_monthly_active_user", self.upsert_monthly_active_user_txn, user_id
         )
 
@@ -261,7 +261,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # never be a big table and alternative approaches (batching multiple
         # upserts into a single txn) introduced a lot of extra complexity.
         # See https://github.com/matrix-org/synapse/issues/3854 for more
-        is_insert = self._simple_upsert_txn(
+        is_insert = self.db.simple_upsert_txn(
             txn,
             table="monthly_active_users",
             keyvalues={"user_id": user_id},
@@ -281,7 +281,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
         """
 
-        return self._simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="monthly_active_users",
             keyvalues={"user_id": user_id},
             retcol="timestamp",

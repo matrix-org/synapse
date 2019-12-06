@@ -24,8 +24,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import make_in_list_sql_clause
-from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 logger = logging.getLogger(__name__)
@@ -36,7 +35,7 @@ SearchEntry = namedtuple(
 )
 
 
-class SearchBackgroundUpdateStore(BackgroundUpdateStore):
+class SearchBackgroundUpdateStore(SQLBaseStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
@@ -49,10 +48,10 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
         if not hs.config.enable_search:
             return
 
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
         )
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             self.EVENT_SEARCH_ORDER_UPDATE_NAME, self._background_reindex_search_order
         )
 
@@ -61,9 +60,11 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
         # a GIN index. However, it's possible that some people might still have
         # the background update queued, so we register a handler to clear the
         # background update.
-        self.register_noop_background_update(self.EVENT_SEARCH_USE_GIST_POSTGRES_NAME)
+        self.db.updates.register_noop_background_update(
+            self.EVENT_SEARCH_USE_GIST_POSTGRES_NAME
+        )
 
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME, self._background_reindex_gin_search
         )
 
@@ -93,7 +94,7 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
             # store_search_entries_txn with a generator function, but that
             # would mean having two cursors open on the database at once.
             # Instead we just build a list of results.
-            rows = self.cursor_to_dict(txn)
+            rows = self.db.cursor_to_dict(txn)
             if not rows:
                 return 0
 
@@ -153,18 +154,18 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
                 "rows_inserted": rows_inserted + len(event_search_rows),
             }
 
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn, self.EVENT_SEARCH_UPDATE_NAME, progress
             )
 
             return len(event_search_rows)
 
-        result = yield self.runInteraction(
+        result = yield self.db.runInteraction(
             self.EVENT_SEARCH_UPDATE_NAME, reindex_search_txn
         )
 
         if not result:
-            yield self._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
+            yield self.db.updates._end_background_update(self.EVENT_SEARCH_UPDATE_NAME)
 
         return result
 
@@ -206,9 +207,11 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
                 conn.set_session(autocommit=False)
 
         if isinstance(self.database_engine, PostgresEngine):
-            yield self.runWithConnection(create_index)
+            yield self.db.runWithConnection(create_index)
 
-        yield self._end_background_update(self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME)
+        yield self.db.updates._end_background_update(
+            self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME
+        )
         return 1
 
     @defer.inlineCallbacks
@@ -237,14 +240,14 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
                 )
                 conn.set_session(autocommit=False)
 
-            yield self.runWithConnection(create_index)
+            yield self.db.runWithConnection(create_index)
 
             pg = dict(progress)
             pg["have_added_indexes"] = True
 
-            yield self.runInteraction(
+            yield self.db.runInteraction(
                 self.EVENT_SEARCH_ORDER_UPDATE_NAME,
-                self._background_update_progress_txn,
+                self.db.updates._background_update_progress_txn,
                 self.EVENT_SEARCH_ORDER_UPDATE_NAME,
                 pg,
             )
@@ -274,18 +277,20 @@ class SearchBackgroundUpdateStore(BackgroundUpdateStore):
                 "have_added_indexes": True,
             }
 
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn, self.EVENT_SEARCH_ORDER_UPDATE_NAME, progress
             )
 
             return len(rows), True
 
-        num_rows, finished = yield self.runInteraction(
+        num_rows, finished = yield self.db.runInteraction(
             self.EVENT_SEARCH_ORDER_UPDATE_NAME, reindex_search_txn
         )
 
         if not finished:
-            yield self._end_background_update(self.EVENT_SEARCH_ORDER_UPDATE_NAME)
+            yield self.db.updates._end_background_update(
+                self.EVENT_SEARCH_ORDER_UPDATE_NAME
+            )
 
         return num_rows
 
@@ -441,7 +446,9 @@ class SearchStore(SearchBackgroundUpdateStore):
         # entire table from the database.
         sql += " ORDER BY rank DESC LIMIT 500"
 
-        results = yield self._execute("search_msgs", self.cursor_to_dict, sql, *args)
+        results = yield self.db.execute(
+            "search_msgs", self.db.cursor_to_dict, sql, *args
+        )
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
@@ -455,8 +462,8 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         count_sql += " GROUP BY room_id"
 
-        count_results = yield self._execute(
-            "search_rooms_count", self.cursor_to_dict, count_sql, *count_args
+        count_results = yield self.db.execute(
+            "search_rooms_count", self.db.cursor_to_dict, count_sql, *count_args
         )
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
@@ -586,7 +593,9 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         args.append(limit)
 
-        results = yield self._execute("search_rooms", self.cursor_to_dict, sql, *args)
+        results = yield self.db.execute(
+            "search_rooms", self.db.cursor_to_dict, sql, *args
+        )
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
@@ -600,8 +609,8 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         count_sql += " GROUP BY room_id"
 
-        count_results = yield self._execute(
-            "search_rooms_count", self.cursor_to_dict, count_sql, *count_args
+        count_results = yield self.db.execute(
+            "search_rooms_count", self.db.cursor_to_dict, count_sql, *count_args
         )
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
@@ -686,7 +695,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
             return highlight_words
 
-        return self.runInteraction("_find_highlights", f)
+        return self.db.runInteraction("_find_highlights", f)
 
 
 def _to_postgres_options(options_dict):
