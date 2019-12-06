@@ -387,7 +387,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             query_params.append(key_type)
 
             txn.execute(sql, query_params)
-            rows = self.cursor_to_dict(txn)
+            rows = self.db.cursor_to_dict(txn)
 
             devices = {}
             for row in rows:
@@ -416,7 +416,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                     query_params.extend(item)
 
                 txn.execute(sql, query_params)
-                rows = self.cursor_to_dict(txn)
+                rows = self.db.cursor_to_dict(txn)
 
                 # and add the signatures to the appropriate keys
                 for row in rows:
@@ -447,7 +447,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 cross-signing key was not found, their user ID will not be in
                 the dict.
         """
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_e2e_cross_signing_key",
             self._get_e2e_cross_signing_keys_bulk_txn,
             users,
