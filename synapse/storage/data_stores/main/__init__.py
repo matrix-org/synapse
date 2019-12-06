@@ -124,7 +124,7 @@ class DataStore(
             raise Exception(
                 "Found users in database not native to %s!\n"
                 "You cannot changed a synapse server_name after it's been configured"
-                % (self.hostname,)
+                % (hs.hostname,)
             )
 
         self._stream_id_gen = StreamIdGenerator(
