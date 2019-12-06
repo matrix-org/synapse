@@ -36,7 +36,6 @@ from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
@@ -198,14 +197,10 @@ def start(config_options):
     # Force the pushers to start since they will be disabled in the main config
     config.start_pushers = True
 
-    database_engine = create_engine(config.database_config)
-
     ps = PusherServer(
         config.server_name,
-        db_config=config.database_config,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
-        database_engine=database_engine,
     )
 
     setup_logging(ps, config, use_worker_options=True)
