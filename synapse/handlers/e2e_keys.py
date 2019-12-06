@@ -280,33 +280,25 @@ class E2eKeysHandler(object):
             defer.Deferred[dict[str, dict[str, dict]]]: map from
                 (master_keys|self_signing_keys|user_signing_keys) -> user_id -> key
         """
-        master_keys = {}
-        self_signing_keys = {}
         user_signing_keys = {}
 
-        for user_id in query:
-            # XXX: consider changing the store functions to allow querying
-            # multiple users simultaneously.
-            key = yield self.store.get_e2e_cross_signing_key(
-                user_id, "master", from_user_id
-            )
-            if key:
-                master_keys[user_id] = key
+        users = list(query)
 
-            key = yield self.store.get_e2e_cross_signing_key(
-                user_id, "self_signing", from_user_id
-            )
-            if key:
-                self_signing_keys[user_id] = key
+        master_keys = yield self.store.get_e2e_cross_signing_keys_bulk(
+            users, "master", from_user_id
+        )
+        self_signing_keys = yield self.store.get_e2e_cross_signing_keys_bulk(
+            users, "self_signing", from_user_id
+        )
 
+        if from_user_id in users:
             # users can see other users' master and self-signing keys, but can
             # only see their own user-signing keys
-            if from_user_id == user_id:
-                key = yield self.store.get_e2e_cross_signing_key(
-                    user_id, "user_signing", from_user_id
-                )
-                if key:
-                    user_signing_keys[user_id] = key
+            key = yield self.store.get_e2e_cross_signing_key(
+                from_user_id, "user_signing", from_user_id
+            )
+            if key:
+                user_signing_keys[from_user_id] = key
 
         return {
             "master_keys": master_keys,
