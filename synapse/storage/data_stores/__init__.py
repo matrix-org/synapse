@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from synapse.storage.database import Database
+from synapse.storage.prepare_database import prepare_database
 
 
 class DataStores(object):
@@ -26,4 +27,10 @@ class DataStores(object):
         # Note we pass in the main store here as workers use a different main
         # store.
         database = Database(hs)
+
+        # Check that db is correctly configured.
+        database.engine.check_database(db_conn.cursor())
+
+        prepare_database(db_conn, database.engine, config=hs.config)
+
         self.main = main_store_class(database, db_conn, hs)
