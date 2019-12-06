@@ -339,7 +339,7 @@ class SyncHandler(object):
             room_ids = sync_result_builder.joined_room_ids
 
             typing_source = self.event_sources.sources["typing"]
-            typing, typing_key = typing_source.get_new_events(
+            typing, typing_key = await typing_source.get_new_events(
                 user=sync_config.user,
                 from_key=typing_key,
                 limit=sync_config.filter_collection.ephemeral_limit(),
@@ -1013,7 +1013,7 @@ class SyncHandler(object):
         now_token = sync_result_builder.now_token
 
         if since_token and since_token.groups_key:
-            results = self.store.get_groups_changes_for_user(
+            results = await self.store.get_groups_changes_for_user(
                 user_id, since_token.groups_key, now_token.groups_key
             )
         else:
@@ -1197,7 +1197,7 @@ class SyncHandler(object):
             (
                 account_data,
                 account_data_by_room,
-            ) = self.store.get_updated_account_data_for_user(
+            ) = await self.store.get_updated_account_data_for_user(
                 user_id, since_token.account_data_key
             )
 

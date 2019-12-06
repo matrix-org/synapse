@@ -1109,7 +1109,7 @@ class GroupServerStore(SQLBaseStore):
             user_id, from_token
         )
         if not has_changed:
-            return []
+            return defer.succeed([])
 
         def _get_groups_changes_for_user_txn(txn):
             sql = """
@@ -1139,7 +1139,7 @@ class GroupServerStore(SQLBaseStore):
             from_token
         )
         if not has_changed:
-            return []
+            return defer.succeed([])
 
         def _get_all_groups_changes_txn(txn):
             sql = """
