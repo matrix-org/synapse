@@ -384,7 +384,11 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 "  FROM e2e_cross_signing_signatures "
                 " WHERE user_id = ?"
                 "   AND (%s)"
-            ) % (" OR ".join("(target_user_id = ? AND target_device_id = ?)" for d in devices))
+            ) % (
+                " OR ".join(
+                    "(target_user_id = ? AND target_device_id = ?)" for d in devices
+                )
+            )
             query_params = [from_user_id]
             for item in devices.items():
                 # item is a (user_id, device_id) tuple
