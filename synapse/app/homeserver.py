@@ -68,7 +68,7 @@ from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
-from synapse.storage import DataStore, are_all_users_on_domain
+from synapse.storage import DataStore
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
 from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_database
 from synapse.util.caches import CACHE_SIZE_FACTOR
@@ -295,16 +295,6 @@ class SynapseHomeServer(HomeServer):
                 logger.warning("Unrecognized listener type: %s", listener["type"])
 
     def run_startup_checks(self, db_conn, database_engine):
-        all_users_native = are_all_users_on_domain(
-            db_conn.cursor(), database_engine, self.hostname
-        )
-        if not all_users_native:
-            quit_with_error(
-                "Found users in database not native to %s!\n"
-                "You cannot changed a synapse server_name after it's been configured"
-                % (self.hostname,)
-            )
-
         try:
             database_engine.check_database(db_conn.cursor())
         except IncorrectDatabaseSetup as e:
