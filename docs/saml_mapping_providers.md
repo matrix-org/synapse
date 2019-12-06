@@ -16,21 +16,21 @@ where SAML mapping providers come into play.
 
 External mapping providers are provided to Synapse in the form of an external
 Python module. Retrieve this module from [PyPi](https://pypi.org) or elsewhere,
-then tell Synapse where to look for the handler class by changing the
-`saml2_config.user_mapping_provider` config option.
+then tell Synapse where to look for the handler class by editing the
+`saml2_config.user_mapping_provider.module` config option.
 
-`saml2_config.user_mapping_provider_config` allows you to provide custom
+`saml2_config.user_mapping_provider.config` allows you to provide custom
 configuration options to the module. Check with the module's documentation for
-what options it provides (if any).
+what options it provides (if any). The options listed by default are for the
+user mapping provider built in to Synapse. If using a custom module, you should
+comment these options out and use those specified by the module instead.
 
 ## Building a Custom Mapping Provider
 
 A custom mapping provider must specify the following method:
 
-* `saml_response_to_user_attributes(self, saml_response, config, failures)`
+* `saml_response_to_user_attributes(self, saml_response, failures)`
     - Arguments:
-      - `config` - A dictionary with the contents of the homeserver config's
-                   `saml2_config.user_mapping_provider_config` option.
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
                           information from.
       - `failures` - An int that represents the amount of times the returned

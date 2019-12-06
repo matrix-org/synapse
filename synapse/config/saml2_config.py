@@ -17,6 +17,11 @@
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 from ._base import Config, ConfigError
 
 
@@ -84,8 +89,8 @@ class SAML2Config(Config):
         user_mapping_provider_module = user_mapping_provider_dict.get(
             "module", default_mapping_provider,
         )
+        logger.warning("hiiiiiii")
         user_mapping_provider_config = user_mapping_provider_dict.get("config", {})
-
         if user_mapping_provider_module == default_mapping_provider:
             # Handle deprecated options in default module config
 
@@ -93,6 +98,11 @@ class SAML2Config(Config):
             # that instead for backwards compatibility
             old_mxid_source_attribute = saml2_config.get("mxid_source_attribute")
             if old_mxid_source_attribute:
+                logger.warning(
+                    "The config option saml2_config.mxid_source_attribute is deprecated. "
+                    "Please use saml2_config.user_mapping_provider.config"
+                    ".mxid_source_attribute instead."
+                )
                 user_mapping_provider_config[
                     "mxid_source_attribute"
                 ] = old_mxid_source_attribute
@@ -107,6 +117,11 @@ class SAML2Config(Config):
             # If mxid_mapping is defined, use that instead for backwards compatibility
             old_mxid_mapping = saml2_config.get("mxid_mapping")
             if old_mxid_mapping:
+                logger.warning(
+                    "The config option saml2_config.mxid_mapping is deprecated. Please use "
+                    "saml2_config.user_mapping_provider.config.mxid_mapping instead."
+                )
+
                 user_mapping_provider_config["mxid_mapping"] = old_mxid_mapping
 
                 # Provide a deprecation warning

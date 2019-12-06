@@ -72,22 +72,6 @@ class SamlHandler:
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="saml_mapping", clock=self._clock)
 
-        # Check for deprecated config options
-        if hasattr(hs.config, "using_old_mxid_source_attribute"):
-            logger.warning(
-                "The config option saml2_config.mxid_source_attribute is "
-                "deprecated. Please use "
-                "saml2_config.user_mapping_provider.config.mxid_source_attribute "
-                "instead."
-            )
-        if hasattr(hs.config, "using_old_mxid_mapping"):
-            logger.warning(
-                "The config option saml2_config.mxid_mapping is "
-                "deprecated. Please use "
-                "saml2_config.user_mapping_provider.config.mxid_mapping "
-                "instead."
-            )
-
     def handle_redirect_request(self, client_redirect_url):
         """Handle an incoming request to /login/sso/redirect
 
@@ -199,13 +183,9 @@ class SamlHandler:
 
             # Map saml response to user attributes using the configured mapping provider
             for i in range(1000):
-                try:
-                    attribute_dict = self._user_mapping_provider.saml_response_to_user_attributes(
-                        saml2_auth, i
-                    )
-                except Exception:
-                    logging.exception("Error in SAML mapping provider plugin")
-                    raise
+                attribute_dict = self._user_mapping_provider.saml_response_to_user_attributes(
+                    saml2_auth, i
+                )
 
                 localpart = attribute_dict.get("mxid_localpart")
                 if not localpart:
