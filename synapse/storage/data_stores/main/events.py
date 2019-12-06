@@ -2020,7 +2020,6 @@ class EventsStore(
                 (replaces, replaces),
             )
 
-            txn.execute("SELECT 1")
             # We don't care about which row we're using because they'll all have the same
             # topological ordering, since they're all about the same event.
             # If the topological ordering (depth) of the current event is lower than the
