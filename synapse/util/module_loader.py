@@ -25,17 +25,16 @@ def load_module(provider):
     (the config dict).
 
     Returns
-        Tuple of (provider class, parsed config object|None, if a config was not passed)
+        Tuple of (provider class, parsed config object
     """
     # We need to import the module, and then pick the class out of
     # that, so we split based on the last dot.
     module, clz = provider["module"].rsplit(".", 1)
     module = importlib.import_module(module)
     provider_class = getattr(module, clz)
-    provider_config = provider.get("config")
 
     try:
-        provider_config = provider_class.parse_config(provider_config)
+        provider_config = provider_class.parse_config(provider["config"])
     except Exception as e:
         raise ConfigError("Failed to parse config for %r: %r" % (provider["module"], e))
 
