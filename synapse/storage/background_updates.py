@@ -379,7 +379,7 @@ class BackgroundUpdater(object):
             logger.debug("[SQL] %s", sql)
             c.execute(sql)
 
-        if isinstance(self.db.database_engine, engines.PostgresEngine):
+        if isinstance(self.db.engine, engines.PostgresEngine):
             runner = create_index_psql
         elif psql_only:
             runner = None

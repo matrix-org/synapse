@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage.database import Database
+
 
 class DataStores(object):
     """The various data stores.
@@ -20,7 +22,8 @@ class DataStores(object):
     These are low level interfaces to physical databases.
     """
 
-    def __init__(self, main_store, db_conn, hs):
+    def __init__(self, main_store_class, db_conn, hs):
         # Note we pass in the main store here as workers use a different main
         # store.
-        self.main = main_store
+        database = Database(hs)
+        self.main = main_store_class(database, db_conn, hs)
