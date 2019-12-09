@@ -238,8 +238,7 @@ class HomeServer(object):
     def setup(self):
         logger.info("Setting up.")
         with self.get_db_conn() as conn:
-            datastore = self.DATASTORE_CLASS(conn, self)
-            self.datastores = DataStores(datastore, conn, self)
+            self.datastores = DataStores(self.DATASTORE_CLASS, conn, self)
             conn.commit()
         self.start_time = int(self.get_clock().time())
         logger.info("Finished setting up.")
@@ -318,8 +317,8 @@ class HomeServer(object):
     def build_proxied_http_client(self):
         return SimpleHttpClient(
             self,
-            http_proxy=os.getenv("http_proxy"),
-            https_proxy=os.getenv("HTTPS_PROXY"),
+            http_proxy=os.getenvb(b"http_proxy"),
+            https_proxy=os.getenvb(b"HTTPS_PROXY"),
         )
 
     def build_room_creation_handler(self):

@@ -19,9 +19,8 @@ import calendar
 import logging
 import time
 
-from twisted.internet import defer
-
 from synapse.api.constants import PresenceState
+from synapse.storage.database import Database
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
     ChainedIdGenerator,
@@ -32,6 +31,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
+from .cache import CacheInvalidationStore
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .devices import DeviceStore
@@ -110,11 +110,22 @@ class DataStore(
     MonthlyActiveUsersStore,
     StatsStore,
     RelationsStore,
+    CacheInvalidationStore,
 ):
-    def __init__(self, db_conn, hs):
+    def __init__(self, database: Database, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
-        self.database_engine = hs.database_engine
+        self.database_engine = database.engine
+
+        all_users_native = are_all_users_on_domain(
+            db_conn.cursor(), database.engine, hs.hostname
+        )
+        if not all_users_native:
+            raise Exception(
+                "Found users in database not native to %s!\n"
+                "You cannot changed a synapse server_name after it's been configured"
+                % (hs.hostname,)
+            )
 
         self._stream_id_gen = StreamIdGenerator(
             db_conn,
@@ -169,9 +180,11 @@ class DataStore(
         else:
             self._cache_id_gen = None
 
+        super(DataStore, self).__init__(database, db_conn, hs)
+
         self._presence_on_startup = self._get_active_presence(db_conn)
 
-        presence_cache_prefill, min_presence_val = self._get_cache_dict(
+        presence_cache_prefill, min_presence_val = self.db.get_cache_dict(
             db_conn,
             "presence_stream",
             entity_column="user_id",
@@ -185,7 +198,7 @@ class DataStore(
         )
 
         max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
-        device_inbox_prefill, min_device_inbox_id = self._get_cache_dict(
+        device_inbox_prefill, min_device_inbox_id = self.db.get_cache_dict(
             db_conn,
             "device_inbox",
             entity_column="user_id",
@@ -200,7 +213,7 @@ class DataStore(
         )
         # The federation outbox and the local device inbox uses the same
         # stream_id generator.
-        device_outbox_prefill, min_device_outbox_id = self._get_cache_dict(
+        device_outbox_prefill, min_device_outbox_id = self.db.get_cache_dict(
             db_conn,
             "device_federation_outbox",
             entity_column="destination",
@@ -226,7 +239,7 @@ class DataStore(
         )
 
         events_max = self._stream_id_gen.get_current_token()
-        curr_state_delta_prefill, min_curr_state_delta_id = self._get_cache_dict(
+        curr_state_delta_prefill, min_curr_state_delta_id = self.db.get_cache_dict(
             db_conn,
             "current_state_delta_stream",
             entity_column="room_id",
@@ -240,7 +253,7 @@ class DataStore(
             prefilled_cache=curr_state_delta_prefill,
         )
 
-        _group_updates_prefill, min_group_updates_id = self._get_cache_dict(
+        _group_updates_prefill, min_group_updates_id = self.db.get_cache_dict(
             db_conn,
             "local_group_updates",
             entity_column="user_id",
@@ -259,8 +272,6 @@ class DataStore(
 
         # Used in _generate_user_daily_visits to keep track of progress
         self._last_user_visit_update = self._get_start_of_day()
-
-        super(DataStore, self).__init__(db_conn, hs)
 
     def take_presence_startup_info(self):
         active_on_startup = self._presence_on_startup
@@ -281,7 +292,7 @@ class DataStore(
 
         txn = db_conn.cursor()
         txn.execute(sql, (PresenceState.OFFLINE,))
-        rows = self.cursor_to_dict(txn)
+        rows = self.db.cursor_to_dict(txn)
         txn.close()
 
         for row in rows:
@@ -294,7 +305,7 @@ class DataStore(
         Counts the number of users who used this homeserver in the last 24 hours.
         """
         yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
-        return self.runInteraction("count_daily_users", self._count_users, yesterday)
+        return self.db.runInteraction("count_daily_users", self._count_users, yesterday)
 
     def count_monthly_users(self):
         """
@@ -304,7 +315,7 @@ class DataStore(
         amongst other things, includes a 3 day grace period before a user counts.
         """
         thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
-        return self.runInteraction(
+        return self.db.runInteraction(
             "count_monthly_users", self._count_users, thirty_days_ago
         )
 
@@ -404,7 +415,7 @@ class DataStore(
 
             return results
 
-        return self.runInteraction("count_r30_users", _count_r30_users)
+        return self.db.runInteraction("count_r30_users", _count_r30_users)
 
     def _get_start_of_day(self):
         """
@@ -469,50 +480,73 @@ class DataStore(
             # frequently
             self._last_user_visit_update = now
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "generate_user_daily_visits", _generate_user_daily_visits
         )
 
     def get_users(self):
-        """Function to reterive a list of users in users table.
+        """Function to retrieve a list of users in users table.
 
         Args:
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
-        return self._simple_select_list(
+        return self.db.simple_select_list(
             table="users",
             keyvalues={},
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
+            retcols=[
+                "name",
+                "password_hash",
+                "is_guest",
+                "admin",
+                "user_type",
+                "deactivated",
+            ],
             desc="get_users",
         )
 
-    @defer.inlineCallbacks
-    def get_users_paginate(self, order, start, limit):
-        """Function to reterive a paginated list of users from
-        users list. This will return a json object, which contains
-        list of users and the total number of users in users table.
+    def get_users_paginate(
+        self, start, limit, name=None, guests=True, deactivated=False
+    ):
+        """Function to retrieve a paginated list of users from
+        users list. This will return a json list of users.
 
         Args:
-            order (str): column name to order the select by this column
             start (int): start number to begin the query from
-            limit (int): number of rows to reterive
+            limit (int): number of rows to retrieve
+            name (string): filter for user names
+            guests (bool): whether to in include guest users
+            deactivated (bool): whether to include deactivated users
         Returns:
-            defer.Deferred: resolves to json object {list[dict[str, Any]], count}
+            defer.Deferred: resolves to list[dict[str, Any]]
         """
-        users = yield self.runInteraction(
-            "get_users_paginate",
-            self._simple_select_list_paginate_txn,
+        name_filter = {}
+        if name:
+            name_filter["name"] = "%" + name + "%"
+
+        attr_filter = {}
+        if not guests:
+            attr_filter["is_guest"] = False
+        if not deactivated:
+            attr_filter["deactivated"] = False
+
+        return self.db.simple_select_list_paginate(
+            desc="get_users_paginate",
             table="users",
-            keyvalues={"is_guest": False},
-            orderby=order,
+            orderby="name",
             start=start,
             limit=limit,
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
+            filters=name_filter,
+            keyvalues=attr_filter,
+            retcols=[
+                "name",
+                "password_hash",
+                "is_guest",
+                "admin",
+                "user_type",
+                "deactivated",
+            ],
         )
-        count = yield self.runInteraction("get_users_paginate", self.get_user_count_txn)
-        retval = {"users": users, "total": count}
-        return retval
 
     def search_users(self, term):
         """Function to search users list for one or more users with
@@ -524,10 +558,22 @@ class DataStore(
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
-        return self._simple_search_list(
+        return self.db.simple_search_list(
             table="users",
             term=term,
             col="name",
             retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
             desc="search_users",
         )
+
+
+def are_all_users_on_domain(txn, database_engine, domain):
+    sql = database_engine.convert_param_style(
+        "SELECT COUNT(*) FROM users WHERE name NOT LIKE ?"
+    )
+    pat = "%:" + domain
+    txn.execute(sql, (pat,))
+    num_not_matching = txn.fetchall()[0][0]
+    if num_not_matching == 0:
+        return True
+    return False

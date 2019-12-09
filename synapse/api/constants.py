@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -94,6 +95,8 @@ class EventTypes(object):
     ServerACL = "m.room.server_acl"
     Pinned = "m.room.pinned_events"
 
+    Retention = "m.room.retention"
+
 
 class RejectedReason(object):
     AUTH_ERROR = "auth_error"
@@ -145,3 +148,7 @@ class EventContentFields(object):
 
     # Labels for the event, cf https://github.com/matrix-org/matrix-doc/pull/2326
     LABELS = "org.matrix.labels"
+
+    # Timestamp to delete the event after
+    # cf https://github.com/matrix-org/matrix-doc/pull/2228
+    SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
