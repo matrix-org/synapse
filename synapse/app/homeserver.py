@@ -68,9 +68,9 @@ from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
-from synapse.storage import DataStore, are_all_users_on_domain
+from synapse.storage import DataStore
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
-from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_database
+from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
@@ -294,22 +294,6 @@ class SynapseHomeServer(HomeServer):
             else:
                 logger.warning("Unrecognized listener type: %s", listener["type"])
 
-    def run_startup_checks(self, db_conn, database_engine):
-        all_users_native = are_all_users_on_domain(
-            db_conn.cursor(), database_engine, self.hostname
-        )
-        if not all_users_native:
-            quit_with_error(
-                "Found users in database not native to %s!\n"
-                "You cannot changed a synapse server_name after it's been configured"
-                % (self.hostname,)
-            )
-
-        try:
-            database_engine.check_database(db_conn.cursor())
-        except IncorrectDatabaseSetup as e:
-            quit_with_error(str(e))
-
 
 # Gauges to expose monthly active user control metrics
 current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
@@ -357,16 +341,12 @@ def setup(config_options):
 
     synapse.config.logger.setup_logging(hs, config, use_worker_options=False)
 
-    logger.info("Preparing database: %s...", config.database_config["name"])
+    logger.info("Setting up server")
 
     try:
-        with hs.get_db_conn(run_new_connection=False) as db_conn:
-            prepare_database(db_conn, database_engine, config=config)
-            database_engine.on_new_connection(db_conn)
-
-            hs.run_startup_checks(db_conn, database_engine)
-
-            db_conn.commit()
+        hs.setup()
+    except IncorrectDatabaseSetup as e:
+        quit_with_error(str(e))
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
@@ -375,9 +355,6 @@ def setup(config_options):
         )
         sys.exit(1)
 
-    logger.info("Database prepared in %s.", config.database_config["name"])
-
-    hs.setup()
     hs.setup_master()
 
     @defer.inlineCallbacks
