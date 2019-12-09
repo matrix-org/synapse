@@ -183,6 +183,10 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         )
         self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
+    test_replace_master_key.skip = (
+        "Disabled waiting on #https://github.com/matrix-org/synapse/pull/6486"
+    )
+
     @defer.inlineCallbacks
     def test_reupload_signatures(self):
         """re-uploading a signature should not fail"""
@@ -503,3 +507,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             ],
             other_master_key["signatures"][local_user]["ed25519:" + usersigning_pubkey],
         )
+
+    test_upload_signatures.skip = (
+        "Disabled waiting on #https://github.com/matrix-org/synapse/pull/6486"
+    )
