@@ -119,7 +119,7 @@ class SAML2Config(Config):
         # Ensure loaded user mapping module has defined all necessary methods
         # Note parse_config() is already checked during the call to load_module
         required_methods = [
-            "get_attributes",
+            "get_saml_attributes",
             "saml_response_to_user_attributes",
         ]
         missing_methods = [
