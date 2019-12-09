@@ -4,14 +4,14 @@ Synapse 1.7.0rc1 (2019-12-09)
 Features
 --------
 
-- Implement per-room message retention policies. ([\#5815](https://github.com/matrix-org/synapse/issues/5815))
+- Implement per-room message retention policies. ([\#5815](https://github.com/matrix-org/synapse/issues/5815), [\#6436](https://github.com/matrix-org/synapse/issues/6436))
 - Add etag and count fields to key backup endpoints to help clients guess if there are new keys. ([\#5858](https://github.com/matrix-org/synapse/issues/5858))
-- Add admin/v2/users endpoint with pagination. Contributed by Awesome Technologies Innovationslabor GmbH. ([\#5925](https://github.com/matrix-org/synapse/issues/5925))
+- Add `/admin/v2/users` endpoint with pagination. Contributed by Awesome Technologies Innovationslabor GmbH. ([\#5925](https://github.com/matrix-org/synapse/issues/5925))
 - Require User-Interactive Authentication for `/account/3pid/add`, meaning the user's password will be required to add a third-party ID to their account. ([\#6119](https://github.com/matrix-org/synapse/issues/6119))
 - Implement the `/_matrix/federation/unstable/net.atleastfornow/state/<context>` API as drafted in MSC2314. ([\#6176](https://github.com/matrix-org/synapse/issues/6176))
-- Configure privacy preserving settings by default for the room directory. ([\#6354](https://github.com/matrix-org/synapse/issues/6354))
+- Configure privacy-preserving settings by default for the room directory. ([\#6354](https://github.com/matrix-org/synapse/issues/6354))
 - Add ephemeral messages support by partially implementing [MSC2228](https://github.com/matrix-org/matrix-doc/pull/2228). ([\#6409](https://github.com/matrix-org/synapse/issues/6409))
-- Add support for MSC 2367, which allows specifying a reason on all membership events. ([\#6434](https://github.com/matrix-org/synapse/issues/6434))
+- Add support for [MSC 2367](https://github.com/matrix-org/matrix-doc/pull/2367), which allows specifying a reason on all membership events. ([\#6434](https://github.com/matrix-org/synapse/issues/6434))
 
 
 Bugfixes
@@ -26,8 +26,6 @@ Bugfixes
 - Fix an intermittent exception when handling read-receipts. ([\#6408](https://github.com/matrix-org/synapse/issues/6408))
 - Fix broken guest registration when there are existing blocks of numeric user IDs. ([\#6420](https://github.com/matrix-org/synapse/issues/6420))
 - Fix startup error when http proxy is defined. ([\#6421](https://github.com/matrix-org/synapse/issues/6421))
-- Clean up local threepids from user on account deactivation. ([\#6426](https://github.com/matrix-org/synapse/issues/6426))
-- Fix a bug where a room could become unusable with a low retention policy and a low activity. ([\#6436](https://github.com/matrix-org/synapse/issues/6436))
 - Fix error when using synapse_port_db on a vanilla synapse db. ([\#6449](https://github.com/matrix-org/synapse/issues/6449))
 - Fix uploading multiple cross signing signatures for the same user. ([\#6451](https://github.com/matrix-org/synapse/issues/6451))
 - Fix bug which lead to exceptions being thrown in a loop when a cross-signed device is deleted. ([\#6462](https://github.com/matrix-org/synapse/issues/6462))
@@ -67,14 +65,10 @@ Internal Changes
 - Add a test scenario to make sure room history purges don't break `/messages` in the future. ([\#6392](https://github.com/matrix-org/synapse/issues/6392))
 - Clarifications for the email configuration settings. ([\#6423](https://github.com/matrix-org/synapse/issues/6423))
 - Add more tests to the blacklist when running in worker mode. ([\#6429](https://github.com/matrix-org/synapse/issues/6429))
-- Move data store specific code out of `SQLBaseStore`. ([\#6454](https://github.com/matrix-org/synapse/issues/6454))
-- Prepare SQLBaseStore functions being moved out of the stores. ([\#6464](https://github.com/matrix-org/synapse/issues/6464))
-- Move per database functionality out of the data stores and into a dedicated `Database` class. ([\#6469](https://github.com/matrix-org/synapse/issues/6469))
+- Refactor data store layer to support multiple databases in the future. ([\#6454](https://github.com/matrix-org/synapse/issues/6454), [\#6464](https://github.com/matrix-org/synapse/issues/6464), [\#6469](https://github.com/matrix-org/synapse/issues/6469), [\#6487](https://github.com/matrix-org/synapse/issues/6487)) 
 - Port synapse.rest.client.v1 to async/await. ([\#6482](https://github.com/matrix-org/synapse/issues/6482))
 - Port synapse.rest.client.v2_alpha to async/await. ([\#6483](https://github.com/matrix-org/synapse/issues/6483))
 - Port SyncHandler to async/await. ([\#6484](https://github.com/matrix-org/synapse/issues/6484))
-- Pass in `Database` object to data stores. ([\#6487](https://github.com/matrix-org/synapse/issues/6487))
-
 
 Synapse 1.6.1 (2019-11-28)
 ==========================
