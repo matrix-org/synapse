@@ -15,6 +15,7 @@
 import logging
 import re
 
+from typing import Tuple
 import attr
 import saml2
 import saml2.response
@@ -332,7 +333,7 @@ class DefaultSamlMappingProvider(object):
         return SamlConfig(mxid_source_attribute, mxid_mapper)
 
     @staticmethod
-    def get_saml_attributes(config: SamlConfig) -> tuple[set:set]:
+    def get_saml_attributes(config: SamlConfig) -> Tuple[set, set]:
         """Returns the required attributes of a SAML
 
         Args:
