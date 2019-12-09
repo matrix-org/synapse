@@ -284,11 +284,13 @@ class E2eKeysHandler(object):
         user_signing_keys = {}
 
         # Currently a stub, implementation coming in https://github.com/matrix-org/synapse/pull/6486
-        return defer.succeed({
-            "master_keys": master_keys,
-            "self_signing_keys": self_signing_keys,
-            "user_signing_keys": user_signing_keys,
-        })
+        return defer.succeed(
+            {
+                "master_keys": master_keys,
+                "self_signing_keys": self_signing_keys,
+                "user_signing_keys": user_signing_keys,
+            }
+        )
 
     @trace
     @defer.inlineCallbacks
