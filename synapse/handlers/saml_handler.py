@@ -14,8 +14,8 @@
 # limitations under the License.
 import logging
 import re
-
 from typing import Tuple
+
 import attr
 import saml2
 import saml2.response
