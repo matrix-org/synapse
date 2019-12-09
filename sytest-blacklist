@@ -1,0 +1,14 @@
+# flaky test
+If remote user leaves room we no longer receive device updates
+
+# flaky test
+Can re-join room if re-invited
+
+# flaky test
+Forgotten room messages cannot be paginated
+
+# flaky test
+Local device key changes get to remote servers
+
+# flaky test
+Old leaves are present in gapped incremental syncs
