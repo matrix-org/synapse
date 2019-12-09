@@ -264,7 +264,6 @@ class E2eKeysHandler(object):
 
         return ret
 
-    @defer.inlineCallbacks
     def get_cross_signing_keys_from_cache(self, query, from_user_id):
         """Get cross-signing keys for users from the database
 
@@ -285,11 +284,11 @@ class E2eKeysHandler(object):
         user_signing_keys = {}
 
         # Currently a stub, implementation coming in https://github.com/matrix-org/synapse/pull/6486
-        return {
+        return defer.succeed({
             "master_keys": master_keys,
             "self_signing_keys": self_signing_keys,
             "user_signing_keys": user_signing_keys,
-        }
+        })
 
     @trace
     @defer.inlineCallbacks
