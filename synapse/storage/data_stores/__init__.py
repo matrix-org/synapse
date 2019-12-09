@@ -24,7 +24,7 @@ class DataStores(object):
     """
 
     def __init__(self, main_store_class, db_conn, hs):
-        # Note we pass in the main store here as workers use a different main
+        # Note we pass in the main store class here as workers use a different main
         # store.
         database = Database(hs)
 
