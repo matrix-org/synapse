@@ -1,1 +1,1 @@
-Back out perf regression from get_cross_signing_keys_from_cache.
+Back out cross-signing code added in Synapse 1.5.0, which caused a performance regression.
