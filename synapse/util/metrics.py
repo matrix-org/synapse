@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import logging
 from functools import wraps
 
@@ -64,12 +65,22 @@ def measure_func(name=None):
     def wrapper(func):
         block_name = func.__name__ if name is None else name
 
-        @wraps(func)
-        @defer.inlineCallbacks
-        def measured_func(self, *args, **kwargs):
-            with Measure(self.clock, block_name):
-                r = yield func(self, *args, **kwargs)
-            return r
+        if inspect.iscoroutinefunction(func):
+
+            @wraps(func)
+            async def measured_func(self, *args, **kwargs):
+                with Measure(self.clock, block_name):
+                    r = await func(self, *args, **kwargs)
+                return r
+
+        else:
+
+            @wraps(func)
+            @defer.inlineCallbacks
+            def measured_func(self, *args, **kwargs):
+                with Measure(self.clock, block_name):
+                    r = yield func(self, *args, **kwargs)
+                return r
 
         return measured_func
 
