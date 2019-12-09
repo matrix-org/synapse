@@ -90,6 +90,22 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             "event_store_labels", self._event_store_labels
         )
 
+        self.db.updates.register_background_index_update(
+            "redactions_have_censored_idx",
+            index_name="redactions_have_censored",
+            table="redactions",
+            columns=["event_id"],
+            where_clause="NOT have_censored",
+        )
+
+        self.db.updates.register_background_index_update(
+            "redactions_have_censored_ts_idx",
+            index_name="redactions_have_censored_ts",
+            table="redactions",
+            columns=["received_ts"],
+            where_clause="NOT have_censored",
+        )
+
     @defer.inlineCallbacks
     def _background_reindex_fields_sender(self, progress, batch_size):
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
