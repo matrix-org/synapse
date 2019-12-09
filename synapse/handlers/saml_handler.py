@@ -191,7 +191,8 @@ class SamlHandler:
                 localpart = attribute_dict.get("mxid_localpart")
                 if not localpart:
                     logger.error(
-                        "SAML mapping provider plugin did not return a mxid_localpart object"
+                        "SAML mapping provider plugin did not return a "
+                        "mxid_localpart object"
                     )
                     raise SynapseError(500, "Error parsing SAML2 response")
 
@@ -250,17 +251,23 @@ MXID_MAPPER_MAP = {
 }
 
 
+@attr.s
+class SamlConfig(object):
+    mxid_source_attribute = attr.ib()
+    mxid_mapper = attr.ib()
+
+
 class DefaultSamlMappingProvider(object):
     __version__ = "0.0.1"
 
-    def __init__(self, parsed_config):
+    def __init__(self, parsed_config: SamlConfig):
         """The default SAML user mapping provider
 
         Args:
             parsed_config: Module configuration
         """
         self._mxid_source_attribute = parsed_config.mxid_source_attribute
-        self._mxid_mapping = parsed_config.mxid_mapping
+        self._mxid_mapper = parsed_config.mxid_mapper
 
     def saml_response_to_user_attributes(
         self, saml_response: saml2.response.AuthnResponse, failures: int = 0,
@@ -289,8 +296,7 @@ class DefaultSamlMappingProvider(object):
             )
 
         # Use the configured mapper for this mxid_source
-        mxid_mapper = MXID_MAPPER_MAP[self._mxid_mapping]
-        base_mxid_localpart = mxid_mapper(mxid_source)
+        base_mxid_localpart = self._mxid_mapper(mxid_source)
 
         # Append suffix integer if last call to this function failed to produce
         # a usable mxid
@@ -305,51 +311,37 @@ class DefaultSamlMappingProvider(object):
         }
 
     @staticmethod
-    def parse_config(config: dict):
+    def parse_config(config: dict) -> SamlConfig:
         """Parse the dict provided by the homeserver's config
         Args:
             config: A dictionary containing configuration options for this provider
         Returns:
-            _SamlConfig: A custom config object
+            SamlConfig: A custom config object for this module
         """
-
-        class _SamlConfig(object):
-            pass
-
-        saml_config = _SamlConfig()
-
-        # Handle deprecated options
-
-        # If mxid_source_attribute or mxid_mapping is defined in the deprecated location, use
-        # that instead for backwards compatibility
-        saml_config.mxid_source_attribute = config[
-            "old_mxid_source_attribute"
-        ] or config.get("mxid_source_attribute", "uid")
-
-        # If mxid_mapping is defined, use that instead for backwards compatibility
-        mapping_type = config["old_mxid_mapping"] or config.get(
-            "mxid_mapping", "hexencode"
-        )
+        # Parse config options and use defaults where necessary
+        mxid_source_attribute = config.get("mxid_source_attribute", "uid")
+        mapping_type = config.get("mxid_mapping", "hexencode")
         try:
-            saml_config.mxid_mapper = MXID_MAPPER_MAP[mapping_type]
+            mxid_mapper = MXID_MAPPER_MAP[mapping_type]
         except KeyError:
             raise ConfigError(
                 "saml2_config.user_mapping_provider.config: %s is not a valid "
                 "mxid_mapping value" % (mapping_type,)
             )
-        return saml_config
+
+        return SamlConfig(mxid_source_attribute, mxid_mapper)
 
     @staticmethod
-    def get_required_saml_attributes(config: dict):
+    def get_saml_attributes(config: SamlConfig) -> tuple[set:set]:
         """Returns the required attributes of a SAML
 
         Args:
-            config: A dictionary containing configuration options for this provider
+            config: A SamlConfig object containing configuration params for this provider
 
         Returns:
-            tuple[set,set]: The first set equates to the saml auth response attributes that
-                are required for the module to function, whereas the second set consists of
-                those attributes which can be used if available, but are not necessary
+            tuple[set,set]: The first set equates to the saml auth response
+                attributes that are required for the module to function, whereas the
+                second set consists of those attributes which can be used if
+                available, but are not necessary
         """
-        saml_config = DefaultSamlMappingProvider.parse_config(config)
-        return {"uid", saml_config.mxid_source_attribute}, {"displayName"}
+        return {"uid", config.mxid_source_attribute}, {"displayName"}

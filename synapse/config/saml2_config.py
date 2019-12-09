@@ -23,6 +23,10 @@ from ._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_USER_MAPPING_PROVIDER = (
+    "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
+)
+
 
 def _dict_merge(merge_dict, into_dict):
     """Do a deep merge of two dicts
@@ -77,35 +81,45 @@ class SAML2Config(Config):
             "grandfathered_mxid_source_attribute", "uid"
         )
 
-        user_mapping_provider_dict = saml2_config.get("user_mapping_provider")
-        if user_mapping_provider_dict is None:
-            user_mapping_provider_dict = {}
+        # user_mapping_provider may be None if the key is present but has no value
+        ump_dict = saml2_config.get("user_mapping_provider") or {}
 
-        # Load configured module class and config
-        default_mapping_provider = (
-            "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
-        )
-        user_mapping_provider_module = user_mapping_provider_dict.get(
-            "module", default_mapping_provider,
-        )
-        user_mapping_provider_config = user_mapping_provider_dict.get("config", {})
+        # Use the default user mapping provider if not set
+        ump_dict.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
+
+        # Ensure a config is present
+        ump_dict.setdefault("config", {})
+
+        if ump_dict["module"] == DEFAULT_USER_MAPPING_PROVIDER:
+            # Load deprecated options for use by the default module
+            old_mxid_source_attribute = saml2_config.get("mxid_source_attribute")
+            if old_mxid_source_attribute:
+                logger.warning(
+                    "The config option saml2_config.mxid_source_attribute is deprecated. "
+                    "Please use saml2_config.user_mapping_provider.config"
+                    ".mxid_source_attribute instead."
+                )
+            ump_dict["config"]["mxid_source_attribute"] = old_mxid_source_attribute
+
+            old_mxid_mapping = saml2_config.get("mxid_mapping")
+            if old_mxid_mapping:
+                logger.warning(
+                    "The config option saml2_config.mxid_mapping is deprecated. Please "
+                    "use saml2_config.user_mapping_provider.config.mxid_mapping instead."
+                )
+            ump_dict["config"]["mxid_mapping"] = old_mxid_mapping
 
         # Retrieve an instance of the module's class
         # Pass the config dictionary to the module for processing
         (
             self.saml2_user_mapping_provider_class,
             self.saml2_user_mapping_provider_config,
-        ) = load_module(
-            {
-                "module": user_mapping_provider_module,
-                "config": user_mapping_provider_config,
-            }
-        )
+        ) = load_module(ump_dict)
 
         # Ensure loaded user mapping module has defined all necessary methods
+        # Note parse_config() is already checked during the call to load_module
         required_methods = [
-            "parse_config",
-            "get_required_attributes",
+            "get_attributes",
             "saml_response_to_user_attributes",
         ]
         missing_methods = [
@@ -120,31 +134,9 @@ class SAML2Config(Config):
                 "methods: %s" % (", ".join(missing_methods),)
             )
 
-        if user_mapping_provider_module == default_mapping_provider:
-            # Load deprecated options for use by the default module
-            old_mxid_source_attribute = saml2_config.get("mxid_source_attribute")
-            if old_mxid_source_attribute:
-                logger.warning(
-                    "The config option saml2_config.mxid_source_attribute is deprecated. "
-                    "Please use saml2_config.user_mapping_provider.config"
-                    ".mxid_source_attribute instead."
-                )
-            self.saml2_user_mapping_provider_config[
-                "old_mxid_source_attribute"
-            ] = old_mxid_source_attribute
-
-            old_mxid_mapping = saml2_config.get("mxid_mapping")
-            if old_mxid_mapping:
-                logger.warning(
-                    "The config option saml2_config.mxid_mapping is deprecated. Please use "
-                    "saml2_config.user_mapping_provider.config.mxid_mapping instead."
-                )
-            self.saml2_user_mapping_provider_config[
-                "old_mxid_mapping"
-            ] = old_mxid_mapping
-
+        # Get the desired saml auth response attributes from the module
         saml2_config_dict = self._default_saml_config_dict(
-            *self.saml2_user_mapping_provider_class.get_required_attributes(
+            *self.saml2_user_mapping_provider_class.get_saml_attributes(
                 self.saml2_user_mapping_provider_config
             )
         )
@@ -174,7 +166,8 @@ class SAML2Config(Config):
         will be needed to process new user registration
 
         Args:
-            required_attributes: SAML auth response attributes that are necessary to function
+            required_attributes: SAML auth response attributes that are
+                necessary to function
             optional_attributes: SAML auth response attributes that can be used to add
                 additional information to Synapse user accounts, but are not required
 

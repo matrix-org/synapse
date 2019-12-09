@@ -25,7 +25,7 @@ def load_module(provider):
     (the config dict).
 
     Returns
-        Tuple of (provider class, parsed config object
+        Tuple of (provider class, parsed config object)
     """
     # We need to import the module, and then pick the class out of
     # that, so we split based on the last dot.

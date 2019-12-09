@@ -60,13 +60,10 @@ A custom mapping provider must specify the following methods:
            they need here.
     - Whatever is returned will be passed back to the user mapping provider module's
       `__init__` method during construction.
-* `get_required_attributes(config)`
+* `get_saml_attributes(config)`
     - This method should have the `@staticmethod` decoration.
     - Arguments:
-        - `config` - A `dict` representing the parsed content of the
-          `saml2_config.user_mapping_provider.config` homeserver config option.
-           Runs on homeserver startup. Providers should extract any option values
-           they need here.
+        - `config` - A object resulting from a call to `parse_config`.
     - Returns a tuple of two sets. The first set equates to the saml auth
       response attributes that are required for the module to function, whereas
       the second set consists of those attributes which can be used if available,
