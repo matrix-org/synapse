@@ -1,1 +1,0 @@
-Fix broken guest registration when there are existing blocks of numeric user IDs.
