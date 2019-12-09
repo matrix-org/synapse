@@ -25,7 +25,7 @@ Restart=on-abort
 User=synapse
 Group=nogroup
 
-WorkingDirectory=/opt/synapse
+WorkingDirectory=/home/synapse/synapse
 ExecStart=/home/synapse/synapse/env/bin/python -m synapse.app.homeserver --config-path=/home/synapse/synapse/homeserver.yaml
 SyslogIdentifier=matrix-synapse
 
