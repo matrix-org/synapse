@@ -88,7 +88,7 @@ class SAML2Config(Config):
         ump_dict.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
 
         # Ensure a config is present
-        ump_dict.setdefault("config", {})
+        ump_dict["config"] = ump_dict.get("config") or {}
 
         if ump_dict["module"] == DEFAULT_USER_MAPPING_PROVIDER:
             # Load deprecated options for use by the default module
