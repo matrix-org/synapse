@@ -28,7 +28,7 @@ Synapse 1.6.0rc2 (2019-11-25)
 Bugfixes
 --------
 
-- Fix a bug which could cause the background database update hander for event labels to get stuck in a loop raising exceptions. ([\#6407](https://github.com/matrix-org/synapse/issues/6407))
+- Fix a bug that could cause the background database update hander for event labels to get stuck in a loop raising exceptions. ([\#6407](https://github.com/matrix-org/synapse/issues/6407))
 
 
 Synapse 1.6.0rc1 (2019-11-20)
