@@ -189,6 +189,9 @@ class SamlHandler:
                     saml2_auth, i
                 )
 
+                logger.info("Retrieved SAML attributes from user mapping provider: %s "
+                            "(attempt %d)", attribute_dict, i)
+
                 localpart = attribute_dict.get("mxid_localpart")
                 if not localpart:
                     logger.error(
