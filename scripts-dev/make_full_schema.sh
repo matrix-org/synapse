@@ -84,7 +84,7 @@ fi
 # Create the output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 
-read -rsp "Postgres password for '$POSTGRES_USERNAME':" POSTGRES_PASSWORD
+read -rsp "Postgres password for '$POSTGRES_USERNAME': " POSTGRES_PASSWORD
 echo ""
 
 # Exit immediately if a command fails
@@ -172,16 +172,13 @@ DROP TABLE applied_module_schemas;
 sqlite3 "$SQLITE_DB" <<< "$SQL"
 psql $POSTGRES_DB_NAME -U "$POSTGRES_USERNAME" -w <<< "$SQL"
 
-echo "Dumping SQLite3 schema to '$SQLITE_FULL_SCHEMA_OUTPUT_FILE'..."
-sqlite3 "$SQLITE_DB_FILE_NAME" ".dump" > "$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE"
+echo "Dumping SQLite3 schema to '$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE'..."
+sqlite3 "$SQLITE_DB" ".dump" > "$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE"
 
-echo "Dumping Postgres schema to '$POSTGRES_FULL_SCHEMA_OUTPUT_FILE'..."
+echo "Dumping Postgres schema to '$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE'..."
 pg_dump --format=plain --no-tablespaces --no-acl --no-owner $POSTGRES_DB_NAME | sed -e '/^--/d' -e 's/public\.//g' -e '/^SET /d' -e '/^SELECT /d' > "$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE"
 
 echo "Cleaning up temporary Postgres database..."
 dropdb $POSTGRES_DB_NAME
-
-# Remove last pesky instance of this table from the output
-sed -i '/applied_module_schemas/d' "$OUTPUT_DIR/$POSTGRES_FULL_SCHEMA_OUTPUT_FILE"
 
 echo "Done! Files dumped to: $OUTPUT_DIR"
