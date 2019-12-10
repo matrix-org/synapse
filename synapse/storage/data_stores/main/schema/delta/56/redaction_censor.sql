@@ -14,6 +14,3 @@
  */
 
 ALTER TABLE redactions ADD COLUMN have_censored BOOL NOT NULL DEFAULT false;
-
-INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('redactions_have_censored_idx', '{}');

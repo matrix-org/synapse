@@ -91,14 +91,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         )
 
         self.db.updates.register_background_index_update(
-            "redactions_have_censored_idx",
-            index_name="redactions_have_censored",
-            table="redactions",
-            columns=["event_id"],
-            where_clause="NOT have_censored",
-        )
-
-        self.db.updates.register_background_index_update(
             "redactions_have_censored_ts_idx",
             index_name="redactions_have_censored_ts",
             table="redactions",
