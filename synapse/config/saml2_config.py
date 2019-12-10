@@ -275,7 +275,7 @@ class SAML2Config(Config):
           #saml_session_lifetime: 5m
 
           # An external module can be provided here as a custom solution to
-          # mapping the above configured saml attribute onto a matrix ID.
+          # mapping attributes returned from a saml provider onto a matrix user.
           #
           user_mapping_provider:
             # The custom module's class. Uncomment to use a custom module.

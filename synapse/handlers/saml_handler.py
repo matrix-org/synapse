@@ -56,9 +56,6 @@ class SamlHandler:
         self._grandfathered_mxid_source_attribute = (
             hs.config.saml2_grandfathered_mxid_source_attribute
         )
-        self._saml2_user_mapping_provider_config = (
-            hs.config.saml2_user_mapping_provider_config
-        )
 
         # plugin to do custom mapping from saml response to mxid
         self._user_mapping_provider = hs.config.saml2_user_mapping_provider_class(
@@ -328,9 +325,14 @@ class DefaultSamlMappingProvider(object):
             SamlConfig: A custom config object for this module
         """
         # Parse config options and use defaults where necessary
-        # We use the 'or' syntax here as these options could be a valid value of None
+
+        # `config` can contain "mxid_source_attribute: None". Using `config.get`
+        # here would still produce `None` even with the default parameter set.
+        # We use `or` syntax instead to set default if `config.get` returns None
         mxid_source_attribute = config.get("mxid_source_attribute") or "uid"
         mapping_type = config.get("mxid_mapping") or "hexencode"
+
+        # Retrieve the associating mapping function
         try:
             mxid_mapper = MXID_MAPPER_MAP[mapping_type]
         except KeyError:
