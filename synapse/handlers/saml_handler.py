@@ -189,8 +189,12 @@ class SamlHandler:
                     saml2_auth, i
                 )
 
-                logger.info("Retrieved SAML attributes from user mapping provider: %s "
-                            "(attempt %d)", attribute_dict, i)
+                logger.debug(
+                    "Retrieved SAML attributes from user mapping provider: %s "
+                    "(attempt %d)",
+                    attribute_dict,
+                    i,
+                )
 
                 localpart = attribute_dict.get("mxid_localpart")
                 if not localpart:
@@ -323,13 +327,13 @@ class DefaultSamlMappingProvider(object):
             SamlConfig: A custom config object for this module
         """
         # Parse config options and use defaults where necessary
-        mxid_source_attribute = config.get("mxid_source_attribute", "uid")
-        mapping_type = config.get("mxid_mapping", "hexencode")
+        mxid_source_attribute = config.get("mxid_source_attribute") or "uid"
+        mapping_type = config.get("mxid_mapping") or "hexencode"
         try:
             mxid_mapper = MXID_MAPPER_MAP[mapping_type]
         except KeyError:
             raise ConfigError(
-                "saml2_config.user_mapping_provider.config: %s is not a valid "
+                "saml2_config.user_mapping_provider.config: '%s' is not a valid "
                 "mxid_mapping value" % (mapping_type,)
             )
 
