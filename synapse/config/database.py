@@ -14,10 +14,72 @@
 # limitations under the License.
 import os
 from textwrap import indent
+from typing import List
 
 import yaml
 
-from ._base import Config
+from twisted.enterprise import adbapi
+
+from synapse.config._base import Config, ConfigError
+from synapse.storage.engines import create_engine
+
+
+class DatabaseConnectionConfig(object):
+    """Contains the connection config for a particular database.
+
+    Args:
+        name: A label for the database, used for logging.
+        db_config: The config for a particular database, as per `database`
+            section of main config. Has two fields: `name` for database
+            module name, and `args` for the args to give to the database
+            connector.
+        data_stores: The list of data stores that should be provisioned on the
+            database.
+    """
+
+    def __init__(self, name: str, db_config: dict, data_stores: List[str]):
+        if db_config["name"] not in ("sqlite3", "psycopg2"):
+            raise ConfigError("Unsupported database type %r" % (db_config["name"],))
+
+        if db_config["name"] == "sqlite3":
+            db_config.setdefault("args", {}).update(
+                {"cp_min": 1, "cp_max": 1, "check_same_thread": False}
+            )
+
+        self.name = name
+        self.config = db_config
+        self.data_stores = data_stores
+
+        self.engine = create_engine(db_config)
+        self.config["args"]["cp_openfun"] = self.engine.on_new_connection
+
+        self._pool = None
+
+    def get_pool(self, reactor) -> adbapi.ConnectionPool:
+        """Get the connection pool for the database.
+        """
+
+        if self._pool is None:
+            self._pool = adbapi.ConnectionPool(
+                self.config["name"], cp_reactor=reactor, **self.config.get("args", {})
+            )
+
+        return self._pool
+
+    def make_conn(self):
+        """Make a new connection to the database and return it.
+
+        Returns:
+            Connection
+        """
+
+        db_params = {
+            k: v
+            for k, v in self.config.get("args", {}).items()
+            if not k.startswith("cp_")
+        }
+        db_conn = self.engine.module.connect(**db_params)
+        return db_conn
 
 
 class DatabaseConfig(Config):
