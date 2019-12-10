@@ -33,3 +33,6 @@ New federated private chats get full presence information (SYN-115)
 # Blacklisted due to https://github.com/matrix-org/matrix-doc/pull/2314 removing
 # this requirement from the spec
 Inbound federation of state requires event_id as a mandatory paramater
+
+# Blacklisted until https://github.com/matrix-org/synapse/pull/6486 lands
+Can upload self-signing keys

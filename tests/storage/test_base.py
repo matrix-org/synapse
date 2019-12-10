@@ -21,6 +21,7 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import Database
 from synapse.storage.engines import create_engine
 
 from tests import unittest
@@ -59,7 +60,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             "test", db_pool=self.db_pool, config=config, database_engine=fake_engine
         )
 
-        self.datastore = SQLBaseStore(None, hs)
+        self.datastore = SQLBaseStore(Database(hs), None, hs)
 
     @defer.inlineCallbacks
     def test_insert_1col(self):

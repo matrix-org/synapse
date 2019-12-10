@@ -103,11 +103,16 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         try:
-            new_name = content["avatar_url"]
+            new_avatar_url = content.get("avatar_url")
         except Exception:
-            return 400, "Unable to parse name"
+            return 400, "Unable to parse avatar_url"
 
-        await self.profile_handler.set_avatar_url(user, requester, new_name, is_admin)
+        if new_avatar_url is None:
+            return 400, "Missing required key: avatar_url"
+
+        await self.profile_handler.set_avatar_url(
+            user, requester, new_avatar_url, is_admin
+        )
 
         return 200, {}
 

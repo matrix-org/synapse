@@ -1,1 +1,0 @@
-Port synapse.rest.client.v1 to async/await.
