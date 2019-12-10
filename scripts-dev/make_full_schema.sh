@@ -11,7 +11,7 @@ POSTGRES_DB_NAME="synapse_full_schema.$$"
 
 SQLITE_FULL_SCHEMA_OUTPUT_FILE="full.sql.sqlite"
 POSTGRES_FULL_SCHEMA_OUTPUT_FILE="full.sql.postgres"
-OUTPUT_DIR=$(pwd)
+OUTPUT_DIR="$(pwd)/full_schema"
 
 REQUIRED_DEPS=("matrix-synapse" "psycopg2")
 
@@ -80,6 +80,9 @@ if [ -z "$OUTPUT_DIR" ]; then
   usage
   exit 1
 fi
+
+# Create the output directory if it doesn't exist
+mkdir -p "$OUTPUT_DIR"
 
 read -rsp "Postgres password for '$POSTGRES_USERNAME':" POSTGRES_PASSWORD
 echo ""
