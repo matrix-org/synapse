@@ -627,8 +627,10 @@ def make_deferred_yieldable(deferred):
     (This is more-or-less the opposite operation to run_in_background.)
     """
     if inspect.isawaitable(deferred):
-        # If we're given a coroutine we need to convert it to a deferred so that
-        # we can attach callbacks (and not immediately return).
+        # If we're given a coroutine we convert it to a deferred so that we
+        # run it and find out if it immediately finishes, it it does then we
+        # don't need to fiddle with log contexts at all and can return
+        # immediately.
         deferred = defer.ensureDeferred(deferred)
 
     if not isinstance(deferred, defer.Deferred):
