@@ -325,12 +325,8 @@ class DefaultSamlMappingProvider(object):
             SamlConfig: A custom config object for this module
         """
         # Parse config options and use defaults where necessary
-
-        # `config` can contain "mxid_source_attribute: None". Using `config.get`
-        # here would still produce `None` even with the default parameter set.
-        # We use `or` syntax instead to set default if `config.get` returns None
-        mxid_source_attribute = config.get("mxid_source_attribute") or "uid"
-        mapping_type = config.get("mxid_mapping") or "hexencode"
+        mxid_source_attribute = config.get("mxid_source_attribute", "uid")
+        mapping_type = config.get("mxid_mapping", "hexencode")
 
         # Retrieve the associating mapping function
         try:
