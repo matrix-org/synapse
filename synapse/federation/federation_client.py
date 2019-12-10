@@ -308,16 +308,15 @@ class FederationClient(FederationBase):
 
         return signed_pdu
 
-    async def get_room_state_ids(
-        self, destination: str, room_id: str, event_id: str
-    ) -> Tuple[List[str], List[str]]:
+    @defer.inlineCallbacks
+    def get_room_state_ids(self, destination: str, room_id: str, event_id: str):
         """Calls the /state_ids endpoint to fetch the state at a particular point
         in the room, and the auth events for the given event
 
         Returns:
-            a tuple of (state event_ids, auth event_ids)
+            Tuple[List[str], List[str]]:  a tuple of (state event_ids, auth event_ids)
         """
-        result = await self.transport_layer.get_room_state_ids(
+        result = yield self.transport_layer.get_room_state_ids(
             destination, room_id, event_id=event_id
         )
 
