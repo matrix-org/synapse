@@ -109,6 +109,7 @@ def default_config(name, parse=False):
     """
     config_dict = {
         "server_name": name,
+        "send_federation": False,
         "media_store_path": "media",
         "uploads_path": "uploads",
         # the test signing key is just an arbitrary ed25519 key to keep the config
@@ -460,7 +461,9 @@ class MockHttpResource(HttpServer):
                 try:
                     args = [urlparse.unquote(u) for u in matcher.groups()]
 
-                    (code, response) = yield func(mock_request, *args)
+                    (code, response) = yield defer.ensureDeferred(
+                        func(mock_request, *args)
+                    )
                     return code, response
                 except CodeMessageException as e:
                     return (e.code, cs_error(e.msg, code=e.errcode))

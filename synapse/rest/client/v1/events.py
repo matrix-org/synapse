@@ -16,8 +16,6 @@
 """This module contains REST servlets to do with event streaming, /events."""
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
 from synapse.rest.client.v2_alpha._base import client_patterns
@@ -36,9 +34,8 @@ class EventStreamRestServlet(RestServlet):
         self.event_stream_handler = hs.get_event_stream_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         is_guest = requester.is_guest
         room_id = None
         if is_guest:
@@ -57,7 +54,7 @@ class EventStreamRestServlet(RestServlet):
 
         as_client_event = b"raw" not in request.args
 
-        chunk = yield self.event_stream_handler.get_stream(
+        chunk = await self.event_stream_handler.get_stream(
             requester.user.to_string(),
             pagin_config,
             timeout=timeout,
@@ -83,14 +80,13 @@ class EventRestServlet(RestServlet):
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, event_id):
-        requester = yield self.auth.get_user_by_req(request)
-        event = yield self.event_handler.get_event(requester.user, None, event_id)
+    async def on_GET(self, request, event_id):
+        requester = await self.auth.get_user_by_req(request)
+        event = await self.event_handler.get_event(requester.user, None, event_id)
 
         time_now = self.clock.time_msec()
         if event:
-            event = yield self._event_serializer.serialize_event(event, time_now)
+            event = await self._event_serializer.serialize_event(event, time_now)
             return 200, event
         else:
             return 404, "Event not found."

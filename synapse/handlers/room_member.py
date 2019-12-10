@@ -95,7 +95,9 @@ class RoomMemberHandler(object):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
+    def _remote_reject_invite(
+        self, requester, remote_room_hosts, room_id, target, content
+    ):
         """Attempt to reject an invite for a room this server is not in. If we
         fail to do so we locally mark the invite as rejected.
 
@@ -105,6 +107,7 @@ class RoomMemberHandler(object):
                 reject invite
             room_id (str)
             target (UserID): The user rejecting the invite
+            content (dict): The content for the rejection event
 
         Returns:
             Deferred[dict]: A dictionary to be returned to the client, may
@@ -491,7 +494,7 @@ class RoomMemberHandler(object):
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
                     res = yield self._remote_reject_invite(
-                        requester, remote_room_hosts, room_id, target
+                        requester, remote_room_hosts, room_id, target, content,
                     )
                     return res
 
@@ -991,13 +994,15 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             )
 
     @defer.inlineCallbacks
-    def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
+    def _remote_reject_invite(
+        self, requester, remote_room_hosts, room_id, target, content
+    ):
         """Implements RoomMemberHandler._remote_reject_invite
         """
         fed_handler = self.federation_handler
         try:
             ret = yield fed_handler.do_remotely_reject_invite(
-                remote_room_hosts, room_id, target.to_string()
+                remote_room_hosts, room_id, target.to_string(), content=content,
             )
             return ret
         except Exception as e:
