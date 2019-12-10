@@ -16,14 +16,15 @@
 import struct
 import threading
 
-from synapse.storage.prepare_database import prepare_database
-
 
 class Sqlite3Engine(object):
     single_threaded = True
 
     def __init__(self, database_module, database_config):
         self.module = database_module
+
+        database = database_config.get("args", {}).get("database")
+        self._is_in_memory = database in (None, ":memory:",)
 
         # The current max state_group, or None if we haven't looked
         # in the DB yet.
@@ -59,7 +60,16 @@ class Sqlite3Engine(object):
         return sql
 
     def on_new_connection(self, db_conn):
-        prepare_database(db_conn, self, config=None)
+
+        # We need to import here to avoid an import loop.
+        from synapse.storage.prepare_database import prepare_database
+
+        if self._is_in_memory:
+            # In memory databases need to be rebuilt each time. Ideally we'd
+            # reuse the same connection as we do when starting up, but that
+            # would involve using adbapi before we have started the reactor.
+            prepare_database(db_conn, self, config=None)
+
         db_conn.create_function("rank", 1, _rank)
 
     def is_deadlock(self, error):
