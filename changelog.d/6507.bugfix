@@ -1,1 +1,1 @@
-Fix pusher worker failing because it can't retrieve retention policies for rooms.
+Fix regression where sending email push would not work when using a pusher worker.
