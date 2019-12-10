@@ -1190,6 +1190,39 @@ class FederationHandler(BaseHandler):
 
         return False
 
+    async def _get_event_and_persist(
+        self, destination: str, room_id: str, event_id: str
+    ):
+        """Fetch the given event from a server, and persist it as an outlier.
+
+        Raises:
+            Exception: if we couldn't find the event
+        """
+        with nested_logging_context(event_id):
+            room_version = await self.store.get_room_version(room_id)
+
+            event = await self.federation_client.get_pdu(
+                [destination], event_id, room_version, outlier=True,
+            )  # type: Optional[EventBase]
+
+            if event is None:
+                raise Exception(
+                    "Server %s didn't return event %s" % (destination, event_id,)
+                )
+
+            auth_events = await self._get_events_from_store_or_dest(
+                destination, room_id, event.auth_event_ids()
+            )
+            auth = {}
+            for auth_event_id in event.auth_event_ids():
+                e = auth_events.get(auth_event_id)
+                if e:
+                    auth[(e.type, e.state_key)] = e
+
+            await self._handle_new_event(
+                destination, event, state=None, auth_events=auth,
+            )
+
     def _sanity_check_event(self, ev):
         """
         Do some early sanity checks of a received event
