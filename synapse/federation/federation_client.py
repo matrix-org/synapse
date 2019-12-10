@@ -17,7 +17,6 @@
 import copy
 import itertools
 import logging
-from typing import List, Tuple
 
 from prometheus_client import Counter
 
