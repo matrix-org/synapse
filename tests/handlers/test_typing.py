@@ -64,27 +64,28 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         mock_federation_client = Mock(spec=["put_json"])
         mock_federation_client.put_json.return_value = defer.succeed((200, "OK"))
 
-        hs = self.setup_test_homeserver(
-            datastore=(
-                Mock(
-                    spec=[
-                        # Bits that Federation needs
-                        "prep_send_transaction",
-                        "delivered_txn",
-                        "get_received_txn_response",
-                        "set_received_txn_response",
-                        "get_destination_retry_timings",
-                        "get_device_updates_by_remote",
-                        # Bits that user_directory needs
-                        "get_user_directory_stream_pos",
-                        "get_current_state_deltas",
-                    ]
-                )
-            ),
-            notifier=Mock(),
-            http_client=mock_federation_client,
-            keyring=mock_keyring,
+        datastores = Mock()
+        datastores.main = Mock(
+            spec=[
+                # Bits that Federation needs
+                "prep_send_transaction",
+                "delivered_txn",
+                "get_received_txn_response",
+                "set_received_txn_response",
+                "get_destination_retry_timings",
+                "get_devices_by_remote",
+                # Bits that user_directory needs
+                "get_user_directory_stream_pos",
+                "get_current_state_deltas",
+                "get_device_updates_by_remote",
+            ]
         )
+
+        hs = self.setup_test_homeserver(
+            notifier=Mock(), http_client=mock_federation_client, keyring=mock_keyring
+        )
+
+        hs.datastores = datastores
 
         return hs
 

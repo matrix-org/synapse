@@ -77,9 +77,10 @@ if __name__ == "__main__":
     # Instantiate and initialise the homeserver object.
     hs = MockHomeserver(config)
 
-    db_conn = hs.get_db_conn()
     # Update the database to the latest schema.
-    prepare_database(db_conn, hs.database_engine, config=config)
+    database = hs.config.get_single_database()
+    db_conn = database.make_conn()
+    prepare_database(db_conn, database.engine, config=config)
     db_conn.commit()
 
     # setup instantiates the store within the homeserver object.
