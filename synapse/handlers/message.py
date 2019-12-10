@@ -363,6 +363,8 @@ class EventCreationHandler(object):
         self.config = hs.config
         self.require_membership_for_aliases = hs.config.require_membership_for_aliases
 
+        self.room_invite_state_types = self.hs.config.room_invite_state_types
+
         self.send_event_to_master = ReplicationSendEventRestServlet.make_client(hs)
 
         # This is only used to get at ratelimit function, and maybe_kick_guest_users
@@ -916,7 +918,7 @@ class EventCreationHandler(object):
                 state_to_include_ids = [
                     e_id
                     for k, e_id in iteritems(current_state_ids)
-                    if k[0] in self.hs.config.room_invite_state_types
+                    if k[0] in self.room_invite_state_types
                     or k == (EventTypes.Member, event.sender)
                 ]
 

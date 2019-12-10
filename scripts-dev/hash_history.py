@@ -27,7 +27,7 @@ class Store(object):
         "_store_pdu_reference_hash_txn"
     ]
     _store_prev_pdu_hash_txn = SignatureStore.__dict__["_store_prev_pdu_hash_txn"]
-    _simple_insert_txn = SQLBaseStore.__dict__["_simple_insert_txn"]
+    simple_insert_txn = SQLBaseStore.__dict__["simple_insert_txn"]
 
 
 store = Store()

@@ -30,7 +30,7 @@ class FilteringStore(SQLBaseStore):
         except ValueError:
             raise SynapseError(400, "Invalid filter ID", Codes.INVALID_PARAM)
 
-        def_json = yield self._simple_select_one_onecol(
+        def_json = yield self.db.simple_select_one_onecol(
             table="user_filters",
             keyvalues={"user_id": user_localpart, "filter_id": filter_id},
             retcol="filter_json",
@@ -71,4 +71,4 @@ class FilteringStore(SQLBaseStore):
 
             return filter_id
 
-        return self.runInteraction("add_user_filter", _do_txn)
+        return self.db.runInteraction("add_user_filter", _do_txn)

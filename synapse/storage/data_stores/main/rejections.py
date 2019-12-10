@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class RejectionsStore(SQLBaseStore):
     def _store_rejections_txn(self, txn, event_id, reason):
-        self._simple_insert_txn(
+        self.db.simple_insert_txn(
             txn,
             table="rejections",
             values={
@@ -33,7 +33,7 @@ class RejectionsStore(SQLBaseStore):
         )
 
     def get_rejection_reason(self, event_id):
-        return self._simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="rejections",
             retcol="reason",
             keyvalues={"event_id": event_id},

@@ -95,7 +95,7 @@ class CacheInvalidationStore(SQLBaseStore):
             txn.call_after(ctx.__exit__, None, None, None)
             txn.call_after(self.hs.get_notifier().on_new_replication_data)
 
-            self._simple_insert_txn(
+            self.db.simple_insert_txn(
                 txn,
                 table="cache_invalidation_stream",
                 values={
@@ -122,7 +122,9 @@ class CacheInvalidationStore(SQLBaseStore):
             txn.execute(sql, (last_id, limit))
             return txn.fetchall()
 
-        return self.runInteraction("get_all_updated_caches", get_all_updated_caches_txn)
+        return self.db.runInteraction(
+            "get_all_updated_caches", get_all_updated_caches_txn
+        )
 
     def get_cache_stream_token(self):
         if self._cache_id_gen:
