@@ -311,6 +311,7 @@ class DefaultSamlMappingProvider(object):
         localpart = base_mxid_localpart + (str(failures) if failures else "")
 
         # Retrieve the display name from the saml response
+        # If displayname is None, the mxid_localpart will be used instead
         displayname = saml_response.ava.get("displayName", [None])[0]
 
         return {
@@ -327,6 +328,7 @@ class DefaultSamlMappingProvider(object):
             SamlConfig: A custom config object for this module
         """
         # Parse config options and use defaults where necessary
+        # We use the 'or' syntax here as these options could be a valid value of None
         mxid_source_attribute = config.get("mxid_source_attribute") or "uid"
         mapping_type = config.get("mxid_mapping") or "hexencode"
         try:

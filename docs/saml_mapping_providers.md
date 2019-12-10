@@ -31,9 +31,9 @@ A custom mapping provider must specify the following methods:
 
 * `__init__(self, parsed_config)`
    - Arguments:
-     - `config` - A configuration object that is the return value of the
-       `parse_config` method. You should set any configuration options needed
-       by the module here.
+     - `parsed_config` - A configuration object that is the return value of the
+       `parse_config` method. You should set any configuration options needed by
+       the module here.
 * `saml_response_to_user_attributes(self, saml_response, failures)`
     - Arguments:
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
@@ -41,7 +41,7 @@ A custom mapping provider must specify the following methods:
       - `failures` - An `int` that represents the amount of times the returned
                      mxid localpart mapping has failed.  This should be used
                      to create a deduplicated mxid localpart which should be
-                     returned instead.  For example, if this method returns
+                     returned instead. For example, if this method returns
                      `john.doe` as the value of `mxid_localpart` in the returned
                      dict, and that is already taken on the homeserver, this
                      method will be called again with the same parameters but
@@ -50,7 +50,8 @@ A custom mapping provider must specify the following methods:
     - This method must return a dictionary, which will then be used by Synapse
       to build a new user. The following keys are allowed:
        * `mxid_localpart` - Required. The mxid localpart of the new user.
-       * `displayname` - The displayname of the new user.
+       * `displayname` - The displayname of the new user. If not provided, will default to
+                         the value of `mxid_localpart`.
 * `parse_config(config)`
     - This method should have the `@staticmethod` decoration.
     - Arguments:

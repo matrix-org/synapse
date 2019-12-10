@@ -99,7 +99,7 @@ class SAML2Config(Config):
                     "Please use saml2_config.user_mapping_provider.config"
                     ".mxid_source_attribute instead."
                 )
-            ump_dict["config"]["mxid_source_attribute"] = old_mxid_source_attribute
+                ump_dict["config"]["mxid_source_attribute"] = old_mxid_source_attribute
 
             old_mxid_mapping = saml2_config.get("mxid_mapping")
             if old_mxid_mapping:
@@ -107,7 +107,7 @@ class SAML2Config(Config):
                     "The config option saml2_config.mxid_mapping is deprecated. Please "
                     "use saml2_config.user_mapping_provider.config.mxid_mapping instead."
                 )
-            ump_dict["config"]["mxid_mapping"] = old_mxid_mapping
+                ump_dict["config"]["mxid_mapping"] = old_mxid_mapping
 
         # Retrieve an instance of the module's class
         # Pass the config dictionary to the module for processing
