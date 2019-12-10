@@ -11,11 +11,11 @@ POSTGRES_DB_NAME="synapse_full_schema.$$"
 
 SQLITE_FULL_SCHEMA_OUTPUT_FILE="full.sql.sqlite"
 POSTGRES_FULL_SCHEMA_OUTPUT_FILE="full.sql.postgres"
-OUTPUT_DIR="$(pwd)/full_schema"
 
 REQUIRED_DEPS=("matrix-synapse" "psycopg2")
 
 usage() {
+  echo
   echo "Usage: $0 -p <postgres_username> -o <path> [-c] [-n] [-h]"
   echo
   echo "-p <postgres_username>"
@@ -52,7 +52,7 @@ while getopts "p:co:h" opt; do
       exit
       ;;
     \?)
-      echo "Invalid option: -$OPTARG" >&2
+      echo "ERROR: Invalid option: -$OPTARG" >&2
       usage
       exit
       ;;
