@@ -25,7 +25,7 @@ class AccountDataEventSource(object):
         user_id = user.to_string()
         last_stream_id = from_key
 
-        current_stream_id = await self.store.get_max_account_data_stream_id()
+        current_stream_id = self.store.get_max_account_data_stream_id()
 
         results = []
         tags = await self.store.get_updated_tags(user_id, last_stream_id)
