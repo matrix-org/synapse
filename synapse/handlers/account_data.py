@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 
 class AccountDataEventSource(object):
     def __init__(self, hs):
@@ -23,15 +21,14 @@ class AccountDataEventSource(object):
     def get_current_key(self, direction="f"):
         return self.store.get_max_account_data_stream_id()
 
-    @defer.inlineCallbacks
-    def get_new_events(self, user, from_key, **kwargs):
+    async def get_new_events(self, user, from_key, **kwargs):
         user_id = user.to_string()
         last_stream_id = from_key
 
-        current_stream_id = yield self.store.get_max_account_data_stream_id()
+        current_stream_id = await self.store.get_max_account_data_stream_id()
 
         results = []
-        tags = yield self.store.get_updated_tags(user_id, last_stream_id)
+        tags = await self.store.get_updated_tags(user_id, last_stream_id)
 
         for room_id, room_tags in tags.items():
             results.append(
@@ -41,7 +38,7 @@ class AccountDataEventSource(object):
         (
             account_data,
             room_account_data,
-        ) = yield self.store.get_updated_account_data_for_user(user_id, last_stream_id)
+        ) = await self.store.get_updated_account_data_for_user(user_id, last_stream_id)
 
         for account_data_type, content in account_data.items():
             results.append({"type": account_data_type, "content": content})
@@ -54,6 +51,5 @@ class AccountDataEventSource(object):
 
         return results, current_stream_id
 
-    @defer.inlineCallbacks
-    def get_pagination_rows(self, user, config, key):
+    async def get_pagination_rows(self, user, config, key):
         return [], config.to_id
