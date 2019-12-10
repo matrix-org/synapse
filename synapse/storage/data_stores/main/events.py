@@ -1053,6 +1053,13 @@ class EventsStore(
         if self.hs.config.redaction_retention_period is None:
             return
 
+        if self.db.updates.has_completed_background_update(
+            "redactions_have_censored_ts_idx"
+        ):
+            # We don't want to run this until the appropriate index has been
+            # created.
+            return
+
         before_ts = self._clock.time_msec() - self.hs.config.redaction_retention_period
 
         # We fetch all redactions that:
