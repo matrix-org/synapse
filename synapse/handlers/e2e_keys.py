@@ -296,7 +296,11 @@ class E2eKeysHandler(object):
             if "self_signing" in user_info:
                 self_signing_keys[user_id] = user_info["self_signing"]
 
-        if from_user_id in keys and "user_signing" in keys[from_user_id]:
+        if (
+            from_user_id in keys
+            and keys[from_user_id] is not None
+            and "user_signing" in keys[from_user_id]
+        ):
             # users can see other users' master and self-signing keys, but can
             # only see their own user-signing keys
             user_signing_keys[from_user_id] = keys[from_user_id]["user_signing"]
