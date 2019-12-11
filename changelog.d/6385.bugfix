@@ -1,0 +1,1 @@
+Prevent error on trying to search a upgraded room when the server is not in the predecessor room.
