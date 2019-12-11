@@ -15,6 +15,7 @@
 
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
@@ -103,12 +104,11 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         try:
-            new_avatar_url = content.get("avatar_url")
-        except Exception:
-            return 400, "Unable to parse avatar_url"
-
-        if new_avatar_url is None:
-            return 400, "Missing required key: avatar_url"
+            new_avatar_url = content["avatar_url"]
+        except KeyError:
+            raise SynapseError(
+                400, "Missing key 'avatar_url'", errcode=Codes.MISSING_PARAM
+            )
 
         await self.profile_handler.set_avatar_url(
             user, requester, new_avatar_url, is_admin

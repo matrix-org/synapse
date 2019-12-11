@@ -46,6 +46,11 @@ RatelimitOverride = collections.namedtuple(
 
 
 class RoomWorkerStore(SQLBaseStore):
+    def __init__(self, database: Database, db_conn, hs):
+        super(RoomWorkerStore, self).__init__(database, db_conn, hs)
+
+        self.config = hs.config
+
     def get_room(self, room_id):
         """Retrieve a room.
 
