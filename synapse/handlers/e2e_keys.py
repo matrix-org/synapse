@@ -264,6 +264,7 @@ class E2eKeysHandler(object):
 
         return ret
 
+    @defer.inlineCallbacks
     def get_cross_signing_keys_from_cache(self, query, from_user_id):
         """Get cross-signing keys for users from the database
 
