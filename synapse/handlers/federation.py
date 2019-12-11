@@ -238,7 +238,6 @@ class FederationHandler(BaseHandler):
             return None
 
         state = None
-        auth_chain = []
 
         # Get missing pdus if necessary.
         if not pdu.internal_metadata.is_outlier():
@@ -348,7 +347,6 @@ class FederationHandler(BaseHandler):
 
                 # Calculate the state after each of the previous events, and
                 # resolve them to find the correct state at the current event.
-                auth_chains = set()
                 event_map = {event_id: pdu}
                 try:
                     # Get the state of the events we know about
@@ -369,23 +367,13 @@ class FederationHandler(BaseHandler):
                             "Requesting state at missing prev_event %s", event_id,
                         )
 
-                        room_version = await self.store.get_room_version(room_id)
-
                         with nested_logging_context(p):
                             # note that if any of the missing prevs share missing state or
                             # auth events, the requests to fetch those events are deduped
                             # by the get_pdu_cache in federation_client.
-                            (
-                                remote_state,
-                                got_auth_chain,
-                            ) = await self._get_state_for_room(
+                            (remote_state, _,) = await self._get_state_for_room(
                                 origin, room_id, p, include_event_in_state=True
                             )
-
-                            # XXX hrm I'm not convinced that duplicate events will compare
-                            # for equality, so I'm not sure this does what the author
-                            # hoped.
-                            auth_chains.update(got_auth_chain)
 
                             remote_state_map = {
                                 (x.type, x.state_key): x.event_id for x in remote_state
@@ -395,6 +383,7 @@ class FederationHandler(BaseHandler):
                             for x in remote_state:
                                 event_map[x.event_id] = x
 
+                    room_version = await self.store.get_room_version(room_id)
                     state_map = await resolve_events_with_store(
                         room_version,
                         state_maps,
@@ -415,7 +404,6 @@ class FederationHandler(BaseHandler):
                     event_map.update(evs)
 
                     state = [event_map[e] for e in six.itervalues(state_map)]
-                    auth_chain = list(auth_chains)
                 except Exception:
                     logger.warning(
                         "[%s %s] Error attempting to resolve state at missing "
@@ -431,9 +419,7 @@ class FederationHandler(BaseHandler):
                         affected=event_id,
                     )
 
-        await self._process_received_pdu(
-            origin, pdu, state=state, auth_chain=auth_chain
-        )
+        await self._process_received_pdu(origin, pdu, state=state)
 
     async def _get_missing_events_for_pdu(self, origin, pdu, prevs, min_depth):
         """
@@ -707,49 +693,25 @@ class FederationHandler(BaseHandler):
 
         return fetched_events
 
-    async def _process_received_pdu(self, origin, event, state, auth_chain):
+    async def _process_received_pdu(
+        self, origin: str, event: EventBase, state: Optional[Iterable[EventBase]],
+    ):
         """ Called when we have a new pdu. We need to do auth checks and put it
         through the StateHandler.
+
+        Args:
+            origin: server sending the event
+
+            event: event to be persisted
+
+            state: Normally None, but if we are handling a gap in the graph
+                (ie, we are missing one or more prev_events), the resolved state at the
+                event
         """
         room_id = event.room_id
         event_id = event.event_id
 
         logger.debug("[%s %s] Processing event: %s", room_id, event_id, event)
-
-        event_ids = set()
-        if state:
-            event_ids |= {e.event_id for e in state}
-        if auth_chain:
-            event_ids |= {e.event_id for e in auth_chain}
-
-        seen_ids = await self.store.have_seen_events(event_ids)
-
-        if state and auth_chain is not None:
-            # If we have any state or auth_chain given to us by the replication
-            # layer, then we should handle them (if we haven't before.)
-
-            event_infos = []
-
-            for e in itertools.chain(auth_chain, state):
-                if e.event_id in seen_ids:
-                    continue
-                e.internal_metadata.outlier = True
-                auth_ids = e.auth_event_ids()
-                auth = {
-                    (e.type, e.state_key): e
-                    for e in auth_chain
-                    if e.event_id in auth_ids or e.type == EventTypes.Create
-                }
-                event_infos.append(_NewEventInfo(event=e, auth_events=auth))
-                seen_ids.add(e.event_id)
-
-            logger.info(
-                "[%s %s] persisting newly-received auth/state events %s",
-                room_id,
-                event_id,
-                [e.event.event_id for e in event_infos],
-            )
-            await self._handle_new_events(origin, event_infos)
 
         try:
             context = await self._handle_new_event(origin, event, state=state)
