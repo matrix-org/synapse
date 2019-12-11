@@ -341,7 +341,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         """Dummy function.  Only used to make a cache for
         _get_bare_e2e_cross_signing_keys_bulk.
         """
-        pass
+        raise NotImplementedError()
 
     @cachedList(
         cached_method_name="_get_bare_e2e_cross_signing_keys",
@@ -359,8 +359,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         Returns:
             dict[str, dict[str, dict]]: mapping from user ID to key type to key
-                data.  If a user's cross-signing keys were not found, their user
-                ID will not be in the dict.
+                data.  If a user's cross-signing keys were not found, either
+                their user ID will not be in the dict, or their user ID will map
+                to None.
 
         """
         return self.db.runInteraction(
@@ -442,6 +443,8 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         devices = {}
 
         for user_id, user_info in keys.items():
+            if user_info is None:
+                continue
             for key_type, key in user_info.items():
                 device_id = None
                 for k in key["keys"].values():
@@ -515,8 +518,8 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         Returns:
             Deferred[dict[str, dict]]: map of user ID to key data.  If a user's
-                cross-signing key was not found, their user ID will not be in
-                the dict.
+                cross-signing keys were not found, either their user ID will not
+                be in the dict, or their user ID will map to None.
         """
 
         result = yield self._get_bare_e2e_cross_signing_keys_bulk(user_ids)

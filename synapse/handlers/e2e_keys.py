@@ -289,6 +289,8 @@ class E2eKeysHandler(object):
         keys = yield self.store.get_e2e_cross_signing_keys_bulk(user_ids, from_user_id)
 
         for user_id, user_info in keys.items():
+            if user_info is None:
+                continue
             if "master" in user_info:
                 master_keys[user_id] = user_info["master"]
             if "self_signing" in user_info:
