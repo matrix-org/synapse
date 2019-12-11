@@ -67,9 +67,7 @@ class SearchHandler(BaseHandler):
                 # We have reached the end of the chain of predecessors
                 break
 
-            if "room_id" not in predecessor or not isinstance(
-                predecessor["room_id"], str
-            ):
+            if not isinstance(predecessor.get("room_id"), str):
                 # This predecessor object is malformed. Exit here
                 break
 
