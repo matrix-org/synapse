@@ -196,7 +196,7 @@ Handles the media repository. It can handle all endpoints starting with:
 
     /_matrix/media/
 
-And the following regular expressions matching media-specific administration APIs:
+... and the following regular expressions matching media-specific administration APIs:
 
     ^/_synapse/admin/v1/purge_media_cache$
     ^/_synapse/admin/v1/room/.*/media$
@@ -206,16 +206,20 @@ You should also set `enable_media_repo: False` in the shared configuration
 file to stop the main synapse running background jobs related to managing the
 media repository.
 
+In the `media_repository` worker configuration file, configure the http listener to
+expose the `media` resource. For example:
+
+```yaml
+    worker_listeners:
+     - type: http
+       port: 8085
+       resources:
+         - names:
+           - media
+```
+
 Note this worker cannot be load-balanced: only one instance should be active.
 
-Note: The name needs to be *media*, not *client*! For example;
-
-    worker_listeners:
-         - type: http
-           port: 8085
-           resources:
-             - names:
-               - media
 
 ### `synapse.app.client_reader`
 
