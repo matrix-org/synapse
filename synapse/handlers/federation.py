@@ -65,7 +65,7 @@ from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRes
 from synapse.state import StateResolutionStore, resolve_events_with_store
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
 from synapse.types import UserID, get_domain_from_id
-from synapse.util import batch_iter, unwrapFirstError
+from synapse.util import batch_iter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room
 from synapse.util.retryutils import NotRetryingDestination
@@ -767,8 +767,6 @@ class FederationHandler(BaseHandler):
         if dest == self.server_name:
             raise SynapseError(400, "Can't backfill from self.")
 
-        room_version = await self.store.get_room_version(room_id)
-
         events = await self.federation_client.backfill(
             dest, room_id, limit=limit, extremities=extremities
         )
@@ -797,6 +795,9 @@ class FederationHandler(BaseHandler):
 
         event_ids = set(e.event_id for e in events)
 
+        # build a list of events whose prev_events weren't in the batch.
+        # (XXX: this will include events whose prev_events we already have; that doesn't
+        # sound right?)
         edges = [ev.event_id for ev in events if set(ev.prev_event_ids()) - event_ids]
 
         logger.info("backfill: Got %d events with %d edges", len(events), len(edges))
@@ -825,95 +826,11 @@ class FederationHandler(BaseHandler):
         auth_events.update(
             {e_id: event_map[e_id] for e_id in required_auth if e_id in event_map}
         )
-        missing_auth = required_auth - set(auth_events)
-        failed_to_fetch = set()
 
-        # Try and fetch any missing auth events from both DB and remote servers.
-        # We repeatedly do this until we stop finding new auth events.
-        while missing_auth - failed_to_fetch:
-            logger.info("Missing auth for backfill: %r", missing_auth)
-            ret_events = await self.store.get_events(missing_auth - failed_to_fetch)
-            auth_events.update(ret_events)
-
-            required_auth.update(
-                a_id for event in ret_events.values() for a_id in event.auth_event_ids()
-            )
-            missing_auth = required_auth - set(auth_events)
-
-            if missing_auth - failed_to_fetch:
-                logger.info(
-                    "Fetching missing auth for backfill: %r",
-                    missing_auth - failed_to_fetch,
-                )
-
-                results = await make_deferred_yieldable(
-                    defer.gatherResults(
-                        [
-                            run_in_background(
-                                self.federation_client.get_pdu,
-                                [dest],
-                                event_id,
-                                room_version=room_version,
-                                outlier=True,
-                                timeout=10000,
-                            )
-                            for event_id in missing_auth - failed_to_fetch
-                        ],
-                        consumeErrors=True,
-                    )
-                ).addErrback(unwrapFirstError)
-                auth_events.update({a.event_id: a for a in results if a})
-                required_auth.update(
-                    a_id
-                    for event in results
-                    if event
-                    for a_id in event.auth_event_ids()
-                )
-                missing_auth = required_auth - set(auth_events)
-
-                failed_to_fetch = missing_auth - set(auth_events)
-
-        seen_events = await self.store.have_seen_events(
-            set(auth_events.keys()) | set(state_events.keys())
-        )
-
-        # We now have a chunk of events plus associated state and auth chain to
-        # persist. We do the persistence in two steps:
-        #   1. Auth events and state get persisted as outliers, plus the
-        #      backward extremities get persisted (as non-outliers).
-        #   2. The rest of the events in the chunk get persisted one by one, as
-        #      each one depends on the previous event for its state.
-        #
-        # The important thing is that events in the chunk get persisted as
-        # non-outliers, including when those events are also in the state or
-        # auth chain. Caution must therefore be taken to ensure that they are
-        # not accidentally marked as outliers.
-
-        # Step 1a: persist auth events that *don't* appear in the chunk
         ev_infos = []
-        for a in auth_events.values():
-            # We only want to persist auth events as outliers that we haven't
-            # seen and aren't about to persist as part of the backfilled chunk.
-            if a.event_id in seen_events or a.event_id in event_map:
-                continue
 
-            a.internal_metadata.outlier = True
-            ev_infos.append(
-                _NewEventInfo(
-                    event=a,
-                    auth_events={
-                        (
-                            auth_events[a_id].type,
-                            auth_events[a_id].state_key,
-                        ): auth_events[a_id]
-                        for a_id in a.auth_event_ids()
-                        if a_id in auth_events
-                    },
-                )
-            )
-
-        # Step 1b: persist the events in the chunk we fetched state for (i.e.
-        # the backwards extremities) as non-outliers.
+        # Step 1: persist the events in the chunk we fetched state for (i.e.
+        # the backwards extremities), with custom auth events and state
         for e_id in events_to_state:
             # For paranoia we ensure that these events are marked as
             # non-outliers
