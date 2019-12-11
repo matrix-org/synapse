@@ -43,6 +43,7 @@ from synapse.replication.tcp.streams.events import (
 from synapse.rest.client.v2_alpha import user_directory
 from synapse.server import HomeServer
 from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
+from synapse.storage.database import Database
 from synapse.storage.engines import create_engine
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.httpresourcetree import create_resource_tree
@@ -60,11 +61,11 @@ class UserDirectorySlaveStore(
     UserDirectoryStore,
     BaseSlavedStore,
 ):
-    def __init__(self, db_conn, hs):
-        super(UserDirectorySlaveStore, self).__init__(db_conn, hs)
+    def __init__(self, database: Database, db_conn, hs):
+        super(UserDirectorySlaveStore, self).__init__(database, db_conn, hs)
 
         events_max = self._stream_id_gen.get_current_token()
-        curr_state_delta_prefill, min_curr_state_delta_id = self._get_cache_dict(
+        curr_state_delta_prefill, min_curr_state_delta_id = self.db.get_cache_dict(
             db_conn,
             "current_state_delta_stream",
             entity_column="room_id",

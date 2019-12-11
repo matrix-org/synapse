@@ -256,6 +256,7 @@ class TerseJSONToTCPLogObserver(object):
             # transport is the same, just trigger a resumeProducing.
             if self._producer and r.transport is self._producer.transport:
                 self._producer.resumeProducing()
+                self._connection_waiter = None
                 return
 
             # If the producer is still producing, stop it.
