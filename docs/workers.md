@@ -208,6 +208,15 @@ media repository.
 
 Note this worker cannot be load-balanced: only one instance should be active.
 
+Note: The name needs to be *media*, not *client*! For example;
+
+    worker_listeners:
+         - type: http
+           port: 8085
+           resources:
+             - names:
+               - media
+
 ### `synapse.app.client_reader`
 
 Handles client API endpoints. It can handle REST endpoints matching the
