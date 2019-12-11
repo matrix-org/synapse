@@ -632,10 +632,7 @@ class FederationHandler(BaseHandler):
     ) -> Dict[str, EventBase]:
         """Fetch events from a remote destination, checking if we already have them.
 
-        Args:
-            destination
-            room_id
-            event_ids
+        Persists any events we don't already have.
 
         If we fail to fetch any of the events, a warning will be logged, and the event
         will be omitted from the result. Likewise, any events which turn out not to
@@ -655,27 +652,33 @@ class FederationHandler(BaseHandler):
                 room_id,
             )
 
-            room_version = await self.store.get_room_version(room_id)
+            def err_cb(f, e_id):
+                logger.warning(
+                    "Error fetching missing state/auth event %s: %s",
+                    e_id,
+                    f.getErrorMessage(),
+                )
 
-            # XXX 20 requests at once? really?
-            for batch in batch_iter(missing_events, 20):
+            for batch in batch_iter(missing_events, 5):
                 deferreds = [
                     run_in_background(
-                        self.federation_client.get_pdu,
-                        destinations=[destination],
+                        self._get_event_and_persist,
+                        destination=destination,
+                        room_id=room_id,
                         event_id=e_id,
-                        room_version=room_version,
-                    )
+                    ).addErrback(err_cb, e_id)
                     for e_id in batch
                 ]
 
-                res = await make_deferred_yieldable(
-                    defer.DeferredList(deferreds, consumeErrors=True)
+                await make_deferred_yieldable(
+                    defer.gatherResults(deferreds, consumeErrors=True)
                 )
 
-                for success, result in res:
-                    if success and result:
-                        fetched_events[result.event_id] = result
+                # we need to make sure we re-load from the database to get the rejected
+                # state correct.
+                fetched_events.update(
+                    (await self.store.get_events(batch, allow_rejected=True))
+                )
 
         # check for events which were in the wrong room.
         #
