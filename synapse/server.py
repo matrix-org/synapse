@@ -34,6 +34,7 @@ from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
+from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
@@ -210,10 +211,11 @@ class HomeServer(object):
     # instantiated during setup() for future return by get_datastore()
     DATASTORE_CLASS = abc.abstractproperty()
 
-    def __init__(self, hostname, config, reactor=None, **kwargs):
+    def __init__(self, hostname: str, config: HomeServerConfig, reactor=None, **kwargs):
         """
         Args:
             hostname : The hostname for the server.
+            config: The full config for the homeserver.
         """
         if not reactor:
             from twisted.internet import reactor
