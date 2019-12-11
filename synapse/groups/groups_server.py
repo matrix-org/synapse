@@ -773,7 +773,7 @@ class GroupsServerHandler(object):
         if not self.hs.is_mine_id(user_id):
             yield self.store.maybe_delete_remote_profile_cache(user_id)
 
-        # Delete group if last user has left
+        # Delete group if the last user has left
         users = yield self.store.get_users_in_group(group_id, include_private=True)
         if not users:
             yield self.store.delete_group(group_id)
