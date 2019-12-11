@@ -220,7 +220,6 @@ expose the `media` resource. For example:
 
 Note this worker cannot be load-balanced: only one instance should be active.
 
-
 ### `synapse.app.client_reader`
 
 Handles client API endpoints. It can handle REST endpoints matching the
