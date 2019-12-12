@@ -134,12 +134,13 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         try:
-            new_name = content["avatar_url"]
+            new_avatar_url = content["avatar_url"]
         except Exception:
             defer.returnValue((400, "Unable to parse name"))
 
         yield self.profile_handler.set_avatar_url(
-            user, requester, new_name, is_admin)
+            user, requester, new_avatar_url, is_admin
+        )
 
         if self.hs.config.shadow_server:
             shadow_user = UserID(

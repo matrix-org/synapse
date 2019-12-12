@@ -111,6 +111,12 @@ class ContentRepositoryConfig(Config):
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
+        self.max_avatar_size = config.get("max_avatar_size")
+        if self.max_avatar_size:
+            self.max_avatar_size = self.parse_size(self.max_avatar_size)
+
+        self.allowed_avatar_mimetypes = config.get("allowed_avatar_mimetypes", [])
+
         self.media_store_path = self.ensure_directory(config["media_store_path"])
 
         backup_media_store_path = config.get("backup_media_store_path")
@@ -246,6 +252,30 @@ class ContentRepositoryConfig(Config):
         # The largest allowed upload size in bytes
         #
         #max_upload_size: 10M
+
+        # The largest allowed size for a user avatar. If not defined, no
+        # restriction will be imposed.
+        #
+        # Note that this only applies when an avatar is changed globally.
+        # Per-room avatar changes are not affected. See allow_per_room_profiles
+        # for disabling that functionality.
+        #
+        # Note that user avatar changes will not work if this is set without
+        # using Synapse's local media repo.
+        #
+        #max_avatar_size: 10M
+
+        # Allow mimetypes for a user avatar. If not defined, no restriction will
+        # be imposed.
+        #
+        # Note that this only applies when an avatar is changed globally.
+        # Per-room avatar changes are not affected. See allow_per_room_profiles
+        # for disabling that functionality.
+        #
+        # Note that user avatar changes will not work if this is set without
+        # using Synapse's local media repo.
+        #
+        #allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 
         # Maximum number of pixels that will be thumbnailed
         #
