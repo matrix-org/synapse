@@ -14,6 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Dict, List
 
 from six import iteritems
 
@@ -348,13 +349,14 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         list_name="user_ids",
         num_args=1,
     )
-    def _get_bare_e2e_cross_signing_keys_bulk(self, user_ids: list) -> dict:
+    def _get_bare_e2e_cross_signing_keys_bulk(
+        self, user_ids: List[str]
+    ) -> Dict[str, Dict[str, dict]]:
         """Returns the cross-signing keys for a set of users.  The output of this
         function should be passed to _get_e2e_cross_signing_signatures_txn if
         the signatures for the calling user need to be fetched.
 
         Args:
-            txn (twisted.enterprise.adbapi.Connection): db connection
             user_ids (list[str]): the users whose keys are being requested
 
         Returns:
@@ -371,8 +373,8 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         )
 
     def _get_bare_e2e_cross_signing_keys_bulk_txn(
-        self, txn: Connection, user_ids: list,
-    ) -> dict:
+        self, txn: Connection, user_ids: List[str],
+    ) -> Dict[str, Dict[str, dict]]:
         """Returns the cross-signing keys for a set of users.  The output of this
         function should be passed to _get_e2e_cross_signing_signatures_txn if
         the signatures for the calling user need to be fetched.
@@ -421,8 +423,8 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         return result
 
     def _get_e2e_cross_signing_signatures_txn(
-        self, txn: Connection, keys: dict, from_user_id: str,
-    ) -> dict:
+        self, txn: Connection, keys: Dict[str, Dict[str, dict]], from_user_id: str,
+    ) -> Dict[str, Dict[str, dict]]:
         """Returns the cross-signing signatures made by a user on a set of keys.
 
         Args:
@@ -507,7 +509,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_e2e_cross_signing_keys_bulk(
-        self, user_ids: list, from_user_id: str = None
+        self, user_ids: List[str], from_user_id: str = None
     ) -> defer.Deferred:
         """Returns the cross-signing keys for a set of users.
 
@@ -517,9 +519,10 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 the self-signing keys will be included in the result
 
         Returns:
-            Deferred[dict[str, dict]]: map of user ID to key data.  If a user's
-                cross-signing keys were not found, either their user ID will not
-                be in the dict, or their user ID will map to None.
+            Deferred[dict[str, dict[str, dict]]]: map of user ID to key type to
+                key data.  If a user's cross-signing keys were not found, either
+                their user ID will not be in the dict, or their user ID will map
+                to None.
         """
 
         result = yield self._get_bare_e2e_cross_signing_keys_bulk(user_ids)
