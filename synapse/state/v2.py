@@ -21,7 +21,6 @@ from typing import Dict, List, Optional, Tuple
 from six import iteritems, itervalues
 
 from twisted.internet import defer
-from twisted.internet.defer import Deferred
 
 from synapse import event_auth
 from synapse.api.constants import EventTypes
@@ -37,7 +36,7 @@ def resolve_events_with_store(
     room_version: str,
     state_sets: List[Dict[Tuple[str, str], str]],
     event_map: Optional[Dict[str, EventBase]],
-    state_res_store: "StateResolutionStore",
+    state_res_store: "synapse.state.StateResolutionStore",
 ):
     """Resolves the state using the v2 state resolution algorithm
 
@@ -57,7 +56,7 @@ def resolve_events_with_store(
 
             If None, all events will be fetched via state_res_store.
 
-        state_res_store (StateResolutionStore)
+        state_res_store:
 
     Returns:
         Deferred[dict[(str, str), str]]:
