@@ -34,5 +34,8 @@ Device list doesn't change if remote server is down
 Remote servers cannot set power levels in rooms without existing powerlevels
 Remote servers should reject attempts by non-creators to set the power levels
 
+# https://buildkite.com/matrix-dot-org/synapse/builds/6134#6f67bf47-e234-474d-80e8-c6e1868b15c5
+Server correctly handles incoming m.device_list_update
+
 # this fails reliably with a torture level of 100 due to https://github.com/matrix-org/synapse/issues/6536
 Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
