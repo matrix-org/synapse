@@ -171,7 +171,7 @@ class LogProducer(object):
 
     def stopProducing(self):
         self._paused = True
-        self._buffer = None
+        self._buffer = deque()
 
     def resumeProducing(self):
         self._paused = False

@@ -21,6 +21,7 @@ from __future__ import print_function
 import email.utils
 import os
 from enum import Enum
+from typing import Optional
 
 import pkg_resources
 
@@ -101,7 +102,7 @@ class EmailConfig(Config):
                 # both in RegistrationConfig and here. We should factor this bit out
                 self.account_threepid_delegate_email = self.trusted_third_party_id_servers[
                     0
-                ]
+                ]  # type: Optional[str]
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
