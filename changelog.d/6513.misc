@@ -1,0 +1,1 @@
+Remove all assumptions of there being a single phyiscal DB apart from the `synapse.config`.
