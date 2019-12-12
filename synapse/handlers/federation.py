@@ -571,7 +571,9 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def _get_state_for_room(self, destination, room_id, event_id, include_event_in_state):
+    def _get_state_for_room(
+        self, destination, room_id, event_id, include_event_in_state
+    ):
         """Requests all of the room state at a given event from a remote homeserver.
 
         Args:
@@ -635,6 +637,10 @@ class FederationHandler(BaseHandler):
             room_id (str)
             event_ids (Iterable[str])
 
+        If we fail to fetch any of the events, a warning will be logged, and the event
+        will be omitted from the result. Likewise, any events which turn out not to
+        be in the given room.
+
         Returns:
             Deferred[dict[str, EventBase]]: A deferred resolving to a map
             from event_id to event
@@ -643,35 +649,59 @@ class FederationHandler(BaseHandler):
 
         missing_events = set(event_ids) - fetched_events.keys()
 
-        if not missing_events:
-            return fetched_events
+        if missing_events:
+            logger.debug(
+                "Fetching unknown state/auth events %s for room %s",
+                missing_events,
+                room_id,
+            )
 
-        logger.debug(
-            "Fetching unknown state/auth events %s for room %s",
-            missing_events,
-            event_ids,
+            room_version = yield self.store.get_room_version(room_id)
+
+            # XXX 20 requests at once? really?
+            for batch in batch_iter(missing_events, 20):
+                deferreds = [
+                    run_in_background(
+                        self.federation_client.get_pdu,
+                        destinations=[destination],
+                        event_id=e_id,
+                        room_version=room_version,
+                    )
+                    for e_id in batch
+                ]
+
+                res = yield make_deferred_yieldable(
+                    defer.DeferredList(deferreds, consumeErrors=True)
+                )
+
+                for success, result in res:
+                    if success and result:
+                        fetched_events[result.event_id] = result
+
+        # check for events which were in the wrong room.
+        #
+        # this can happen if a remote server claims that the state or
+        # auth_events at an event in room A are actually events in room B
+
+        bad_events = list(
+            (event_id, event.room_id)
+            for event_id, event in fetched_events.items()
+            if event.room_id != room_id
         )
 
-        room_version = yield self.store.get_room_version(room_id)
-
-        # XXX 20 requests at once? really?
-        for batch in batch_iter(missing_events, 20):
-            deferreds = [
-                run_in_background(
-                    self.federation_client.get_pdu,
-                    destinations=[destination],
-                    event_id=e_id,
-                    room_version=room_version,
-                )
-                for e_id in batch
-            ]
-
-            res = yield make_deferred_yieldable(
-                defer.DeferredList(deferreds, consumeErrors=True)
+        for bad_event_id, bad_room_id in bad_events:
+            # This is a bogus situation, but since we may only discover it a long time
+            # after it happened, we try our best to carry on, by just omitting the
+            # bad events from the returned auth/state set.
+            logger.warning(
+                "Remote server %s claims event %s in room %s is an auth/state "
+                "event in room %s",
+                destination,
+                bad_event_id,
+                bad_room_id,
+                room_id,
             )
-            for success, result in res:
-                if success and result:
-                    fetched_events[result.event_id] = result
+            del fetched_events[bad_event_id]
 
         return fetched_events
 
