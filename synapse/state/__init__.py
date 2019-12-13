@@ -16,7 +16,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Iterable, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from six import iteritems, itervalues
 
@@ -416,6 +416,7 @@ class StateHandler(object):
 
         with Measure(self.clock, "state._resolve_events"):
             new_state = yield resolve_events_with_store(
+                event.room_id,
                 room_version,
                 state_set_ids,
                 event_map=state_map,
@@ -461,7 +462,7 @@ class StateResolutionHandler(object):
         not be called for a single state group
 
         Args:
-            room_id (str): room we are resolving for (used for logging)
+            room_id (str): room we are resolving for (used for logging and sanity checks)
             room_version (str): version of the room
             state_groups_ids (dict[int, dict[(str, str), str]]):
                  map from state group id to the state in that state group
@@ -517,6 +518,7 @@ class StateResolutionHandler(object):
                 logger.info("Resolving conflicted state for %r", room_id)
                 with Measure(self.clock, "state._resolve_events"):
                     new_state = yield resolve_events_with_store(
+                        room_id,
                         room_version,
                         list(itervalues(state_groups_ids)),
                         event_map=event_map,
@@ -588,36 +590,44 @@ def _make_state_cache_entry(new_state, state_groups_ids):
     )
 
 
-def resolve_events_with_store(room_version, state_sets, event_map, state_res_store):
+def resolve_events_with_store(
+    room_id: str,
+    room_version: str,
+    state_sets: List[Dict[Tuple[str, str], str]],
+    event_map: Optional[Dict[str, EventBase]],
+    state_res_store: "StateResolutionStore",
+):
     """
     Args:
-        room_version(str): Version of the room
+        room_id: the room we are working in
 
-        state_sets(list): List of dicts of (type, state_key) -> event_id,
+        room_version: Version of the room
+
+        state_sets: List of dicts of (type, state_key) -> event_id,
             which are the different state groups to resolve.
 
-        event_map(dict[str,FrozenEvent]|None):
+        event_map:
             a dict from event_id to event, for any events that we happen to
             have in flight (eg, those currently being persisted). This will be
             used as a starting point fof finding the state we need; any missing
             events will be requested via state_map_factory.
 
-            If None, all events will be fetched via state_map_factory.
+            If None, all events will be fetched via state_res_store.
 
-        state_res_store (StateResolutionStore)
+        state_res_store: a place to fetch events from
 
-    Returns
+    Returns:
         Deferred[dict[(str, str), str]]:
             a map from (type, state_key) to event_id.
     """
     v = KNOWN_ROOM_VERSIONS[room_version]
     if v.state_res == StateResolutionVersions.V1:
         return v1.resolve_events_with_store(
-            state_sets, event_map, state_res_store.get_events
+            room_id, state_sets, event_map, state_res_store.get_events
         )
     else:
         return v2.resolve_events_with_store(
-            room_version, state_sets, event_map, state_res_store
+            room_id, room_version, state_sets, event_map, state_res_store
         )
 
 

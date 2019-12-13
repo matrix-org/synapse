@@ -397,6 +397,7 @@ class FederationHandler(BaseHandler):
                                 event_map[x.event_id] = x
 
                     state_map = yield resolve_events_with_store(
+                        room_id,
                         room_version,
                         state_maps,
                         event_map,
