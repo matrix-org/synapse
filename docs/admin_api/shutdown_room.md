@@ -12,6 +12,8 @@ the new room. Users on other servers will be unaffected.
 
 ## API
 
+You will need to authenticate with an access token for an admin user.
+
 ### URL
 
 `POST /_synapse/admin/v1/shutdown_room/{room_id}`
@@ -39,7 +41,7 @@ othis server is not permitted and rooms in violation will be blocked."
 * `kicked_users` - An integer number representing the number of users that
                    were kicked.
 * `failed_to_kick_users` - An integer number representing the number of users
-                           that were kicked.
+                           that were not kicked.
 * `local_aliases` - An array of strings representing the local aliases that were migrated from
                     the old room to the new.
 * `new_room_id` - A string representing the room ID of the new room.
