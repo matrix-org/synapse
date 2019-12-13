@@ -5,7 +5,7 @@ This release changes the default settings so that only local authenticated users
 
 Support for SQLite versions before 3.11 is now deprecated. A future release will refuse to start if used with an SQLite version before 3.11.
 
-Administrators are reminded that SQLite should not be used for production instances. Instructions for migrating to Postgres are available [here](docs/postgres.md). A future release of synapse will disable federation for servers using SQLite unless adminstrators explicitly override the setting.
+Administrators are reminded that SQLite should not be used for production instances. Instructions for migrating to Postgres are available [here](docs/postgres.md). A future release of synapse will, by default, disable federation for servers using SQLite.
 
 No significant changes since 1.7.0rc2.
 
