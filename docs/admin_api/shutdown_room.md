@@ -2,7 +2,7 @@
 
 Shuts down a room, preventing new joins and moves local users and room aliases automatically
 to a new room. The new room will be created with the user specified by the
-`new_room_user_id` parameter as room administrator and contain a message
+`new_room_user_id` parameter as room administrator and will contain a message
 explaining what happened. Users invited to the new room will have power level
 -10 by default, and thus be unable to speak. The old room's power levels will be changed to
 disallow any further invites or joins.
@@ -16,7 +16,7 @@ the new room. Users on other servers will be unaffected.
 
 `POST /_synapse/admin/v1/shutdown_room/{room_id}`
 
-### Query Parameters
+### URL Parameters
 
 * `room_id` - The ID of the room (e.g `!someroom:example.com`)
 
@@ -44,7 +44,7 @@ othis server is not permitted and rooms in violation will be blocked."
                     the old room to the new.
 * `new_room_id` - A string representing the room ID of the new room.
 
-### Example
+## Example
 
 Request:
 
