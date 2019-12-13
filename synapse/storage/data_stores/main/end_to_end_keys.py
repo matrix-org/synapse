@@ -48,7 +48,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         if not query_list:
             return {}
 
-        results = yield self.runInteraction(
+        results = yield self.db.runInteraction(
             "get_e2e_device_keys",
             self._get_e2e_device_keys_txn,
             query_list,
@@ -125,7 +125,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         )
 
         txn.execute(sql, query_params)
-        rows = self.cursor_to_dict(txn)
+        rows = self.db.cursor_to_dict(txn)
 
         result = {}
         for row in rows:
@@ -138,20 +138,35 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 result.setdefault(user_id, {})[device_id] = None
 
         # get signatures on the device
-        signature_sql = (
-            "SELECT * " "  FROM e2e_cross_signing_signatures " " WHERE %s"
-        ) % (" OR ".join("(" + q + ")" for q in signature_query_clauses))
+        signature_sql = ("SELECT *  FROM e2e_cross_signing_signatures WHERE %s") % (
+            " OR ".join("(" + q + ")" for q in signature_query_clauses)
+        )
 
         txn.execute(signature_sql, signature_query_params)
-        rows = self.cursor_to_dict(txn)
+        rows = self.db.cursor_to_dict(txn)
 
+        # add each cross-signing signature to the correct device in the result dict.
         for row in rows:
+            signing_user_id = row["user_id"]
+            signing_key_id = row["key_id"]
             target_user_id = row["target_user_id"]
             target_device_id = row["target_device_id"]
-            if target_user_id in result and target_device_id in result[target_user_id]:
-                result[target_user_id][target_device_id].setdefault(
-                    "signatures", {}
-                ).setdefault(row["user_id"], {})[row["key_id"]] = row["signature"]
+            signature = row["signature"]
+
+            target_user_result = result.get(target_user_id)
+            if not target_user_result:
+                continue
+
+            target_device_result = target_user_result.get(target_device_id)
+            if not target_device_result:
+                # note that target_device_result will be None for deleted devices.
+                continue
+
+            target_device_signatures = target_device_result.setdefault("signatures", {})
+            signing_user_signatures = target_device_signatures.setdefault(
+                signing_user_id, {}
+            )
+            signing_user_signatures[signing_key_id] = signature
 
         log_kv(result)
         return result
@@ -171,7 +186,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             key_id) to json string for key
         """
 
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="e2e_one_time_keys_json",
             column="key_id",
             iterable=key_ids,
@@ -204,7 +219,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             # a unique constraint. If there is a race of two calls to
             # `add_e2e_one_time_keys` then they'll conflict and we will only
             # insert one set.
-            self._simple_insert_many_txn(
+            self.db.simple_insert_many_txn(
                 txn,
                 table="e2e_one_time_keys_json",
                 values=[
@@ -223,7 +238,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 txn, self.count_e2e_one_time_keys, (user_id, device_id)
             )
 
-        yield self.runInteraction(
+        yield self.db.runInteraction(
             "add_e2e_one_time_keys_insert", _add_e2e_one_time_keys
         )
 
@@ -246,7 +261,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 result[algorithm] = key_count
             return result
 
-        return self.runInteraction("count_e2e_one_time_keys", _count_e2e_one_time_keys)
+        return self.db.runInteraction(
+            "count_e2e_one_time_keys", _count_e2e_one_time_keys
+        )
 
     def _get_e2e_cross_signing_key_txn(self, txn, user_id, key_type, from_user_id=None):
         """Returns a user's cross-signing key.
@@ -307,7 +324,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         Returns:
             dict of the key data or None if not found
         """
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_e2e_cross_signing_key",
             self._get_e2e_cross_signing_key_txn,
             user_id,
@@ -335,7 +352,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             WHERE ? < stream_id AND stream_id <= ?
             GROUP BY user_id
         """
-        return self._execute(
+        return self.db.execute(
             "get_all_user_signature_changes_for_remotes", None, sql, from_key, to_key
         )
 
@@ -352,7 +369,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             set_tag("time_now", time_now)
             set_tag("device_keys", device_keys)
 
-            old_key_json = self._simple_select_one_onecol_txn(
+            old_key_json = self.db.simple_select_one_onecol_txn(
                 txn,
                 table="e2e_device_keys_json",
                 keyvalues={"user_id": user_id, "device_id": device_id},
@@ -368,7 +385,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 log_kv({"Message": "Device key already stored."})
                 return False
 
-            self._simple_upsert_txn(
+            self.db.simple_upsert_txn(
                 txn,
                 table="e2e_device_keys_json",
                 keyvalues={"user_id": user_id, "device_id": device_id},
@@ -377,7 +394,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             log_kv({"message": "Device keys stored."})
             return True
 
-        return self.runInteraction("set_e2e_device_keys", _set_e2e_device_keys_txn)
+        return self.db.runInteraction("set_e2e_device_keys", _set_e2e_device_keys_txn)
 
     def claim_e2e_one_time_keys(self, query_list):
         """Take a list of one time keys out of the database"""
@@ -416,7 +433,9 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 )
             return result
 
-        return self.runInteraction("claim_e2e_one_time_keys", _claim_e2e_one_time_keys)
+        return self.db.runInteraction(
+            "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
+        )
 
     def delete_e2e_keys_by_device(self, user_id, device_id):
         def delete_e2e_keys_by_device_txn(txn):
@@ -427,12 +446,12 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                     "user_id": user_id,
                 }
             )
-            self._simple_delete_txn(
+            self.db.simple_delete_txn(
                 txn,
                 table="e2e_device_keys_json",
                 keyvalues={"user_id": user_id, "device_id": device_id},
             )
-            self._simple_delete_txn(
+            self.db.simple_delete_txn(
                 txn,
                 table="e2e_one_time_keys_json",
                 keyvalues={"user_id": user_id, "device_id": device_id},
@@ -441,7 +460,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 txn, self.count_e2e_one_time_keys, (user_id, device_id)
             )
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "delete_e2e_keys_by_device", delete_e2e_keys_by_device_txn
         )
 
@@ -477,7 +496,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         # The "keys" property must only have one entry, which will be the public
         # key, so we just grab the first value in there
         pubkey = next(iter(key["keys"].values()))
-        self._simple_insert_txn(
+        self.db.simple_insert_txn(
             txn,
             "devices",
             values={
@@ -490,7 +509,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
 
         # and finally, store the key itself
         with self._cross_signing_id_gen.get_next() as stream_id:
-            self._simple_insert_txn(
+            self.db.simple_insert_txn(
                 txn,
                 "e2e_cross_signing_keys",
                 values={
@@ -509,7 +528,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             key_type (str): the type of cross-signing key to set
             key (dict): the key data
         """
-        return self.runInteraction(
+        return self.db.runInteraction(
             "add_e2e_cross_signing_key",
             self._set_e2e_cross_signing_key_txn,
             user_id,
@@ -524,7 +543,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             user_id (str): the user who made the signatures
             signatures (iterable[SignatureListItem]): signatures to add
         """
-        return self._simple_insert_many(
+        return self.db.simple_insert_many(
             "e2e_cross_signing_signatures",
             [
                 {

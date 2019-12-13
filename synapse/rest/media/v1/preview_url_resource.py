@@ -122,7 +122,7 @@ class PreviewUrlResource(DirectServeResource):
                 pattern = entry[attrib]
                 value = getattr(url_tuple, attrib)
                 logger.debug(
-                    "Matching attrib '%s' with value '%s' against" " pattern '%s'",
+                    "Matching attrib '%s' with value '%s' against pattern '%s'",
                     attrib,
                     value,
                     pattern,
@@ -402,7 +402,7 @@ class PreviewUrlResource(DirectServeResource):
 
         logger.info("Running url preview cache expiry")
 
-        if not (yield self.store.has_completed_background_updates()):
+        if not (yield self.store.db.updates.has_completed_background_updates()):
             logger.info("Still running DB updates; skipping expiry")
             return
 

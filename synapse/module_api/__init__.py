@@ -175,4 +175,4 @@ class ModuleApi(object):
         Returns:
             Deferred[object]: result of func
         """
-        return self._store.runInteraction(desc, func, *args, **kwargs)
+        return self._store.db.runInteraction(desc, func, *args, **kwargs)

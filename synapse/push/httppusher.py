@@ -246,7 +246,7 @@ class HttpPusher(object):
                     # fixed, we don't suddenly deliver a load
                     # of old notifications.
                     logger.warning(
-                        "Giving up on a notification to user %s, " "pushkey %s",
+                        "Giving up on a notification to user %s, pushkey %s",
                         self.user_id,
                         self.pushkey,
                     )
@@ -299,8 +299,7 @@ class HttpPusher(object):
                     # for sanity, we only remove the pushkey if it
                     # was the one we actually sent...
                     logger.warning(
-                        ("Ignoring rejected pushkey %s because we" " didn't send it"),
-                        pk,
+                        ("Ignoring rejected pushkey %s because we didn't send it"), pk,
                     )
                 else:
                     logger.info("Pushkey %s was rejected: removing", pk)
