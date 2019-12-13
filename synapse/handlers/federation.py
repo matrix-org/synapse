@@ -66,7 +66,7 @@ from synapse.state import StateResolutionStore, resolve_events_with_store
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
 from synapse.types import UserID, get_domain_from_id
 from synapse.util import batch_iter
-from synapse.util.async_helpers import Linearizer
+from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.distributor import user_joined_room
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.visibility import filter_events_for_server
@@ -618,7 +618,7 @@ class FederationHandler(BaseHandler):
     ) -> Dict[str, EventBase]:
         """Fetch events from a remote destination, checking if we already have them.
 
-        Persists any events we don't already have.
+        Persists any events we don't already have as outliers.
 
         If we fail to fetch any of the events, a warning will be logged, and the event
         will be omitted from the result. Likewise, any events which turn out not to
@@ -638,33 +638,15 @@ class FederationHandler(BaseHandler):
                 room_id,
             )
 
-            def err_cb(f, e_id):
-                logger.warning(
-                    "Error fetching missing state/auth event %s: %s",
-                    e_id,
-                    f.getErrorMessage(),
-                )
+            await self._get_events_and_persist(
+                destination=destination, room_id=room_id, events=missing_events
+            )
 
-            for batch in batch_iter(missing_events, 5):
-                deferreds = [
-                    run_in_background(
-                        self._get_event_and_persist,
-                        destination=destination,
-                        room_id=room_id,
-                        event_id=e_id,
-                    ).addErrback(err_cb, e_id)
-                    for e_id in batch
-                ]
-
-                await make_deferred_yieldable(
-                    defer.gatherResults(deferreds, consumeErrors=True)
-                )
-
-                # we need to make sure we re-load from the database to get the rejected
-                # state correct.
-                fetched_events.update(
-                    (await self.store.get_events(batch, allow_rejected=True))
-                )
+            # we need to make sure we re-load from the database to get the rejected
+            # state correct.
+            fetched_events.update(
+                (await self.store.get_events(missing_events, allow_rejected=True))
+            )
 
         # check for events which were in the wrong room.
         #
@@ -1072,38 +1054,55 @@ class FederationHandler(BaseHandler):
 
         return False
 
-    async def _get_event_and_persist(
-        self, destination: str, room_id: str, event_id: str
+    async def _get_events_and_persist(
+        self, destination: str, room_id: str, events: Iterable[str]
     ):
-        """Fetch the given event from a server, and persist it as an outlier.
+        """Fetch the given events from a server, and persist them as outliers.
 
-        Raises:
-            Exception: if we couldn't find the event
+        Logs a warning if we can't find the given event.
         """
-        with nested_logging_context(event_id):
-            room_version = await self.store.get_room_version(room_id)
 
-            event = await self.federation_client.get_pdu(
-                [destination], event_id, room_version, outlier=True,
-            )  # type: Optional[EventBase]
+        room_version = await self.store.get_room_version(room_id)
 
-            if event is None:
-                raise Exception(
-                    "Server %s didn't return event %s" % (destination, event_id,)
-                )
+        event_infos = []
 
-            auth_events = await self._get_events_from_store_or_dest(
-                destination, room_id, event.auth_event_ids()
-            )
-            auth = {}
-            for auth_event_id in event.auth_event_ids():
-                e = auth_events.get(auth_event_id)
-                if e:
-                    auth[(e.type, e.state_key)] = e
+        async def get_event(event_id: str):
+            with nested_logging_context(event_id):
+                try:
+                    event = await self.federation_client.get_pdu(
+                        [destination], event_id, room_version, outlier=True,
+                    )
+                    if event is None:
+                        logger.warning(
+                            "Server %s didn't return event %s", destination, event_id,
+                        )
+                        return
 
-            await self._handle_new_event(
-                destination, event, state=None, auth_events=auth,
-            )
+                    # recursively fetch the auth events for this event
+                    auth_events = await self._get_events_from_store_or_dest(
+                        destination, room_id, event.auth_event_ids()
+                    )
+                    auth = {}
+                    for auth_event_id in event.auth_event_ids():
+                        ae = auth_events.get(auth_event_id)
+                        if ae:
+                            auth[(ae.type, ae.state_key)] = ae
+
+                    event_infos.append(_NewEventInfo(event, None, auth))
+
+                except Exception as e:
+                    logger.warning(
+                        "Error fetching missing state/auth event %s: %s %s",
+                        event_id,
+                        type(e),
+                        e,
+                    )
+
+        await concurrently_execute(get_event, events, 5)
+
+        await self._handle_new_events(
+            destination, event_infos,
+        )
 
     def _sanity_check_event(self, ev):
         """
