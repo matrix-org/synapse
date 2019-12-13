@@ -1,7 +1,13 @@
 Synapse 1.7.0 (2019-12-13)
 ==========================
 
-No significant changes.
+This release changes the default settings so that only local authenticated users can query the server's room directory. See the [upgrade notes](UPGRADE.rst#upgrading-to-v170) for details.
+
+Support for SQLite 3.7 is now deprecated, with the recommended minimum version being SQLite 3.11. A future release will hard error if used with an SQLite version before 3.11.
+
+Additionally, using SQLite with federation enabled is deprecated, and a future release will default to disabling federation for servers using SQLite.
+
+No significant changes since 1.7.0rc2.
 
 
 Synapse 1.7.0rc2 (2019-12-11)
