@@ -137,6 +137,7 @@ Some guidelines follow:
     correctly handles the top-level option being set to `None` (as it
     will be if no sub-options are enabled).
 -   Lines should be wrapped at 80 characters.
+-   Use two-space indents.
 
 Example:
 
@@ -155,13 +156,13 @@ Example:
     # Settings for the frobber
     #
     frobber:
-       # frobbing speed. Defaults to 1.
-       #
-       #speed: 10
+      # frobbing speed. Defaults to 1.
+      #
+      #speed: 10
 
-       # frobbing distance. Defaults to 1000.
-       #
-       #distance: 100
+      # frobbing distance. Defaults to 1000.
+      #
+      #distance: 100
 
 Note that the sample configuration is generated from the synapse code
 and is maintained by a script, `scripts-dev/generate_sample_config`.

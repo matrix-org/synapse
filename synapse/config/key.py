@@ -108,7 +108,7 @@ class KeyConfig(Config):
             self.signing_key = self.read_signing_keys(signing_key_path, "signing_key")
 
         self.old_signing_keys = self.read_old_signing_keys(
-            config.get("old_signing_keys", {})
+            config.get("old_signing_keys")
         )
         self.key_refresh_interval = self.parse_duration(
             config.get("key_refresh_interval", "1d")
@@ -199,14 +199,19 @@ class KeyConfig(Config):
         signing_key_path: "%(base_key_name)s.signing.key"
 
         # The keys that the server used to sign messages with but won't use
-        # to sign new messages. E.g. it has lost its private key
+        # to sign new messages.
         #
-        #old_signing_keys:
-        #  "ed25519:auto":
-        #    # Base64 encoded public key
-        #    key: "The public part of your old signing key."
-        #    # Millisecond POSIX timestamp when the key expired.
-        #    expired_ts: 123456789123
+        old_signing_keys:
+          # For each key, `key` should be the base64-encoded public key, and `expired_ts`
+          # should be the time (in milliseconds since the unix epoch) that it was last 
+          # used.
+          #
+          # It is possible to build an entry from an old signing.key file using the 
+          # `export_signing_key` script which is provided with synapse.
+          #
+          # For example:
+          #
+          #"ed25519:id": { key: "base64string", expired_ts: 123456789123 }
 
         # How long key response published by this server is valid for.
         # Used to set the valid_until_ts in /key/v2 APIs.
@@ -290,6 +295,8 @@ class KeyConfig(Config):
             raise ConfigError("Error reading %s: %s" % (name, str(e)))
 
     def read_old_signing_keys(self, old_signing_keys):
+        if old_signing_keys is None:
+            return {}
         keys = {}
         for key_id, key_data in old_signing_keys.items():
             if is_signing_algorithm_supported(key_id):
