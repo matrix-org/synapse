@@ -405,6 +405,9 @@ class LoggingContext(object):
         """
         current = get_thread_resource_usage()
 
+        # Indicate to mypy that we know that self.usage_start is None.
+        assert self.usage_start is not None
+
         utime_delta = current.ru_utime - self.usage_start.ru_utime
         stime_delta = current.ru_stime - self.usage_start.ru_stime
 

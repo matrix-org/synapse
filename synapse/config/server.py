@@ -200,7 +200,7 @@ class ServerConfig(Config):
         self.admin_contact = config.get("admin_contact", None)
 
         # FIXME: federation_domain_whitelist needs sytests
-        self.federation_domain_whitelist = None
+        self.federation_domain_whitelist = None  # type: Optional[dict]
         federation_domain_whitelist = config.get("federation_domain_whitelist", None)
 
         if federation_domain_whitelist is not None:
