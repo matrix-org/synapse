@@ -76,9 +76,9 @@ def flatten_event(event: dict, metadata: dict, include_time: bool = False):
     # context only given in the log format (e.g. what is being logged) is
     # available.
     if "log_text" in event:
-        new_event["log"] = event["log_text"]
+        new_event["message"] = event["log_text"]
     else:
-        new_event["log"] = event["log_format"]
+        new_event["message"] = event["log_format"]
 
     # We want to include the timestamp when forwarding over the network, but
     # exclude it when we are writing to stdout. This is because the log ingester
