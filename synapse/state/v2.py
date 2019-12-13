@@ -22,6 +22,7 @@ from six import iteritems, itervalues
 
 from twisted.internet import defer
 
+import synapse.state
 from synapse import event_auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
