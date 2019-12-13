@@ -1,6 +1,6 @@
 # Shutdown room API
 
-Shutdown a room, preventing new joins and move local users, room aliases automatically
+Shuts down a room, preventing new joins and moves local users and room aliases automatically
 to a new room. The new room will be created with the user specified by the
 `new_room_user_id` parameter as room administrator and contain a message
 explaining what happened. Users invited to the new room will have power level
