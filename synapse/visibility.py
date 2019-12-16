@@ -52,7 +52,8 @@ def filter_events_for_client(
     apply_retention_policies=True,
 ):
     """
-    Check which events a user is allowed to see
+    Check which events a user is allowed to see. If the user can see the event but its
+    sender asked for their data to be erased, prune the content of the event.
 
     Args:
         storage
