@@ -19,10 +19,7 @@ from typing import List
 
 import yaml
 
-from twisted.enterprise import adbapi
-
 from synapse.config._base import Config, ConfigError
-from synapse.storage.engines import create_engine
 
 logger = logging.getLogger(__name__)
 
@@ -52,37 +49,6 @@ class DatabaseConnectionConfig:
         self.name = name
         self.config = db_config
         self.data_stores = data_stores
-
-        self.engine = create_engine(db_config)
-        self.config["args"]["cp_openfun"] = self.engine.on_new_connection
-
-        self._pool = None
-
-    def get_pool(self, reactor) -> adbapi.ConnectionPool:
-        """Get the connection pool for the database.
-        """
-
-        if self._pool is None:
-            self._pool = adbapi.ConnectionPool(
-                self.config["name"], cp_reactor=reactor, **self.config.get("args", {})
-            )
-
-        return self._pool
-
-    def make_conn(self):
-        """Make a new connection to the database and return it.
-
-        Returns:
-            Connection
-        """
-
-        db_params = {
-            k: v
-            for k, v in self.config.get("args", {}).items()
-            if not k.startswith("cp_")
-        }
-        db_conn = self.engine.module.connect(**db_params)
-        return db_conn
 
 
 class DatabaseConfig(Config):

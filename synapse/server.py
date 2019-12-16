@@ -273,6 +273,9 @@ class HomeServer(object):
     def get_datastore(self):
         return self.datastores.main
 
+    def get_datastores(self):
+        return self.datastores
+
     def get_config(self):
         return self.config
 

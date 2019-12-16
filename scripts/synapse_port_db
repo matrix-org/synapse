@@ -56,7 +56,7 @@ from synapse.storage.data_stores.main.stats import StatsStore
 from synapse.storage.data_stores.main.user_directory import (
     UserDirectoryBackgroundUpdateStore,
 )
-from synapse.storage.database import Database
+from synapse.storage.database import Database, make_conn
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.util import Clock
@@ -440,9 +440,9 @@ class Porter(object):
             else:
                 return
 
-    def setup_db(self, db_config: DatabaseConnectionConfig):
-        db_conn = db_config.make_conn()
-        prepare_database(db_conn, db_config.engine, config=None)
+    def setup_db(self, db_config: DatabaseConnectionConfig, engine):
+        db_conn = make_conn(db_config, engine)
+        prepare_database(db_conn, engine, config=None)
 
         db_conn.commit()
 
@@ -460,15 +460,16 @@ class Porter(object):
         """
         self.progress.set_state("Preparing %s" % db_config.config["name"])
 
-        conn = self.setup_db(db_config)
+        engine = create_engine(db_config.config)
+        conn = self.setup_db(db_config, engine)
 
         hs = MockHomeserver(self.hs_config)
 
-        store = Store(Database(hs, db_config), conn, hs)
+        store = Store(Database(hs, db_config, engine), conn, hs)
 
         yield store.db.runInteraction(
             "%s_engine.check_database" % db_config.config["name"],
-            db_config.engine.check_database,
+            engine.check_database,
         )
 
         return store

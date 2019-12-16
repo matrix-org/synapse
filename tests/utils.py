@@ -232,8 +232,9 @@ def setup_test_homeserver(
         }
 
     database = DatabaseConnectionConfig("master", database_config, ["main"])
-    db_engine = database.engine
     config.database.databases = [database]
+
+    db_engine = create_engine(database.config)
 
     # Create the database before we actually try and connect to it, based off
     # the template database we generate in setupdb()
@@ -264,13 +265,19 @@ def setup_test_homeserver(
             **kargs
         )
 
+        hs.setup()
+        if homeserverToUse.__name__ == "TestHomeServer":
+            hs.setup_master()
+
         if isinstance(db_engine, PostgresEngine):
+            database = hs.get_datastores().databases[0]
+
             # We need to do cleanup on PostgreSQL
             def cleanup():
                 import psycopg2
 
                 # Close all the db pools
-                database.get_pool(reactor).close()
+                database._db_pool.close()
 
                 dropped = False
 
@@ -309,9 +316,6 @@ def setup_test_homeserver(
                 # Register the cleanup hook
                 cleanup_func(cleanup)
 
-        hs.setup()
-        if homeserverToUse.__name__ == "TestHomeServer":
-            hs.setup_master()
     else:
         hs = homeserverToUse(
             name,

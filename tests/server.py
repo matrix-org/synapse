@@ -308,33 +308,35 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
 
     # Make the thread pool synchronous.
     clock = server.get_clock()
-    pool = database.get_pool(clock._reactor)
 
-    def runWithConnection(func, *args, **kwargs):
-        return threads.deferToThreadPool(
-            pool._reactor,
-            pool.threadpool,
-            pool._runWithConnection,
-            func,
-            *args,
-            **kwargs
-        )
+    for database in server.get_datastores().databases:
+        pool = database._db_pool
 
-    def runInteraction(interaction, *args, **kwargs):
-        return threads.deferToThreadPool(
-            pool._reactor,
-            pool.threadpool,
-            pool._runInteraction,
-            interaction,
-            *args,
-            **kwargs
-        )
+        def runWithConnection(func, *args, **kwargs):
+            return threads.deferToThreadPool(
+                pool._reactor,
+                pool.threadpool,
+                pool._runWithConnection,
+                func,
+                *args,
+                **kwargs
+            )
 
-    if pool:
+        def runInteraction(interaction, *args, **kwargs):
+            return threads.deferToThreadPool(
+                pool._reactor,
+                pool.threadpool,
+                pool._runInteraction,
+                interaction,
+                *args,
+                **kwargs
+            )
+
         pool.runWithConnection = runWithConnection
         pool.runInteraction = runInteraction
         pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
+
     return server
 
 

@@ -20,7 +20,7 @@ from synapse.replication.tcp.client import (
     ReplicationClientHandler,
 )
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
-from synapse.storage.database import Database
+from synapse.storage.database import make_conn
 
 from tests import unittest
 from tests.server import FakeTransport
@@ -44,8 +44,9 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         db_config = hs.config.database.get_single_database()
         self.master_store = self.hs.get_datastore()
         self.storage = hs.get_storage()
+        database = hs.get_datastores().databases[0]
         self.slaved_store = self.STORE_TYPE(
-            Database(hs, db_config), db_config.get_pool(reactor).connect(), self.hs
+            database, make_conn(db_config, database.engine), self.hs
         )
         self.event_id = 0
 
