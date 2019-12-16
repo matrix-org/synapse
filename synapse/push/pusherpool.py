@@ -244,7 +244,7 @@ class PusherPool:
         """Start the given pusher
 
         Args:
-            pusherdict (dict):
+            pusherdict (dict): dict with the values pulled from the db table
 
         Returns:
             Deferred[EmailPusher|HttpPusher]
@@ -253,7 +253,8 @@ class PusherPool:
             p = self.pusher_factory.create_pusher(pusherdict)
         except PusherConfigException as e:
             logger.warning(
-                "Pusher incorrectly configured user=%s, appid=%s, pushkey=%s: %s",
+                "Pusher incorrectly configured id=%i, user=%s, appid=%s, pushkey=%s: %s",
+                pusherdict["id"],
                 pusherdict.get("user_name"),
                 pusherdict.get("app_id"),
                 pusherdict.get("pushkey"),
@@ -261,7 +262,9 @@ class PusherPool:
             )
             return
         except Exception:
-            logger.exception("Couldn't start a pusher: caught Exception")
+            logger.exception(
+                "Couldn't start pusher id %i: caught Exception", pusherdict["id"],
+            )
             return
 
         if not p:
