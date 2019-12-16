@@ -237,6 +237,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config["require_auth_for_profile_requests"] = True
+        config["limit_profile_requests_to_users_who_share_rooms"] = True
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -309,6 +310,7 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
         config["require_auth_for_profile_requests"] = True
+        config["limit_profile_requests_to_users_who_share_rooms"] = True
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
