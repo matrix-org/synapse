@@ -27,7 +27,7 @@ from synapse.storage.engines import create_engine
 logger = logging.getLogger(__name__)
 
 
-class DatabaseConnectionConfig(object):
+class DatabaseConnectionConfig:
     """Contains the connection config for a particular database.
 
     Args:
