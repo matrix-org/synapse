@@ -5,3 +5,4 @@ INSERT INTO federation_stream_position (type, stream_id) SELECT 'events', coales
 INSERT INTO user_directory_stream_pos (stream_id) VALUES (0);
 INSERT INTO stats_stream_pos (stream_id) VALUES (0);
 INSERT INTO event_push_summary_stream_ordering (stream_ordering) VALUES (0);
+-- device_max_stream_id is handled separately in 56/device_stream_id_insert.sql
