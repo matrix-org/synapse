@@ -264,6 +264,7 @@ class E2eKeysHandler(object):
 
         return ret
 
+    @defer.inlineCallbacks
     def get_cross_signing_keys_from_cache(self, query, from_user_id):
         """Get cross-signing keys for users from the database
 
@@ -283,14 +284,32 @@ class E2eKeysHandler(object):
         self_signing_keys = {}
         user_signing_keys = {}
 
-        # Currently a stub, implementation coming in https://github.com/matrix-org/synapse/pull/6486
-        return defer.succeed(
-            {
-                "master_keys": master_keys,
-                "self_signing_keys": self_signing_keys,
-                "user_signing_keys": user_signing_keys,
-            }
-        )
+        user_ids = list(query)
+
+        keys = yield self.store.get_e2e_cross_signing_keys_bulk(user_ids, from_user_id)
+
+        for user_id, user_info in keys.items():
+            if user_info is None:
+                continue
+            if "master" in user_info:
+                master_keys[user_id] = user_info["master"]
+            if "self_signing" in user_info:
+                self_signing_keys[user_id] = user_info["self_signing"]
+
+        if (
+            from_user_id in keys
+            and keys[from_user_id] is not None
+            and "user_signing" in keys[from_user_id]
+        ):
+            # users can see other users' master and self-signing keys, but can
+            # only see their own user-signing keys
+            user_signing_keys[from_user_id] = keys[from_user_id]["user_signing"]
+
+        return {
+            "master_keys": master_keys,
+            "self_signing_keys": self_signing_keys,
+            "user_signing_keys": user_signing_keys,
+        }
 
     @trace
     @defer.inlineCallbacks
