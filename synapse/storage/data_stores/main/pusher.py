@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from typing import Iterable, Iterator
 
 from canonicaljson import encode_canonical_json, json
 
@@ -27,10 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 class PusherWorkerStore(SQLBaseStore):
-    def _decode_pushers_rows(self, rows):
+    def _decode_pushers_rows(self, rows: Iterable[dict]) -> Iterator[dict]:
+        """JSON-decode the data in the rows returned from the `pushers` table
+
+        Drops any rows whose data cannot be decoded
+        """
         for r in rows:
             dataJson = r["data"]
-            r["data"] = None
             try:
                 r["data"] = json.loads(dataJson)
             except Exception as e:
@@ -40,9 +44,9 @@ class PusherWorkerStore(SQLBaseStore):
                     dataJson,
                     e.args[0],
                 )
-                pass
+                continue
 
-        return rows
+            yield r
 
     @defer.inlineCallbacks
     def user_has_pusher(self, user_id):

@@ -232,7 +232,6 @@ class PusherPool:
             Deferred
         """
         pushers = yield self.store.get_all_pushers()
-        logger.info("Starting %d pushers", len(pushers))
 
         # Stagger starting up the pushers so we don't completely drown the
         # process on start up.
