@@ -513,16 +513,19 @@ class Auth(object):
         event,
         current_state_ids: Dict[Tuple[str, str], str],
         for_verification: bool = False,
-    ) -> List[str]:
+    ):
         """Given an event and current state return the list of event IDs used
         to auth an event.
 
         If `for_verification` is False then only return auth events that
         should be added to the event's `auth_events`.
+
+        Returns:
+            defer.Deferred(list[str]): List of event IDs.
         """
 
         if event.type == EventTypes.Create:
-            return []
+            return defer.succeed([])
 
         # Currently we ignore the `for_verification` flag even though there are
         # some situations where we can drop particular auth events when adding
@@ -541,7 +544,7 @@ class Auth(object):
             if auth_ev_id:
                 auth_ids.append(auth_ev_id)
 
-        return auth_ids
+        return defer.succeed(auth_ids)
 
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id, user):

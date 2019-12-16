@@ -1,1 +1,1 @@
-Fix a cause of state resets in v5.
+Fix a cause of state resets in room versions 2 onwards.
