@@ -1706,7 +1706,7 @@ class ContextTestCase(unittest.HomeserverTestCase):
         # the messages anymore.
 
         request, channel = self.make_request(
-            'GET',
+            "GET",
             '/rooms/%s/context/%s?filter={"types":["m.room.message"]}'
             % (self.room_id, event_id),
             access_token=invited_tok,
@@ -1729,4 +1729,3 @@ class ContextTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(events_after), 2, events_after)
         self.assertDictEqual(events_after[0].get("content"), {}, events_after[0])
         self.assertEqual(events_after[1].get("content"), {}, events_after[1])
-
