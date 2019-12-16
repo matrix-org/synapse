@@ -941,7 +941,7 @@ class RoomContextHandler(object):
         if event_filter:
             state_events = event_filter.filter(state_events)
 
-        results["state"] = state_events
+        results["state"] = yield filter_evts(state_events)
 
         # We use a dummy token here as we only care about the room portion of
         # the token, which we replace.

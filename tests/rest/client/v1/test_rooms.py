@@ -1609,11 +1609,6 @@ class ContextTestCase(unittest.HomeserverTestCase):
         account.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
-        self.hs = self.setup_test_homeserver()
-
-        return self.hs
-
     def prepare(self, reactor, clock, homeserver):
         self.user_id = self.register_user("user", "password")
         self.tok = self.login("user", "password")
