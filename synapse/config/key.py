@@ -202,11 +202,11 @@ class KeyConfig(Config):
         # to sign new messages.
         #
         old_signing_keys:
-          # For each key, `key` should be the base64-encoded public key, and `expired_ts`
-          # should be the time (in milliseconds since the unix epoch) that it was last 
-          # used.
+          # For each key, `key` should be the base64-encoded public key, and
+          # `expired_ts`should be the time (in milliseconds since the unix epoch) that
+          # it was last used.
           #
-          # It is possible to build an entry from an old signing.key file using the 
+          # It is possible to build an entry from an old signing.key file using the
           # `export_signing_key` script which is provided with synapse.
           #
           # For example:
