@@ -14,13 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import sys
+import time
 from typing import Optional
 
 import nacl.signing
-import sys
-import time
-
-from signedjson.key import read_signing_keys, get_verify_key, encode_verify_key_base64
+from signedjson.key import encode_verify_key_base64, get_verify_key, read_signing_keys
 
 
 def exit(status: int = 0, message: Optional[str] = None):
