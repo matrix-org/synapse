@@ -1008,15 +1008,3 @@ class RoomEventSource(object):
 
     def get_current_key_for_room(self, room_id):
         return self.store.get_room_events_max_id(room_id)
-
-    @defer.inlineCallbacks
-    def get_pagination_rows(self, user, config, key):
-        events, next_key = yield self.store.paginate_room_events(
-            room_id=key,
-            from_key=config.from_key,
-            to_key=config.to_key,
-            direction=config.direction,
-            limit=config.limit,
-        )
-
-        return (events, next_key)
