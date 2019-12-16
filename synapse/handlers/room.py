@@ -907,7 +907,10 @@ class RoomContextHandler(object):
 
         results["events_before"] = yield filter_evts(results["events_before"])
         results["events_after"] = yield filter_evts(results["events_after"])
-        results["event"] = event
+        # filter_evts can return a pruned event in case the user is allowed to see that
+        # there's something there but not see the content, so use the event that's in
+        # `filtered` rather than the event we retrieved from the datastore.
+        results["event"] = filtered[0]
 
         if results["events_after"]:
             last_event_id = results["events_after"][-1].event_id
