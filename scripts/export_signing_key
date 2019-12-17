@@ -63,9 +63,8 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--expiry-ts",
-        nargs=1,
         type=int,
-        default=int(time.time() * 1000),
+        default=int(time.time() * 1000) + 6*3600000,
         help=(
             "The expiry time to use for -x, in milliseconds since 1970. The default "
             "is (now+6h)."
