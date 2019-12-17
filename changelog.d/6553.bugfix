@@ -1,0 +1,1 @@
+Fix a bug causing responses to the `/context` client endpoint to not use the pruned version of the event.
