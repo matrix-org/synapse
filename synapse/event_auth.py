@@ -649,13 +649,11 @@ def auth_types_for_event(event) -> Set[Tuple[str]]:
     if event.type == EventTypes.Create:
         return set()
 
-    auth_types = set(
-        (
-            (EventTypes.PowerLevels, ""),
-            (EventTypes.Member, event.sender),
-            (EventTypes.Create, ""),
-        )
-    )
+    auth_types = {
+        (EventTypes.PowerLevels, ""),
+        (EventTypes.Member, event.sender),
+        (EventTypes.Create, ""),
+    }
 
     if event.type == EventTypes.Member:
         membership = event.content["membership"]
