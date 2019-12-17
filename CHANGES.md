@@ -1,3 +1,26 @@
+Synapse 1.7.0 (2019-12-13)
+==========================
+
+This release changes the default settings so that only local authenticated users can query the server's room directory. See the [upgrade notes](UPGRADE.rst#upgrading-to-v170) for details.
+
+Support for SQLite versions before 3.11 is now deprecated. A future release will refuse to start if used with an SQLite version before 3.11.
+
+Administrators are reminded that SQLite should not be used for production instances. Instructions for migrating to Postgres are available [here](docs/postgres.md). A future release of synapse will, by default, disable federation for servers using SQLite.
+
+No significant changes since 1.7.0rc2.
+
+
+Synapse 1.7.0rc2 (2019-12-11)
+=============================
+
+Bugfixes
+--------
+
+- Fix incorrect error message for invalid requests when setting user's avatar URL. ([\#6497](https://github.com/matrix-org/synapse/issues/6497))
+- Fix support for SQLite 3.7. ([\#6499](https://github.com/matrix-org/synapse/issues/6499))
+- Fix regression where sending email push would not work when using a pusher worker. ([\#6507](https://github.com/matrix-org/synapse/issues/6507), [\#6509](https://github.com/matrix-org/synapse/issues/6509))
+
+
 Synapse 1.7.0rc1 (2019-12-09)
 =============================
 
