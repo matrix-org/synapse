@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Set, Tuple
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -637,7 +638,7 @@ def get_public_keys(invite_event):
     return public_keys
 
 
-def auth_types_for_event(event):
+def auth_types_for_event(event) -> Set[Tuple[str]]:
     """Given an event, return a list of (EventType, StateKey) that may be
     needed to auth the event. The returned list may be a superset of what
     would actually be required depending on the full state of the room.
@@ -646,20 +647,22 @@ def auth_types_for_event(event):
     actually auth the event.
     """
     if event.type == EventTypes.Create:
-        return []
+        return set()
 
-    auth_types = [
-        (EventTypes.PowerLevels, ""),
-        (EventTypes.Member, event.sender),
-        (EventTypes.Create, ""),
-    ]
+    auth_types = set(
+        (
+            (EventTypes.PowerLevels, ""),
+            (EventTypes.Member, event.sender),
+            (EventTypes.Create, ""),
+        )
+    )
 
     if event.type == EventTypes.Member:
         membership = event.content["membership"]
         if membership in [Membership.JOIN, Membership.INVITE]:
-            auth_types.append((EventTypes.JoinRules, ""))
+            auth_types.add((EventTypes.JoinRules, ""))
 
-        auth_types.append((EventTypes.Member, event.state_key))
+        auth_types.add((EventTypes.Member, event.state_key))
 
         if membership == Membership.INVITE:
             if "third_party_invite" in event.content:
@@ -667,6 +670,6 @@ def auth_types_for_event(event):
                     EventTypes.ThirdPartyInvite,
                     event.content["third_party_invite"]["signed"]["token"],
                 )
-                auth_types.append(key)
+                auth_types.add(key)
 
     return auth_types
