@@ -289,13 +289,13 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return set(row["state_group"] for row in rows)
 
 
-class StateBackgroundUpdateStore(SQLBaseStore):
+class MainStateBackgroundUpdateStore(SQLBaseStore):
 
     CURRENT_STATE_INDEX_UPDATE_NAME = "current_state_members_idx"
     EVENT_STATE_GROUP_INDEX_UPDATE_NAME = "event_to_state_groups_sg_index"
 
     def __init__(self, database: Database, db_conn, hs):
-        super(StateBackgroundUpdateStore, self).__init__(database, db_conn, hs)
+        super(MainStateBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
         self.db.updates.register_background_index_update(
             self.CURRENT_STATE_INDEX_UPDATE_NAME,
@@ -312,7 +312,7 @@ class StateBackgroundUpdateStore(SQLBaseStore):
         )
 
 
-class StateStore(StateGroupWorkerStore, StateBackgroundUpdateStore):
+class StateStore(StateGroupWorkerStore, MainStateBackgroundUpdateStore):
     """ Keeps track of the state at a given event.
 
     This is done by the concept of `state groups`. Every event is a assigned
