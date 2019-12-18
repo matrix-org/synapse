@@ -51,6 +51,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         super(ReplicationFederationSendEventsRestServlet, self).__init__(hs)
 
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.clock = hs.get_clock()
         self.federation_handler = hs.get_handlers().federation_handler
 
@@ -100,7 +101,9 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                 EventType = event_type_from_format_version(format_ver)
                 event = EventType(event_dict, internal_metadata, rejected_reason)
 
-                context = EventContext.deserialize(self.store, event_payload["context"])
+                context = EventContext.deserialize(
+                    self.storage, event_payload["context"]
+                )
 
                 event_and_contexts.append((event, context))
 
