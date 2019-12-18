@@ -526,9 +526,9 @@ class DataStore(
 
         attr_filter = {}
         if not guests:
-            attr_filter["is_guest"] = False
+            attr_filter["is_guest"] = 0
         if not deactivated:
-            attr_filter["deactivated"] = False
+            attr_filter["deactivated"] = 0
 
         return self.db.simple_select_list_paginate(
             desc="get_users_paginate",

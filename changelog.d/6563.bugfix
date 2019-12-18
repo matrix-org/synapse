@@ -1,0 +1,1 @@
+Fix GET request on /_synapse/admin/v2/users endpoint. Contributed by Awesome Technologies Innovationslabor GmbH.
