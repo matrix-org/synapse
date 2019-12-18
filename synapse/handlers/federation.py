@@ -671,6 +671,7 @@ class FederationHandler(BaseHandler):
                 bad_room_id,
                 room_id,
             )
+
             del fetched_events[bad_event_id]
 
         return fetched_events
