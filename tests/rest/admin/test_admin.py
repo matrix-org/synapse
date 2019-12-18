@@ -341,6 +341,47 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Invalid user type", channel.json_body["error"])
 
 
+class UsersListTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+    ]
+    url = "/_synapse/admin/v2/users"
+
+    def prepare(self, reactor, clock, hs):
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.register_user("user1", "pass1", admin=False)
+        self.register_user("user2", "pass2", admin=False)
+
+    def test_no_auth(self):
+        """
+        Try to list users without authentication.
+        """
+        request, channel = self.make_request("GET", self.url, b"{}")
+        self.render(request)
+
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("M_MISSING_TOKEN", channel.json_body["errcode"])
+
+    def test_all_users(self):
+        """
+        List all users, including deactivated users.
+        """
+        request, channel = self.make_request(
+            "GET",
+            self.url + "?deactivated=true",
+            b"{}",
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(3, len(channel.json_body["users"]))
+
+
 class ShutdownRoomTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
