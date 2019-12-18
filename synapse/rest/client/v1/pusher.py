@@ -28,6 +28,17 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_KEYS = {
+    "app_display_name",
+    "app_id",
+    "data",
+    "device_display_name",
+    "kind",
+    "lang",
+    "profile_tag",
+    "pushkey",
+}
+
 
 class PushersRestServlet(RestServlet):
     PATTERNS = client_patterns("/pushers$", v1=True)
@@ -43,23 +54,11 @@ class PushersRestServlet(RestServlet):
 
         pushers = await self.hs.get_datastore().get_pushers_by_user_id(user.to_string())
 
-        allowed_keys = [
-            "app_display_name",
-            "app_id",
-            "data",
-            "device_display_name",
-            "kind",
-            "lang",
-            "profile_tag",
-            "pushkey",
-        ]
+        filtered_pushers = list(
+            {k: v for k, v in p.items() if k in ALLOWED_KEYS} for p in pushers
+        )
 
-        for p in pushers:
-            for k, v in list(p.items()):
-                if k not in allowed_keys:
-                    del p[k]
-
-        return 200, {"pushers": pushers}
+        return 200, {"pushers": filtered_pushers}
 
     def on_OPTIONS(self, _):
         return 200, {}
