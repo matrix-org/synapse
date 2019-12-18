@@ -184,7 +184,7 @@ class RoomCreationHandler(BaseHandler):
             requester, tombstone_event, tombstone_context
         )
 
-        old_room_state = yield tombstone_context.get_current_state_ids(self.store)
+        old_room_state = yield tombstone_context.get_current_state_ids()
 
         # update any aliases
         yield self._move_aliases_to_new_room(
