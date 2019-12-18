@@ -20,7 +20,7 @@ from six import iteritems
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.storage.database import Database
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.state import StateFilter
 
@@ -64,7 +64,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             count = 0
 
             while next_group:
-                next_group = self._simple_select_one_onecol_txn(
+                next_group = self.db.simple_select_one_onecol_txn(
                     txn,
                     table="state_group_edges",
                     keyvalues={"state_group": next_group},
@@ -167,7 +167,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     ):
                         break
 
-                    next_group = self._simple_select_one_onecol_txn(
+                    next_group = self.db.simple_select_one_onecol_txn(
                         txn,
                         table="state_group_edges",
                         keyvalues={"state_group": next_group},
@@ -178,24 +178,22 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         return results
 
 
-class StateBackgroundUpdateStore(
-    StateGroupBackgroundUpdateStore, BackgroundUpdateStore
-):
+class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
 
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
     STATE_GROUPS_ROOM_INDEX_UPDATE_NAME = "state_groups_room_id_idx"
 
-    def __init__(self, db_conn, hs):
-        super(StateBackgroundUpdateStore, self).__init__(db_conn, hs)
-        self.register_background_update_handler(
+    def __init__(self, database: Database, db_conn, hs):
+        super(StateBackgroundUpdateStore, self).__init__(database, db_conn, hs)
+        self.db.updates.register_background_update_handler(
             self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME,
             self._background_deduplicate_state,
         )
-        self.register_background_update_handler(
+        self.db.updates.register_background_update_handler(
             self.STATE_GROUP_INDEX_UPDATE_NAME, self._background_index_state
         )
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             self.STATE_GROUPS_ROOM_INDEX_UPDATE_NAME,
             index_name="state_groups_room_id_idx",
             table="state_groups",
@@ -216,7 +214,7 @@ class StateBackgroundUpdateStore(
         batch_size = max(1, int(batch_size / BATCH_SIZE_SCALE_FACTOR))
 
         if max_group is None:
-            rows = yield self._execute(
+            rows = yield self.db.execute(
                 "_background_deduplicate_state",
                 None,
                 "SELECT coalesce(max(id), 0) FROM state_groups",
@@ -286,13 +284,13 @@ class StateBackgroundUpdateStore(
                             if prev_state.get(key, None) != value
                         }
 
-                        self._simple_delete_txn(
+                        self.db.simple_delete_txn(
                             txn,
                             table="state_group_edges",
                             keyvalues={"state_group": state_group},
                         )
 
-                        self._simple_insert_txn(
+                        self.db.simple_insert_txn(
                             txn,
                             table="state_group_edges",
                             values={
@@ -301,13 +299,13 @@ class StateBackgroundUpdateStore(
                             },
                         )
 
-                        self._simple_delete_txn(
+                        self.db.simple_delete_txn(
                             txn,
                             table="state_groups_state",
                             keyvalues={"state_group": state_group},
                         )
 
-                        self._simple_insert_many_txn(
+                        self.db.simple_insert_many_txn(
                             txn,
                             table="state_groups_state",
                             values=[
@@ -328,18 +326,18 @@ class StateBackgroundUpdateStore(
                 "max_group": max_group,
             }
 
-            self._background_update_progress_txn(
+            self.db.updates._background_update_progress_txn(
                 txn, self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME, progress
             )
 
             return False, batch_size
 
-        finished, result = yield self.runInteraction(
+        finished, result = yield self.db.runInteraction(
             self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME, reindex_txn
         )
 
         if finished:
-            yield self._end_background_update(
+            yield self.db.updates._end_background_update(
                 self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME
             )
 
@@ -369,8 +367,8 @@ class StateBackgroundUpdateStore(
                 )
                 txn.execute("DROP INDEX IF EXISTS state_groups_state_id")
 
-        yield self.runWithConnection(reindex_txn)
+        yield self.db.runWithConnection(reindex_txn)
 
-        yield self._end_background_update(self.STATE_GROUP_INDEX_UPDATE_NAME)
+        yield self.db.updates._end_background_update(self.STATE_GROUP_INDEX_UPDATE_NAME)
 
         return 1

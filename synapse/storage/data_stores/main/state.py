@@ -26,8 +26,8 @@ from synapse.api.errors import NotFoundError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
+from synapse.storage.database import Database
 from synapse.storage.state import StateFilter
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedList
@@ -57,8 +57,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     """The parts of StateGroupStore that can be called from workers.
     """
 
-    def __init__(self, db_conn, hs):
-        super(StateGroupWorkerStore, self).__init__(db_conn, hs)
+    def __init__(self, database: Database, db_conn, hs):
+        super(StateGroupWorkerStore, self).__init__(database, db_conn, hs)
 
     @defer.inlineCallbacks
     def get_room_version(self, room_id):
@@ -82,7 +82,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_room_predecessor(self, room_id):
-        """Get the predecessor room of an upgraded room if one exists.
+        """Get the predecessor of an upgraded room if it exists.
         Otherwise return None.
 
         Args:
@@ -95,14 +95,22 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                     * room_id (str): The room ID of the predecessor room
                     * event_id (str): The ID of the tombstone event in the predecessor room
 
+                None if a predecessor key is not found, or is not a dictionary.
+
         Raises:
-            NotFoundError if the room is unknown
+            NotFoundError if the given room is unknown
         """
         # Retrieve the room's create event
         create_event = yield self.get_create_event_for_room(room_id)
 
-        # Return predecessor if present
-        return create_event.content.get("predecessor", None)
+        # Retrieve the predecessor key of the create event
+        predecessor = create_event.content.get("predecessor", None)
+
+        # Ensure the key is a dictionary
+        if not isinstance(predecessor, dict):
+            return None
+
+        return predecessor
 
     @defer.inlineCallbacks
     def get_create_event_for_room(self, room_id):
@@ -122,7 +130,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
-            raise NotFoundError("Unknown room %s" % (room_id))
+            raise NotFoundError("Unknown room %s" % (room_id,))
 
         # Retrieve the room's create event and return
         create_event = yield self.get_event(create_id)
@@ -152,7 +160,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 (intern_string(r[0]), intern_string(r[1])): to_ascii(r[2]) for r in txn
             }
 
-        return self.runInteraction("get_current_state_ids", _get_current_state_ids_txn)
+        return self.db.runInteraction(
+            "get_current_state_ids", _get_current_state_ids_txn
+        )
 
     # FIXME: how should this be cached?
     def get_filtered_current_state_ids(self, room_id, state_filter=StateFilter.all()):
@@ -196,7 +206,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return results
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_filtered_current_state_ids", _get_filtered_current_state_ids_txn
         )
 
@@ -227,7 +237,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     @cached(max_entries=50000)
     def _get_state_group_for_event(self, event_id):
-        return self._simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="event_to_state_groups",
             keyvalues={"event_id": event_id},
             retcol="state_group",
@@ -244,7 +254,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     def _get_state_group_for_events(self, event_ids):
         """Returns mapping event_id -> state_group
         """
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="event_to_state_groups",
             column="event_id",
             iterable=event_ids,
@@ -267,7 +277,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             referenced.
         """
 
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="event_to_state_groups",
             column="state_group",
             iterable=state_groups,
@@ -279,22 +289,22 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return set(row["state_group"] for row in rows)
 
 
-class StateBackgroundUpdateStore(BackgroundUpdateStore):
+class StateBackgroundUpdateStore(SQLBaseStore):
 
     CURRENT_STATE_INDEX_UPDATE_NAME = "current_state_members_idx"
     EVENT_STATE_GROUP_INDEX_UPDATE_NAME = "event_to_state_groups_sg_index"
 
-    def __init__(self, db_conn, hs):
-        super(StateBackgroundUpdateStore, self).__init__(db_conn, hs)
+    def __init__(self, database: Database, db_conn, hs):
+        super(StateBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             self.CURRENT_STATE_INDEX_UPDATE_NAME,
             index_name="current_state_events_member_index",
             table="current_state_events",
             columns=["state_key"],
             where_clause="type='m.room.member'",
         )
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             self.EVENT_STATE_GROUP_INDEX_UPDATE_NAME,
             index_name="event_to_state_groups_sg_index",
             table="event_to_state_groups",
@@ -321,8 +331,8 @@ class StateStore(StateGroupWorkerStore, StateBackgroundUpdateStore):
       * `state_groups_state`: Maps state group to state events.
     """
 
-    def __init__(self, db_conn, hs):
-        super(StateStore, self).__init__(db_conn, hs)
+    def __init__(self, database: Database, db_conn, hs):
+        super(StateStore, self).__init__(database, db_conn, hs)
 
     def _store_event_state_mappings_txn(
         self, txn, events_and_contexts: Iterable[Tuple[EventBase, EventContext]]
@@ -340,7 +350,7 @@ class StateStore(StateGroupWorkerStore, StateBackgroundUpdateStore):
 
             state_groups[event.event_id] = context.state_group
 
-        self._simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="event_to_state_groups",
             values=[

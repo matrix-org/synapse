@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Set, Tuple
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -42,11 +43,25 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
     Returns:
          if the auth checks pass.
     """
+    assert isinstance(auth_events, dict)
+
     if do_size_check:
         _check_size_limits(event)
 
     if not hasattr(event, "room_id"):
         raise AuthError(500, "Event has no room_id: %s" % event)
+
+    room_id = event.room_id
+
+    # I'm not really expecting to get auth events in the wrong room, but let's
+    # sanity-check it
+    for auth_event in auth_events.values():
+        if auth_event.room_id != room_id:
+            raise Exception(
+                "During auth for event %s in room %s, found event %s in the state "
+                "which is in room %s"
+                % (event.event_id, room_id, auth_event.event_id, auth_event.room_id)
+            )
 
     if do_sig_check:
         sender_domain = get_domain_from_id(event.sender)
@@ -73,12 +88,6 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
             # Check the origin domain has signed the event
             if not event.signatures.get(event_id_domain):
                 raise AuthError(403, "Event not signed by sending server")
-
-    if auth_events is None:
-        # Oh, we don't know what the state of the room was, so we
-        # are trusting that this is allowed (at least for now)
-        logger.warning("Trusting event: %s", event.event_id)
-        return
 
     if event.type == EventTypes.Create:
         sender_domain = get_domain_from_id(event.sender)
@@ -625,7 +634,7 @@ def get_public_keys(invite_event):
     return public_keys
 
 
-def auth_types_for_event(event):
+def auth_types_for_event(event) -> Set[Tuple[str]]:
     """Given an event, return a list of (EventType, StateKey) that may be
     needed to auth the event. The returned list may be a superset of what
     would actually be required depending on the full state of the room.
@@ -634,20 +643,20 @@ def auth_types_for_event(event):
     actually auth the event.
     """
     if event.type == EventTypes.Create:
-        return []
+        return set()
 
-    auth_types = [
+    auth_types = {
         (EventTypes.PowerLevels, ""),
         (EventTypes.Member, event.sender),
         (EventTypes.Create, ""),
-    ]
+    }
 
     if event.type == EventTypes.Member:
         membership = event.content["membership"]
         if membership in [Membership.JOIN, Membership.INVITE]:
-            auth_types.append((EventTypes.JoinRules, ""))
+            auth_types.add((EventTypes.JoinRules, ""))
 
-        auth_types.append((EventTypes.Member, event.state_key))
+        auth_types.add((EventTypes.Member, event.state_key))
 
         if membership == Membership.INVITE:
             if "third_party_invite" in event.content:
@@ -655,6 +664,6 @@ def auth_types_for_event(event):
                     EventTypes.ThirdPartyInvite,
                     event.content["third_party_invite"]["signed"]["token"],
                 )
-                auth_types.append(key)
+                auth_types.add(key)
 
     return auth_types

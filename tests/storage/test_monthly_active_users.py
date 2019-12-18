@@ -65,7 +65,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.user_add_threepid(user1, "email", user1_email, now, now)
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
 
-        self.store.runInteraction(
+        self.store.db.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
         self.pump()
@@ -183,7 +183,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
                 )
 
         self.hs.config.mau_limits_reserved_threepids = threepids
-        self.store.runInteraction(
+        self.store.db.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
         count = self.store.get_monthly_active_count()
@@ -244,7 +244,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
             {"medium": "email", "address": user2_email},
         ]
         self.hs.config.mau_limits_reserved_threepids = threepids
-        self.store.runInteraction(
+        self.store.db.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
 

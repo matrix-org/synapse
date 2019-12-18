@@ -313,10 +313,7 @@ class TypingNotificationEventSource(object):
 
                 events.append(self._make_event_for(room_id))
 
-            return events, handler._latest_room_serial
+            return defer.succeed((events, handler._latest_room_serial))
 
     def get_current_key(self):
         return self.get_typing_handler()._latest_room_serial
-
-    def get_pagination_rows(self, user, pagination_config, key):
-        return [], pagination_config.from_key

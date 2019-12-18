@@ -1,6 +1,6 @@
 from mock import Mock
 
-from twisted.internet.defer import maybeDeferred, succeed
+from twisted.internet.defer import ensureDeferred, maybeDeferred, succeed
 
 from synapse.events import FrozenEvent
 from synapse.logging.context import LoggingContext
@@ -32,6 +32,8 @@ class MessageAcceptTests(unittest.TestCase):
         )
         self.reactor.advance(0.1)
         self.room_id = self.successResultOf(room)["room_id"]
+
+        self.store = self.homeserver.get_datastore()
 
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
@@ -68,8 +70,10 @@ class MessageAcceptTests(unittest.TestCase):
         )
 
         # Send the join, it should return None (which is not an error)
-        d = self.handler.on_receive_pdu(
-            "test.serv", join_event, sent_to_us_directly=True
+        d = ensureDeferred(
+            self.handler.on_receive_pdu(
+                "test.serv", join_event, sent_to_us_directly=True
+            )
         )
         self.reactor.advance(1)
         self.assertEqual(self.successResultOf(d), None)
@@ -77,10 +81,7 @@ class MessageAcceptTests(unittest.TestCase):
         # Make sure we actually joined the room
         self.assertEqual(
             self.successResultOf(
-                maybeDeferred(
-                    self.homeserver.get_datastore().get_latest_event_ids_in_room,
-                    self.room_id,
-                )
+                maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
             )[0],
             "$join:test.serv",
         )
@@ -100,10 +101,7 @@ class MessageAcceptTests(unittest.TestCase):
 
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
-            maybeDeferred(
-                self.homeserver.get_datastore().get_latest_event_ids_in_room,
-                self.room_id,
-            )
+            maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
         )[0]
 
         # Now lie about an event
@@ -123,8 +121,10 @@ class MessageAcceptTests(unittest.TestCase):
         )
 
         with LoggingContext(request="lying_event"):
-            d = self.handler.on_receive_pdu(
-                "test.serv", lying_event, sent_to_us_directly=True
+            d = ensureDeferred(
+                self.handler.on_receive_pdu(
+                    "test.serv", lying_event, sent_to_us_directly=True
+                )
             )
 
             # Step the reactor, so the database fetches come back
@@ -141,7 +141,5 @@ class MessageAcceptTests(unittest.TestCase):
         )
 
         # Make sure the invalid event isn't there
-        extrem = maybeDeferred(
-            self.homeserver.get_datastore().get_latest_event_ids_in_room, self.room_id
-        )
+        extrem = maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
         self.assertEqual(self.successResultOf(extrem)[0], "$join:test.serv")

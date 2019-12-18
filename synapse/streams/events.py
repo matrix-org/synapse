@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Dict
+
 from twisted.internet import defer
 
 from synapse.handlers.account_data import AccountDataEventSource
@@ -35,7 +37,7 @@ class EventSources(object):
     def __init__(self, hs):
         self.sources = {
             name: cls(hs) for name, cls in EventSources.SOURCE_TYPES.items()
-        }
+        }  # type: Dict[str, Any]
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks

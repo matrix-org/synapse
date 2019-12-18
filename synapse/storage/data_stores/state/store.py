@@ -23,7 +23,8 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.data_stores.state.bg_updates import StateGroupBackgroundUpdateStore
+from synapse.storage.data_stores.state.bg_updates import StateBackgroundUpdateStore
+from synapse.storage.database import Database
 from synapse.storage.state import StateFilter
 from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.descriptors import cached
@@ -48,12 +49,12 @@ class _GetStateGroupDelta(
         return len(self.delta_ids) if self.delta_ids else 0
 
 
-class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
+class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
     """A data store for fetching/storing state groups.
     """
 
-    def __init__(self, db_conn, hs):
-        super(StateGroupDataStore, self).__init__(db_conn, hs)
+    def __init__(self, database: Database, db_conn, hs):
+        super(StateGroupDataStore, self).__init__(database, db_conn, hs)
 
         # Originally the state store used a single DictionaryCache to cache the
         # event IDs for the state types in a given state group to avoid hammering
@@ -104,7 +105,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
         """
 
         def _get_state_group_delta_txn(txn):
-            prev_group = self._simple_select_one_onecol_txn(
+            prev_group = self.db.simple_select_one_onecol_txn(
                 txn,
                 table="state_group_edges",
                 keyvalues={"state_group": state_group},
@@ -115,7 +116,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
             if not prev_group:
                 return _GetStateGroupDelta(None, None)
 
-            delta_ids = self._simple_select_list_txn(
+            delta_ids = self.db.simple_select_list_txn(
                 txn,
                 table="state_groups_state",
                 keyvalues={"state_group": state_group},
@@ -127,7 +128,9 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
                 {(row["type"], row["state_key"]): row["event_id"] for row in delta_ids},
             )
 
-        return self.runInteraction("get_state_group_delta", _get_state_group_delta_txn)
+        return self.db.runInteraction(
+            "get_state_group_delta", _get_state_group_delta_txn
+        )
 
     @defer.inlineCallbacks
     def _get_state_groups_from_groups(self, groups, state_filter):
@@ -146,7 +149,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
 
         chunks = [groups[i : i + 100] for i in range(0, len(groups), 100)]
         for chunk in chunks:
-            res = yield self.runInteraction(
+            res = yield self.db.runInteraction(
                 "_get_state_groups_from_groups",
                 self._get_state_groups_from_groups_txn,
                 chunk,
@@ -386,7 +389,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
 
             state_group = self.database_engine.get_next_state_group_id(txn)
 
-            self._simple_insert_txn(
+            self.db.simple_insert_txn(
                 txn,
                 table="state_groups",
                 values={"id": state_group, "room_id": room_id, "event_id": event_id},
@@ -395,7 +398,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
             # We persist as a delta if we can, while also ensuring the chain
             # of deltas isn't tooo long, as otherwise read performance degrades.
             if prev_group:
-                is_in_db = self._simple_select_one_onecol_txn(
+                is_in_db = self.db.simple_select_one_onecol_txn(
                     txn,
                     table="state_groups",
                     keyvalues={"id": prev_group},
@@ -410,13 +413,13 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
 
                 potential_hops = self._count_state_group_hops_txn(txn, prev_group)
             if prev_group and potential_hops < MAX_STATE_DELTA_HOPS:
-                self._simple_insert_txn(
+                self.db.simple_insert_txn(
                     txn,
                     table="state_group_edges",
                     values={"state_group": state_group, "prev_state_group": prev_group},
                 )
 
-                self._simple_insert_many_txn(
+                self.db.simple_insert_many_txn(
                     txn,
                     table="state_groups_state",
                     values=[
@@ -431,7 +434,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
                     ],
                 )
             else:
-                self._simple_insert_many_txn(
+                self.db.simple_insert_many_txn(
                     txn,
                     table="state_groups_state",
                     values=[
@@ -477,7 +480,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
 
             return state_group
 
-        return self.runInteraction("store_state_group", _store_state_group_txn)
+        return self.db.runInteraction("store_state_group", _store_state_group_txn)
 
     def purge_unreferenced_state_groups(
         self, room_id: str, state_groups_to_delete
@@ -492,7 +495,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
                 to delete.
         """
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "purge_unreferenced_state_groups",
             self._purge_unreferenced_state_groups,
             room_id,
@@ -504,7 +507,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
             "[purge] found %i state groups to delete", len(state_groups_to_delete)
         )
 
-        rows = self._simple_select_many_txn(
+        rows = self.db.simple_select_many_txn(
             txn,
             table="state_group_edges",
             column="prev_state_group",
@@ -531,15 +534,15 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
             curr_state = self._get_state_groups_from_groups_txn(txn, [sg])
             curr_state = curr_state[sg]
 
-            self._simple_delete_txn(
+            self.db.simple_delete_txn(
                 txn, table="state_groups_state", keyvalues={"state_group": sg}
             )
 
-            self._simple_delete_txn(
+            self.db.simple_delete_txn(
                 txn, table="state_group_edges", keyvalues={"state_group": sg}
             )
 
-            self._simple_insert_many_txn(
+            self.db.simple_insert_many_txn(
                 txn,
                 table="state_groups_state",
                 values=[
@@ -576,7 +579,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
             state group.
         """
 
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="state_group_edges",
             column="prev_state_group",
             iterable=state_groups,
@@ -595,7 +598,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
             state_groups_to_delete (list[int]): State groups to delete
         """
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "purge_room_state",
             self._purge_room_state_txn,
             room_id,
@@ -606,7 +609,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
         # first we have to delete the state groups states
         logger.info("[purge] removing %s from state_groups_state", room_id)
 
-        self._simple_delete_many_txn(
+        self.db.simple_delete_many_txn(
             txn,
             table="state_groups_state",
             column="state_group",
@@ -617,7 +620,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
         # ... and the state group edges
         logger.info("[purge] removing %s from state_group_edges", room_id)
 
-        self._simple_delete_many_txn(
+        self.db.simple_delete_many_txn(
             txn,
             table="state_group_edges",
             column="state_group",
@@ -628,7 +631,7 @@ class StateGroupDataStore(StateGroupBackgroundUpdateStore, SQLBaseStore):
         # ... and the state groups
         logger.info("[purge] removing %s from state_groups", room_id)
 
-        self._simple_delete_many_txn(
+        self.db.simple_delete_many_txn(
             txn,
             table="state_groups",
             column="id",

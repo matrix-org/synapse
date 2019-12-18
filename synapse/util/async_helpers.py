@@ -140,8 +140,8 @@ def concurrently_execute(func, args, limit):
 
     Args:
         func (func): Function to execute, should return a deferred or coroutine.
-        args (list): List of arguments to pass to func, each invocation of func
-            gets a signle argument.
+        args (Iterable): List of arguments to pass to func, each invocation of func
+            gets a single argument.
         limit (int): Maximum number of conccurent executions.
 
     Returns:

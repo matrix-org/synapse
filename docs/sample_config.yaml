@@ -54,15 +54,23 @@ pid_file: DATADIR/homeserver.pid
 #
 #require_auth_for_profile_requests: true
 
-# If set to 'false', requires authentication to access the server's public rooms
-# directory through the client API. Defaults to 'true'.
+# Uncomment to require a user to share a room with another user in order
+# to retrieve their profile information. Only checked on Client-Server
+# requests. Profile requests from other servers should be checked by the
+# requesting server. Defaults to 'false'.
 #
-#allow_public_rooms_without_auth: false
+#limit_profile_requests_to_users_who_share_rooms: true
 
-# If set to 'false', forbids any other homeserver to fetch the server's public
-# rooms directory via federation. Defaults to 'true'.
+# If set to 'true', removes the need for authentication to access the server's
+# public rooms directory through the client API, meaning that anyone can
+# query the room directory. Defaults to 'false'.
 #
-#allow_public_rooms_over_federation: false
+#allow_public_rooms_without_auth: true
+
+# If set to 'true', allows any other homeserver to fetch the server's public
+# rooms directory via federation. Defaults to 'false'.
+#
+#allow_public_rooms_over_federation: true
 
 # The default room version for newly created rooms.
 #
@@ -327,6 +335,69 @@ listeners:
 # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
 #
 #user_ips_max_age: 14d
+
+# Message retention policy at the server level.
+#
+# Room admins and mods can define a retention period for their rooms using the
+# 'm.room.retention' state event, and server admins can cap this period by setting
+# the 'allowed_lifetime_min' and 'allowed_lifetime_max' config options.
+#
+# If this feature is enabled, Synapse will regularly look for and purge events
+# which are older than the room's maximum retention period. Synapse will also
+# filter events received over federation so that events that should have been
+# purged are ignored and not stored again.
+#
+retention:
+  # The message retention policies feature is disabled by default. Uncomment the
+  # following line to enable it.
+  #
+  #enabled: true
+
+  # Default retention policy. If set, Synapse will apply it to rooms that lack the
+  # 'm.room.retention' state event. Currently, the value of 'min_lifetime' doesn't
+  # matter much because Synapse doesn't take it into account yet.
+  #
+  #default_policy:
+  #  min_lifetime: 1d
+  #  max_lifetime: 1y
+
+  # Retention policy limits. If set, a user won't be able to send a
+  # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
+  # that's not within this range. This is especially useful in closed federations,
+  # in which server admins can make sure every federating server applies the same
+  # rules.
+  #
+  #allowed_lifetime_min: 1d
+  #allowed_lifetime_max: 1y
+
+  # Server admins can define the settings of the background jobs purging the
+  # events which lifetime has expired under the 'purge_jobs' section.
+  #
+  # If no configuration is provided, a single job will be set up to delete expired
+  # events in every room daily.
+  #
+  # Each job's configuration defines which range of message lifetimes the job
+  # takes care of. For example, if 'shortest_max_lifetime' is '2d' and
+  # 'longest_max_lifetime' is '3d', the job will handle purging expired events in
+  # rooms whose state defines a 'max_lifetime' that's both higher than 2 days, and
+  # lower than or equal to 3 days. Both the minimum and the maximum value of a
+  # range are optional, e.g. a job with no 'shortest_max_lifetime' and a
+  # 'longest_max_lifetime' of '3d' will handle every room with a retention policy
+  # which 'max_lifetime' is lower than or equal to three days.
+  #
+  # The rationale for this per-job configuration is that some rooms might have a
+  # retention policy with a low 'max_lifetime', where history needs to be purged
+  # of outdated messages on a very frequent basis (e.g. every 5min), but not want
+  # that purge to be performed by a job that's iterating over every room it knows,
+  # which would be quite heavy on the server.
+  #
+  #purge_jobs:
+  #  - shortest_max_lifetime: 1d
+  #    longest_max_lifetime: 3d
+  #    interval: 5m:
+  #  - shortest_max_lifetime: 3d
+  #    longest_max_lifetime: 1y
+  #    interval: 24h
 
 
 ## TLS ##
@@ -1186,33 +1257,58 @@ saml2_config:
   #
   #config_path: "CONFDIR/sp_conf.py"
 
-  # the lifetime of a SAML session. This defines how long a user has to
+  # The lifetime of a SAML session. This defines how long a user has to
   # complete the authentication process, if allow_unsolicited is unset.
   # The default is 5 minutes.
   #
   #saml_session_lifetime: 5m
 
-  # The SAML attribute (after mapping via the attribute maps) to use to derive
-  # the Matrix ID from. 'uid' by default.
+  # An external module can be provided here as a custom solution to
+  # mapping attributes returned from a saml provider onto a matrix user.
   #
-  #mxid_source_attribute: displayName
+  user_mapping_provider:
+    # The custom module's class. Uncomment to use a custom module.
+    #
+    #module: mapping_provider.SamlMappingProvider
 
-  # The mapping system to use for mapping the saml attribute onto a matrix ID.
-  # Options include:
-  #  * 'hexencode' (which maps unpermitted characters to '=xx')
-  #  * 'dotreplace' (which replaces unpermitted characters with '.').
-  # The default is 'hexencode'.
-  #
-  #mxid_mapping: dotreplace
+    # Custom configuration values for the module. Below options are
+    # intended for the built-in provider, they should be changed if
+    # using a custom module. This section will be passed as a Python
+    # dictionary to the module's `parse_config` method.
+    #
+    config:
+      # The SAML attribute (after mapping via the attribute maps) to use
+      # to derive the Matrix ID from. 'uid' by default.
+      #
+      # Note: This used to be configured by the
+      # saml2_config.mxid_source_attribute option. If that is still
+      # defined, its value will be used instead.
+      #
+      #mxid_source_attribute: displayName
 
-  # In previous versions of synapse, the mapping from SAML attribute to MXID was
-  # always calculated dynamically rather than stored in a table. For backwards-
-  # compatibility, we will look for user_ids matching such a pattern before
-  # creating a new account.
+      # The mapping system to use for mapping the saml attribute onto a
+      # matrix ID.
+      #
+      # Options include:
+      #  * 'hexencode' (which maps unpermitted characters to '=xx')
+      #  * 'dotreplace' (which replaces unpermitted characters with
+      #     '.').
+      # The default is 'hexencode'.
+      #
+      # Note: This used to be configured by the
+      # saml2_config.mxid_mapping option. If that is still defined, its
+      # value will be used instead.
+      #
+      #mxid_mapping: dotreplace
+
+  # In previous versions of synapse, the mapping from SAML attribute to
+  # MXID was always calculated dynamically rather than stored in a
+  # table. For backwards- compatibility, we will look for user_ids
+  # matching such a pattern before creating a new account.
   #
   # This setting controls the SAML attribute which will be used for this
-  # backwards-compatibility lookup. Typically it should be 'uid', but if the
-  # attribute maps are changed, it may be necessary to change it.
+  # backwards-compatibility lookup. Typically it should be 'uid', but if
+  # the attribute maps are changed, it may be necessary to change it.
   #
   # The default is 'uid'.
   #
@@ -1270,8 +1366,23 @@ password_config:
 #   smtp_user: "exampleusername"
 #   smtp_pass: "examplepassword"
 #   require_transport_security: false
+#
+#   # notif_from defines the "From" address to use when sending emails.
+#   # It must be set if email sending is enabled.
+#   #
+#   # The placeholder '%(app)s' will be replaced by the application name,
+#   # which is normally 'app_name' (below), but may be overridden by the
+#   # Matrix client application.
+#   #
+#   # Note that the placeholder must be written '%(app)s', including the
+#   # trailing 's'.
+#   #
 #   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
-#   app_name: Matrix
+#
+#   # app_name defines the default value for '%(app)s' in notif_from. It
+#   # defaults to 'Matrix'.
+#   #
+#   #app_name: my_branded_matrix_server
 #
 #   # Enable email notifications by default
 #   #
