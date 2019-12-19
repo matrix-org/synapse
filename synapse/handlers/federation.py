@@ -797,7 +797,10 @@ class FederationHandler(BaseHandler):
         events_to_state = {}
         for e_id in edges:
             state, auth = yield self._get_state_for_room(
-                destination=dest, room_id=room_id, event_id=e_id
+                destination=dest,
+                room_id=room_id,
+                event_id=e_id,
+                include_event_in_state=False,
             )
             auth_events.update({a.event_id: a for a in auth})
             auth_events.update({s.event_id: s for s in state})
