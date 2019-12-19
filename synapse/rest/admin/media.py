@@ -16,7 +16,7 @@
 
 import logging
 
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.http.servlet import RestServlet, parse_integer
 from synapse.rest.admin._base import (
     assert_requester_is_admin,
@@ -32,21 +32,56 @@ class QuarantineMediaInRoom(RestServlet):
     this server.
     """
 
-    PATTERNS = historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
+    PATTERNS = historical_admin_path_patterns("/quarantine_media/(?P<identifier>[^/]+)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request, room_id):
+    async def on_POST(self, request, identifier: str):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
-        num_quarantined = await self.store.quarantine_media_ids_in_room(
-            room_id, requester.user.to_string()
-        )
+        if identifier.startswith("!"):
+            # Quarantine all media in this room
+            num_quarantined = await self.store.quarantine_media_ids_in_room(
+                identifier, requester.user.to_string()
+            )
+        elif identifier.startswith("@"):
+            # Quarantine all media this user has uploaded
+            num_quarantined = await self.store.quarantine_media_ids_of_user(
+                identifier, requester.user.to_string()
+            )
+        else:
+            raise SynapseError(
+                400, "Unknown identifier type", errcode=Codes.INVALID_PARAM
+            )
 
         return 200, {"num_quarantined": num_quarantined}
+
+
+class QuarantineMediaById(RestServlet):
+    """Quarantines a single media record by its ID so that no one can download it via
+    this server.
+    """
+
+    PATTERNS = historical_admin_path_patterns(
+        "/quarantine_media/id/(?P<server>[^/]+)/(?P<media_id>[^/]+)"
+    )
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_POST(self, request, server: str, media_id: str):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        await self.store.quarantine_media_by_id(
+            server, media_id, requester.user.to_string()
+        )
+
+        return 200, {}
 
 
 class ListMediaInRoom(RestServlet):
