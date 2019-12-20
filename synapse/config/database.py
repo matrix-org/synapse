@@ -37,9 +37,7 @@ class DatabaseConnectionConfig:
             database. Defaults to all data stores.
     """
 
-    def __init__(
-        self, name: str, db_config: dict, data_stores: List[str] = ["main", "state"]
-    ):
+    def __init__(self, name: str, db_config: dict, data_stores: List[str] = None):
         if db_config["name"] not in ("sqlite3", "psycopg2"):
             raise ConfigError("Unsupported database type %r" % (db_config["name"],))
 
@@ -47,6 +45,9 @@ class DatabaseConnectionConfig:
             db_config.setdefault("args", {}).update(
                 {"cp_min": 1, "cp_max": 1, "check_same_thread": False}
             )
+
+        if data_stores is None:
+            data_stores = ["main", "state"]
 
         self.name = name
         self.config = db_config
@@ -86,7 +87,7 @@ class DatabaseConfig(Config):
 
             self.databases = [
                 DatabaseConnectionConfig(
-                    name, db_conf, data_stores=db_conf["data_stores"]
+                    name, db_conf, data_stores=db_conf.get("data_stores")
                 )
                 for name, db_conf in multi_database_config.items()
             ]
