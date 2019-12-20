@@ -59,14 +59,45 @@ class DatabaseConfig(Config):
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
 
+        # We *experimentally* support specifying multiple databases via the
+        # `databases` key. This is a map from a label to database config in the
+        # same format as the `database` config option, plus an extra
+        # `data_stores` key to specify which data store goes where. For example:
+        #
+        #   databases:
+        #       master:
+        #           name: psycopg2
+        #           data_stores: ["main"]
+        #           args: {}
+        #       state:
+        #           name: psycopg2
+        #           data_stores: ["state"]
+        #           args: {}
+
+        multi_database_config = config.get("databases")
         database_config = config.get("database")
 
-        if database_config is None:
-            database_config = {"name": "sqlite3", "args": {}}
+        if multi_database_config and database_config:
+            raise ConfigError("Can't specify both 'database' and 'datbases' in config")
 
-        self.databases = [DatabaseConnectionConfig("master", database_config)]
+        if multi_database_config:
+            if config.get("database_path"):
+                raise ConfigError("Can't specify 'database_path' with 'databases'")
 
-        self.set_databasepath(config.get("database_path"))
+            self.databases = [
+                DatabaseConnectionConfig(
+                    name, db_conf, data_stores=db_conf["data_stores"]
+                )
+                for name, db_conf in multi_database_config.items()
+            ]
+
+        else:
+            if database_config is None:
+                database_config = {"name": "sqlite3", "args": {}}
+
+            self.databases = [DatabaseConnectionConfig("master", database_config)]
+
+            self.set_databasepath(config.get("database_path"))
 
     def generate_config_section(self, data_dir_path, database_conf, **kwargs):
         if not database_conf:
