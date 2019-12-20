@@ -1,3 +1,5 @@
+These commands will require an ``access_token`` of a server admin. Make sure you read the ``admin_api`` documentation on how to obtain and use such an ``access_token`` (section `"Using an admin token" <https://github.com/matrix-org/synapse/tree/master/docs/admin_api#using-an-admin-access_token>`_) before going any further.
+
 List Accounts
 =============
 
@@ -129,6 +131,14 @@ with a body of:
    }
 
 including an ``access_token`` of a server admin.
+
+"<secret>" is the new password you wish to set (without the `< >`).
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {}
 
 
 Get whether a user is a server administrator or not
