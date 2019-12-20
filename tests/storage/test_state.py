@@ -35,7 +35,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
-        self.state_datastore = self.store
+        self.state_datastore = self.storage.state.stores.state
         self.event_builder_factory = hs.get_event_builder_factory()
         self.event_creation_handler = hs.get_event_creation_handler()
 

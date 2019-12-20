@@ -51,11 +51,12 @@ from synapse.storage.data_stores.main.registration import (
 from synapse.storage.data_stores.main.room import RoomBackgroundUpdateStore
 from synapse.storage.data_stores.main.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.data_stores.main.search import SearchBackgroundUpdateStore
-from synapse.storage.data_stores.main.state import StateBackgroundUpdateStore
+from synapse.storage.data_stores.main.state import MainStateBackgroundUpdateStore
 from synapse.storage.data_stores.main.stats import StatsStore
 from synapse.storage.data_stores.main.user_directory import (
     UserDirectoryBackgroundUpdateStore,
 )
+from synapse.storage.data_stores.state.bg_updates import StateBackgroundUpdateStore
 from synapse.storage.database import Database, make_conn
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
@@ -138,6 +139,7 @@ class Store(
     RoomMemberBackgroundUpdateStore,
     SearchBackgroundUpdateStore,
     StateBackgroundUpdateStore,
+    MainStateBackgroundUpdateStore,
     UserDirectoryBackgroundUpdateStore,
     StatsStore,
 ):
@@ -496,9 +498,7 @@ class Porter(object):
     def run(self):
         try:
             self.sqlite_store = yield self.build_db_store(
-                DatabaseConnectionConfig(
-                    "master", self.sqlite_config, data_stores=["main"]
-                )
+                DatabaseConnectionConfig("master-sqlite", self.sqlite_config)
             )
 
             # Check if all background updates are done, abort if not.

@@ -231,7 +231,7 @@ def setup_test_homeserver(
             "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
         }
 
-    database = DatabaseConnectionConfig("master", database_config, ["main"])
+    database = DatabaseConnectionConfig("master", database_config)
     config.database.databases = [database]
 
     db_engine = create_engine(database.config)

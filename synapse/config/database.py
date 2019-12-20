@@ -34,10 +34,12 @@ class DatabaseConnectionConfig:
             module name, and `args` for the args to give to the database
             connector.
         data_stores: The list of data stores that should be provisioned on the
-            database.
+            database. Defaults to all data stores.
     """
 
-    def __init__(self, name: str, db_config: dict, data_stores: List[str]):
+    def __init__(
+        self, name: str, db_config: dict, data_stores: List[str] = ["main", "state"]
+    ):
         if db_config["name"] not in ("sqlite3", "psycopg2"):
             raise ConfigError("Unsupported database type %r" % (db_config["name"],))
 
@@ -62,9 +64,7 @@ class DatabaseConfig(Config):
         if database_config is None:
             database_config = {"name": "sqlite3", "args": {}}
 
-        self.databases = [
-            DatabaseConnectionConfig("master", database_config, data_stores=["main"])
-        ]
+        self.databases = [DatabaseConnectionConfig("master", database_config)]
 
         self.set_databasepath(config.get("database_path"))
 
