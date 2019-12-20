@@ -1,3 +1,15 @@
+Synapse 1.7.2 (2019-12-20)
+==========================
+
+This release fixes some regressions introduced in Synapse 1.7.0 and 1.7.1.
+
+Bugfixes
+--------
+
+- Fix a regression introduced in Synapse 1.7.1 which caused errors when attempting to backfill rooms over federation. ([\#6576](https://github.com/matrix-org/synapse/issues/6576))
+- Fix a bug introduced in Synapse 1.7.0 which caused an error on startup when upgrading from versions before 1.3.0. ([\#6578](https://github.com/matrix-org/synapse/issues/6578))
+
+
 Synapse 1.7.1 (2019-12-18)
 ==========================
 
