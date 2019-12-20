@@ -172,7 +172,8 @@ class EventContext:
         EventContext.
 
         Args:
-            store (DataStore): Used to convert AS ID to AS object
+            storage (Storage): Used to convert AS ID to AS object and fetch
+                state.
             input (dict): A dict produced by `serialize`
 
         Returns:

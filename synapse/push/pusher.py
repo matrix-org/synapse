@@ -80,9 +80,11 @@ class PusherFactory(object):
         return EmailPusher(self.hs, pusherdict, mailer)
 
     def _app_name_from_pusherdict(self, pusherdict):
-        if "data" in pusherdict and "brand" in pusherdict["data"]:
-            app_name = pusherdict["data"]["brand"]
-        else:
-            app_name = self.config.email_app_name
+        data = pusherdict["data"]
 
-        return app_name
+        if isinstance(data, dict):
+            brand = data.get("brand")
+            if isinstance(brand, str):
+                return brand
+
+        return self.config.email_app_name

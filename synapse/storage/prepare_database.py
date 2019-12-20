@@ -18,6 +18,7 @@ import imp
 import logging
 import os
 import re
+from collections import Counter
 
 import attr
 
@@ -69,7 +70,10 @@ def prepare_database(db_conn, database_engine, config, data_stores=["main", "sta
                 if user_version != SCHEMA_VERSION:
                     # If we don't pass in a config file then we are expecting to
                     # have already upgraded the DB.
-                    raise UpgradeDatabaseException("Database needs to be upgraded")
+                    raise UpgradeDatabaseException(
+                        "Expected database schema version %i but got %i"
+                        % (SCHEMA_VERSION, user_version)
+                    )
             else:
                 _upgrade_existing_database(
                     cur,
@@ -312,6 +316,9 @@ def _upgrade_existing_database(
                 )
             )
 
+        # Used to check if we have any duplicate file names
+        file_name_counter = Counter()
+
         # Now find which directories have anything of interest.
         directory_entries = []
         for directory in directories:
@@ -322,6 +329,9 @@ def _upgrade_existing_database(
                     _DirectoryListing(file_name, os.path.join(directory, file_name))
                     for file_name in file_names
                 )
+
+                for file_name in file_names:
+                    file_name_counter[file_name] += 1
             except FileNotFoundError:
                 # Data stores can have empty entries for a given version delta.
                 pass
@@ -329,6 +339,17 @@ def _upgrade_existing_database(
                 raise UpgradeDatabaseException(
                     "Could not open delta dir for version %d: %s" % (v, directory)
                 )
+
+        duplicates = set(
+            file_name for file_name, count in file_name_counter.items() if count > 1
+        )
+        if duplicates:
+            # We don't support using the same file name in the same delta version.
+            raise PrepareDatabaseException(
+                "Found multiple delta files with the same name in v%d: %s",
+                v,
+                duplicates,
+            )
 
         # We sort to ensure that we apply the delta files in a consistent
         # order (to avoid bugs caused by inconsistent directory listing order)
