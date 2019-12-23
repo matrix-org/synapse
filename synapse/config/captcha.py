@@ -16,6 +16,8 @@ from ._base import Config
 
 
 class CaptchaConfig(Config):
+    section = "captcha"
+
     def read_config(self, config, **kwargs):
         self.recaptcha_private_key = config.get("recaptcha_private_key")
         self.recaptcha_public_key = config.get("recaptcha_public_key")
@@ -33,11 +35,11 @@ class CaptchaConfig(Config):
         ## Captcha ##
         # See docs/CAPTCHA_SETUP for full details of configuring this.
 
-        # This Home Server's ReCAPTCHA public key.
+        # This homeserver's ReCAPTCHA public key.
         #
         #recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
-        # This Home Server's ReCAPTCHA private key.
+        # This homeserver's ReCAPTCHA private key.
         #
         #recaptcha_private_key: "YOUR_PRIVATE_KEY"
 

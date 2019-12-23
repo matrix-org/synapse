@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import inspect
+
+from synapse.spam_checker_api import SpamCheckerApi
 
 
 class SpamChecker(object):
@@ -26,7 +31,14 @@ class SpamChecker(object):
             pass
 
         if module is not None:
-            self.spam_checker = module(config=config)
+            # Older spam checkers don't accept the `api` argument, so we
+            # try and detect support.
+            spam_args = inspect.getfullargspec(module)
+            if "api" in spam_args.args:
+                api = SpamCheckerApi(hs)
+                self.spam_checker = module(config=config, api=api)
+            else:
+                self.spam_checker = module(config=config)
 
     def check_event_for_spam(self, event):
         """Checks if a given event is considered "spammy" by this server.

@@ -1,0 +1,1 @@
+Port synapse.handlers.initial_sync to async/await.

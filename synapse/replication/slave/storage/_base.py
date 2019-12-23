@@ -14,10 +14,13 @@
 # limitations under the License.
 
 import logging
+from typing import Dict
 
 import six
 
-from synapse.storage._base import _CURRENT_STATE_CACHE_NAME, SQLBaseStore
+from synapse.storage._base import SQLBaseStore
+from synapse.storage.data_stores.main.cache import CURRENT_STATE_CACHE_NAME
+from synapse.storage.database import Database
 from synapse.storage.engines import PostgresEngine
 
 from ._slaved_id_tracker import SlavedIdTracker
@@ -33,8 +36,8 @@ def __func__(inp):
 
 
 class BaseSlavedStore(SQLBaseStore):
-    def __init__(self, db_conn, hs):
-        super(BaseSlavedStore, self).__init__(db_conn, hs)
+    def __init__(self, database: Database, db_conn, hs):
+        super(BaseSlavedStore, self).__init__(database, db_conn, hs)
         if isinstance(self.database_engine, PostgresEngine):
             self._cache_id_gen = SlavedIdTracker(
                 db_conn, "cache_invalidation_stream", "stream_id"
@@ -44,7 +47,14 @@ class BaseSlavedStore(SQLBaseStore):
 
         self.hs = hs
 
-    def stream_positions(self):
+    def stream_positions(self) -> Dict[str, int]:
+        """
+        Get the current positions of all the streams this store wants to subscribe to
+
+        Returns:
+            map from stream name to the most recent update we have for
+            that stream (ie, the point we want to start replicating from)
+        """
         pos = {}
         if self._cache_id_gen:
             pos["caches"] = self._cache_id_gen.get_current_token()
@@ -54,7 +64,7 @@ class BaseSlavedStore(SQLBaseStore):
         if stream_name == "caches":
             self._cache_id_gen.advance(token)
             for row in rows:
-                if row.cache_func == _CURRENT_STATE_CACHE_NAME:
+                if row.cache_func == CURRENT_STATE_CACHE_NAME:
                     room_id = row.keys[0]
                     members_changed = set(row.keys[1:])
                     self._invalidate_state_caches(room_id, members_changed)

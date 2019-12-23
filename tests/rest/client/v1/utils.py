@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -106,13 +109,22 @@ class RestHelper(object):
         self.auth_user_id = temp_id
 
     def send(self, room_id, body=None, txn_id=None, tok=None, expect_code=200):
-        if txn_id is None:
-            txn_id = "m%s" % (str(time.time()))
         if body is None:
             body = "body_text_here"
 
-        path = "/_matrix/client/r0/rooms/%s/send/m.room.message/%s" % (room_id, txn_id)
         content = {"msgtype": "m.text", "body": body}
+
+        return self.send_event(
+            room_id, "m.room.message", content, txn_id, tok, expect_code
+        )
+
+    def send_event(
+        self, room_id, type, content={}, txn_id=None, tok=None, expect_code=200
+    ):
+        if txn_id is None:
+            txn_id = "m%s" % (str(time.time()))
+
+        path = "/_matrix/client/r0/rooms/%s/send/%s/%s" % (room_id, type, txn_id)
         if tok:
             path = path + "?access_token=%s" % tok
 

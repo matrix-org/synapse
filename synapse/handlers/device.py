@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +46,7 @@ class DeviceWorkerHandler(BaseHandler):
 
         self.hs = hs
         self.state = hs.get_state_handler()
+        self.state_store = hs.get_storage().state
         self._auth_handler = hs.get_auth_handler()
 
     @trace
@@ -176,7 +179,7 @@ class DeviceWorkerHandler(BaseHandler):
                 continue
 
             # mapping from event_id -> state_dict
-            prev_state_ids = yield self.store.get_state_ids_for_events(event_ids)
+            prev_state_ids = yield self.state_store.get_state_ids_for_events(event_ids)
 
             # Check if we've joined the room? If so we just blindly add all the users to
             # the "possibly changed" users.
@@ -439,9 +442,35 @@ class DeviceHandler(DeviceWorkerHandler):
                 log_kv({"message": "sent device update to host", "host": host})
 
     @defer.inlineCallbacks
+    def notify_user_signature_update(self, from_user_id, user_ids):
+        """Notify a user that they have made new signatures of other users.
+
+        Args:
+            from_user_id (str): the user who made the signature
+            user_ids (list[str]): the users IDs that have new signatures
+        """
+
+        position = yield self.store.add_user_signature_change_to_streams(
+            from_user_id, user_ids
+        )
+
+        self.notifier.on_new_event("device_list_key", position, users=[from_user_id])
+
+    @defer.inlineCallbacks
     def on_federation_query_user_devices(self, user_id):
         stream_id, devices = yield self.store.get_devices_with_keys_by_user(user_id)
-        return {"user_id": user_id, "stream_id": stream_id, "devices": devices}
+        master_key = yield self.store.get_e2e_cross_signing_key(user_id, "master")
+        self_signing_key = yield self.store.get_e2e_cross_signing_key(
+            user_id, "self_signing"
+        )
+
+        return {
+            "user_id": user_id,
+            "stream_id": stream_id,
+            "devices": devices,
+            "master_key": master_key,
+            "self_signing_key": self_signing_key,
+        }
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
@@ -639,7 +668,7 @@ class DeviceListUpdater(object):
         except (NotRetryingDestination, RequestSendFailed, HttpResponseException):
             # TODO: Remember that we are now out of sync and try again
             # later
-            logger.warn("Failed to handle device list update for %s", user_id)
+            logger.warning("Failed to handle device list update for %s", user_id)
             # We abort on exceptions rather than accepting the update
             # as otherwise synapse will 'forget' that its device list
             # is out of date. If we bail then we will retry the resync
@@ -677,7 +706,7 @@ class DeviceListUpdater(object):
         # up on storing the total list of devices and only handle the
         # delta instead.
         if len(devices) > 1000:
-            logger.warn(
+            logger.warning(
                 "Ignoring device list snapshot for %s as it has >1K devs (%d)",
                 user_id,
                 len(devices),

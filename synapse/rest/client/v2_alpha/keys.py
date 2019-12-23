@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +16,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
     RestServlet,
@@ -27,7 +26,7 @@ from synapse.http.servlet import (
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.types import StreamToken
 
-from ._base import client_patterns
+from ._base import client_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +69,8 @@ class KeyUploadServlet(RestServlet):
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
     @trace(opname="upload_keys")
-    @defer.inlineCallbacks
-    def on_POST(self, request, device_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_POST(self, request, device_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
@@ -102,7 +100,7 @@ class KeyUploadServlet(RestServlet):
                 400, "To upload keys, you must pass device_id when authenticating"
             )
 
-        result = yield self.e2e_keys_handler.upload_keys_for_user(
+        result = await self.e2e_keys_handler.upload_keys_for_user(
             user_id, device_id, body
         )
         return 200, result
@@ -153,12 +151,12 @@ class KeyQueryServlet(RestServlet):
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        user_id = requester.user.to_string()
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
-        result = yield self.e2e_keys_handler.query_devices(body, timeout)
+        result = await self.e2e_keys_handler.query_devices(body, timeout, user_id)
         return 200, result
 
 
@@ -183,9 +181,8 @@ class KeyChangesServlet(RestServlet):
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         from_token_string = parse_string(request, "from")
         set_tag("from", from_token_string)
@@ -198,7 +195,7 @@ class KeyChangesServlet(RestServlet):
 
         user_id = requester.user.to_string()
 
-        results = yield self.device_handler.get_user_ids_changed(user_id, from_token)
+        results = await self.device_handler.get_user_ids_changed(user_id, from_token)
 
         return 200, results
 
@@ -229,12 +226,96 @@ class OneTimeKeyServlet(RestServlet):
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_POST(self, request):
+        await self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
-        result = yield self.e2e_keys_handler.claim_one_time_keys(body, timeout)
+        result = await self.e2e_keys_handler.claim_one_time_keys(body, timeout)
+        return 200, result
+
+
+class SigningKeyUploadServlet(RestServlet):
+    """
+    POST /keys/device_signing/upload HTTP/1.1
+    Content-Type: application/json
+
+    {
+    }
+    """
+
+    PATTERNS = client_patterns("/keys/device_signing/upload$", releases=())
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(SigningKeyUploadServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.e2e_keys_handler = hs.get_e2e_keys_handler()
+        self.auth_handler = hs.get_auth_handler()
+
+    @interactive_auth_handler
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+        body = parse_json_object_from_request(request)
+
+        await self.auth_handler.validate_user_via_ui_auth(
+            requester, body, self.hs.get_ip_from_request(request)
+        )
+
+        result = await self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)
+        return 200, result
+
+
+class SignaturesUploadServlet(RestServlet):
+    """
+    POST /keys/signatures/upload HTTP/1.1
+    Content-Type: application/json
+
+    {
+      "@alice:example.com": {
+        "<device_id>": {
+          "user_id": "<user_id>",
+          "device_id": "<device_id>",
+          "algorithms": [
+            "m.olm.curve25519-aes-sha256",
+            "m.megolm.v1.aes-sha"
+          ],
+          "keys": {
+            "<algorithm>:<device_id>": "<key_base64>",
+          },
+          "signatures": {
+            "<signing_user_id>": {
+              "<algorithm>:<signing_key_base64>": "<signature_base64>>"
+            }
+          }
+        }
+      }
+    }
+    """
+
+    PATTERNS = client_patterns("/keys/signatures/upload$")
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(SignaturesUploadServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.e2e_keys_handler = hs.get_e2e_keys_handler()
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        user_id = requester.user.to_string()
+        body = parse_json_object_from_request(request)
+
+        result = await self.e2e_keys_handler.upload_signatures_for_device_keys(
+            user_id, body
+        )
         return 200, result
 
 
@@ -243,3 +324,5 @@ def register_servlets(hs, http_server):
     KeyQueryServlet(hs).register(http_server)
     KeyChangesServlet(hs).register(http_server)
     OneTimeKeyServlet(hs).register(http_server)
+    SigningKeyUploadServlet(hs).register(http_server)
+    SignaturesUploadServlet(hs).register(http_server)

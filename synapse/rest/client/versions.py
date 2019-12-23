@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,6 +68,9 @@ class VersionsRestServlet(RestServlet):
                     "m.require_identity_server": False,
                     # as per MSC2290
                     "m.separate_add_and_bind": True,
+                    # Implements support for label-based filtering as described in
+                    # MSC2326.
+                    "org.matrix.label_based_filtering": True,
                 },
             },
         )

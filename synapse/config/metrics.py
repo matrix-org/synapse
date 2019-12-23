@@ -34,6 +34,8 @@ class MetricsFlags(object):
 
 
 class MetricsConfig(Config):
+    section = "metrics"
+
     def read_config(self, config, **kwargs):
         self.enable_metrics = config.get("enable_metrics", False)
         self.report_stats = config.get("report_stats", None)
@@ -68,7 +70,7 @@ class MetricsConfig(Config):
 
         # Enable collection and rendering of performance metrics
         #
-        #enable_metrics: False
+        #enable_metrics: false
 
         # Enable sentry integration
         # NOTE: While attempts are made to ensure that the logs don't contain

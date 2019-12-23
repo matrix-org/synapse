@@ -20,15 +20,18 @@ from synapse.replication.tcp.streams.events import (
     EventsStreamCurrentStateRow,
     EventsStreamEventRow,
 )
-from synapse.storage.event_federation import EventFederationWorkerStore
-from synapse.storage.event_push_actions import EventPushActionsWorkerStore
-from synapse.storage.events_worker import EventsWorkerStore
-from synapse.storage.relations import RelationsWorkerStore
-from synapse.storage.roommember import RoomMemberWorkerStore
-from synapse.storage.signatures import SignatureWorkerStore
-from synapse.storage.state import StateGroupWorkerStore
-from synapse.storage.stream import StreamWorkerStore
-from synapse.storage.user_erasure_store import UserErasureWorkerStore
+from synapse.storage.data_stores.main.event_federation import EventFederationWorkerStore
+from synapse.storage.data_stores.main.event_push_actions import (
+    EventPushActionsWorkerStore,
+)
+from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
+from synapse.storage.data_stores.main.relations import RelationsWorkerStore
+from synapse.storage.data_stores.main.roommember import RoomMemberWorkerStore
+from synapse.storage.data_stores.main.signatures import SignatureWorkerStore
+from synapse.storage.data_stores.main.state import StateGroupWorkerStore
+from synapse.storage.data_stores.main.stream import StreamWorkerStore
+from synapse.storage.data_stores.main.user_erasure_store import UserErasureWorkerStore
+from synapse.storage.database import Database
 
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
@@ -57,13 +60,13 @@ class SlavedEventStore(
     RelationsWorkerStore,
     BaseSlavedStore,
 ):
-    def __init__(self, db_conn, hs):
+    def __init__(self, database: Database, db_conn, hs):
         self._stream_id_gen = SlavedIdTracker(db_conn, "events", "stream_ordering")
         self._backfill_id_gen = SlavedIdTracker(
             db_conn, "events", "stream_ordering", step=-1
         )
 
-        super(SlavedEventStore, self).__init__(db_conn, hs)
+        super(SlavedEventStore, self).__init__(database, db_conn, hs)
 
     # Cached functions can't be accessed through a class instance so we need
     # to reach inside the __dict__ to extract them.

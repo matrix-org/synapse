@@ -20,6 +20,23 @@ from zope.interface import implementer
 from OpenSSL import SSL
 from OpenSSL.SSL import Connection
 from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
+from twisted.internet.ssl import Certificate, trustRootFromCertificates
+from twisted.web.client import BrowserLikePolicyForHTTPS  # noqa: F401
+from twisted.web.iweb import IPolicyForHTTPS  # noqa: F401
+
+
+def get_test_https_policy():
+    """Get a test IPolicyForHTTPS which trusts the test CA cert
+
+    Returns:
+        IPolicyForHTTPS
+    """
+    ca_file = get_test_ca_cert_file()
+    with open(ca_file) as stream:
+        content = stream.read()
+    cert = Certificate.loadPEM(content)
+    trust_root = trustRootFromCertificates([cert])
+    return BrowserLikePolicyForHTTPS(trustRoot=trust_root)
 
 
 def get_test_ca_cert_file():

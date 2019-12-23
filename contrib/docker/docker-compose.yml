@@ -15,13 +15,10 @@ services:
     restart: unless-stopped
     # See the readme for a full documentation of the environment settings
     environment:
-      - SYNAPSE_SERVER_NAME=my.matrix.host
-      - SYNAPSE_REPORT_STATS=no
-      - SYNAPSE_ENABLE_REGISTRATION=yes
-      - SYNAPSE_LOG_LEVEL=INFO
-      - POSTGRES_PASSWORD=changeme
+      - SYNAPSE_CONFIG_PATH=/etc/homeserver.yaml
     volumes:
       # You may either store all the files in a local folder
+      - ./matrix-config:/etc
       - ./files:/data
       # .. or you may split this between different storage points
       # - ./files:/data
@@ -35,9 +32,23 @@ services:
       - 8448:8448/tcp
     # ... or use a reverse proxy, here is an example for traefik:
     labels:
+      # The following lines are valid for Traefik version 1.x:
       - traefik.enable=true
       - traefik.frontend.rule=Host:my.matrix.Host
       - traefik.port=8008
+      # Alternatively, for Traefik version 2.0:
+      - traefik.enable=true
+      - traefik.http.routers.http-synapse.entryPoints=http
+      - traefik.http.routers.http-synapse.rule=Host(`my.matrix.host`)
+      - traefik.http.middlewares.https_redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.https_redirect.redirectscheme.permanent=true
+      - traefik.http.routers.http-synapse.middlewares=https_redirect
+      - traefik.http.routers.https-synapse.entryPoints=https
+      - traefik.http.routers.https-synapse.rule=Host(`my.matrix.host`)
+      - traefik.http.routers.https-synapse.service=synapse
+      - traefik.http.routers.https-synapse.tls=true
+      - traefik.http.services.synapse.loadbalancer.server.port=8008
+      - traefik.http.routers.https-synapse.tls.certResolver=le-ssl
 
   db:
     image: docker.io/postgres:10-alpine

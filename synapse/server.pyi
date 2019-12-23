@@ -12,6 +12,7 @@ import synapse.handlers.message
 import synapse.handlers.room
 import synapse.handlers.room_member
 import synapse.handlers.set_password
+import synapse.http.client
 import synapse.rest.media.v1.media_repository
 import synapse.server_notices.server_notices_manager
 import synapse.server_notices.server_notices_sender
@@ -38,8 +39,16 @@ class HomeServer(object):
         pass
     def get_state_resolution_handler(self) -> synapse.state.StateResolutionHandler:
         pass
+    def get_simple_http_client(self) -> synapse.http.client.SimpleHttpClient:
+        """Fetch an HTTP client implementation which doesn't do any blacklisting
+        or support any HTTP_PROXY settings"""
+        pass
+    def get_proxied_http_client(self) -> synapse.http.client.SimpleHttpClient:
+        """Fetch an HTTP client implementation which doesn't do any blacklisting
+        but does support HTTP_PROXY settings"""
+        pass
     def get_deactivate_account_handler(
-        self
+        self,
     ) -> synapse.handlers.deactivate_account.DeactivateAccountHandler:
         pass
     def get_room_creation_handler(self) -> synapse.handlers.room.RoomCreationHandler:
@@ -47,32 +56,32 @@ class HomeServer(object):
     def get_room_member_handler(self) -> synapse.handlers.room_member.RoomMemberHandler:
         pass
     def get_event_creation_handler(
-        self
+        self,
     ) -> synapse.handlers.message.EventCreationHandler:
         pass
     def get_set_password_handler(
-        self
+        self,
     ) -> synapse.handlers.set_password.SetPasswordHandler:
         pass
     def get_federation_sender(self) -> synapse.federation.sender.FederationSender:
         pass
     def get_federation_transport_client(
-        self
+        self,
     ) -> synapse.federation.transport.client.TransportLayerClient:
         pass
     def get_media_repository_resource(
-        self
+        self,
     ) -> synapse.rest.media.v1.media_repository.MediaRepositoryResource:
         pass
     def get_media_repository(
-        self
+        self,
     ) -> synapse.rest.media.v1.media_repository.MediaRepository:
         pass
     def get_server_notices_manager(
-        self
+        self,
     ) -> synapse.server_notices.server_notices_manager.ServerNoticesManager:
         pass
     def get_server_notices_sender(
-        self
+        self,
     ) -> synapse.server_notices.server_notices_sender.ServerNoticesSender:
         pass

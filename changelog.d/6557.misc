@@ -1,0 +1,1 @@
+Remove unused `get_pagination_rows` methods from `EventSource` classes.

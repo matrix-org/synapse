@@ -88,13 +88,13 @@ TagAccountDataStreamRow = namedtuple(
     "TagAccountDataStreamRow", ("user_id", "room_id", "data")  # str  # str  # dict
 )
 AccountDataStreamRow = namedtuple(
-    "AccountDataStream",
-    ("user_id", "room_id", "data_type", "data"),  # str  # str  # str  # dict
+    "AccountDataStream", ("user_id", "room_id", "data_type")  # str  # str  # str
 )
 GroupsStreamRow = namedtuple(
     "GroupsStreamRow",
     ("group_id", "user_id", "type", "content"),  # str  # str  # str  # dict
 )
+UserSignatureStreamRow = namedtuple("UserSignatureStreamRow", ("user_id"))  # str
 
 
 class Stream(object):
@@ -420,8 +420,8 @@ class AccountDataStream(Stream):
 
         results = list(room_results)
         results.extend(
-            (stream_id, user_id, None, account_data_type, content)
-            for stream_id, user_id, account_data_type, content in global_results
+            (stream_id, user_id, None, account_data_type)
+            for stream_id, user_id, account_data_type in global_results
         )
 
         return results
@@ -438,3 +438,20 @@ class GroupServerStream(Stream):
         self.update_function = store.get_all_groups_changes
 
         super(GroupServerStream, self).__init__(hs)
+
+
+class UserSignatureStream(Stream):
+    """A user has signed their own device with their user-signing key
+    """
+
+    NAME = "user_signature"
+    _LIMITED = False
+    ROW_TYPE = UserSignatureStreamRow
+
+    def __init__(self, hs):
+        store = hs.get_datastore()
+
+        self.current_token = store.get_device_stream_token
+        self.update_function = store.get_all_user_signature_changes_for_remotes
+
+        super(UserSignatureStream, self).__init__(hs)

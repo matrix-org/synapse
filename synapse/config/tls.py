@@ -18,6 +18,7 @@ import os
 import warnings
 from datetime import datetime
 from hashlib import sha256
+from typing import List
 
 import six
 
@@ -33,7 +34,9 @@ logger = logging.getLogger(__name__)
 
 
 class TlsConfig(Config):
-    def read_config(self, config, config_dir_path, **kwargs):
+    section = "tls"
+
+    def read_config(self, config: dict, config_dir_path: str, **kwargs):
 
         acme_config = config.get("acme", None)
         if acme_config is None:
@@ -57,7 +60,7 @@ class TlsConfig(Config):
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
 
-        if self.has_tls_listener():
+        if self.root.server.has_tls_listener():
             if not self.tls_certificate_file:
                 raise ConfigError(
                     "tls_certificate_path must be specified if TLS-enabled listeners are "
@@ -108,7 +111,7 @@ class TlsConfig(Config):
         )
 
         # Support globs (*) in whitelist values
-        self.federation_certificate_verification_whitelist = []
+        self.federation_certificate_verification_whitelist = []  # type: List[str]
         for entry in fed_whitelist_entries:
             try:
                 entry_regex = glob_to_regex(entry.encode("ascii").decode("ascii"))
@@ -286,6 +289,9 @@ class TlsConfig(Config):
             "http://localhost:8009/.well-known/acme-challenge"
         )
 
+        # flake8 doesn't recognise that variables are used in the below string
+        _ = tls_enabled, proxypassline, acme_enabled, default_acme_account_file
+
         return (
             """\
         ## TLS ##
@@ -448,7 +454,11 @@ class TlsConfig(Config):
         #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
         """
-            % locals()
+            # Lowercase the string representation of boolean values
+            % {
+                x[0]: str(x[1]).lower() if isinstance(x[1], bool) else x[1]
+                for x in locals().items()
+            }
         )
 
     def read_tls_certificate(self):

@@ -18,17 +18,14 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.config.ratelimiting import FederationRateLimitConfig
-from synapse.federation.transport import server
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.types import UserID
-from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests import unittest
 
 
-class RoomComplexityTests(unittest.HomeserverTestCase):
+class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
     servlets = [
         admin.register_servlets,
@@ -40,25 +37,6 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         config = super().default_config(name=name)
         config["limit_remote_rooms"] = {"enabled": True, "complexity": 0.05}
         return config
-
-    def prepare(self, reactor, clock, homeserver):
-        class Authenticator(object):
-            def authenticate_request(self, request, content):
-                return defer.succeed("otherserver.nottld")
-
-        ratelimiter = FederationRateLimiter(
-            clock,
-            FederationRateLimitConfig(
-                window_size=1,
-                sleep_limit=1,
-                sleep_msec=1,
-                reject_limit=1000,
-                concurrent_requests=1000,
-            ),
-        )
-        server.register_servlets(
-            homeserver, self.resource, Authenticator(), ratelimiter
-        )
 
     def test_complexity_simple(self):
 
@@ -105,7 +83,7 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
 
         d = handler._remote_join(
             None,
-            ["otherserver.example"],
+            ["other.example.com"],
             "roomid",
             UserID.from_string(u1),
             {"membership": "join"},
@@ -146,7 +124,7 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
 
         d = handler._remote_join(
             None,
-            ["otherserver.example"],
+            ["other.example.com"],
             room_1,
             UserID.from_string(u1),
             {"membership": "join"},

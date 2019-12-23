@@ -22,17 +22,21 @@ class CasConfig(Config):
     cas_server_url: URL of CAS server
     """
 
+    section = "cas"
+
     def read_config(self, config, **kwargs):
         cas_config = config.get("cas_config", None)
         if cas_config:
             self.cas_enabled = cas_config.get("enabled", True)
             self.cas_server_url = cas_config["server_url"]
             self.cas_service_url = cas_config["service_url"]
+            self.cas_displayname_attribute = cas_config.get("displayname_attribute")
             self.cas_required_attributes = cas_config.get("required_attributes", {})
         else:
             self.cas_enabled = False
             self.cas_server_url = None
             self.cas_service_url = None
+            self.cas_displayname_attribute = None
             self.cas_required_attributes = {}
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
@@ -43,6 +47,7 @@ class CasConfig(Config):
         #   enabled: true
         #   server_url: "https://cas-server.com"
         #   service_url: "https://homeserver.domain.com:8448"
+        #   #displayname_attribute: name
         #   #required_attributes:
         #   #    name: value
         """

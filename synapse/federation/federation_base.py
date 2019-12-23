@@ -102,7 +102,7 @@ class FederationBase(object):
                     pass
 
             if not res:
-                logger.warn(
+                logger.warning(
                     "Failed to find copy of %s with valid signature", pdu.event_id
                 )
 
@@ -173,7 +173,7 @@ class FederationBase(object):
                     return redacted_event
 
                 if self.spam_checker.check_event_for_spam(pdu):
-                    logger.warn(
+                    logger.warning(
                         "Event contains spam, redacting %s: %s",
                         pdu.event_id,
                         pdu.get_pdu_json(),
@@ -185,7 +185,7 @@ class FederationBase(object):
         def errback(failure, pdu):
             failure.trap(SynapseError)
             with PreserveLoggingContext(ctx):
-                logger.warn(
+                logger.warning(
                     "Signature check failed for %s: %s",
                     pdu.event_id,
                     failure.getErrorMessage(),
@@ -278,9 +278,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
             pdu_to_check.sender_domain,
             e.getErrorMessage(),
         )
-        # XX not really sure if these are the right codes, but they are what
-        # we've done for ages
-        raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
+        raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
     for p, d in zip(pdus_to_check_sender, more_deferreds):
         d.addErrback(sender_err, p)
@@ -314,8 +312,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
                 "event id %s: unable to verify signature for event id domain: %s"
                 % (pdu_to_check.pdu.event_id, e.getErrorMessage())
             )
-            # XX as above: not really sure if these are the right codes
-            raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
         for p, d in zip(pdus_to_check_event_id, more_deferreds):
             d.addErrback(event_err, p)

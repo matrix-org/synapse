@@ -199,7 +199,7 @@ class SynapseRequest(Request):
         # It's useful to log it here so that we can get an idea of when
         # the client disconnects.
         with PreserveLoggingContext(self.logcontext):
-            logger.warn(
+            logger.warning(
                 "Error processing request %r: %s %s", self, reason.type, reason.value
             )
 
@@ -305,7 +305,7 @@ class SynapseRequest(Request):
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
-            logger.warn("Failed to stop metrics: %r", e)
+            logger.warning("Failed to stop metrics: %r", e)
 
 
 class XForwardedForRequest(SynapseRequest):

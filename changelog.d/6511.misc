@@ -1,0 +1,1 @@
+Move database config from apps into HomeServer object.

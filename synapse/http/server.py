@@ -388,7 +388,7 @@ class DirectServeResource(resource.Resource):
         if not callback:
             return super().render(request)
 
-        resp = callback(request)
+        resp = trace_servlet(self.__class__.__name__)(callback)(request)
 
         # If it's a coroutine, turn it into a Deferred
         if isinstance(resp, types.CoroutineType):
@@ -454,7 +454,7 @@ def respond_with_json(
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
     if request._disconnected:
-        logger.warn(
+        logger.warning(
             "Not sending response to request %s, already disconnected.", request
         )
         return

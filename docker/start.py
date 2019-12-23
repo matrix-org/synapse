@@ -169,11 +169,11 @@ def run_generate_config(environ, ownership):
     # log("running %s" % (args, ))
 
     if ownership is not None:
-        args = ["su-exec", ownership] + args
-        os.execv("/sbin/su-exec", args)
-
         # make sure that synapse has perms to write to the data dir.
         subprocess.check_output(["chown", ownership, data_dir])
+
+        args = ["su-exec", ownership] + args
+        os.execv("/sbin/su-exec", args)
     else:
         os.execv("/usr/local/bin/python", args)
 
@@ -217,8 +217,9 @@ def main(args, environ):
         # backwards-compatibility generate-a-config-on-the-fly mode
         if "SYNAPSE_CONFIG_PATH" in environ:
             error(
-                "SYNAPSE_SERVER_NAME and SYNAPSE_CONFIG_PATH are mutually exclusive "
-                "except in `generate` or `migrate_config` mode."
+                "SYNAPSE_SERVER_NAME can only be combined with SYNAPSE_CONFIG_PATH "
+                "in `generate` or `migrate_config` mode. To start synapse using a "
+                "config file, unset the SYNAPSE_SERVER_NAME environment variable."
             )
 
         config_path = "/compiled/homeserver.yaml"

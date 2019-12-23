@@ -185,7 +185,7 @@ DEFAULT_LOGGERS = {"synapse": {"level": "INFO"}}
 
 
 def parse_drain_configs(
-    drains: dict
+    drains: dict,
 ) -> typing.Generator[DrainConfiguration, None, None]:
     """
     Parse the drain configurations.
@@ -259,6 +259,18 @@ def parse_drain_configs(
                 "The %s drain type is currently not implemented."
                 % (config["type"].upper(),)
             )
+
+
+class StoppableLogPublisher(LogPublisher):
+    """
+    A log publisher that can tell its observers to shut down any external
+    communications.
+    """
+
+    def stop(self):
+        for obs in self._observers:
+            if hasattr(obs, "stop"):
+                obs.stop()
 
 
 def setup_structured_logging(
@@ -336,7 +348,7 @@ def setup_structured_logging(
             # We should never get here, but, just in case, throw an error.
             raise ConfigError("%s drain type cannot be configured" % (observer.type,))
 
-    publisher = LogPublisher(*observers)
+    publisher = StoppableLogPublisher(*observers)
     log_filter = LogLevelFilterPredicate()
 
     for namespace, namespace_config in log_config.get(

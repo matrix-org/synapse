@@ -237,6 +237,12 @@ def start(hs, listeners=None):
     """
     Start a Synapse server or worker.
 
+    Should be called once the reactor is running and (if we're using ACME) the
+    TLS certificates are in place.
+
+    Will start the main HTTP listeners and do some other startup tasks, and then
+    notify systemd.
+
     Args:
         hs (synapse.server.HomeServer)
         listeners (list[dict]): Listener configuration ('listeners' in homeserver.yaml)
@@ -269,7 +275,7 @@ def start(hs, listeners=None):
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)
-        hs.get_datastore().start_profiling()
+        hs.get_datastore().db.start_profiling()
 
         setup_sentry(hs)
         setup_sdnotify(hs)
@@ -311,9 +317,7 @@ def setup_sdnotify(hs):
 
     # Tell systemd our state, if we're using it. This will silently fail if
     # we're not using systemd.
-    hs.get_reactor().addSystemEventTrigger(
-        "after", "startup", sdnotify, b"READY=1\nMAINPID=%i" % (os.getpid(),)
-    )
+    sdnotify(b"READY=1\nMAINPID=%i" % (os.getpid(),))
 
     hs.get_reactor().addSystemEventTrigger(
         "before", "shutdown", sdnotify, b"STOPPING=1"

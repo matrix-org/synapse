@@ -21,7 +21,7 @@ from unpaddedbase64 import decode_base64, encode_base64
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import SynapseError
+from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.storage.state import StateFilter
 from synapse.visibility import filter_events_for_client
@@ -35,6 +35,9 @@ class SearchHandler(BaseHandler):
     def __init__(self, hs):
         super(SearchHandler, self).__init__(hs)
         self._event_serializer = hs.get_event_client_serializer()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def get_old_rooms_from_upgraded_room(self, room_id):
@@ -51,23 +54,38 @@ class SearchHandler(BaseHandler):
             room_id (str): id of the room to search through.
 
         Returns:
-            Deferred[iterable[unicode]]: predecessor room ids
+            Deferred[iterable[str]]: predecessor room ids
         """
 
         historical_room_ids = []
 
-        while True:
-            predecessor = yield self.store.get_room_predecessor(room_id)
+        # The initial room must have been known for us to get this far
+        predecessor = yield self.store.get_room_predecessor(room_id)
 
-            # If no predecessor, assume we've hit a dead end
+        while True:
             if not predecessor:
+                # We have reached the end of the chain of predecessors
                 break
 
-            # Add predecessor's room ID
-            historical_room_ids.append(predecessor["room_id"])
+            if not isinstance(predecessor.get("room_id"), str):
+                # This predecessor object is malformed. Exit here
+                break
 
-            # Scan through the old room for further predecessors
-            room_id = predecessor["room_id"]
+            predecessor_room_id = predecessor["room_id"]
+
+            # Don't add it to the list until we have checked that we are in the room
+            try:
+                next_predecessor_room = yield self.store.get_room_predecessor(
+                    predecessor_room_id
+                )
+            except NotFoundError:
+                # The predecessor is not a known room, so we are done here
+                break
+
+            historical_room_ids.append(predecessor_room_id)
+
+            # And repeat
+            predecessor = next_predecessor_room
 
         return historical_room_ids
 
@@ -221,7 +239,7 @@ class SearchHandler(BaseHandler):
             filtered_events = search_filter.filter([r["event"] for r in results])
 
             events = yield filter_events_for_client(
-                self.store, user.to_string(), filtered_events
+                self.storage, user.to_string(), filtered_events
             )
 
             events.sort(key=lambda e: -rank_map[e.event_id])
@@ -271,7 +289,7 @@ class SearchHandler(BaseHandler):
                 filtered_events = search_filter.filter([r["event"] for r in results])
 
                 events = yield filter_events_for_client(
-                    self.store, user.to_string(), filtered_events
+                    self.storage, user.to_string(), filtered_events
                 )
 
                 room_events.extend(events)
@@ -340,11 +358,11 @@ class SearchHandler(BaseHandler):
                 )
 
                 res["events_before"] = yield filter_events_for_client(
-                    self.store, user.to_string(), res["events_before"]
+                    self.storage, user.to_string(), res["events_before"]
                 )
 
                 res["events_after"] = yield filter_events_for_client(
-                    self.store, user.to_string(), res["events_after"]
+                    self.storage, user.to_string(), res["events_after"]
                 )
 
                 res["start"] = now_token.copy_and_replace(
@@ -372,7 +390,7 @@ class SearchHandler(BaseHandler):
                         [(EventTypes.Member, sender) for sender in senders]
                     )
 
-                    state = yield self.store.get_state_for_event(
+                    state = yield self.state_store.get_state_for_event(
                         last_event_id, state_filter
                     )
 
@@ -394,15 +412,11 @@ class SearchHandler(BaseHandler):
         time_now = self.clock.time_msec()
 
         for context in contexts.values():
-            context["events_before"] = (
-                yield self._event_serializer.serialize_events(
-                    context["events_before"], time_now
-                )
+            context["events_before"] = yield self._event_serializer.serialize_events(
+                context["events_before"], time_now
             )
-            context["events_after"] = (
-                yield self._event_serializer.serialize_events(
-                    context["events_after"], time_now
-                )
+            context["events_after"] = yield self._event_serializer.serialize_events(
+                context["events_after"], time_now
             )
 
         state_results = {}

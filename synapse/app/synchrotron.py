@@ -54,8 +54,7 @@ from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.rest.client.v1.room import RoomInitialSyncRestServlet
 from synapse.rest.client.v2_alpha import sync
 from synapse.server import HomeServer
-from synapse.storage.engines import create_engine
-from synapse.storage.presence import UserPresenceState
+from synapse.storage.data_stores.main.presence import UserPresenceState
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.stringutils import random_string
@@ -151,7 +150,7 @@ class SynchrotronPresence(object):
 
     def set_state(self, user, state, ignore_status_msg=False):
         # TODO Hows this supposed to work?
-        pass
+        return defer.succeed(None)
 
     get_states = __func__(PresenceHandler.get_states)
     get_state = __func__(PresenceHandler.get_state)
@@ -326,7 +325,7 @@ class SynchrotronServer(HomeServer):
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(
+                    logger.warning(
                         (
                             "Metrics listener configured, but "
                             "enable_metrics is not True!"
@@ -335,7 +334,7 @@ class SynchrotronServer(HomeServer):
                 else:
                     _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
-                logger.warn("Unrecognized listener type: %s", listener["type"])
+                logger.warning("Unrecognized listener type: %s", listener["type"])
 
         self.get_tcp_replication().start_replication(self)
 
@@ -437,14 +436,10 @@ def start(config_options):
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    database_engine = create_engine(config.database_config)
-
     ss = SynchrotronServer(
         config.server_name,
-        db_config=config.database_config,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
-        database_engine=database_engine,
         application_service_handler=SynchrotronApplicationService(),
     )
 

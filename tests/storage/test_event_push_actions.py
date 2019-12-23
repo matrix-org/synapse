@@ -55,7 +55,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
 
         @defer.inlineCallbacks
         def _assert_counts(noitf_count, highlight_count):
-            counts = yield self.store.runInteraction(
+            counts = yield self.store.db.runInteraction(
                 "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
             )
             self.assertEquals(
@@ -74,7 +74,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             yield self.store.add_push_actions_to_staging(
                 event.event_id, {user_id: action}
             )
-            yield self.store.runInteraction(
+            yield self.store.db.runInteraction(
                 "",
                 self.store._set_push_actions_for_event_and_users_txn,
                 [(event, None)],
@@ -82,12 +82,12 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             )
 
         def _rotate(stream):
-            return self.store.runInteraction(
+            return self.store.db.runInteraction(
                 "", self.store._rotate_notifs_before_txn, stream
             )
 
         def _mark_read(stream, depth):
-            return self.store.runInteraction(
+            return self.store.db.runInteraction(
                 "",
                 self.store._remove_old_push_actions_before_txn,
                 room_id,
@@ -116,7 +116,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         yield _inject_actions(6, PlAIN_NOTIF)
         yield _rotate(7)
 
-        yield self.store._simple_delete(
+        yield self.store.db.simple_delete(
             table="event_push_actions", keyvalues={"1": 1}, desc=""
         )
 
@@ -135,7 +135,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def test_find_first_stream_ordering_after_ts(self):
         def add_event(so, ts):
-            return self.store._simple_insert(
+            return self.store.db.simple_insert(
                 "events",
                 {
                     "stream_ordering": so,

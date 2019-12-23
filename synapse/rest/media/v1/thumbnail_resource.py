@@ -182,7 +182,7 @@ class ThumbnailResource(DirectServeResource):
         if file_path:
             yield respond_with_file(request, desired_type, file_path)
         else:
-            logger.warn("Failed to generate thumbnail")
+            logger.warning("Failed to generate thumbnail")
             respond_404(request)
 
     @defer.inlineCallbacks
@@ -245,7 +245,7 @@ class ThumbnailResource(DirectServeResource):
         if file_path:
             yield respond_with_file(request, desired_type, file_path)
         else:
-            logger.warn("Failed to generate thumbnail")
+            logger.warning("Failed to generate thumbnail")
             respond_404(request)
 
     @defer.inlineCallbacks

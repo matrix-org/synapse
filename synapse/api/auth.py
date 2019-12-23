@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict, Tuple
 
 from six import itervalues
 
@@ -25,7 +26,7 @@ from twisted.internet import defer
 import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, JoinRules, Membership, UserTypes
+from synapse.api.constants import EventTypes, LimitBlockingTypes, Membership, UserTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -78,32 +79,15 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_from_context(self, room_version, event, context, do_sig_check=True):
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = yield context.get_prev_state_ids()
         auth_events_ids = yield self.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
-        self.check(
+        event_auth.check(
             room_version, event, auth_events=auth_events, do_sig_check=do_sig_check
         )
-
-    def check(self, room_version, event, auth_events, do_sig_check=True):
-        """ Checks if this event is correctly authed.
-
-        Args:
-            room_version (str): version of the room
-            event: the event being checked.
-            auth_events (dict: event-key -> event): the existing room state.
-
-
-        Returns:
-            True if the auth checks pass.
-        """
-        with Measure(self.clock, "auth.check"):
-            event_auth.check(
-                room_version, event, auth_events, do_sig_check=do_sig_check
-            )
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
@@ -508,7 +492,7 @@ class Auth(object):
         token = self.get_access_token_from_request(request)
         service = self.store.get_app_service_by_token(token)
         if not service:
-            logger.warn("Unrecognised appservice access token.")
+            logger.warning("Unrecognised appservice access token.")
             raise InvalidClientTokenError()
         request.authenticated_entity = service.sender
         return defer.succeed(service)
@@ -524,71 +508,43 @@ class Auth(object):
         """
         return self.store.is_server_admin(user)
 
-    @defer.inlineCallbacks
-    def compute_auth_events(self, event, current_state_ids, for_verification=False):
+    def compute_auth_events(
+        self,
+        event,
+        current_state_ids: Dict[Tuple[str, str], str],
+        for_verification: bool = False,
+    ):
+        """Given an event and current state return the list of event IDs used
+        to auth an event.
+
+        If `for_verification` is False then only return auth events that
+        should be added to the event's `auth_events`.
+
+        Returns:
+            defer.Deferred(list[str]): List of event IDs.
+        """
+
         if event.type == EventTypes.Create:
-            return []
+            return defer.succeed([])
+
+        # Currently we ignore the `for_verification` flag even though there are
+        # some situations where we can drop particular auth events when adding
+        # to the event's `auth_events` (e.g. joins pointing to previous joins
+        # when room is publically joinable). Dropping event IDs has the
+        # advantage that the auth chain for the room grows slower, but we use
+        # the auth chain in state resolution v2 to order events, which means
+        # care must be taken if dropping events to ensure that it doesn't
+        # introduce undesirable "state reset" behaviour.
+        #
+        # All of which sounds a bit tricky so we don't bother for now.
 
         auth_ids = []
+        for etype, state_key in event_auth.auth_types_for_event(event):
+            auth_ev_id = current_state_ids.get((etype, state_key))
+            if auth_ev_id:
+                auth_ids.append(auth_ev_id)
 
-        key = (EventTypes.PowerLevels, "")
-        power_level_event_id = current_state_ids.get(key)
-
-        if power_level_event_id:
-            auth_ids.append(power_level_event_id)
-
-        key = (EventTypes.JoinRules, "")
-        join_rule_event_id = current_state_ids.get(key)
-
-        key = (EventTypes.Member, event.sender)
-        member_event_id = current_state_ids.get(key)
-
-        key = (EventTypes.Create, "")
-        create_event_id = current_state_ids.get(key)
-        if create_event_id:
-            auth_ids.append(create_event_id)
-
-        if join_rule_event_id:
-            join_rule_event = yield self.store.get_event(join_rule_event_id)
-            join_rule = join_rule_event.content.get("join_rule")
-            is_public = join_rule == JoinRules.PUBLIC if join_rule else False
-        else:
-            is_public = False
-
-        if event.type == EventTypes.Member:
-            e_type = event.content["membership"]
-            if e_type in [Membership.JOIN, Membership.INVITE]:
-                if join_rule_event_id:
-                    auth_ids.append(join_rule_event_id)
-
-            if e_type == Membership.JOIN:
-                if member_event_id and not is_public:
-                    auth_ids.append(member_event_id)
-            else:
-                if member_event_id:
-                    auth_ids.append(member_event_id)
-
-                if for_verification:
-                    key = (EventTypes.Member, event.state_key)
-                    existing_event_id = current_state_ids.get(key)
-                    if existing_event_id:
-                        auth_ids.append(existing_event_id)
-
-            if e_type == Membership.INVITE:
-                if "third_party_invite" in event.content:
-                    key = (
-                        EventTypes.ThirdPartyInvite,
-                        event.content["third_party_invite"]["signed"]["token"],
-                    )
-                    third_party_invite_id = current_state_ids.get(key)
-                    if third_party_invite_id:
-                        auth_ids.append(third_party_invite_id)
-        elif member_event_id:
-            member_event = yield self.store.get_event(member_event_id)
-            if member_event.content["membership"] == Membership.JOIN:
-                auth_ids.append(member_event.event_id)
-
-        return auth_ids
+        return defer.succeed(auth_ids)
 
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id, user):
@@ -743,7 +699,7 @@ class Auth(object):
                 self.hs.config.hs_disabled_message,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 admin_contact=self.hs.config.admin_contact,
-                limit_type=self.hs.config.hs_disabled_limit_type,
+                limit_type=LimitBlockingTypes.HS_DISABLED,
             )
         if self.hs.config.limit_usage_by_mau is True:
             assert not (user_id and threepid)
@@ -776,5 +732,5 @@ class Auth(object):
                     "Monthly Active User Limit Exceeded",
                     admin_contact=self.hs.config.admin_contact,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                    limit_type="monthly_active_user",
+                    limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER,
                 )

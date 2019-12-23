@@ -20,6 +20,8 @@ class PasswordConfig(Config):
     """Password login configuration
     """
 
+    section = "password"
+
     def read_config(self, config, **kwargs):
         password_config = config.get("password_config", {})
         if password_config is None:

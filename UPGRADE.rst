@@ -2,7 +2,7 @@ Upgrading Synapse
 =================
 
 Before upgrading check if any special steps are required to upgrade from the
-what you currently have installed to current version of Synapse. The extra
+version you currently have installed to the current version of Synapse. The extra
 instructions that may be required are listed later in this document.
 
 * If Synapse was installed using `prebuilt packages
@@ -29,7 +29,7 @@ instructions that may be required are listed later in this document.
      running:
 
      .. code:: bash
-     
+
        git pull
        pip install --upgrade .
 
@@ -74,6 +74,33 @@ for example:
      # replace `1.3.0` and `stretch` accordingly:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+
+Upgrading to v1.7.0
+===================
+
+In an attempt to configure Synapse in a privacy preserving way, the default
+behaviours of ``allow_public_rooms_without_auth`` and
+``allow_public_rooms_over_federation`` have been inverted. This means that by
+default, only authenticated users querying the Client/Server API will be able
+to query the room directory, and relatedly that the server will not share
+room directory information with other servers over federation.
+
+If your installation does not explicitly set these settings one way or the other
+and you want either setting to be ``true`` then it will necessary to update
+your homeserver configuration file accordingly.
+
+For more details on the surrounding context see our `explainer
+<https://matrix.org/blog/2019/11/09/avoiding-unwelcome-visitors-on-private-matrix-servers>`_.
+
+
+Upgrading to v1.5.0
+===================
+
+This release includes a database migration which may take several minutes to
+complete if there are a large number (more than a million or so) of entries in
+the ``devices`` table. This is only likely to a be a problem on very large
+installations.
+
 
 Upgrading to v1.4.0
 ===================

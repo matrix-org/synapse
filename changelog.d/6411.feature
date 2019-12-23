@@ -1,0 +1,1 @@
+Allow custom SAML username mapping functinality through an external provider plugin.

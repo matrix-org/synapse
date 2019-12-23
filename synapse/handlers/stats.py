@@ -45,6 +45,8 @@ class StatsHandler(StateDeltasHandler):
         self.is_mine_id = hs.is_mine_id
         self.stats_bucket_size = hs.config.stats_bucket_size
 
+        self.stats_enabled = hs.config.stats_enabled
+
         # The current position in the current_state_delta stream
         self.pos = None
 
@@ -61,7 +63,7 @@ class StatsHandler(StateDeltasHandler):
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
-        if not self.hs.config.stats_enabled or self._is_processing:
+        if not self.stats_enabled or self._is_processing:
             return
 
         self._is_processing = True
@@ -87,24 +89,29 @@ class StatsHandler(StateDeltasHandler):
             # Be sure to read the max stream_ordering *before* checking if there are any outstanding
             # deltas, since there is otherwise a chance that we could miss updates which arrive
             # after we check the deltas.
-            room_max_stream_ordering = yield self.store.get_room_max_stream_ordering()
+            room_max_stream_ordering = self.store.get_room_max_stream_ordering()
             if self.pos == room_max_stream_ordering:
                 break
 
-            deltas = yield self.store.get_current_state_deltas(self.pos)
+            logger.debug(
+                "Processing room stats %s->%s", self.pos, room_max_stream_ordering
+            )
+            max_pos, deltas = yield self.store.get_current_state_deltas(
+                self.pos, room_max_stream_ordering
+            )
 
             if deltas:
                 logger.debug("Handling %d state deltas", len(deltas))
                 room_deltas, user_deltas = yield self._handle_deltas(deltas)
-
-                max_pos = deltas[-1]["stream_id"]
             else:
                 room_deltas = {}
                 user_deltas = {}
-                max_pos = room_max_stream_ordering
 
             # Then count deltas for total_events and total_event_bytes.
-            room_count, user_count = yield self.store.get_changes_room_total_events_and_bytes(
+            (
+                room_count,
+                user_count,
+            ) = yield self.store.get_changes_room_total_events_and_bytes(
                 self.pos, max_pos
             )
 
@@ -293,6 +300,7 @@ class StatsHandler(StateDeltasHandler):
                 room_state["guest_access"] = event_content.get("guest_access")
 
         for room_id, state in room_to_state_updates.items():
+            logger.info("Updating room_stats_state for %s: %s", room_id, state)
             yield self.store.update_room_state(room_id, state)
 
         return room_to_stats_deltas, user_to_stats_deltas

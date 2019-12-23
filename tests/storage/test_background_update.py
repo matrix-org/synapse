@@ -15,7 +15,7 @@ class BackgroundUpdateTestCase(unittest.TestCase):
 
         self.update_handler = Mock()
 
-        yield self.store.register_background_update_handler(
+        yield self.store.db.updates.register_background_update_handler(
             "test_update", self.update_handler
         )
 
@@ -23,7 +23,7 @@ class BackgroundUpdateTestCase(unittest.TestCase):
         # (perhaps we should run them as part of the test HS setup, since we
         # run all of the other schema setup stuff there?)
         while True:
-            res = yield self.store.do_next_background_update(1000)
+            res = yield self.store.db.updates.do_next_background_update(1000)
             if res is None:
                 break
 
@@ -37,9 +37,9 @@ class BackgroundUpdateTestCase(unittest.TestCase):
         def update(progress, count):
             self.clock.advance_time_msec(count * duration_ms)
             progress = {"my_key": progress["my_key"] + 1}
-            yield self.store.runInteraction(
+            yield self.store.db.runInteraction(
                 "update_progress",
-                self.store._background_update_progress_txn,
+                self.store.db.updates._background_update_progress_txn,
                 "test_update",
                 progress,
             )
@@ -47,29 +47,37 @@ class BackgroundUpdateTestCase(unittest.TestCase):
 
         self.update_handler.side_effect = update
 
-        yield self.store.start_background_update("test_update", {"my_key": 1})
+        yield self.store.db.updates.start_background_update(
+            "test_update", {"my_key": 1}
+        )
 
         self.update_handler.reset_mock()
-        result = yield self.store.do_next_background_update(duration_ms * desired_count)
+        result = yield self.store.db.updates.do_next_background_update(
+            duration_ms * desired_count
+        )
         self.assertIsNotNone(result)
         self.update_handler.assert_called_once_with(
-            {"my_key": 1}, self.store.DEFAULT_BACKGROUND_BATCH_SIZE
+            {"my_key": 1}, self.store.db.updates.DEFAULT_BACKGROUND_BATCH_SIZE
         )
 
         # second step: complete the update
         @defer.inlineCallbacks
         def update(progress, count):
-            yield self.store._end_background_update("test_update")
+            yield self.store.db.updates._end_background_update("test_update")
             return count
 
         self.update_handler.side_effect = update
         self.update_handler.reset_mock()
-        result = yield self.store.do_next_background_update(duration_ms * desired_count)
+        result = yield self.store.db.updates.do_next_background_update(
+            duration_ms * desired_count
+        )
         self.assertIsNotNone(result)
         self.update_handler.assert_called_once_with({"my_key": 2}, desired_count)
 
         # third step: we don't expect to be called any more
         self.update_handler.reset_mock()
-        result = yield self.store.do_next_background_update(duration_ms * desired_count)
+        result = yield self.store.db.updates.do_next_background_update(
+            duration_ms * desired_count
+        )
         self.assertIsNone(result)
         self.assertFalse(self.update_handler.called)

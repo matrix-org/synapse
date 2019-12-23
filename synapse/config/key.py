@@ -92,6 +92,8 @@ class TrustedKeyServer(object):
 
 
 class KeyConfig(Config):
+    section = "key"
+
     def read_config(self, config, config_dir_path, **kwargs):
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
@@ -106,7 +108,7 @@ class KeyConfig(Config):
             self.signing_key = self.read_signing_keys(signing_key_path, "signing_key")
 
         self.old_signing_keys = self.read_old_signing_keys(
-            config.get("old_signing_keys", {})
+            config.get("old_signing_keys")
         )
         self.key_refresh_interval = self.parse_duration(
             config.get("key_refresh_interval", "1d")
@@ -123,7 +125,7 @@ class KeyConfig(Config):
 
         # if neither trusted_key_servers nor perspectives are given, use the default.
         if "perspectives" not in config and "trusted_key_servers" not in config:
-            logger.warn(TRUSTED_KEY_SERVER_NOT_CONFIGURED_WARN)
+            logger.warning(TRUSTED_KEY_SERVER_NOT_CONFIGURED_WARN)
             key_servers = [{"server_name": "matrix.org"}]
         else:
             key_servers = config.get("trusted_key_servers", [])
@@ -154,7 +156,7 @@ class KeyConfig(Config):
         if not self.macaroon_secret_key:
             # Unfortunately, there are people out there that don't have this
             # set. Lets just be "nice" and derive one from their secret key.
-            logger.warn("Config is missing macaroon_secret_key")
+            logger.warning("Config is missing macaroon_secret_key")
             seed = bytes(self.signing_key[0])
             self.macaroon_secret_key = hashlib.sha256(seed).digest()
 
@@ -197,14 +199,19 @@ class KeyConfig(Config):
         signing_key_path: "%(base_key_name)s.signing.key"
 
         # The keys that the server used to sign messages with but won't use
-        # to sign new messages. E.g. it has lost its private key
+        # to sign new messages.
         #
-        #old_signing_keys:
-        #  "ed25519:auto":
-        #    # Base64 encoded public key
-        #    key: "The public part of your old signing key."
-        #    # Millisecond POSIX timestamp when the key expired.
-        #    expired_ts: 123456789123
+        old_signing_keys:
+          # For each key, `key` should be the base64-encoded public key, and
+          # `expired_ts`should be the time (in milliseconds since the unix epoch) that
+          # it was last used.
+          #
+          # It is possible to build an entry from an old signing.key file using the
+          # `export_signing_key` script which is provided with synapse.
+          #
+          # For example:
+          #
+          #"ed25519:id": { key: "base64string", expired_ts: 123456789123 }
 
         # How long key response published by this server is valid for.
         # Used to set the valid_until_ts in /key/v2 APIs.
@@ -288,6 +295,8 @@ class KeyConfig(Config):
             raise ConfigError("Error reading %s: %s" % (name, str(e)))
 
     def read_old_signing_keys(self, old_signing_keys):
+        if old_signing_keys is None:
+            return {}
         keys = {}
         for key_id, key_data in old_signing_keys.items():
             if is_signing_algorithm_supported(key_id):

@@ -16,8 +16,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.errors import AuthError
 from synapse.http.servlet import RestServlet, parse_integer
 from synapse.rest.admin._base import (
@@ -40,12 +38,11 @@ class QuarantineMediaInRoom(RestServlet):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
-        yield assert_user_is_admin(self.auth, requester.user)
+    async def on_POST(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
 
-        num_quarantined = yield self.store.quarantine_media_ids_in_room(
+        num_quarantined = await self.store.quarantine_media_ids_in_room(
             room_id, requester.user.to_string()
         )
 
@@ -62,14 +59,13 @@ class ListMediaInRoom(RestServlet):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+    async def on_GET(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        is_admin = await self.auth.is_server_admin(requester.user)
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        local_mxcs, remote_mxcs = yield self.store.get_media_mxcs_in_room(room_id)
+        local_mxcs, remote_mxcs = await self.store.get_media_mxcs_in_room(room_id)
 
         return 200, {"local": local_mxcs, "remote": remote_mxcs}
 
@@ -81,14 +77,13 @@ class PurgeMediaCacheRestServlet(RestServlet):
         self.media_repository = hs.get_media_repository()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        yield assert_requester_is_admin(self.auth, request)
+    async def on_POST(self, request):
+        await assert_requester_is_admin(self.auth, request)
 
         before_ts = parse_integer(request, "before_ts", required=True)
         logger.info("before_ts: %r", before_ts)
 
-        ret = yield self.media_repository.delete_old_remote_media(before_ts)
+        ret = await self.media_repository.delete_old_remote_media(before_ts)
 
         return 200, ret
 

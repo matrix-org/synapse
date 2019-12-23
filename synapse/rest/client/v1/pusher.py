@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
@@ -30,6 +28,17 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_KEYS = {
+    "app_display_name",
+    "app_id",
+    "data",
+    "device_display_name",
+    "kind",
+    "lang",
+    "profile_tag",
+    "pushkey",
+}
+
 
 class PushersRestServlet(RestServlet):
     PATTERNS = client_patterns("/pushers$", v1=True)
@@ -39,30 +48,17 @@ class PushersRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request)
         user = requester.user
 
-        pushers = yield self.hs.get_datastore().get_pushers_by_user_id(user.to_string())
+        pushers = await self.hs.get_datastore().get_pushers_by_user_id(user.to_string())
 
-        allowed_keys = [
-            "app_display_name",
-            "app_id",
-            "data",
-            "device_display_name",
-            "kind",
-            "lang",
-            "profile_tag",
-            "pushkey",
-        ]
+        filtered_pushers = list(
+            {k: v for k, v in p.items() if k in ALLOWED_KEYS} for p in pushers
+        )
 
-        for p in pushers:
-            for k, v in list(p.items()):
-                if k not in allowed_keys:
-                    del p[k]
-
-        return 200, {"pushers": pushers}
+        return 200, {"pushers": filtered_pushers}
 
     def on_OPTIONS(self, _):
         return 200, {}
@@ -78,9 +74,8 @@ class PushersSetRestServlet(RestServlet):
         self.notifier = hs.get_notifier()
         self.pusher_pool = self.hs.get_pusherpool()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
         user = requester.user
 
         content = parse_json_object_from_request(request)
@@ -91,7 +86,7 @@ class PushersSetRestServlet(RestServlet):
             and "kind" in content
             and content["kind"] is None
         ):
-            yield self.pusher_pool.remove_pusher(
+            await self.pusher_pool.remove_pusher(
                 content["app_id"], content["pushkey"], user_id=user.to_string()
             )
             return 200, {}
@@ -117,14 +112,14 @@ class PushersSetRestServlet(RestServlet):
             append = content["append"]
 
         if not append:
-            yield self.pusher_pool.remove_pushers_by_app_id_and_pushkey_not_user(
+            await self.pusher_pool.remove_pushers_by_app_id_and_pushkey_not_user(
                 app_id=content["app_id"],
                 pushkey=content["pushkey"],
                 not_user_id=user.to_string(),
             )
 
         try:
-            yield self.pusher_pool.add_pusher(
+            await self.pusher_pool.add_pusher(
                 user_id=user.to_string(),
                 access_token=requester.access_token_id,
                 kind=content["kind"],
@@ -164,16 +159,15 @@ class PushersRemoveRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.pusher_pool = self.hs.get_pusherpool()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request, rights="delete_pusher")
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request, rights="delete_pusher")
         user = requester.user
 
         app_id = parse_string(request, "app_id", required=True)
         pushkey = parse_string(request, "pushkey", required=True)
 
         try:
-            yield self.pusher_pool.remove_pusher(
+            await self.pusher_pool.remove_pusher(
                 app_id=app_id, pushkey=pushkey, user_id=user.to_string()
             )
         except StoreError as se:

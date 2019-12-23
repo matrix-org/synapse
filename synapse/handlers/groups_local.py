@@ -392,7 +392,7 @@ class GroupsLocalHandler(object):
         try:
             user_profile = yield self.profile_handler.get_profile(user_id)
         except Exception as e:
-            logger.warn("No profile for user %s: %s", user_id, e)
+            logger.warning("No profile for user %s: %s", user_id, e)
             user_profile = {}
 
         return {"state": "invite", "user_profile": user_profile}

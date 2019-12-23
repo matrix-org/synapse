@@ -17,7 +17,7 @@ import logging
 
 from twisted.web.server import NOT_DONE_YET
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import (
     DirectServeResource,
     respond_with_json,
@@ -56,7 +56,11 @@ class UploadResource(DirectServeResource):
         if content_length is None:
             raise SynapseError(msg="Request must specify a Content-Length", code=400)
         if int(content_length) > self.max_upload_size:
-            raise SynapseError(msg="Upload request body is too large", code=413)
+            raise SynapseError(
+                msg="Upload request body is too large",
+                code=413,
+                errcode=Codes.TOO_LARGE,
+            )
 
         upload_name = parse_string(request, b"filename", encoding=None)
         if upload_name:

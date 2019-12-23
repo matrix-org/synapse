@@ -102,7 +102,7 @@ class RemoteKey(DirectServeResource):
     @wrap_json_request_handler
     async def _async_render_GET(self, request):
         if len(request.postpath) == 1:
-            server, = request.postpath
+            (server,) = request.postpath
             query = {server.decode("ascii"): {}}
         elif len(request.postpath) == 2:
             server, key_id = request.postpath

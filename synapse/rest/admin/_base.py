@@ -15,8 +15,6 @@
 
 import re
 
-from twisted.internet import defer
-
 from synapse.api.errors import AuthError
 
 
@@ -42,8 +40,7 @@ def historical_admin_path_patterns(path_regex):
     )
 
 
-@defer.inlineCallbacks
-def assert_requester_is_admin(auth, request):
+async def assert_requester_is_admin(auth, request):
     """Verify that the requester is an admin user
 
     WARNING: MAKE SURE YOU YIELD ON THE RESULT!
@@ -58,12 +55,11 @@ def assert_requester_is_admin(auth, request):
     Raises:
         AuthError if the requester is not an admin
     """
-    requester = yield auth.get_user_by_req(request)
-    yield assert_user_is_admin(auth, requester.user)
+    requester = await auth.get_user_by_req(request)
+    await assert_user_is_admin(auth, requester.user)
 
 
-@defer.inlineCallbacks
-def assert_user_is_admin(auth, user_id):
+async def assert_user_is_admin(auth, user_id):
     """Verify that the given user is an admin user
 
     WARNING: MAKE SURE YOU YIELD ON THE RESULT!
@@ -79,6 +75,6 @@ def assert_user_is_admin(auth, user_id):
         AuthError if the user is not an admin
     """
 
-    is_admin = yield auth.is_server_admin(user_id)
+    is_admin = await auth.is_server_admin(user_id)
     if not is_admin:
         raise AuthError(403, "You are not a server admin")

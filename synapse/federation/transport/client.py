@@ -39,36 +39,12 @@ class TransportLayerClient(object):
         self.client = hs.get_http_client()
 
     @log_function
-    def get_room_state(self, destination, room_id, event_id):
-        """ Requests all state for a given room from the given server at the
-        given event.
-
-        Args:
-            destination (str): The host name of the remote home server we want
-                to get the state from.
-            context (str): The name of the context we want the state of
-            event_id (str): The event we want the context at.
-
-        Returns:
-            Deferred: Results in a dict received from the remote homeserver.
-        """
-        logger.debug("get_room_state dest=%s, room=%s", destination, room_id)
-
-        path = _create_v1_path("/state/%s", room_id)
-        return self.client.get_json(
-            destination,
-            path=path,
-            args={"event_id": event_id},
-            try_trailing_slash_on_400=True,
-        )
-
-    @log_function
     def get_room_state_ids(self, destination, room_id, event_id):
         """ Requests all state for a given room from the given server at the
         given event. Returns the state's event_id's
 
         Args:
-            destination (str): The host name of the remote home server we want
+            destination (str): The host name of the remote homeserver we want
                 to get the state from.
             context (str): The name of the context we want the state of
             event_id (str): The event we want the context at.
@@ -91,7 +67,7 @@ class TransportLayerClient(object):
         """ Requests the pdu with give id and origin from the given server.
 
         Args:
-            destination (str): The host name of the remote home server we want
+            destination (str): The host name of the remote homeserver we want
                 to get the state from.
             event_id (str): The id of the event being requested.
             timeout (int): How long to try (in ms) the destination for before
@@ -122,10 +98,10 @@ class TransportLayerClient(object):
             Deferred: Results in a dict received from the remote homeserver.
         """
         logger.debug(
-            "backfill dest=%s, room_id=%s, event_tuples=%s, limit=%s",
+            "backfill dest=%s, room_id=%s, event_tuples=%r, limit=%s",
             destination,
             room_id,
-            repr(event_tuples),
+            event_tuples,
             str(limit),
         )
 
@@ -267,7 +243,7 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_join(self, destination, room_id, event_id, content):
+    def send_join_v1(self, destination, room_id, event_id, content):
         path = _create_v1_path("/send_join/%s/%s", room_id, event_id)
 
         response = yield self.client.put_json(
@@ -278,8 +254,37 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_leave(self, destination, room_id, event_id, content):
+    def send_join_v2(self, destination, room_id, event_id, content):
+        path = _create_v2_path("/send_join/%s/%s", room_id, event_id)
+
+        response = yield self.client.put_json(
+            destination=destination, path=path, data=content
+        )
+
+        return response
+
+    @defer.inlineCallbacks
+    @log_function
+    def send_leave_v1(self, destination, room_id, event_id, content):
         path = _create_v1_path("/send_leave/%s/%s", room_id, event_id)
+
+        response = yield self.client.put_json(
+            destination=destination,
+            path=path,
+            data=content,
+            # we want to do our best to send this through. The problem is
+            # that if it fails, we won't retry it later, so if the remote
+            # server was just having a momentary blip, the room will be out of
+            # sync.
+            ignore_backoff=True,
+        )
+
+        return response
+
+    @defer.inlineCallbacks
+    @log_function
+    def send_leave_v2(self, destination, room_id, event_id, content):
+        path = _create_v2_path("/send_leave/%s/%s", room_id, event_id)
 
         response = yield self.client.put_json(
             destination=destination,
@@ -378,17 +383,6 @@ class TransportLayerClient(object):
         path = _create_v1_path("/event_auth/%s/%s", room_id, event_id)
 
         content = yield self.client.get_json(destination=destination, path=path)
-
-        return content
-
-    @defer.inlineCallbacks
-    @log_function
-    def send_query_auth(self, destination, room_id, event_id, content):
-        path = _create_v1_path("/query_auth/%s/%s", room_id, event_id)
-
-        content = yield self.client.post_json(
-            destination=destination, path=path, data=content
-        )
 
         return content
 
