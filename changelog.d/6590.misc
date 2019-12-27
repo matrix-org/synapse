@@ -1,1 +1,1 @@
-synctl: On restart don't start if nothing was stopped. Warns that the process might not be started by synctl
+synctl: On restart don't start if nothing was stopped. Warns that the process might not be started by synctl.
