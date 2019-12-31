@@ -1,3 +1,14 @@
+Synapse 1.7.3 (2019-12-31)
+==========================
+
+This release fixes a long-standing bug in the state resolution algorithm.
+
+Bugfixes
+--------
+
+- Fix exceptions caused by state resolution choking on malformed events. ([\#6608](https://github.com/matrix-org/synapse/issues/6608))
+
+
 Synapse 1.7.2 (2019-12-20)
 ==========================
 
