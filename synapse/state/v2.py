@@ -183,7 +183,9 @@ def _get_power_level_for_sender(room_id, event_id, event_map, state_res_store):
 
     pl = None
     for aid in event.auth_event_ids():
-        aev = yield _get_event(room_id, aid, event_map, state_res_store, allow_none=True)
+        aev = yield _get_event(
+            room_id, aid, event_map, state_res_store, allow_none=True
+        )
         if aev and (aev.type, aev.state_key) == (EventTypes.PowerLevels, ""):
             pl = aev
             break
@@ -191,7 +193,9 @@ def _get_power_level_for_sender(room_id, event_id, event_map, state_res_store):
     if pl is None:
         # Couldn't find power level. Check if they're the creator of the room
         for aid in event.auth_event_ids():
-            aev = yield _get_event(room_id, aid, event_map, state_res_store, allow_none=True)
+            aev = yield _get_event(
+                room_id, aid, event_map, state_res_store, allow_none=True
+            )
             if aev and (aev.type, aev.state_key) == (EventTypes.Create, ""):
                 if aev.content.get("creator") == event.sender:
                     return 100
@@ -403,10 +407,17 @@ def _iterative_auth_checks(
 
         auth_events = {}
         for aid in event.auth_event_ids():
-            ev = yield _get_event(room_id, aid, event_map, state_res_store, allow_none=True)
+            ev = yield _get_event(
+                room_id, aid, event_map, state_res_store, allow_none=True
+            )
 
-            if ev and ev.rejected_reason is None:
-                auth_events[(ev.type, ev.state_key)] = ev
+            if not ev:
+                logger.warning(
+                    "auth_event id %s for event %s is missing", aid, event_id
+                )
+            else:
+                if ev.rejected_reason is None:
+                    auth_events[(ev.type, ev.state_key)] = ev
 
         for key in event_auth.auth_types_for_event(event):
             if key in resolved_state:
@@ -457,8 +468,10 @@ def _mainline_sort(
         auth_events = pl_ev.auth_event_ids()
         pl = None
         for aid in auth_events:
-            ev = yield _get_event(room_id, aid, event_map, state_res_store)
-            if (ev.type, ev.state_key) == (EventTypes.PowerLevels, ""):
+            ev = yield _get_event(
+                room_id, aid, event_map, state_res_store, allow_none=True
+            )
+            if ev and (ev.type, ev.state_key) == (EventTypes.PowerLevels, ""):
                 pl = aid
                 break
 
@@ -506,8 +519,10 @@ def _get_mainline_depth_for_event(event, mainline_map, event_map, state_res_stor
         event = None
 
         for aid in auth_events:
-            aev = yield _get_event(room_id, aid, event_map, state_res_store)
-            if (aev.type, aev.state_key) == (EventTypes.PowerLevels, ""):
+            aev = yield _get_event(
+                room_id, aid, event_map, state_res_store, allow_none=True
+            )
+            if aev and (aev.type, aev.state_key) == (EventTypes.PowerLevels, ""):
                 event = aev
                 break
 
@@ -525,17 +540,22 @@ def _get_event(room_id, event_id, event_map, state_res_store, allow_none=False):
         event_id (str)
         event_map (dict[str,FrozenEvent])
         state_res_store (StateResolutionStore)
+        allow_none (bool): if the event is not found, return None rather than raising
+            an exception
 
     Returns:
-        Deferred[FrozenEvent]
+        Deferred[Optional[FrozenEvent]]
     """
     if event_id not in event_map:
         events = yield state_res_store.get_events([event_id], allow_rejected=True)
         event_map.update(events)
     event = event_map.get(event_id)
-    if allow_none and event is None:
-        return None
-    assert event is not None
+
+    if event is None:
+        if allow_none:
+            return None
+        raise Exception("Unknown event %s" % (event_id,))
+
     if event.room_id != room_id:
         raise Exception(
             "In state res for room %s, event %s is in %s"
