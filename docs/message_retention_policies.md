@@ -185,7 +185,7 @@ host. However, even though the database engine won't free up the disk
 space, it will start writing new data into where the purged data was.
 
 If you want to reclaim the freed disk space anyway and return it to the
-operating system, the server admin needs to run `VACUUM FULL;` on the
-database (see the related
+operating system, the server admin needs to run `VACUUM FULL;` (or
+`VACUUM;` for SQLite databases) on Synapse's database (see the related
 [PostgreSQL documentation](https://www.postgresql.org/docs/current/sql-vacuum.html)).
 
