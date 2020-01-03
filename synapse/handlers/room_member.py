@@ -164,6 +164,12 @@ class RoomMemberHandler(object):
         if requester.is_guest:
             content["kind"] = "guest"
 
+        prev_event_ids = (
+            None
+            if prev_events_and_hashes is None
+            else [event_id for event_id, _, _ in prev_events_and_hashes]
+        )
+
         event, context = yield self.event_creation_handler.create_event(
             requester,
             {
@@ -177,7 +183,7 @@ class RoomMemberHandler(object):
             },
             token_id=requester.access_token_id,
             txn_id=txn_id,
-            prev_events_and_hashes=prev_events_and_hashes,
+            prev_event_ids=prev_event_ids,
             require_consent=require_consent,
         )
 
