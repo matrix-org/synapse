@@ -762,9 +762,10 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 keys = yield self.get_server_verify_key_v2_direct(server_name, key_ids)
                 results[server_name] = keys
             except KeyLookupError as e:
-                logger.warning(
-                    "Error looking up keys %s from %s: %s", key_ids, server_name, e
-                )
+                if str(e) != "Failed to connect to remote server":
+                    logger.warning(
+                        "Error looking up keys %s from %s: %s", key_ids, server_name, e
+                    )
             except Exception:
                 logger.exception("Error getting keys %s from %s", key_ids, server_name)
 

@@ -478,14 +478,16 @@ class MatrixFederationHttpClient(object):
 
                     break
                 except RequestSendFailed as e:
-                    logger.warning(
-                        "{%s} [%s] Request failed: %s %s: %s",
-                        request.txn_id,
-                        request.destination,
-                        request.method,
-                        url_str,
-                        _flatten_response_never_received(e.inner_exception),
-                    )
+                    in_ex_txt = _flatten_response_never_received(e.inner_exception)
+                    if in_ex_txt != "ResponseNeverReceived:[Error([('SSL routines', 'tls_process_server_certificate', 'certificate verify failed')])]":
+                        logger.warning(
+                            "{%s} [%s] Request failed: %s %s: %s",
+                            request.txn_id,
+                            request.destination,
+                            request.method,
+                            url_str,
+                            in_ex_txt,
+                        )
 
                     if not e.can_retry:
                         raise
