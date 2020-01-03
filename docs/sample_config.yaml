@@ -692,10 +692,6 @@ media_store_path: "DATADIR/media_store"
 #    config:
 #       directory: /mnt/some/other/directory
 
-# Directory where in-progress uploads are stored.
-#
-uploads_path: "DATADIR/uploads"
-
 # The largest allowed upload size in bytes
 #
 #max_upload_size: 10M

@@ -82,9 +82,6 @@ class MediaRepositoryServer(HomeServer):
                         {
                             MEDIA_PREFIX: media_repo,
                             LEGACY_MEDIA_PREFIX: media_repo,
-                            CONTENT_REPO_PREFIX: ContentRepoResource(
-                                self, self.config.uploads_path
-                            ),
                             "/_synapse/admin": admin_resource,
                         }
                     )
