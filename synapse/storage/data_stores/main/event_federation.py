@@ -177,6 +177,41 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         return res
 
+    def get_prev_events_for_room(self, room_id: str):
+        """
+        Gets a subset of the current forward extremities in the given room.
+
+        Limits the result to 10 extremities, so that we can avoid creating
+        events which refer to hundreds of prev_events.
+
+        Args:
+            room_id (str): room_id
+
+        Returns:
+            Deferred[List[str]]: the event ids of the forward extremites
+
+        """
+
+        return self.db.runInteraction(
+            "get_prev_events_for_room", self._get_prev_events_for_room_txn, room_id
+        )
+
+    def _get_prev_events_for_room_txn(self, txn, room_id: str):
+        # we just use the 10 newest events. Older events will become
+        # prev_events of future events.
+
+        sql = """
+            SELECT e.event_id FROM event_forward_extremities AS f
+            INNER JOIN events AS e USING (event_id)
+            WHERE f.room_id = ?
+            ORDER BY e.depth DESC
+            LIMIT 10
+        """
+
+        txn.execute(sql, (room_id,))
+
+        return [row[0] for row in txn]
+
     def get_latest_event_ids_and_hashes_in_room(self, room_id):
         """
         Gets the current forward extremities in the given room

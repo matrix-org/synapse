@@ -739,17 +739,11 @@ class EventCreationHandler(object):
                 "Attempting to create an event with %i prev_events"
                 % (len(prev_events_and_hashes),)
             )
+            prev_event_ids = [event_id for event_id, _, _ in prev_events_and_hashes]
         else:
-            prev_events_and_hashes = yield self.store.get_prev_events_and_hashes_for_room(
-                builder.room_id
-            )
+            prev_event_ids = yield self.store.get_prev_events_for_room(builder.room_id)
 
-        prev_events = [
-            (event_id, prev_hashes)
-            for event_id, prev_hashes, _ in prev_events_and_hashes
-        ]
-
-        event = yield builder.build(prev_event_ids=[p for p, _ in prev_events])
+        event = yield builder.build(prev_event_ids=prev_event_ids)
         context = yield self.state.compute_event_context(event)
         if requester:
             context.app_service = requester.app_service
