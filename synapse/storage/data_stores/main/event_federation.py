@@ -18,8 +18,6 @@ import logging
 from six.moves import range
 from six.moves.queue import Empty, PriorityQueue
 
-from unpaddedbase64 import encode_base64
-
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
@@ -182,25 +180,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         return [row[0] for row in txn]
 
-    def get_latest_event_ids_and_hashes_in_room(self, room_id):
-        """
-        Gets the current forward extremities in the given room
-
-        Args:
-            room_id (str): room_id
-
-        Returns:
-            Deferred[list[(str, dict[str, str], int)]]
-                for each event, a tuple of (event_id, hashes, depth)
-                where *hashes* is a map from algorithm to hash.
-        """
-
-        return self.db.runInteraction(
-            "get_latest_event_ids_and_hashes_in_room",
-            self._get_latest_event_ids_and_hashes_in_room,
-            room_id,
-        )
-
     def get_rooms_with_many_extremities(self, min_count, limit, room_id_filter):
         """Get the top rooms with at least N extremities.
 
@@ -248,27 +227,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             retcol="event_id",
             desc="get_latest_event_ids_in_room",
         )
-
-    def _get_latest_event_ids_and_hashes_in_room(self, txn, room_id):
-        sql = (
-            "SELECT e.event_id, e.depth FROM events as e "
-            "INNER JOIN event_forward_extremities as f "
-            "ON e.event_id = f.event_id "
-            "AND e.room_id = f.room_id "
-            "WHERE f.room_id = ?"
-        )
-
-        txn.execute(sql, (room_id,))
-
-        results = []
-        for event_id, depth in txn.fetchall():
-            hashes = self._get_event_reference_hashes_txn(txn, event_id)
-            prev_hashes = {
-                k: encode_base64(v) for k, v in hashes.items() if k == "sha256"
-            }
-            results.append((event_id, prev_hashes, depth))
-
-        return results
 
     def get_min_depth(self, room_id):
         """ For hte given room, get the minimum depth we have seen for it.
