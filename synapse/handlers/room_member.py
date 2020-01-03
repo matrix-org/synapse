@@ -25,7 +25,7 @@ from twisted.internet import defer
 from synapse import types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
-from synapse.types import RoomID, UserID
+from synapse.types import Collection, RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
 
@@ -149,7 +149,7 @@ class RoomMemberHandler(object):
         target,
         room_id,
         membership,
-        prev_events_and_hashes,
+        prev_event_ids: Collection[str],
         txn_id=None,
         ratelimit=True,
         content=None,
@@ -163,12 +163,6 @@ class RoomMemberHandler(object):
         content["membership"] = membership
         if requester.is_guest:
             content["kind"] = "guest"
-
-        prev_event_ids = (
-            None
-            if prev_events_and_hashes is None
-            else [event_id for event_id, _, _ in prev_events_and_hashes]
-        )
 
         event, context = yield self.event_creation_handler.create_event(
             requester,
@@ -376,10 +370,7 @@ class RoomMemberHandler(object):
             if block_invite:
                 raise SynapseError(403, "Invites have been disabled on this server")
 
-        prev_events_and_hashes = yield self.store.get_prev_events_and_hashes_for_room(
-            room_id
-        )
-        latest_event_ids = (event_id for (event_id, _, _) in prev_events_and_hashes)
+        latest_event_ids = yield self.store.get_prev_events_for_room(room_id)
 
         current_state_ids = yield self.state_handler.get_current_state_ids(
             room_id, latest_event_ids=latest_event_ids
@@ -493,7 +484,7 @@ class RoomMemberHandler(object):
             membership=effective_membership_state,
             txn_id=txn_id,
             ratelimit=ratelimit,
-            prev_events_and_hashes=prev_events_and_hashes,
+            prev_event_ids=latest_event_ids,
             content=content,
             require_consent=require_consent,
         )
