@@ -740,7 +740,7 @@ class EventCreationHandler(object):
                 % (len(prev_events_and_hashes),)
             )
         else:
-            prev_events_and_hashes = yield self.store.get_prev_events_for_room(
+            prev_events_and_hashes = yield self.store.get_prev_events_and_hashes_for_room(
                 builder.room_id
             )
 
@@ -1042,7 +1042,9 @@ class EventCreationHandler(object):
             # For each room we need to find a joined member we can use to send
             # the dummy event with.
 
-            prev_events_and_hashes = yield self.store.get_prev_events_for_room(room_id)
+            prev_events_and_hashes = yield self.store.get_prev_events_and_hashes_for_room(
+                room_id
+            )
 
             latest_event_ids = (event_id for (event_id, _, _) in prev_events_and_hashes)
 

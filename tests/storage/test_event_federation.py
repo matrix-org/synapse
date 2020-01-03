@@ -26,7 +26,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def test_get_prev_events_for_room(self):
+    def test_get_prev_events_and_hashes_for_room(self):
         room_id = "@ROOM:local"
 
         # add a bunch of events and hashes to act as forward extremities
@@ -64,7 +64,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
             yield self.store.db.runInteraction("insert", insert_event, i)
 
         # this should get the last five and five others
-        r = yield self.store.get_prev_events_for_room(room_id)
+        r = yield self.store.get_prev_events_and_hashes_for_room(room_id)
         self.assertEqual(10, len(r))
         for i in range(0, 5):
             el = r[i]

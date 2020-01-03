@@ -149,9 +149,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     @defer.inlineCallbacks
-    def get_prev_events_for_room(self, room_id):
+    def get_prev_events_and_hashes_for_room(self, room_id):
         """
-        Gets a subset of the current forward extremities in the given room.
+        Gets a subset of the current forward extremities in the given room,
+        along with their depths and hashes.
 
         Limits the result to 10 extremities, so that we can avoid creating
         events which refer to hundreds of prev_events.
