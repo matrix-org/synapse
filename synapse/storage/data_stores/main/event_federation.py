@@ -14,7 +14,6 @@
 # limitations under the License.
 import itertools
 import logging
-import random
 
 from six.moves import range
 from six.moves.queue import Empty, PriorityQueue
@@ -147,35 +146,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             keyvalues={"room_id": room_id},
             retcol="event_id",
         )
-
-    @defer.inlineCallbacks
-    def get_prev_events_and_hashes_for_room(self, room_id):
-        """
-        Gets a subset of the current forward extremities in the given room,
-        along with their depths and hashes.
-
-        Limits the result to 10 extremities, so that we can avoid creating
-        events which refer to hundreds of prev_events.
-
-        Args:
-            room_id (str): room_id
-
-        Returns:
-            Deferred[list[(str, dict[str, str], int)]]
-                for each event, a tuple of (event_id, hashes, depth)
-                where *hashes* is a map from algorithm to hash.
-        """
-        res = yield self.get_latest_event_ids_and_hashes_in_room(room_id)
-        if len(res) > 10:
-            # Sort by reverse depth, so we point to the most recent.
-            res.sort(key=lambda a: -a[2])
-
-            # we use half of the limit for the actual most recent events, and
-            # the other half to randomly point to some of the older events, to
-            # make sure that we don't completely ignore the older events.
-            res = res[0:5] + random.sample(res[5:], 5)
-
-        return res
 
     def get_prev_events_for_room(self, room_id: str):
         """
