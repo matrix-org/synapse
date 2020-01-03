@@ -955,7 +955,7 @@ class ServerConfig(Config):
           #purge_jobs:
           #  - shortest_max_lifetime: 1d
           #    longest_max_lifetime: 3d
-          #    interval: 5m:
+          #    interval: 5m
           #  - shortest_max_lifetime: 3d
           #    longest_max_lifetime: 1y
           #    interval: 24h
