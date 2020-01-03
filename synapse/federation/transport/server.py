@@ -292,7 +292,9 @@ class BaseFederationServlet(object):
                     )
                     raise
             except Exception as e:
-                if not (isinstance(e, SynapseError) and e.errcode == Codes.UNAUTHORIZED):
+                if not (
+                    isinstance(e, SynapseError) and e.errcode == Codes.UNAUTHORIZED
+                ):
                     logger.warning("authenticate_request failed: %s", e)
                 raise
 
