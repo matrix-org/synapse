@@ -448,7 +448,10 @@ class CasTicketServlet(RestServlet):
     def __init__(self, hs):
         super(CasTicketServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url
-        self.cas_service_url = hs.config.cas_service_url.encode("ascii") + b"/_matrix/client/r0/login/cas/ticket?redirectUrl="
+        self.cas_service_url = (
+            hs.config.cas_service_url.encode("ascii")
+            + b"/_matrix/client/r0/login/cas/ticket?redirectUrl="
+        )
         self.cas_displayname_attribute = hs.config.cas_displayname_attribute
         self.cas_required_attributes = hs.config.cas_required_attributes
         self._sso_auth_handler = SSOAuthHandler(hs)
@@ -457,7 +460,9 @@ class CasTicketServlet(RestServlet):
     async def on_GET(self, request):
         client_redirect_url = parse_string(request, "redirectUrl", required=True)
         uri = self.cas_server_url + "/proxyValidate"
-        service_url = self.cas_service_url + urllib.parse.quote(client_redirect_url, safe='').encode("ascii")
+        service_url = self.cas_service_url + urllib.parse.quote(
+            client_redirect_url, safe=""
+        ).encode("ascii")
         args = {
             "ticket": parse_string(request, "ticket", required=True),
             "service": service_url,
