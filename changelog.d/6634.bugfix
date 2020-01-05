@@ -1,0 +1,1 @@
+Build the same service URL when requesting the CAS ticket and when calling the proxyValidate URL.
