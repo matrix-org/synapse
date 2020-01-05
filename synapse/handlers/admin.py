@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Optional
 
 from synapse.api.constants import Membership
 from synapse.types import RoomStreamToken
@@ -80,6 +81,31 @@ class AdminHandler(BaseHandler):
         )
 
         return ret
+
+    async def get_rooms_paginate(
+        self,
+        start: int,
+        limit: int,
+        order_by: str,
+        reverse_order: bool,
+        search_term: Optional[str],
+    ):
+        """Function to retrieve a paginated list of rooms as json.
+
+        Args:
+            start: offset in the list
+            limit: maximum amount of rooms to retrieve
+            order_by: the sort order of the returned list. valid values:
+                * alphabetical (default)
+                * size
+            reverse_order: whether to reverse the room list
+            search_term: a string to filter room names by
+        Returns:
+            defer.Deferred: a json list[dict[str, Any]]
+        """
+        return await self.store.get_rooms_paginate(
+            start, limit, order_by, reverse_order, search_term
+        )
 
     async def search_users(self, term):
         """Function to search users list for one or more users with

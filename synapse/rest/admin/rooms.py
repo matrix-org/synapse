@@ -15,10 +15,13 @@
 import logging
 
 from synapse.api.constants import Membership
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_integer,
     parse_json_object_from_request,
+    parse_string,
 )
 from synapse.rest.admin._base import (
     assert_user_is_admin,
@@ -155,3 +158,53 @@ class ShutdownRoomRestServlet(RestServlet):
                 "new_room_id": new_room_id,
             },
         )
+
+
+class ListRoomRestServlet(RestServlet):
+    """
+    List all rooms that are known to the homeserver. Results are returned
+    in a dictionary containing room information. Supports pagination.
+    """
+
+    PATTERNS = historical_admin_path_patterns("/rooms")
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.admin_handler = hs.get_handlers().admin_handler
+
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        # Extract query parameters
+        start = parse_integer(request, "from", default=0)
+        limit = parse_integer(request, "limit", default=100)
+        order_by = parse_string(request, "order_by", default="alphabetical")
+        search_term = parse_string(request, "search_term")
+
+        direction = parse_string(request, "dir", default="f")
+        if direction != "f" and direction != "b":
+            raise SynapseError(
+                400, "Unknown direction: %s" % direction, errcode=Codes.INVALID_PARAM
+            )
+        reverse_order = True if direction == "b" else False
+
+        if search_term == "":
+            raise SynapseError(
+                400,
+                "search_term cannot be an empty string",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        # Return list of rooms according to parameters
+        rooms, next_token = await self.admin_handler.get_rooms_paginate(
+            start, limit, order_by, reverse_order, search_term
+        )
+        response = {"rooms": rooms}
+
+        if next_token:
+            response["next_token"] = next_token
+
+        return 200, response

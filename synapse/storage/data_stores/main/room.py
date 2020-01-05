@@ -17,7 +17,7 @@
 import collections
 import logging
 import re
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from six import integer_types
 
@@ -279,6 +279,123 @@ class RoomWorkerStore(SQLBaseStore):
             allow_none=True,
             desc="is_room_blocked",
         )
+
+    async def get_rooms_paginate(
+        self,
+        start: int,
+        limit: int,
+        order_by: str,
+        reverse_order: bool,
+        search_term: Optional[str],
+    ):
+        """Function to retrieve a paginated list of rooms as json.
+
+        Args:
+            start: offset in the list
+            limit: maximum amount of rooms to retrieve
+            order_by: the sort order of the returned list. valid values:
+                * alphabetical (default)
+                * size
+            reverse_order: whether to reverse the room list
+            search_term: a string to filter room names by
+        Returns:
+            defer.Deferred: a json list[dict[str, Any]]
+        """
+        # Filter room names by a string
+        where_statement = ""
+        if search_term:
+            where_statement = "WHERE state.name LIKE '%' || ? || '%'"
+
+        # Set ordering
+        if order_by == "size":
+            order_by_column = "curr.joined_members"
+            order_by_asc = False
+        else:
+            # Sort alphabetically
+            order_by_column = "state.name"
+            order_by_asc = True
+
+        # Whether to return the list in reverse order
+        if reverse_order:
+            # Flip the boolean
+            order_by_asc = not order_by_asc
+
+        # Create one query for getting the limited number of events that the user asked
+        # for, and another query for getting the total number of events that could be
+        # returned. Thus allowing us to see if there are more events to paginate through
+        info_sql = """
+            SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members
+            FROM room_stats_state state
+            LEFT JOIN room_stats_current curr ON state.room_id = curr.room_id
+            %s
+            ORDER BY %s %s
+            LIMIT ?
+            OFFSET ?
+        """ % (
+            where_statement,
+            order_by_column,
+            "ASC" if order_by_asc else "DESC",
+        )
+
+        # Use a nested SELECT statement as SQL can't count(*) with an OFFSET
+        count_sql = """
+            SELECT count(*) FROM (
+              SELECT room_id FROM room_stats_state state
+              %s
+              LIMIT ?
+              OFFSET ?
+            )
+        """ % (
+            where_statement,
+        )
+
+        def _get_rooms_paginate_txn(txn):
+            # Execute the data query
+            sql_values = (limit, start)
+            if search_term:
+                # Add the search term into the WHERE clause
+                sql_values = (search_term,) + sql_values
+            txn.execute(info_sql, sql_values)
+            rows = [row for row in txn]
+
+            # Execute the count query
+            sql_values = (-1, start)  # Set LIMIT to -1. OFFSET can't be used on its own
+            if search_term:
+                # Add the search term into the WHERE clause
+                sql_values = (search_term,) + sql_values
+            txn.execute(count_sql, sql_values)
+            room_count = txn.fetchone()
+            if room_count:
+                return rows, room_count[0]
+
+            # room_count can be None if there are no rows and OFFSET > 1
+            # Set to 0 instead
+            return rows, 0
+
+        room_tuples, total_rooms = await self.db.runInteraction(
+            "get_rooms_paginate", _get_rooms_paginate_txn,
+        )
+        rooms = []
+
+        # Refactor rooms into structured dictionary
+        for room in room_tuples:
+            rooms.append(
+                {
+                    "room_id": room[0],
+                    "name": room[1],
+                    "canonical_alias": room[2],
+                    "joined_members": room[3],
+                }
+            )
+
+        # Are there more rooms to paginate through after this?
+        next_token = None
+        if total_rooms > len(room_tuples):
+            # There are. Calculate where the query should start from next time to get
+            # the next part of the list
+            next_token = start + limit
+
+        return rooms, next_token
 
     @cachedInlineCallbacks(max_entries=10000)
     def get_ratelimit_for_user(self, user_id):
@@ -719,6 +836,49 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
         return self.db.runInteraction(
             "get_all_new_public_rooms", get_all_new_public_rooms
+        )
+
+    @defer.inlineCallbacks
+    def get_all_rooms_with_alias(
+        self, offset: int, limit: int
+    ) -> List[Tuple[str, str, str]]:
+        """Retrieves a list of all rooms the server is in as well as all room
+        aliases for that room. Rooms are retrieved in alphabetical order by room ID.
+
+        Args:
+            offset: What to offset the list of rooms by
+            limit: The maximum number of rooms to return
+
+        Returns:
+            A list of tuples containing the (room_id, room_name, main room_alias)
+        """
+
+        def get_all_rooms_with_alias_txn(txn):
+            # Retrieve all known room_ids and aliases
+            sql = """
+                SELECT rooms.room_id, room_aliases.room_alias
+                FROM rooms
+                INNER JOIN room_aliases on room_aliases.room_id = rooms.room_id
+                ORDER BY rooms.room_id ASC
+                LIMIT ?
+                OFFSET ?
+            """
+
+            txn.execute(sql, (limit, offset))
+            room_ids_and_aliases = txn.fetchall()
+
+            # Extract all known aliases for a room
+            room_id_to_alias_list = {}
+            for room_id, room_alias in room_ids_and_aliases:
+                if room_id in room_id_to_alias_list:
+                    room_id_to_alias_list[room_id].append(room_alias)
+                else:
+                    room_id_to_alias_list[room_id] = [room_alias]
+
+            return room_id_to_alias_list
+
+        return self.db.runInteraction(
+            "get_all_rooms_with_alias", get_all_rooms_with_alias_txn
         )
 
     @defer.inlineCallbacks
