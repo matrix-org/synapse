@@ -370,12 +370,12 @@ class RoomCreationHandler(BaseHandler):
         if current_power_level < needed_power_level:
             # Perform a deepcopy of the dict in order to not modify initial_state, as its
             # contents are preserved as the state for the old room later on
-            initial_state = copy.deepcopy(initial_state)
+            existing_power_levels = initial_state[(EventTypes.PowerLevels, "")]
+            new_power_levels = copy.deepcopy(existing_power_levels)
+            initial_state[(EventTypes.PowerLevels, "")] = new_power_levels
 
             # Assign this power level to the requester
-            initial_state[(EventTypes.PowerLevels, "")]["users"][
-                requester.user.to_string()
-            ] = needed_power_level
+            new_power_levels["users"][requester.user.to_string()] = needed_power_level
 
         yield self._send_events_for_new_room(
             requester,
