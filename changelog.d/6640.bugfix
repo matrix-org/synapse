@@ -1,0 +1,1 @@
+Fix an error which was thrown by the PresenceHandler _on_shutdown handler.
