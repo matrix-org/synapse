@@ -20,6 +20,7 @@ from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
 from twisted.web.http import unquote
 from twisted.web.http_headers import Headers
+from twisted.web.server import Site
 
 from synapse.http.site import SynapseRequest
 from synapse.util import Clock
@@ -42,6 +43,7 @@ class FakeChannel(object):
     wire).
     """
 
+    site = attr.ib(type=Site)
     _reactor = attr.ib()
     result = attr.ib(default=attr.Factory(dict))
     _producer = None
@@ -176,9 +178,9 @@ def make_request(
         content = content.encode("utf8")
 
     site = FakeSite()
-    channel = FakeChannel(reactor)
+    channel = FakeChannel(site, reactor)
 
-    req = request(site, channel)
+    req = request(channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
     req.postpath = list(map(unquote, path[1:].split(b"/")))
@@ -302,41 +304,42 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
     Set up a synchronous test server, driven by the reactor used by
     the homeserver.
     """
-    d = _sth(cleanup_func, *args, **kwargs).result
+    server = _sth(cleanup_func, *args, **kwargs)
 
-    if isinstance(d, Failure):
-        d.raiseException()
+    database = server.config.database.get_single_database()
 
     # Make the thread pool synchronous.
-    clock = d.get_clock()
-    pool = d.get_db_pool()
+    clock = server.get_clock()
 
-    def runWithConnection(func, *args, **kwargs):
-        return threads.deferToThreadPool(
-            pool._reactor,
-            pool.threadpool,
-            pool._runWithConnection,
-            func,
-            *args,
-            **kwargs
-        )
+    for database in server.get_datastores().databases:
+        pool = database._db_pool
 
-    def runInteraction(interaction, *args, **kwargs):
-        return threads.deferToThreadPool(
-            pool._reactor,
-            pool.threadpool,
-            pool._runInteraction,
-            interaction,
-            *args,
-            **kwargs
-        )
+        def runWithConnection(func, *args, **kwargs):
+            return threads.deferToThreadPool(
+                pool._reactor,
+                pool.threadpool,
+                pool._runWithConnection,
+                func,
+                *args,
+                **kwargs
+            )
 
-    if pool:
+        def runInteraction(interaction, *args, **kwargs):
+            return threads.deferToThreadPool(
+                pool._reactor,
+                pool.threadpool,
+                pool._runInteraction,
+                interaction,
+                *args,
+                **kwargs
+            )
+
         pool.runWithConnection = runWithConnection
         pool.runInteraction = runInteraction
         pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
-    return d
+
+    return server
 
 
 def get_clock():

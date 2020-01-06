@@ -54,6 +54,13 @@ pid_file: DATADIR/homeserver.pid
 #
 #require_auth_for_profile_requests: true
 
+# Uncomment to require a user to share a room with another user in order
+# to retrieve their profile information. Only checked on Client-Server
+# requests. Profile requests from other servers should be checked by the
+# requesting server. Defaults to 'false'.
+#
+#limit_profile_requests_to_users_who_share_rooms: true
+
 # If set to 'true', removes the need for authentication to access the server's
 # public rooms directory through the client API, meaning that anyone can
 # query the room directory. Defaults to 'false'.
@@ -685,10 +692,6 @@ media_store_path: "DATADIR/media_store"
 #    config:
 #       directory: /mnt/some/other/directory
 
-# Directory where in-progress uploads are stored.
-#
-uploads_path: "DATADIR/uploads"
-
 # The largest allowed upload size in bytes
 #
 #max_upload_size: 10M
@@ -1115,14 +1118,19 @@ metrics_flags:
 signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 
 # The keys that the server used to sign messages with but won't use
-# to sign new messages. E.g. it has lost its private key
+# to sign new messages.
 #
-#old_signing_keys:
-#  "ed25519:auto":
-#    # Base64 encoded public key
-#    key: "The public part of your old signing key."
-#    # Millisecond POSIX timestamp when the key expired.
-#    expired_ts: 123456789123
+old_signing_keys:
+  # For each key, `key` should be the base64-encoded public key, and
+  # `expired_ts`should be the time (in milliseconds since the unix epoch) that
+  # it was last used.
+  #
+  # It is possible to build an entry from an old signing.key file using the
+  # `export_signing_key` script which is provided with synapse.
+  #
+  # For example:
+  #
+  #"ed25519:id": { key: "base64string", expired_ts: 123456789123 }
 
 # How long key response published by this server is valid for.
 # Used to set the valid_until_ts in /key/v2 APIs.
@@ -1250,33 +1258,58 @@ saml2_config:
   #
   #config_path: "CONFDIR/sp_conf.py"
 
-  # the lifetime of a SAML session. This defines how long a user has to
+  # The lifetime of a SAML session. This defines how long a user has to
   # complete the authentication process, if allow_unsolicited is unset.
   # The default is 5 minutes.
   #
   #saml_session_lifetime: 5m
 
-  # The SAML attribute (after mapping via the attribute maps) to use to derive
-  # the Matrix ID from. 'uid' by default.
+  # An external module can be provided here as a custom solution to
+  # mapping attributes returned from a saml provider onto a matrix user.
   #
-  #mxid_source_attribute: displayName
+  user_mapping_provider:
+    # The custom module's class. Uncomment to use a custom module.
+    #
+    #module: mapping_provider.SamlMappingProvider
 
-  # The mapping system to use for mapping the saml attribute onto a matrix ID.
-  # Options include:
-  #  * 'hexencode' (which maps unpermitted characters to '=xx')
-  #  * 'dotreplace' (which replaces unpermitted characters with '.').
-  # The default is 'hexencode'.
-  #
-  #mxid_mapping: dotreplace
+    # Custom configuration values for the module. Below options are
+    # intended for the built-in provider, they should be changed if
+    # using a custom module. This section will be passed as a Python
+    # dictionary to the module's `parse_config` method.
+    #
+    config:
+      # The SAML attribute (after mapping via the attribute maps) to use
+      # to derive the Matrix ID from. 'uid' by default.
+      #
+      # Note: This used to be configured by the
+      # saml2_config.mxid_source_attribute option. If that is still
+      # defined, its value will be used instead.
+      #
+      #mxid_source_attribute: displayName
 
-  # In previous versions of synapse, the mapping from SAML attribute to MXID was
-  # always calculated dynamically rather than stored in a table. For backwards-
-  # compatibility, we will look for user_ids matching such a pattern before
-  # creating a new account.
+      # The mapping system to use for mapping the saml attribute onto a
+      # matrix ID.
+      #
+      # Options include:
+      #  * 'hexencode' (which maps unpermitted characters to '=xx')
+      #  * 'dotreplace' (which replaces unpermitted characters with
+      #     '.').
+      # The default is 'hexencode'.
+      #
+      # Note: This used to be configured by the
+      # saml2_config.mxid_mapping option. If that is still defined, its
+      # value will be used instead.
+      #
+      #mxid_mapping: dotreplace
+
+  # In previous versions of synapse, the mapping from SAML attribute to
+  # MXID was always calculated dynamically rather than stored in a
+  # table. For backwards- compatibility, we will look for user_ids
+  # matching such a pattern before creating a new account.
   #
   # This setting controls the SAML attribute which will be used for this
-  # backwards-compatibility lookup. Typically it should be 'uid', but if the
-  # attribute maps are changed, it may be necessary to change it.
+  # backwards-compatibility lookup. Typically it should be 'uid', but if
+  # the attribute maps are changed, it may be necessary to change it.
   #
   # The default is 'uid'.
   #

@@ -1,0 +1,1 @@
+Simplify http handling by removing redundant SynapseRequestFactory.

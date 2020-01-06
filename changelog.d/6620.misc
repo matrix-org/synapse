@@ -1,0 +1,1 @@
+Add a workaround for synapse raising exceptions when fetching the notary's own key from the notary.

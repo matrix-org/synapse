@@ -15,6 +15,7 @@
 import logging
 
 from canonicaljson import encode_canonical_json, json
+from signedjson.key import encode_verify_key_base64
 from signedjson.sign import sign_json
 
 from twisted.internet import defer
@@ -216,15 +217,28 @@ class RemoteKey(DirectServeResource):
         if cache_misses and query_remote_on_cache_miss:
             yield self.fetcher.get_keys(cache_misses)
             yield self.query_keys(request, query, query_remote_on_cache_miss=False)
-        else:
-            signed_keys = []
-            for key_json in json_results:
-                key_json = json.loads(key_json)
+            return
+
+        signed_keys = []
+        for key_json in json_results:
+            key_json = json.loads(key_json)
+
+            # backwards-compatibility hack for #6596: if the requested key belongs
+            # to us, make sure that all of the signing keys appear in the
+            # "verify_keys" section.
+            if key_json["server_name"] == self.config.server_name:
+                verify_keys = key_json["verify_keys"]
                 for signing_key in self.config.key_server_signing_keys:
-                    key_json = sign_json(key_json, self.config.server_name, signing_key)
+                    key_id = "%s:%s" % (signing_key.alg, signing_key.version)
+                    verify_keys[key_id] = {
+                        "key": encode_verify_key_base64(signing_key.verify_key)
+                    }
 
-                signed_keys.append(key_json)
+            for signing_key in self.config.key_server_signing_keys:
+                key_json = sign_json(key_json, self.config.server_name, signing_key)
 
-            results = {"server_keys": signed_keys}
+            signed_keys.append(key_json)
 
-            respond_with_json_bytes(request, 200, encode_canonical_json(results))
+        results = {"server_keys": signed_keys}
+
+        respond_with_json_bytes(request, 200, encode_canonical_json(results))

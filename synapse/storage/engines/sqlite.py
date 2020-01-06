@@ -16,8 +16,6 @@
 import struct
 import threading
 
-from synapse.storage.prepare_database import prepare_database
-
 
 class Sqlite3Engine(object):
     single_threaded = True
@@ -62,6 +60,10 @@ class Sqlite3Engine(object):
         return sql
 
     def on_new_connection(self, db_conn):
+
+        # We need to import here to avoid an import loop.
+        from synapse.storage.prepare_database import prepare_database
+
         if self._is_in_memory:
             # In memory databases need to be rebuilt each time. Ideally we'd
             # reuse the same connection as we do when starting up, but that

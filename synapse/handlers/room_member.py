@@ -194,7 +194,7 @@ class RoomMemberHandler(object):
             requester, event, context, extra_users=[target], ratelimit=ratelimit
         )
 
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = yield context.get_prev_state_ids()
 
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
 
@@ -527,6 +527,8 @@ class RoomMemberHandler(object):
         Returns:
             Deferred
         """
+        logger.info("Transferring room state from %s to %s", old_room_id, room_id)
+
         # Find all local users that were in the old room and copy over each user's state
         users = yield self.store.get_users_in_room(old_room_id)
         yield self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
@@ -621,7 +623,7 @@ class RoomMemberHandler(object):
         if prev_event is not None:
             return
 
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = yield context.get_prev_state_ids()
         if event.membership == Membership.JOIN:
             if requester.is_guest:
                 guest_can_join = yield self._can_guest_join(prev_state_ids)

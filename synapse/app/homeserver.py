@@ -39,7 +39,6 @@ import synapse
 import synapse.config.logger
 from synapse import events
 from synapse.api.urls import (
-    CONTENT_REPO_PREFIX,
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_PREFIX,
@@ -65,11 +64,10 @@ from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.key.v2 import KeyApiV2Resource
-from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
+from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.httpresourcetree import create_resource_tree
@@ -223,13 +221,7 @@ class SynapseHomeServer(HomeServer):
             if self.get_config().enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
-                    {
-                        MEDIA_PREFIX: media_repo,
-                        LEGACY_MEDIA_PREFIX: media_repo,
-                        CONTENT_REPO_PREFIX: ContentRepoResource(
-                            self, self.config.uploads_path
-                        ),
-                    }
+                    {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
                 )
             elif name == "media":
                 raise ConfigError(
@@ -318,7 +310,7 @@ def setup(config_options):
             "Synapse Homeserver", config_options
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + str(e) + "\n")
+        sys.stderr.write("\nERROR: %s\n" % (e,))
         sys.exit(1)
 
     if not config:
@@ -328,15 +320,10 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    database_engine = create_engine(config.database_config)
-    config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
-
     hs = SynapseHomeServer(
         config.server_name,
-        db_config=config.database_config,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
-        database_engine=database_engine,
     )
 
     synapse.config.logger.setup_logging(hs, config, use_worker_options=False)
@@ -347,13 +334,8 @@ def setup(config_options):
         hs.setup()
     except IncorrectDatabaseSetup as e:
         quit_with_error(str(e))
-    except UpgradeDatabaseException:
-        sys.stderr.write(
-            "\nFailed to upgrade database.\n"
-            "Have you checked for version specific instructions in"
-            " UPGRADES.rst?\n"
-        )
-        sys.exit(1)
+    except UpgradeDatabaseException as e:
+        quit_with_error("Failed to upgrade database: %s" % (e,))
 
     hs.setup_master()
 
@@ -519,8 +501,10 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     # Database version
     #
 
-    stats["database_engine"] = hs.database_engine.module.__name__
-    stats["database_server_version"] = hs.database_engine.server_version
+    # This only reports info about the *main* database.
+    stats["database_engine"] = hs.get_datastore().db.engine.module.__name__
+    stats["database_server_version"] = hs.get_datastore().db.engine.server_version
+
     logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
     try:
         yield hs.get_proxied_http_client().put_json(
