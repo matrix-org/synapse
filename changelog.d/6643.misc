@@ -1,0 +1,1 @@
+Fix test failures when frozen_dicts are enabled.
