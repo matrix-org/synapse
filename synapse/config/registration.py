@@ -324,6 +324,11 @@ class RegistrationConfig(Config):
         # users cannot be auto-joined since they do not exist.
         #
         #autocreate_auto_join_rooms: true
+
+        # When auto_join_rooms is specified, setting this flag to False prevents
+        # guest accounts from being automatically joined to the rooms. Default
+        # true when auto_join_rooms is specified.
+        #auto_join_rooms_for_guests: False
         """
             % locals()
         )
