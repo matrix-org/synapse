@@ -16,7 +16,7 @@
 # limitations under the License.
 
 """Contains functions for performing events on rooms."""
-import copy
+
 import itertools
 import logging
 import math
@@ -368,13 +368,16 @@ class RoomCreationHandler(BaseHandler):
         # Raise the requester's power level in the new room if necessary
         current_power_level = power_levels["users"][user_id]
         if current_power_level < needed_power_level:
-            # Perform a deepcopy in order to not modify the original power levels in a
-            # room, as its contents are preserved as the state for the old room later on
-            new_power_levels = copy.deepcopy(power_levels)
-            initial_state[(EventTypes.PowerLevels, "")] = new_power_levels
+            # make sure we copy the event content rather than overwriting it.
+            # note that if frozen_dicts are enabled, `power_levels` will be a frozen
+            # dict so we can't just copy.deepcopy it.
 
-            # Assign this power level to the requester
+            new_power_levels = {k: v for k, v in power_levels.items() if k != "users"}
+            new_power_levels["users"] = {
+                k: v for k, v in power_levels.get("users", {}).items() if k != user_id
+            }
             new_power_levels["users"][user_id] = needed_power_level
+            initial_state[(EventTypes.PowerLevels, "")] = new_power_levels
 
         yield self._send_events_for_new_room(
             requester,

@@ -507,6 +507,8 @@ class RoomMemberHandler(object):
         Returns:
             Deferred
         """
+        logger.info("Transferring room state from %s to %s", old_room_id, room_id)
+
         # Find all local users that were in the old room and copy over each user's state
         users = yield self.store.get_users_in_room(old_room_id)
         yield self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
