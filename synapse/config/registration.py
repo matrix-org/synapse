@@ -328,7 +328,7 @@ class RegistrationConfig(Config):
         # When auto_join_rooms is specified, setting this flag to False prevents
         # guest accounts from being automatically joined to the rooms. Default
         # true when auto_join_rooms is specified.
-        #auto_join_rooms_for_guests: False
+        #auto_join_rooms_for_guests: false
         """
             % locals()
         )
