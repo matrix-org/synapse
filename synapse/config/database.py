@@ -15,7 +15,6 @@
 import logging
 import os
 from textwrap import indent
-from typing import List
 
 import yaml
 
@@ -30,16 +29,13 @@ class DatabaseConnectionConfig:
     Args:
         name: A label for the database, used for logging.
         db_config: The config for a particular database, as per `database`
-            section of main config. Has two fields: `name` for database
-            module name, and `args` for the args to give to the database
-            connector.
-        data_stores: The list of data stores that should be provisioned on the
-            database. Defaults to all data stores.
+            section of main config. Has three fields: `name` for database
+            module name, `args` for the args to give to the database
+            connector, and optional `data_stores` that is a list of stores to
+            provision on this database (defaulting to all).
     """
 
-    def __init__(
-        self, name: str, db_config: dict, data_stores: List[str] = ["main", "state"]
-    ):
+    def __init__(self, name: str, db_config: dict):
         if db_config["name"] not in ("sqlite3", "psycopg2"):
             raise ConfigError("Unsupported database type %r" % (db_config["name"],))
 
@@ -47,6 +43,10 @@ class DatabaseConnectionConfig:
             db_config.setdefault("args", {}).update(
                 {"cp_min": 1, "cp_max": 1, "check_same_thread": False}
             )
+
+        data_stores = db_config.get("data_stores")
+        if data_stores is None:
+            data_stores = ["main", "state"]
 
         self.name = name
         self.config = db_config
@@ -59,14 +59,43 @@ class DatabaseConfig(Config):
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
 
+        # We *experimentally* support specifying multiple databases via the
+        # `databases` key. This is a map from a label to database config in the
+        # same format as the `database` config option, plus an extra
+        # `data_stores` key to specify which data store goes where. For example:
+        #
+        #   databases:
+        #       master:
+        #           name: psycopg2
+        #           data_stores: ["main"]
+        #           args: {}
+        #       state:
+        #           name: psycopg2
+        #           data_stores: ["state"]
+        #           args: {}
+
+        multi_database_config = config.get("databases")
         database_config = config.get("database")
 
-        if database_config is None:
-            database_config = {"name": "sqlite3", "args": {}}
+        if multi_database_config and database_config:
+            raise ConfigError("Can't specify both 'database' and 'datbases' in config")
 
-        self.databases = [DatabaseConnectionConfig("master", database_config)]
+        if multi_database_config:
+            if config.get("database_path"):
+                raise ConfigError("Can't specify 'database_path' with 'databases'")
 
-        self.set_databasepath(config.get("database_path"))
+            self.databases = [
+                DatabaseConnectionConfig(name, db_conf)
+                for name, db_conf in multi_database_config.items()
+            ]
+
+        else:
+            if database_config is None:
+                database_config = {"name": "sqlite3", "args": {}}
+
+            self.databases = [DatabaseConnectionConfig("master", database_config)]
+
+            self.set_databasepath(config.get("database_path"))
 
     def generate_config_section(self, data_dir_path, database_conf, **kwargs):
         if not database_conf:
