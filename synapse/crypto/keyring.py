@@ -511,17 +511,18 @@ class BaseV2KeyFetcher(object):
         server_name = response_json["server_name"]
         verified = False
         for key_id in response_json["signatures"].get(server_name, {}):
-            # each of the keys used for the signature must be present in the response
-            # json.
             key = verify_keys.get(key_id)
             if not key:
-                raise KeyLookupError(
-                    "Key response is signed by key id %s:%s but that key is not "
-                    "present in the response" % (server_name, key_id)
-                )
+                # the key may not be present in verify_keys if:
+                #  * we got the key from the notary server, and:
+                #  * the key belongs to the notary server, and:
+                #  * the notary server is using a different key to sign notary
+                #    responses.
+                continue
 
             verify_signed_json(response_json, server_name, key.verify_key)
             verified = True
+            break
 
         if not verified:
             raise KeyLookupError(
