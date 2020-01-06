@@ -136,6 +136,7 @@ def default_config(name, parse=False):
         "media_storage_providers": [],
         "autocreate_auto_join_rooms": True,
         "auto_join_rooms": [],
+        "auto_join_rooms_for_guest": True,
         "limit_usage_by_mau": False,
         "hs_disabled": False,
         "hs_disabled_message": "",

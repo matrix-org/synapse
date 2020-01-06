@@ -135,6 +135,14 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
+    def test_auto_join_rooms_for_guests(self):
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+        self.hs.config.auto_join_rooms_for_guests = False
+        user_id = self.get_success(self.handler.register_user(localpart="jeff", make_guest=True))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertEqual(len(rooms), 0)
+
     def test_auto_create_auto_join_rooms(self):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]

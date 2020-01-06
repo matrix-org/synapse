@@ -125,6 +125,7 @@ class RegistrationConfig(Config):
             if not RoomAlias.is_valid(room_alias):
                 raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
+        self.auto_join_rooms_for_guests = config.get("auto_join_rooms_for_guests", True)
 
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False

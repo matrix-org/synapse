@@ -248,7 +248,13 @@ class RegistrationHandler(BaseHandler):
                     fail_count += 1
 
         if not self.hs.config.user_consent_at_registration:
-            yield self._auto_join_rooms(user_id)
+            if not self.hs.config.auto_join_rooms_for_guests and make_guest:
+                logger.info(
+                    "Skipping auto-join for %s because auto-join for guests is disabled",
+                    user_id,
+                )
+            else:
+                yield self._auto_join_rooms(user_id)
         else:
             logger.info(
                 "Skipping auto-join for %s because consent is required at registration",
