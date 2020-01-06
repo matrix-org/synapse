@@ -15,7 +15,6 @@
 import logging
 import os
 from textwrap import indent
-from typing import List
 
 import yaml
 
@@ -30,14 +29,13 @@ class DatabaseConnectionConfig:
     Args:
         name: A label for the database, used for logging.
         db_config: The config for a particular database, as per `database`
-            section of main config. Has two fields: `name` for database
-            module name, and `args` for the args to give to the database
-            connector.
-        data_stores: The list of data stores that should be provisioned on the
-            database. Defaults to all data stores.
+            section of main config. Has three fields: `name` for database
+            module name, `args` for the args to give to the database
+            connector, and optional `data_stores` that is a list of stores to
+            provision on this database (defaulting to all).
     """
 
-    def __init__(self, name: str, db_config: dict, data_stores: List[str] = None):
+    def __init__(self, name: str, db_config: dict):
         if db_config["name"] not in ("sqlite3", "psycopg2"):
             raise ConfigError("Unsupported database type %r" % (db_config["name"],))
 
@@ -46,6 +44,7 @@ class DatabaseConnectionConfig:
                 {"cp_min": 1, "cp_max": 1, "check_same_thread": False}
             )
 
+        data_stores = db_config.get("data_stores")
         if data_stores is None:
             data_stores = ["main", "state"]
 
@@ -86,9 +85,7 @@ class DatabaseConfig(Config):
                 raise ConfigError("Can't specify 'database_path' with 'databases'")
 
             self.databases = [
-                DatabaseConnectionConfig(
-                    name, db_conf, data_stores=db_conf.get("data_stores")
-                )
+                DatabaseConnectionConfig(name, db_conf)
                 for name, db_conf in multi_database_config.items()
             ]
 
