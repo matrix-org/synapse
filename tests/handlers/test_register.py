@@ -139,7 +139,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
         self.hs.config.auto_join_rooms_for_guests = False
-        user_id = self.get_success(self.handler.register_user(localpart="jeff", make_guest=True))
+        user_id = self.get_success(
+            self.handler.register_user(localpart="jeff", make_guest=True),
+        )
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
