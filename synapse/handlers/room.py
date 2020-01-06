@@ -366,16 +366,15 @@ class RoomCreationHandler(BaseHandler):
         needed_power_level = max(state_default, ban, max(event_power_levels.values()))
 
         # Raise the requester's power level in the new room if necessary
-        current_power_level = power_levels["users"][requester.user.to_string()]
+        current_power_level = power_levels["users"][user_id]
         if current_power_level < needed_power_level:
             # Perform a deepcopy in order to not modify the original power levels in a
             # room, as its contents are preserved as the state for the old room later on
-            existing_power_levels = initial_state[(EventTypes.PowerLevels, "")]
-            new_power_levels = copy.deepcopy(existing_power_levels)
+            new_power_levels = copy.deepcopy(power_levels)
             initial_state[(EventTypes.PowerLevels, "")] = new_power_levels
 
             # Assign this power level to the requester
-            new_power_levels["users"][requester.user.to_string()] = needed_power_level
+            new_power_levels["users"][user_id] = needed_power_level
 
         yield self._send_events_for_new_room(
             requester,
