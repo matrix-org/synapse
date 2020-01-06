@@ -60,21 +60,14 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
                 (event_id, bytearray(b"ffff")),
             )
 
-        for i in range(0, 11):
+        for i in range(0, 20):
             yield self.store.db.runInteraction("insert", insert_event, i)
 
-        # this should get the last five and five others
+        # this should get the last ten
         r = yield self.store.get_prev_events_for_room(room_id)
         self.assertEqual(10, len(r))
-        for i in range(0, 5):
-            el = r[i]
-            depth = el[2]
-            self.assertEqual(10 - i, depth)
-
-        for i in range(5, 5):
-            el = r[i]
-            depth = el[2]
-            self.assertLessEqual(5, depth)
+        for i in range(0, 10):
+            self.assertEqual("$event_%i:local" % (19 - i), r[i])
 
     @defer.inlineCallbacks
     def test_get_rooms_with_many_extremities(self):
