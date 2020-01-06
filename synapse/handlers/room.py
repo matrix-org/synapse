@@ -16,7 +16,7 @@
 # limitations under the License.
 
 """Contains functions for performing events on rooms."""
-import copy
+
 import itertools
 import logging
 import math
