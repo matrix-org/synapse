@@ -17,6 +17,7 @@
 import collections
 import logging
 import re
+from abc import abstractmethod
 from typing import Optional, Tuple
 
 from six import integer_types
@@ -499,7 +500,12 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
         return len(rooms)
 
+    @abstractmethod
     def set_room_is_public(self, room_id, is_public):
+        # this will need to be implemented if a background update is performed with
+        # existing (tombstoned, public) rooms in the database.
+        #
+        # It's overridden by RoomStore for the synapse master.
         raise NotImplementedError()
 
 
