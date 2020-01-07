@@ -436,6 +436,21 @@ class BackgroundUpdater(object):
             "background_updates", keyvalues={"update_name": update_name}
         )
 
+    def _background_update_progress(self, update_name: str, progress: dict):
+        """Update the progress of a background update
+
+        Args:
+            update_name: The name of the background update task
+            progress: The progress of the update.
+        """
+
+        return self.db.runInteraction(
+            "background_update_progress",
+            self._background_update_progress_txn,
+            update_name,
+            progress,
+        )
+
     def _background_update_progress_txn(self, txn, update_name, progress):
         """Update the progress of a background update
 
