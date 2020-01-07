@@ -6,6 +6,9 @@ follow the semantics described in
 [MSC1763](https://github.com/matrix-org/matrix-doc/blob/matthew/msc1763/proposals/1763-configurable-retention-periods.md),
 and allow server and room admins to configure how long messages should
 be kept in a homeserver's database before being purged from it.
+**Please note that, as this feature isn't part of the Matrix
+specification yet, this implementation is to be considered as
+experimental.** 
 
 A message retention policy is mainly defined by its `max_lifetime`
 parameter, which defines how long a message can be kept around after
@@ -38,30 +41,6 @@ enabled) receives from another server an event that should have been
 purged according to its room's policy, then the receiving server will
 process and store that event until it's picked up by the next purge job,
 though it will always hide it from clients.
-
-
-## Room configuration
-
-To configure a room's message retention policy, a room's admin or
-moderator needs to send a state event in that room with the type
-`m.room.retention` and the following content:
-
-```json
-{
-    "max_lifetime": ...
-}
-```
-
-In this event's content, the `max_lifetime` parameter has the same
-meaning as previously described, and needs to be expressed in
-milliseconds. The event's content can also include a `min_lifetime`
-parameter, which has the same meaning and limited support as previously
-described.
-
-Note that over every server in the room, only the ones with support for
-message retention policies will actually remove expired events. While
-we plan to eventually enable this support by default in Synapse, this
-isn't currently the case.
 
 
 ## Server configuration
@@ -103,9 +82,8 @@ Purge jobs are the jobs that Synapse runs in the background to purge
 expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
-Synapse will run one daily that will handle every room with a message
-retention policy (or, if the server has a default policy configured,
-every room it knows), which should be enough in most cases.
+Synapse will use a default configuration, which is described in the
+[sample configuration file](https://github.com/matrix-org/synapse/blob/v1.7.3/docs/sample_config.yaml#L332-L393).
 
 Some server admins might want a finer control on when events are removed
 depending on an event's room's policy. This can be done by setting the
@@ -175,6 +153,29 @@ minimum and no maximum).
 
 Like other settings in this section, these parameters can be expressed
 either as a duration or as a number of milliseconds.
+
+
+## Room configuration
+
+To configure a room's message retention policy, a room's admin or
+moderator needs to send a state event in that room with the type
+`m.room.retention` and the following content:
+
+```json
+{
+    "max_lifetime": ...
+}
+```
+
+In this event's content, the `max_lifetime` parameter has the same
+meaning as previously described, and needs to be expressed in
+milliseconds. The event's content can also include a `min_lifetime`
+parameter, which has the same meaning and limited support as previously
+described.
+
+Note that over every server in the room, only the ones with support for
+message retention policies will actually remove expired events. This
+support is currently not enabled by default in Synapse.
 
 
 ## Note on reclaiming disk space
