@@ -948,9 +948,9 @@ class ServerConfig(Config):
           #
           # The rationale for this per-job configuration is that some rooms might have a
           # retention policy with a low 'max_lifetime', where history needs to be purged
-          # of outdated messages on a more frequent basis (e.g. every 12h), but not want
-          # that purge to be performed by a job that's iterating over every room it knows,
-          # which could be heavy on the server.
+          # of outdated messages on a more frequent basis than for the rest of the rooms
+          # (e.g. every 12h), but not want that purge to be performed by a job that's
+          # iterating over every room it knows, which could be heavy on the server.
           #
           #purge_jobs:
           #  - shortest_max_lifetime: 1d
