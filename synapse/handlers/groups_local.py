@@ -130,6 +130,8 @@ class GroupsLocalHandler(object):
                 res = yield self.transport_client.get_group_summary(
                     get_domain_from_id(group_id), group_id, requester_user_id
                 )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
             except RequestSendFailed:
                 raise SynapseError(502, "Failed to contact group server")
 
@@ -190,6 +192,8 @@ class GroupsLocalHandler(object):
                 res = yield self.transport_client.create_group(
                     get_domain_from_id(group_id), group_id, user_id, content
                 )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
             except RequestSendFailed:
                 raise SynapseError(502, "Failed to contact group server")
 
@@ -231,6 +235,8 @@ class GroupsLocalHandler(object):
             res = yield self.transport_client.get_users_in_group(
                 get_domain_from_id(group_id), group_id, requester_user_id
             )
+        except HttpResponseException as e:
+            raise e.to_synapse_error()
         except RequestSendFailed:
             raise SynapseError(502, "Failed to contact group server")
 
@@ -271,6 +277,8 @@ class GroupsLocalHandler(object):
                 res = yield self.transport_client.join_group(
                     get_domain_from_id(group_id), group_id, user_id, content
                 )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
             except RequestSendFailed:
                 raise SynapseError(502, "Failed to contact group server")
 
@@ -315,6 +323,8 @@ class GroupsLocalHandler(object):
                 res = yield self.transport_client.accept_group_invite(
                     get_domain_from_id(group_id), group_id, user_id, content
                 )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
             except RequestSendFailed:
                 raise SynapseError(502, "Failed to contact group server")
 
@@ -361,6 +371,8 @@ class GroupsLocalHandler(object):
                     requester_user_id,
                     content,
                 )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
             except RequestSendFailed:
                 raise SynapseError(502, "Failed to contact group server")
 
@@ -424,6 +436,8 @@ class GroupsLocalHandler(object):
                     user_id,
                     content,
                 )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
             except RequestSendFailed:
                 raise SynapseError(502, "Failed to contact group server")
 
@@ -460,6 +474,8 @@ class GroupsLocalHandler(object):
                 bulk_result = yield self.transport_client.bulk_get_publicised_groups(
                     get_domain_from_id(user_id), [user_id]
                 )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
             except RequestSendFailed:
                 raise SynapseError(502, "Failed to contact group server")
 
