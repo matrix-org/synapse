@@ -32,7 +32,7 @@ from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.server import FakeChannel, setup_test_homeserver, wait_until_result
+from tests.server import FakeChannel, wait_until_result
 from tests.utils import default_config
 
 
