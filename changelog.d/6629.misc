@@ -1,1 +1,0 @@
-Simplify event creation code by removing redundant queries on the event_reference_hashes table.

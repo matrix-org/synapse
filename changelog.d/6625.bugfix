@@ -1,1 +1,0 @@
-Fix exception when fetching the `matrix.org:ed25519:auto` key.

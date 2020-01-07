@@ -1,1 +1,0 @@
-Fix exceptions in the synchrotron worker log when events are rejected.

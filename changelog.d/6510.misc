@@ -1,1 +1,0 @@
-Change phone home stats to not assume there is a single database and report information about the database used by the main data store.
