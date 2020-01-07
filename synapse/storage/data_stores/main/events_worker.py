@@ -137,7 +137,7 @@ class EventsWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_event(
         self,
-        event_id: List[str],
+        event_id: str,
         redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
@@ -148,15 +148,22 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             event_id: The event_id of the event to fetch
+
             redact_behaviour: Determine what to do with a redacted event. Possible values:
                 * AS_IS - Return the full event body with no redacted content
                 * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events
+                * DISALLOW - Do not return redacted events (behave as per allow_none
+                    if the event is redacted)
+
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
-            allow_rejected: If True return rejected events.
+
+            allow_rejected: If True, return rejected events. Otherwise,
+                behave as per allow_none.
+
             allow_none: If True, return None if no event found, if
                 False throw a NotFoundError
+
             check_room_id: if not None, check the room of the found event.
                 If there is a mismatch, behave as per allow_none.
 
@@ -196,14 +203,18 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             event_ids: The event_ids of the events to fetch
+
             redact_behaviour: Determine what to do with a redacted event. Possible
                 values:
                 * AS_IS - Return the full event body with no redacted content
                 * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events
+                * DISALLOW - Do not return redacted events (omit them from the response)
+
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
-            allow_rejected: If True return rejected events.
+
+            allow_rejected: If True, return rejected events. Otherwise,
+                omits rejeted events from the response.
 
         Returns:
             Deferred : Dict from event_id to event.
@@ -228,15 +239,21 @@ class EventsWorkerStore(SQLBaseStore):
         """Get events from the database and return in a list in the same order
         as given by `event_ids` arg.
 
+        Unknown events will be omitted from the response.
+
         Args:
             event_ids: The event_ids of the events to fetch
+
             redact_behaviour: Determine what to do with a redacted event. Possible values:
                 * AS_IS - Return the full event body with no redacted content
                 * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events
+                * DISALLOW - Do not return redacted events (omit them from the response)
+
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
-            allow_rejected: If True, return rejected events.
+
+            allow_rejected: If True, return rejected events. Otherwise,
+                omits rejected events from the response.
 
         Returns:
             Deferred[list[EventBase]]: List of events fetched from the database. The
@@ -369,9 +386,14 @@ class EventsWorkerStore(SQLBaseStore):
 
         If events are pulled from the database, they will be cached for future lookups.
 
+        Unknown events are omitted from the response.
+
         Args:
+
             event_ids (Iterable[str]): The event_ids of the events to fetch
-            allow_rejected (bool): Whether to include rejected events
+
+            allow_rejected (bool): Whether to include rejected events. If False,
+                rejected events are omitted from the response.
 
         Returns:
             Deferred[Dict[str, _EventCacheEntry]]:
@@ -506,9 +528,13 @@ class EventsWorkerStore(SQLBaseStore):
 
         Returned events will be added to the cache for future lookups.
 
+        Unknown events are omitted from the response.
+
         Args:
             event_ids (Iterable[str]): The event_ids of the events to fetch
-            allow_rejected (bool): Whether to include rejected events
+
+            allow_rejected (bool): Whether to include rejected events. If False,
+                rejected events are omitted from the response.
 
         Returns:
             Deferred[Dict[str, _EventCacheEntry]]:
