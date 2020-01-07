@@ -9,13 +9,13 @@ be kept in a homeserver's database before being purged from it.
 
 A message retention policy is mainly defined by its `max_lifetime`
 parameter, which defines how long a message can be kept around after
-it's been sent in the room. If a room doesn't have a message retention
+it was sent to the room. If a room doesn't have a message retention
 policy, and there's no default one for a given server, then no message
 sent in that room is ever purged on that server.
 
 MSC1763 also specifies semantics for a `min_lifetime` parameter which
 defines the amount of time after which an event _can_ get purged (after
-it's been sent to the room), but Synapse doesn't currently support it
+it was sent to the room), but Synapse doesn't currently support it
 beyond registering it.
 
 Both `max_lifetime` and `min_lifetime` are optional parameters.
@@ -70,7 +70,7 @@ Support for this feature can be enabled and configured in the
 `retention` section of the Synapse configuration file (see the
 [sample file](https://github.com/matrix-org/synapse/blob/v1.7.3/docs/sample_config.yaml#L332-L393)).
 
-To enable support for message retentions policies, set the setting
+To enable support for message retention policies, set the setting
 `enabled` in this section to `true`.
 
 
@@ -99,7 +99,7 @@ duration (using the units `s` (seconds), `m` (minutes), `h` (hours),
 
 ### Purge jobs
 
-Purge jobs are the jobs that Synapse run in the background to purge
+Purge jobs are the jobs that Synapse runs in the background to purge
 expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
@@ -188,4 +188,3 @@ If you want to reclaim the freed disk space anyway and return it to the
 operating system, the server admin needs to run `VACUUM FULL;` (or
 `VACUUM;` for SQLite databases) on Synapse's database (see the related
 [PostgreSQL documentation](https://www.postgresql.org/docs/current/sql-vacuum.html)).
-
