@@ -1,0 +1,1 @@
+No more overriding the entire /etc folder of the container in docker-compose.yaml. Contributed by Fabian Meyer
