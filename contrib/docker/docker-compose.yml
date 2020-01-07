@@ -18,7 +18,7 @@ services:
       - SYNAPSE_CONFIG_PATH=/etc/homeserver.yaml
     volumes:
       # You may either store all the files in a local folder
-      - ./matrix-config:/etc
+      - ./matrix-config/homeserver.yaml:/etc/homeserver.yaml
       - ./files:/data
       # .. or you may split this between different storage points
       # - ./files:/data
