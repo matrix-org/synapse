@@ -36,7 +36,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import JsonResource
-from synapse.http.site import SynapseRequest
+from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.server import HomeServer
 from synapse.types import Requester, UserID, create_requester
@@ -209,6 +209,15 @@ class HomeserverTestCase(TestCase):
 
         # Register the resources
         self.resource = self.create_test_json_resource()
+
+        # create a site to wrap the resource.
+        self.site = SynapseSite(
+            logger_name="synapse.access.http.fake",
+            site_tag="test",
+            config={},
+            resource=self.resource,
+            server_version_string="1",
+        )
 
         from tests.rest.client.v1.utils import RestHelper
 
@@ -522,10 +531,6 @@ class HomeserverTestCase(TestCase):
         secrets = self.hs.get_secrets()
         requester = Requester(user, None, False, None, None)
 
-        prev_events_and_hashes = None
-        if prev_event_ids:
-            prev_events_and_hashes = [[p, {}, 0] for p in prev_event_ids]
-
         event, context = self.get_success(
             event_creator.create_event(
                 requester,
@@ -535,7 +540,7 @@ class HomeserverTestCase(TestCase):
                     "sender": user.to_string(),
                     "content": {"body": secrets.token_hex(), "msgtype": "m.text"},
                 },
-                prev_events_and_hashes=prev_events_and_hashes,
+                prev_event_ids=prev_event_ids,
             )
         )
 

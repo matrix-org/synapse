@@ -16,6 +16,7 @@
 # limitations under the License.
 
 """Contains functions for performing events on rooms."""
+
 import itertools
 import logging
 import math
@@ -271,7 +272,7 @@ class RoomCreationHandler(BaseHandler):
             except AuthError as e:
                 logger.warning("Unable to update PLs in old room: %s", e)
 
-        logger.info("Setting correct PLs in new room")
+        logger.info("Setting correct PLs in new room to %s", old_room_pl_state.content)
         yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
@@ -365,13 +366,18 @@ class RoomCreationHandler(BaseHandler):
         needed_power_level = max(state_default, ban, max(event_power_levels.values()))
 
         # Raise the requester's power level in the new room if necessary
-        current_power_level = power_levels["users"][requester.user.to_string()]
+        current_power_level = power_levels["users"][user_id]
         if current_power_level < needed_power_level:
-            # Assign this power level to the requester
-            power_levels["users"][requester.user.to_string()] = needed_power_level
+            # make sure we copy the event content rather than overwriting it.
+            # note that if frozen_dicts are enabled, `power_levels` will be a frozen
+            # dict so we can't just copy.deepcopy it.
 
-        # Set the power levels to the modified state
-        initial_state[(EventTypes.PowerLevels, "")] = power_levels
+            new_power_levels = {k: v for k, v in power_levels.items() if k != "users"}
+            new_power_levels["users"] = {
+                k: v for k, v in power_levels.get("users", {}).items() if k != user_id
+            }
+            new_power_levels["users"][user_id] = needed_power_level
+            initial_state[(EventTypes.PowerLevels, "")] = new_power_levels
 
         yield self._send_events_for_new_room(
             requester,
@@ -733,7 +739,7 @@ class RoomCreationHandler(BaseHandler):
         initial_state,
         creation_content,
         room_alias=None,
-        power_level_content_override=None,
+        power_level_content_override=None,  # Doesn't apply when initial state has power level state event content
         creator_join_profile=None,
     ):
         def create(etype, content, **kwargs):

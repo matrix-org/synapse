@@ -17,6 +17,7 @@
 import collections
 import logging
 import re
+from abc import abstractmethod
 from typing import Optional, Tuple
 
 from six import integer_types
@@ -367,6 +368,8 @@ class RoomWorkerStore(SQLBaseStore):
 
 
 class RoomBackgroundUpdateStore(SQLBaseStore):
+    REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"
+
     def __init__(self, database: Database, db_conn, hs):
         super(RoomBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
@@ -374,6 +377,11 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
         self.db.updates.register_background_update_handler(
             "insert_room_retention", self._background_insert_retention,
+        )
+
+        self.db.updates.register_background_update_handler(
+            self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE,
+            self._remove_tombstoned_rooms_from_directory,
         )
 
     @defer.inlineCallbacks
@@ -443,6 +451,62 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             yield self.db.updates._end_background_update("insert_room_retention")
 
         defer.returnValue(batch_size)
+
+    async def _remove_tombstoned_rooms_from_directory(
+        self, progress, batch_size
+    ) -> int:
+        """Removes any rooms with tombstone events from the room directory
+
+        Nowadays this is handled by the room upgrade handler, but we may have some
+        that got left behind
+        """
+
+        last_room = progress.get("room_id", "")
+
+        def _get_rooms(txn):
+            txn.execute(
+                """
+                SELECT room_id
+                FROM rooms r
+                INNER JOIN current_state_events cse USING (room_id)
+                WHERE room_id > ? AND r.is_public
+                AND cse.type = '%s' AND cse.state_key = ''
+                ORDER BY room_id ASC
+                LIMIT ?;
+                """
+                % EventTypes.Tombstone,
+                (last_room, batch_size),
+            )
+
+            return [row[0] for row in txn]
+
+        rooms = await self.db.runInteraction(
+            "get_tombstoned_directory_rooms", _get_rooms
+        )
+
+        if not rooms:
+            await self.db.updates._end_background_update(
+                self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE
+            )
+            return 0
+
+        for room_id in rooms:
+            logger.info("Removing tombstoned room %s from the directory", room_id)
+            await self.set_room_is_public(room_id, False)
+
+        await self.db.updates._background_update_progress(
+            self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE, {"room_id": rooms[-1]}
+        )
+
+        return len(rooms)
+
+    @abstractmethod
+    def set_room_is_public(self, room_id, is_public):
+        # this will need to be implemented if a background update is performed with
+        # existing (tombstoned, public) rooms in the database.
+        #
+        # It's overridden by RoomStore for the synapse master.
+        raise NotImplementedError()
 
 
 class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):

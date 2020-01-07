@@ -156,7 +156,6 @@ class ContentRepositoryConfig(Config):
                 (provider_class, parsed_config, wrapper_config)
             )
 
-        self.uploads_path = self.ensure_directory(config.get("uploads_path", "uploads"))
         self.dynamic_thumbnails = config.get("dynamic_thumbnails", False)
         self.thumbnail_requirements = parse_thumbnail_requirements(
             config.get("thumbnail_sizes", DEFAULT_THUMBNAIL_SIZES)
@@ -230,10 +229,6 @@ class ContentRepositoryConfig(Config):
         #    store_synchronous: false
         #    config:
         #       directory: /mnt/some/other/directory
-
-        # Directory where in-progress uploads are stored.
-        #
-        uploads_path: "%(uploads_path)s"
 
         # The largest allowed upload size in bytes
         #

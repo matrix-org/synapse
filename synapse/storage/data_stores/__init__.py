@@ -37,6 +37,8 @@ class DataStores(object):
         # store.
 
         self.databases = []
+        self.main = None
+        self.state = None
 
         for database_config in hs.config.database.databases:
             db_name = database_config.name
@@ -54,10 +56,22 @@ class DataStores(object):
 
                 if "main" in database_config.data_stores:
                     logger.info("Starting 'main' data store")
+
+                    # Sanity check we don't try and configure the main store on
+                    # multiple databases.
+                    if self.main:
+                        raise Exception("'main' data store already configured")
+
                     self.main = main_store_class(database, db_conn, hs)
 
                 if "state" in database_config.data_stores:
                     logger.info("Starting 'state' data store")
+
+                    # Sanity check we don't try and configure the state store on
+                    # multiple databases.
+                    if self.state:
+                        raise Exception("'state' data store already configured")
+
                     self.state = StateGroupDataStore(database, db_conn, hs)
 
                 db_conn.commit()
@@ -65,3 +79,10 @@ class DataStores(object):
                 self.databases.append(database)
 
                 logger.info("Database %r prepared", db_name)
+
+        # Sanity check that we have actually configured all the required stores.
+        if not self.main:
+            raise Exception("No 'main' data store configured")
+
+        if not self.state:
+            raise Exception("No 'main' data store configured")

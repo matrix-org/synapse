@@ -1,4 +1,4 @@
-# Example log config file for synapse.
+# Log configuration for Synapse.
 #
 # This is a YAML file containing a standard Python logging configuration
 # dictionary. See [1] for details on the valid settings.
@@ -20,7 +20,7 @@ handlers:
     file:
         class: logging.handlers.RotatingFileHandler
         formatter: precise
-        filename: /home/rav/work/synapse/homeserver.log
+        filename: /var/log/matrix-synapse/homeserver.log
         maxBytes: 104857600
         backupCount: 10
         filters: [context]
