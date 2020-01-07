@@ -15,6 +15,7 @@
 # limitations under the License.
 import re
 import string
+import sys
 from collections import namedtuple
 
 import attr
@@ -22,6 +23,17 @@ from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import SynapseError
+
+# define a version of typing.Collection that works on python 3.5
+if sys.version_info[:3] >= (3, 6, 0):
+    from typing import Collection
+else:
+    from typing import Sized, Iterable, Container, TypeVar
+
+    T_co = TypeVar("T_co", covariant=True)
+
+    class Collection(Iterable[T_co], Container[T_co], Sized):
+        __slots__ = ()
 
 
 class Requester(

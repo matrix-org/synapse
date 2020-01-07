@@ -531,10 +531,6 @@ class HomeserverTestCase(TestCase):
         secrets = self.hs.get_secrets()
         requester = Requester(user, None, False, None, None)
 
-        prev_events_and_hashes = None
-        if prev_event_ids:
-            prev_events_and_hashes = [[p, {}, 0] for p in prev_event_ids]
-
         event, context = self.get_success(
             event_creator.create_event(
                 requester,
@@ -544,7 +540,7 @@ class HomeserverTestCase(TestCase):
                     "sender": user.to_string(),
                     "content": {"body": secrets.token_hex(), "msgtype": "m.text"},
                 },
-                prev_events_and_hashes=prev_events_and_hashes,
+                prev_event_ids=prev_event_ids,
             )
         )
 
