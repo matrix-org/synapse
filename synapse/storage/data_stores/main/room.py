@@ -453,6 +453,8 @@ class RoomWorkerStore(SQLBaseStore):
         remote_media_mxcs = []
 
         while True:
+            # The first time round we just want to get the most recent
+            # events, then we bound by stream ordering
             if next_token is None:
                 sql = """
                     SELECT stream_ordering, json FROM events
@@ -496,6 +498,7 @@ class RoomWorkerStore(SQLBaseStore):
                             remote_media_mxcs.append((hostname, media_id))
 
             if next_token is None:
+                # We've gone through the whole room, so we're finished.
                 break
 
         return local_media_mxcs, remote_media_mxcs
