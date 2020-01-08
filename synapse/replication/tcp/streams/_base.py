@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import itertools
 import logging
 from collections import namedtuple
+from typing import Any
 
 from twisted.internet import defer
 
@@ -104,8 +104,9 @@ class Stream(object):
     time it was called up until the point `advance_current_token` was called.
     """
 
-    NAME = None  # The name of the stream
-    ROW_TYPE = None  # The type of the row. Used by the default impl of parse_row.
+    NAME = None  # type: str  # The name of the stream
+    # The type of the row. Used by the default impl of parse_row.
+    ROW_TYPE = None  # type: Any
     _LIMITED = True  # Whether the update function takes a limit
 
     @classmethod

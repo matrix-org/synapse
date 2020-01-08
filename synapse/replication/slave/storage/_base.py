@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 import six
 
@@ -41,7 +41,7 @@ class BaseSlavedStore(SQLBaseStore):
         if isinstance(self.database_engine, PostgresEngine):
             self._cache_id_gen = SlavedIdTracker(
                 db_conn, "cache_invalidation_stream", "stream_id"
-            )
+            )  # type: Optional[SlavedIdTracker]
         else:
             self._cache_id_gen = None
 

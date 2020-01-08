@@ -16,7 +16,7 @@
 """
 
 import logging
-from typing import Dict
+from typing import Dict, List
 
 from twisted.internet import defer
 from twisted.internet.protocol import ReconnectingClientFactory
@@ -28,6 +28,7 @@ from synapse.replication.tcp.protocol import (
 )
 
 from .commands import (
+    Command,
     FederationAckCommand,
     InvalidateCacheCommand,
     RemovePusherCommand,
@@ -89,12 +90,12 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
 
         # Any pending commands to be sent once a new connection has been
         # established
-        self.pending_commands = []
+        self.pending_commands = []  # type: List[Command]
 
         # Map from string -> deferred, to wake up when receiveing a SYNC with
         # the given string.
         # Used for tests.
-        self.awaiting_syncs = {}
+        self.awaiting_syncs = {}  # type: Dict[str, defer.Deferred]
 
         # The factory used to create connections.
         self.factory = None

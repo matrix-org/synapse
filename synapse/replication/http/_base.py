@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import abc
+from typing import Tuple, Dict, List
 import logging
 import re
 
@@ -78,8 +79,15 @@ class ReplicationEndpoint(object):
 
     __metaclass__ = abc.ABCMeta
 
-    NAME = abc.abstractproperty()
-    PATH_ARGS = abc.abstractproperty()
+    @property
+    @abc.abstractmethod
+    def NAME(self) -> str:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def PATH_ARGS(self) -> Tuple[str, ...]:
+        pass
 
     METHOD = "POST"
     CACHE = True
@@ -171,7 +179,7 @@ class ReplicationEndpoint(object):
                 # have a good idea that the request has either succeeded or failed on
                 # the master, and so whether we should clean up or not.
                 while True:
-                    headers = {}
+                    headers = {}  # type: Dict[bytes, List[bytes]]
                     inject_active_span_byte_dict(headers, None, check_destination=False)
                     try:
                         result = yield request_func(uri, data, headers=headers)
