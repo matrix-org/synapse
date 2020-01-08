@@ -448,35 +448,21 @@ class RoomWorkerStore(SQLBaseStore):
         """
         mxc_re = re.compile("^mxc://([^/]+)/([^/#?]+)")
 
-        next_token = None
+        sql = """
+            SELECT stream_ordering, json FROM events
+            JOIN event_json USING (room_id, event_id)
+            WHERE room_id = ?
+                %(where_clause)s
+                AND contains_url = ? AND outlier = ?
+            ORDER BY stream_ordering DESC
+            LIMIT ?
+        """
+        txn.execute(sql % {"where_clause": ""}, (room_id, True, False, 100))
+
         local_media_mxcs = []
         remote_media_mxcs = []
 
         while True:
-            # The first time round we just want to get the most recent
-            # events, then we bound by stream ordering
-            if next_token is None:
-                sql = """
-                    SELECT stream_ordering, json FROM events
-                    JOIN event_json USING (room_id, event_id)
-                    WHERE room_id = ?
-                        AND contains_url = ? AND outlier = ?
-                    ORDER BY stream_ordering DESC
-                    LIMIT ?
-                """
-                txn.execute(sql, (room_id, True, False, 100))
-            else:
-                sql = """
-                    SELECT stream_ordering, json FROM events
-                    JOIN event_json USING (room_id, event_id)
-                    WHERE room_id = ?
-                        AND stream_ordering < ?
-                        AND contains_url = ? AND outlier = ?
-                    ORDER BY stream_ordering DESC
-                    LIMIT ?
-                """
-                txn.execute(sql, (room_id, next_token, True, False, 100))
-
             next_token = None
             for stream_ordering, content_json in txn:
                 next_token = stream_ordering
@@ -500,6 +486,11 @@ class RoomWorkerStore(SQLBaseStore):
             if next_token is None:
                 # We've gone through the whole room, so we're finished.
                 break
+
+            txn.execute(
+                sql % {"where_clause": "AND stream_ordering < ?"},
+                (room_id, next_token, True, False, 100),
+            )
 
         return local_media_mxcs, remote_media_mxcs
 
