@@ -468,8 +468,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
             cmd.last_seen,
         )
 
-    @defer.inlineCallbacks
-    def subscribe_to_stream(self, stream_name, token):
+    async def subscribe_to_stream(self, stream_name, token):
         """Subscribe the remote to a stream.
 
         This invloves checking if they've missed anything and sending those
@@ -481,7 +480,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
         try:
             # Get missing updates
-            updates, current_token = yield self.streamer.get_stream_updates(
+            updates, current_token = await self.streamer.get_stream_updates(
                 stream_name, token
             )
 
@@ -566,7 +565,7 @@ class AbstractReplicationClientHandler(metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def on_rdata(self, stream_name, token, rows):
+    async def on_rdata(self, stream_name, token, rows):
         """Called to handle a batch of replication data with a given stream token.
 
         Args:
@@ -574,19 +573,16 @@ class AbstractReplicationClientHandler(metaclass=abc.ABCMeta):
             token (int): stream token for this batch of rows
             rows (list): a list of Stream.ROW_TYPE objects as returned by
                 Stream.parse_row.
-
-        Returns:
-            Deferred|None
         """
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def on_position(self, stream_name, token):
+    async def on_position(self, stream_name, token):
         """Called when we get new position data."""
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def on_sync(self, data):
+    async def on_sync(self, data):
         """Called when get a new SYNC command."""
         raise NotImplementedError()
 
