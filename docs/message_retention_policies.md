@@ -101,7 +101,7 @@ file. An example of such configuration could be:
       interval: 2d
 ```
 
-In this example, we define two jobs:
+In this example, we define three jobs:
 
 * one that runs twice a day (every 12 hours) and purges events in rooms
   which policy's `max_lifetime` is lower or equal to 3 days.
