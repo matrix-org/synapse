@@ -14,11 +14,17 @@
 # limitations under the License.
 
 import json
+import os
+import urllib.parse
+from binascii import unhexlify
 
 from mock import Mock
 
+from twisted.internet.defer import Deferred
+
 import synapse.rest.admin
 from synapse.http.server import JsonResource
+from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.admin import VersionServlet
 from synapse.rest.client.v1 import events, login, room
 from synapse.rest.client.v2_alpha import groups
@@ -346,3 +352,326 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
             self.assertEqual(count, 0, msg="Rows not purged in {}".format(table))
 
     test_purge_room.skip = "Disabled because it's currently broken"
+
+
+class QuarantineMediaTestCase(unittest.HomeserverTestCase):
+    """Test /quarantine_media admin API.
+    """
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_media_repo,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.hs = hs
+
+        # Allow for uploading and downloading to/from the media repo
+        self.media_repo = hs.get_media_repository_resource()
+        self.download_resource = self.media_repo.children[b"download"]
+        self.upload_resource = self.media_repo.children[b"upload"]
+        self.image_data = unhexlify(
+            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+            b"0000001f15c4890000000a49444154789c63000100000500010d"
+            b"0a2db40000000049454e44ae426082"
+        )
+
+    def make_homeserver(self, reactor, clock):
+
+        self.fetches = []
+
+        def get_file(destination, path, output_stream, args=None, max_size=None):
+            """
+            Returns tuple[int,dict,str,int] of file length, response headers,
+            absolute URI, and response code.
+            """
+
+            def write_to(r):
+                data, response = r
+                output_stream.write(data)
+                return response
+
+            d = Deferred()
+            d.addCallback(write_to)
+            self.fetches.append((d, destination, path, args))
+            return make_deferred_yieldable(d)
+
+        client = Mock()
+        client.get_file = get_file
+
+        self.storage_path = self.mktemp()
+        self.media_store_path = self.mktemp()
+        os.mkdir(self.storage_path)
+        os.mkdir(self.media_store_path)
+
+        config = self.default_config()
+        config["media_store_path"] = self.media_store_path
+        config["thumbnail_requirements"] = {}
+        config["max_image_pixels"] = 2000000
+
+        provider_config = {
+            "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
+            "store_local": True,
+            "store_synchronous": False,
+            "store_remote": True,
+            "config": {"directory": self.storage_path},
+        }
+        config["media_storage_providers"] = [provider_config]
+
+        hs = self.setup_test_homeserver(config=config, http_client=client)
+
+        return hs
+
+    def test_quarantine_media_requires_admin(self):
+        self.register_user("nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("nonadmin", "pass")
+
+        # Attempt quarantine media APIs as non-admin
+        url = "/_synapse/admin/v1/quarantine_media/id/example.org/abcde12345"
+        request, channel = self.make_request(
+            "POST", url.encode("ascii"), access_token=non_admin_user_tok,
+        )
+        self.render(request)
+
+        # Expect a forbidden error
+        self.assertEqual(
+            403,
+            int(channel.result["code"]),
+            msg="Expected forbidden on quarantining media as a non-admin",
+        )
+
+        # And the roomID/userID endpoint
+        url = "/_synapse/admin/v1/quarantine_media/!room%3Aexample.com"
+        request, channel = self.make_request(
+            "POST", url.encode("ascii"), access_token=non_admin_user_tok,
+        )
+        self.render(request)
+
+        # Expect a forbidden error
+        self.assertEqual(
+            403,
+            int(channel.result["code"]),
+            msg="Expected forbidden on quarantining media as a non-admin",
+        )
+
+    def test_quarantine_media_by_id(self):
+        self.register_user("id_admin", "pass", admin=True)
+        admin_user_tok = self.login("id_admin", "pass")
+
+        self.register_user("id_nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("id_nonadmin", "pass")
+
+        # Upload some media into the room
+        response = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=admin_user_tok
+        )
+
+        # Extract media ID from the response
+        server_name_and_media_id = response["content_uri"][
+            6:
+        ]  # Cut off the 'mxc://' bit
+
+        # Attempt to access the media
+        request, channel = self.make_request(
+            "GET",
+            server_name_and_media_id,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be successful
+        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+
+        # Quarantine the media
+        url = "/_synapse/admin/v1/quarantine_media/" + urllib.parse.quote(
+            server_name_and_media_id, safe=""
+        )
+        request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
+        self.render(request)
+        self.pump(1.0)
+        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+
+        # Attempt to access the media
+        request, channel = self.make_request(
+            "GET",
+            server_name_and_media_id,
+            shorthand=False,
+            access_token=admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_name_and_media_id
+            ),
+        )
+
+    def test_quarantine_all_media_in_room(self):
+        self.register_user("room_admin", "pass", admin=True)
+        admin_user_tok = self.login("room_admin", "pass")
+
+        non_admin_user = self.register_user("room_nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("room_nonadmin", "pass")
+
+        room_id = self.helper.create_room_as(non_admin_user, tok=admin_user_tok)
+        self.helper.join(room_id, non_admin_user, tok=non_admin_user_tok)
+
+        # Upload some media
+        response_1 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+        response_2 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+
+        # Extract mxcs
+        mxc_1 = response_1["content_uri"]
+        mxc_2 = response_2["content_uri"]
+
+        # Send it into the room
+        self.helper.send_event(
+            room_id,
+            "m.room.message",
+            content={"body": "image-1", "msgtype": "m.image", "url": mxc_1},
+            txn_id="111",
+            tok=non_admin_user_tok,
+        )
+        self.helper.send_event(
+            room_id,
+            "m.room.message",
+            content={"body": "image-2", "msgtype": "m.image", "url": mxc_2},
+            txn_id="222",
+            tok=non_admin_user_tok,
+        )
+
+        # Quarantine all media in the room
+        url = "/_synapse/admin/v1/quarantine_media/" + urllib.parse.quote(room_id)
+        request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
+        self.render(request)
+        self.pump(1.0)
+        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+
+        # Convert mxc URLs to server/media_id strings
+        server_and_media_id_1 = mxc_1[6:]
+        server_and_media_id_2 = mxc_2[6:]
+
+        # Test that we cannot download any of the media anymore
+        request, channel = self.make_request(
+            "GET",
+            server_and_media_id_1,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id_1
+            ),
+        )
+
+        request, channel = self.make_request(
+            "GET",
+            server_and_media_id_2,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id_2
+            ),
+        )
+
+    @unittest.DEBUG
+    def test_quarantine_all_media_by_user(self):
+        self.register_user("user_admin", "pass", admin=True)
+        admin_user_tok = self.login("user_admin", "pass")
+
+        non_admin_user = self.register_user("user_nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("user_nonadmin", "pass")
+
+        # Upload some media
+        response_1 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+        response_2 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+
+        # Extract media IDs
+        server_and_media_id_1 = response_1["content_uri"][6:]
+        server_and_media_id_2 = response_2["content_uri"][6:]
+
+        # Quarantine all media by this user
+        url = "/_synapse/admin/v1/quarantine_media/" + urllib.parse.quote(
+            non_admin_user
+        )
+        request, channel = self.make_request(
+            "POST", url.encode("ascii"), access_token=admin_user_tok,
+        )
+        self.render(request)
+        self.pump(1.0)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Attempt to access each piece of media
+        request, channel = self.make_request(
+            "GET",
+            server_and_media_id_1,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id_1,
+            ),
+        )
+
+        # Attempt to access each piece of media
+        request, channel = self.make_request(
+            "GET",
+            server_and_media_id_2,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id_2
+            ),
+        )

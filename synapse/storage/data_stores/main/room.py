@@ -974,10 +974,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         def _quarantine_media_in_room_txn(txn):
             local_mxcs, remote_mxcs = self._get_media_mxcs_in_room_txn(txn, room_id)
             return self._quarantine_media_txn(
-                txn,
-                local_mxcs,
-                remote_mxcs,
-                quarantined_by,
+                txn, local_mxcs, remote_mxcs, quarantined_by,
             )
 
         return self.db.runInteraction(
@@ -985,9 +982,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         )
 
     def _get_media_mxcs_in_room_txn(
-        self,
-        txn,
-        room_id,
+        self, txn, room_id,
     ) -> Tuple[List[str], List[Tuple[str, str]]]:
         """Retrieves all the local and remote media MXC URIs in a given room
 
@@ -1039,8 +1034,33 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
         return local_media_mxcs, remote_media_mxcs
 
+    def quarantine_media_by_id(
+        self, server_name: str, media_id: str, quarantined_by: str,
+    ):
+        """quarantines a single local or remote media id
+
+        Args:
+            server_name: The name of the server that holds this media
+            media_id: The ID of the media to be quarantined
+            quarantined_by: The user ID that initiated the quarantine request
+        """
+        logger.info("Quarantining media: %s/%s", server_name, media_id)
+        is_local = server_name == self.config.server_name
+
+        def _quarantine_media_by_id_txn(txn):
+            local_mxcs = [media_id] if is_local else []
+            remote_mxcs = [(server_name, media_id)] if not is_local else []
+
+            return self._quarantine_media_txn(
+                txn, local_mxcs, remote_mxcs, quarantined_by
+            )
+
+        return self.db.runInteraction(
+            "quarantine_media_by_user", _quarantine_media_by_id_txn
+        )
+
     def quarantine_media_ids_by_user(self, user_id: str, quarantined_by: str):
-        """quarantines all associated media with a single user
+        """quarantines all local media associated with a single user
 
         Args:
             user_id: The ID of the user to quarantine media of
@@ -1048,63 +1068,43 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         """
 
         def _quarantine_media_by_user_txn(txn):
-            local_mxcs, remote_mxcs = self._get_media_mxcs_by_user_txn(txn, user_id)
-            return self._quarantine_media_txn(
-                txn, local_mxcs, remote_mxcs, quarantined_by
-            )
+            local_media_ids = self._get_media_ids_by_user_txn(txn, user_id)
+            return self._quarantine_media_txn(txn, local_media_ids, [], quarantined_by)
 
         return self.db.runInteraction(
             "quarantine_media_by_user", _quarantine_media_by_user_txn
         )
 
-    def _get_media_mxcs_by_user_txn(self, txn, user_id: str, filter_quarantined=True):
-        """Retrieves all local and remote media MXC URIs by a given user
+    def _get_media_ids_by_user_txn(self, txn, user_id: str, filter_quarantined=True):
+        """Retrieves local media IDs by a given user
 
         Args:
             txn (cursor)
-            user_id
+            user_id: The ID of the user to retrieve media IDs of
 
         Returns:
             The local and remote media as a lists of tuples where the key is
             the hostname and the value is the media ID.
         """
         # Local media
-        sql = (
-            """
+        sql = """
             SELECT media_id
             FROM local_media_repository
             WHERE user_id = ?
             """
-        )
         if filter_quarantined:
-            sql += "AND quarantined_by = NULL"
+            sql += "AND quarantined_by IS NULL"
         txn.execute(sql, (user_id,))
 
         rows = txn.fetchall()
         if rows:
-            local_media_mxcs = [row[0] for row in rows]
+            local_media_ids = [row[0] for row in rows]
         else:
-            local_media_mxcs = []
+            local_media_ids = []
 
-        # Remote media
-        sql = (
-            """
-            SELECT media_origin, media_id
-            FROM remote_media_cache
-            WHERE user_id = ?
-            """
-        )
-        if filter_quarantined:
-            sql += "AND quarantined_by = NULL"
-        txn.execute(sql, (user_id,))
+        # TODO: Figure out all remote media a user has referenced in a message
 
-        rows = txn.fetchall()
-        if rows:
-            remote_media_mxcs = [(row[0], row[1]) for row in rows]
-        else:
-            remote_media_mxcs = []
-
-        return local_media_mxcs, remote_media_mxcs
+        return local_media_ids
 
     def _quarantine_media_txn(
         self,
@@ -1142,10 +1142,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 SET quarantined_by = ?
                 WHERE media_origin = ? AND media_id = ?
             """,
-            (
-                (quarantined_by, origin, media_id)
-                for origin, media_id in remote_mxcs
-            ),
+            ((quarantined_by, origin, media_id) for origin, media_id in remote_mxcs),
         )
 
         total_media_quarantined += len(local_mxcs)

@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 class QuarantineMediaInRoom(RestServlet):
-    """Quarantines all media in a room so that no one can download it via
-    this server.
+    """Quarantines all media in a room or by a user so that no one can download it via
+    this server. This endpoint accepts both a room ID and user ID.
     """
 
     PATTERNS = historical_admin_path_patterns("/quarantine_media/(?P<identifier>[^/]+)")
@@ -42,6 +42,8 @@ class QuarantineMediaInRoom(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
+        logging.info("Quarantining %s", identifier)
+
         if identifier.startswith("!"):
             # Quarantine all media in this room
             num_quarantined = await self.store.quarantine_media_ids_in_room(
@@ -49,39 +51,25 @@ class QuarantineMediaInRoom(RestServlet):
             )
         elif identifier.startswith("@"):
             # Quarantine all media this user has uploaded
-            num_quarantined = await self.store.quarantine_media_ids_of_user(
+            num_quarantined = await self.store.quarantine_media_ids_by_user(
                 identifier, requester.user.to_string()
             )
         else:
-            raise SynapseError(
-                400, "Unknown identifier type", errcode=Codes.INVALID_PARAM
+            # Quarantine this media id
+            server_and_media_id = identifier.split("/")
+            if len(server_and_media_id) != 2:
+                raise SynapseError(
+                    400,
+                    "Invalid media_id supplied: '%s'" % identifier,
+                    errcode=Codes.INVALID_PARAM,
+                )
+            server, media_id = server_and_media_id
+            await self.store.quarantine_media_by_id(
+                server, media_id, requester.user.to_string()
             )
+            return 200, {}
 
         return 200, {"num_quarantined": num_quarantined}
-
-
-class QuarantineMediaById(RestServlet):
-    """Quarantines a single media record by its ID so that no one can download it via
-    this server.
-    """
-
-    PATTERNS = historical_admin_path_patterns(
-        "/quarantine_media/id/(?P<server>[^/]+)/(?P<media_id>[^/]+)"
-    )
-
-    def __init__(self, hs):
-        self.store = hs.get_datastore()
-        self.auth = hs.get_auth()
-
-    async def on_POST(self, request, server: str, media_id: str):
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
-
-        await self.store.quarantine_media_by_id(
-            server, media_id, requester.user.to_string()
-        )
-
-        return 200, {}
 
 
 class ListMediaInRoom(RestServlet):
