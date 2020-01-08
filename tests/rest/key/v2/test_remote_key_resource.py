@@ -154,7 +154,8 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
 
         return config
 
-    def make_second_homeserver(self):
+    def prepare(self, reactor, clock, homeserver):
+        # make a second homeserver, configured to use the first one as a key notary
         self.http_client2 = Mock()
         config = default_config(name="keyclient")
         config["trusted_key_servers"] = [
@@ -174,9 +175,8 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             http_client=self.http_client2, config=config
         )
 
-    def expect_outgoing_perspectives_request(self):
-        """expect an outbound POST /key/v2/query from hs2; forward it to hs1"""
-
+        # wire up outbound POST /key/v2/query requests from hs2 so that they
+        # will be forwarded to hs1
         def post_json(destination, path, data):
             self.assertEqual(destination, self.hs.hostname)
             self.assertEqual(
@@ -199,15 +199,10 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
 
     def test_get_key(self):
         """Fetch a key belonging to a random server"""
-        self.make_second_homeserver()
-
         # make up a key to be fetched.
         testkey = signedjson.key.generate_signing_key("abc")
 
-        # we expect hs2 to make a perspectives request, which we will forward to hs1
-        self.expect_outgoing_perspectives_request()
-
-        # then we expect hs1 to make a regular key request to itself
+        # we expect hs1 to make a regular key request to the target server
         self.expect_outgoing_key_request("targetserver", testkey)
         keyid = "ed25519:%s" % (testkey.version,)
 
@@ -224,17 +219,12 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
 
     def test_get_notary_key(self):
         """Fetch a key belonging to the notary server"""
-        self.make_second_homeserver()
-
         # make up a key to be fetched. We randomise the keyid to try to get it to
         # appear before the key server signing key sometimes (otherwise we bail out
         # before fetching its signature)
         testkey = signedjson.key.generate_signing_key(random_string(5))
 
-        # we expect hs2 to make a perspectives request, which we will forward to hs1
-        self.expect_outgoing_perspectives_request()
-
-        # then we expect hs1 to make a regular key request to itself
+        # we expect hs1 to make a regular key request to itself
         self.expect_outgoing_key_request(self.hs.hostname, testkey)
         keyid = "ed25519:%s" % (testkey.version,)
 
@@ -251,12 +241,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
 
     def test_get_notary_keyserver_key(self):
         """Fetch the notary's keyserver key"""
-        self.make_second_homeserver()
-
-        # we expect hs2 to make a perspectives request, which we will forward to hs1
-        self.expect_outgoing_perspectives_request()
-
-        # then we expect hs1 to make a regular key request to itself
+        # we expect hs1 to make a regular key request to itself
         self.expect_outgoing_key_request(self.hs.hostname, self.hs_signing_key)
         keyid = "ed25519:%s" % (self.hs_signing_key.version,)
 
