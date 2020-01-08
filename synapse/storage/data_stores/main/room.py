@@ -448,21 +448,32 @@ class RoomWorkerStore(SQLBaseStore):
         """
         mxc_re = re.compile("^mxc://([^/]+)/([^/#?]+)")
 
-        next_token = self.get_current_events_token() + 1
+        next_token = None
         local_media_mxcs = []
         remote_media_mxcs = []
 
-        while next_token:
-            sql = """
-                SELECT stream_ordering, json FROM events
-                JOIN event_json USING (room_id, event_id)
-                WHERE room_id = ?
-                    AND stream_ordering < ?
-                    AND contains_url = ? AND outlier = ?
-                ORDER BY stream_ordering DESC
-                LIMIT ?
-            """
-            txn.execute(sql, (room_id, next_token, True, False, 100))
+        while True:
+            if next_token is None:
+                sql = """
+                    SELECT stream_ordering, json FROM events
+                    JOIN event_json USING (room_id, event_id)
+                    WHERE room_id = ?
+                        AND contains_url = ? AND outlier = ?
+                    ORDER BY stream_ordering DESC
+                    LIMIT ?
+                """
+                txn.execute(sql, (room_id, True, False, 100))
+            else:
+                sql = """
+                    SELECT stream_ordering, json FROM events
+                    JOIN event_json USING (room_id, event_id)
+                    WHERE room_id = ?
+                        AND stream_ordering < ?
+                        AND contains_url = ? AND outlier = ?
+                    ORDER BY stream_ordering DESC
+                    LIMIT ?
+                """
+                txn.execute(sql, (room_id, next_token, True, False, 100))
 
             next_token = None
             for stream_ordering, content_json in txn:
@@ -483,6 +494,9 @@ class RoomWorkerStore(SQLBaseStore):
                             local_media_mxcs.append(media_id)
                         else:
                             remote_media_mxcs.append((hostname, media_id))
+
+            if next_token is None:
+                break
 
         return local_media_mxcs, remote_media_mxcs
 
