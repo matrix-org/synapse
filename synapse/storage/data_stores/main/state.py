@@ -293,8 +293,6 @@ class MainStateBackgroundUpdateStore(SQLBaseStore):
 
     CURRENT_STATE_INDEX_UPDATE_NAME = "current_state_members_idx"
     EVENT_STATE_GROUP_INDEX_UPDATE_NAME = "event_to_state_groups_sg_index"
-    LOCAL_CURRENT_MEMBERSHIP_UPDATE_NAME = "local_current_membership_idx"
-    LOCAL_CURRENT_MEMBERSHIP_ROOM_UPDATE_NAME = "local_current_membership_rm_idx"
 
     def __init__(self, database: Database, db_conn, hs):
         super(MainStateBackgroundUpdateStore, self).__init__(database, db_conn, hs)
@@ -311,19 +309,6 @@ class MainStateBackgroundUpdateStore(SQLBaseStore):
             index_name="event_to_state_groups_sg_index",
             table="event_to_state_groups",
             columns=["state_group"],
-        )
-        self.db.updates.register_background_index_update(
-            self.LOCAL_CURRENT_MEMBERSHIP_UPDATE_NAME,
-            index_name="local_current_membership_idx",
-            table="local_current_membership",
-            columns=["user_id", "room_id"],
-            unique=True,
-        )
-        self.db.updates.register_background_index_update(
-            self.LOCAL_CURRENT_MEMBERSHIP_ROOM_UPDATE_NAME,
-            index_name="local_current_membership_room_idx",
-            table="local_current_membership",
-            columns=["room_id"],
         )
 
 

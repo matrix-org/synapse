@@ -449,7 +449,7 @@ class Porter(object):
 
     def setup_db(self, db_config: DatabaseConnectionConfig, engine):
         db_conn = make_conn(db_config, engine)
-        prepare_database(db_conn, engine, config=None)
+        prepare_database(db_conn, engine, config=self.hs_config)
 
         db_conn.commit()
 
