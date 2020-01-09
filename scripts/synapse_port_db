@@ -447,11 +447,15 @@ class Porter(object):
             else:
                 return
 
-    def build_db_store(self, db_config: DatabaseConnectionConfig):
+    def build_db_store(
+        self, db_config: DatabaseConnectionConfig, allow_outdated_version: bool = False,
+    ):
         """Builds and returns a database store using the provided configuration.
 
         Args:
-            config: The database configuration
+            db_config: The database configuration
+            allow_outdated_version: True to suppress errors about the database server
+                version being too old to run a complete synapse
 
         Returns:
             The built Store object.
@@ -463,7 +467,9 @@ class Porter(object):
         hs = MockHomeserver(self.hs_config)
 
         with make_conn(db_config, engine) as db_conn:
-            engine.check_database(db_conn)
+            engine.check_database(
+                db_conn, allow_outdated_version=allow_outdated_version
+            )
             prepare_database(db_conn, engine, config=None)
             store = Store(Database(hs, db_config, engine), db_conn, hs)
             db_conn.commit()
@@ -491,8 +497,10 @@ class Porter(object):
     @defer.inlineCallbacks
     def run(self):
         try:
+            # we allow people to port away from outdated versions of sqlite.
             self.sqlite_store = self.build_db_store(
-                DatabaseConnectionConfig("master-sqlite", self.sqlite_config)
+                DatabaseConnectionConfig("master-sqlite", self.sqlite_config),
+                allow_outdated_version=True,
             )
 
             # Check if all background updates are done, abort if not.
