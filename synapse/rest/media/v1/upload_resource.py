@@ -52,9 +52,9 @@ class UploadResource(DirectServeResource):
         requester = await self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
-        content_length = request.getHeader(b"Content-Length").decode("ascii")
-        if content_length is None:
+        if not request.hasHeader(b"Content-Length"):
             raise SynapseError(msg="Request must specify a Content-Length", code=400)
+        content_length = request.getHeader(b"Content-Length").decode("ascii")
         if int(content_length) > self.max_upload_size:
             raise SynapseError(
                 msg="Upload request body is too large",
