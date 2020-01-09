@@ -53,7 +53,7 @@ class Sqlite3Engine(object):
         """
         return False
 
-    def check_database(self, txn):
+    def check_database(self, db_conn):
         pass
 
     def convert_param_style(self, sql):

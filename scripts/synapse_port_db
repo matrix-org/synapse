@@ -447,15 +447,6 @@ class Porter(object):
             else:
                 return
 
-    def setup_db(self, db_config: DatabaseConnectionConfig, engine):
-        db_conn = make_conn(db_config, engine)
-        prepare_database(db_conn, engine, config=None)
-
-        db_conn.commit()
-
-        return db_conn
-
-    @defer.inlineCallbacks
     def build_db_store(self, db_config: DatabaseConnectionConfig):
         """Builds and returns a database store using the provided configuration.
 
@@ -468,16 +459,14 @@ class Porter(object):
         self.progress.set_state("Preparing %s" % db_config.config["name"])
 
         engine = create_engine(db_config.config)
-        conn = self.setup_db(db_config, engine)
 
         hs = MockHomeserver(self.hs_config)
 
-        store = Store(Database(hs, db_config, engine), conn, hs)
-
-        yield store.db.runInteraction(
-            "%s_engine.check_database" % db_config.config["name"],
-            engine.check_database,
-        )
+        with make_conn(db_config, engine) as db_conn:
+            engine.check_database(db_conn)
+            prepare_database(db_conn, engine, config=None)
+            store = Store(Database(hs, db_config, engine), db_conn, hs)
+            db_conn.commit()
 
         return store
 
@@ -502,7 +491,7 @@ class Porter(object):
     @defer.inlineCallbacks
     def run(self):
         try:
-            self.sqlite_store = yield self.build_db_store(
+            self.sqlite_store = self.build_db_store(
                 DatabaseConnectionConfig("master-sqlite", self.sqlite_config)
             )
 
@@ -518,7 +507,7 @@ class Porter(object):
                 )
                 defer.returnValue(None)
 
-            self.postgres_store = yield self.build_db_store(
+            self.postgres_store = self.build_db_store(
                 self.hs_config.get_single_database()
             )
 
