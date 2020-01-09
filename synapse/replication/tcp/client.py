@@ -16,7 +16,7 @@
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from twisted.internet import defer
 from twisted.internet.protocol import ReconnectingClientFactory
@@ -98,7 +98,7 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         self.awaiting_syncs = {}  # type: Dict[str, defer.Deferred]
 
         # The factory used to create connections.
-        self.factory = None
+        self.factory = None  # type: Optional[ReplicationClientFactory]
 
     def start_replication(self, hs):
         """Helper method to start a replication connection to the remote server
@@ -236,4 +236,5 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         # We don't reset the delay any earlier as otherwise if there is a
         # problem during start up we'll end up tight looping connecting to the
         # server.
-        self.factory.resetDelay()
+        if self.factory:
+            self.factory.resetDelay()

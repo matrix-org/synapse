@@ -14,9 +14,9 @@
 # limitations under the License.
 
 import abc
-from typing import Tuple, Dict, List
 import logging
 import re
+from typing import Dict, List, Tuple
 
 from six import raise_from
 from six.moves import urllib
@@ -79,16 +79,8 @@ class ReplicationEndpoint(object):
 
     __metaclass__ = abc.ABCMeta
 
-    @property
-    @abc.abstractmethod
-    def NAME(self) -> str:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def PATH_ARGS(self) -> Tuple[str, ...]:
-        pass
-
+    NAME = abc.abstractproperty()  # type: str  # type: ignore
+    PATH_ARGS = abc.abstractproperty()  # type: Tuple[str, ...]  # type: ignore
     METHOD = "POST"
     CACHE = True
     RETRY_ON_TIMEOUT = True
@@ -215,7 +207,7 @@ class ReplicationEndpoint(object):
         method = self.METHOD
 
         if self.CACHE:
-            handler = self._cached_handler
+            handler = self._cached_handler  # type: ignore
             url_args.append("txn_id")
 
         args = "/".join("(?P<%s>[^/]+)" % (arg,) for arg in url_args)

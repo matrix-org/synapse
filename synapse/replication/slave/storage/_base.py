@@ -62,7 +62,8 @@ class BaseSlavedStore(SQLBaseStore):
 
     def process_replication_rows(self, stream_name, token, rows):
         if stream_name == "caches":
-            self._cache_id_gen.advance(token)
+            if self._cache_id_gen:
+                self._cache_id_gen.advance(token)
             for row in rows:
                 if row.cache_func == CURRENT_STATE_CACHE_NAME:
                     room_id = row.keys[0]
