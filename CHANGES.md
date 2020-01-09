@@ -1,6 +1,9 @@
 Synapse 1.8.0 (2020-01-09)
 ==========================
 
+**WARNING**: As of this release Synapse will refuse to start if the `log_file` config option is specified. Support for the option was removed in v1.3.0.
+
+
 Bugfixes
 --------
 
