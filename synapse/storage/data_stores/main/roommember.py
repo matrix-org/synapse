@@ -363,8 +363,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # Paranoia check.
         if not self.hs.is_mine_id(user_id):
             raise Exception(
-                "Cannot call 'get_rooms_for_local_user_where_membership_is' on non-local user %r",
-                user_id,
+                "Cannot call 'get_rooms_for_local_user_where_membership_is' on non-local user %r"
+                % (user_id,),
             )
 
         clause, args = make_in_list_sql_clause(
@@ -1066,6 +1066,10 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
                 # latest invite info. This will usually get updated by the
                 # `current_state_events` handling, unless its an outlier.
                 if event.internal_metadata.is_outlier():
+                    # This should only happen for out of band memberships, so
+                    # we add a paranoia check.
+                    assert event.internal_metadata.is_out_of_band_membership()
+
                     self.db.simple_upsert_txn(
                         txn,
                         table="local_current_membership",
