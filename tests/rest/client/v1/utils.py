@@ -21,6 +21,7 @@ import time
 
 import attr
 
+from twisted.web.resource import Resource
 from synapse.api.constants import Membership
 
 from tests.server import make_request, render
@@ -163,7 +164,7 @@ class RestHelper(object):
 
     def upload_media(
         self,
-        resource,
+        resource: Resource,
         image_data: bytes,
         tok: str,
         filename: str = "test.png",
@@ -171,7 +172,7 @@ class RestHelper(object):
     ) -> dict:
         """Upload a piece of test media to the media repo
         Args:
-            resource:
+            resource: The resource that will handle the upload request
             image_data: The image data to upload
             tok: The user token to use during the upload
             filename: The filename of the media to be uploaded
