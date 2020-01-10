@@ -22,6 +22,7 @@ import time
 import attr
 
 from twisted.web.resource import Resource
+
 from synapse.api.constants import Membership
 
 from tests.server import make_request, render
