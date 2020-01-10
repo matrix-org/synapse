@@ -19,6 +19,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+import synapse
 from synapse.api.errors import SynapseError
 from synapse.logging.opentracing import (
     get_active_span_text_map,
@@ -31,9 +32,11 @@ from synapse.util.stringutils import random_string
 
 logger = logging.getLogger(__name__)
 
+device_list_debugging_logger = logging.getLogger("synapse.devices.DEBUG_TRACKING")
+
 
 class DeviceMessageHandler(object):
-    def __init__(self, hs):
+    def __init__(self, hs: "synapse.server.HomeServer"):
         """
         Args:
             hs (synapse.server.HomeServer): server
@@ -65,6 +68,9 @@ class DeviceMessageHandler(object):
                 logger.warning("Request for keys for non-local user %s", user_id)
                 raise SynapseError(400, "Not a user here")
 
+            if not by_device:
+                continue
+
             messages_by_device = {
                 device_id: {
                     "content": message_content,
@@ -73,8 +79,40 @@ class DeviceMessageHandler(object):
                 }
                 for device_id, message_content in by_device.items()
             }
-            if messages_by_device:
-                local_messages[user_id] = messages_by_device
+            local_messages[user_id] = messages_by_device
+
+            # We expect the sending user to send the message to all the devices
+            # to the user, if they don't then that is potentially suspicious and
+            # so we log for debugging purposes.
+            if device_list_debugging_logger.isEnabledFor(logging.INFO):
+                expected_devices = yield self.store.get_devices_by_user(user_id)
+                expected_devices = set(expected_devices)
+                received_devices = set(by_device)
+                if received_devices != {"*"} and received_devices != expected_devices:
+                    # Devices that the remote didn't send to
+                    missed = expected_devices - received_devices
+
+                    # Devices the remote sent to that we don't know bout
+                    extraneous = received_devices - expected_devices
+
+                    # We try and pull out the `sender_key` from the first message,
+                    # if it has one. This just helps figure out which device the
+                    # message came from.
+                    sender_key = list(by_device.values())[0].get(
+                        "sender_key", "<unknown>"
+                    )
+
+                    device_list_debugging_logger.info(
+                        "Received direct message (%s, %s) from %s (%s) to %s with mismatched devices."
+                        " Missing: %s, extraneous: %s",
+                        message_type,
+                        message_id,
+                        sender_user_id,
+                        sender_key,
+                        user_id,
+                        missed,
+                        extraneous,
+                    )
 
         stream_id = yield self.store.add_messages_from_remote_to_device_inbox(
             origin, message_id, local_messages
