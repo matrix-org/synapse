@@ -47,7 +47,7 @@ class DataStores(object):
             with make_conn(database_config, engine) as db_conn:
                 logger.info("Preparing database %r...", db_name)
 
-                engine.check_database(db_conn.cursor())
+                engine.check_database(db_conn)
                 prepare_database(
                     db_conn, engine, hs.config, data_stores=database_config.data_stores,
                 )
