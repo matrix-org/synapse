@@ -177,7 +177,6 @@ class RestHelper(object):
             filename: The filename of the media to be uploaded
             expect_code: The return code to expect from attempting to upload the media
         """
-        # small png
         image_length = len(image_data)
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
         request, channel = make_request(
