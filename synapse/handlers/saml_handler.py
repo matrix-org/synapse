@@ -114,10 +114,10 @@ class SamlHandler:
         # the dict.
         self.expire_sessions()
 
-        user_id = await self._map_saml_response_to_user(resp_bytes)
+        user_id = await self._map_saml_response_to_user(resp_bytes, relay_state)
         self._sso_auth_handler.complete_sso_login(user_id, request, relay_state)
 
-    async def _map_saml_response_to_user(self, resp_bytes):
+    async def _map_saml_response_to_user(self, resp_bytes, client_redirect_url):
         try:
             saml2_auth = self._saml_client.parse_authn_request_response(
                 resp_bytes,
@@ -185,7 +185,7 @@ class SamlHandler:
             # Map saml response to user attributes using the configured mapping provider
             for i in range(1000):
                 attribute_dict = self._user_mapping_provider.saml_response_to_user_attributes(
-                    saml2_auth, i
+                    saml2_auth, i, client_redirect_url=client_redirect_url,
                 )
 
                 logger.debug(
@@ -217,6 +217,8 @@ class SamlHandler:
                 raise SynapseError(
                     500, "Unable to generate a Matrix ID from the SAML response"
                 )
+
+            logger.info("Mapped SAML user to local part %s", localpart)
 
             registered_user_id = await self._registration_handler.register_user(
                 localpart=localpart, default_display_name=displayname
@@ -278,7 +280,10 @@ class DefaultSamlMappingProvider(object):
         self._mxid_mapper = parsed_config.mxid_mapper
 
     def saml_response_to_user_attributes(
-        self, saml_response: saml2.response.AuthnResponse, failures: int = 0,
+        self,
+        saml_response: saml2.response.AuthnResponse,
+        failures: int,
+        client_redirect_url: str,
     ) -> dict:
         """Maps some text from a SAML response to attributes of a new user
 
@@ -287,6 +292,8 @@ class DefaultSamlMappingProvider(object):
 
             failures: How many times a call to this function with this
                 saml_response has resulted in a failure
+
+            client_redirect_url: where the client wants to redirect to
 
         Returns:
             dict: A dict containing new user attributes. Possible keys:
