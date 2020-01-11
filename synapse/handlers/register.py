@@ -174,7 +174,7 @@ class RegistrationHandler(BaseHandler):
         if password:
             password_hash = yield self._auth_handler.hash(password)
 
-        if localpart:
+        if localpart is not None:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
 
             was_guest = guest_access_token is not None
