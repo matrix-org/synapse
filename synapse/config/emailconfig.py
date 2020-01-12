@@ -74,9 +74,9 @@ class EmailConfig(Config):
         self.email_template_dir = os.path.abspath(template_dir)
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
-        account_validity_renewal_enabled = config.get("account_validity", {}).get(
-            "renew_at"
-        )
+
+        account_validity_config = config.get("account_validity") or {}
+        account_validity_renewal_enabled = account_validity_config.get("renew_at")
 
         self.threepid_behaviour_email = (
             # Have Synapse handle the email sending if account_threepid_delegates.email
