@@ -36,6 +36,7 @@ import synapse.metrics
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
+    RedirectException,
     SynapseError,
     UnrecognizedRequestError,
 )
@@ -153,14 +154,18 @@ def _return_html_error(f, request):
 
     Args:
         f (twisted.python.failure.Failure):
-        request (twisted.web.iweb.IRequest):
+        request (twisted.web.server.Request):
     """
     if f.check(CodeMessageException):
         cme = f.value
         code = cme.code
         msg = cme.msg
 
-        if isinstance(cme, SynapseError):
+        if isinstance(cme, RedirectException):
+            logger.info("%s redirect to %s", request, cme.location)
+            request.setHeader(b"location", cme.location)
+            request.cookies.extend(cme.cookies)
+        elif isinstance(cme, SynapseError):
             logger.info("%s SynapseError: %s - %s", request, code, msg)
         else:
             logger.error(
