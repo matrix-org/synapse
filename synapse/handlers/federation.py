@@ -438,7 +438,9 @@ class FederationHandler(BaseHandler):
         if not prevs - seen:
             return
 
+        logger.info("here1")
         latest = await self.store.get_latest_event_ids_in_room(room_id)
+        logger.info("here2")
 
         # We add the prev events that we have seen to the latest
         # list to ensure the remote server doesn't give them to us
