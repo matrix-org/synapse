@@ -1,1 +1,1 @@
-Extend the quarantine_media admin API to quarantine media by ID or all media by a specific user.
+Add new quarantine media admin APIs to quarantine by media ID or by user who uploaded the media.
