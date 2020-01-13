@@ -34,19 +34,20 @@ The media file itself (and any thumbnails) is not deleted from the server.
 This API quarantines a single piece of local or remote media.
 
 ```
-POST /_synapse/admin/v1/quarantine_media/<media_id>
+POST /_synapse/admin/v1/quarantine_media_by_id/<server_name>/<media_id>
 
 {}
 ```
 
-Where `media_id` is in the form of `example.org/abcdefg12345...`.
+Where `server_name` is in the form of `example.org`, and `media_id` is in the
+form of `abcdefg12345...`.
 
 ## Quarantining media in a room
 
 This API quarantines all local and remote media in a room.
 
 ```
-POST /_synapse/admin/v1/quarantine_media/<room_id>
+POST /_synapse/admin/v1/quarantine_media_by_room/<room_id>
 
 {
   "num_quarantined": 10  # The number of media items successfully quarantined
@@ -55,6 +56,10 @@ POST /_synapse/admin/v1/quarantine_media/<room_id>
 
 Where `room_id` is in the form of `!roomid12345:example.org`.
 
+Note that there is a legacy endpoint, `POST
+/_synapse/admin/v1/quarantine_media/<room_id >`, that operates the same.
+However, it is deprecated and may be removed in a future release.
+
 ## Quarantining all media of a user
 
 This API quarantines all *local* media that a *local* user has uploaded. That is to say, if
@@ -62,7 +67,7 @@ you would like to quarantine media uploaded by a user on a remote homeserver, yo
 instead use one of the other APIs.
 
 ```
-POST /_synapse/admin/v1/quarantine_media/<user_id>
+POST /_synapse/admin/v1/quarantine_media_by_user/<user_id>
 {
   "num_quarantined": 10  # The number of media items successfully quarantined
 }

@@ -430,7 +430,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         non_admin_user_tok = self.login("nonadmin", "pass")
 
         # Attempt quarantine media APIs as non-admin
-        url = "/_synapse/admin/v1/quarantine_media/id/example.org/abcde12345"
+        url = "/_synapse/admin/v1/quarantine_media_by_id/example.org/abcde12345"
         request, channel = self.make_request(
             "POST", url.encode("ascii"), access_token=non_admin_user_tok,
         )
@@ -444,7 +444,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # And the roomID/userID endpoint
-        url = "/_synapse/admin/v1/quarantine_media/!room%3Aexample.com"
+        url = "/_synapse/admin/v1/quarantine_media_by_room/!room%3Aexample.com"
         request, channel = self.make_request(
             "POST", url.encode("ascii"), access_token=non_admin_user_tok,
         )
@@ -457,6 +457,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             msg="Expected forbidden on quarantining media as a non-admin",
         )
 
+    @unittest.DEBUG
     def test_quarantine_media_by_id(self):
         self.register_user("id_admin", "pass", admin=True)
         admin_user_tok = self.login("id_admin", "pass")
@@ -473,6 +474,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         server_name_and_media_id = response["content_uri"][
             6:
         ]  # Cut off the 'mxc://' bit
+        server_name, media_id = server_name_and_media_id.split("/")
 
         # Attempt to access the media
         request, channel = self.make_request(
@@ -488,8 +490,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
 
         # Quarantine the media
-        url = "/_synapse/admin/v1/quarantine_media/" + urllib.parse.quote(
-            server_name_and_media_id, safe=""
+        url = "/_synapse/admin/v1/quarantine_media_by_id/%s/%s" % (
+            urllib.parse.quote(server_name),
+            urllib.parse.quote(media_id),
         )
         request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
         self.render(request)
@@ -516,6 +519,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             ),
         )
 
+    @unittest.DEBUG
     def test_quarantine_all_media_in_room(self):
         self.register_user("room_admin", "pass", admin=True)
         admin_user_tok = self.login("room_admin", "pass")
@@ -555,11 +559,18 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Quarantine all media in the room
-        url = "/_synapse/admin/v1/quarantine_media/" + urllib.parse.quote(room_id)
+        url = "/_synapse/admin/v1/quarantine_media_by_room/" + urllib.parse.quote(
+            room_id
+        )
         request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
         self.render(request)
         self.pump(1.0)
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(
+            json.loads(channel.result["body"]),
+            {"num_quarantined": 2},
+            "Expected 2 quarantined items",
+        )
 
         # Convert mxc URLs to server/media_id strings
         server_and_media_id_1 = mxc_1[6:]
@@ -625,7 +636,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         server_and_media_id_2 = response_2["content_uri"][6:]
 
         # Quarantine all media by this user
-        url = "/_synapse/admin/v1/quarantine_media/" + urllib.parse.quote(
+        url = "/_synapse/admin/v1/quarantine_media_by_user/" + urllib.parse.quote(
             non_admin_user
         )
         request, channel = self.make_request(
@@ -633,8 +644,12 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.pump(1.0)
-
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            json.loads(channel.result["body"]),
+            {"num_quarantined": 2},
+            "Expected 2 quarantined items",
+        )
 
         # Attempt to access each piece of media
         request, channel = self.make_request(
