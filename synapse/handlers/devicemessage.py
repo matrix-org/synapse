@@ -89,13 +89,19 @@ class DeviceMessageHandler(object):
                 # didn't know about the sender's device (or might just mean
                 # things are being a bit slow to propogate).
                 received_devices = set(by_device)
-                sender_key = list(by_device.values())[0].get("sender_key", "<unknown>")
+                requesting_device_id = list(by_device.values())[0].get(
+                    "requesting_device_id", "<unknown>"
+                )
+                request_id = list(by_device.values())[0].get("request_id", "<unknown>")
+                action = list(by_device.values())[0].get("action", "<unknown>")
                 device_list_debugging_logger.info(
-                    "Received room_key request direct message (%s, %s) from %s (%s) to %s (%s).",
+                    "Received room_key %s direct message (%s, %s, %s) from %s (%s) to %s (%s).",
+                    action,
                     message_type,
                     message_id,
+                    request_id,
                     sender_user_id,
-                    sender_key,
+                    requesting_device_id,
                     user_id,
                     received_devices,
                 )
