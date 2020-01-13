@@ -36,7 +36,7 @@ This API quarantines a single piece of local or remote media.
 Request:
 
 ```
-POST /_synapse/admin/v1/quarantine_media_by_id/<server_name>/<media_id>
+POST /_synapse/admin/v1/media/quarantine/<server_name>/<media_id>
 
 {}
 ```
@@ -57,7 +57,7 @@ This API quarantines all local and remote media in a room.
 Request:
 
 ```
-POST /_synapse/admin/v1/quarantine_media_by_room/<room_id>
+POST /_synapse/admin/v1/room/<room_id>/media/quarantine
 
 {}
 ```
@@ -85,7 +85,7 @@ instead use one of the other APIs.
 Request:
 
 ```
-POST /_synapse/admin/v1/quarantine_media_by_user/<user_id>
+POST /_synapse/admin/v1/user/<user_id>/media/quarantine
 
 {}
 ```

@@ -33,7 +33,7 @@ class QuarantineMediaInRoom(RestServlet):
     """
 
     PATTERNS = (
-        historical_admin_path_patterns("/quarantine_media_by_room/(?P<room_id>[^/]+)")
+        historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
         +
         # This path kept around for legacy reasons
         historical_admin_path_patterns("/quarantine_media/(?P<room_id>![^/]+)")
@@ -63,7 +63,7 @@ class QuarantineMediaByUser(RestServlet):
     """
 
     PATTERNS = historical_admin_path_patterns(
-        "/quarantine_media_by_user/(?P<user_id>[^/]+)"
+        "/user/(?P<user_id>[^/]+)/media/quarantine"
     )
 
     def __init__(self, hs):
@@ -90,7 +90,7 @@ class QuarantineMediaByID(RestServlet):
     """
 
     PATTERNS = historical_admin_path_patterns(
-        "/quarantine_media_by_id/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
+        "/media/quarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
     )
 
     def __init__(self, hs):

@@ -430,7 +430,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         non_admin_user_tok = self.login("nonadmin", "pass")
 
         # Attempt quarantine media APIs as non-admin
-        url = "/_synapse/admin/v1/quarantine_media_by_id/example.org/abcde12345"
+        url = "/_synapse/admin/v1/media/quarantine/example.org/abcde12345"
         request, channel = self.make_request(
             "POST", url.encode("ascii"), access_token=non_admin_user_tok,
         )
@@ -444,7 +444,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # And the roomID/userID endpoint
-        url = "/_synapse/admin/v1/quarantine_media_by_room/!room%3Aexample.com"
+        url = "/_synapse/admin/v1/room/!room%3Aexample.com/media/quarantine"
         request, channel = self.make_request(
             "POST", url.encode("ascii"), access_token=non_admin_user_tok,
         )
@@ -490,7 +490,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
 
         # Quarantine the media
-        url = "/_synapse/admin/v1/quarantine_media_by_id/%s/%s" % (
+        url = "/_synapse/admin/v1/media/quarantine/%s/%s" % (
             urllib.parse.quote(server_name),
             urllib.parse.quote(media_id),
         )
@@ -559,7 +559,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Quarantine all media in the room
-        url = "/_synapse/admin/v1/quarantine_media_by_room/" + urllib.parse.quote(
+        url = "/_synapse/admin/v1/room/%s/media/quarantine" % urllib.parse.quote(
             room_id
         )
         request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
@@ -636,7 +636,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         server_and_media_id_2 = response_2["content_uri"][6:]
 
         # Quarantine all media by this user
-        url = "/_synapse/admin/v1/quarantine_media_by_user/" + urllib.parse.quote(
+        url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
             non_admin_user
         )
         request, channel = self.make_request(
