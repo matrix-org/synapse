@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Dict
 
 import six
 from six import iteritems
@@ -160,6 +161,34 @@ class FederationServer(FederationBase):
             )
             return 400, response
 
+        pdu_results = await self._handle_pdus_in_txn(origin, transaction, request_time)
+
+        if hasattr(transaction, "edus"):
+            for edu in (Edu(**x) for x in transaction.edus):
+                await self.received_edu(origin, edu.edu_type, edu.content)
+
+        response = {"pdus": pdu_results}
+
+        logger.debug("Returning: %s", str(response))
+
+        await self.transaction_actions.set_response(origin, transaction, 200, response)
+        return 200, response
+
+    async def _handle_pdus_in_txn(
+        self, origin: str, transaction: Transaction, request_time: int
+    ) -> Dict[str, dict]:
+        """Process the PDUs in a received transaction.
+
+        Args:
+            origin: the server making the request
+            transaction: incoming transaction
+            request_time: timestamp that the HTTP request arrived at
+
+        Returns:
+            A map from event ID of a processed PDU to any errors we should
+            report back to sending server.
+        """
+
         received_pdus_counter.inc(len(transaction.pdus))
 
         origin_host, _ = parse_server_name(origin)
@@ -250,16 +279,7 @@ class FederationServer(FederationBase):
             process_pdus_for_room, pdus_by_room.keys(), TRANSACTION_CONCURRENCY_LIMIT
         )
 
-        if hasattr(transaction, "edus"):
-            for edu in (Edu(**x) for x in transaction.edus):
-                await self.received_edu(origin, edu.edu_type, edu.content)
-
-        response = {"pdus": pdu_results}
-
-        logger.debug("Returning: %s", str(response))
-
-        await self.transaction_actions.set_response(origin, transaction, 200, response)
-        return 200, response
+        return pdu_results
 
     async def received_edu(self, origin, edu_type, content):
         received_edus_counter.inc()
