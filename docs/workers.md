@@ -199,7 +199,9 @@ Handles the media repository. It can handle all endpoints starting with:
 ... and the following regular expressions matching media-specific administration APIs:
 
     ^/_synapse/admin/v1/purge_media_cache$
-    ^/_synapse/admin/v1/room/.*/media$
+    ^/_synapse/admin/v1/room/.*/media.*$
+    ^/_synapse/admin/v1/user/.*/media.*$
+    ^/_synapse/admin/v1/media/.*$
     ^/_synapse/admin/v1/quarantine_media/.*$
 
 You should also set `enable_media_repo: False` in the shared configuration
