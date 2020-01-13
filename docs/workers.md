@@ -168,8 +168,11 @@ endpoints matching the following regular expressions:
     ^/_matrix/federation/v1/make_join/
     ^/_matrix/federation/v1/make_leave/
     ^/_matrix/federation/v1/send_join/
+    ^/_matrix/federation/v2/send_join/
     ^/_matrix/federation/v1/send_leave/
+    ^/_matrix/federation/v2/send_leave/
     ^/_matrix/federation/v1/invite/
+    ^/_matrix/federation/v2/invite/
     ^/_matrix/federation/v1/query_auth/
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
@@ -288,6 +291,7 @@ file. For example:
 Handles some event creation. It can handle REST endpoints matching:
 
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state/
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
     ^/_matrix/client/(api/v1|r0|unstable)/join/
     ^/_matrix/client/(api/v1|r0|unstable)/profile/
