@@ -162,10 +162,7 @@ class FederationServer(FederationBase):
             return 400, response
 
         pdu_results = await self._handle_pdus_in_txn(origin, transaction, request_time)
-
-        if hasattr(transaction, "edus"):
-            for edu in (Edu(**x) for x in transaction.edus):
-                await self.received_edu(origin, edu.edu_type, edu.content)
+        await self._handle_edus_in_txn(origin, transaction)
 
         response = {"pdus": pdu_results}
 
@@ -281,9 +278,21 @@ class FederationServer(FederationBase):
 
         return pdu_results
 
-    async def received_edu(self, origin, edu_type, content):
-        received_edus_counter.inc()
-        await self.registry.on_edu(edu_type, origin, content)
+    async def _handle_edus_in_txn(self, origin: str, transaction: Transaction):
+        """Process the EDUs in a received transaction.
+        """
+
+        async def _process_edu(edu_dict):
+            received_edus_counter.inc()
+
+            edu = Edu(**edu_dict)
+            await self.registry.on_edu(edu.edu_type, origin, edu.content)
+
+        await concurrently_execute(
+            _process_edu,
+            getattr(transaction, "edus", []),
+            TRANSACTION_CONCURRENCY_LIMIT,
+        )
 
     async def on_context_state_request(self, origin, room_id, event_id):
         origin_host, _ = parse_server_name(origin)
