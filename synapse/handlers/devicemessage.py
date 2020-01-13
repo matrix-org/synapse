@@ -81,10 +81,29 @@ class DeviceMessageHandler(object):
             }
             local_messages[user_id] = messages_by_device
 
-            # We expect the sending user to send the message to all the devices
-            # to the user, if they don't then that is potentially suspicious and
-            # so we log for debugging purposes.
-            if device_list_debugging_logger.isEnabledFor(logging.INFO):
+            if (
+                device_list_debugging_logger.isEnabledFor(logging.INFO)
+                and message_type == "m.room_key_request"
+            ):
+                # If we get a request to get keys then may mean the recipient
+                # didn't know about the sender's device (or might just mean
+                # things are being a bit slow to propogate).
+                received_devices = set(by_device)
+                sender_key = list(by_device.values())[0].get("sender_key", "<unknown>")
+                device_list_debugging_logger.info(
+                    "Received room_key request direct message (%s, %s) from %s (%s) to %s (%s).",
+                    message_type,
+                    message_id,
+                    sender_user_id,
+                    sender_key,
+                    user_id,
+                    received_devices,
+                )
+            elif device_list_debugging_logger.isEnabledFor(logging.INFO):
+                # We expect the sending user to send the message to all the devices
+                # to the user, if they don't then that is potentially suspicious and
+                # so we log for debugging purposes.
+
                 expected_devices = yield self.store.get_devices_by_user(user_id)
                 expected_devices = set(expected_devices)
                 received_devices = set(by_device)
