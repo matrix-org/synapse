@@ -457,7 +457,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             msg="Expected forbidden on quarantining media as a non-admin",
         )
 
-    @unittest.DEBUG
     def test_quarantine_media_by_id(self):
         self.register_user("id_admin", "pass", admin=True)
         admin_user_tok = self.login("id_admin", "pass")
@@ -519,7 +518,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             ),
         )
 
-    @unittest.DEBUG
     def test_quarantine_all_media_in_room(self):
         self.register_user("room_admin", "pass", admin=True)
         admin_user_tok = self.login("room_admin", "pass")
@@ -615,7 +613,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             ),
         )
 
-    @unittest.DEBUG
     def test_quarantine_all_media_by_user(self):
         self.register_user("user_admin", "pass", admin=True)
         admin_user_tok = self.login("user_admin", "pass")
