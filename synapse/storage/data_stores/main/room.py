@@ -1052,34 +1052,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             (room_id,),
         )
 
-    def get_media_mxcs_in_room(self, room_id):
-        """Retrieves all the local and remote media MXC URIs in a given room
-
-        Args:
-            room_id (str)
-
-        Returns:
-            The local and remote media as a lists of tuples where the key is
-            the hostname and the value is the media ID.
-        """
-
-        def _get_media_mxcs_in_room_txn(txn):
-            local_mxcs, remote_mxcs = self._get_media_mxcs_in_room_txn(txn, room_id)
-            local_media_mxcs = []
-            remote_media_mxcs = []
-
-            # Convert the IDs to MXC URIs
-            for media_id in local_mxcs:
-                local_media_mxcs.append("mxc://%s/%s" % (self.hs.hostname, media_id))
-            for hostname, media_id in remote_mxcs:
-                remote_media_mxcs.append("mxc://%s/%s" % (hostname, media_id))
-
-            return local_media_mxcs, remote_media_mxcs
-
-        return self.db.runInteraction(
-            "get_media_ids_in_room", _get_media_mxcs_in_room_txn
-        )
-
     @defer.inlineCallbacks
     def get_rooms_for_retention_period_in_range(
         self, min_ms, max_ms, include_null=False
