@@ -567,7 +567,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.pump(1.0)
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
         self.assertEqual(
-            json.loads(channel.result["body"]),
+            json.loads(channel.result["body"].decode("utf-8")),
             {"num_quarantined": 2},
             "Expected 2 quarantined items",
         )
@@ -646,7 +646,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.pump(1.0)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
-            json.loads(channel.result["body"]),
+            json.loads(channel.result["body"].decode("utf-8")),
             {"num_quarantined": 2},
             "Expected 2 quarantined items",
         )
