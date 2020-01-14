@@ -168,7 +168,7 @@ class FederationServer(FederationBase):
 
         # We process PDUs and EDUs in parallel. This is important as we don't
         # want to block things like to device messages from reaching clients
-        # behind the pontentially expensive handling of PDUs.
+        # behind the potentially expensive handling of PDUs.
         pdu_results, _ = await make_deferred_yieldable(
             defer.gatherResults(
                 [
@@ -200,7 +200,7 @@ class FederationServer(FederationBase):
 
         Returns:
             A map from event ID of a processed PDU to any errors we should
-            report back to sending server.
+            report back to the sending server.
         """
 
         received_pdus_counter.inc(len(transaction.pdus))
