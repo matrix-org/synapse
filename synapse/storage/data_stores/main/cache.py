@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine
-from synapse.util import batch_iter
+from synapse.util.iterutils import batch_iter
 
 logger = logging.getLogger(__name__)
 
