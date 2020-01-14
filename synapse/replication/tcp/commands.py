@@ -387,6 +387,20 @@ class UserIpCommand(Command):
         )
 
 
+class RemoteServerUpCommand(Command):
+    """Sent when a worker has detected that a remote server is no longer
+    "down" and retry timings should be reset.
+
+    If sent from a client the server will relay to all other workers.
+
+    Format::
+
+        REMOTE_SEREVER_UP <server>
+    """
+
+    NAME = "REMOTE_SEREVER_UP"
+
+
 _COMMANDS = (
     ServerCommand,
     RdataCommand,
@@ -401,6 +415,7 @@ _COMMANDS = (
     RemovePusherCommand,
     InvalidateCacheCommand,
     UserIpCommand,
+    RemoteServerUpCommand,
 )  # type: Tuple[Type[Command], ...]
 
 # Map of command name to command type.
@@ -414,6 +429,7 @@ VALID_SERVER_COMMANDS = (
     ErrorCommand.NAME,
     PingCommand.NAME,
     SyncCommand.NAME,
+    RemoteServerUpCommand.NAME,
 )
 
 # The commands the client is allowed to send
@@ -427,4 +443,5 @@ VALID_CLIENT_COMMANDS = (
     InvalidateCacheCommand.NAME,
     UserIpCommand.NAME,
     ErrorCommand.NAME,
+    RemoteServerUpCommand.NAME,
 )

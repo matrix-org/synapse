@@ -291,6 +291,12 @@ class ReplicationStreamer(object):
         )
         yield self._server_notices_sender.on_user_ip(user_id)
 
+    @measure_func("repl.on_remote_server_up")
+    @defer.inlineCallbacks
+    def on_remote_server_up(self, server: str):
+        for conn in self.connections:
+            conn.send_remote_server_up(server)
+
     def send_sync_to_all_connections(self, data):
         """Sends a SYNC command to all clients.
 
