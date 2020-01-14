@@ -141,6 +141,9 @@ class SamlHandler:
             saml2_auth, client_redirect_url
         )
 
+        if not remote_user_id:
+            raise Exception("Failed to extract remote user id from SAML response")
+
         with (await self._mapping_lock.queue(self._auth_provider_id)):
             # first of all, check if we already have a mapping for this user
             logger.info(
