@@ -294,6 +294,11 @@ class ReplicationStreamer(object):
     @measure_func("repl.on_remote_server_up")
     @defer.inlineCallbacks
     def on_remote_server_up(self, server: str):
+        # If we're responsible for sending outbound federation traffic, lets
+        # wake up the transaction queue for that destination.
+        if self.federation_sender:
+            self.federation_sender.wake_destination(server)
+
         for conn in self.connections:
             conn.send_remote_server_up(server)
 

@@ -487,5 +487,18 @@ class FederationSender(object):
 
         self._get_per_destination_queue(destination).attempt_new_transaction()
 
+    def wake_destination(self, destination: str):
+        """Called when we want to retry sending transactions to a remote.
+
+        This is mainly useful if the remote server has been down and we think it
+        migtht have come back.
+        """
+
+        if destination == self.server_name:
+            logger.info("Not waking up ourselves")
+            return
+
+        self._get_per_destination_queue(destination).attempt_new_transaction()
+
     def get_current_token(self):
         return 0
