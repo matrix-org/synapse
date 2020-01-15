@@ -17,6 +17,7 @@
 
 import logging
 import random
+from typing import List
 
 from six import itervalues
 
@@ -79,7 +80,7 @@ class ReplicationStreamer(object):
         self._replication_torture_level = hs.config.replication_torture_level
 
         # Current connections.
-        self.connections = []
+        self.connections = []  # type: List[ServerReplicationStreamProtocol]
 
         LaterGauge(
             "synapse_replication_tcp_resource_total_connections",

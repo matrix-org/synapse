@@ -75,6 +75,15 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+
+Upgrading to v1.8.0
+===================
+
+Specifying a ``log_file`` config option will now cause Synapse to refuse to
+start, and should be replaced by with the ``log_config`` option. Support for
+the ``log_file`` option was removed in v1.3.0 and has since had no effect.
+
+
 Upgrading to v1.7.0
 ===================
 

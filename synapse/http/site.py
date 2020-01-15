@@ -88,7 +88,7 @@ class SynapseRequest(Request):
     def get_redacted_uri(self):
         uri = self.uri
         if isinstance(uri, bytes):
-            uri = self.uri.decode("ascii")
+            uri = self.uri.decode("ascii", errors="replace")
         return redact_uri(uri)
 
     def get_method(self):

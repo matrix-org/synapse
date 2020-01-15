@@ -34,6 +34,7 @@ from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
+from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.admin import register_servlets_for_media_repo
@@ -47,6 +48,7 @@ logger = logging.getLogger("synapse.app.media_repository")
 
 
 class MediaRepositorySlavedStore(
+    RoomStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedClientIpStore,
