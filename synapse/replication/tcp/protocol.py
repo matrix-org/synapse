@@ -372,7 +372,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         self.on_connection_closed()
 
-    async def on_connection_closed(self):
+    def on_connection_closed(self):
         logger.info("[%s] Connection was closed", self.id())
 
         self.state = ConnectionStates.CLOSED
@@ -584,7 +584,7 @@ class AbstractReplicationClientHandler(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def on_sync(self, data):
+    def on_sync(self, data):
         """Called when get a new SYNC command."""
         raise NotImplementedError()
 
