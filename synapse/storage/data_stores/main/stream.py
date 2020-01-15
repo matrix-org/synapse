@@ -556,7 +556,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         return self.db.runInteraction(
             "get_room_event_before_stream_ordering",
             self.get_room_event_around_stream_ordering_txn,
-            room_id, stream_ordering, "f",
+            room_id, stream_ordering, "b",
         )
 
     def get_room_event_around_stream_ordering_txn(
