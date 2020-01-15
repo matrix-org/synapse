@@ -115,13 +115,13 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
     def test_invites(self):
         self.persist(type="m.room.create", key="", creator=USER_ID)
-        self.check("get_invited_rooms_for_user", [USER_ID_2], [])
+        self.check("get_invited_rooms_for_local_user", [USER_ID_2], [])
         event = self.persist(type="m.room.member", key=USER_ID_2, membership="invite")
 
         self.replicate()
 
         self.check(
-            "get_invited_rooms_for_user",
+            "get_invited_rooms_for_local_user",
             [USER_ID_2],
             [
                 RoomsForUser(

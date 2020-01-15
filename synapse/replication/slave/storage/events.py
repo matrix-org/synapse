@@ -152,7 +152,7 @@ class SlavedEventStore(
 
         if etype == EventTypes.Member:
             self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
-            self.get_invited_rooms_for_user.invalidate((state_key,))
+            self.get_invited_rooms_for_local_user.invalidate((state_key,))
 
         if relates_to:
             self.get_relations_for_event.invalidate_many((relates_to,))
