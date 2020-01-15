@@ -1,0 +1,1 @@
+Remove duplicate check for the `session` query parameter on the `/auth/xxx/fallback/web` Client-Server endpoint.
