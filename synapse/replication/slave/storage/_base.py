@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 import six
 
@@ -41,7 +41,7 @@ class BaseSlavedStore(SQLBaseStore):
         if isinstance(self.database_engine, PostgresEngine):
             self._cache_id_gen = SlavedIdTracker(
                 db_conn, "cache_invalidation_stream", "stream_id"
-            )
+            )  # type: Optional[SlavedIdTracker]
         else:
             self._cache_id_gen = None
 
@@ -62,7 +62,8 @@ class BaseSlavedStore(SQLBaseStore):
 
     def process_replication_rows(self, stream_name, token, rows):
         if stream_name == "caches":
-            self._cache_id_gen.advance(token)
+            if self._cache_id_gen:
+                self._cache_id_gen.advance(token)
             for row in rows:
                 if row.cache_func == CURRENT_STATE_CACHE_NAME:
                     room_id = row.keys[0]

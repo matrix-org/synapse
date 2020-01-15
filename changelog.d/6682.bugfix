@@ -1,0 +1,2 @@
+Fix "CRITICAL" errors being logged when a request is received for a uri containing non-ascii characters.
+

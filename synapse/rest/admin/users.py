@@ -102,6 +102,148 @@ class UsersRestServletV2(RestServlet):
         return 200, ret
 
 
+class UserRestServletV2(RestServlet):
+    PATTERNS = (re.compile("^/_synapse/admin/v2/users/(?P<user_id>@[^/]+)$"),)
+
+    """Get request to list user details.
+    This needs user to have administrator access in Synapse.
+
+    GET /_synapse/admin/v2/users/<user_id>
+
+    returns:
+        200 OK with user details if success otherwise an error.
+
+    Put request to allow an administrator to add or modify a user.
+    This needs user to have administrator access in Synapse.
+    We use PUT instead of POST since we already know the id of the user
+    object to create. POST could be used to create guests.
+
+    PUT /_synapse/admin/v2/users/<user_id>
+    {
+        "password": "secret",
+        "displayname": "User"
+    }
+
+    returns:
+        201 OK with new user object if user was created or
+        200 OK with modified user object if user was modified
+        otherwise an error.
+    """
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.admin_handler = hs.get_handlers().admin_handler
+        self.profile_handler = hs.get_profile_handler()
+        self.set_password_handler = hs.get_set_password_handler()
+        self.deactivate_account_handler = hs.get_deactivate_account_handler()
+        self.registration_handler = hs.get_registration_handler()
+
+    async def on_GET(self, request, user_id):
+        await assert_requester_is_admin(self.auth, request)
+
+        target_user = UserID.from_string(user_id)
+        if not self.hs.is_mine(target_user):
+            raise SynapseError(400, "Can only lookup local users")
+
+        ret = await self.admin_handler.get_user(target_user)
+
+        return 200, ret
+
+    async def on_PUT(self, request, user_id):
+        await assert_requester_is_admin(self.auth, request)
+
+        target_user = UserID.from_string(user_id)
+        body = parse_json_object_from_request(request)
+
+        if not self.hs.is_mine(target_user):
+            raise SynapseError(400, "This endpoint can only be used with local users")
+
+        user = await self.admin_handler.get_user(target_user)
+
+        if user:  # modify user
+            requester = await self.auth.get_user_by_req(request)
+
+            if "displayname" in body:
+                await self.profile_handler.set_displayname(
+                    target_user, requester, body["displayname"], True
+                )
+
+            if "avatar_url" in body:
+                await self.profile_handler.set_avatar_url(
+                    target_user, requester, body["avatar_url"], True
+                )
+
+            if "admin" in body:
+                set_admin_to = bool(body["admin"])
+                if set_admin_to != user["admin"]:
+                    auth_user = requester.user
+                    if target_user == auth_user and not set_admin_to:
+                        raise SynapseError(400, "You may not demote yourself.")
+
+                    await self.admin_handler.set_user_server_admin(
+                        target_user, set_admin_to
+                    )
+
+            if "password" in body:
+                if (
+                    not isinstance(body["password"], text_type)
+                    or len(body["password"]) > 512
+                ):
+                    raise SynapseError(400, "Invalid password")
+                else:
+                    new_password = body["password"]
+                    await self._set_password_handler.set_password(
+                        target_user, new_password, requester
+                    )
+
+            if "deactivated" in body:
+                deactivate = bool(body["deactivated"])
+                if deactivate and not user["deactivated"]:
+                    result = await self.deactivate_account_handler.deactivate_account(
+                        target_user.to_string(), False
+                    )
+                    if not result:
+                        raise SynapseError(500, "Could not deactivate user")
+
+            user = await self.admin_handler.get_user(target_user)
+            return 200, user
+
+        else:  # create user
+            if "password" not in body:
+                raise SynapseError(
+                    400, "password must be specified", errcode=Codes.BAD_JSON
+                )
+            elif (
+                not isinstance(body["password"], text_type)
+                or len(body["password"]) > 512
+            ):
+                raise SynapseError(400, "Invalid password")
+
+            admin = body.get("admin", None)
+            user_type = body.get("user_type", None)
+            displayname = body.get("displayname", None)
+
+            if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
+                raise SynapseError(400, "Invalid user type")
+
+            user_id = await self.registration_handler.register_user(
+                localpart=target_user.localpart,
+                password=body["password"],
+                admin=bool(admin),
+                default_display_name=displayname,
+                user_type=user_type,
+            )
+            if "avatar_url" in body:
+                await self.profile_handler.set_avatar_url(
+                    user_id, requester, body["avatar_url"], True
+                )
+
+            ret = await self.admin_handler.get_user(target_user)
+
+            return 201, ret
+
+
 class UserRegisterServlet(RestServlet):
     """
     Attributes:
