@@ -548,7 +548,7 @@ class EventsStore(
                 ],
             )
 
-            # Note: Do we really want to delete rows here (that we do
+            # Note: Do we really want to delete rows here (that we do not
             # subsequently reinsert below)? While technically correct it means
             # we have no record of the fact the user *was* a member of the
             # room but got, say, state reset out of it.
