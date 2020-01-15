@@ -31,7 +31,7 @@ from prometheus_client import Gauge
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
-from twisted.web.resource import EncodingResourceWrapper, NoResource
+from twisted.web.resource import EncodingResourceWrapper, IResource, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
 
@@ -109,7 +109,16 @@ class SynapseHomeServer(HomeServer):
         for path, resmodule in additional_resources.items():
             handler_cls, config = load_module(resmodule)
             handler = handler_cls(config, module_api)
-            resources[path] = AdditionalResource(self, handler.handle_request)
+            if IResource.providedBy(handler):
+                resource = handler
+            elif hasattr(handler, "handle_request"):
+                resource = AdditionalResource(self, handler.handle_request)
+            else:
+                raise ConfigError(
+                    "additional_resource %s does not implement a known interface"
+                    % (resmodule["module"],)
+                )
+            resources[path] = resource
 
         # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:

@@ -269,8 +269,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
               one will be randomly generated.
         Returns:
             A tuple of (user_id, access_token).
-        Raises:
-            RegistrationError if there was a problem registering.
         """
         if localpart is None:
             raise SynapseError(400, "Request must include user id")
