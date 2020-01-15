@@ -409,6 +409,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     def _get_rooms_for_user_with_stream_ordering_txn(self, txn, user_id):
+        # We use `current_state_events` here and not `local_current_membership`
+        # as a) this gets called with remote users and b) this only gets called
+        # for rooms the server is participating in.
         if self._current_state_events_membership_up_to_date:
             sql = """
                 SELECT room_id, e.stream_ordering

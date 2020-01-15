@@ -20,18 +20,21 @@
 # `current_state_events`). This will also include outstanding invites for local
 # users for rooms the server isn't in.
 #
+# If the server isn't and hasn't been in the room then it will only include
+# outsstanding invites, and not e.g. pre-emptive bans of local users.
+#
 # If the server later rejoins a room `local_current_membership` can simply be
 # replaced with the new current state of the room (which results in the
 # equivalent behaviour as if the server had remained in the room).
-#
-# This may take a bit of time for large servers (e.g. one minute for matrix.org)
-# but means we avoid a lots of book keeping required to do it as a background
-# update.
 
 
 def run_upgrade(cur, database_engine, config, *args, **kwargs):
     # We need to do the insert in `run_upgrade` section as we don't have access
     # to `config` in `run_create`.
+
+    # This upgrade may take a bit of time for large servers (e.g. one minute for
+    # matrix.org) but means we avoid a lots of book keeping required to do it as
+    # a background update.
 
     # We check if the `current_state_events.membership` is up to date by
     # checking if the relevant background update has finished. If it has
