@@ -580,9 +580,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             " FROM events"
             " WHERE room_id = ? AND stream_ordering %s ?"
             " AND NOT outlier"
-            " ORDER BY stream_ordering"
+            " ORDER BY stream_ordering %s"
             " LIMIT 1"
-        ) % ("<=" if dir == "b" else ">=",)
+        ) % (
+            "<=" if dir == "b" else ">=",
+            "DESC" if dir == "b" else "ASC",
+        )
         txn.execute(sql, (room_id, stream_ordering))
         return txn.fetchone()
 
