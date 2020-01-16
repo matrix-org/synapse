@@ -484,7 +484,7 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
     stats["daily_sent_messages"] = daily_sent_messages
     stats["cache_factor"] = hs.config.caches.global_factor
-    stats["event_cache_size"] = hs.config.event_cache_size
+    stats["event_cache_size"] = hs.config.caches.event_cache_size
 
     #
     # Performance statistics

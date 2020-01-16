@@ -72,7 +72,7 @@ class EventsWorkerStore(SQLBaseStore):
         super(EventsWorkerStore, self).__init__(database, db_conn, hs)
 
         self._get_event_cache = Cache(
-            "*getEvent*", keylen=3, max_entries=hs.config.event_cache_size
+            "*getEvent*", keylen=3, max_entries=hs.config.caches.event_cache_size
         )
 
         self._event_fetch_lock = threading.Condition()

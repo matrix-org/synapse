@@ -53,6 +53,8 @@ class CacheConfig(Config):
     section = "caches"
 
     def read_config(self, config, **kwargs):
+        self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
+
         global DEFAULT_CACHE_SIZE_FACTOR
 
         cache_config = config.get("caches", {})
