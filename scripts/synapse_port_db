@@ -60,6 +60,11 @@ from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.util import Clock
 from synapse.util.versionstring import get_version_string
+from synapse.logging.context import (
+    LoggingContext,
+    make_deferred_yieldable,
+    run_in_background,
+)
 
 logger = logging.getLogger("synapse_port_db")
 
@@ -565,18 +570,26 @@ class Porter(object):
 
             # Step 3. Figure out what still needs copying
             self.progress.set_state("Checking on port progress")
-            setup_res = await asyncio.gather(
-                *[
-                    self.setup_table(table)
-                    for table in tables
-                    if table not in ["schema_version", "applied_schema_deltas"]
-                    and not table.startswith("sqlite_")
-                ],
+            setup_res = await make_deferred_yieldable(
+                defer.gatherResults(
+                    [
+                        run_in_background(self.setup_table, table)
+                        for table in tables
+                        if table not in ["schema_version", "applied_schema_deltas"]
+                        and not table.startswith("sqlite_")
+                    ],
+                    consumeErrors=True,
+                )
             )
 
             # Step 4. Do the copying.
             self.progress.set_state("Copying to postgres")
-            await asyncio.gather(*[self.handle_table(*res) for res in setup_res])
+            await make_deferred_yieldable(
+                defer.gatherResults(
+                    [run_in_background(self.handle_table, *res) for res in setup_res],
+                    consumeErrors=True,
+                )
+            )
 
             # Step 5. Do final post-processing
             await self._setup_state_group_id_seq()
@@ -1001,8 +1014,10 @@ if __name__ == "__main__":
             hs_config=config,
         )
 
+        @defer.inlineCallbacks
         def run():
-            return defer.ensureDeferred(porter.run())
+            with LoggingContext("synapse_port_db_run"):
+                yield defer.ensureDeferred(porter.run())
 
         reactor.callWhenRunning(run)
 
