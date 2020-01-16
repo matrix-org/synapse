@@ -508,12 +508,11 @@ class Porter(object):
                 yield self.sqlite_store.db.updates.has_completed_background_updates()
             )
             if not updates_complete:
-                sys.stderr.write(
+                raise Exception(
                     "Pending background updates exist in the SQLite3 database."
                     " Please start Synapse again and wait until every update has finished"
                     " before running this script.\n"
                 )
-                defer.returnValue(None)
 
             self.postgres_store = self.build_db_store(
                 self.hs_config.get_single_database()
