@@ -33,3 +33,16 @@ def batch_iter(iterable: Iterable[T], size: int) -> Iterator[Tuple[T]]:
     sourceiter = iter(iterable)
     # call islice until it returns an empty tuple
     return iter(lambda: tuple(islice(sourceiter, size)), ())
+
+
+ISeq = TypeVar("ISeq", bound=Sequence, covariant=True)
+
+
+def chunk_seq(iseq: ISeq, maxlen: int) -> Iterable[ISeq]:
+    """Split the given sequence into chunks of the given size
+
+    The last chunk may be shorter than the given size.
+
+    If the input is empty, no chunks are returned.
+    """
+    return (iseq[i : i + maxlen] for i in range(0, len(iseq), maxlen))
