@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+set -e
 
 if [[ "$BUILDKITE_BRANCH" =~ ^(develop|master|dinsic|shhs|release-.*)$ ]]; then
     echo "Not merging forward, as this is a release branch"
@@ -17,6 +17,8 @@ else
     # Get the reference, using the GitHub API
     GITBASE=$BUILDKITE_PULL_REQUEST_BASE_BRANCH
 fi
+
+echo "--- merge_base_branch $GITBASE"
 
 # Show what we are before
 git --no-pager show -s

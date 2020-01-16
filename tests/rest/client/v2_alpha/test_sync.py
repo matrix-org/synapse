@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 New Vector
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-
-from mock import Mock
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes
@@ -34,13 +33,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         sync.register_servlets,
     ]
-
-    def make_homeserver(self, reactor, clock):
-
-        hs = self.setup_test_homeserver(
-            "red", http_client=None, federation_client=Mock()
-        )
-        return hs
 
     def test_sync_argless(self):
         request, channel = self.make_request("GET", "/sync")

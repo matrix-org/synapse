@@ -203,6 +203,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     @unittest.override_config(
         {
+            "public_baseurl": "https://test_server",
             "enable_registration_captcha": True,
             "user_consent": {
                 "version": "1",
@@ -390,9 +391,8 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # Email config.
         self.email_attempts = []
 
-        def sendmail(*args, **kwargs):
+        async def sendmail(*args, **kwargs):
             self.email_attempts.append((args, kwargs))
-            return
 
         config["email"] = {
             "enable_notifs": True,

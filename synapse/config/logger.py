@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import argparse
 import logging
 import logging.config
 import os
@@ -37,10 +37,17 @@ from synapse.logging._structured import (
 from synapse.logging.context import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 DEFAULT_LOG_CONFIG = Template(
-    """
+    """\
+# Log configuration for Synapse.
+#
+# This is a YAML file containing a standard Python logging configuration
+# dictionary. See [1] for details on the valid settings.
+#
+# [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+
 version: 1
 
 formatters:
@@ -81,11 +88,18 @@ disable_existing_loggers: false
 """
 )
 
+LOG_FILE_ERROR = """\
+Support for the log_file configuration option and --log-file command-line option was
+removed in Synapse 1.3.0. You should instead set up a separate log configuration file.
+"""
+
 
 class LoggingConfig(Config):
     section = "logging"
 
     def read_config(self, config, **kwargs):
+        if config.get("log_file"):
+            raise ConfigError(LOG_FILE_ERROR)
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
@@ -106,6 +120,8 @@ class LoggingConfig(Config):
     def read_arguments(self, args):
         if args.no_redirect_stdio is not None:
             self.no_redirect_stdio = args.no_redirect_stdio
+        if args.log_file is not None:
+            raise ConfigError(LOG_FILE_ERROR)
 
     @staticmethod
     def add_arguments(parser):
@@ -116,6 +132,10 @@ class LoggingConfig(Config):
             action="store_true",
             default=None,
             help="Do not redirect stdout/stderr to the log",
+        )
+
+        logging_group.add_argument(
+            "-f", "--log-file", dest="log_file", help=argparse.SUPPRESS,
         )
 
     def generate_files(self, config, config_dir_path):

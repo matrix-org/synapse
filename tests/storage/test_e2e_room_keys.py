@@ -39,8 +39,8 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.store.set_e2e_room_key(
-                "user_id", version1, "room", "session", room_key
+            self.store.add_e2e_room_keys(
+                "user_id", version1, [("room", "session", room_key)]
             )
         )
 
@@ -51,8 +51,8 @@ class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.store.set_e2e_room_key(
-                "user_id", version2, "room", "session", room_key
+            self.store.add_e2e_room_keys(
+                "user_id", version2, [("room", "session", room_key)]
             )
         )
 

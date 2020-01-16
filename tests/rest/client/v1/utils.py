@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +20,8 @@ import json
 import time
 
 import attr
+
+from twisted.web.resource import Resource
 
 from synapse.api.constants import Membership
 
@@ -154,6 +159,41 @@ class RestHelper(object):
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
             % (expect_code, int(channel.result["code"]), channel.result["body"])
+        )
+
+        return channel.json_body
+
+    def upload_media(
+        self,
+        resource: Resource,
+        image_data: bytes,
+        tok: str,
+        filename: str = "test.png",
+        expect_code: int = 200,
+    ) -> dict:
+        """Upload a piece of test media to the media repo
+        Args:
+            resource: The resource that will handle the upload request
+            image_data: The image data to upload
+            tok: The user token to use during the upload
+            filename: The filename of the media to be uploaded
+            expect_code: The return code to expect from attempting to upload the media
+        """
+        image_length = len(image_data)
+        path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
+        request, channel = make_request(
+            self.hs.get_reactor(), "POST", path, content=image_data, access_token=tok
+        )
+        request.requestHeaders.addRawHeader(
+            b"Content-Length", str(image_length).encode("UTF-8")
+        )
+        request.render(resource)
+        self.hs.get_reactor().pump([100])
+
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
         )
 
         return channel.json_body

@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Optional
 
 from six import iteritems, itervalues, string_types
 
@@ -22,9 +23,16 @@ from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
 from twisted.internet.defer import succeed
+from twisted.internet.interfaces import IDelayedCall
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RelationTypes, UserTypes
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RelationTypes,
+    UserTypes,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -38,8 +46,9 @@ from synapse.events.validator import EventValidator
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
+from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
-from synapse.types import RoomAlias, UserID, create_requester
+from synapse.types import Collection, RoomAlias, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.metrics import measure_func
@@ -62,6 +71,17 @@ class MessageHandler(object):
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
+        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+        self._is_worker_app = bool(hs.config.worker_app)
+
+        # The scheduled call to self._expire_event. None if no call is currently
+        # scheduled.
+        self._scheduled_expiry = None  # type: Optional[IDelayedCall]
+
+        if not hs.config.worker_app:
+            run_as_background_process(
+                "_schedule_next_expiry", self._schedule_next_expiry
+            )
 
     @defer.inlineCallbacks
     def get_room_data(
@@ -138,7 +158,7 @@ class MessageHandler(object):
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
             visible_events = yield filter_events_for_client(
-                self.storage, user_id, last_events
+                self.storage, user_id, last_events, apply_retention_policies=False
             )
 
             event = last_events[0]
@@ -225,6 +245,100 @@ class MessageHandler(object):
             for user_id, profile in iteritems(users_with_profile)
         }
 
+    def maybe_schedule_expiry(self, event):
+        """Schedule the expiry of an event if there's not already one scheduled,
+        or if the one running is for an event that will expire after the provided
+        timestamp.
+
+        This function needs to invalidate the event cache, which is only possible on
+        the master process, and therefore needs to be run on there.
+
+        Args:
+            event (EventBase): The event to schedule the expiry of.
+        """
+        assert not self._is_worker_app
+
+        expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
+        if not isinstance(expiry_ts, int) or event.is_state():
+            return
+
+        # _schedule_expiry_for_event won't actually schedule anything if there's already
+        # a task scheduled for a timestamp that's sooner than the provided one.
+        self._schedule_expiry_for_event(event.event_id, expiry_ts)
+
+    @defer.inlineCallbacks
+    def _schedule_next_expiry(self):
+        """Retrieve the ID and the expiry timestamp of the next event to be expired,
+        and schedule an expiry task for it.
+
+        If there's no event left to expire, set _expiry_scheduled to None so that a
+        future call to save_expiry_ts can schedule a new expiry task.
+        """
+        # Try to get the expiry timestamp of the next event to expire.
+        res = yield self.store.get_next_event_to_expire()
+        if res:
+            event_id, expiry_ts = res
+            self._schedule_expiry_for_event(event_id, expiry_ts)
+
+    def _schedule_expiry_for_event(self, event_id, expiry_ts):
+        """Schedule an expiry task for the provided event if there's not already one
+        scheduled at a timestamp that's sooner than the provided one.
+
+        Args:
+            event_id (str): The ID of the event to expire.
+            expiry_ts (int): The timestamp at which to expire the event.
+        """
+        if self._scheduled_expiry:
+            # If the provided timestamp refers to a time before the scheduled time of the
+            # next expiry task, cancel that task and reschedule it for this timestamp.
+            next_scheduled_expiry_ts = self._scheduled_expiry.getTime() * 1000
+            if expiry_ts < next_scheduled_expiry_ts:
+                self._scheduled_expiry.cancel()
+            else:
+                return
+
+        # Figure out how many seconds we need to wait before expiring the event.
+        now_ms = self.clock.time_msec()
+        delay = (expiry_ts - now_ms) / 1000
+
+        # callLater doesn't support negative delays, so trim the delay to 0 if we're
+        # in that case.
+        if delay < 0:
+            delay = 0
+
+        logger.info("Scheduling expiry for event %s in %.3fs", event_id, delay)
+
+        self._scheduled_expiry = self.clock.call_later(
+            delay,
+            run_as_background_process,
+            "_expire_event",
+            self._expire_event,
+            event_id,
+        )
+
+    @defer.inlineCallbacks
+    def _expire_event(self, event_id):
+        """Retrieve and expire an event that needs to be expired from the database.
+
+        If the event doesn't exist in the database, log it and delete the expiry date
+        from the database (so that we don't try to expire it again).
+        """
+        assert self._ephemeral_events_enabled
+
+        self._scheduled_expiry = None
+
+        logger.info("Expiring event %s", event_id)
+
+        try:
+            # Expire the event if we know about it. This function also deletes the expiry
+            # date from the database in the same database transaction.
+            yield self.store.expire_event(event_id)
+        except Exception as e:
+            logger.error("Could not expire event %s: %r", event_id, e)
+
+        # Schedule the expiry of the next event to expire.
+        yield self._schedule_next_expiry()
+
 
 # The duration (in ms) after which rooms should be removed
 # `_rooms_to_exclude_from_dummy_event_insertion` (with the effect that we will try
@@ -249,6 +363,8 @@ class EventCreationHandler(object):
         self.notifier = hs.get_notifier()
         self.config = hs.config
         self.require_membership_for_aliases = hs.config.require_membership_for_aliases
+
+        self.room_invite_state_types = self.hs.config.room_invite_state_types
 
         self.send_event_to_master = ReplicationSendEventRestServlet.make_client(hs)
 
@@ -295,6 +411,10 @@ class EventCreationHandler(object):
                 5 * 60 * 1000,
             )
 
+        self._message_handler = hs.get_message_handler()
+
+        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+
     @defer.inlineCallbacks
     def create_event(
         self,
@@ -302,7 +422,7 @@ class EventCreationHandler(object):
         event_dict,
         token_id=None,
         txn_id=None,
-        prev_events_and_hashes=None,
+        prev_event_ids: Optional[Collection[str]] = None,
         require_consent=True,
     ):
         """
@@ -319,10 +439,9 @@ class EventCreationHandler(object):
             token_id (str)
             txn_id (str)
 
-            prev_events_and_hashes (list[(str, dict[str, str], int)]|None):
+            prev_event_ids:
                 the forward extremities to use as the prev_events for the
-                new event. For each event, a tuple of (event_id, hashes, depth)
-                where *hashes* is a map from algorithm to hash.
+                new event.
 
                 If None, they will be requested from the database.
 
@@ -378,9 +497,7 @@ class EventCreationHandler(object):
             builder.internal_metadata.txn_id = txn_id
 
         event, context = yield self.create_new_client_event(
-            builder=builder,
-            requester=requester,
-            prev_events_and_hashes=prev_events_and_hashes,
+            builder=builder, requester=requester, prev_event_ids=prev_event_ids,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -395,7 +512,7 @@ class EventCreationHandler(object):
             # federation as well as those created locally. As of room v3, aliases events
             # can be created by users that are not in the room, therefore we have to
             # tolerate them in event_auth.check().
-            prev_state_ids = yield context.get_prev_state_ids(self.store)
+            prev_state_ids = yield context.get_prev_state_ids()
             prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = (
                 yield self.store.get_event(prev_event_id, allow_none=True)
@@ -417,7 +534,7 @@ class EventCreationHandler(object):
                     403, "You must be in the room to create an alias for it"
                 )
 
-        self.validator.validate_new(event)
+        self.validator.validate_new(event, self.config)
 
         return (event, context)
 
@@ -545,7 +662,7 @@ class EventCreationHandler(object):
         If so, returns the version of the event in context.
         Otherwise, returns None.
         """
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = yield context.get_prev_state_ids()
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
             return
@@ -594,7 +711,7 @@ class EventCreationHandler(object):
     @measure_func("create_new_client_event")
     @defer.inlineCallbacks
     def create_new_client_event(
-        self, builder, requester=None, prev_events_and_hashes=None
+        self, builder, requester=None, prev_event_ids: Optional[Collection[str]] = None
     ):
         """Create a new event for a local client
 
@@ -603,10 +720,9 @@ class EventCreationHandler(object):
 
             requester (synapse.types.Requester|None):
 
-            prev_events_and_hashes (list[(str, dict[str, str], int)]|None):
+            prev_event_ids:
                 the forward extremities to use as the prev_events for the
-                new event. For each event, a tuple of (event_id, hashes, depth)
-                where *hashes* is a map from algorithm to hash.
+                new event.
 
                 If None, they will be requested from the database.
 
@@ -614,27 +730,20 @@ class EventCreationHandler(object):
             Deferred[(synapse.events.EventBase, synapse.events.snapshot.EventContext)]
         """
 
-        if prev_events_and_hashes is not None:
-            assert len(prev_events_and_hashes) <= 10, (
+        if prev_event_ids is not None:
+            assert len(prev_event_ids) <= 10, (
                 "Attempting to create an event with %i prev_events"
-                % (len(prev_events_and_hashes),)
+                % (len(prev_event_ids),)
             )
         else:
-            prev_events_and_hashes = yield self.store.get_prev_events_for_room(
-                builder.room_id
-            )
+            prev_event_ids = yield self.store.get_prev_events_for_room(builder.room_id)
 
-        prev_events = [
-            (event_id, prev_hashes)
-            for event_id, prev_hashes, _ in prev_events_and_hashes
-        ]
-
-        event = yield builder.build(prev_event_ids=[p for p, _ in prev_events])
+        event = yield builder.build(prev_event_ids=prev_event_ids)
         context = yield self.state.compute_event_context(event)
         if requester:
             context.app_service = requester.app_service
 
-        self.validator.validate_new(event)
+        self.validator.validate_new(event, self.config)
 
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
@@ -756,7 +865,7 @@ class EventCreationHandler(object):
             if event.type == EventTypes.Redaction:
                 original_event = yield self.store.get_event(
                     event.redacts,
-                    check_redacted=False,
+                    redact_behaviour=EventRedactBehaviour.AS_IS,
                     get_prev_content=False,
                     allow_rejected=False,
                     allow_none=True,
@@ -794,12 +903,12 @@ class EventCreationHandler(object):
                 def is_inviter_member_event(e):
                     return e.type == EventTypes.Member and e.sender == event.sender
 
-                current_state_ids = yield context.get_current_state_ids(self.store)
+                current_state_ids = yield context.get_current_state_ids()
 
                 state_to_include_ids = [
                     e_id
                     for k, e_id in iteritems(current_state_ids)
-                    if k[0] in self.hs.config.room_invite_state_types
+                    if k[0] in self.room_invite_state_types
                     or k == (EventTypes.Member, event.sender)
                 ]
 
@@ -833,7 +942,7 @@ class EventCreationHandler(object):
         if event.type == EventTypes.Redaction:
             original_event = yield self.store.get_event(
                 event.redacts,
-                check_redacted=False,
+                redact_behaviour=EventRedactBehaviour.AS_IS,
                 get_prev_content=False,
                 allow_rejected=False,
                 allow_none=True,
@@ -847,7 +956,7 @@ class EventCreationHandler(object):
                 if original_event.room_id != event.room_id:
                     raise SynapseError(400, "Cannot redact event from a different room")
 
-            prev_state_ids = yield context.get_prev_state_ids(self.store)
+            prev_state_ids = yield context.get_prev_state_ids()
             auth_events_ids = yield self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
@@ -869,13 +978,17 @@ class EventCreationHandler(object):
                 event.internal_metadata.recheck_redaction = False
 
         if event.type == EventTypes.Create:
-            prev_state_ids = yield context.get_prev_state_ids(self.store)
+            prev_state_ids = yield context.get_prev_state_ids()
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
         event_stream_id, max_stream_id = yield self.storage.persistence.persist_event(
             event, context=context
         )
+
+        if self._ephemeral_events_enabled:
+            # If there's an expiry timestamp on the event, schedule its expiry.
+            self._message_handler.maybe_schedule_expiry(event)
 
         yield self.pusher_pool.on_new_notifications(event_stream_id, max_stream_id)
 
@@ -918,9 +1031,7 @@ class EventCreationHandler(object):
             # For each room we need to find a joined member we can use to send
             # the dummy event with.
 
-            prev_events_and_hashes = yield self.store.get_prev_events_for_room(room_id)
-
-            latest_event_ids = (event_id for (event_id, _, _) in prev_events_and_hashes)
+            latest_event_ids = yield self.store.get_prev_events_for_room(room_id)
 
             members = yield self.state.get_current_users_in_room(
                 room_id, latest_event_ids=latest_event_ids
@@ -939,7 +1050,7 @@ class EventCreationHandler(object):
                             "room_id": room_id,
                             "sender": user_id,
                         },
-                        prev_events_and_hashes=prev_events_and_hashes,
+                        prev_event_ids=latest_event_ids,
                     )
 
                     event.internal_metadata.proactively_send = False

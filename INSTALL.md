@@ -109,8 +109,8 @@ Installing prerequisites on Ubuntu or Debian:
 
 ```
 sudo apt-get install build-essential python3-dev libffi-dev \
-                     python-pip python-setuptools sqlite3 \
-                     libssl-dev python-virtualenv libjpeg-dev libxslt1-dev
+                     python3-pip python3-setuptools sqlite3 \
+                     libssl-dev python3-virtualenv libjpeg-dev libxslt1-dev
 ```
 
 #### ArchLinux
@@ -133,15 +133,28 @@ sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
 sudo yum groupinstall "Development Tools"
 ```
 
-#### Mac OS X
+Note that Synapse does not support versions of SQLite before 3.11, and CentOS 7
+uses SQLite 3.7. You may be able to work around this by installing a more
+recent SQLite version, but it is recommended that you instead use a Postgres
+database: see [docs/postgres.md](docs/postgres.md).
 
-Installing prerequisites on Mac OS X:
+#### macOS
+
+Installing prerequisites on macOS:
 
 ```
 xcode-select --install
 sudo easy_install pip
 sudo pip install virtualenv
 brew install pkg-config libffi
+```
+
+On macOS Catalina (10.15) you may need to explicitly install OpenSSL
+via brew and inform `pip` about it so that `psycopg2` builds:
+
+```
+brew install openssl@1.1
+export LDFLAGS=-L/usr/local/Cellar/openssl\@1.1/1.1.1d/lib/
 ```
 
 #### OpenSUSE

@@ -93,6 +93,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         {
             "requester": ...,
             "remote_room_hosts": [...],
+            "content": { ... }
         }
     """
 
@@ -107,7 +108,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         self.clock = hs.get_clock()
 
     @staticmethod
-    def _serialize_payload(requester, room_id, user_id, remote_room_hosts):
+    def _serialize_payload(requester, room_id, user_id, remote_room_hosts, content):
         """
         Args:
             requester(Requester)
@@ -118,12 +119,14 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         return {
             "requester": requester.serialize(),
             "remote_room_hosts": remote_room_hosts,
+            "content": content,
         }
 
     async def _handle_request(self, request, room_id, user_id):
         content = parse_json_object_from_request(request)
 
         remote_room_hosts = content["remote_room_hosts"]
+        event_content = content["content"]
 
         requester = Requester.deserialize(self.store, content["requester"])
 
@@ -134,7 +137,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
 
         try:
             event = await self.federation_handler.do_remotely_reject_invite(
-                remote_room_hosts, room_id, user_id
+                remote_room_hosts, room_id, user_id, event_content,
             )
             ret = event.get_pdu_json()
         except Exception as e:

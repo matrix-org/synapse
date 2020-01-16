@@ -44,10 +44,16 @@ MEMBERSHIP_PRIORITY = (
 
 @defer.inlineCallbacks
 def filter_events_for_client(
-    storage: Storage, user_id, events, is_peeking=False, always_include_ids=frozenset()
+    storage: Storage,
+    user_id,
+    events,
+    is_peeking=False,
+    always_include_ids=frozenset(),
+    apply_retention_policies=True,
 ):
     """
-    Check which events a user is allowed to see
+    Check which events a user is allowed to see. If the user can see the event but its
+    sender asked for their data to be erased, prune the content of the event.
 
     Args:
         storage
@@ -59,6 +65,10 @@ def filter_events_for_client(
             events
         always_include_ids (set(event_id)): set of event ids to specifically
             include (unless sender is ignored)
+        apply_retention_policies (bool): Whether to filter out events that's older than
+            allowed by the room's retention policy. Useful when this function is called
+            to e.g. check whether a user should be allowed to see the state at a given
+            event rather than to know if it should send an event to a user's client(s).
 
     Returns:
         Deferred[list[synapse.events.EventBase]]
@@ -86,6 +96,15 @@ def filter_events_for_client(
 
     erased_senders = yield storage.main.are_users_erased((e.sender for e in events))
 
+    if apply_retention_policies:
+        room_ids = set(e.room_id for e in events)
+        retention_policies = {}
+
+        for room_id in room_ids:
+            retention_policies[
+                room_id
+            ] = yield storage.main.get_retention_policy_for_room(room_id)
+
     def allowed(event):
         """
         Args:
@@ -102,6 +121,18 @@ def filter_events_for_client(
         """
         if not event.is_state() and event.sender in ignore_list:
             return None
+
+        # Don't try to apply the room's retention policy if the event is a state event, as
+        # MSC1763 states that retention is only considered for non-state events.
+        if apply_retention_policies and not event.is_state():
+            retention_policy = retention_policies[event.room_id]
+            max_lifetime = retention_policy.get("max_lifetime")
+
+            if max_lifetime is not None:
+                oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
+
+                if event.origin_server_ts < oldest_allowed_ts:
+                    return None
 
         if event.event_id in always_include_ids:
             return event

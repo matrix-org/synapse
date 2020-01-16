@@ -83,10 +83,9 @@ class RatelimitConfig(Config):
         )
 
         rc_admin_redaction = config.get("rc_admin_redaction")
+        self.rc_admin_redaction = None
         if rc_admin_redaction:
             self.rc_admin_redaction = RateLimitConfig(rc_admin_redaction)
-        else:
-            self.rc_admin_redaction = None
 
     def generate_config_section(self, **kwargs):
         return """\

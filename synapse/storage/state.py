@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Iterable, List, TypeVar
 
 from six import iteritems, itervalues
 
@@ -22,8 +23,12 @@ import attr
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
+from synapse.types import StateMap
 
 logger = logging.getLogger(__name__)
+
+# Used for generic functions below
+T = TypeVar("T")
 
 
 @attr.s(slots=True)
@@ -233,14 +238,14 @@ class StateFilter(object):
 
         return len(self.concrete_types())
 
-    def filter_state(self, state_dict):
+    def filter_state(self, state_dict: StateMap[T]) -> StateMap[T]:
         """Returns the state filtered with by this StateFilter
 
         Args:
-            state (dict[tuple[str, str], Any]): The state map to filter
+            state: The state map to filter
 
         Returns:
-            dict[tuple[str, str], Any]: The filtered state map
+            The filtered state map
         """
         if self.is_full():
             return dict(state_dict)
@@ -333,16 +338,16 @@ class StateGroupStorage(object):
     def __init__(self, hs, stores):
         self.stores = stores
 
-    def get_state_group_delta(self, state_group):
+    def get_state_group_delta(self, state_group: int):
         """Given a state group try to return a previous group and a delta between
         the old and the new.
 
         Returns:
-            Deferred[Tuple[Optional[int], Optional[list[dict[tuple[str, str], str]]]]]):
+            Deferred[Tuple[Optional[int], Optional[StateMap[str]]]]:
                 (prev_group, delta_ids)
         """
 
-        return self.stores.main.get_state_group_delta(state_group)
+        return self.stores.state.get_state_group_delta(state_group)
 
     @defer.inlineCallbacks
     def get_state_groups_ids(self, _room_id, event_ids):
@@ -353,7 +358,7 @@ class StateGroupStorage(object):
             event_ids (iterable[str]): ids of the events
 
         Returns:
-            Deferred[dict[int, dict[tuple[str, str], str]]]:
+            Deferred[dict[int, StateMap[str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
         if not event_ids:
@@ -362,7 +367,7 @@ class StateGroupStorage(object):
         event_to_groups = yield self.stores.main._get_state_group_for_events(event_ids)
 
         groups = set(itervalues(event_to_groups))
-        group_to_state = yield self.stores.main._get_state_for_groups(groups)
+        group_to_state = yield self.stores.state._get_state_for_groups(groups)
 
         return group_to_state
 
@@ -410,20 +415,21 @@ class StateGroupStorage(object):
             for group, event_id_map in iteritems(group_to_ids)
         }
 
-    def _get_state_groups_from_groups(self, groups, state_filter):
+    def _get_state_groups_from_groups(
+        self, groups: List[int], state_filter: StateFilter
+    ):
         """Returns the state groups for a given set of groups, filtering on
         types of state events.
 
         Args:
-            groups(list[int]): list of state group IDs to query
-            state_filter (StateFilter): The state filter used to fetch state
+            groups: list of state group IDs to query
+            state_filter: The state filter used to fetch state
                 from the database.
         Returns:
-            Deferred[dict[int, dict[tuple[str, str], str]]]:
-                dict of state_group_id -> (dict of (type, state_key) -> event id)
+            Deferred[Dict[int, StateMap[str]]]: Dict of state group to state map.
         """
 
-        return self.stores.main._get_state_groups_from_groups(groups, state_filter)
+        return self.stores.state._get_state_groups_from_groups(groups, state_filter)
 
     @defer.inlineCallbacks
     def get_state_for_events(self, event_ids, state_filter=StateFilter.all()):
@@ -439,7 +445,7 @@ class StateGroupStorage(object):
         event_to_groups = yield self.stores.main._get_state_group_for_events(event_ids)
 
         groups = set(itervalues(event_to_groups))
-        group_to_state = yield self.stores.main._get_state_for_groups(
+        group_to_state = yield self.stores.state._get_state_for_groups(
             groups, state_filter
         )
 
@@ -476,7 +482,7 @@ class StateGroupStorage(object):
         event_to_groups = yield self.stores.main._get_state_group_for_events(event_ids)
 
         groups = set(itervalues(event_to_groups))
-        group_to_state = yield self.stores.main._get_state_for_groups(
+        group_to_state = yield self.stores.state._get_state_for_groups(
             groups, state_filter
         )
 
@@ -519,7 +525,9 @@ class StateGroupStorage(object):
         state_map = yield self.get_state_ids_for_events([event_id], state_filter)
         return state_map[event_id]
 
-    def _get_state_for_groups(self, groups, state_filter=StateFilter.all()):
+    def _get_state_for_groups(
+        self, groups: Iterable[int], state_filter: StateFilter = StateFilter.all()
+    ):
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 
@@ -529,10 +537,9 @@ class StateGroupStorage(object):
             state_filter (StateFilter): The state filter used to fetch state
                 from the database.
         Returns:
-            Deferred[dict[int, dict[tuple[str, str], str]]]:
-                dict of state_group_id -> (dict of (type, state_key) -> event id)
+            Deferred[dict[int, StateMap[str]]]: Dict of state group to state map.
         """
-        return self.stores.main._get_state_for_groups(groups, state_filter)
+        return self.stores.state._get_state_for_groups(groups, state_filter)
 
     def store_state_group(
         self, event_id, room_id, prev_group, delta_ids, current_state_ids
@@ -552,6 +559,6 @@ class StateGroupStorage(object):
         Returns:
             Deferred[int]: The state group ID
         """
-        return self.stores.main.store_state_group(
+        return self.stores.state.store_state_group(
             event_id, room_id, prev_group, delta_ids, current_state_ids
         )

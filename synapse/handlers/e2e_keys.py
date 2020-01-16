@@ -30,6 +30,7 @@ from twisted.internet import defer
 from synapse.api.errors import CodeMessageException, Codes, NotFoundError, SynapseError
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
+from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.types import (
     UserID,
     get_domain_from_id,
@@ -52,6 +53,12 @@ class E2eKeysHandler(object):
         self.clock = hs.get_clock()
 
         self._edu_updater = SigningKeyEduUpdater(hs, self)
+
+        self._is_master = hs.config.worker_app is None
+        if not self._is_master:
+            self._user_device_resync_client = ReplicationUserDevicesResyncRestServlet.make_client(
+                hs
+            )
 
         federation_registry = hs.get_federation_registry()
 
@@ -191,9 +198,15 @@ class E2eKeysHandler(object):
                 # probably be tracking their device lists. However, we haven't
                 # done an initial sync on the device list so we do it now.
                 try:
-                    user_devices = yield self.device_handler.device_list_updater.user_device_resync(
-                        user_id
-                    )
+                    if self._is_master:
+                        user_devices = yield self.device_handler.device_list_updater.user_device_resync(
+                            user_id
+                        )
+                    else:
+                        user_devices = yield self._user_device_resync_client(
+                            user_id=user_id
+                        )
+
                     user_devices = user_devices["devices"]
                     for device in user_devices:
                         results[user_id] = {device["device_id"]: device["keys"]}
@@ -271,29 +284,26 @@ class E2eKeysHandler(object):
         self_signing_keys = {}
         user_signing_keys = {}
 
-        for user_id in query:
-            # XXX: consider changing the store functions to allow querying
-            # multiple users simultaneously.
-            key = yield self.store.get_e2e_cross_signing_key(
-                user_id, "master", from_user_id
-            )
-            if key:
-                master_keys[user_id] = key
+        user_ids = list(query)
 
-            key = yield self.store.get_e2e_cross_signing_key(
-                user_id, "self_signing", from_user_id
-            )
-            if key:
-                self_signing_keys[user_id] = key
+        keys = yield self.store.get_e2e_cross_signing_keys_bulk(user_ids, from_user_id)
 
+        for user_id, user_info in keys.items():
+            if user_info is None:
+                continue
+            if "master" in user_info:
+                master_keys[user_id] = user_info["master"]
+            if "self_signing" in user_info:
+                self_signing_keys[user_id] = user_info["self_signing"]
+
+        if (
+            from_user_id in keys
+            and keys[from_user_id] is not None
+            and "user_signing" in keys[from_user_id]
+        ):
             # users can see other users' master and self-signing keys, but can
             # only see their own user-signing keys
-            if from_user_id == user_id:
-                key = yield self.store.get_e2e_cross_signing_key(
-                    user_id, "user_signing", from_user_id
-                )
-                if key:
-                    user_signing_keys[user_id] = key
+            user_signing_keys[from_user_id] = keys[from_user_id]["user_signing"]
 
         return {
             "master_keys": master_keys,

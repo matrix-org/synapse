@@ -21,7 +21,7 @@ from synapse.storage import Storage
 
 @defer.inlineCallbacks
 def get_badge_count(store, user_id):
-    invites = yield store.get_invited_rooms_for_user(user_id)
+    invites = yield store.get_invited_rooms_for_local_user(user_id)
     joins = yield store.get_rooms_for_user(user_id)
 
     my_receipts_by_room = yield store.get_receipts_for_user(user_id, "m.read")

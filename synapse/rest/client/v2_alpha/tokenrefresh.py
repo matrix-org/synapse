@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 from synapse.api.errors import AuthError
 from synapse.http.servlet import RestServlet
 
@@ -32,8 +30,7 @@ class TokenRefreshRestServlet(RestServlet):
     def __init__(self, hs):
         super(TokenRefreshRestServlet, self).__init__()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         raise AuthError(403, "tokenrefresh is no longer supported.")
 
 

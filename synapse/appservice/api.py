@@ -185,7 +185,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
-                        "query_3pe_protocol to %s did not return a" " valid result", uri
+                        "query_3pe_protocol to %s did not return a valid result", uri
                     )
                     return None
 

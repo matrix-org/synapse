@@ -1,1 +1,0 @@
-Fix the `hidden` field in the `devices` table for SQLite versions prior to 3.23.0.

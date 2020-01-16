@@ -106,6 +106,13 @@ class RegistrationConfig(Config):
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
+        if self.account_threepid_delegate_msisdn and not self.public_baseurl:
+            raise ConfigError(
+                "The configuration option `public_baseurl` is required if "
+                "`account_threepid_delegate.msisdn` is set, such that "
+                "clients know where to submit validation tokens to. Please "
+                "configure `public_baseurl`."
+            )
 
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)

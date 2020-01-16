@@ -714,7 +714,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             target = UserID.from_string(content["user_id"])
 
         event_content = None
-        if "reason" in content and membership_action in ["kick", "ban"]:
+        if "reason" in content:
             event_content = {"reason": content["reason"]}
 
         await self.room_member_handler.update_membership(

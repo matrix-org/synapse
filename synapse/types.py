@@ -15,13 +15,32 @@
 # limitations under the License.
 import re
 import string
+import sys
 from collections import namedtuple
+from typing import Dict, Tuple, TypeVar
 
 import attr
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import SynapseError
+
+# define a version of typing.Collection that works on python 3.5
+if sys.version_info[:3] >= (3, 6, 0):
+    from typing import Collection
+else:
+    from typing import Sized, Iterable, Container
+
+    T_co = TypeVar("T_co", covariant=True)
+
+    class Collection(Iterable[T_co], Container[T_co], Sized):
+        __slots__ = ()
+
+
+# Define a state map type from type/state_key to T (usually an event ID or
+# event)
+T = TypeVar("T")
+StateMap = Dict[Tuple[str, str], T]
 
 
 class Requester(

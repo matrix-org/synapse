@@ -1,1 +1,0 @@
-Move `persist_events` out from main data store.

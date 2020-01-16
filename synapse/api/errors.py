@@ -17,12 +17,14 @@
 """Contains exceptions and error codes."""
 
 import logging
-from typing import Dict
+from typing import Dict, List
 
 from six import iteritems
 from six.moves import http_client
 
 from canonicaljson import json
+
+from twisted.web import http
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +80,29 @@ class CodeMessageException(RuntimeError):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
         self.msg = msg
+
+
+class RedirectException(CodeMessageException):
+    """A pseudo-error indicating that we want to redirect the client to a different
+    location
+
+    Attributes:
+        cookies: a list of set-cookies values to add to the response. For example:
+           b"sessionId=a3fWa; Expires=Wed, 21 Oct 2015 07:28:00 GMT"
+    """
+
+    def __init__(self, location: bytes, http_code: int = http.FOUND):
+        """
+
+        Args:
+            location: the URI to redirect to
+            http_code: the HTTP response code
+        """
+        msg = "Redirect to %s" % (location.decode("utf-8"),)
+        super().__init__(code=http_code, msg=msg)
+        self.location = location
+
+        self.cookies = []  # type: List[bytes]
 
 
 class SynapseError(CodeMessageException):
@@ -156,12 +181,6 @@ class UserDeactivatedError(SynapseError):
         super(UserDeactivatedError, self).__init__(
             code=http_client.FORBIDDEN, msg=msg, errcode=Codes.USER_DEACTIVATED
         )
-
-
-class RegistrationError(SynapseError):
-    """An error raised when a registration event fails."""
-
-    pass
 
 
 class FederationDeniedError(SynapseError):

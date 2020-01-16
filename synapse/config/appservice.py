@@ -134,7 +134,7 @@ def _load_appservice(hostname, as_info, config_filename):
             for regex_obj in as_info["namespaces"][ns]:
                 if not isinstance(regex_obj, dict):
                     raise ValueError(
-                        "Expected namespace entry in %s to be an object," " but got %s",
+                        "Expected namespace entry in %s to be an object, but got %s",
                         ns,
                         regex_obj,
                     )

@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.events.utils import format_event_for_client_v2_without_room_id
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 
@@ -35,9 +33,8 @@ class NotificationsServlet(RestServlet):
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         from_token = parse_string(request, "from", required=False)
@@ -46,16 +43,16 @@ class NotificationsServlet(RestServlet):
 
         limit = min(limit, 500)
 
-        push_actions = yield self.store.get_push_actions_for_user(
+        push_actions = await self.store.get_push_actions_for_user(
             user_id, from_token, limit, only_highlight=(only == "highlight")
         )
 
-        receipts_by_room = yield self.store.get_receipts_for_user_with_orderings(
+        receipts_by_room = await self.store.get_receipts_for_user_with_orderings(
             user_id, "m.read"
         )
 
         notif_event_ids = [pa["event_id"] for pa in push_actions]
-        notif_events = yield self.store.get_events(notif_event_ids)
+        notif_events = await self.store.get_events(notif_event_ids)
 
         returned_push_actions = []
 
@@ -68,7 +65,7 @@ class NotificationsServlet(RestServlet):
                 "actions": pa["actions"],
                 "ts": pa["received_ts"],
                 "event": (
-                    yield self._event_serializer.serialize_event(
+                    await self._event_serializer.serialize_event(
                         notif_events[pa["event_id"]],
                         self.clock.time_msec(),
                         event_format=format_event_for_client_v2_without_room_id,
