@@ -81,15 +81,17 @@ if __name__ == "__main__":
     hs.setup()
     store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def run_background_updates():
-        yield store.db.updates.run_background_updates(sleep=False)
+    async def run_background_updates():
+        await store.db.updates.run_background_updates(sleep=False)
         # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 
-    # Apply all background updates on the database.
-    reactor.callWhenRunning(
-        lambda: run_as_background_process("background_updates", run_background_updates)
-    )
+    def run():
+        # Apply all background updates on the database.
+        defer.ensureDeferred(
+            run_as_background_process("background_updates", run_background_updates)
+        )
+
+    reactor.callWhenRunning(run)
 
     reactor.run()
